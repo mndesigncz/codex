@@ -10,10 +10,11 @@ function getWeekDays(startDate) {
 }
 
 const shiftTypeLabels = { morning: '🌅 Ranní', afternoon: '🌆 Odpolední' };
-const statusColors = {
-  completed: 'bg-tea-200 text-tea-600',
-  ongoing: 'bg-matcha-500 text-white',
-  upcoming: 'bg-blue-100 text-blue-700',
+
+const statusStyles = {
+  completed: 'bg-elevated text-text-secondary',
+  ongoing:   'bg-accent text-black',
+  upcoming:  'bg-accent-blue/20 text-accent-blue',
 };
 
 export default function ShiftManagement() {
@@ -32,10 +33,8 @@ export default function ShiftManagement() {
   });
 
   const weekDays = getWeekDays(weekStart);
-
   const prevWeek = () => setWeekStart(d => addDays(d, -7));
   const nextWeek = () => setWeekStart(d => addDays(d, 7));
-
   const dayNames = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
   const handleAddShift = () => {
@@ -52,28 +51,35 @@ export default function ShiftManagement() {
   const pendingRequests = requests.filter(r => r.status === 'pending');
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-tea-800">📅 Správa směn</h1>
-          <p className="text-tea-500 text-sm">Plánování a přehled směn</p>
+          <h1 className="text-xl md:text-2xl font-bold text-white">Správa směn</h1>
+          <p className="text-text-secondary text-sm">Plánování a přehled směn</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white font-semibold rounded-xl transition-all shadow-md"
+          className="flex items-center gap-2 px-3 md:px-4 py-2 bg-accent hover:bg-accent/90 text-black font-semibold rounded-xl transition-all shadow-lg text-sm"
         >
-          ➕ Nová směna
+          <span>+</span>
+          <span className="hidden sm:inline">Nová směna</span>
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-tea-100 p-1 rounded-xl w-fit">
-        {[['calendar', '📅 Kalendář'], ['list', '📋 Seznam'], ['requests', `📨 Žádosti ${pendingRequests.length > 0 ? `(${pendingRequests.length})` : ''}`]].map(([id, label]) => (
+      <div className="flex gap-1 bg-elevated p-1 rounded-xl w-fit">
+        {[
+          ['calendar', '📅 Kalendář'],
+          ['list', '📋 Seznam'],
+          [`requests`, `📨 Žádosti${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}`]
+        ].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === id ? 'bg-white shadow text-matcha-700' : 'text-tea-500 hover:text-tea-800'}`}
+            className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+              activeTab === id ? 'bg-card text-white shadow' : 'text-text-secondary hover:text-white'
+            }`}
           >
             {label}
           </button>
@@ -82,27 +88,27 @@ export default function ShiftManagement() {
 
       {/* Calendar view */}
       {activeTab === 'calendar' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-tea-100 overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
           {/* Week navigation */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-tea-100">
-            <button onClick={prevWeek} className="p-2 hover:bg-tea-100 rounded-lg transition-colors">◀</button>
-            <span className="font-bold text-tea-800">
+          <div className="flex items-center justify-between px-4 md:px-5 py-4 border-b border-border">
+            <button onClick={prevWeek} className="w-8 h-8 flex items-center justify-center hover:bg-elevated rounded-lg transition-colors text-text-secondary hover:text-white">◀</button>
+            <span className="font-bold text-white text-sm">
               {new Date(weekDays[0]).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' })} –{' '}
               {new Date(weekDays[6]).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
             </span>
-            <button onClick={nextWeek} className="p-2 hover:bg-tea-100 rounded-lg transition-colors">▶</button>
+            <button onClick={nextWeek} className="w-8 h-8 flex items-center justify-center hover:bg-elevated rounded-lg transition-colors text-text-secondary hover:text-white">▶</button>
           </div>
 
           {/* Calendar grid */}
-          <div className="grid grid-cols-7 divide-x divide-tea-100">
+          <div className="grid grid-cols-7 divide-x divide-border">
             {weekDays.map((day, i) => {
               const dayShifts = shifts.filter(s => s.date === day);
               const isToday = day === fmt(today);
               return (
-                <div key={day} className={`min-h-32 ${isToday ? 'bg-matcha-50' : ''}`}>
-                  <div className={`p-2 text-center border-b border-tea-100 ${isToday ? 'bg-matcha-600 text-white' : ''}`}>
-                    <p className="text-xs font-semibold">{dayNames[i]}</p>
-                    <p className={`text-lg font-bold ${isToday ? '' : 'text-tea-700'}`}>
+                <div key={day} className={`min-h-28 ${isToday ? 'bg-accent/5' : ''}`}>
+                  <div className={`p-2 text-center border-b border-border ${isToday ? 'bg-accent text-black' : ''}`}>
+                    <p className={`text-xs font-semibold ${isToday ? 'text-black' : 'text-text-secondary'}`}>{dayNames[i]}</p>
+                    <p className={`text-base font-bold ${isToday ? 'text-black' : 'text-white'}`}>
                       {new Date(day).getDate()}
                     </p>
                   </div>
@@ -112,7 +118,7 @@ export default function ShiftManagement() {
                       return (
                         <div
                           key={shift.id}
-                          className={`text-xs p-1.5 rounded-lg ${statusColors[shift.status] || 'bg-tea-100 text-tea-700'}`}
+                          className={`text-xs p-1.5 rounded-lg ${statusStyles[shift.status] || 'bg-elevated text-text-secondary'}`}
                         >
                           <p className="font-semibold truncate">{emp?.name.split(' ')[0]}</p>
                           <p className="opacity-80">{shift.start}–{shift.end}</p>
@@ -126,49 +132,48 @@ export default function ShiftManagement() {
           </div>
 
           {/* Legend */}
-          <div className="flex gap-4 px-5 py-3 border-t border-tea-100 bg-tea-50">
-            <span className="flex items-center gap-1 text-xs text-tea-500">
-              <span className="w-3 h-3 rounded bg-matcha-500 inline-block"></span> Probíhá
-            </span>
-            <span className="flex items-center gap-1 text-xs text-tea-500">
-              <span className="w-3 h-3 rounded bg-blue-200 inline-block"></span> Nadcházející
-            </span>
-            <span className="flex items-center gap-1 text-xs text-tea-500">
-              <span className="w-3 h-3 rounded bg-tea-300 inline-block"></span> Dokončeno
-            </span>
+          <div className="flex gap-4 px-4 md:px-5 py-3 border-t border-border bg-elevated">
+            {[
+              ['bg-accent', 'Probíhá'],
+              ['bg-accent-blue/50', 'Nadcházející'],
+              ['bg-elevated border border-border', 'Dokončeno'],
+            ].map(([cls, label]) => (
+              <span key={label} className="flex items-center gap-1 text-xs text-text-secondary">
+                <span className={`w-3 h-3 rounded ${cls} inline-block`}></span> {label}
+              </span>
+            ))}
           </div>
         </div>
       )}
 
       {/* List view */}
       {activeTab === 'list' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-tea-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-tea-100">
-            <h3 className="font-bold text-tea-800">Všechny směny</h3>
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
+          <div className="px-4 md:px-5 py-4 border-b border-border">
+            <h3 className="font-bold text-white">Všechny směny</h3>
           </div>
-          <div className="divide-y divide-tea-50">
+          <div className="divide-y divide-border">
             {shifts
               .filter(s => s.date >= fmt(addDays(today, -7)))
               .sort((a, b) => a.date.localeCompare(b.date))
               .map(shift => {
                 const emp = employees.find(e => e.id === shift.employeeId);
                 return (
-                  <div key={shift.id} className="flex items-center gap-4 px-5 py-3 hover:bg-tea-50 transition-colors">
+                  <div key={shift.id} className="flex items-center gap-3 md:gap-4 px-4 md:px-5 py-3 hover:bg-elevated transition-colors">
                     <span className="text-xl">{emp?.avatar || '👤'}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-tea-800">{emp?.name}</p>
-                      <p className="text-xs text-tea-500">
+                      <p className="text-sm font-semibold text-white">{emp?.name}</p>
+                      <p className="text-xs text-text-secondary">
                         {new Date(shift.date).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-tea-700">{shiftTypeLabels[shift.type]}</p>
-                      <p className="text-xs text-tea-400">{shift.start} – {shift.end}</p>
+                    <div className="text-right hidden sm:block">
+                      <p className="text-sm font-medium text-text-secondary">{shiftTypeLabels[shift.type]}</p>
+                      <p className="text-xs text-text-secondary/60">{shift.start} – {shift.end}</p>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[shift.status] || 'bg-tea-100 text-tea-500'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusStyles[shift.status] || 'bg-elevated text-text-secondary'} border border-border`}>
                       {shift.status === 'completed' ? 'Dokončeno' : shift.status === 'ongoing' ? 'Probíhá' : 'Nadcházející'}
                     </span>
-                    {shift.note && <span title={shift.note} className="text-tea-400 text-sm">💬</span>}
                   </div>
                 );
               })}
@@ -180,62 +185,59 @@ export default function ShiftManagement() {
       {activeTab === 'requests' && (
         <div className="space-y-4">
           {requests.length === 0 && (
-            <div className="bg-white rounded-2xl p-8 text-center text-tea-400">
+            <div className="bg-card rounded-2xl border border-border p-8 text-center text-text-secondary">
               Žádné žádosti o směny
             </div>
           )}
           {requests.map(req => {
             const emp = employees.find(e => e.id === req.employeeId);
             return (
-              <div key={req.id} className={`bg-white rounded-2xl shadow-sm border-2 overflow-hidden ${
-                req.status === 'pending' ? 'border-amber-200' : req.status === 'approved' ? 'border-matcha-200' : 'border-red-200'
+              <div key={req.id} className={`bg-card rounded-2xl border-2 overflow-hidden ${
+                req.status === 'pending' ? 'border-warning/40' : req.status === 'approved' ? 'border-accent/40' : 'border-danger/40'
               }`}>
-                <div className="p-5">
+                <div className="p-4 md:p-5">
                   <div className="flex items-start gap-4">
                     <span className="text-2xl">{emp?.avatar || '👤'}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-bold text-tea-800">{emp?.name}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="font-bold text-white">{emp?.name}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          req.type === 'swap' ? 'bg-blue-100 text-blue-700' :
-                          req.type === 'day_off' ? 'bg-purple-100 text-purple-700' :
-                          'bg-matcha-100 text-matcha-700'
+                          req.type === 'swap' ? 'bg-accent-blue/20 text-accent-blue' :
+                          req.type === 'day_off' ? 'bg-elevated text-text-secondary border border-border' :
+                          'bg-accent/20 text-accent'
                         }`}>
-                          {req.type === 'swap' ? '🔄 Výměna směny' : req.type === 'day_off' ? '🏠 Volno' : '📋 Žádost o směnu'}
+                          {req.type === 'swap' ? '🔄 Výměna' : req.type === 'day_off' ? '🏠 Volno' : '📋 Žádost'}
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-auto ${
-                          req.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                          req.status === 'approved' ? 'bg-matcha-100 text-matcha-700' :
-                          'bg-red-100 text-red-700'
+                          req.status === 'pending' ? 'bg-warning/20 text-warning' :
+                          req.status === 'approved' ? 'bg-accent/20 text-accent' :
+                          'bg-danger/20 text-danger'
                         }`}>
                           {req.status === 'pending' ? '⏳ Čeká' : req.status === 'approved' ? '✅ Schváleno' : '❌ Zamítnuto'}
                         </span>
                       </div>
-                      <p className="text-sm text-tea-600 mb-2">{req.reason}</p>
+                      <p className="text-sm text-text-secondary mb-2">{req.reason}</p>
                       {req.requestedDate && (
-                        <p className="text-xs text-tea-400">
-                          Požadované datum: {new Date(req.requestedDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        <p className="text-xs text-text-secondary/60">
+                          Datum: {new Date(req.requestedDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
                           {req.requestedType && ` · ${shiftTypeLabels[req.requestedType]}`}
                         </p>
                       )}
-                      <p className="text-xs text-tea-400 mt-1">
-                        Odesláno: {new Date(req.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' })}
-                      </p>
                     </div>
                   </div>
                   {req.status === 'pending' && (
-                    <div className="flex gap-3 mt-4 pt-4 border-t border-tea-100">
+                    <div className="flex gap-3 mt-4 pt-4 border-t border-border">
                       <button
                         onClick={() => handleRequestAction(req.id, 'approved')}
-                        className="flex-1 py-2 bg-matcha-600 hover:bg-matcha-700 text-white text-sm font-semibold rounded-xl transition-all"
+                        className="flex-1 py-2 bg-accent hover:bg-accent/90 text-black text-sm font-bold rounded-xl transition-all"
                       >
-                        ✅ Schválit
+                        Schválit
                       </button>
                       <button
                         onClick={() => handleRequestAction(req.id, 'rejected')}
-                        className="flex-1 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-semibold rounded-xl transition-all"
+                        className="flex-1 py-2 bg-danger/20 hover:bg-danger/30 text-danger text-sm font-bold rounded-xl transition-all"
                       >
-                        ❌ Zamítnout
+                        Zamítnout
                       </button>
                     </div>
                   )}
@@ -248,19 +250,19 @@ export default function ShiftManagement() {
 
       {/* Add shift modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-tea-100">
-              <h3 className="font-bold text-tea-800 text-lg">➕ Přidat novou směnu</h3>
-              <button onClick={() => setShowModal(false)} className="text-tea-400 hover:text-tea-700 text-xl">✕</button>
+        <div className="fixed inset-0 bg-black/70 flex items-end md:items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-3xl border border-border shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="font-bold text-white text-lg">Přidat novou směnu</h3>
+              <button onClick={() => setShowModal(false)} className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-white bg-elevated rounded-lg">✕</button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-tea-700 mb-1">Zaměstnanec</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">Zaměstnanec</label>
                 <select
                   value={newShift.employeeId}
                   onChange={e => setNewShift(s => ({ ...s, employeeId: e.target.value }))}
-                  className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500"
+                  className="w-full px-3 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent text-white text-sm"
                 >
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>{emp.name}</option>
@@ -268,20 +270,20 @@ export default function ShiftManagement() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-tea-700 mb-1">Datum</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">Datum</label>
                 <input
                   type="date"
                   value={newShift.date}
                   onChange={e => setNewShift(s => ({ ...s, date: e.target.value }))}
-                  className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500"
+                  className="w-full px-3 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent text-white text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-tea-700 mb-1">Typ směny</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">Typ směny</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[['morning', '🌅 Ranní (6:00–14:00)'], ['afternoon', '🌆 Odpolední (14:00–22:00)']].map(([val, label]) => (
-                    <label key={val} className={`flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer ${
-                      newShift.type === val ? 'border-matcha-500 bg-matcha-50' : 'border-tea-200'
+                    <label key={val} className={`flex items-center gap-2 p-3 rounded-2xl border cursor-pointer transition-all ${
+                      newShift.type === val ? 'border-accent bg-accent/10 text-white' : 'border-border bg-elevated text-text-secondary'
                     }`}>
                       <input
                         type="radio"
@@ -294,37 +296,30 @@ export default function ShiftManagement() {
                           start: val === 'morning' ? '06:00' : '14:00',
                           end: val === 'morning' ? '14:00' : '22:00',
                         }))}
-                        className="accent-matcha-600"
+                        className="sr-only"
                       />
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${newShift.type === val ? 'border-accent' : 'border-border'}`}>
+                        {newShift.type === val && <div className="w-2 h-2 rounded-full bg-accent" />}
+                      </div>
                       <span className="text-sm">{label}</span>
                     </label>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-tea-700 mb-1">Poznámka</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">Poznámka</label>
                 <input
                   type="text"
                   value={newShift.note}
                   onChange={e => setNewShift(s => ({ ...s, note: e.target.value }))}
                   placeholder="Volitelná poznámka..."
-                  className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500"
+                  className="w-full px-3 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent text-white placeholder:text-text-secondary/50 text-sm"
                 />
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 py-2 border-2 border-tea-200 text-tea-600 rounded-xl hover:bg-tea-50 transition-all font-semibold"
-              >
-                Zrušit
-              </button>
-              <button
-                onClick={handleAddShift}
-                className="flex-1 py-2 bg-matcha-600 hover:bg-matcha-700 text-white rounded-xl transition-all font-semibold shadow-md"
-              >
-                Přidat směnu
-              </button>
+              <button onClick={() => setShowModal(false)} className="flex-1 py-3 border border-border text-text-secondary rounded-2xl hover:bg-elevated font-semibold text-sm transition-colors">Zrušit</button>
+              <button onClick={handleAddShift} className="flex-1 py-3 bg-accent hover:bg-accent/90 text-black rounded-2xl font-bold shadow-lg text-sm transition-colors">Přidat směnu</button>
             </div>
           </div>
         </div>

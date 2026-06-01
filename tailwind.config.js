@@ -7,6 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        void: '#000000',
+        base: '#0D0D0D',
+        card: '#1C1C1E',
+        elevated: '#2C2C2E',
+        border: '#38383A',
+        'text-primary': '#FFFFFF',
+        'text-secondary': 'rgba(235,235,245,0.6)',
+        accent: '#30D158',
+        'accent-blue': '#0A84FF',
+        lime: '#B8FF6B',
+        warning: '#FF9F0A',
+        danger: '#FF453A',
         tea: {
           50:  '#f7f5f0',
           100: '#ede8dc',

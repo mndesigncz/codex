@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { tasks as allTasks, employees } from '../../data/mockData.js';
 
 const priorityColors = {
-  high: { bg: 'bg-red-50 border-red-200', badge: 'bg-red-100 text-red-700', dot: '🔴', label: 'Vysoká' },
-  medium: { bg: 'bg-amber-50 border-amber-200', badge: 'bg-amber-100 text-amber-700', dot: '🟡', label: 'Střední' },
-  low: { bg: 'bg-green-50 border-green-200', badge: 'bg-green-100 text-green-700', dot: '🟢', label: 'Nízká' },
+  high:   { dot: '🔴', badge: 'bg-danger/20 text-danger border-danger/30', label: 'Vysoká' },
+  medium: { dot: '🟡', badge: 'bg-warning/20 text-warning border-warning/30', label: 'Střední' },
+  low:    { dot: '🟢', badge: 'bg-accent/20 text-accent border-accent/30', label: 'Nízká' },
 };
 
 const statusColors = {
-  pending: { label: 'Čeká', badge: 'bg-tea-100 text-tea-600' },
-  in_progress: { label: 'Probíhá', badge: 'bg-blue-100 text-blue-700' },
-  done: { label: 'Hotovo', badge: 'bg-matcha-100 text-matcha-700' },
+  pending:     { label: 'Čeká',    badge: 'bg-elevated text-text-secondary border-border' },
+  in_progress: { label: 'Probíhá', badge: 'bg-accent-blue/20 text-accent-blue border-accent-blue/30' },
+  done:        { label: 'Hotovo',  badge: 'bg-accent/20 text-accent border-accent/30' },
 };
 
 export default function Tasks({ user }) {
@@ -35,53 +35,59 @@ export default function Tasks({ user }) {
   const isOverdue = (dueDate) => new Date(dueDate) < today;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4 md:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-tea-800">✅ Moje úkoly</h1>
-        <p className="text-tea-500 text-sm">Úkoly přidělené vám vedením</p>
+        <h1 className="text-xl md:text-2xl font-bold text-white">Moje úkoly</h1>
+        <p className="text-text-secondary text-sm">Úkoly přidělené vám vedením</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-tea-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-tea-800">{activeTasks}</p>
-          <p className="text-xs text-tea-400 mt-1">Aktivní úkoly</p>
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
+        <div className="bg-card rounded-2xl border border-border p-3 md:p-4 text-center">
+          <p className="text-2xl font-bold text-white">{activeTasks}</p>
+          <p className="text-xs text-text-secondary mt-1">Aktivní úkoly</p>
         </div>
-        <div className="bg-white rounded-2xl border border-tea-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-red-500">{highPriority}</p>
-          <p className="text-xs text-tea-400 mt-1">Vysoká priorita</p>
+        <div className="bg-card rounded-2xl border border-border p-3 md:p-4 text-center">
+          <p className="text-2xl font-bold text-danger">{highPriority}</p>
+          <p className="text-xs text-text-secondary mt-1">Vysoká priorita</p>
         </div>
-        <div className="bg-white rounded-2xl border border-tea-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-matcha-600">{doneTasks}</p>
-          <p className="text-xs text-tea-400 mt-1">Dokončeno</p>
+        <div className="bg-card rounded-2xl border border-border p-3 md:p-4 text-center">
+          <p className="text-2xl font-bold text-accent">{doneTasks}</p>
+          <p className="text-xs text-text-secondary mt-1">Dokončeno</p>
         </div>
       </div>
 
       {/* Progress bar */}
       {tasks.length > 0 && (
-        <div className="bg-white rounded-2xl border border-tea-100 p-4 shadow-sm">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-tea-700">Celkový pokrok</span>
-            <span className="text-sm font-bold text-matcha-700">{Math.round((doneTasks / tasks.length) * 100)}%</span>
+            <span className="text-sm font-semibold text-white">Celkový pokrok</span>
+            <span className="text-sm font-bold text-accent">{Math.round((doneTasks / tasks.length) * 100)}%</span>
           </div>
-          <div className="w-full bg-tea-100 rounded-full h-3">
+          <div className="w-full bg-elevated rounded-full h-3 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-matcha-400 to-matcha-600 rounded-full transition-all"
+              className="h-full bg-accent rounded-full transition-all"
               style={{ width: `${(doneTasks / tasks.length) * 100}%` }}
             />
           </div>
-          <p className="text-xs text-tea-400 mt-1.5">{doneTasks} z {tasks.length} úkolů dokončeno</p>
+          <p className="text-xs text-text-secondary mt-1.5">{doneTasks} z {tasks.length} úkolů dokončeno</p>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-tea-100 p-1 rounded-xl w-fit">
-        {[['active', `⏳ Aktivní (${activeTasks})`], ['done', `✅ Dokončeno (${doneTasks})`], ['all', '📋 Vše']].map(([id, label]) => (
+      <div className="flex gap-1 bg-elevated p-1 rounded-xl w-fit">
+        {[
+          ['active', `Aktivní (${activeTasks})`],
+          ['done', `Hotovo (${doneTasks})`],
+          ['all', 'Vše']
+        ].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setFilter(id)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filter === id ? 'bg-white shadow text-matcha-700' : 'text-tea-500 hover:text-tea-800'}`}
+            className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+              filter === id ? 'bg-card text-white shadow' : 'text-text-secondary hover:text-white'
+            }`}
           >
             {label}
           </button>
@@ -91,17 +97,17 @@ export default function Tasks({ user }) {
       {/* Task list */}
       <div className="space-y-3">
         {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-tea-100 p-8 text-center">
+          <div className="bg-card rounded-2xl border border-border p-8 text-center">
             {filter === 'done' ? (
               <>
                 <p className="text-3xl mb-2">📭</p>
-                <p className="text-tea-400">Žádné dokončené úkoly</p>
+                <p className="text-text-secondary">Žádné dokončené úkoly</p>
               </>
             ) : (
               <>
                 <p className="text-3xl mb-2">🎉</p>
-                <p className="font-semibold text-matcha-700">Všechny úkoly dokončeny!</p>
-                <p className="text-sm text-tea-400 mt-1">Výborná práce!</p>
+                <p className="font-semibold text-accent">Všechny úkoly dokončeny!</p>
+                <p className="text-sm text-text-secondary mt-1">Výborná práce!</p>
               </>
             )}
           </div>
@@ -117,38 +123,40 @@ export default function Tasks({ user }) {
               const s = statusColors[task.status];
               const overdue = task.status !== 'done' && isOverdue(task.dueDate);
               return (
-                <div key={task.id} className={`bg-white rounded-2xl border-2 overflow-hidden transition-all ${p?.bg || ''} ${task.status === 'done' ? 'opacity-60' : ''}`}>
-                  <div className="p-5">
+                <div key={task.id} className={`bg-card rounded-2xl border overflow-hidden transition-all ${
+                  task.status === 'done' ? 'border-border opacity-60' : overdue ? 'border-danger/40' : 'border-border'
+                }`}>
+                  <div className="p-4 md:p-5">
                     <div className="flex items-start gap-3">
-                      {/* Checkbox-style button */}
+                      {/* Checkbox */}
                       <button
                         onClick={() => handleStatus(task.id, task.status === 'done' ? 'pending' : 'done')}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                           task.status === 'done'
-                            ? 'bg-matcha-500 border-matcha-500 text-white'
-                            : 'border-tea-300 hover:border-matcha-400'
+                            ? 'bg-accent border-accent text-black'
+                            : 'border-border hover:border-accent'
                         }`}
                       >
-                        {task.status === 'done' && <span className="text-xs">✓</span>}
+                        {task.status === 'done' && <span className="text-xs font-bold">✓</span>}
                       </button>
 
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-2 flex-wrap">
-                          <p className={`font-bold text-tea-800 ${task.status === 'done' ? 'line-through' : ''}`}>
+                          <p className={`font-bold text-white ${task.status === 'done' ? 'line-through text-text-secondary' : ''}`}>
                             {task.title}
                           </p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s?.badge} flex-shrink-0`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${s?.badge} flex-shrink-0`}>
                             {s?.label}
                           </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p?.badge} flex-shrink-0`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${p?.badge} flex-shrink-0`}>
                             {p?.dot} {p?.label}
                           </span>
                         </div>
                         {task.description && (
-                          <p className="text-sm text-tea-600 mt-1.5 leading-relaxed">{task.description}</p>
+                          <p className="text-sm text-text-secondary mt-1.5 leading-relaxed">{task.description}</p>
                         )}
                         <div className="flex items-center gap-3 mt-2 text-xs">
-                          <span className={`${overdue ? 'text-red-500 font-semibold' : 'text-tea-400'}`}>
+                          <span className={`${overdue ? 'text-danger font-semibold' : 'text-text-secondary/60'}`}>
                             📅 Splatnost: {new Date(task.dueDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' })}
                             {overdue && ' ⚠️ Po termínu!'}
                           </span>
@@ -160,17 +168,17 @@ export default function Tasks({ user }) {
                           {task.status === 'pending' && (
                             <button
                               onClick={() => handleStatus(task.id, 'in_progress')}
-                              className="text-xs px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-medium"
+                              className="text-xs px-2 py-1.5 bg-accent-blue/20 text-accent-blue rounded-lg hover:bg-accent-blue/30 transition-colors font-medium"
                             >
-                              ▶ Zahájit
+                              Zahájit
                             </button>
                           )}
                           {task.status === 'in_progress' && (
                             <button
                               onClick={() => handleStatus(task.id, 'done')}
-                              className="text-xs px-2 py-1.5 bg-matcha-100 text-matcha-700 rounded-lg hover:bg-matcha-200 transition-colors font-medium"
+                              className="text-xs px-2 py-1.5 bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors font-medium"
                             >
-                              ✓ Dokončit
+                              Dokončit
                             </button>
                           )}
                         </div>
@@ -183,10 +191,9 @@ export default function Tasks({ user }) {
         )}
       </div>
 
-      {/* Info note */}
-      <div className="bg-tea-50 rounded-xl p-3 border border-tea-200">
-        <p className="text-xs text-tea-500">
-          💡 Máte-li otázky k úkolům, napište do chatu nebo přímo vedení.
+      <div className="bg-elevated rounded-xl p-3 border border-border">
+        <p className="text-xs text-text-secondary">
+          Máte-li otázky k úkolům, napište do chatu nebo přímo vedení.
           Nové úkoly jsou přidávány zaměstnavatelem.
         </p>
       </div>

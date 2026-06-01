@@ -4,7 +4,6 @@ import { messages as initialMessages, employees, currentEmployer } from '../../d
 export default function Chat({ user }) {
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState('');
-  const [quickMessage, setQuickMessage] = useState('');
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -26,7 +25,6 @@ export default function Chat({ user }) {
     };
     setMessages(prev => [...prev, msg]);
     setNewMessage('');
-    setQuickMessage('');
   };
 
   const handleKeyDown = (e) => {
@@ -55,20 +53,20 @@ export default function Chat({ user }) {
   }, {});
 
   const quickMessages = [
-    '🤒 Jsem nemocný/á, nemohu přijít na dnešní směnu.',
+    '🤒 Jsem nemocný/á, nemohu přijít.',
     '⏰ Přijdu o 15 minut pozdě.',
     '✅ Jsem na místě, otevírám.',
-    '🔄 Potřebuji vyměnit směnu, může někdo zaskočit?',
-    '📦 Dochází zásoby – informuji vedení.',
+    '🔄 Potřebuji vyměnit směnu.',
+    '📦 Dochází zásoby – hlásím vedení.',
     '✓ Směna proběhla v pořádku, zavírám.',
   ];
 
   return (
     <div className="flex h-full">
-      {/* Sidebar */}
-      <div className="w-64 bg-matcha-800 text-white flex flex-col flex-shrink-0">
-        <div className="px-4 py-4 border-b border-matcha-700">
-          <h3 className="font-bold text-sm uppercase tracking-wide text-matcha-300">Kanály</h3>
+      {/* Sidebar — hidden on mobile */}
+      <div className="hidden md:flex w-52 bg-card border-r border-border text-white flex-col flex-shrink-0">
+        <div className="px-4 py-4 border-b border-border">
+          <h3 className="font-bold text-xs uppercase tracking-wide text-text-secondary">Kanály</h3>
         </div>
         <div className="p-2">
           {[
@@ -79,7 +77,7 @@ export default function Chat({ user }) {
             <button
               key={ch.name}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                ch.active ? 'bg-matcha-600 text-white' : 'text-matcha-300 hover:bg-matcha-700'
+                ch.active ? 'bg-accent-blue/20 text-accent-blue' : 'text-text-secondary hover:bg-elevated hover:text-white'
               }`}
             >
               {ch.name}
@@ -87,17 +85,17 @@ export default function Chat({ user }) {
           ))}
         </div>
 
-        <div className="px-4 py-4 border-t border-b border-matcha-700 mt-2">
-          <h3 className="font-bold text-sm uppercase tracking-wide text-matcha-300">Tým</h3>
+        <div className="px-4 py-4 border-t border-b border-border mt-2">
+          <h3 className="font-bold text-xs uppercase tracking-wide text-text-secondary">Tým</h3>
         </div>
-        <div className="p-2 flex-1">
+        <div className="p-2 flex-1 overflow-y-auto scrollbar-thin">
           {[currentEmployer, ...employees].map((member, i) => {
             const isMe = member.id === user.id;
             return (
-              <div key={member.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${isMe ? 'bg-matcha-700 text-white' : 'text-matcha-200'}`}>
+              <div key={member.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${isMe ? 'bg-elevated text-white border border-border' : 'text-text-secondary'}`}>
                 <div className="relative">
                   <span className="text-xl">{member.avatar}</span>
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-matcha-800 ${i < 3 ? 'bg-green-400' : 'bg-tea-500'}`}></span>
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${i < 3 ? 'bg-accent' : 'bg-elevated'}`}></span>
                 </div>
                 <span className="truncate">{member.name.split(' ')[0]}{isMe ? ' (já)' : ''}</span>
               </div>
@@ -106,16 +104,16 @@ export default function Chat({ user }) {
         </div>
 
         {/* Quick messages */}
-        <div className="px-4 py-3 border-t border-matcha-700">
-          <p className="text-xs font-semibold text-matcha-300 uppercase tracking-wide mb-2">Rychlé zprávy</p>
-          <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
+        <div className="px-4 py-3 border-t border-border">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Rychlé zprávy</p>
+          <div className="space-y-1 max-h-36 overflow-y-auto scrollbar-thin">
             {quickMessages.map((qm, i) => (
               <button
                 key={i}
                 onClick={() => handleSend(qm)}
-                className="w-full text-left text-xs text-matcha-300 hover:text-white hover:bg-matcha-700 px-2 py-1.5 rounded-lg transition-colors"
+                className="w-full text-left text-xs text-text-secondary hover:text-white hover:bg-elevated px-2 py-1.5 rounded-lg transition-colors"
               >
-                {qm.length > 40 ? qm.slice(0, 40) + '...' : qm}
+                {qm.length > 38 ? qm.slice(0, 38) + '...' : qm}
               </button>
             ))}
           </div>
@@ -123,48 +121,46 @@ export default function Chat({ user }) {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col bg-white overflow-hidden">
+      <div className="flex-1 flex flex-col bg-base overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-tea-200 flex items-center justify-between flex-shrink-0">
+        <div className="px-4 md:px-6 py-4 border-b border-border bg-card flex items-center justify-between flex-shrink-0">
           <div>
-            <h2 className="font-bold text-tea-800"># obecný</h2>
-            <p className="text-xs text-tea-400">Týmová komunikace</p>
+            <h2 className="font-bold text-white"># obecný</h2>
+            <p className="text-xs text-text-secondary">Týmová komunikace</p>
           </div>
-          <div className="flex gap-2">
-            <button className="px-3 py-1.5 text-xs bg-tea-100 text-tea-600 rounded-lg hover:bg-tea-200 transition-colors">
-              🔍 Hledat
-            </button>
-          </div>
+          <button className="px-3 py-1.5 text-xs bg-elevated text-text-secondary rounded-lg hover:text-white hover:bg-border transition-colors border border-border">
+            🔍 Hledat
+          </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-thin">
           {Object.entries(groupedMessages).map(([date, msgs]) => (
             <div key={date}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 border-t border-tea-200"></div>
-                <span className="text-xs text-tea-400 font-medium px-2">{date}</span>
-                <div className="flex-1 border-t border-tea-200"></div>
+                <div className="flex-1 border-t border-border"></div>
+                <span className="text-xs text-text-secondary font-medium px-2">{date}</span>
+                <div className="flex-1 border-t border-border"></div>
               </div>
               <div className="space-y-4">
                 {msgs.map(msg => {
                   const isMe = msg.senderId === user.id;
                   return (
                     <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                      <div className="w-9 h-9 rounded-xl bg-tea-100 flex items-center justify-center text-lg flex-shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-elevated flex items-center justify-center text-lg flex-shrink-0 border border-border">
                         {msg.senderAvatar}
                       </div>
                       <div className={`max-w-xs sm:max-w-md flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                         <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
-                          <span className="text-sm font-semibold text-tea-800">
+                          <span className="text-sm font-semibold text-white">
                             {isMe ? 'Já' : msg.senderName.split(' ')[0]}
                           </span>
-                          <span className="text-xs text-tea-400">{formatTime(msg.timestamp)}</span>
+                          <span className="text-xs text-text-secondary">{formatTime(msg.timestamp)}</span>
                         </div>
                         <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                           isMe
-                            ? 'bg-matcha-600 text-white rounded-tr-sm'
-                            : 'bg-tea-100 text-tea-800 rounded-tl-sm'
+                            ? 'bg-accent-blue text-white rounded-tr-sm'
+                            : 'bg-card text-white rounded-tl-sm border border-border'
                         }`}>
                           {msg.content}
                         </div>
@@ -179,29 +175,29 @@ export default function Chat({ user }) {
         </div>
 
         {/* Input */}
-        <div className="px-6 py-4 border-t border-tea-200 flex-shrink-0">
+        <div className="px-4 md:px-6 py-4 border-t border-border bg-card flex-shrink-0">
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <textarea
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Napište zprávu... (pro rychlé zprávy použijte levý panel)"
+                placeholder="Napište zprávu..."
                 rows={1}
-                className="w-full px-4 py-3 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 resize-none text-sm text-tea-800 placeholder:text-tea-300"
+                className="w-full px-4 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent-blue resize-none text-sm text-white placeholder:text-text-secondary/50"
                 style={{ minHeight: '46px', maxHeight: '120px' }}
               />
             </div>
             <button
               onClick={() => handleSend()}
               disabled={!newMessage.trim()}
-              className="px-4 py-3 bg-matcha-600 hover:bg-matcha-700 disabled:bg-matcha-300 text-white rounded-xl transition-all shadow-sm text-xl"
+              className="px-4 py-3 bg-accent-blue hover:bg-accent-blue/90 disabled:bg-elevated disabled:text-text-secondary text-white rounded-2xl transition-all text-xl font-bold min-h-[46px]"
             >
               ➤
             </button>
           </div>
-          <p className="text-xs text-tea-400 mt-1.5 px-1">
-            Enter = odeslat • Shift+Enter = nový řádek
+          <p className="text-xs text-text-secondary/40 mt-1.5 px-1">
+            Enter = odeslat · Shift+Enter = nový řádek
           </p>
         </div>
       </div>

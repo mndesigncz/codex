@@ -8,9 +8,9 @@ function StockBar({ quantity, min, max }) {
   const isLow = quantity <= min;
   const isCritical = quantity <= min * 0.5;
   return (
-    <div className="w-full bg-tea-100 rounded-full h-2 overflow-hidden">
+    <div className="w-full bg-elevated rounded-full h-2 overflow-hidden">
       <div
-        className={`h-full rounded-full transition-all ${isCritical ? 'bg-red-500' : isLow ? 'bg-amber-400' : 'bg-matcha-500'}`}
+        className={`h-full rounded-full transition-all ${isCritical ? 'bg-danger' : isLow ? 'bg-warning' : 'bg-accent'}`}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -49,34 +49,35 @@ export default function Inventory() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-tea-800">📦 Sklad & Zásoby</h1>
-          <p className="text-tea-500 text-sm">{items.length} položek · {lowStock.length} pod minimem</p>
+          <h1 className="text-xl md:text-2xl font-bold text-white">Sklad & Zásoby</h1>
+          <p className="text-text-secondary text-sm">{items.length} položek · {lowStock.length} pod minimem</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white font-semibold rounded-xl transition-all shadow-md"
+          className="flex items-center gap-2 px-3 md:px-4 py-2 bg-accent hover:bg-accent/90 text-black font-semibold rounded-xl transition-all shadow-lg text-sm"
         >
-          ➕ Přidat položku
+          <span>+</span>
+          <span className="hidden sm:inline">Přidat položku</span>
         </button>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
-          { label: 'Celkem položek', value: items.length, icon: '📦', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-          { label: 'Pod minimem', value: lowStock.length, icon: '⚠️', color: 'bg-amber-50 border-amber-200 text-amber-700' },
-          { label: 'Kategorie', value: categories.length - 1, icon: '🏷️', color: 'bg-matcha-50 border-matcha-200 text-matcha-700' },
-          { label: 'Dodavatelé', value: [...new Set(items.map(i => i.supplier))].length, icon: '🚚', color: 'bg-tea-50 border-tea-200 text-tea-700' },
+          { label: 'Celkem položek', value: items.length, icon: '📦', accent: 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue' },
+          { label: 'Pod minimem', value: lowStock.length, icon: '⚠️', accent: 'bg-warning/10 border-warning/30 text-warning' },
+          { label: 'Kategorie', value: categories.length - 1, icon: '🏷️', accent: 'bg-accent/10 border-accent/30 text-accent' },
+          { label: 'Dodavatelé', value: [...new Set(items.map(i => i.supplier))].length, icon: '🚚', accent: 'bg-elevated border-border text-text-secondary' },
         ].map(c => (
-          <div key={c.label} className={`rounded-2xl border-2 p-4 ${c.color}`}>
+          <div key={c.label} className={`rounded-2xl border p-4 ${c.accent}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs opacity-70">{c.label}</p>
-                <p className="text-2xl font-bold">{c.value}</p>
+                <p className="text-2xl font-bold text-white">{c.value}</p>
               </div>
               <span className="text-2xl">{c.icon}</span>
             </div>
@@ -85,12 +86,17 @@ export default function Inventory() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-tea-100 p-1 rounded-xl w-fit">
-        {[['stock', '📦 Skladové zásoby'], ['shopping', `🛒 Nákupní seznam ${shoppingList.length > 0 ? `(${shoppingList.length})` : ''}`]].map(([id, label]) => (
+      <div className="flex gap-1 bg-elevated p-1 rounded-xl w-fit">
+        {[
+          ['stock', '📦 Zásoby'],
+          ['shopping', `🛒 Nákup${shoppingList.length > 0 ? ` (${shoppingList.length})` : ''}`]
+        ].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === id ? 'bg-white shadow text-matcha-700' : 'text-tea-500 hover:text-tea-800'}`}
+            className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
+              activeTab === id ? 'bg-card text-white shadow' : 'text-text-secondary hover:text-white'
+            }`}
           >
             {label}
           </button>
@@ -98,15 +104,15 @@ export default function Inventory() {
       </div>
 
       {activeTab === 'stock' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-tea-100 overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-tea-100">
+          <div className="flex flex-wrap items-center gap-3 px-4 md:px-5 py-4 border-b border-border">
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="🔍 Hledat položku..."
-              className="px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-500 w-56"
+              placeholder="Hledat položku..."
+              className="px-3 py-2 bg-elevated border border-border rounded-xl text-sm focus:outline-none focus:border-accent text-white placeholder:text-text-secondary/50 w-48"
             />
             <div className="flex gap-1 flex-wrap">
               {categories.map(cat => (
@@ -114,7 +120,7 @@ export default function Inventory() {
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    activeCategory === cat ? 'bg-matcha-600 text-white' : 'bg-tea-100 text-tea-600 hover:bg-tea-200'
+                    activeCategory === cat ? 'bg-accent text-black' : 'bg-elevated text-text-secondary hover:text-white border border-border'
                   }`}
                 >
                   {cat}
@@ -127,30 +133,30 @@ export default function Inventory() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-xs text-tea-400 uppercase bg-tea-50 border-b border-tea-100">
-                  <th className="text-left px-5 py-3 font-semibold">Název</th>
-                  <th className="text-left px-3 py-3 font-semibold">Kat.</th>
+                <tr className="text-xs text-text-secondary uppercase bg-elevated border-b border-border">
+                  <th className="text-left px-4 md:px-5 py-3 font-semibold">Název</th>
+                  <th className="text-left px-3 py-3 font-semibold hidden sm:table-cell">Kat.</th>
                   <th className="text-right px-3 py-3 font-semibold">Množství</th>
-                  <th className="px-4 py-3 font-semibold w-32">Stav</th>
-                  <th className="text-right px-3 py-3 font-semibold">Min/Max</th>
-                  <th className="text-left px-3 py-3 font-semibold">Dodavatel</th>
+                  <th className="px-4 py-3 font-semibold w-28 hidden md:table-cell">Stav</th>
+                  <th className="text-right px-3 py-3 font-semibold hidden lg:table-cell">Min/Max</th>
+                  <th className="text-left px-3 py-3 font-semibold hidden lg:table-cell">Dodavatel</th>
                   <th className="px-3 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-tea-50">
+              <tbody className="divide-y divide-border">
                 {filtered.map(item => {
                   const isLow = item.quantity <= item.minQuantity;
                   const isCritical = item.quantity <= item.minQuantity * 0.5;
                   return (
-                    <tr key={item.id} className={`hover:bg-tea-50 transition-colors ${isLow ? 'bg-red-50/30' : ''}`}>
-                      <td className="px-5 py-3">
+                    <tr key={item.id} className={`hover:bg-elevated transition-colors ${isLow ? 'bg-danger/5' : ''}`}>
+                      <td className="px-4 md:px-5 py-3">
                         <div className="flex items-center gap-2">
                           {isCritical ? '🔴' : isLow ? '🟡' : '🟢'}
-                          <span className="text-sm font-medium text-tea-800">{item.name}</span>
+                          <span className="text-sm font-medium text-white">{item.name}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-3">
-                        <span className="text-xs px-2 py-0.5 bg-tea-100 text-tea-600 rounded-full">{item.category}</span>
+                      <td className="px-3 py-3 hidden sm:table-cell">
+                        <span className="text-xs px-2 py-0.5 bg-elevated text-text-secondary rounded-full border border-border">{item.category}</span>
                       </td>
                       <td className="px-3 py-3 text-right">
                         {editingId === item.id ? (
@@ -159,29 +165,29 @@ export default function Inventory() {
                               type="number"
                               value={editQty}
                               onChange={e => setEditQty(e.target.value)}
-                              className="w-20 px-2 py-1 border-2 border-matcha-500 rounded-lg text-sm text-right focus:outline-none"
+                              className="w-20 px-2 py-1 bg-elevated border border-accent rounded-lg text-sm text-right focus:outline-none text-white"
                               autoFocus
                             />
-                            <button onClick={() => handleUpdateQty(item.id)} className="text-matcha-600 hover:text-matcha-800 text-sm">✓</button>
-                            <button onClick={() => setEditingId(null)} className="text-red-400 hover:text-red-600 text-sm">✕</button>
+                            <button onClick={() => handleUpdateQty(item.id)} className="text-accent hover:text-accent/80 text-sm">✓</button>
+                            <button onClick={() => setEditingId(null)} className="text-danger hover:text-danger/80 text-sm">✕</button>
                           </div>
                         ) : (
-                          <span className={`text-sm font-semibold ${isLow ? 'text-red-600' : 'text-tea-800'}`}>
+                          <span className={`text-sm font-semibold ${isLow ? 'text-danger' : 'text-white'}`}>
                             {item.quantity} {item.unit}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         <StockBar quantity={item.quantity} min={item.minQuantity} max={item.maxQuantity} />
                       </td>
-                      <td className="px-3 py-3 text-right text-xs text-tea-400">
+                      <td className="px-3 py-3 text-right text-xs text-text-secondary hidden lg:table-cell">
                         {item.minQuantity}/{item.maxQuantity} {item.unit}
                       </td>
-                      <td className="px-3 py-3 text-xs text-tea-500">{item.supplier}</td>
+                      <td className="px-3 py-3 text-xs text-text-secondary hidden lg:table-cell">{item.supplier}</td>
                       <td className="px-3 py-3">
                         <button
                           onClick={() => { setEditingId(item.id); setEditQty(String(item.quantity)); }}
-                          className="text-xs px-2 py-1 text-matcha-600 hover:bg-matcha-50 rounded-lg transition-colors"
+                          className="text-xs px-2 py-1 text-text-secondary hover:text-white hover:bg-elevated rounded-lg transition-colors"
                         >
                           ✏️
                         </button>
@@ -196,46 +202,42 @@ export default function Inventory() {
       )}
 
       {activeTab === 'shopping' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-tea-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-tea-100">
-            <h3 className="font-bold text-tea-800">🛒 Nákupní seznam</h3>
-            <p className="text-sm text-tea-500 mt-0.5">Položky pod minimální zásobou</p>
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
+          <div className="px-4 md:px-5 py-4 border-b border-border">
+            <h3 className="font-bold text-white">🛒 Nákupní seznam</h3>
+            <p className="text-sm text-text-secondary mt-0.5">Položky pod minimální zásobou</p>
           </div>
           {shoppingList.length === 0 ? (
-            <div className="p-8 text-center text-matcha-600">
+            <div className="p-8 text-center text-accent">
               <p className="text-2xl mb-2">✅</p>
-              <p className="font-semibold">Vše je doplněno!</p>
-              <p className="text-sm text-tea-400 mt-1">Žádné položky nevyžadují doplnění.</p>
+              <p className="font-semibold text-white">Vše je doplněno!</p>
+              <p className="text-sm text-text-secondary mt-1">Žádné položky nevyžadují doplnění.</p>
             </div>
           ) : (
-            <div className="divide-y divide-tea-50">
+            <div className="divide-y divide-border">
               {shoppingList.map(item => {
                 const needed = item.maxQuantity - item.quantity;
                 return (
-                  <div key={item.id} className="flex items-center gap-4 px-5 py-4">
+                  <div key={item.id} className="flex items-center gap-4 px-4 md:px-5 py-4">
                     <span className="text-xl">{item.quantity <= item.minQuantity * 0.5 ? '🔴' : '🟡'}</span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-tea-800">{item.name}</p>
-                      <p className="text-xs text-tea-400">Dodavatel: {item.supplier}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-white">{item.name}</p>
+                      <p className="text-xs text-text-secondary">{item.supplier}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-matcha-700">
-                        +{needed} {item.unit}
-                      </p>
-                      <p className="text-xs text-tea-400">Má: {item.quantity} / Min: {item.minQuantity}</p>
+                      <p className="text-sm font-bold text-accent">+{needed} {item.unit}</p>
+                      <p className="text-xs text-text-secondary">Má: {item.quantity} / Min: {item.minQuantity}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-tea-700">
-                        ~{(needed * item.price).toFixed(0)} Kč
-                      </p>
-                      <p className="text-xs text-tea-400">{item.price} Kč/{item.unit}</p>
+                    <div className="text-right hidden sm:block">
+                      <p className="text-sm font-semibold text-white">~{(needed * item.price).toFixed(0)} Kč</p>
+                      <p className="text-xs text-text-secondary">{item.price} Kč/{item.unit}</p>
                     </div>
                   </div>
                 );
               })}
-              <div className="flex items-center justify-between px-5 py-4 bg-tea-50 font-bold">
-                <span className="text-tea-700">Celková odhadovaná cena:</span>
-                <span className="text-matcha-700 text-lg">
+              <div className="flex items-center justify-between px-4 md:px-5 py-4 bg-elevated font-bold">
+                <span className="text-text-secondary">Celková odhadovaná cena:</span>
+                <span className="text-accent text-lg">
                   {shoppingList.reduce((sum, item) => sum + (item.maxQuantity - item.quantity) * item.price, 0).toFixed(0)} Kč
                 </span>
               </div>
@@ -246,11 +248,11 @@ export default function Inventory() {
 
       {/* Add item modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-tea-100 sticky top-0 bg-white">
-              <h3 className="font-bold text-tea-800 text-lg">➕ Nová položka</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-tea-400 hover:text-tea-700 text-xl">✕</button>
+        <div className="fixed inset-0 bg-black/70 flex items-end md:items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-3xl border border-border shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card">
+              <h3 className="font-bold text-white text-lg">Nová položka</h3>
+              <button onClick={() => setShowAddModal(false)} className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-white bg-elevated rounded-lg">✕</button>
             </div>
             <div className="p-6 space-y-4">
               {[
@@ -258,22 +260,22 @@ export default function Inventory() {
                 ['Dodavatel', 'supplier', 'text', 'Název dodavatele'],
               ].map(([label, key, type, placeholder]) => (
                 <div key={key}>
-                  <label className="block text-sm font-medium text-tea-700 mb-1">{label}</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">{label}</label>
                   <input
                     type={type}
                     value={newItem[key]}
                     onChange={e => setNewItem(s => ({ ...s, [key]: e.target.value }))}
                     placeholder={placeholder}
-                    className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500"
+                    className="w-full px-3 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent text-white placeholder:text-text-secondary/50 text-sm"
                   />
                 </div>
               ))}
               <div>
-                <label className="block text-sm font-medium text-tea-700 mb-1">Kategorie</label>
+                <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">Kategorie</label>
                 <select
                   value={newItem.category}
                   onChange={e => setNewItem(s => ({ ...s, category: e.target.value }))}
-                  className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500"
+                  className="w-full px-3 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent text-white text-sm"
                 >
                   {categories.filter(c => c !== 'Vše').map(c => <option key={c}>{c}</option>)}
                 </select>
@@ -286,21 +288,21 @@ export default function Inventory() {
                   ['Maximální množství', 'maxQuantity', 'number', '1000'],
                 ].map(([label, key, type, placeholder]) => (
                   <div key={key}>
-                    <label className="block text-sm font-medium text-tea-700 mb-1">{label}</label>
+                    <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">{label}</label>
                     <input
                       type={type}
                       value={newItem[key]}
                       onChange={e => setNewItem(s => ({ ...s, [key]: e.target.value }))}
                       placeholder={placeholder}
-                      className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500"
+                      className="w-full px-3 py-3 bg-elevated border border-border rounded-2xl focus:outline-none focus:border-accent text-white placeholder:text-text-secondary/50 text-sm"
                     />
                   </div>
                 ))}
               </div>
             </div>
             <div className="flex gap-3 px-6 pb-6">
-              <button onClick={() => setShowAddModal(false)} className="flex-1 py-2 border-2 border-tea-200 text-tea-600 rounded-xl hover:bg-tea-50 font-semibold">Zrušit</button>
-              <button onClick={handleAddItem} className="flex-1 py-2 bg-matcha-600 hover:bg-matcha-700 text-white rounded-xl font-semibold shadow-md">Přidat</button>
+              <button onClick={() => setShowAddModal(false)} className="flex-1 py-3 border border-border text-text-secondary rounded-2xl hover:bg-elevated font-semibold text-sm transition-colors">Zrušit</button>
+              <button onClick={handleAddItem} className="flex-1 py-3 bg-accent hover:bg-accent/90 text-black rounded-2xl font-bold shadow-lg text-sm transition-colors">Přidat</button>
             </div>
           </div>
         </div>
