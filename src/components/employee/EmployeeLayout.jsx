@@ -178,7 +178,7 @@ export default function EmployeeLayout({ user, onLogout }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto scrollbar-thin">
+        <main className={`flex-1 ${currentView === 'chat' ? 'overflow-hidden' : 'overflow-y-auto scrollbar-thin'}`}>
           {renderView()}
         </main>
       </div>

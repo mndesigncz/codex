@@ -1,182 +1,225 @@
 import { useState } from 'react';
-import { dailyReports, employees } from '../../data/mockData.js';
+import { dailyReports as initialReports, employees, statsData } from '../../data/mockData.js';
 
 const today = new Date();
 const fmt = (d) => d instanceof Date ? d.toISOString().split('T')[0] : d;
+const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
 
 export default function DailyReports() {
-  const [reports, setReports] = useState(dailyReports);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
+  const [reports, setReports] = useState(initialReports);
+  const [showNewReport, setShowNewReport] = useState(false);
+  const [newReport, setNewReport] = useState({
+    date: fmt(today),
     customers: '',
     revenue: '',
     topSeller: '',
     topSellerCount: '',
     notes: '',
     weather: 'Slunečno',
+    openedBy: '1',
+    closedBy: '2',
   });
 
-  const submitReport = (e) => {
-    e.preventDefault();
-    const report = {
-      id: Date.now(),
-      date: fmt(today),
-      openedBy: 0,
-      closedBy: 0,
-      customers: parseInt(form.customers) || 0,
-      revenue: parseInt(form.revenue) || 0,
-      topSeller: form.topSeller,
-      topSellerCount: parseInt(form.topSellerCount) || 0,
-      notes: form.notes,
-      weather: form.weather,
-      staffOnDuty: [],
-    };
-    setReports(prev => [report, ...prev]);
-    setShowForm(false);
-    setForm({ customers: '', revenue: '', topSeller: '', topSellerCount: '', notes: '', weather: 'Slunečno' });
+  const handleAddReport = () => {
+    if (!newReport.date || !newReport.customers) return;
+    const id = Math.max(...reports.map(r => r.id)) + 1;
+    setReports(prev => [{
+      ...newReport,
+      id,
+      customers: parseInt(newReport.customers) || 0,
+      revenue: parseInt(newReport.revenue) || 0,
+      topSellerCount: parseInt(newReport.topSellerCount) || 0,
+      openedBy: parseInt(newReport.openedBy),
+      closedBy: parseInt(newReport.closedBy),
+      staffOnDuty: [parseInt(newReport.openedBy), parseInt(newReport.closedBy)],
+    }, ...prev]);
+    setShowNewReport(false);
+    setNewReport({ date: fmt(today), customers: '', revenue: '', topSeller: '', topSellerCount: '', notes: '', weather: 'Slunečno', openedBy: '1', closedBy: '2' });
   };
+
+  const totalRevenue = reports.reduce((s, r) => s + r.revenue, 0);
+  const totalCustomers = reports.reduce((s, r) => s + r.customers, 0);
+  const avgPerCustomer = totalCustomers > 0 ? (totalRevenue / totalCustomers).toFixed(0) : 0;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-tea-500">{reports.length} zpráv celkem</div>
+        <div>
+          <h1 className="text-2xl font-bold text-tea-800">📈 Denní zprávy</h1>
+          <p className="text-tea-500 text-sm">Přehled denní aktivity čajovny</p>
+        </div>
         <button
-          onClick={() => setShowForm(v => !v)}
-          className="px-4 py-2 bg-matcha-600 text-white text-sm font-semibold rounded-xl hover:bg-matcha-700 transition-colors"
+          onClick={() => setShowNewReport(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white font-semibold rounded-xl transition-all shadow-md"
         >
-          + Přidat dnešní zprávu
+          ➕ Nová zpráva
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={submitReport} className="bg-white rounded-2xl border-2 border-matcha-200 p-6 space-y-4 shadow-sm">
-          <h3 className="font-bold text-tea-800 text-lg">📝 Denní zpráva — {today.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-tea-700 mb-1">Počet zákazníků</label>
-              <input
-                type="number" min="0"
-                value={form.customers}
-                onChange={e => setForm(f => ({ ...f, customers: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-400"
-                placeholder="Např. 45"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-tea-700 mb-1">Tržby (Kč)</label>
-              <input
-                type="number" min="0"
-                value={form.revenue}
-                onChange={e => setForm(f => ({ ...f, revenue: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-400"
-                placeholder="Např. 3500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-tea-700 mb-1">Nejprodávanější</label>
-              <input
-                type="text"
-                value={form.topSeller}
-                onChange={e => setForm(f => ({ ...f, topSeller: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-400"
-                placeholder="Např. Matcha Latte"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-tea-700 mb-1">Počet prodaných ks</label>
-              <input
-                type="number" min="0"
-                value={form.topSellerCount}
-                onChange={e => setForm(f => ({ ...f, topSellerCount: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-400"
-                placeholder="Např. 12"
-              />
+      {/* Summary stats */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Celkové tržby', value: `${totalRevenue.toLocaleString('cs-CZ')} Kč`, icon: '💰', color: 'matcha' },
+          { label: 'Celkem zákazníků', value: totalCustomers, icon: '👥', color: 'tea' },
+          { label: 'Průměr/zákazník', value: `${avgPerCustomer} Kč`, icon: '📊', color: 'amber' },
+        ].map(s => (
+          <div key={s.label} className={`bg-white rounded-2xl border border-tea-100 p-4 shadow-sm`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-tea-400">{s.label}</p>
+                <p className="text-xl font-bold text-tea-800 mt-0.5">{s.value}</p>
+              </div>
+              <span className="text-2xl">{s.icon}</span>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-tea-700 mb-1">Počasí</label>
-            <select
-              value={form.weather}
-              onChange={e => setForm(f => ({ ...f, weather: e.target.value }))}
-              className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-400 bg-white"
-            >
-              {['Slunečno', 'Zataženo', 'Déšť', 'Sníh', 'Mlha', 'Větrno', 'Chladno'].map(w => (
-                <option key={w}>{w}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-tea-700 mb-1">Poznámky ze dne</label>
-            <textarea
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl text-sm focus:outline-none focus:border-matcha-400 resize-none"
-              placeholder="Co se dnes dělo, co bylo neobvyklé, feedback zákazníků..."
-            />
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" className="px-6 py-2 bg-matcha-600 text-white rounded-xl font-semibold text-sm hover:bg-matcha-700 transition-colors">
-              Uložit zprávu
-            </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 text-tea-500 rounded-xl text-sm hover:bg-tea-100">
-              Zrušit
-            </button>
-          </div>
-        </form>
-      )}
+        ))}
+      </div>
 
+      {/* Revenue chart (mini) */}
+      <div className="bg-white rounded-2xl border border-tea-100 p-5 shadow-sm">
+        <h3 className="font-bold text-tea-800 mb-4">📊 Tržby posledních dní</h3>
+        <div className="flex items-end gap-3 h-24">
+          {[...reports].reverse().map((r, i) => {
+            const maxRev = Math.max(...reports.map(rr => rr.revenue));
+            const pct = maxRev > 0 ? (r.revenue / maxRev) * 100 : 0;
+            return (
+              <div key={r.id} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-xs text-matcha-700 font-semibold">{r.revenue.toLocaleString('cs-CZ')}</span>
+                <div
+                  className="w-full bg-matcha-500 rounded-t-lg transition-all"
+                  style={{ height: `${Math.max(pct, 5)}%` }}
+                />
+                <span className="text-xs text-tea-400">
+                  {new Date(r.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Reports list */}
       <div className="space-y-4">
         {reports.map(report => {
           const opener = employees.find(e => e.id === report.openedBy);
           const closer = employees.find(e => e.id === report.closedBy);
-          const avgRev = report.customers > 0 ? (report.revenue / report.customers).toFixed(0) : 0;
-
+          const weekday = new Date(report.date).toLocaleDateString('cs-CZ', { weekday: 'long' });
           return (
-            <div key={report.id} className="bg-white rounded-2xl border border-tea-100 shadow-sm overflow-hidden">
-              <div className="flex items-center gap-4 px-5 py-4 border-b border-tea-100 bg-tea-50">
+            <div key={report.id} className="bg-white rounded-2xl shadow-sm border border-tea-100 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-tea-50 to-matcha-50 border-b border-tea-100">
                 <div>
-                  <p className="font-bold text-tea-800">
-                    {new Date(report.date).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                  </p>
-                  <div className="flex gap-3 text-xs text-tea-400 mt-0.5">
-                    <span>🌤 {report.weather}</span>
-                    {opener && <span>🌅 Otevřel: {opener.name.split(' ')[0]}</span>}
-                    {closer && <span>🌙 Zavřel: {closer.name.split(' ')[0]}</span>}
+                  <h3 className="font-bold text-tea-800 capitalize">
+                    {weekday}, {new Date(report.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-tea-400">{report.weather}</span>
                   </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-matcha-700">{report.revenue.toLocaleString('cs-CZ')} Kč</p>
+                  <p className="text-sm text-tea-500">{report.customers} zákazníků</p>
                 </div>
               </div>
               <div className="p-5">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-tea-800">{report.customers}</p>
-                    <p className="text-xs text-tea-400">Zákazníků</p>
+                  <div className="bg-tea-50 rounded-xl p-3">
+                    <p className="text-xs text-tea-400">Průměr/zákazník</p>
+                    <p className="text-lg font-bold text-tea-800">{(report.revenue / report.customers).toFixed(0)} Kč</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-matcha-700">{report.revenue.toLocaleString('cs-CZ')}</p>
-                    <p className="text-xs text-tea-400">Tržby (Kč)</p>
+                  <div className="bg-tea-50 rounded-xl p-3">
+                    <p className="text-xs text-tea-400">Nejprodávanější</p>
+                    <p className="text-sm font-bold text-tea-800">{report.topSeller}</p>
+                    <p className="text-xs text-tea-500">{report.topSellerCount}× prodáno</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-tea-800">{avgRev}</p>
-                    <p className="text-xs text-tea-400">Kč / zákazník</p>
+                  <div className="bg-tea-50 rounded-xl p-3">
+                    <p className="text-xs text-tea-400">Otevíral</p>
+                    <p className="text-sm font-bold text-tea-800">{opener?.name.split(' ')[0] || '—'}</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-tea-800 leading-tight">{report.topSeller}</p>
-                    <p className="text-xs text-tea-400">Nejprodávanější ({report.topSellerCount}x)</p>
+                  <div className="bg-tea-50 rounded-xl p-3">
+                    <p className="text-xs text-tea-400">Zavíral</p>
+                    <p className="text-sm font-bold text-tea-800">{closer?.name.split(' ')[0] || '—'}</p>
                   </div>
                 </div>
-                {report.notes && (
-                  <div className="bg-tea-50 rounded-xl p-3 text-sm text-tea-600 italic">
-                    "{report.notes}"
-                  </div>
-                )}
+                <div className="p-3 bg-matcha-50 rounded-xl border border-matcha-100">
+                  <p className="text-xs text-matcha-600 font-semibold mb-1">📝 Poznámky ze směny</p>
+                  <p className="text-sm text-tea-700">{report.notes}</p>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* New report modal */}
+      {showNewReport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-tea-100 sticky top-0 bg-white">
+              <h3 className="font-bold text-tea-800 text-lg">📝 Nová denní zpráva</h3>
+              <button onClick={() => setShowNewReport(false)} className="text-tea-400 hover:text-tea-700 text-xl">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-tea-700 mb-1">Datum</label>
+                <input type="date" value={newReport.date} onChange={e => setNewReport(s => ({ ...s, date: e.target.value }))} className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-tea-700 mb-1">Počet zákazníků</label>
+                  <input type="number" value={newReport.customers} onChange={e => setNewReport(s => ({ ...s, customers: e.target.value }))} placeholder="0" className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-tea-700 mb-1">Tržby (Kč)</label>
+                  <input type="number" value={newReport.revenue} onChange={e => setNewReport(s => ({ ...s, revenue: e.target.value }))} placeholder="0" className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-tea-700 mb-1">Nejprodávanější</label>
+                  <input type="text" value={newReport.topSeller} onChange={e => setNewReport(s => ({ ...s, topSeller: e.target.value }))} placeholder="Název nápoje" className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-tea-700 mb-1">Počet prodaných</label>
+                  <input type="number" value={newReport.topSellerCount} onChange={e => setNewReport(s => ({ ...s, topSellerCount: e.target.value }))} placeholder="0" className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-tea-700 mb-1">Počasí</label>
+                <select value={newReport.weather} onChange={e => setNewReport(s => ({ ...s, weather: e.target.value }))} className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm">
+                  <option>Slunečno</option>
+                  <option>Zataženo</option>
+                  <option>Zataženo, chladno</option>
+                  <option>Déšť</option>
+                  <option>Sněžení</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-tea-700 mb-1">Otevíral</label>
+                  <select value={newReport.openedBy} onChange={e => setNewReport(s => ({ ...s, openedBy: e.target.value }))} className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm">
+                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name.split(' ')[0]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-tea-700 mb-1">Zavíral</label>
+                  <select value={newReport.closedBy} onChange={e => setNewReport(s => ({ ...s, closedBy: e.target.value }))} className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm">
+                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name.split(' ')[0]}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-tea-700 mb-1">Poznámky</label>
+                <textarea value={newReport.notes} onChange={e => setNewReport(s => ({ ...s, notes: e.target.value }))} placeholder="Co se dělo, jak byl den rušný, problémy..." rows={3} className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 resize-none text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button onClick={() => setShowNewReport(false)} className="flex-1 py-2 border-2 border-tea-200 text-tea-600 rounded-xl hover:bg-tea-50 font-semibold">Zrušit</button>
+              <button onClick={handleAddReport} className="flex-1 py-2 bg-matcha-600 hover:bg-matcha-700 text-white rounded-xl font-semibold shadow-md">Přidat zprávu</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
