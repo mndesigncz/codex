@@ -102,7 +102,7 @@ export default function InventoryReport({ user }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="text-4xl animate-spin">⏳</div></div>
+        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="glass-card overflow-hidden">
@@ -147,7 +147,7 @@ export default function InventoryReport({ user }: Props) {
 
           <button type="submit" disabled={selected.length === 0 || submitting}
             className="rounded-full bg-[#C8F542] text-black font-semibold px-6 py-3 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {submitting ? '⏳ Odesílám...' : `📤 Odeslat hlášení (${selected.length} položek)`}
+            {submitting ? 'Odesílám…' : `Odeslat hlášení (${selected.length} položek)`}
           </button>
         </form>
       )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Icon } from '../Icons';
 
 interface ShiftItem {
   id: number;
@@ -45,7 +46,9 @@ function StatCard({ icon, label, value, sub, progress = 100, alert = false }: { 
     <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
       <div className="flex items-start justify-between">
         <p className="text-xs uppercase tracking-wider text-white/40">{label}</p>
-        <span className="text-xl opacity-80">{icon}</span>
+        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#C8F542]'}`}>
+          <Icon name={icon} size={17} />
+        </span>
       </div>
       <p className="text-3xl md:text-4xl font-bold tracking-tight mt-3 text-white">{value}</p>
       {sub && <p className="text-xs text-white/40 mt-1">{sub}</p>}
@@ -112,22 +115,22 @@ export default function Overview({ onNavigate }: { onNavigate: (view: string) =>
     <div className="p-6 space-y-6">
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="text-4xl animate-spin">⏳</div>
+          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
         </div>
       ) : (
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon="👥" label="Zaměstnanci" value={users.length} sub="aktivních" progress={users.length > 0 ? 100 : 0} />
-            <StatCard icon="📅" label="Směny dnes" value={todayShifts.length} sub="naplánovaných" progress={Math.min(100, todayShifts.length * 25)} />
-            <StatCard icon="✅" label="Aktivní úkoly" value={pendingTasks.length} sub="ke splnění" progress={tasks.length > 0 ? Math.round((pendingTasks.length / tasks.length) * 100) : 0} />
-            <StatCard icon="⚠️" label="Nízké zásoby" value={lowStock.length} sub="položek" progress={inventory.length > 0 ? Math.round((lowStock.length / inventory.length) * 100) : 0} alert={lowStock.length > 0} />
+            <StatCard icon="users" label="Zaměstnanci" value={users.length} sub="aktivních" progress={users.length > 0 ? 100 : 0} />
+            <StatCard icon="calendar" label="Směny dnes" value={todayShifts.length} sub="naplánovaných" progress={Math.min(100, todayShifts.length * 25)} />
+            <StatCard icon="check" label="Aktivní úkoly" value={pendingTasks.length} sub="ke splnění" progress={tasks.length > 0 ? Math.round((pendingTasks.length / tasks.length) * 100) : 0} />
+            <StatCard icon="warning" label="Nízké zásoby" value={lowStock.length} sub="položek" progress={inventory.length > 0 ? Math.round((lowStock.length / inventory.length) * 100) : 0} alert={lowStock.length > 0} />
           </div>
 
           {/* Today's shifts */}
           <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold tracking-tight text-white">📅 Dnešní směny</h3>
+              <h3 className="text-lg font-bold tracking-tight text-white">Dnešní směny</h3>
               <button onClick={() => onNavigate('shifts')} className="text-sm text-[#C8F542] hover:brightness-110 transition-all">Všechny směny →</button>
             </div>
             {todayShifts.length === 0 ? (
@@ -151,7 +154,7 @@ export default function Overview({ onNavigate }: { onNavigate: (view: string) =>
             {/* Pending tasks */}
             <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold tracking-tight text-white">✅ Aktivní úkoly</h3>
+                <h3 className="font-bold tracking-tight text-white">Aktivní úkoly</h3>
                 <button onClick={() => onNavigate('team')} className="text-sm text-[#C8F542] hover:brightness-110 transition-all">Zobrazit →</button>
               </div>
               <div className="space-y-2">
@@ -174,7 +177,7 @@ export default function Overview({ onNavigate }: { onNavigate: (view: string) =>
             {/* Low stock */}
             <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold tracking-tight text-white">⚠️ Nízké zásoby</h3>
+                <h3 className="font-bold tracking-tight text-white">Nízké zásoby</h3>
                 <button onClick={() => onNavigate('inventory')} className="text-sm text-[#C8F542] hover:brightness-110 transition-all">Sklad →</button>
               </div>
               <div className="space-y-2">
@@ -187,7 +190,7 @@ export default function Overview({ onNavigate }: { onNavigate: (view: string) =>
                     </div>
                   </div>
                 ))}
-                {lowStock.length === 0 && <p className="text-white/40 text-sm">Zásoby jsou v pořádku ✅</p>}
+                {lowStock.length === 0 && <p className="text-white/40 text-sm">Zásoby jsou v pořádku</p>}
               </div>
             </div>
           </div>

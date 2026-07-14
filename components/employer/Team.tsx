@@ -111,7 +111,7 @@ export default function Team() {
           <div className="flex gap-3">
             <button type="submit" disabled={submitting}
               className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
-              {submitting ? '⏳ Přidávám...' : '✅ Přidat'}
+              {submitting ? 'Přidávám…' : 'Přidat'}
             </button>
             <button type="button" onClick={() => setShowForm(false)}
               className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
@@ -123,7 +123,7 @@ export default function Team() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="text-4xl animate-spin">⏳</div>
+          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

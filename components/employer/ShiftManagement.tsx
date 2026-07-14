@@ -92,7 +92,7 @@ export default function ShiftManagement() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="text-4xl animate-spin">⏳</div>
+          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
         </div>
       ) : tab === 'shifts' ? (
         <div className="space-y-4">

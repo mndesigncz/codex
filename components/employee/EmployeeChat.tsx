@@ -94,7 +94,7 @@ export default function EmployeeChat({ user }: Props) {
       <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-4xl animate-spin">⏳</div>
+            <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center text-white/40 py-12">
@@ -146,7 +146,7 @@ export default function EmployeeChat({ user }: Props) {
         />
         <button type="submit" disabled={!newMessage.trim() || sending}
           className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 transition-all disabled:opacity-40">
-          {sending ? '⏳' : '📤'}
+          {sending ? '…' : 'Odeslat'}
         </button>
       </form>
     </div>

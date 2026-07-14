@@ -115,7 +115,7 @@ export default function ShiftRequests({ user }: Props) {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="text-4xl animate-spin">⏳</div></div>
+        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>
       ) : requests.length === 0 ? (
         <div className="glass-card p-8 text-center">
           <p className="text-white/40">Žádné žádosti. Vytvořte svoji první žádost!</p>

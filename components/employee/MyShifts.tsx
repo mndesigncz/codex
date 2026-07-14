@@ -67,7 +67,7 @@ export default function MyShifts({ user }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="text-4xl animate-spin">⏳</div></div>
+        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>
       ) : (
         <>
           <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">

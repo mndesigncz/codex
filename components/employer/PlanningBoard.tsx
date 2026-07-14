@@ -57,7 +57,7 @@ export default function PlanningBoard() {
     <div className="p-6">
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="text-4xl animate-spin">⏳</div>
+          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -98,7 +98,7 @@ export default function PlanningBoard() {
                   />
                   <div className="flex gap-2">
                     <button onClick={handleAddCard} disabled={adding} className="flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
-                      {adding ? '⏳' : 'Přidat'}
+                      {adding ? 'Přidávám…' : 'Přidat'}
                     </button>
                     <button onClick={() => setNewCard(null)} className="flex-1 py-1.5 rounded-full glass border border-white/15 text-white/60 text-xs hover:bg-white/10 transition-all">
                       Zrušit

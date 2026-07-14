@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { LogoMark } from './Icons';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -44,7 +45,7 @@ export default function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🍵</div>
+          <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Čajovna Zelená</h1>
           <p className="text-white/50 text-sm">Systém správy čajovny</p>
         </div>

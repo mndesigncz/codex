@@ -71,7 +71,7 @@ export default function Tasks({ user }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="text-4xl animate-spin">⏳</div></div>
+        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center">
           <p className="text-4xl mb-2">✅</p>

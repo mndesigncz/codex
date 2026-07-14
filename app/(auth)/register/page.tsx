@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { LogoMark } from '@/components/Icons';
 
 const inputClass =
   'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
@@ -64,7 +65,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🍵</div>
+          <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Čajovna Zelená</h1>
           <p className="text-white/40 text-sm">Vytvořte si účet a začněte používat systém</p>
         </div>
