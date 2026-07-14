@@ -10,6 +10,9 @@ interface DailyReport {
   notes?: string;
 }
 
+const inputClass =
+  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+
 export default function DailyReports() {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,60 +54,69 @@ export default function DailyReports() {
   const avgRevenue = reports.length > 0 ? Math.round(totalRevenue / reports.length) : 0;
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-6">
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-matcha-50 border-2 border-matcha-200 rounded-2xl p-4 text-center">
-          <p className="text-xs text-matcha-600 font-medium">Celkový příjem</p>
-          <p className="text-2xl font-bold text-matcha-700 mt-1">{totalRevenue.toLocaleString('cs-CZ')} Kč</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="glass-card p-6">
+          <p className="text-xs uppercase tracking-wider text-white/40">Celkový příjem</p>
+          <p className="text-3xl font-bold tracking-tight text-white mt-2">{totalRevenue.toLocaleString('cs-CZ')} Kč</p>
+          <div className="h-1 rounded-full bg-white/10 mt-4 overflow-hidden">
+            <div className="h-full rounded-full bg-[#C8F542] w-full" />
+          </div>
         </div>
-        <div className="bg-tea-50 border-2 border-tea-200 rounded-2xl p-4 text-center">
-          <p className="text-xs text-tea-600 font-medium">Zákazníci celkem</p>
-          <p className="text-2xl font-bold text-tea-700 mt-1">{totalCustomers}</p>
+        <div className="glass-card p-6">
+          <p className="text-xs uppercase tracking-wider text-white/40">Zákazníci celkem</p>
+          <p className="text-3xl font-bold tracking-tight text-white mt-2">{totalCustomers}</p>
+          <div className="h-1 rounded-full bg-white/10 mt-4 overflow-hidden">
+            <div className="h-full rounded-full bg-[#0A84FF] w-full" />
+          </div>
         </div>
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-center">
-          <p className="text-xs text-amber-600 font-medium">Průměr/den</p>
-          <p className="text-2xl font-bold text-amber-700 mt-1">{avgRevenue.toLocaleString('cs-CZ')} Kč</p>
+        <div className="glass-card p-6">
+          <p className="text-xs uppercase tracking-wider text-white/40">Průměr/den</p>
+          <p className="text-3xl font-bold tracking-tight text-white mt-2">{avgRevenue.toLocaleString('cs-CZ')} Kč</p>
+          <div className="h-1 rounded-full bg-white/10 mt-4 overflow-hidden">
+            <div className="h-full rounded-full bg-orange-400 w-2/3" />
+          </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-tea-800">Denní zprávy</h3>
-        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white text-sm rounded-xl font-medium">
+        <h3 className="text-lg font-bold tracking-tight text-white">Denní zprávy</h3>
+        <button onClick={() => setShowForm(!showForm)} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all">
           + Přidat zprávu
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border-2 border-matcha-200 p-5 space-y-4">
-          <h4 className="font-bold text-tea-800">Nová denní zpráva</h4>
-          <div className="grid grid-cols-3 gap-3">
+        <form onSubmit={handleSubmit} className="glass-card border-[#C8F542]/20 p-6 space-y-5">
+          <h4 className="font-bold tracking-tight text-white">Nová denní zpráva</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Datum</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Datum</label>
               <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Příjem (Kč)</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Příjem (Kč)</label>
               <input type="number" required value={form.revenue} onChange={e => setForm(f => ({ ...f, revenue: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Zákazníků</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Zákazníků</label>
               <input type="number" required value={form.customers} onChange={e => setForm(f => ({ ...f, customers: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-tea-700 mb-1">Poznámky</label>
+            <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Poznámky</label>
             <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2}
-              className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800 resize-none" />
+              className={`${inputClass} resize-none`} />
           </div>
           <div className="flex gap-3">
-            <button type="submit" disabled={submitting} className="px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white text-sm rounded-xl font-medium disabled:opacity-60">
+            <button type="submit" disabled={submitting} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
               {submitting ? '⏳' : '✅ Uložit'}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-tea-100 hover:bg-tea-200 text-tea-700 text-sm rounded-xl font-medium">
+            <button type="button" onClick={() => setShowForm(false)} className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
               Zrušit
             </button>
           </div>
@@ -118,22 +130,22 @@ export default function DailyReports() {
       ) : (
         <div className="space-y-3">
           {reports.map(r => (
-            <div key={r.id} className="bg-white rounded-2xl border-2 border-tea-100 p-5">
+            <div key={r.id} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-center justify-between mb-2">
-                <p className="font-bold text-tea-800">
+                <p className="font-bold tracking-tight text-white">
                   {new Date(r.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
                 <div className="flex gap-4">
-                  <span className="text-sm font-semibold text-matcha-700">{r.revenue.toLocaleString('cs-CZ')} Kč</span>
-                  <span className="text-sm text-tea-500">👥 {r.customers}</span>
+                  <span className="text-sm font-semibold text-[#C8F542]">{r.revenue.toLocaleString('cs-CZ')} Kč</span>
+                  <span className="text-sm text-white/50">👥 {r.customers}</span>
                 </div>
               </div>
-              {r.notes && <p className="text-sm text-tea-500 bg-tea-50 rounded-lg p-2">{r.notes}</p>}
+              {r.notes && <p className="text-sm text-white/50 bg-white/[0.06] border border-white/[0.06] rounded-2xl p-3">{r.notes}</p>}
             </div>
           ))}
           {reports.length === 0 && (
-            <div className="bg-white rounded-2xl border-2 border-tea-100 p-8 text-center">
-              <p className="text-tea-400">Žádné zprávy k zobrazení.</p>
+            <div className="glass-card p-8 text-center">
+              <p className="text-white/40">Žádné zprávy k zobrazení.</p>
             </div>
           )}
         </div>
