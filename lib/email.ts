@@ -25,6 +25,24 @@ export async function sendInvitationEmail(to: string, name: string, tempPassword
   });
 }
 
+export async function sendTeamInvitation(to: string, teamName: string, inviterName: string, token: string) {
+  const url = `${process.env.NEXT_PUBLIC_APP_URL}/join?token=${token}`;
+  await getResend().emails.send({
+    from: 'Čajovna Zelená <onboarding@resend.dev>',
+    to,
+    subject: `Pozvánka do týmu ${teamName} 🍵`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; background: #0A0A0C; color: white; border-radius: 20px;">
+        <h1 style="color: #C8F542; font-size: 26px;">Pozvánka do týmu</h1>
+        <p style="color: rgba(235,235,245,0.6);"><strong style="color:white;">${inviterName}</strong> vás zve do týmu <strong style="color:white;">${teamName}</strong> v aplikaci pro správu podniku.</p>
+        <p style="color: rgba(235,235,245,0.6);">Klikněte na tlačítko níže a vytvořte si účet zaměstnance.</p>
+        <a href="${url}" style="display: inline-block; margin-top: 12px; background: #C8F542; color: black; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Přijmout pozvánku →</a>
+        <p style="color: rgba(235,235,245,0.35); font-size: 12px; margin-top: 24px;">Pokud tlačítko nefunguje, otevřete: ${url}</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendLowStockAlert(employerEmail: string, items: string[]) {
   await getResend().emails.send({
     from: 'Čajovna Zelená <onboarding@resend.dev>',

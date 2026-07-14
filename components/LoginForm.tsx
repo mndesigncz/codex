@@ -100,13 +100,11 @@ export default function LoginForm() {
             </button>
           </form>
 
-          {/* Register link */}
-          <p className="text-center text-white/50 text-sm mt-6">
-            Nemáte účet?{' '}
-            <Link href="/register" className="text-[#C8F542] hover:underline font-medium">
-              Registrovat se →
-            </Link>
-          </p>
+          {/* Register / join links */}
+          <div className="mt-6 space-y-1.5 text-center text-sm">
+            <p className="text-white/50">Provozujete podnik? <Link href="/register" className="text-[#C8F542] hover:underline font-medium">Vytvořit účet →</Link></p>
+            <p className="text-white/50">Máte kód týmu? <Link href="/join" className="text-[#C8F542] hover:underline font-medium">Připojit se →</Link></p>
+          </div>
         </div>
 
         <p className="text-center text-white/30 text-xs mt-6">

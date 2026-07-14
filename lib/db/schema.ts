@@ -1,8 +1,19 @@
-import { pgTable, text, timestamp, integer, boolean, serial, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, boolean, serial, pgEnum, jsonb } from 'drizzle-orm/pg-core';
 
 export const roleEnum = pgEnum('role', ['employer', 'employee']);
 export const shiftTypeEnum = pgEnum('shift_type', ['morning', 'afternoon', 'flexible']);
 export const priorityEnum = pgEnum('priority', ['high', 'medium', 'low']);
+
+// ---------------------------------------------------------------------------
+// Teams
+// ---------------------------------------------------------------------------
+export const teams = pgTable('teams', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  ownerId: integer('owner_id').notNull(),
+  joinCode: text('join_code').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -15,11 +26,28 @@ export const users = pgTable('users', {
   jobTitle: text('job_title').default('Barista'),
   shiftPreference: shiftTypeEnum('shift_preference').default('flexible'),
   employerId: integer('employer_id'),
+  teamId: integer('team_id'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Email invitations for employees to join a team
+export const invitations = pgTable('invitations', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  email: text('email').notNull(),
+  token: text('token').notNull().unique(),
+  jobTitle: text('job_title').default('Barista'),
+  invitedBy: integer('invited_by').notNull(),
+  status: text('status').default('pending'), // pending | accepted | revoked
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Shifts & scheduling
+// ---------------------------------------------------------------------------
 export const shifts = pgTable('shifts', {
   id: serial('id').primaryKey(),
+  teamId: integer('team_id'),
   employeeId: integer('employee_id').notNull(),
   date: text('date').notNull(),
   startTime: text('start_time').notNull(),
@@ -38,15 +66,47 @@ export const shiftRequests = pgTable('shift_requests', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Monthly availability submitted by employees for the next month's schedule
+export const availabilityRequests = pgTable('availability_requests', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  employeeId: integer('employee_id').notNull(),
+  month: text('month').notNull(), // YYYY-MM
+  unavailableDates: jsonb('unavailable_dates').default([]), // string[] of YYYY-MM-DD
+  preferredShift: text('preferred_shift').default('flexible'),
+  maxShifts: integer('max_shifts'),
+  note: text('note'),
+  status: text('status').default('submitted'), // submitted | processed
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
 export const inventoryItems = pgTable('inventory_items', {
   id: serial('id').primaryKey(),
+  teamId: integer('team_id'),
   name: text('name').notNull(),
   category: text('category').notNull(),
   quantity: integer('quantity').notNull().default(0),
   minQuantity: integer('min_quantity').notNull().default(5),
+  criticalQuantity: integer('critical_quantity').notNull().default(2),
   maxQuantity: integer('max_quantity').notNull().default(100),
   unit: text('unit').notNull().default('ks'),
   supplier: text('supplier'),
+  createdBy: integer('created_by'),
+  updatedBy: integer('updated_by'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const inventoryLog = pgTable('inventory_log', {
+  id: serial('id').primaryKey(),
+  itemId: integer('item_id').notNull(),
+  userId: integer('user_id').notNull(),
+  oldQuantity: integer('old_quantity').notNull(),
+  newQuantity: integer('new_quantity').notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const inventoryReports = pgTable('inventory_reports', {
@@ -58,6 +118,36 @@ export const inventoryReports = pgTable('inventory_reports', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// ---------------------------------------------------------------------------
+// Chat (team channel + direct threads, with attachments)
+// ---------------------------------------------------------------------------
+export const conversations = pgTable('conversations', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  type: text('type').notNull().default('direct'), // team | direct
+  name: text('name'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const conversationMembers = pgTable('conversation_members', {
+  id: serial('id').primaryKey(),
+  conversationId: integer('conversation_id').notNull(),
+  userId: integer('user_id').notNull(),
+  lastReadAt: timestamp('last_read_at').defaultNow(),
+});
+
+export const chatMessages = pgTable('chat_messages', {
+  id: serial('id').primaryKey(),
+  conversationId: integer('conversation_id').notNull(),
+  senderId: integer('sender_id').notNull(),
+  content: text('content'),
+  attachmentUrl: text('attachment_url'),
+  attachmentType: text('attachment_type'), // image | file
+  attachmentName: text('attachment_name'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Legacy single-channel messages (kept for backwards compatibility)
 export const messages = pgTable('messages', {
   id: serial('id').primaryKey(),
   senderId: integer('sender_id').notNull(),
@@ -66,6 +156,32 @@ export const messages = pgTable('messages', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// ---------------------------------------------------------------------------
+// Guides / návody
+// ---------------------------------------------------------------------------
+export const guideCategories = pgTable('guide_categories', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  name: text('name').notNull(),
+  icon: text('icon').default('book'),
+  position: integer('position').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const guides = pgTable('guides', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  categoryId: integer('category_id'),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  createdBy: integer('created_by').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Tasks, planning, reports, recipes
+// ---------------------------------------------------------------------------
 export const tasks = pgTable('tasks', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
@@ -106,5 +222,28 @@ export const recipes = pgTable('recipes', {
   instructions: text('instructions').notNull(),
   prepTime: integer('prep_time').default(5),
   createdBy: integer('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Notifications & push
+// ---------------------------------------------------------------------------
+export const notifications = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  title: text('title').notNull(),
+  body: text('body'),
+  type: text('type').default('info'), // info | chat | inventory | shift | invite
+  link: text('link'),
+  isRead: boolean('is_read').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });

@@ -28,16 +28,24 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           avatar: user.avatar ?? '👤',
           jobTitle: user.jobTitle ?? 'Barista',
-        };
+          teamId: user.teamId ?? null,
+        } as any;
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = (user as any).role;
         token.avatar = (user as any).avatar;
         token.jobTitle = (user as any).jobTitle;
+        token.teamId = (user as any).teamId;
+      }
+      // Allow client-side session.update() to refresh profile fields
+      if (trigger === 'update' && session?.user) {
+        if (session.user.name) token.name = session.user.name;
+        if ((session.user as any).avatar) token.avatar = (session.user as any).avatar;
+        if ((session.user as any).teamId !== undefined) token.teamId = (session.user as any).teamId;
       }
       return token;
     },
@@ -45,6 +53,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).avatar = token.avatar;
+        (session.user as any).jobTitle = token.jobTitle;
+        (session.user as any).teamId = token.teamId;
         (session.user as any).id = token.sub;
       }
       return session;
