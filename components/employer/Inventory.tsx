@@ -44,17 +44,17 @@ export default function Inventory() {
   };
 
   const stockColor = (level: string) => {
-    if (level === 'low') return 'bg-red-500';
-    if (level === 'medium') return 'bg-amber-500';
-    return 'bg-matcha-500';
+    if (level === 'low') return 'bg-red-400';
+    if (level === 'medium') return 'bg-orange-400';
+    return 'bg-[#C8F542]';
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-6">
       {lowStock.length > 0 && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4">
-          <p className="text-red-700 font-semibold text-sm">⚠️ {lowStock.length} položek pod minimální zásobou:</p>
-          <p className="text-red-600 text-sm mt-1">{lowStock.map(i => i.name).join(', ')}</p>
+        <div className="glass-card border-red-500/20 bg-red-500/[0.06] p-5">
+          <p className="text-red-400 font-semibold text-sm">⚠️ {lowStock.length} položek pod minimální zásobou:</p>
+          <p className="text-red-400/70 text-sm mt-1">{lowStock.map(i => i.name).join(', ')}</p>
         </div>
       )}
 
@@ -64,15 +64,15 @@ export default function Inventory() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Hledat položku..."
-          className="flex-1 px-4 py-2.5 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-tea-800 placeholder:text-tea-300 text-sm"
+          className="flex-1 rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
         />
-        <div className="flex gap-1 overflow-x-auto">
+        <div className="flex gap-1 overflow-x-auto glass rounded-full p-1">
           {CATEGORIES.map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCat(cat)}
-              className={`px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
-                selectedCat === cat ? 'bg-matcha-600 text-white' : 'bg-tea-100 text-tea-600 hover:bg-tea-200'
+              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-300 ${
+                selectedCat === cat ? 'bg-[#C8F542] text-black' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'
               }`}
             >
               {cat}
@@ -86,48 +86,48 @@ export default function Inventory() {
           <div className="text-4xl animate-spin">⏳</div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border-2 border-tea-100 overflow-hidden">
+        <div className="glass-card overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-tea-100 bg-tea-50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-tea-600 uppercase">Název</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-tea-600 uppercase hidden sm:table-cell">Kategorie</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-tea-600 uppercase">Množství</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-tea-600 uppercase hidden md:table-cell">Stav</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-tea-600 uppercase hidden lg:table-cell">Dodavatel</th>
+              <tr className="border-b border-white/[0.06]">
+                <th className="text-left px-5 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Název</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider hidden sm:table-cell">Kategorie</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Množství</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider hidden md:table-cell">Stav</th>
+                <th className="text-left px-5 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider hidden lg:table-cell">Dodavatel</th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.map((item, idx) => {
+            <tbody className="divide-y divide-white/[0.06]">
+              {filtered.map(item => {
                 const level = getStockLevel(item);
                 const pct = Math.min(100, Math.round((item.quantity / item.maxQuantity) * 100));
                 return (
-                  <tr key={item.id} className={`border-b border-tea-50 hover:bg-tea-50/50 transition-colors ${level === 'low' ? 'bg-red-50/40' : ''}`}>
-                    <td className="px-4 py-3">
+                  <tr key={item.id} className={`hover:bg-white/[0.04] transition-colors ${level === 'low' ? 'bg-red-500/[0.04]' : ''}`}>
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        {level === 'low' && <span className="text-red-500 text-sm">⚠️</span>}
-                        <span className="text-sm font-medium text-tea-800">{item.name}</span>
+                        {level === 'low' && <span className="text-red-400 text-sm">⚠️</span>}
+                        <span className="text-sm font-medium text-white">{item.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className="text-xs bg-tea-100 text-tea-600 px-2 py-0.5 rounded-full">{item.category}</span>
+                    <td className="px-5 py-4 hidden sm:table-cell">
+                      <span className="text-xs rounded-full px-3 py-1 font-medium bg-white/[0.08] text-white/60">{item.category}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-sm font-semibold ${level === 'low' ? 'text-red-600' : 'text-tea-800'}`}>
+                    <td className="px-5 py-4">
+                      <span className={`text-sm font-semibold ${level === 'low' ? 'text-red-400' : 'text-white'}`}>
                         {item.quantity} {item.unit}
                       </span>
-                      <span className="text-xs text-tea-400 ml-1">/ min. {item.minQuantity}</span>
+                      <span className="text-xs text-white/30 ml-1">/ min. {item.minQuantity}</span>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-5 py-4 hidden md:table-cell">
                       <div className="w-24">
-                        <div className="h-2 bg-tea-100 rounded-full overflow-hidden">
-                          <div className={`h-full ${stockColor(level)} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div className={`h-full ${stockColor(level)} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
                         </div>
-                        <span className="text-xs text-tea-400 mt-0.5 block">{pct}%</span>
+                        <span className="text-xs text-white/30 mt-1 block">{pct}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      <span className="text-xs text-tea-500">{item.supplier ?? '—'}</span>
+                    <td className="px-5 py-4 hidden lg:table-cell">
+                      <span className="text-xs text-white/40">{item.supplier ?? '—'}</span>
                     </td>
                   </tr>
                 );
@@ -136,7 +136,7 @@ export default function Inventory() {
           </table>
           {filtered.length === 0 && (
             <div className="p-8 text-center">
-              <p className="text-tea-400 text-sm">Žádné položky nenalezeny.</p>
+              <p className="text-white/40 text-sm">Žádné položky nenalezeny.</p>
             </div>
           )}
         </div>

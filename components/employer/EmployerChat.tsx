@@ -86,18 +86,18 @@ export default function EmployerChat({ user }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-3 border-b border-tea-200 bg-white flex-shrink-0">
-        <h3 className="font-bold text-tea-800">💬 Obecný chat</h3>
-        <p className="text-xs text-tea-400">Komunikace s týmem</p>
+      <div className="px-6 py-4 border-b border-white/[0.06] backdrop-blur-xl bg-white/[0.03] flex-shrink-0">
+        <h3 className="font-bold tracking-tight text-white">💬 Obecný chat</h3>
+        <p className="text-xs text-white/40">Komunikace s týmem</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-4xl animate-spin">⏳</div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-tea-400 py-12">
+          <div className="text-center text-white/40 py-12">
             <p className="text-4xl mb-2">💬</p>
             <p>Žádné zprávy. Buďte první!</p>
           </div>
@@ -105,15 +105,15 @@ export default function EmployerChat({ user }: Props) {
           const isMe = msg.senderId === myId;
           return (
             <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-              <div className="w-9 h-9 rounded-full bg-matcha-100 flex items-center justify-center text-lg flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center text-lg flex-shrink-0">
                 {msg.senderAvatar}
               </div>
               <div className={`max-w-[70%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
-                {!isMe && <p className="text-xs text-tea-400 mb-1 ml-1">{msg.senderName}</p>}
-                <div className={`px-4 py-2.5 rounded-2xl text-sm ${isMe ? 'bg-matcha-600 text-white rounded-tr-sm' : 'bg-white border border-tea-200 text-tea-800 rounded-tl-sm shadow-sm'}`}>
+                {!isMe && <p className="text-xs text-white/40 mb-1 ml-1">{msg.senderName}</p>}
+                <div className={`px-4 py-2.5 text-sm ${isMe ? 'bg-[#C8F542] text-black rounded-3xl rounded-br-lg font-medium' : 'glass text-white rounded-3xl rounded-bl-lg'}`}>
                   {msg.content}
                 </div>
-                <p className="text-xs text-tea-300 mt-1 mx-1">
+                <p className="text-xs text-white/25 mt-1 mx-1">
                   {new Date(msg.createdAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
@@ -123,17 +123,17 @@ export default function EmployerChat({ user }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={sendMessage} className="flex-shrink-0 p-4 border-t border-tea-200 bg-white flex gap-3">
+      <form onSubmit={sendMessage} className="flex-shrink-0 p-4 border-t border-white/[0.06] backdrop-blur-xl bg-white/[0.03] flex gap-3">
         <input
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
           placeholder="Napište zprávu..."
-          className="flex-1 px-4 py-2.5 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800 placeholder:text-tea-300"
+          className="flex-1 rounded-full bg-white/[0.06] border border-white/10 px-5 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
         />
         <button
           type="submit"
           disabled={!newMessage.trim() || sending}
-          className="px-4 py-2.5 bg-matcha-600 hover:bg-matcha-700 disabled:bg-matcha-400 text-white rounded-xl font-medium text-sm transition-all"
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 transition-all disabled:opacity-40"
         >
           {sending ? '⏳' : '📤 Odeslat'}
         </button>

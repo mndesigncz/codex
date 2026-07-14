@@ -12,6 +12,9 @@ interface Employee {
   shiftPreference?: string;
 }
 
+const inputClass =
+  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+
 export default function Team() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,58 +62,59 @@ export default function Team() {
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-6">
       {success && (
-        <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 text-green-700 text-sm">
+        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#C8F542] text-sm">
           ✅ {success}
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-tea-800 text-lg">Zaměstnanci ({employees.length})</h3>
+        <h3 className="text-lg font-bold tracking-tight text-white">Zaměstnanci ({employees.length})</h3>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white text-sm rounded-xl font-medium transition-all"
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all"
         >
           + Přidat zaměstnance
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} className="bg-white rounded-2xl border-2 border-matcha-200 p-5 space-y-4">
-          <h4 className="font-bold text-tea-800">Nový zaměstnanec</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={handleAdd} className="glass-card border-[#C8F542]/20 p-6 space-y-5">
+          <h4 className="font-bold tracking-tight text-white">Nový zaměstnanec</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Jméno *</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Jméno *</label>
               <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Email *</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Email *</label>
               <input required type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Telefon</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Telefon</label>
               <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-tea-700 mb-1">Pozice</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Pozice</label>
               <input value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))}
-                className="w-full px-3 py-2 border-2 border-tea-200 rounded-xl focus:outline-none focus:border-matcha-500 text-sm text-tea-800" />
+                className={inputClass} />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-tea-700 cursor-pointer">
-            <input type="checkbox" checked={form.sendInvite} onChange={e => setForm(f => ({ ...f, sendInvite: e.target.checked }))} className="accent-matcha-600" />
+          <label className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
+            <input type="checkbox" checked={form.sendInvite} onChange={e => setForm(f => ({ ...f, sendInvite: e.target.checked }))} className="accent-[#C8F542]" />
             Odeslat pozvánku emailem s dočasným heslem
           </label>
           <div className="flex gap-3">
             <button type="submit" disabled={submitting}
-              className="px-4 py-2 bg-matcha-600 hover:bg-matcha-700 text-white text-sm rounded-xl font-medium disabled:opacity-60">
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
               {submitting ? '⏳ Přidávám...' : '✅ Přidat'}
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-tea-100 hover:bg-tea-200 text-tea-700 text-sm rounded-xl font-medium">
+            <button type="button" onClick={() => setShowForm(false)}
+              className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
               Zrušit
             </button>
           </div>
@@ -124,20 +128,20 @@ export default function Team() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {employees.map(emp => (
-            <div key={emp.id} className="bg-white rounded-2xl border-2 border-tea-100 p-5 hover:border-tea-200 transition-all">
+            <div key={emp.id} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-matcha-100 flex items-center justify-center text-2xl">
+                <div className="w-12 h-12 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/20 flex items-center justify-center text-2xl">
                   {emp.avatar ?? '👤'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-tea-800">{emp.name}</p>
-                  <p className="text-sm text-tea-500">{emp.jobTitle ?? 'Barista'}</p>
+                  <p className="font-bold tracking-tight text-white">{emp.name}</p>
+                  <p className="text-sm text-white/40">{emp.jobTitle ?? 'Barista'}</p>
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
-                <p className="text-sm text-tea-600">📧 {emp.email}</p>
-                {emp.phone && <p className="text-sm text-tea-600">📞 {emp.phone}</p>}
-                <p className="text-sm text-tea-600">{shiftPrefLabel(emp.shiftPreference)}</p>
+                <p className="text-sm text-white/60">📧 {emp.email}</p>
+                {emp.phone && <p className="text-sm text-white/60">📞 {emp.phone}</p>}
+                <p className="text-sm text-white/60">{shiftPrefLabel(emp.shiftPreference)}</p>
               </div>
             </div>
           ))}

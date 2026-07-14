@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const inputClass =
+  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+
 export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -57,83 +60,83 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🍵</div>
-          <h1 className="text-2xl font-bold text-white mb-1">Čajovna Zelená</h1>
-          <p className="text-[#8E8E93] text-sm">Vytvořte si účet a začněte používat systém</p>
+          <div className="text-5xl mb-4">🍵</div>
+          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Čajovna Zelená</h1>
+          <p className="text-white/40 text-sm">Vytvořte si účet a začněte používat systém</p>
         </div>
 
         {/* Register Card */}
-        <div className="bg-[#1C1C1E] rounded-2xl p-6 border border-[#2C2C2E]">
-          <h2 className="text-lg font-semibold text-white mb-5">Registrace</h2>
+        <div className="glass-card p-8">
+          <h2 className="text-lg font-bold tracking-tight text-white mb-6">Registrace</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-1.5">Jméno</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Jméno</label>
               <input
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="Jana Nováková"
                 required
-                className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#3A3A3C] rounded-xl text-white placeholder:text-[#48484A] focus:outline-none focus:border-[#30D158] transition-colors text-sm"
+                className={inputClass}
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-1.5">Email</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="vas@email.cz"
                 required
-                className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#3A3A3C] rounded-xl text-white placeholder:text-[#48484A] focus:outline-none focus:border-[#30D158] transition-colors text-sm"
+                className={inputClass}
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-1.5">Heslo</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Heslo</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Minimálně 8 znaků"
                 required
-                className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#3A3A3C] rounded-xl text-white placeholder:text-[#48484A] focus:outline-none focus:border-[#30D158] transition-colors text-sm"
+                className={inputClass}
               />
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-1.5">Zopakuj heslo</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Zopakuj heslo</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Zadejte heslo znovu"
                 required
-                className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#3A3A3C] rounded-xl text-white placeholder:text-[#48484A] focus:outline-none focus:border-[#30D158] transition-colors text-sm"
+                className={inputClass}
               />
             </div>
 
             {/* Role selection */}
             <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-2">Typ účtu</label>
+              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Typ účtu</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setRole('employer')}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-300 ${
                     role === 'employer'
-                      ? 'border-[#30D158] bg-[#30D158]/10 text-white'
-                      : 'border-[#3A3A3C] bg-[#2C2C2E] text-[#8E8E93] hover:border-[#48484A]'
+                      ? 'border-[#C8F542]/60 bg-[#C8F542]/10 text-white'
+                      : 'border-white/10 bg-white/[0.04] text-white/50 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
                   <span className="text-2xl">🏪</span>
@@ -145,10 +148,10 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setRole('employee')}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-300 ${
                     role === 'employee'
-                      ? 'border-[#30D158] bg-[#30D158]/10 text-white'
-                      : 'border-[#3A3A3C] bg-[#2C2C2E] text-[#8E8E93] hover:border-[#48484A]'
+                      ? 'border-[#C8F542]/60 bg-[#C8F542]/10 text-white'
+                      : 'border-white/10 bg-white/[0.04] text-white/50 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
                   <span className="text-2xl">👤</span>
@@ -162,7 +165,7 @@ export default function RegisterPage() {
 
             {/* Error */}
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                 {error}
               </div>
             )}
@@ -171,22 +174,22 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-[#30D158] hover:bg-[#28B84A] disabled:bg-[#30D158]/50 text-black font-semibold rounded-xl transition-all text-sm active:scale-95"
+              className="w-full py-3 rounded-full bg-[#C8F542] hover:brightness-110 disabled:opacity-50 text-black font-semibold transition-all text-sm active:scale-[0.98]"
             >
               {isLoading ? 'Vytváření účtu...' : 'Vytvořit účet'}
             </button>
           </form>
 
           {/* Login link */}
-          <p className="text-center text-[#8E8E93] text-sm mt-5">
+          <p className="text-center text-white/40 text-sm mt-6">
             Už máte účet?{' '}
-            <Link href="/login" className="text-[#30D158] hover:text-[#28B84A] font-medium transition-colors">
+            <Link href="/login" className="text-[#C8F542] hover:underline font-medium">
               Přihlásit se
             </Link>
           </p>
         </div>
 
-        <p className="text-center text-[#48484A] text-xs mt-4">
+        <p className="text-center text-white/20 text-xs mt-6">
           © 2025 Čajovna Zelená · Interní systém
         </p>
       </div>

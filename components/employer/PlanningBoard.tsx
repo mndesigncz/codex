@@ -11,10 +11,10 @@ interface PlanningCard {
 }
 
 const COLUMNS = [
-  { id: 'ideas', label: 'Nápady', color: 'bg-blue-100 border-blue-200', headerColor: 'bg-blue-500' },
-  { id: 'in_progress', label: 'Rozpracováno', color: 'bg-amber-50 border-amber-200', headerColor: 'bg-amber-500' },
-  { id: 'review', label: 'Ke schválení', color: 'bg-yellow-50 border-yellow-200', headerColor: 'bg-yellow-500' },
-  { id: 'done', label: 'Hotovo', color: 'bg-green-50 border-green-200', headerColor: 'bg-green-500' },
+  { id: 'ideas', label: 'Nápady', dot: 'bg-[#0A84FF]', chip: 'bg-[#0A84FF]/15 text-[#0A84FF]' },
+  { id: 'in_progress', label: 'Rozpracováno', dot: 'bg-orange-400', chip: 'bg-orange-500/15 text-orange-400' },
+  { id: 'review', label: 'Ke schválení', dot: 'bg-yellow-400', chip: 'bg-yellow-500/15 text-yellow-400' },
+  { id: 'done', label: 'Hotovo', dot: 'bg-[#C8F542]', chip: 'bg-[#C8F542]/15 text-[#C8F542]' },
 ];
 
 export default function PlanningBoard() {
@@ -62,42 +62,45 @@ export default function PlanningBoard() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {COLUMNS.map(col => (
-            <div key={col.id} className="flex flex-col gap-3">
-              <div className={`${col.headerColor} text-white px-3 py-2 rounded-xl font-semibold text-sm flex items-center justify-between`}>
-                <span>{col.label}</span>
-                <span className="bg-white/20 rounded-full px-2 text-xs">{getColumnCards(col.id).length}</span>
+            <div key={col.id} className="glass rounded-3xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between px-1 py-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${col.dot}`} />
+                  <span className="font-semibold text-sm text-white tracking-tight">{col.label}</span>
+                </div>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${col.chip}`}>{getColumnCards(col.id).length}</span>
               </div>
 
               <div className="space-y-3 min-h-24">
                 {getColumnCards(col.id).map(card => (
-                  <div key={card.id} className={`${col.color} border-2 rounded-xl p-3 shadow-sm`}>
-                    <p className="font-semibold text-tea-800 text-sm">{card.title}</p>
-                    {card.description && <p className="text-xs text-tea-500 mt-1">{card.description}</p>}
+                  <div key={card.id} className="bg-white/[0.06] border border-white/[0.08] rounded-2xl p-4 hover:bg-white/[0.09] transition-all duration-300">
+                    <p className="font-semibold text-white text-sm">{card.title}</p>
+                    {card.description && <p className="text-xs text-white/40 mt-1.5">{card.description}</p>}
                   </div>
                 ))}
               </div>
 
               {newCard?.column === col.id ? (
-                <div className="bg-white border-2 border-matcha-200 rounded-xl p-3 space-y-2">
+                <div className="bg-white/[0.06] border border-[#C8F542]/30 rounded-2xl p-3 space-y-2">
                   <input
                     autoFocus
                     value={newCard.title}
                     onChange={e => setNewCard(prev => prev ? { ...prev, title: e.target.value } : null)}
                     placeholder="Název karty..."
-                    className="w-full text-sm border border-tea-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-matcha-500 text-tea-800"
+                    className="w-full text-sm rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:outline-none transition-all"
                   />
                   <textarea
                     value={newCard.description}
                     onChange={e => setNewCard(prev => prev ? { ...prev, description: e.target.value } : null)}
                     placeholder="Popis (volitelné)"
                     rows={2}
-                    className="w-full text-xs border border-tea-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-matcha-500 text-tea-800 resize-none"
+                    className="w-full text-xs rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:outline-none transition-all resize-none"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleAddCard} disabled={adding} className="flex-1 py-1 bg-matcha-600 text-white text-xs rounded-lg hover:bg-matcha-700 disabled:opacity-60">
+                    <button onClick={handleAddCard} disabled={adding} className="flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
                       {adding ? '⏳' : 'Přidat'}
                     </button>
-                    <button onClick={() => setNewCard(null)} className="flex-1 py-1 bg-tea-100 text-tea-600 text-xs rounded-lg hover:bg-tea-200">
+                    <button onClick={() => setNewCard(null)} className="flex-1 py-1.5 rounded-full glass border border-white/15 text-white/60 text-xs hover:bg-white/10 transition-all">
                       Zrušit
                     </button>
                   </div>
@@ -105,7 +108,7 @@ export default function PlanningBoard() {
               ) : (
                 <button
                   onClick={() => setNewCard({ column: col.id, title: '', description: '' })}
-                  className="w-full py-2 border-2 border-dashed border-tea-200 rounded-xl text-xs text-tea-400 hover:border-tea-300 hover:text-tea-500 transition-all"
+                  className="w-full py-2.5 border border-dashed border-white/15 rounded-2xl text-xs text-white/30 hover:border-[#C8F542]/40 hover:text-[#C8F542] transition-all duration-300"
                 >
                   + Přidat kartu
                 </button>
