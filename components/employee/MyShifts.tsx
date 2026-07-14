@@ -40,20 +40,29 @@ export default function MyShifts({ user }: Props) {
   const shiftLabel = (type: string) => type === 'morning' ? '🌅 Ranní' : type === 'afternoon' ? '🌆 Odpolední' : '🔄 Flexibilní';
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-matcha-50 border-2 border-matcha-200 rounded-2xl p-4 text-center">
-          <p className="text-xs text-matcha-600 font-medium">Nadcházející</p>
-          <p className="text-2xl font-bold text-matcha-700 mt-1">{upcoming.length}</p>
+        <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-white/40">Nadcházející</p>
+          <p className="text-3xl font-bold tracking-tight text-white mt-2">{upcoming.length}</p>
+          <div className="mt-3 h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${shifts.length ? Math.min(100, (upcoming.length / shifts.length) * 100) : 0}%` }} />
+          </div>
         </div>
-        <div className="bg-tea-50 border-2 border-tea-200 rounded-2xl p-4 text-center">
-          <p className="text-xs text-tea-600 font-medium">Odpracované (odhad)</p>
-          <p className="text-2xl font-bold text-tea-700 mt-1">{past.length * 8}h</p>
+        <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-white/40">Odpracované (odhad)</p>
+          <p className="text-3xl font-bold tracking-tight text-white mt-2">{past.length * 8}h</p>
+          <div className="mt-3 h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, ((past.length * 8) / totalHours) * 100) : 0}%` }} />
+          </div>
         </div>
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-center">
-          <p className="text-xs text-amber-600 font-medium">Celkem směn</p>
-          <p className="text-2xl font-bold text-amber-700 mt-1">{shifts.length}</p>
+        <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-white/40">Celkem směn</p>
+          <p className="text-3xl font-bold tracking-tight text-white mt-2">{shifts.length}</p>
+          <div className="mt-3 h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: shifts.length ? '100%' : '0%' }} />
+          </div>
         </div>
       </div>
 
@@ -61,25 +70,25 @@ export default function MyShifts({ user }: Props) {
         <div className="flex items-center justify-center h-48"><div className="text-4xl animate-spin">⏳</div></div>
       ) : (
         <>
-          <div className="bg-white rounded-2xl border-2 border-tea-100 p-5">
-            <h3 className="font-bold text-tea-800 mb-4">📅 Nadcházející směny</h3>
+          <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+            <h3 className="font-bold tracking-tight text-white mb-4">📅 Nadcházející směny</h3>
             {upcoming.length === 0 ? (
-              <p className="text-tea-400 text-sm">Žádné nadcházející směny.</p>
+              <p className="text-white/40 text-sm">Žádné nadcházející směny.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-white/[0.06]">
                 {upcoming.slice(0, 8).map(s => {
                   const isToday = s.date === today;
                   return (
-                    <div key={s.id} className={`flex items-center gap-3 p-3 rounded-xl ${isToday ? 'bg-matcha-50 border-2 border-matcha-200' : 'bg-tea-50'}`}>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${isToday ? 'bg-matcha-100' : 'bg-tea-100'}`}>
+                    <div key={s.id} className={`flex items-center gap-3 p-3 rounded-2xl transition-colors hover:bg-white/[0.04] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${isToday ? 'bg-[#C8F542]/15' : 'bg-white/[0.06]'}`}>
                         {s.type === 'morning' ? '🌅' : '🌆'}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-tea-800 text-sm">{formatDate(s.date)}</p>
-                          {isToday && <span className="text-xs bg-matcha-500 text-white px-2 py-0.5 rounded-full font-medium">Dnes</span>}
+                          <p className="font-semibold text-white text-sm">{formatDate(s.date)}</p>
+                          {isToday && <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#C8F542]">Dnes</span>}
                         </div>
-                        <p className="text-xs text-tea-400">{s.startTime} – {s.endTime} · {shiftLabel(s.type)}</p>
+                        <p className="text-xs text-white/40">{s.startTime} – {s.endTime} · {shiftLabel(s.type)}</p>
                       </div>
                     </div>
                   );
@@ -89,17 +98,17 @@ export default function MyShifts({ user }: Props) {
           </div>
 
           {past.length > 0 && (
-            <div className="bg-white rounded-2xl border-2 border-tea-100 p-5">
-              <h3 className="font-bold text-tea-800 mb-4">📋 Minulé směny</h3>
-              <div className="space-y-2">
+            <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+              <h3 className="font-bold tracking-tight text-white mb-4">📋 Minulé směny</h3>
+              <div className="divide-y divide-white/[0.06]">
                 {past.slice(0, 5).map(s => (
-                  <div key={s.id} className="flex items-center gap-3 p-3 bg-tea-50 rounded-xl opacity-70">
+                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl opacity-70 transition-colors hover:bg-white/[0.04]">
                     <span className="text-lg">{s.type === 'morning' ? '🌅' : '🌆'}</span>
                     <div className="flex-1">
-                      <p className="text-sm text-tea-700 font-medium">{formatDate(s.date)}</p>
-                      <p className="text-xs text-tea-400">{s.startTime} – {s.endTime}</p>
+                      <p className="text-sm text-white font-medium">{formatDate(s.date)}</p>
+                      <p className="text-xs text-white/40">{s.startTime} – {s.endTime}</p>
                     </div>
-                    <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">✓ Splněno</span>
+                    <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#C8F542]">✓ Splněno</span>
                   </div>
                 ))}
               </div>

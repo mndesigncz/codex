@@ -40,52 +40,52 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🍵</div>
-          <h1 className="text-2xl font-bold text-white mb-1">Čajovna Zelená</h1>
-          <p className="text-[#8E8E93] text-sm">Systém správy čajovny</p>
+          <div className="text-5xl mb-4">🍵</div>
+          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Čajovna Zelená</h1>
+          <p className="text-white/50 text-sm">Systém správy čajovny</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-[#1C1C1E] rounded-2xl p-6 border border-[#2C2C2E]">
-          <h2 className="text-lg font-semibold text-white mb-5">Přihlásit se</h2>
+        <div className="glass-card p-8">
+          <h2 className="text-3xl font-bold tracking-tight text-white mb-6">Přihlásit se</h2>
 
           {justRegistered && (
-            <div className="p-3 bg-[#30D158]/10 border border-[#30D158]/30 rounded-xl text-[#30D158] text-sm mb-4">
+            <div className="p-4 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 text-[#C8F542] text-sm mb-6">
               Účet byl vytvořen. Nyní se můžete přihlásit.
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-1.5">Email</label>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-xs uppercase tracking-wider text-white/40">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="vas@email.cz"
                 required
-                className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#3A3A3C] rounded-xl text-white placeholder:text-[#48484A] focus:outline-none focus:border-[#30D158] transition-colors text-sm"
+                className="w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#8E8E93] mb-1.5">Heslo</label>
+            <div className="space-y-2">
+              <label className="block text-xs uppercase tracking-wider text-white/40">Heslo</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Zadejte heslo"
                 required
-                className="w-full px-4 py-3 bg-[#2C2C2E] border border-[#3A3A3C] rounded-xl text-white placeholder:text-[#48484A] focus:outline-none focus:border-[#30D158] transition-colors text-sm"
+                className="w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
               />
             </div>
 
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                 {error}
               </div>
             )}
@@ -93,22 +93,22 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-[#30D158] hover:bg-[#28B84A] disabled:bg-[#30D158]/50 text-black font-semibold rounded-xl transition-all text-sm active:scale-95"
+              className="w-full rounded-full bg-[#C8F542] text-black font-semibold py-3 hover:brightness-110 disabled:opacity-50 transition text-sm active:scale-95"
             >
               {isLoading ? 'Přihlašování...' : 'Přihlásit se'}
             </button>
           </form>
 
           {/* Register link */}
-          <p className="text-center text-[#8E8E93] text-sm mt-5">
+          <p className="text-center text-white/50 text-sm mt-6">
             Nemáte účet?{' '}
-            <Link href="/register" className="text-[#30D158] hover:text-[#28B84A] font-medium transition-colors">
+            <Link href="/register" className="text-[#C8F542] hover:underline font-medium">
               Registrovat se →
             </Link>
           </p>
         </div>
 
-        <p className="text-center text-[#48484A] text-xs mt-4">
+        <p className="text-center text-white/30 text-xs mt-6">
           © 2025 Čajovna Zelená · Interní systém
         </p>
       </div>

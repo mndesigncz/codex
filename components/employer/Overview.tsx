@@ -40,22 +40,20 @@ interface DailyReport {
   customers: number;
 }
 
-function StatCard({ icon, label, value, sub, color = 'matcha' }: { icon: string; label: string; value: string | number; sub?: string; color?: string }) {
-  const colorMap: Record<string, string> = {
-    matcha: 'bg-matcha-50 border-matcha-200 text-matcha-700',
-    tea: 'bg-tea-50 border-tea-200 text-tea-700',
-    amber: 'bg-amber-50 border-amber-200 text-amber-700',
-    red: 'bg-red-50 border-red-200 text-red-700',
-  };
+function StatCard({ icon, label, value, sub, progress = 100, alert = false }: { icon: string; label: string; value: string | number; sub?: string; progress?: number; alert?: boolean }) {
   return (
-    <div className={`rounded-2xl border-2 p-5 ${colorMap[color] ?? colorMap.matcha}`}>
+    <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
       <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium opacity-70">{label}</p>
-          <p className="text-3xl font-bold mt-1">{value}</p>
-          {sub && <p className="text-xs opacity-60 mt-1">{sub}</p>}
-        </div>
-        <span className="text-3xl">{icon}</span>
+        <p className="text-xs uppercase tracking-wider text-white/40">{label}</p>
+        <span className="text-xl opacity-80">{icon}</span>
+      </div>
+      <p className="text-3xl md:text-4xl font-bold tracking-tight mt-3 text-white">{value}</p>
+      {sub && <p className="text-xs text-white/40 mt-1">{sub}</p>}
+      <div className="h-1 rounded-full bg-white/10 mt-4 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${alert ? 'bg-red-400' : 'bg-[#C8F542]'}`}
+          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+        />
       </div>
     </div>
   );
@@ -120,28 +118,28 @@ export default function Overview({ onNavigate }: { onNavigate: (view: string) =>
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon="👥" label="Zaměstnanci" value={users.length} sub="aktivních" color="matcha" />
-            <StatCard icon="📅" label="Směny dnes" value={todayShifts.length} sub="naplánovaných" color="tea" />
-            <StatCard icon="✅" label="Aktivní úkoly" value={pendingTasks.length} sub="ke splnění" color="amber" />
-            <StatCard icon="⚠️" label="Nízké zásoby" value={lowStock.length} sub="položek" color={lowStock.length > 0 ? 'red' : 'matcha'} />
+            <StatCard icon="👥" label="Zaměstnanci" value={users.length} sub="aktivních" progress={users.length > 0 ? 100 : 0} />
+            <StatCard icon="📅" label="Směny dnes" value={todayShifts.length} sub="naplánovaných" progress={Math.min(100, todayShifts.length * 25)} />
+            <StatCard icon="✅" label="Aktivní úkoly" value={pendingTasks.length} sub="ke splnění" progress={tasks.length > 0 ? Math.round((pendingTasks.length / tasks.length) * 100) : 0} />
+            <StatCard icon="⚠️" label="Nízké zásoby" value={lowStock.length} sub="položek" progress={inventory.length > 0 ? Math.round((lowStock.length / inventory.length) * 100) : 0} alert={lowStock.length > 0} />
           </div>
 
           {/* Today's shifts */}
-          <div className="bg-white rounded-2xl border-2 border-tea-100 p-5">
+          <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-tea-800 text-lg">📅 Dnešní směny</h3>
-              <button onClick={() => onNavigate('shifts')} className="text-sm text-matcha-600 hover:underline">Všechny směny →</button>
+              <h3 className="text-lg font-bold tracking-tight text-white">📅 Dnešní směny</h3>
+              <button onClick={() => onNavigate('shifts')} className="text-sm text-[#C8F542] hover:brightness-110 transition-all">Všechny směny →</button>
             </div>
             {todayShifts.length === 0 ? (
-              <p className="text-tea-400 text-sm">Dnes nejsou žádné naplánované směny.</p>
+              <p className="text-white/40 text-sm">Dnes nejsou žádné naplánované směny.</p>
             ) : (
               <div className="space-y-3">
                 {todayShifts.map(s => (
-                  <div key={s.id} className="flex items-center gap-3 p-3 bg-tea-50 rounded-xl">
+                  <div key={s.id} className="flex items-center gap-3 p-3 bg-white/[0.06] rounded-2xl hover:bg-white/[0.08] transition-all duration-300">
                     <span className="text-2xl">{s.type === 'morning' ? '🌅' : '🌆'}</span>
                     <div>
-                      <p className="font-semibold text-tea-800 text-sm">{getUserName(s.employeeId)}</p>
-                      <p className="text-xs text-tea-500">{s.startTime} – {s.endTime} · {s.type === 'morning' ? 'Ranní' : 'Odpolední'} směna</p>
+                      <p className="font-semibold text-white text-sm">{getUserName(s.employeeId)}</p>
+                      <p className="text-xs text-white/40">{s.startTime} – {s.endTime} · {s.type === 'morning' ? 'Ranní' : 'Odpolední'} směna</p>
                     </div>
                   </div>
                 ))}
@@ -151,45 +149,45 @@ export default function Overview({ onNavigate }: { onNavigate: (view: string) =>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Pending tasks */}
-            <div className="bg-white rounded-2xl border-2 border-tea-100 p-5">
+            <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-tea-800">✅ Aktivní úkoly</h3>
-                <button onClick={() => onNavigate('team')} className="text-sm text-matcha-600 hover:underline">Zobrazit →</button>
+                <h3 className="font-bold tracking-tight text-white">✅ Aktivní úkoly</h3>
+                <button onClick={() => onNavigate('team')} className="text-sm text-[#C8F542] hover:brightness-110 transition-all">Zobrazit →</button>
               </div>
               <div className="space-y-2">
                 {pendingTasks.slice(0, 4).map(t => (
-                  <div key={t.id} className="flex items-center gap-3 p-3 bg-tea-50 rounded-xl">
+                  <div key={t.id} className="flex items-center gap-3 p-3 bg-white/[0.06] rounded-2xl hover:bg-white/[0.08] transition-all duration-300">
                     <span className="text-lg">{t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '🟢'}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-tea-800 truncate">{t.title}</p>
-                      {t.dueDate && <p className="text-xs text-tea-400">Do: {t.dueDate}</p>}
+                      <p className="text-sm font-medium text-white truncate">{t.title}</p>
+                      {t.dueDate && <p className="text-xs text-white/40">Do: {t.dueDate}</p>}
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${t.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-tea-100 text-tea-600'}`}>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${t.status === 'in_progress' ? 'bg-blue-500/15 text-blue-400' : 'bg-white/10 text-white/60'}`}>
                       {t.status === 'in_progress' ? 'Probíhá' : 'Čeká'}
                     </span>
                   </div>
                 ))}
-                {pendingTasks.length === 0 && <p className="text-tea-400 text-sm">Žádné aktivní úkoly 🎉</p>}
+                {pendingTasks.length === 0 && <p className="text-white/40 text-sm">Žádné aktivní úkoly 🎉</p>}
               </div>
             </div>
 
             {/* Low stock */}
-            <div className="bg-white rounded-2xl border-2 border-tea-100 p-5">
+            <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-tea-800">⚠️ Nízké zásoby</h3>
-                <button onClick={() => onNavigate('inventory')} className="text-sm text-matcha-600 hover:underline">Sklad →</button>
+                <h3 className="font-bold tracking-tight text-white">⚠️ Nízké zásoby</h3>
+                <button onClick={() => onNavigate('inventory')} className="text-sm text-[#C8F542] hover:brightness-110 transition-all">Sklad →</button>
               </div>
               <div className="space-y-2">
                 {lowStock.slice(0, 5).map(i => (
-                  <div key={i.id} className="flex items-center gap-3 p-3 bg-red-50 rounded-xl">
+                  <div key={i.id} className="flex items-center gap-3 p-3 bg-red-500/10 rounded-2xl hover:bg-red-500/15 transition-all duration-300">
                     <span className="text-lg">📦</span>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-tea-800">{i.name}</p>
-                      <p className="text-xs text-red-500">{i.quantity} {i.unit} / min. {i.minQuantity} {i.unit}</p>
+                      <p className="text-sm font-medium text-white">{i.name}</p>
+                      <p className="text-xs text-red-400">{i.quantity} {i.unit} / min. {i.minQuantity} {i.unit}</p>
                     </div>
                   </div>
                 ))}
-                {lowStock.length === 0 && <p className="text-tea-400 text-sm">Zásoby jsou v pořádku ✅</p>}
+                {lowStock.length === 0 && <p className="text-white/40 text-sm">Zásoby jsou v pořádku ✅</p>}
               </div>
             </div>
           </div>

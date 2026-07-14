@@ -73,18 +73,18 @@ export default function ShiftManagement() {
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-6">
       {/* Tabs */}
-      <div className="flex gap-2 bg-tea-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 glass rounded-full p-1 w-fit">
         <button
           onClick={() => setTab('shifts')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'shifts' ? 'bg-white shadow text-tea-800' : 'text-tea-500 hover:text-tea-700'}`}
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${tab === 'shifts' ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
         >
           📅 Směny ({shifts.length})
         </button>
         <button
           onClick={() => setTab('requests')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'requests' ? 'bg-white shadow text-tea-800' : 'text-tea-500 hover:text-tea-700'}`}
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${tab === 'requests' ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
         >
           📨 Žádosti ({requests.filter(r => r.status === 'pending').length})
         </button>
@@ -97,17 +97,17 @@ export default function ShiftManagement() {
       ) : tab === 'shifts' ? (
         <div className="space-y-4">
           {Object.keys(grouped).slice(0, 7).map(date => (
-            <div key={date} className="bg-white rounded-2xl border-2 border-tea-100 p-5">
-              <h3 className="font-bold text-tea-800 mb-3 capitalize">{formatDate(date)}</h3>
-              <div className="space-y-2">
+            <div key={date} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+              <h3 className="font-bold tracking-tight text-white mb-3 capitalize">{formatDate(date)}</h3>
+              <div className="divide-y divide-white/[0.06]">
                 {grouped[date].map(s => (
-                  <div key={s.id} className="flex items-center gap-3 p-3 bg-tea-50 rounded-xl">
+                  <div key={s.id} className="flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
                     <span className="text-xl">{getUserAvatar(s.employeeId)}</span>
                     <div className="flex-1">
-                      <p className="font-medium text-tea-800 text-sm">{getUserName(s.employeeId)}</p>
-                      <p className="text-xs text-tea-400">{s.startTime} – {s.endTime}</p>
+                      <p className="font-medium text-white text-sm">{getUserName(s.employeeId)}</p>
+                      <p className="text-xs text-white/40">{s.startTime} – {s.endTime}</p>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.type === 'morning' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${s.type === 'morning' ? 'bg-orange-500/15 text-orange-400' : 'bg-blue-500/15 text-blue-400'}`}>
                       {s.type === 'morning' ? '🌅 Ranní' : '🌆 Odpolední'}
                     </span>
                   </div>
@@ -116,32 +116,32 @@ export default function ShiftManagement() {
             </div>
           ))}
           {Object.keys(grouped).length === 0 && (
-            <div className="bg-white rounded-2xl border-2 border-tea-100 p-8 text-center">
-              <p className="text-tea-400">Žádné nadcházející směny.</p>
+            <div className="glass-card p-8 text-center">
+              <p className="text-white/40">Žádné nadcházející směny.</p>
             </div>
           )}
         </div>
       ) : (
         <div className="space-y-3">
           {requests.length === 0 ? (
-            <div className="bg-white rounded-2xl border-2 border-tea-100 p-8 text-center">
-              <p className="text-tea-400">Žádné žádosti ke schválení.</p>
+            <div className="glass-card p-8 text-center">
+              <p className="text-white/40">Žádné žádosti ke schválení.</p>
             </div>
           ) : requests.map(r => (
-            <div key={r.id} className="bg-white rounded-2xl border-2 border-tea-100 p-5">
+            <div key={r.id} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">{getUserAvatar(r.employeeId)}</span>
                 <div className="flex-1">
-                  <p className="font-semibold text-tea-800">{getUserName(r.employeeId)}</p>
-                  <p className="text-sm text-tea-500 mt-0.5">
+                  <p className="font-semibold text-white">{getUserName(r.employeeId)}</p>
+                  <p className="text-sm text-white/60 mt-0.5">
                     {r.requestType === 'day_off' ? 'Volno' : r.requestType === 'swap' ? 'Výměna směny' : 'Extra směna'} · {r.date}
                   </p>
-                  {r.note && <p className="text-sm text-tea-600 mt-2 bg-tea-50 p-2 rounded-lg">{r.note}</p>}
+                  {r.note && <p className="text-sm text-white/60 mt-2 bg-white/[0.06] p-3 rounded-2xl">{r.note}</p>}
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  r.status === 'approved' ? 'bg-green-100 text-green-700' :
-                  r.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                  'bg-amber-100 text-amber-700'
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#C8F542]' :
+                  r.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
+                  'bg-orange-500/15 text-orange-400'
                 }`}>
                   {r.status === 'approved' ? '✅ Schváleno' : r.status === 'rejected' ? '❌ Zamítnuto' : '⏳ Čeká'}
                 </span>
