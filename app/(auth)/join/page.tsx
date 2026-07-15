@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { LogoMark } from '@/components/Icons';
 
 const inputClass =
-  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 function JoinForm() {
   const searchParams = useSearchParams();
@@ -68,10 +68,10 @@ function JoinForm() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
+          <h1 className="text-3xl font-bold tracking-tight text-[#16181A] mb-2">
             {token ? 'Přijmout pozvánku' : 'Připojit se k týmu'}
           </h1>
-          <p className="text-white/40 text-sm">
+          <p className="text-black/45 text-sm">
             {token && teamName ? `Byli jste pozváni do týmu ${teamName}.` : 'Zadejte kód týmu od svého zaměstnavatele.'}
           </p>
         </div>
@@ -80,34 +80,34 @@ function JoinForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {!token && (
               <div>
-                <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Kód týmu</label>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kód týmu</label>
                 <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Např. K7QP2M" required
                   className={`${inputClass} tracking-[0.25em] font-semibold text-center uppercase`} maxLength={6} />
               </div>
             )}
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Vaše jméno</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jana Nováková" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Email</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required disabled={!!token}
                 className={`${inputClass} ${token ? 'opacity-60' : ''}`} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Heslo</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Heslo</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
             </div>
 
-            {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+            {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}
 
             <button type="submit" disabled={isLoading} className="w-full py-3 rounded-full bg-[#C8F542] hover:brightness-110 disabled:opacity-50 text-black font-semibold transition-all text-sm active:scale-[0.98]">
               {isLoading ? 'Připojování…' : 'Připojit se'}
             </button>
           </form>
 
-          <p className="text-center text-white/40 text-sm mt-6">
-            Už máte účet? <Link href="/login" className="text-[#C8F542] hover:underline font-medium">Přihlásit se</Link>
+          <p className="text-center text-black/45 text-sm mt-6">
+            Už máte účet? <Link href="/login" className="text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link>
           </p>
         </div>
       </div>
@@ -117,7 +117,7 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/40 text-sm">Načítání…</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-black/45 text-sm">Načítání…</div>}>
       <JoinForm />
     </Suspense>
   );

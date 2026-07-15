@@ -23,8 +23,8 @@ interface Account {
 const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍🍳', '🧑‍💼', '🙂', '😎', '🌿', '🍵'];
 
 const inputClass =
-  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const labelClass = 'block text-xs uppercase tracking-wider text-white/40 mb-2';
+  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const labelClass = 'block text-xs uppercase tracking-wider text-black/45 mb-2';
 const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50';
 
 type Tab = 'account' | 'security' | 'team';
@@ -147,8 +147,8 @@ export default function Settings({ user }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div>
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Nastavení</h2>
-        <p className="text-white/40 text-sm mt-1">Spravujte svůj profil, zabezpečení a tým.</p>
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Nastavení</h2>
+        <p className="text-black/45 text-sm mt-1">Spravujte svůj profil, zabezpečení a tým.</p>
       </div>
 
       {/* Tabs */}
@@ -156,7 +156,7 @@ export default function Settings({ user }: Props) {
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-              tab === t.id ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'
+              tab === t.id ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
             }`}>
             {t.label}
           </button>
@@ -165,17 +165,17 @@ export default function Settings({ user }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : tab === 'account' ? (
         <form onSubmit={saveProfile} className="glass-card p-6 space-y-6">
           {profileMsg && (
-            <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#C8F542] text-sm flex items-center gap-2">
+            <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
               <Icon name="check" size={16} /> {profileMsg}
             </div>
           )}
           {profileErr && (
-            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-400 text-sm flex items-center gap-2">
+            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
               <Icon name="warning" size={16} /> {profileErr}
             </div>
           )}
@@ -191,7 +191,7 @@ export default function Settings({ user }: Props) {
                 {AVATARS.map(a => (
                   <button key={a} type="button" onClick={() => setAvatar(a)}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${
-                      avatar === a ? 'bg-[#C8F542]/20 border border-[#C8F542]/40' : 'bg-white/[0.06] border border-white/10 hover:bg-white/10'
+                      avatar === a ? 'bg-[#C8F542]/20 border border-[#C8F542]/40' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                     }`}>
                     {a}
                   </button>
@@ -240,17 +240,17 @@ export default function Settings({ user }: Props) {
       ) : tab === 'security' ? (
         <form onSubmit={savePassword} className="glass-card p-6 space-y-6">
           <div>
-            <h3 className="font-bold tracking-tight text-white">Změna hesla</h3>
-            <p className="text-white/40 text-sm mt-1">Nové heslo musí mít alespoň 8 znaků.</p>
+            <h3 className="font-bold tracking-tight text-[#16181A]">Změna hesla</h3>
+            <p className="text-black/45 text-sm mt-1">Nové heslo musí mít alespoň 8 znaků.</p>
           </div>
 
           {pwdMsg && (
-            <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#C8F542] text-sm flex items-center gap-2">
+            <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
               <Icon name="check" size={16} /> {pwdMsg}
             </div>
           )}
           {pwdErr && (
-            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-400 text-sm flex items-center gap-2">
+            <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
               <Icon name="warning" size={16} /> {pwdErr}
             </div>
           )}

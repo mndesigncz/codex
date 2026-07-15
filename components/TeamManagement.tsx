@@ -30,21 +30,21 @@ interface Invitation {
 }
 
 const inputClass =
-  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 function roleChip(role: string) {
   return role === 'employer'
-    ? 'bg-[#C8F542]/15 text-[#C8F542]'
-    : 'bg-blue-500/15 text-blue-400';
+    ? 'bg-[#C8F542]/15 text-[#5B7A08]'
+    : 'bg-blue-500/15 text-blue-600';
 }
 function roleLabel(role: string) {
   return role === 'employer' ? 'Vedoucí' : 'Zaměstnanec';
 }
 
 function statusChip(status: string) {
-  if (status === 'accepted') return 'bg-[#C8F542]/15 text-[#C8F542]';
-  if (status === 'expired' || status === 'declined') return 'bg-red-500/15 text-red-400';
-  return 'bg-blue-500/15 text-blue-400';
+  if (status === 'accepted') return 'bg-[#C8F542]/15 text-[#5B7A08]';
+  if (status === 'expired' || status === 'declined') return 'bg-red-500/15 text-red-600';
+  return 'bg-blue-500/15 text-blue-600';
 }
 function statusLabel(status: string) {
   if (status === 'accepted') return 'Přijato';
@@ -225,7 +225,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+        <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
       </div>
     );
   }
@@ -233,7 +233,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   if (!team) {
     return (
       <div className="glass-card p-8 text-center">
-        <p className="text-white/40">Zatím nemáte žádný tým.</p>
+        <p className="text-black/45">Zatím nemáte žádný tým.</p>
       </div>
     );
   }
@@ -244,19 +244,19 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   return (
     <div className="space-y-6">
       {notice && (
-        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#C8F542] text-sm flex items-center gap-2">
+        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={16} /> {notice}
         </div>
       )}
       {error && (
-        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-400 text-sm flex items-center gap-2">
+        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
           <Icon name="warning" size={16} /> {error}
         </div>
       )}
 
       {/* Team name */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-white/40 text-xs uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
           <Icon name="users" size={16} /> Název týmu
         </div>
         {editingName ? (
@@ -268,16 +268,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 {savingName ? 'Ukládám…' : 'Uložit'}
               </button>
               <button onClick={() => { setEditingName(false); setTeamName(team.name); }}
-                className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
+                className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
                 Zrušit
               </button>
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4">
-            <p className="text-2xl font-bold tracking-tight text-white">{team.name}</p>
+            <p className="text-2xl font-bold tracking-tight text-[#16181A]">{team.name}</p>
             <button onClick={() => setEditingName(true)}
-              className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
+              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
               Přejmenovat
             </button>
           </div>
@@ -286,20 +286,20 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       {/* Join code */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-white/40 text-xs uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
           <Icon name="check" size={16} /> Připojovací kód
         </div>
-        <p className="text-sm text-white/40">Sdílejte tento kód s novými členy, aby se mohli připojit k týmu.</p>
+        <p className="text-sm text-black/45">Sdílejte tento kód s novými členy, aby se mohli připojit k týmu.</p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1 rounded-2xl bg-white/[0.06] border border-white/10 px-6 py-5 flex items-center justify-between">
-            <span className="text-3xl md:text-4xl font-bold tracking-[0.3em] text-[#C8F542]">{team.join_code}</span>
+          <div className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-6 py-5 flex items-center justify-between">
+            <span className="text-3xl md:text-4xl font-bold tracking-[0.3em] text-[#5B7A08]">{team.join_code}</span>
             <button onClick={copyCode} title="Kopírovat"
-              className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
+              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
               {copied ? 'Zkopírováno ✓' : 'Kopírovat'}
             </button>
           </div>
           <button onClick={regenerate} disabled={regenerating}
-            className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all disabled:opacity-50 whitespace-nowrap">
+            className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all disabled:opacity-50 whitespace-nowrap">
             {regenerating ? 'Generuji…' : 'Vygenerovat nový'}
           </button>
         </div>
@@ -307,7 +307,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       {/* Invite */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-white/40 text-xs uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
           <Icon name="plus" size={16} /> Pozvat nového člena
         </div>
         <form onSubmit={sendInvite} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-3">
@@ -322,16 +322,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </form>
 
         <div className="pt-2">
-          <p className="text-xs uppercase tracking-wider text-white/40 mb-3">Odeslané pozvánky ({pending.length})</p>
+          <p className="text-xs uppercase tracking-wider text-black/45 mb-3">Odeslané pozvánky ({pending.length})</p>
           {invitations.length === 0 ? (
-            <p className="text-sm text-white/40">Zatím žádné pozvánky.</p>
+            <p className="text-sm text-black/45">Zatím žádné pozvánky.</p>
           ) : (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="divide-y divide-black/[0.06]">
               {invitations.map(inv => (
                 <div key={inv.id} className="flex items-center justify-between py-3 gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-white truncate">{inv.email}</p>
-                    <p className="text-xs text-white/40">{inv.job_title || 'Barista'}</p>
+                    <p className="text-sm text-[#16181A] truncate">{inv.email}</p>
+                    <p className="text-xs text-black/45">{inv.job_title || 'Barista'}</p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
                     {statusLabel(inv.status)}
@@ -345,10 +345,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       {/* Members */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-white/40 text-xs uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
           <Icon name="users" size={16} /> Členové týmu ({members.length})
         </div>
-        <div className="divide-y divide-white/[0.06]">
+        <div className="divide-y divide-black/[0.06]">
           {members.map(m => {
             const owner = m.id === team.owner_id;
             const editing = editMemberId === m.id;
@@ -360,20 +360,20 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-bold tracking-tight text-white truncate">{m.name}</p>
+                      <p className="font-bold tracking-tight text-[#16181A] truncate">{m.name}</p>
                       <span className={`rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
-                      {owner && <span className="rounded-full px-3 py-1 text-xs font-medium bg-white/10 text-white/60">Vlastník</span>}
+                      {owner && <span className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
                     </div>
-                    <p className="text-sm text-white/40 truncate">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
+                    <p className="text-sm text-black/45 truncate">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>
                   {!owner && !editing && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => startEdit(m)}
-                        className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-4 py-2 text-sm font-medium transition-all">
+                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all">
                         Upravit
                       </button>
                       <button onClick={() => setRemoveTarget(m)}
-                        className="rounded-full px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all">
+                        className="rounded-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition-all">
                         Odebrat
                       </button>
                     </div>
@@ -383,7 +383,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 {editing && (
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pl-0 sm:pl-15">
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Role</label>
+                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Role</label>
                       <select value={editRole} onChange={e => setEditRole(e.target.value)}
                         className={inputClass + ' appearance-none'}>
                         <option value="employee" className="bg-neutral-900">Zaměstnanec</option>
@@ -391,7 +391,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Pozice</label>
+                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Pozice</label>
                       <input value={editJob} onChange={e => setEditJob(e.target.value)} className={inputClass} />
                     </div>
                     <div className="sm:col-span-2 flex gap-2">
@@ -400,7 +400,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         {savingMember ? 'Ukládám…' : 'Uložit'}
                       </button>
                       <button onClick={() => setEditMemberId(null)}
-                        className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
+                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
                         Zrušit
                       </button>
                     </div>
@@ -419,22 +419,22 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <div className="glass-strong rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-400">
+              <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">
                 <Icon name="warning" size={20} />
               </div>
-              <h3 className="text-lg font-bold tracking-tight text-white">Odebrat člena</h3>
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Odebrat člena</h3>
             </div>
-            <p className="text-sm text-white/60">
-              Opravdu chcete odebrat <span className="text-white font-medium">{removeTarget.name}</span> z týmu?
+            <p className="text-sm text-black/60">
+              Opravdu chcete odebrat <span className="text-[#16181A] font-medium">{removeTarget.name}</span> z týmu?
               Ztratí přístup k týmu.
             </p>
             <div className="flex gap-3 pt-2">
               <button onClick={confirmRemove} disabled={removing}
-                className="rounded-full bg-red-500 text-white font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
+                className="rounded-full bg-red-500 text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
                 {removing ? 'Odebírám…' : 'Odebrat'}
               </button>
               <button onClick={() => setRemoveTarget(null)} disabled={removing}
-                className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
+                className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
                 Zrušit
               </button>
             </div>

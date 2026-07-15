@@ -61,48 +61,48 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   })();
 
   if (loading) {
-    return <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>;
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/15 bg-white/[0.08]">{user.avatar ?? '👤'}</span>
+        <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-black/[0.05]">{user.avatar ?? '👤'}</span>
         <div>
-          <p className="text-white/40 text-sm">{greeting},</p>
-          <h1 className="text-2xl font-bold tracking-tight text-white">{user.name}</h1>
+          <p className="text-black/45 text-sm">{greeting},</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">{user.name}</h1>
         </div>
       </div>
 
       {/* Next shift — hero card */}
-      <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+      <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs uppercase tracking-wider text-white/40">Nejbližší směna</p>
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#C8F542]"><Icon name="calendar" size={17} /></span>
+          <p className="text-xs uppercase tracking-wider text-black/45">Nejbližší směna</p>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
         </div>
         {nextShift ? (
           <div>
-            <p className="text-3xl font-bold tracking-tight text-white">
+            <p className="text-3xl font-bold tracking-tight text-[#16181A]">
               {new Date((nextShift.date) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-            <p className="text-white/50 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna'}</p>
+            <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna'}</p>
           </div>
         ) : (
-          <p className="text-white/40">Žádná nadcházející směna.</p>
+          <p className="text-black/45">Žádná nadcházející směna.</p>
         )}
       </button>
 
       {/* Stat row */}
       <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-white/[0.08] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-white/40">Moje úkoly</p>
-          <p className="text-3xl font-bold tracking-tight text-white mt-2">{activeTasks.length}</p>
-          <p className="text-xs text-white/40 mt-1">aktivních</p>
+        <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-black/45">Moje úkoly</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{activeTasks.length}</p>
+          <p className="text-xs text-black/45 mt-1">aktivních</p>
         </button>
-        <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-white/[0.08] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-white/40">Nepřečtené zprávy</p>
-          <p className="text-3xl font-bold tracking-tight text-white mt-2">{unreadChats}</p>
-          <p className="text-xs text-white/40 mt-1">v chatu</p>
+        <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-black/45">Nepřečtené zprávy</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{unreadChats}</p>
+          <p className="text-xs text-black/45 mt-1">v chatu</p>
         </button>
       </div>
 
@@ -110,10 +110,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       {availabilitySubmitted === false && (
         <button onClick={() => onNavigate('shift-requests')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#C8F542]"><Icon name="calendar" size={18} /></span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="calendar" size={18} /></span>
             <div>
-              <p className="font-semibold text-white">Zadejte dostupnost na příští měsíc</p>
-              <p className="text-sm text-white/50">Dejte vedení vědět, kdy nemůžete — sestaví podle toho rozvrh.</p>
+              <p className="font-semibold text-[#16181A]">Zadejte dostupnost na příští měsíc</p>
+              <p className="text-sm text-black/55">Dejte vedení vědět, kdy nemůžete — sestaví podle toho rozvrh.</p>
             </div>
           </div>
         </button>
@@ -123,12 +123,12 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       {lowStock.length > 0 && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold tracking-tight text-white">Zásoby, které docházejí</h3>
-            <button onClick={() => onNavigate('inventory')} className="text-sm text-[#C8F542] hover:brightness-110">Sklad →</button>
+            <h3 className="font-bold tracking-tight text-[#16181A]">Zásoby, které docházejí</h3>
+            <button onClick={() => onNavigate('inventory')} className="text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
           </div>
           <div className="flex flex-wrap gap-2">
             {lowStock.slice(0, 8).map(i => (
-              <span key={i.id} className="rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-400">{i.name} · {i.quantity} {i.unit}</span>
+              <span key={i.id} className="rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-600">{i.name} · {i.quantity} {i.unit}</span>
             ))}
           </div>
         </div>

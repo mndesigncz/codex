@@ -43,52 +43,52 @@ export default function MyShifts({ user }: Props) {
     <div className="p-6 space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-white/40">Nadcházející</p>
-          <p className="text-3xl font-bold tracking-tight text-white mt-2">{upcoming.length}</p>
-          <div className="mt-3 h-1 rounded-full bg-white/10 overflow-hidden">
+        <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-black/45">Nadcházející</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{upcoming.length}</p>
+          <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${shifts.length ? Math.min(100, (upcoming.length / shifts.length) * 100) : 0}%` }} />
           </div>
         </div>
-        <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-white/40">Odpracované (odhad)</p>
-          <p className="text-3xl font-bold tracking-tight text-white mt-2">{past.length * 8}h</p>
-          <div className="mt-3 h-1 rounded-full bg-white/10 overflow-hidden">
+        <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-black/45">Odpracované (odhad)</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{past.length * 8}h</p>
+          <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, ((past.length * 8) / totalHours) * 100) : 0}%` }} />
           </div>
         </div>
-        <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-white/40">Celkem směn</p>
-          <p className="text-3xl font-bold tracking-tight text-white mt-2">{shifts.length}</p>
-          <div className="mt-3 h-1 rounded-full bg-white/10 overflow-hidden">
+        <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+          <p className="text-xs uppercase tracking-wider text-black/45">Celkem směn</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{shifts.length}</p>
+          <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: shifts.length ? '100%' : '0%' }} />
           </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>
+        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
       ) : (
         <>
-          <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
-            <h3 className="font-bold tracking-tight text-white mb-4">📅 Nadcházející směny</h3>
+          <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+            <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📅 Nadcházející směny</h3>
             {upcoming.length === 0 ? (
-              <p className="text-white/40 text-sm">Žádné nadcházející směny.</p>
+              <p className="text-black/45 text-sm">Žádné nadcházející směny.</p>
             ) : (
-              <div className="divide-y divide-white/[0.06]">
+              <div className="divide-y divide-black/[0.06]">
                 {upcoming.slice(0, 8).map(s => {
                   const isToday = s.date === today;
                   return (
-                    <div key={s.id} className={`flex items-center gap-3 p-3 rounded-2xl transition-colors hover:bg-white/[0.04] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${isToday ? 'bg-[#C8F542]/15' : 'bg-white/[0.06]'}`}>
+                    <div key={s.id} className={`flex items-center gap-3 p-3 rounded-2xl transition-colors hover:bg-black/[0.03] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${isToday ? 'bg-[#C8F542]/15' : 'bg-black/[0.04]'}`}>
                         {s.type === 'morning' ? '🌅' : '🌆'}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-white text-sm">{formatDate(s.date)}</p>
-                          {isToday && <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#C8F542]">Dnes</span>}
+                          <p className="font-semibold text-[#16181A] text-sm">{formatDate(s.date)}</p>
+                          {isToday && <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
                         </div>
-                        <p className="text-xs text-white/40">{s.startTime} – {s.endTime} · {shiftLabel(s.type)}</p>
+                        <p className="text-xs text-black/45">{s.startTime} – {s.endTime} · {shiftLabel(s.type)}</p>
                       </div>
                     </div>
                   );
@@ -98,17 +98,17 @@ export default function MyShifts({ user }: Props) {
           </div>
 
           {past.length > 0 && (
-            <div className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
-              <h3 className="font-bold tracking-tight text-white mb-4">📋 Minulé směny</h3>
-              <div className="divide-y divide-white/[0.06]">
+            <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+              <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📋 Minulé směny</h3>
+              <div className="divide-y divide-black/[0.06]">
                 {past.slice(0, 5).map(s => (
-                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl opacity-70 transition-colors hover:bg-white/[0.04]">
+                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
                     <span className="text-lg">{s.type === 'morning' ? '🌅' : '🌆'}</span>
                     <div className="flex-1">
-                      <p className="text-sm text-white font-medium">{formatDate(s.date)}</p>
-                      <p className="text-xs text-white/40">{s.startTime} – {s.endTime}</p>
+                      <p className="text-sm text-[#16181A] font-medium">{formatDate(s.date)}</p>
+                      <p className="text-xs text-black/45">{s.startTime} – {s.endTime}</p>
                     </div>
-                    <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#C8F542]">✓ Splněno</span>
+                    <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">✓ Splněno</span>
                   </div>
                 ))}
               </div>

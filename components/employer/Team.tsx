@@ -13,7 +13,7 @@ interface Employee {
 }
 
 const inputClass =
-  'w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 export default function Team() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -64,13 +64,13 @@ export default function Team() {
   return (
     <div className="p-6 space-y-6">
       {success && (
-        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#C8F542] text-sm">
+        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">
           ✅ {success}
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold tracking-tight text-white">Zaměstnanci ({employees.length})</h3>
+        <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Zaměstnanci ({employees.length})</h3>
         <button
           onClick={() => setShowForm(!showForm)}
           className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all"
@@ -81,30 +81,30 @@ export default function Team() {
 
       {showForm && (
         <form onSubmit={handleAdd} className="glass-card border-[#C8F542]/20 p-6 space-y-5">
-          <h4 className="font-bold tracking-tight text-white">Nový zaměstnanec</h4>
+          <h4 className="font-bold tracking-tight text-[#16181A]">Nový zaměstnanec</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Jméno *</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Jméno *</label>
               <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Email *</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email *</label>
               <input required type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Telefon</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Telefon</label>
               <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                 className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Pozice</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Pozice</label>
               <input value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))}
                 className={inputClass} />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-black/60 cursor-pointer">
             <input type="checkbox" checked={form.sendInvite} onChange={e => setForm(f => ({ ...f, sendInvite: e.target.checked }))} className="accent-[#C8F542]" />
             Odeslat pozvánku emailem s dočasným heslem
           </label>
@@ -114,7 +114,7 @@ export default function Team() {
               {submitting ? 'Přidávám…' : 'Přidat'}
             </button>
             <button type="button" onClick={() => setShowForm(false)}
-              className="rounded-full glass border border-white/15 hover:bg-white/10 text-white px-5 py-2.5 text-sm font-medium transition-all">
+              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
               Zrušit
             </button>
           </div>
@@ -123,25 +123,25 @@ export default function Team() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {employees.map(emp => (
-            <div key={emp.id} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+            <div key={emp.id} className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/20 flex items-center justify-center text-2xl">
                   {emp.avatar ?? '👤'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold tracking-tight text-white">{emp.name}</p>
-                  <p className="text-sm text-white/40">{emp.jobTitle ?? 'Barista'}</p>
+                  <p className="font-bold tracking-tight text-[#16181A]">{emp.name}</p>
+                  <p className="text-sm text-black/45">{emp.jobTitle ?? 'Barista'}</p>
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
-                <p className="text-sm text-white/60">📧 {emp.email}</p>
-                {emp.phone && <p className="text-sm text-white/60">📞 {emp.phone}</p>}
-                <p className="text-sm text-white/60">{shiftPrefLabel(emp.shiftPreference)}</p>
+                <p className="text-sm text-black/60">📧 {emp.email}</p>
+                {emp.phone && <p className="text-sm text-black/60">📞 {emp.phone}</p>}
+                <p className="text-sm text-black/60">{shiftPrefLabel(emp.shiftPreference)}</p>
               </div>
             </div>
           ))}

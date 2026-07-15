@@ -40,18 +40,18 @@ export default function ChatView({ user }: Props) {
       <aside
         className={`${
           activeId ? 'hidden md:flex' : 'flex'
-        } flex-col w-full md:w-80 md:flex-shrink-0 border-r border-white/[0.06] h-full`}
+        } flex-col w-full md:w-80 md:flex-shrink-0 border-r border-black/[0.06] h-full`}
       >
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-2">
-          <Icon name="chat" size={22} className="text-[#C8F542]" />
-          <h2 className="text-lg font-semibold text-white">Zprávy</h2>
+        <div className="px-5 py-4 border-b border-black/[0.06] flex items-center gap-2">
+          <Icon name="chat" size={22} className="text-[#5B7A08]" />
+          <h2 className="text-lg font-semibold text-[#16181A]">Zprávy</h2>
         </div>
-        <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-white/[0.06]">
+        <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
           {loading && (
-            <div className="p-6 text-center text-white/40 text-sm">Načítání…</div>
+            <div className="p-6 text-center text-black/45 text-sm">Načítání…</div>
           )}
           {!loading && conversations.length === 0 && (
-            <div className="p-6 text-center text-white/40 text-sm">Žádné konverzace</div>
+            <div className="p-6 text-center text-black/45 text-sm">Žádné konverzace</div>
           )}
           {conversations.map((c) => (
             <ConversationRow
@@ -79,8 +79,8 @@ export default function ChatView({ user }: Props) {
             onSent={refresh}
           />
         ) : (
-          <div className="flex-1 hidden md:flex flex-col items-center justify-center text-white/40 gap-3">
-            <Icon name="chat" size={48} className="text-white/15" />
+          <div className="flex-1 hidden md:flex flex-col items-center justify-center text-black/45 gap-3">
+            <Icon name="chat" size={48} className="text-[#16181A]/15" />
             <p className="text-sm">Vyberte konverzaci</p>
           </div>
         )}
@@ -102,19 +102,19 @@ function ConversationRow({
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-        active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
+        active ? 'bg-black/[0.04]' : 'hover:bg-white/[0.03]'
       }`}
     >
       <Avatar conv={conv} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-medium text-white truncate">{conv.name}</span>
-          <span className="text-[11px] text-white/40 flex-shrink-0">
+          <span className="font-medium text-[#16181A] truncate">{conv.name}</span>
+          <span className="text-[11px] text-black/45 flex-shrink-0">
             {formatTime(conv.lastTime)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-white/40 truncate">
+          <span className="text-sm text-black/45 truncate">
             {conv.lastMessage ?? 'Zatím žádné zprávy'}
           </span>
           {conv.unreadCount > 0 && (
@@ -132,7 +132,7 @@ function Avatar({ conv, size = 44 }: { conv: Conversation; size?: number }) {
   if (conv.type === 'team') {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#C8F542] flex-shrink-0"
+        className="inline-flex items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] flex-shrink-0"
         style={{ width: size, height: size }}
       >
         <Icon name="users" size={Math.round(size * 0.5)} />
@@ -141,7 +141,7 @@ function Avatar({ conv, size = 44 }: { conv: Conversation; size?: number }) {
   }
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full bg-white/[0.06] border border-white/10 flex-shrink-0"
+      className="inline-flex items-center justify-center rounded-full bg-black/[0.04] border border-black/[0.08] flex-shrink-0"
       style={{ width: size, height: size, fontSize: size * 0.5 }}
     >
       {conv.avatar ?? '👤'}
@@ -214,10 +214,10 @@ function Thread({
 
   return (
     <>
-      <header className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3">
+      <header className="px-4 py-3 border-b border-black/[0.06] flex items-center gap-3">
         <button
           onClick={onBack}
-          className="md:hidden text-white/60 hover:text-white p-1 -ml-1"
+          className="md:hidden text-black/60 hover:text-black p-1 -ml-1"
           aria-label="Zpět"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -226,19 +226,19 @@ function Thread({
         </button>
         <Avatar conv={conv} size={38} />
         <div className="min-w-0">
-          <div className="font-semibold text-white truncate">{conv.name}</div>
+          <div className="font-semibold text-[#16181A] truncate">{conv.name}</div>
           {conv.type === 'team' && (
-            <div className="text-[11px] text-white/40">Týmový kanál</div>
+            <div className="text-[11px] text-black/45">Týmový kanál</div>
           )}
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4 space-y-2">
         {loading && (
-          <div className="text-center text-white/40 text-sm py-6">Načítání…</div>
+          <div className="text-center text-black/45 text-sm py-6">Načítání…</div>
         )}
         {!loading && messages.length === 0 && (
-          <div className="text-center text-white/40 text-sm py-6">
+          <div className="text-center text-black/45 text-sm py-6">
             Zatím žádné zprávy. Napište první!
           </div>
         )}
@@ -255,7 +255,7 @@ function Thread({
 
       <form
         onSubmit={handleSend}
-        className="px-3 py-3 border-t border-white/[0.06] flex items-center gap-2"
+        className="px-3 py-3 border-t border-black/[0.06] flex items-center gap-2"
       >
         <input
           ref={fileRef}
@@ -268,7 +268,7 @@ function Thread({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+          className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-black/60 hover:text-black hover:bg-black/[0.04] transition-colors disabled:opacity-40"
           aria-label="Připojit soubor"
         >
           {uploading ? (
@@ -281,7 +281,7 @@ function Thread({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Napište zprávu…"
-          className="flex-1 rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-2.5 text-white placeholder-white/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+          className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
         <button
           type="submit"
@@ -308,13 +308,13 @@ export function MessageBubble({
   return (
     <div className={`flex flex-col ${own ? 'items-end' : 'items-start'}`}>
       {showSender && (
-        <span className="text-[11px] text-white/40 ml-3 mb-0.5">{msg.senderName}</span>
+        <span className="text-[11px] text-black/45 ml-3 mb-0.5">{msg.senderName}</span>
       )}
       <div
         className={`max-w-[78%] px-4 py-2.5 ${
           own
             ? 'bg-[#C8F542] text-black rounded-3xl rounded-br-lg'
-            : 'glass text-white rounded-3xl rounded-bl-lg'
+            : 'glass text-[#16181A] rounded-3xl rounded-bl-lg'
         }`}
       >
         {msg.attachmentUrl && msg.attachmentType === 'image' && (
@@ -333,7 +333,7 @@ export function MessageBubble({
             rel="noreferrer"
             download={msg.attachmentName ?? undefined}
             className={`flex items-center gap-2 rounded-2xl px-3 py-2 ${
-              own ? 'bg-black/10' : 'bg-white/[0.06]'
+              own ? 'bg-black/10' : 'bg-black/[0.04]'
             }`}
           >
             <FileIcon />
@@ -348,7 +348,7 @@ export function MessageBubble({
           </p>
         )}
         <div
-          className={`text-[10px] mt-1 ${own ? 'text-black/50' : 'text-white/40'} text-right`}
+          className={`text-[10px] mt-1 ${own ? 'text-black/50' : 'text-black/45'} text-right`}
         >
           {formatTime(msg.createdAt)}
         </div>

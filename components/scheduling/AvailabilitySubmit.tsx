@@ -121,9 +121,9 @@ export default function AvailabilitySubmit({ user }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Moje dostupnost</h1>
-        <p className="text-white/40 mt-1">
-          Označ dny, kdy <span className="text-white/70 font-medium">nemůžeš</span> pracovat. Zbytek se bere jako dostupný.
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje dostupnost</h1>
+        <p className="text-black/45 mt-1">
+          Označ dny, kdy <span className="text-black/70 font-medium">nemůžeš</span> pracovat. Zbytek se bere jako dostupný.
         </p>
       </div>
 
@@ -134,7 +134,7 @@ export default function AvailabilitySubmit({ user }: Props) {
             key={m}
             onClick={() => setMonth(m)}
             className={`px-5 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 ${
-              month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'
+              month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
             }`}
           >
             {monthLabel(m)}
@@ -144,29 +144,29 @@ export default function AvailabilitySubmit({ user }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : (
         <>
           {/* Calendar */}
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-white capitalize flex items-center gap-2">
+              <h2 className="font-bold text-[#16181A] capitalize flex items-center gap-2">
                 <Icon name="calendar" size={20} />
                 {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1.5 text-white/50">
+                <span className="flex items-center gap-1.5 text-black/55">
                   <span className="h-3 w-3 rounded-md bg-[#C8F542]/25 ring-1 ring-[#C8F542]/40" /> Dostupný
                 </span>
-                <span className="flex items-center gap-1.5 text-white/50">
+                <span className="flex items-center gap-1.5 text-black/55">
                   <span className="h-3 w-3 rounded-md bg-red-500/25 ring-1 ring-red-500/40" /> Nemůžu
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1.5 mb-1.5">
               {CZ_DAYS.map((d) => (
-                <div key={d} className="text-center text-[11px] font-medium text-white/35 py-1">
+                <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
                   {d}
                 </div>
               ))}
@@ -184,7 +184,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                     className={`aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-all duration-200 border ${
                       off
                         ? 'bg-red-500/20 border-red-500/40 text-red-300 line-through'
-                        : 'bg-[#C8F542]/12 border-[#C8F542]/25 text-white hover:bg-[#C8F542]/20'
+                        : 'bg-[#C8F542]/12 border-[#C8F542]/25 text-[#16181A] hover:bg-[#C8F542]/20'
                     } ${isToday ? 'ring-2 ring-white/50' : ''}`}
                   >
                     {day}
@@ -192,8 +192,8 @@ export default function AvailabilitySubmit({ user }: Props) {
                 );
               })}
             </div>
-            <p className="text-xs text-white/40 mt-3">
-              Dostupných dní: <span className="text-white/70 font-medium">{availableCount}</span> · Nemůžu:{' '}
+            <p className="text-xs text-black/45 mt-3">
+              Dostupných dní: <span className="text-black/70 font-medium">{availableCount}</span> · Nemůžu:{' '}
               <span className="text-red-300 font-medium">{unavailable.size}</span>
             </p>
           </div>
@@ -201,7 +201,7 @@ export default function AvailabilitySubmit({ user }: Props) {
           {/* Preferences */}
           <div className="glass-card p-5 space-y-5">
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">Preferovaná směna</label>
+              <label className="block text-sm font-medium text-black/70 mb-2">Preferovaná směna</label>
               <div className="flex gap-1 glass rounded-full p-1 w-fit">
                 {SHIFTS.map((s) => (
                   <button
@@ -210,7 +210,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                       preferredShift === s.id
                         ? 'bg-[#C8F542] text-black font-semibold'
-                        : 'text-white/60 hover:text-white hover:bg-white/10'
+                        : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
                     }`}
                   >
                     {s.label}
@@ -220,8 +220,8 @@ export default function AvailabilitySubmit({ user }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">
-                Maximální počet směn <span className="text-white/35">(nepovinné)</span>
+              <label className="block text-sm font-medium text-black/70 mb-2">
+                Maximální počet směn <span className="text-black/35">(nepovinné)</span>
               </label>
               <input
                 type="number"
@@ -229,20 +229,20 @@ export default function AvailabilitySubmit({ user }: Props) {
                 value={maxShifts}
                 onChange={(e) => setMaxShifts(e.target.value)}
                 placeholder="např. 12"
-                className="w-40 rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 outline-none focus:border-[#C8F542]/50 transition-colors"
+                className="w-40 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 outline-none focus:border-[#C8F542]/50 transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">
-                Poznámka <span className="text-white/35">(nepovinné)</span>
+              <label className="block text-sm font-medium text-black/70 mb-2">
+                Poznámka <span className="text-black/35">(nepovinné)</span>
               </label>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
                 placeholder="Např. preferuji víkendy, ve středu mám školu…"
-                className="w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 outline-none focus:border-[#C8F542]/50 transition-colors resize-none"
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 outline-none focus:border-[#C8F542]/50 transition-colors resize-none"
               />
             </div>
           </div>
@@ -257,12 +257,12 @@ export default function AvailabilitySubmit({ user }: Props) {
               {saving ? 'Ukládám…' : existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
             </button>
             {confirmed && (
-              <span className="flex items-center gap-1.5 text-[#C8F542] text-sm font-medium">
+              <span className="flex items-center gap-1.5 text-[#5B7A08] text-sm font-medium">
                 <Icon name="check" size={18} /> Uloženo!
               </span>
             )}
             {existing && !confirmed && (
-              <span className="text-white/40 text-sm">Dostupnost už jsi odeslal/a — můžeš ji upravit.</span>
+              <span className="text-black/45 text-sm">Dostupnost už jsi odeslal/a — můžeš ji upravit.</span>
             )}
           </div>
         </>

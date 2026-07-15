@@ -63,7 +63,7 @@ export default function EmployerLayout({ user }: Props) {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-[28px] text-white flex-col transition-all duration-300 flex-shrink-0 overflow-hidden`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} panel-dark hidden md:flex m-4 mr-0 rounded-[28px] text-white flex-col transition-all duration-300 flex-shrink-0 overflow-hidden`}>
         <div className={`flex items-center gap-3 py-5 border-b border-white/[0.08] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
           <LogoMark size={40} />
           {sidebarOpen && (
@@ -110,7 +110,7 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="glass-strong m-4 mb-0 rounded-[28px] px-5 py-3.5 flex items-center gap-4 flex-shrink-0">
+        <header className="panel-dark m-4 mb-0 rounded-[28px] px-5 py-3.5 flex items-center gap-4 flex-shrink-0">
           <button onClick={() => setSidebarOpen(v => !v)} className="hidden md:flex rounded-full p-2 text-white/45 hover:text-white hover:bg-white/[0.06] transition-colors">
             <Icon name="menu" size={20} />
           </button>
@@ -138,7 +138,7 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Mobile bottom dock */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-        <nav className="glass-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+        <nav className="panel-dark mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
               className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${currentView === item.id ? 'text-[#C8F542]' : 'text-white/40'}`}>
@@ -154,7 +154,7 @@ export default function EmployerLayout({ user }: Props) {
         </nav>
 
         {moreOpen && (
-          <div className="glass-strong mx-auto max-w-md rounded-3xl mb-2 p-2 absolute bottom-full left-4 right-4 grid grid-cols-2 gap-1">
+          <div className="panel-dark mx-auto max-w-md rounded-3xl mb-2 p-2 absolute bottom-full left-4 right-4 grid grid-cols-2 gap-1">
             {mobileSecondary.map(item => (
               <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${currentView === item.id ? 'bg-[#C8F542]/12 text-[#C8F542]' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'}`}>

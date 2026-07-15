@@ -63,7 +63,7 @@ export default function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => { setOpen(o => !o); if (!open && unread) markAllRead(); }}
-        className="relative rounded-full glass w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        className="relative rounded-full bg-white/[0.08] border border-white/10 w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
         title="Notifikace"
       >
         <Icon name="bell" size={19} />
@@ -75,7 +75,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] panel-dark rounded-3xl overflow-hidden z-50 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
           <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between">
             <span className="font-bold text-white text-sm">Notifikace</span>
             {notifs.some(n => !n.is_read) && (

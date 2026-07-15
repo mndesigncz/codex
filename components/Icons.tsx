@@ -143,7 +143,7 @@ export function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }: { n
 export function LogoMark({ size = 40 }: { size?: number }) {
   return (
     <span
-      className="inline-flex items-center justify-center rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#C8F542] flex-shrink-0"
+      className="inline-flex items-center justify-center rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] flex-shrink-0"
       style={{ width: size, height: size }}
     >
       <Icon name="leaf" size={Math.round(size * 0.55)} strokeWidth={1.8} />

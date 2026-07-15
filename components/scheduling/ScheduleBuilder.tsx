@@ -261,8 +261,8 @@ export default function ScheduleBuilder({ user }: Props) {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Rozvrh směn</h1>
-          <p className="text-white/40 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Rozvrh směn</h1>
+          <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
         </div>
         {/* Month selector */}
         <div className="flex gap-1 glass rounded-full p-1">
@@ -271,7 +271,7 @@ export default function ScheduleBuilder({ user }: Props) {
               key={m}
               onClick={() => setMonth(m)}
               className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 ${
-                month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'
+                month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
               }`}
             >
               {monthLabel(m)}
@@ -282,21 +282,21 @@ export default function ScheduleBuilder({ user }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : (
         <>
           {/* Availability summary */}
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Icon name="users" size={20} className="text-white/70" />
-              <h2 className="font-bold text-white">Dostupnost týmu</h2>
-              <span className="text-xs text-white/40">
+              <Icon name="users" size={20} className="text-black/70" />
+              <h2 className="font-bold text-[#16181A]">Dostupnost týmu</h2>
+              <span className="text-xs text-black/45">
                 {submissions.length}/{employees.length} odesláno
               </span>
             </div>
             {employees.length === 0 ? (
-              <p className="text-white/40 text-sm">Zatím nemáš v týmu žádné zaměstnance.</p>
+              <p className="text-black/45 text-sm">Zatím nemáš v týmu žádné zaměstnance.</p>
             ) : (
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
@@ -306,23 +306,23 @@ export default function ScheduleBuilder({ user }: Props) {
                       onClick={() => setExpanded(expanded === s.employeeId ? null : s.employeeId)}
                       className={`flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-sm border transition-all ${
                         expanded === s.employeeId
-                          ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-white'
-                          : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-white/80 hover:bg-[#C8F542]/15'
+                          ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#16181A]'
+                          : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-black/80 hover:bg-[#C8F542]/15'
                       }`}
                     >
                       <span className="text-base">{s.employeeAvatar}</span>
                       {s.employeeName}
-                      <Icon name="check" size={15} className="text-[#C8F542]" />
+                      <Icon name="check" size={15} className="text-[#5B7A08]" />
                     </button>
                   ))}
                   {notSubmitted.map((e) => (
                     <span
                       key={e.id}
-                      className="flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-sm bg-white/[0.04] border border-white/10 text-white/40"
+                      className="flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45"
                     >
                       <span className="text-base opacity-60">{e.avatar ?? '👤'}</span>
                       {e.name}
-                      <span className="text-[10px] uppercase tracking-wide text-white/30">čeká</span>
+                      <span className="text-[10px] uppercase tracking-wide text-black/30">čeká</span>
                     </span>
                   ))}
                 </div>
@@ -332,13 +332,13 @@ export default function ScheduleBuilder({ user }: Props) {
                     const s = submissions.find((x) => x.employeeId === expanded);
                     if (!s) return null;
                     return (
-                      <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-4 space-y-2 text-sm">
-                        <div className="flex items-center gap-2 font-semibold text-white">
+                      <div className="rounded-2xl bg-black/[0.03] border border-black/[0.08] p-4 space-y-2 text-sm">
+                        <div className="flex items-center gap-2 font-semibold text-[#16181A]">
                           <span className="text-lg">{s.employeeAvatar}</span> {s.employeeName}
                         </div>
-                        <p className="text-white/60">
+                        <p className="text-black/60">
                           Preferuje:{' '}
-                          <span className="text-white/90">
+                          <span className="text-[#16181A]/90">
                             {s.preferredShift === 'morning'
                               ? 'Ranní'
                               : s.preferredShift === 'afternoon'
@@ -347,14 +347,14 @@ export default function ScheduleBuilder({ user }: Props) {
                           </span>
                           {s.maxShifts != null && (
                             <>
-                              {' · '}max <span className="text-white/90">{s.maxShifts}</span> směn
+                              {' · '}max <span className="text-[#16181A]/90">{s.maxShifts}</span> směn
                             </>
                           )}
                         </p>
-                        <div className="text-white/60">
+                        <div className="text-black/60">
                           Nemůže ({(s.unavailableDates ?? []).length}):{' '}
                           {(s.unavailableDates ?? []).length === 0 ? (
-                            <span className="text-white/40">bez omezení</span>
+                            <span className="text-black/45">bez omezení</span>
                           ) : (
                             <span className="flex flex-wrap gap-1 mt-1">
                               {(s.unavailableDates ?? []).sort().map((d) => (
@@ -365,7 +365,7 @@ export default function ScheduleBuilder({ user }: Props) {
                             </span>
                           )}
                         </div>
-                        {s.note && <p className="text-white/60">Poznámka: <span className="text-white/90">{s.note}</span></p>}
+                        {s.note && <p className="text-black/60">Poznámka: <span className="text-[#16181A]/90">{s.note}</span></p>}
                       </div>
                     );
                   })()}
@@ -384,13 +384,13 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={exportCsv}
               disabled={shifts.length === 0}
-              className="rounded-full glass border border-white/15 text-white hover:bg-white/10 px-5 py-2.5 transition inline-flex items-center gap-2 disabled:opacity-40"
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition inline-flex items-center gap-2 disabled:opacity-40"
             >
               <Icon name="trend" size={18} /> Export CSV
             </button>
             <button
               onClick={() => fileRef.current?.click()}
-              className="rounded-full glass border border-white/15 text-white hover:bg-white/10 px-5 py-2.5 transition inline-flex items-center gap-2"
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition inline-flex items-center gap-2"
             >
               <Icon name="plus" size={18} /> Import CSV
             </button>
@@ -410,13 +410,13 @@ export default function ScheduleBuilder({ user }: Props) {
               className={`rounded-full px-5 py-2.5 transition inline-flex items-center gap-2 border ${
                 confirmClear
                   ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                  : 'glass border-white/15 text-white/70 hover:bg-white/10'
+                  : 'glass border-black/10 text-black/70 hover:bg-black/[0.06]'
               }`}
             >
               <Icon name="warning" size={18} /> {confirmClear ? 'Opravdu vymazat?' : 'Vymazat měsíc'}
             </button>
             {confirmClear && (
-              <button onClick={() => setConfirmClear(false)} className="text-white/40 text-sm hover:text-white">
+              <button onClick={() => setConfirmClear(false)} className="text-black/45 text-sm hover:text-black">
                 Zrušit
               </button>
             )}
@@ -424,8 +424,8 @@ export default function ScheduleBuilder({ user }: Props) {
 
           {publishNote && (
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
-              <Icon name="check" size={20} className="text-[#C8F542] mt-0.5" />
-              <p className="text-sm text-white/70">
+              <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />
+              <p className="text-sm text-black/70">
                 Rozvrh je průběžně ukládán — každá přidaná směna je hned uložena a viditelná zaměstnancům v jejich sekci
                 „Moje směny". Není potřeba nic dalšího potvrzovat.
               </p>
@@ -435,21 +435,21 @@ export default function ScheduleBuilder({ user }: Props) {
           {/* Calendar grid */}
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-white capitalize flex items-center gap-2">
+              <h2 className="font-bold text-[#16181A] capitalize flex items-center gap-2">
                 <Icon name="calendar" size={20} /> {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1.5 text-white/50">
+                <span className="flex items-center gap-1.5 text-black/55">
                   <span className="h-3 w-3 rounded-md bg-[#C8F542]" /> Ranní
                 </span>
-                <span className="flex items-center gap-1.5 text-white/50">
+                <span className="flex items-center gap-1.5 text-black/55">
                   <span className="h-3 w-3 rounded-md bg-blue-500" /> Odpolední
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1.5 mb-1.5">
               {CZ_DAYS.map((d) => (
-                <div key={d} className="text-center text-[11px] font-medium text-white/35 py-1">
+                <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
                   {d}
                 </div>
               ))}
@@ -463,9 +463,9 @@ export default function ScheduleBuilder({ user }: Props) {
                   <button
                     key={cell}
                     onClick={() => setDayModal(cell)}
-                    className="min-h-[84px] rounded-xl bg-white/[0.04] border border-white/10 hover:border-[#C8F542]/40 hover:bg-white/[0.06] p-1.5 text-left transition-all flex flex-col gap-1"
+                    className="min-h-[84px] rounded-xl bg-black/[0.03] border border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04] p-1.5 text-left transition-all flex flex-col gap-1"
                   >
-                    <span className="text-xs font-medium text-white/50">{day}</span>
+                    <span className="text-xs font-medium text-black/55">{day}</span>
                     <div className="flex flex-col gap-1 overflow-hidden">
                       {dayShifts.slice(0, 3).map((s) => (
                         <span
@@ -473,10 +473,10 @@ export default function ScheduleBuilder({ user }: Props) {
                           title={`${s.employeeName} · ${s.startTime}–${s.endTime}`}
                           className={`flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-medium truncate ${
                             s.type === 'morning'
-                              ? 'bg-[#C8F542]/20 text-[#C8F542]'
+                              ? 'bg-[#C8F542]/20 text-[#5B7A08]'
                               : s.type === 'afternoon'
                               ? 'bg-blue-500/20 text-blue-300'
-                              : 'bg-white/10 text-white/70'
+                              : 'bg-black/[0.06] text-black/70'
                           }`}
                         >
                           <span>{s.employeeAvatar}</span>
@@ -484,7 +484,7 @@ export default function ScheduleBuilder({ user }: Props) {
                         </span>
                       ))}
                       {dayShifts.length > 3 && (
-                        <span className="text-[10px] text-white/40">+{dayShifts.length - 3} další</span>
+                        <span className="text-[10px] text-black/45">+{dayShifts.length - 3} další</span>
                       )}
                     </div>
                   </button>
@@ -514,25 +514,25 @@ export default function ScheduleBuilder({ user }: Props) {
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-xl p-0 md:p-4">
           <div className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-white">Náhled importu</h3>
-              <button onClick={() => setImportPreview(null)} className="text-white/40 hover:text-white text-2xl leading-none">
+              <h3 className="text-xl font-bold text-[#16181A]">Náhled importu</h3>
+              <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none">
                 ×
               </button>
             </div>
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3 text-xs text-white/50">
-              Očekávaný formát: <code className="text-white/80">datum,zaměstnanec,od,do,typ</code> — např.{' '}
-              <code className="text-white/80">2026-08-03,anna@cajovna.cz,08:00,14:00,morning</code>. Sloupec „zaměstnanec"
+            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.08] p-3 text-xs text-black/55">
+              Očekávaný formát: <code className="text-black/80">datum,zaměstnanec,od,do,typ</code> — např.{' '}
+              <code className="text-black/80">2026-08-03,anna@cajovna.cz,08:00,14:00,morning</code>. Sloupec „zaměstnanec"
               může být e-mail nebo jméno. Typ: morning / afternoon / flexible.
             </div>
 
             {importPreview.rows.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-[#C8F542] mb-2">
+                <p className="text-sm font-medium text-[#5B7A08] mb-2">
                   {importPreview.rows.length} platných směn k importu
                 </p>
-                <div className="rounded-2xl border border-white/10 overflow-hidden">
+                <div className="rounded-2xl border border-black/[0.08] overflow-hidden">
                   <table className="w-full text-xs">
-                    <thead className="bg-white/[0.05] text-white/50">
+                    <thead className="bg-black/[0.04] text-black/55">
                       <tr>
                         <th className="text-left px-3 py-2">Datum</th>
                         <th className="text-left px-3 py-2">Zaměstnanec</th>
@@ -541,9 +541,9 @@ export default function ScheduleBuilder({ user }: Props) {
                         <th className="text-left px-3 py-2">Typ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.06]">
+                    <tbody className="divide-y divide-black/[0.06]">
                       {importPreview.rows.slice(0, 40).map((r, i) => (
-                        <tr key={i} className="text-white/80">
+                        <tr key={i} className="text-black/80">
                           <td className="px-3 py-1.5">{r.date}</td>
                           <td className="px-3 py-1.5">{r.employeeName}</td>
                           <td className="px-3 py-1.5">{r.startTime}</td>
@@ -554,7 +554,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     </tbody>
                   </table>
                   {importPreview.rows.length > 40 && (
-                    <p className="text-[11px] text-white/40 px-3 py-2">…a dalších {importPreview.rows.length - 40}</p>
+                    <p className="text-[11px] text-black/45 px-3 py-2">…a dalších {importPreview.rows.length - 40}</p>
                   )}
                 </div>
               </div>
@@ -583,7 +583,7 @@ export default function ScheduleBuilder({ user }: Props) {
               </button>
               <button
                 onClick={() => setImportPreview(null)}
-                className="rounded-full glass border border-white/15 text-white hover:bg-white/10 px-5 py-2.5 transition"
+                className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition"
               >
                 Zrušit
               </button>
@@ -644,8 +644,8 @@ function DayModal({
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-xl p-0 md:p-4">
       <div className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-white capitalize">{dayLabel(date)}</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white text-2xl leading-none">
+          <h3 className="text-xl font-bold text-[#16181A] capitalize">{dayLabel(date)}</h3>
+          <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none">
             ×
           </button>
         </div>
@@ -653,33 +653,33 @@ function DayModal({
         {/* Existing shifts */}
         {shifts.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-white/40">Přiřazené směny</p>
+            <p className="text-xs uppercase tracking-wide text-black/45">Přiřazené směny</p>
             {shifts.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-3 rounded-2xl bg-white/[0.05] border border-white/10 px-3 py-2"
+                className="flex items-center gap-3 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2"
               >
                 <span className="text-lg">{s.employeeAvatar}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{s.employeeName}</p>
-                  <p className="text-xs text-white/40">
+                  <p className="text-sm font-medium text-[#16181A] truncate">{s.employeeName}</p>
+                  <p className="text-xs text-black/45">
                     {s.startTime}–{s.endTime}
                   </p>
                 </div>
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                     s.type === 'morning'
-                      ? 'bg-[#C8F542]/15 text-[#C8F542]'
+                      ? 'bg-[#C8F542]/15 text-[#5B7A08]'
                       : s.type === 'afternoon'
                       ? 'bg-blue-500/15 text-blue-300'
-                      : 'bg-white/10 text-white/60'
+                      : 'bg-black/[0.06] text-black/60'
                   }`}
                 >
                   {SHIFT_LABEL[s.type] ?? s.type}
                 </span>
                 <button
                   onClick={() => onRemove(s.id)}
-                  className="text-white/30 hover:text-red-400 transition p-1"
+                  className="text-black/30 hover:text-red-600 transition p-1"
                   title="Odebrat"
                 >
                   ×
@@ -690,15 +690,15 @@ function DayModal({
         )}
 
         {/* Add shift */}
-        <div className="space-y-4 border-t border-white/10 pt-4">
-          <p className="text-xs uppercase tracking-wide text-white/40 flex items-center gap-1.5">
+        <div className="space-y-4 border-t border-black/[0.08] pt-4">
+          <p className="text-xs uppercase tracking-wide text-black/45 flex items-center gap-1.5">
             <Icon name="plus" size={14} /> Přidat směnu
           </p>
 
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">Zaměstnanec</label>
+            <label className="block text-sm font-medium text-black/70 mb-2">Zaměstnanec</label>
             {employees.length === 0 ? (
-              <p className="text-white/40 text-sm">Žádní zaměstnanci v týmu.</p>
+              <p className="text-black/45 text-sm">Žádní zaměstnanci v týmu.</p>
             ) : (
               <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto">
                 {employees.map((e) => {
@@ -711,18 +711,18 @@ function DayModal({
                       className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 text-left border transition-all ${
                         employeeId === e.id
                           ? 'bg-[#C8F542]/15 border-[#C8F542]/40'
-                          : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.07]'
+                          : 'bg-black/[0.03] border-black/[0.08] hover:bg-white/[0.07]'
                       }`}
                     >
                       <span className="text-lg">{e.avatar ?? '👤'}</span>
-                      <span className="flex-1 text-sm text-white">{e.name}</span>
+                      <span className="flex-1 text-sm text-[#16181A]">{e.name}</span>
                       {blocked && (
-                        <span className="flex items-center gap-1 text-xs text-orange-400 font-medium">
+                        <span className="flex items-center gap-1 text-xs text-orange-600 font-medium">
                           <Icon name="warning" size={14} /> nemůže
                         </span>
                       )}
                       {!blocked && sub?.preferredShift === type && (
-                        <span className="text-xs text-[#C8F542]/80">preferuje</span>
+                        <span className="text-xs text-[#5B7A08]/80">preferuje</span>
                       )}
                     </button>
                   );
@@ -730,21 +730,21 @@ function DayModal({
               </div>
             )}
             {employeeId !== '' && unavailable.has(Number(employeeId)) && (
-              <p className="mt-2 text-xs text-orange-400 flex items-center gap-1.5">
+              <p className="mt-2 text-xs text-orange-600 flex items-center gap-1.5">
                 <Icon name="warning" size={14} /> Tento zaměstnanec označil tento den jako nedostupný.
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">Typ směny</label>
+            <label className="block text-sm font-medium text-black/70 mb-2">Typ směny</label>
             <div className="flex gap-1 glass rounded-full p-1 w-fit">
               {(['morning', 'afternoon', 'flexible'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => pickType(t)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                    type === t ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'
+                    type === t ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
                   }`}
                 >
                   {t === 'morning' ? 'Ranní' : t === 'afternoon' ? 'Odpolední' : 'Vlastní'}
@@ -755,7 +755,7 @@ function DayModal({
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-white/70 mb-2">Od</label>
+              <label className="block text-sm font-medium text-black/70 mb-2">Od</label>
               <input
                 type="time"
                 value={start}
@@ -763,11 +763,11 @@ function DayModal({
                   setStart(e.target.value);
                   setType('flexible');
                 }}
-                className="w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white outline-none focus:border-[#C8F542]/50 transition-colors"
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] outline-none focus:border-[#C8F542]/50 transition-colors"
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-white/70 mb-2">Do</label>
+              <label className="block text-sm font-medium text-black/70 mb-2">Do</label>
               <input
                 type="time"
                 value={end}
@@ -775,7 +775,7 @@ function DayModal({
                   setEnd(e.target.value);
                   setType('flexible');
                 }}
-                className="w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white outline-none focus:border-[#C8F542]/50 transition-colors"
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] outline-none focus:border-[#C8F542]/50 transition-colors"
               />
             </div>
           </div>

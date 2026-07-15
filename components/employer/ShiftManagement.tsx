@@ -78,13 +78,13 @@ export default function ShiftManagement() {
       <div className="flex gap-1 glass rounded-full p-1 w-fit">
         <button
           onClick={() => setTab('shifts')}
-          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${tab === 'shifts' ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${tab === 'shifts' ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'}`}
         >
           📅 Směny ({shifts.length})
         </button>
         <button
           onClick={() => setTab('requests')}
-          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${tab === 'requests' ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${tab === 'requests' ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'}`}
         >
           📨 Žádosti ({requests.filter(r => r.status === 'pending').length})
         </button>
@@ -92,22 +92,22 @@ export default function ShiftManagement() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : tab === 'shifts' ? (
         <div className="space-y-4">
           {Object.keys(grouped).slice(0, 7).map(date => (
-            <div key={date} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
-              <h3 className="font-bold tracking-tight text-white mb-3 capitalize">{formatDate(date)}</h3>
-              <div className="divide-y divide-white/[0.06]">
+            <div key={date} className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+              <h3 className="font-bold tracking-tight text-[#16181A] mb-3 capitalize">{formatDate(date)}</h3>
+              <div className="divide-y divide-black/[0.06]">
                 {grouped[date].map(s => (
-                  <div key={s.id} className="flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.04] transition-all duration-300">
+                  <div key={s.id} className="flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-black/[0.03] transition-all duration-300">
                     <span className="text-xl">{getUserAvatar(s.employeeId)}</span>
                     <div className="flex-1">
-                      <p className="font-medium text-white text-sm">{getUserName(s.employeeId)}</p>
-                      <p className="text-xs text-white/40">{s.startTime} – {s.endTime}</p>
+                      <p className="font-medium text-[#16181A] text-sm">{getUserName(s.employeeId)}</p>
+                      <p className="text-xs text-black/45">{s.startTime} – {s.endTime}</p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${s.type === 'morning' ? 'bg-orange-500/15 text-orange-400' : 'bg-blue-500/15 text-blue-400'}`}>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${s.type === 'morning' ? 'bg-orange-500/15 text-orange-600' : 'bg-blue-500/15 text-blue-600'}`}>
                       {s.type === 'morning' ? '🌅 Ranní' : '🌆 Odpolední'}
                     </span>
                   </div>
@@ -117,7 +117,7 @@ export default function ShiftManagement() {
           ))}
           {Object.keys(grouped).length === 0 && (
             <div className="glass-card p-8 text-center">
-              <p className="text-white/40">Žádné nadcházející směny.</p>
+              <p className="text-black/45">Žádné nadcházející směny.</p>
             </div>
           )}
         </div>
@@ -125,23 +125,23 @@ export default function ShiftManagement() {
         <div className="space-y-3">
           {requests.length === 0 ? (
             <div className="glass-card p-8 text-center">
-              <p className="text-white/40">Žádné žádosti ke schválení.</p>
+              <p className="text-black/45">Žádné žádosti ke schválení.</p>
             </div>
           ) : requests.map(r => (
-            <div key={r.id} className="glass-card p-6 hover:bg-white/[0.08] transition-all duration-300">
+            <div key={r.id} className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">{getUserAvatar(r.employeeId)}</span>
                 <div className="flex-1">
-                  <p className="font-semibold text-white">{getUserName(r.employeeId)}</p>
-                  <p className="text-sm text-white/60 mt-0.5">
+                  <p className="font-semibold text-[#16181A]">{getUserName(r.employeeId)}</p>
+                  <p className="text-sm text-black/60 mt-0.5">
                     {r.requestType === 'day_off' ? 'Volno' : r.requestType === 'swap' ? 'Výměna směny' : 'Extra směna'} · {r.date}
                   </p>
-                  {r.note && <p className="text-sm text-white/60 mt-2 bg-white/[0.06] p-3 rounded-2xl">{r.note}</p>}
+                  {r.note && <p className="text-sm text-black/60 mt-2 bg-black/[0.04] p-3 rounded-2xl">{r.note}</p>}
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#C8F542]' :
-                  r.status === 'rejected' ? 'bg-red-500/15 text-red-400' :
-                  'bg-orange-500/15 text-orange-400'
+                  r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#5B7A08]' :
+                  r.status === 'rejected' ? 'bg-red-500/15 text-red-600' :
+                  'bg-orange-500/15 text-orange-600'
                 }`}>
                   {r.status === 'approved' ? '✅ Schváleno' : r.status === 'rejected' ? '❌ Zamítnuto' : '⏳ Čeká'}
                 </span>

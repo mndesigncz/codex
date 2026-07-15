@@ -16,14 +16,14 @@ function nextMonthStr() {
 
 function StatCard({ icon, label, value, onClick, alert = false }: { icon: string; label: string; value: number | string; onClick?: () => void; alert?: boolean }) {
   return (
-    <button onClick={onClick} className="text-left glass-card p-5 hover:bg-white/[0.08] transition-all duration-300">
+    <button onClick={onClick} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
       <div className="flex items-start justify-between">
-        <p className="text-xs uppercase tracking-wider text-white/40">{label}</p>
-        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#C8F542]'}`}>
+        <p className="text-xs uppercase tracking-wider text-black/45">{label}</p>
+        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-600' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#5B7A08]'}`}>
           <Icon name={icon} size={16} />
         </span>
       </div>
-      <p className="text-3xl font-bold tracking-tight text-white mt-3">{value}</p>
+      <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-3">{value}</p>
     </button>
   );
 }
@@ -74,14 +74,14 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   if (loading) {
-    return <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>;
   }
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <p className="text-white/40 text-sm">Přehled podniku</p>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Vítejte zpět, {user.name}</h1>
+        <p className="text-black/45 text-sm">Přehled podniku</p>
+        <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Vítejte zpět, {user.name}</h1>
       </div>
 
       {/* KPIs */}
@@ -96,24 +96,24 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-bold tracking-tight text-white">Dostupnost — {monthLabel}</h3>
-            <p className="text-sm text-white/40">{submittedIds.size} z {members.length} zaměstnanců zadalo dostupnost</p>
+            <h3 className="font-bold tracking-tight text-[#16181A]">Dostupnost — {monthLabel}</h3>
+            <p className="text-sm text-black/45">{submittedIds.size} z {members.length} zaměstnanců zadalo dostupnost</p>
           </div>
           <button onClick={() => onNavigate('schedule')} className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110">Sestavit rozvrh</button>
         </div>
         {notSubmitted.length > 0 ? (
           <div>
-            <p className="text-xs uppercase tracking-wider text-white/40 mb-2">Ještě nezadali</p>
+            <p className="text-xs uppercase tracking-wider text-black/45 mb-2">Ještě nezadali</p>
             <div className="flex flex-wrap gap-2">
               {notSubmitted.map(m => (
-                <span key={m.id} className="rounded-full px-3 py-1 text-xs font-medium bg-white/[0.08] text-white/60">{m.avatar} {m.name}</span>
+                <span key={m.id} className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</span>
               ))}
             </div>
           </div>
         ) : members.length > 0 ? (
-          <p className="text-sm text-[#C8F542]">Všichni zadali dostupnost — můžete sestavit rozvrh.</p>
+          <p className="text-sm text-[#5B7A08]">Všichni zadali dostupnost — můžete sestavit rozvrh.</p>
         ) : (
-          <p className="text-sm text-white/40">Zatím žádní zaměstnanci. Pozvěte tým v sekci Nastavení.</p>
+          <p className="text-sm text-black/45">Zatím žádní zaměstnanci. Pozvěte tým v sekci Nastavení.</p>
         )}
       </div>
 
@@ -121,19 +121,19 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         {/* Low stock */}
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold tracking-tight text-white">Nízké zásoby</h3>
-            <button onClick={() => onNavigate('inventory')} className="text-sm text-[#C8F542] hover:brightness-110">Sklad →</button>
+            <h3 className="font-bold tracking-tight text-[#16181A]">Nízké zásoby</h3>
+            <button onClick={() => onNavigate('inventory')} className="text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
           </div>
           {lowStock.length === 0 ? (
-            <p className="text-sm text-white/40">Zásoby jsou v pořádku.</p>
+            <p className="text-sm text-black/45">Zásoby jsou v pořádku.</p>
           ) : (
             <div className="space-y-2">
               {lowStock.slice(0, 5).map(i => {
                 const isCritical = i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0);
                 return (
-                  <div key={i.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.06]">
-                    <span className="text-sm text-white">{i.name}</span>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-400' : 'bg-orange-500/15 text-orange-400'}`}>{i.quantity} {i.unit}</span>
+                  <div key={i.id} className="flex items-center justify-between p-3 rounded-2xl bg-black/[0.04]">
+                    <span className="text-sm text-[#16181A]">{i.name}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-orange-500/15 text-orange-600'}`}>{i.quantity} {i.unit}</span>
                   </div>
                 );
               })}
@@ -144,19 +144,19 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         {/* Today's shifts */}
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold tracking-tight text-white">Dnešní směny</h3>
-            <button onClick={() => onNavigate('shifts')} className="text-sm text-[#C8F542] hover:brightness-110">Rozvrh →</button>
+            <h3 className="font-bold tracking-tight text-[#16181A]">Dnešní směny</h3>
+            <button onClick={() => onNavigate('shifts')} className="text-sm text-[#5B7A08] hover:brightness-110">Rozvrh →</button>
           </div>
           {todayShifts.length === 0 ? (
-            <p className="text-sm text-white/40">Dnes nejsou naplánované žádné směny.</p>
+            <p className="text-sm text-black/45">Dnes nejsou naplánované žádné směny.</p>
           ) : (
             <div className="space-y-2">
               {todayShifts.map(s => (
-                <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.06]">
+                <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-black/[0.04]">
                   <span className="text-lg">{s.type === 'morning' ? '🌅' : '🌆'}</span>
                   <div>
-                    <p className="text-sm font-medium text-white">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p>
-                    <p className="text-xs text-white/40">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>
+                    <p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p>
+                    <p className="text-xs text-black/45">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>
                   </div>
                 </div>
               ))}
