@@ -7,6 +7,7 @@ import TeamManagement from './TeamManagement';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
+  initialTab?: 'account' | 'security' | 'team';
 }
 
 interface Account {
@@ -29,9 +30,9 @@ const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2
 
 type Tab = 'account' | 'security' | 'team';
 
-export default function Settings({ user }: Props) {
+export default function Settings({ user, initialTab }: Props) {
   const { update } = useSession();
-  const [tab, setTab] = useState<Tab>('account');
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'account');
 
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);

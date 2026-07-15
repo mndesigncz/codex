@@ -3,7 +3,7 @@ import './globals.css';
 import { SessionProvider } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Čajovna Zelená',
+  title: 'Pangea',
   description: 'Správa čajovny',
 };
 

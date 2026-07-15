@@ -6,13 +6,13 @@ function getResend() {
 
 export async function sendInvitationEmail(to: string, name: string, tempPassword: string) {
   await getResend().emails.send({
-    from: 'Čajovna Zelená <onboarding@resend.dev>',
+    from: 'Pangea <onboarding@resend.dev>',
     to,
-    subject: 'Vítejte v Čajovně Zelená! 🍵',
+    subject: 'Vítejte v Pangea! 🍵',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; background: #0D0D0D; color: white; border-radius: 16px;">
         <h1 style="color: #30D158; font-size: 28px;">Vítejte, ${name}! 🍵</h1>
-        <p style="color: rgba(235,235,245,0.6);">Byli jste přidáni do systému Čajovny Zelená.</p>
+        <p style="color: rgba(235,235,245,0.6);">Byli jste přidáni do systému Pangea.</p>
         <div style="background: #1C1C1E; border-radius: 12px; padding: 20px; margin: 24px 0;">
           <p style="margin: 0; color: rgba(235,235,245,0.6); font-size: 14px;">Přihlašovací email</p>
           <p style="margin: 4px 0 16px; font-weight: bold;">${to}</p>
@@ -28,7 +28,7 @@ export async function sendInvitationEmail(to: string, name: string, tempPassword
 export async function sendTeamInvitation(to: string, teamName: string, inviterName: string, token: string) {
   const url = `${process.env.NEXT_PUBLIC_APP_URL}/join?token=${token}`;
   await getResend().emails.send({
-    from: 'Čajovna Zelená <onboarding@resend.dev>',
+    from: 'Pangea <onboarding@resend.dev>',
     to,
     subject: `Pozvánka do týmu ${teamName} 🍵`,
     html: `
@@ -45,7 +45,7 @@ export async function sendTeamInvitation(to: string, teamName: string, inviterNa
 
 export async function sendLowStockAlert(employerEmail: string, items: string[]) {
   await getResend().emails.send({
-    from: 'Čajovna Zelená <onboarding@resend.dev>',
+    from: 'Pangea <onboarding@resend.dev>',
     to: employerEmail,
     subject: '⚠️ Upozornění: Nízké zásoby',
     html: `
@@ -63,7 +63,7 @@ export async function sendLowStockAlert(employerEmail: string, items: string[]) 
 
 export async function sendShiftRequestNotification(employerEmail: string, employeeName: string, requestType: string, date: string) {
   await getResend().emails.send({
-    from: 'Čajovna Zelená <onboarding@resend.dev>',
+    from: 'Pangea <onboarding@resend.dev>',
     to: employerEmail,
     subject: `📅 Nová žádost o směnu od ${employeeName}`,
     html: `

@@ -87,7 +87,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název podniku</label>
-              <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Čajovna Zelená" className={inputClass} />
+              <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Pangea" className={inputClass} />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>

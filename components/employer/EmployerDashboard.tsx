@@ -153,7 +153,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             <div className="space-y-2">
               {todayShifts.map(s => (
                 <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-black/[0.04]">
-                  <span className="text-lg">{s.type === 'morning' ? '🌅' : '🌆'}</span>
+                  <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-orange-500' : 'text-[#0A6FE0]'} /></span>
                   <div>
                     <p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p>
                     <p className="text-xs text-black/45">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>

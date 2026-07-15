@@ -117,6 +117,14 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12h2.5M19 12h2.5M4.2 19.8l1.8-1.8M18 6l1.8-1.8" />
     </>
   ),
+  chevron: <path d="m6 9 6 6 6-6" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </>
+  ),
+  moon: <path d="M20 14.5A8 8 0 1 1 10 4.2a6.5 6.5 0 0 0 10 10.3Z" />,
 };
 
 export type IconName = keyof typeof paths;
@@ -140,13 +148,34 @@ export function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }: { n
   );
 }
 
+// Pangea brand mark — charcoal squircle with an iridescent lime "supercontinent"
+// globe and a small spark, echoing the reference app-icon vibe.
 export function LogoMark({ size = 40 }: { size?: number }) {
+  const r = Math.round(size * 0.28);
   return (
     <span
-      className="inline-flex items-center justify-center rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] flex-shrink-0"
-      style={{ width: size, height: size }}
+      className="inline-flex items-center justify-center flex-shrink-0 shadow-[0_4px_14px_rgba(20,24,10,0.28)]"
+      style={{ width: size, height: size, background: '#16181A', borderRadius: r }}
+      aria-label="Pangea"
     >
-      <Icon name="leaf" size={Math.round(size * 0.55)} strokeWidth={1.8} />
+      <svg width={size * 0.66} height={size * 0.66} viewBox="0 0 32 32" fill="none">
+        <defs>
+          <linearGradient id="pangeaG" x1="4" y1="6" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#DFFF8A" />
+            <stop offset="0.45" stopColor="#C8F542" />
+            <stop offset="1" stopColor="#8FD9C4" />
+          </linearGradient>
+        </defs>
+        {/* globe */}
+        <circle cx="15" cy="17" r="10.5" fill="url(#pangeaG)" />
+        {/* abstract landmass carved out in charcoal */}
+        <path
+          d="M9 13.5c2.2-.6 3.3.8 5 .6 1.6-.2 2.1-1.8 3.9-1.5 1.7.3 2 1.9 3.7 2.2M8.5 19c1.9.2 2.6-1 4.2-.7 1.8.3 1.9 2.1 3.7 2.1 1.5 0 2.2-1.1 3.9-.8"
+          stroke="#16181A" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity="0.85"
+        />
+        {/* spark */}
+        <path d="M25 7.5c.15 1.6.7 2.1 2.3 2.3-1.6.15-2.15.7-2.3 2.3-.15-1.6-.7-2.15-2.3-2.3 1.6-.2 2.15-.7 2.3-2.3Z" fill="#fff" />
+      </svg>
     </span>
   );
 }

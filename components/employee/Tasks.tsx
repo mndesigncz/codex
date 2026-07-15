@@ -54,7 +54,7 @@ export default function Tasks({ user }: Props) {
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
   const counts = { pending: tasks.filter(t => t.status === 'pending').length, in_progress: tasks.filter(t => t.status === 'in_progress').length, done: tasks.filter(t => t.status === 'done').length };
 
-  const priorityIcon = (p: string) => p === 'high' ? '🔴' : p === 'medium' ? '🟡' : '🟢';
+  const priorityColor = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
 
   const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 
@@ -74,7 +74,7 @@ export default function Tasks({ user }: Props) {
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center">
-          <p className="text-4xl mb-2">✅</p>
+          
           <p className="text-black/45">{filter === 'done' ? 'Žádné splněné úkoly.' : 'Žádné úkoly v této kategorii.'}</p>
         </div>
       ) : (
@@ -95,7 +95,7 @@ export default function Tasks({ user }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <p className={`font-semibold text-[#16181A] tracking-tight ${task.status === 'done' ? 'line-through' : ''}`}>
-                        <span className="mr-2">{priorityIcon(task.priority)}</span>{task.title}
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${priorityColor(task.priority)}`} />{task.title}
                       </p>
                       <select
                         value={task.status}
@@ -108,8 +108,8 @@ export default function Tasks({ user }: Props) {
                     {task.description && <p className="text-sm text-black/55 mt-1.5">{task.description}</p>}
                     {task.dueDate && (
                       <p className={`text-xs mt-2 ${new Date(task.dueDate) < new Date() && task.status !== 'done' ? 'text-red-600 font-medium' : 'text-black/45'}`}>
-                        📅 Do: {task.dueDate}
-                        {new Date(task.dueDate) < new Date() && task.status !== 'done' && ' ⚠️ Po termínu'}
+                        Do: {task.dueDate}
+                        {new Date(task.dueDate) < new Date() && task.status !== 'done' && ' · Po termínu'}
                       </p>
                     )}
                   </div>
