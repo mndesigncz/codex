@@ -63,7 +63,7 @@ export default function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => { setOpen(o => !o); if (!open && unread) markAllRead(); }}
-        className="relative rounded-full bg-white/[0.08] border border-white/10 w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
         title="Notifikace"
       >
         <Icon name="bell" size={19} />
@@ -75,26 +75,26 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] panel-dark rounded-3xl overflow-hidden z-50 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
-          <div className="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between">
-            <span className="font-bold text-white text-sm">Notifikace</span>
+        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
+          <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
+            <span className="font-bold text-[#16181A] text-sm">Notifikace</span>
             {notifs.some(n => !n.is_read) && (
-              <button onClick={markAllRead} className="text-xs text-[#C8F542] hover:underline">Přečíst vše</button>
+              <button onClick={markAllRead} className="text-xs text-[#5B7A08] hover:underline">Přečíst vše</button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-white/[0.05]">
+          <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
             {notifs.length === 0 ? (
-              <div className="p-8 text-center text-white/40 text-sm">Žádné notifikace</div>
+              <div className="p-8 text-center text-black/40 text-sm">Žádné notifikace</div>
             ) : notifs.map(n => (
               <button key={n.id} onClick={() => openNotif(n)}
-                className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-white/[0.04] transition-colors ${!n.is_read ? 'bg-[#C8F542]/[0.04]' : ''}`}>
-                <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[#C8F542]">
+                className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-black/[0.03] transition-colors ${!n.is_read ? 'bg-[#C8F542]/[0.04]' : ''}`}>
+                <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 text-[#5B7A08]">
                   <Icon name={typeIcon[n.type] || 'bell'} size={15} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white truncate">{n.title}</p>
-                  {n.body && <p className="text-xs text-white/50 mt-0.5 line-clamp-2">{n.body}</p>}
-                  <p className="text-[11px] text-white/30 mt-1">
+                  <p className="text-sm font-semibold text-[#16181A] truncate">{n.title}</p>
+                  {n.body && <p className="text-xs text-black/50 mt-0.5 line-clamp-2">{n.body}</p>}
+                  <p className="text-[11px] text-black/35 mt-1">
                     {new Date(n.created_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
