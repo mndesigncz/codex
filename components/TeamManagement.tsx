@@ -289,7 +289,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
           <Icon name="check" size={16} /> Připojovací kód
         </div>
-        <p className="text-sm text-black/45">Sdílejte tento kód s novými členy, aby se mohli připojit k týmu.</p>
+        <p className="text-sm text-black/45">Zaměstnanci se připojí zadáním tohoto kódu na stránce <span className="font-medium text-[#16181A]">/join</span>.</p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-6 py-5 flex items-center justify-between">
             <span className="text-3xl md:text-4xl font-bold tracking-[0.3em] text-[#5B7A08]">{team.join_code}</span>
@@ -333,9 +333,17 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <p className="text-sm text-[#16181A] truncate">{inv.email}</p>
                     <p className="text-xs text-black/45">{inv.job_title || 'Barista'}</p>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
-                    {statusLabel(inv.status)}
-                  </span>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {inv.status === 'pending' && (
+                      <button type="button" onClick={() => { setInviteEmail(inv.email); setInviteJob(inv.job_title || 'Barista'); }}
+                        className="text-xs text-[#5B7A08] hover:underline whitespace-nowrap">
+                        Odeslat znovu
+                      </button>
+                    )}
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
+                      {statusLabel(inv.status)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

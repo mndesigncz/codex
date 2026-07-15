@@ -21,6 +21,28 @@ function excerpt(content: string) {
   return flat.length > 120 ? flat.slice(0, 120).trimEnd() + '…' : flat;
 }
 
+// Normalize an incoming checklist into a clean string[] of step texts.
+function normalizeChecklist(input: any): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((s) => String(s ?? '').trim())
+    .filter((s) => s.length > 0)
+    .slice(0, 100);
+}
+
+function checklistLength(raw: any): number {
+  if (Array.isArray(raw)) return raw.length;
+  if (typeof raw === 'string') {
+    try {
+      const p = JSON.parse(raw);
+      return Array.isArray(p) ? p.length : 0;
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
+
 // GET — list team's guides (optionally ?categoryId=)
 export async function GET(request: Request) {
   const c = await ctx();
@@ -32,12 +54,12 @@ export async function GET(request: Request) {
 
   const rows = categoryId
     ? await sql`
-        SELECT id, title, category_id, content, updated_at
+        SELECT id, title, category_id, content, checklist, updated_at
         FROM guides
         WHERE team_id = ${c.teamId} AND category_id = ${parseInt(categoryId)}
         ORDER BY updated_at DESC`
     : await sql`
-        SELECT id, title, category_id, content, updated_at
+        SELECT id, title, category_id, content, checklist, updated_at
         FROM guides
         WHERE team_id = ${c.teamId}
         ORDER BY updated_at DESC`;
@@ -48,6 +70,7 @@ export async function GET(request: Request) {
     categoryId: g.category_id,
     updatedAt: g.updated_at,
     excerpt: excerpt(g.content),
+    hasChecklist: checklistLength(g.checklist) > 0,
   }));
 
   return NextResponse.json({ guides });
@@ -60,20 +83,23 @@ export async function POST(request: Request) {
   if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
-  const { title, content, categoryId } = await request.json();
+  const { title, content, categoryId, checklist } = await request.json();
   if (!title || !String(title).trim()) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
+  const steps = normalizeChecklist(checklist);
+
   const [guide] = await sql`
-    INSERT INTO guides (team_id, category_id, title, content, created_by, updated_at)
+    INSERT INTO guides (team_id, category_id, title, content, checklist, created_by, updated_at)
     VALUES (
       ${c.teamId},
       ${categoryId ? parseInt(categoryId) : null},
       ${String(title).trim()},
       ${content || ''},
+      ${JSON.stringify(steps)},
       ${c.meId},
       NOW()
     )
-    RETURNING id, title, category_id, content, updated_at`;
+    RETURNING id, title, category_id, content, checklist, updated_at`;
 
   return NextResponse.json({
     guide: {
@@ -82,6 +108,7 @@ export async function POST(request: Request) {
       categoryId: guide.category_id,
       updatedAt: guide.updated_at,
       excerpt: excerpt(guide.content),
+      hasChecklist: checklistLength(guide.checklist) > 0,
     },
   });
 }

@@ -12,18 +12,18 @@ import EmployerDashboard from './EmployerDashboard';
 import ScheduleBuilder from '../scheduling/ScheduleBuilder';
 import Inventory from './Inventory';
 import PlanningBoard from './PlanningBoard';
-import Recipes from './Recipes';
 import DailyReports from './DailyReports';
+import Procedures from '../procedures/Procedures';
 
 const navItems = [
-  { id: 'overview',  label: 'Přehled',    icon: 'overview' },
-  { id: 'shifts',    label: 'Rozvrh',     icon: 'calendar' },
-  { id: 'inventory', label: 'Sklad',      icon: 'box' },
-  { id: 'chat',      label: 'Chat',       icon: 'chat' },
-  { id: 'guides',    label: 'Návody',     icon: 'book' },
-  { id: 'planning',  label: 'Plánování',  icon: 'kanban' },
-  { id: 'recipes',   label: 'Recepty',    icon: 'leaf' },
-  { id: 'reports',   label: 'Zprávy',     icon: 'trend' },
+  { id: 'overview',   label: 'Přehled',    icon: 'overview' },
+  { id: 'shifts',     label: 'Rozvrh',     icon: 'calendar' },
+  { id: 'inventory',  label: 'Sklad',      icon: 'box' },
+  { id: 'procedures', label: 'Postupy',    icon: 'clipboard' },
+  { id: 'chat',       label: 'Chat',       icon: 'chat' }, // mobile dock only
+  { id: 'guides',     label: 'Návody',     icon: 'book' },
+  { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
+  { id: 'reports',    label: 'Zprávy',     icon: 'trend' },
 ];
 
 const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
@@ -37,9 +37,9 @@ export default function EmployerLayout({ user }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'account' | 'team'>('account');
+  const [settingsTab, setSettingsTab] = useState<'account' | 'app' | 'team'>('account');
 
-  const openSettings = (tab: 'account' | 'team') => {
+  const openSettings = (tab: 'account' | 'app' | 'team') => {
     setSettingsTab(tab); setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false);
   };
 
@@ -49,9 +49,9 @@ export default function EmployerLayout({ user }: Props) {
       case 'shifts':    return <ScheduleBuilder user={user as any} />;
       case 'inventory': return <Inventory user={user as any} />;
       case 'chat':      return <ChatView user={user as any} />;
+      case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
-      case 'recipes':   return <Recipes />;
       case 'reports':   return <DailyReports />;
       case 'settings':  return <Settings user={user as any} initialTab={settingsTab} key={settingsTab} />;
       default:          return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
@@ -59,13 +59,18 @@ export default function EmployerLayout({ user }: Props) {
   };
 
   const active = navItems.find(n => n.id === currentView);
-  const title = currentView === 'settings' ? (settingsTab === 'team' ? 'Správa týmu' : 'Nastavení') : active?.label;
+  const title = currentView === 'settings'
+    ? (settingsTab === 'team' ? 'Správa týmu' : settingsTab === 'app' ? 'Aplikace' : 'Nastavení')
+    : active?.label;
   const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
 
   const AccountMenu = () => (
     <div className="glass rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(25,35,15,0.14)]">
       <button onClick={() => openSettings('account')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
         <Icon name="settings" size={18} /> Nastavení účtu
+      </button>
+      <button onClick={() => openSettings('app')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
+        <Icon name="leaf" size={18} /> Vzhled a aplikace
       </button>
       <button onClick={() => openSettings('team')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
         <Icon name="users" size={18} /> Správa týmu
@@ -91,7 +96,7 @@ export default function EmployerLayout({ user }: Props) {
           )}
         </div>
         <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto scrollbar-thin">
-          {navItems.map(item => (
+          {navItems.filter(n => n.id !== 'chat').map(item => (
             <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
               className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
                 currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
@@ -168,6 +173,9 @@ export default function EmployerLayout({ user }: Props) {
             ))}
             <button onClick={() => openSettings('account')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
               <Icon name="settings" size={20} /> Nastavení
+            </button>
+            <button onClick={() => openSettings('app')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
+              <Icon name="leaf" size={20} /> Aplikace
             </button>
             <button onClick={() => openSettings('team')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
               <Icon name="users" size={20} /> Správa týmu

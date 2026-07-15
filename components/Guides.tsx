@@ -22,20 +22,23 @@ interface GuideSummary {
   categoryId: number | null;
   updatedAt: string;
   excerpt: string;
+  hasChecklist: boolean;
 }
 
 interface GuideFull {
   id: number;
   title: string;
   content: string;
+  checklist: string[];
   categoryId: number | null;
   updatedAt: string;
   createdAt?: string;
   author?: string;
 }
 
+// Replaces the removed Recipes feature — recipes now live as guides under "Recepty & Menu".
 const DEFAULT_CATEGORIES = [
-  { name: 'Menu & recepty', icon: 'leaf' },
+  { name: 'Recepty & Menu', icon: 'leaf' },
   { name: 'Úklid', icon: 'check' },
   { name: 'Provoz', icon: 'box' },
   { name: 'Zákaznický servis', icon: 'chat' },
@@ -173,10 +176,10 @@ export default function Guides({ user }: { user: User }) {
 
   const openReader = async (id: number) => {
     setReaderLoading(true);
-    setReader({ id, title: '', content: '', categoryId: null, updatedAt: '' });
+    setReader({ id, title: '', content: '', checklist: [], categoryId: null, updatedAt: '' });
     const r = await fetch(`/api/guides/${id}`);
     const d = await r.json();
-    if (d.guide) setReader(d.guide);
+    if (d.guide) setReader({ ...d.guide, checklist: Array.isArray(d.guide.checklist) ? d.guide.checklist : [] });
     setReaderLoading(false);
   };
 
@@ -284,7 +287,7 @@ export default function Guides({ user }: { user: User }) {
               )}
             </nav>
 
-            {isEmployer && (
+            {isEmployer && categories.length > 0 && (
               <button
                 onClick={() => setManageOpen(true)}
                 className="mt-2 w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center gap-2 text-sm transition-all"
@@ -363,7 +366,7 @@ export default function Guides({ user }: { user: User }) {
                               e.stopPropagation();
                               const r = await fetch(`/api/guides/${g.id}`);
                               const d = await r.json();
-                              if (d.guide) openEditor(d.guide);
+                              if (d.guide) openEditor({ ...d.guide, checklist: Array.isArray(d.guide.checklist) ? d.guide.checklist : [] });
                             }}
                             className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
                             title="Upravit"
@@ -389,6 +392,12 @@ export default function Guides({ user }: { user: User }) {
                         <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08]">
                           <Icon name={cat.icon} size={12} strokeWidth={2} />
                           {cat.name}
+                        </span>
+                      )}
+                      {g.hasChecklist && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
+                          <Icon name="check" size={12} strokeWidth={2.2} />
+                          checklist
                         </span>
                       )}
                       <span className="text-xs text-black/30 flex items-center gap-1 ml-auto">
@@ -470,7 +479,10 @@ export default function Guides({ user }: { user: User }) {
                 <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
               </div>
             ) : (
-              <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
+              <>
+                <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
+                {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} />}
+              </>
             )}
           </div>
         </div>
@@ -496,6 +508,80 @@ export default function Guides({ user }: { user: User }) {
             await Promise.all([loadCategories(), loadGuides()]);
           }}
         />
+      )}
+    </div>
+  );
+}
+
+// Interactive tick list for the reader. State is local to the session — resets on reopen.
+function ReaderChecklist({ steps }: { steps: string[] }) {
+  const [done, setDone] = useState<boolean[]>(() => steps.map(() => false));
+
+  const doneCount = done.filter(Boolean).length;
+  const total = steps.length;
+  const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
+  const allDone = doneCount === total && total > 0;
+
+  const toggle = (i: number) => setDone((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
+  const reset = () => setDone(steps.map(() => false));
+
+  return (
+    <div className="mt-6 pt-6 border-t border-black/[0.08]">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-black/45">Postup</h3>
+        <span className={`text-xs font-medium ${allDone ? 'text-[#5B7A08]' : 'text-black/45'}`}>
+          {doneCount}/{total}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 w-full rounded-full bg-black/[0.06] overflow-hidden mb-4">
+        <div
+          className="h-full rounded-full bg-[#C8F542] transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <ul className="space-y-2">
+        {steps.map((s, i) => {
+          const checked = done[i];
+          return (
+            <li key={i}>
+              <button
+                onClick={() => toggle(i)}
+                className={`w-full flex items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition-all ${
+                  checked ? 'bg-[#C8F542]/10' : 'bg-black/[0.03] hover:bg-black/[0.05]'
+                }`}
+              >
+                <span
+                  className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all ${
+                    checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'
+                  }`}
+                >
+                  <Icon name="check" size={13} strokeWidth={3} />
+                </span>
+                <span className={`text-sm leading-relaxed ${checked ? 'text-black/40 line-through' : 'text-black/80'}`}>
+                  {s}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {allDone && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-4 py-3">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#5B7A08]">
+            <Icon name="check" size={16} strokeWidth={2.5} />
+            Hotovo! Všechny kroky splněny.
+          </span>
+          <button
+            onClick={reset}
+            className="text-xs text-[#5B7A08]/80 hover:text-[#5B7A08] transition-colors underline underline-offset-2"
+          >
+            Znovu
+          </button>
+        </div>
       )}
     </div>
   );
@@ -546,8 +632,21 @@ function GuideEditor({
   const [categoryId, setCategoryId] = useState<number | null>(
     editing ? editing.categoryId : defaultCategory
   );
+  const [steps, setSteps] = useState<string[]>(editing?.checklist?.length ? [...editing.checklist] : []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const addStep = () => setSteps((prev) => [...prev, '']);
+  const updateStep = (i: number, v: string) => setSteps((prev) => prev.map((s, idx) => (idx === i ? v : s)));
+  const removeStep = (i: number) => setSteps((prev) => prev.filter((_, idx) => idx !== i));
+  const moveStep = (i: number, dir: -1 | 1) =>
+    setSteps((prev) => {
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
 
   const save = async () => {
     if (!title.trim()) {
@@ -556,7 +655,8 @@ function GuideEditor({
     }
     setSaving(true);
     setError('');
-    const payload = { title: title.trim(), content, categoryId };
+    const checklist = steps.map((s) => s.trim()).filter((s) => s.length > 0);
+    const payload = { title: title.trim(), content, categoryId, checklist };
     const res = editing
       ? await fetch(`/api/guides/${editing.id}`, {
           method: 'PATCH',
@@ -629,6 +729,73 @@ function GuideEditor({
               className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all leading-relaxed resize-y"
             />
             <p className="text-xs text-black/30 mt-2">Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.</p>
+          </div>
+
+          {/* Checklist builder */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs uppercase tracking-wider text-black/45">Checklist (volitelný)</label>
+              <span className="text-xs text-black/30">{steps.length} kroků</span>
+            </div>
+            {steps.length === 0 ? (
+              <p className="text-xs text-black/40 mb-3">Přidejte kroky, které si personál může odškrtávat při čtení návodu.</p>
+            ) : (
+              <div className="space-y-2 mb-3">
+                {steps.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex flex-col flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveStep(i, -1)}
+                        disabled={i === 0}
+                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition-all rotate-180"
+                        title="Nahoru"
+                      >
+                        <Icon name="chevron" size={14} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveStep(i, 1)}
+                        disabled={i === steps.length - 1}
+                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition-all"
+                        title="Dolů"
+                      >
+                        <Icon name="chevron" size={14} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                    <span className="text-xs text-black/30 w-5 text-right flex-shrink-0">{i + 1}.</span>
+                    <input
+                      value={s}
+                      onChange={(e) => updateStep(i, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (i === steps.length - 1) addStep();
+                        }
+                      }}
+                      placeholder={`Krok ${i + 1}`}
+                      className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm min-w-0"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeStep(i)}
+                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-red-600 transition-all text-xs flex-shrink-0"
+                      title="Odebrat krok"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={addStep}
+              className="w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center justify-center gap-2 text-sm transition-all"
+            >
+              <Icon name="plus" size={16} strokeWidth={2} />
+              Přidat krok
+            </button>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

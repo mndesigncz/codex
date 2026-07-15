@@ -118,6 +118,14 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   chevron: <path d="m6 9 6 6 6-6" />,
+  clipboard: (
+    <>
+      <rect x="6" y="4.5" width="12" height="17" rx="2.5" />
+      <path d="M9 4.5a1.6 1.6 0 0 1 1.6-1.6h2.8A1.6 1.6 0 0 1 15 4.5v1.2a.8.8 0 0 1-.8.8H9.8a.8.8 0 0 1-.8-.8Z" />
+      <path d="m8.8 12.2 1.7 1.7 3.2-3.4" />
+    </>
+  ),
+  play: <path d="M8 5.5v13l11-6.5-11-6.5Z" />,
   sun: (
     <>
       <circle cx="12" cy="12" r="4" />

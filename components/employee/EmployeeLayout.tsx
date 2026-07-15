@@ -13,14 +13,16 @@ import MyShifts from './MyShifts';
 import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
 import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
+import Procedures from '../procedures/Procedures';
 
 const navItems = [
   { id: 'home',        label: 'Přehled',    icon: 'overview' },
   { id: 'my-shifts',   label: 'Směny',      icon: 'calendar' },
+  { id: 'procedures',  label: 'Postupy',    icon: 'clipboard' },
   { id: 'availability',label: 'Dostupnost', icon: 'swap' },
   { id: 'inventory',   label: 'Sklad',      icon: 'box' },
   { id: 'tasks',       label: 'Úkoly',      icon: 'check' },
-  { id: 'chat',        label: 'Chat',       icon: 'chat' },
+  { id: 'chat',        label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',      label: 'Návody',     icon: 'book' },
 ];
 
@@ -35,8 +37,11 @@ export default function EmployeeLayout({ user }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'account' | 'app'>('account');
 
-  const openSettings = () => { setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
+  const openSettings = (tab: 'account' | 'app' = 'account') => {
+    setSettingsTab(tab); setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false);
+  };
 
   const renderView = () => {
     switch (currentView) {
@@ -44,16 +49,17 @@ export default function EmployeeLayout({ user }: Props) {
       case 'my-shifts':    return <MyShifts user={user as any} />;
       case 'availability': return <AvailabilitySubmit user={user as any} />;
       case 'inventory':    return <InventoryReport user={user as any} />;
+      case 'procedures':   return <Procedures user={user as any} />;
       case 'tasks':        return <Tasks user={user as any} />;
       case 'chat':         return <ChatView user={user as any} />;
       case 'guides':       return <Guides user={user as any} />;
-      case 'settings':     return <Settings user={user as any} />;
+      case 'settings':     return <Settings user={user as any} initialTab={settingsTab} key={settingsTab} />;
       default:             return <EmployeeDashboard user={user as any} onNavigate={setCurrentView} />;
     }
   };
 
   const active = navItems.find(n => n.id === currentView);
-  const title = currentView === 'settings' ? 'Nastavení' : active?.label;
+  const title = currentView === 'settings' ? (settingsTab === 'app' ? 'Aplikace' : 'Nastavení') : active?.label;
   const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
 
   return (
@@ -69,7 +75,7 @@ export default function EmployeeLayout({ user }: Props) {
           )}
         </div>
         <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto scrollbar-thin">
-          {navItems.map(item => (
+          {navItems.filter(n => n.id !== 'chat').map(item => (
             <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
               className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
                 currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
@@ -82,8 +88,11 @@ export default function EmployeeLayout({ user }: Props) {
         <div className="p-3 border-t border-black/[0.07] relative">
           {accountOpen && (
             <div className="absolute left-3 right-3 bottom-full mb-2 glass rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(25,35,15,0.14)]">
-              <button onClick={openSettings} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
+              <button onClick={() => openSettings('account')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
                 <Icon name="settings" size={18} /> Nastavení účtu
+              </button>
+              <button onClick={() => openSettings('app')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
+                <Icon name="leaf" size={18} /> Vzhled a aplikace
               </button>
               <div className="h-px bg-black/[0.06] my-1" />
               <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-600 hover:bg-red-500/[0.06] transition-colors">
@@ -150,8 +159,11 @@ export default function EmployeeLayout({ user }: Props) {
                 <Icon name={item.icon} size={20} /> {item.label}
               </button>
             ))}
-            <button onClick={openSettings} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
+            <button onClick={() => openSettings('account')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
               <Icon name="settings" size={20} /> Nastavení
+            </button>
+            <button onClick={() => openSettings('app')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
+              <Icon name="leaf" size={20} /> Aplikace
             </button>
             <button onClick={() => signOut({ callbackUrl: '/login' })} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-red-600 hover:bg-red-500/[0.06]">
               <Icon name="logout" size={20} /> Odhlásit se

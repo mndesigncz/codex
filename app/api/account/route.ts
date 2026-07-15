@@ -14,35 +14,38 @@ async function meId() {
   return parseInt((session.user as any).id);
 }
 
+function serialize(u: any) {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    avatar: u.avatar,
+    phone: u.phone,
+    jobTitle: u.job_title,
+    shiftPreference: u.shift_preference,
+    theme: u.theme ?? 'light',
+    role: u.role,
+  };
+}
+
 export async function GET() {
   const id = await meId();
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
   const [user] = await sql`
-    SELECT id, name, email, avatar, phone, job_title, shift_preference, role
+    SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role
     FROM users WHERE id = ${id}`;
   if (!user) return NextResponse.json({ error: 'Uživatel nenalezen' }, { status: 404 });
 
-  return NextResponse.json({
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      phone: user.phone,
-      jobTitle: user.job_title,
-      shiftPreference: user.shift_preference,
-      role: user.role,
-    },
-  });
+  return NextResponse.json({ user: serialize(user) });
 }
 
 export async function PATCH(request: Request) {
   const id = await meId();
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  const body = await request.json();
-  const { name, avatar, phone, jobTitle, shiftPreference, currentPassword, newPassword } = body;
+  const body = await request.json().catch(() => ({}));
+  const { name, avatar, phone, jobTitle, shiftPreference, theme, currentPassword, newPassword } = body;
 
   // Password change flow
   if (currentPassword !== undefined || newPassword !== undefined) {
@@ -64,35 +67,28 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, message: 'Heslo bylo změněno.' });
   }
 
-  // Profile update flow (only provided fields)
+  // Validation for provided fields
   if (name !== undefined && String(name).trim() === '') {
     return NextResponse.json({ error: 'Jméno nesmí být prázdné.' }, { status: 400 });
   }
+  if (theme !== undefined && theme !== 'light' && theme !== 'dark') {
+    return NextResponse.json({ error: 'Neplatný motiv vzhledu.' }, { status: 400 });
+  }
 
+  // Profile update flow (only provided fields)
   await sql`
     UPDATE users SET
       name = COALESCE(${name ?? null}, name),
       avatar = COALESCE(${avatar ?? null}, avatar),
       phone = COALESCE(${phone ?? null}, phone),
       job_title = COALESCE(${jobTitle ?? null}, job_title),
-      shift_preference = COALESCE(${shiftPreference ?? null}, shift_preference)
+      shift_preference = COALESCE(${shiftPreference ?? null}, shift_preference),
+      theme = COALESCE(${theme ?? null}, theme)
     WHERE id = ${id}`;
 
   const [updated] = await sql`
-    SELECT id, name, email, avatar, phone, job_title, shift_preference, role
+    SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role
     FROM users WHERE id = ${id}`;
 
-  return NextResponse.json({
-    ok: true,
-    user: {
-      id: updated.id,
-      name: updated.name,
-      email: updated.email,
-      avatar: updated.avatar,
-      phone: updated.phone,
-      jobTitle: updated.job_title,
-      shiftPreference: updated.shift_preference,
-      role: updated.role,
-    },
-  });
+  return NextResponse.json({ ok: true, user: serialize(updated) });
 }
