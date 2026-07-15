@@ -43,6 +43,20 @@ export async function sendTeamInvitation(to: string, teamName: string, inviterNa
   });
 }
 
+export async function sendBackupEmail(to: string, filename: string, json: string) {
+  await getResend().emails.send({
+    from: 'Pangea Zálohy <onboarding@resend.dev>',
+    to,
+    subject: `Záloha dat Pangea — ${filename.replace('pangea-backup-', '').replace('.json', '')}`,
+    html: `
+      <div style="font-family:-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;">
+        <h1 style="font-size:20px;margin:0 0 8px;">🗄️ Automatická záloha</h1>
+        <p style="color:#5c6353;font-size:14px;">V příloze je kompletní záloha dat tvého podniku (${filename}). Ulož si e-mail — kdyby se s databází cokoli stalo, data se z něj dají obnovit.</p>
+      </div>`,
+    attachments: [{ filename, content: Buffer.from(json).toString('base64') }],
+  });
+}
+
 export async function sendLowStockAlert(employerEmail: string, items: string[]) {
   await getResend().emails.send({
     from: 'Pangea <onboarding@resend.dev>',

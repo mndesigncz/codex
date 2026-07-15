@@ -1,9 +1,42 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
+import { neon } from '@neondatabase/serverless';
 import { db } from './db';
 import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
+import { generateJoinCode } from './team';
+
+// Self-heal: an employer must always have a team. If theirs is missing
+// (e.g. after a DB issue), recreate/relink it on login so the app never
+// lands in a broken "employer without a team" state.
+async function ensureEmployerTeam(userId: number, name: string, currentTeamId: number | null): Promise<number | null> {
+  if (currentTeamId) return currentTeamId;
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    const existing = await sql`SELECT id FROM teams WHERE owner_id = ${userId} LIMIT 1`;
+    let teamId: number;
+    if (existing.length > 0) {
+      teamId = existing[0].id as number;
+    } else {
+      let code = generateJoinCode();
+      for (let i = 0; i < 5; i++) {
+        const clash = await sql`SELECT id FROM teams WHERE join_code = ${code}`;
+        if (clash.length === 0) break;
+        code = generateJoinCode();
+      }
+      const [team] = await sql`
+        INSERT INTO teams (name, owner_id, join_code)
+        VALUES (${'Podnik ' + name}, ${userId}, ${code}) RETURNING id`;
+      teamId = team.id as number;
+      try { await sql`INSERT INTO conversations (team_id, type, name) VALUES (${teamId}, 'team', 'Týmový chat')`; } catch {}
+    }
+    await sql`UPDATE users SET team_id = ${teamId} WHERE id = ${userId}`;
+    return teamId;
+  } catch {
+    return currentTeamId;
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -21,6 +54,10 @@ export const authOptions: NextAuthOptions = {
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
+        let teamId: number | null = user.teamId ?? null;
+        if (user.role === 'employer') {
+          teamId = await ensureEmployerTeam(user.id, user.name, teamId);
+        }
         return {
           id: String(user.id),
           name: user.name,
@@ -28,7 +65,7 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           avatar: user.avatar ?? '👤',
           jobTitle: user.jobTitle ?? 'Barista',
-          teamId: user.teamId ?? null,
+          teamId,
         } as any;
       },
     }),
