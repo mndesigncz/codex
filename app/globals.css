@@ -72,3 +72,60 @@ select option { background-color: #ffffff; color: #16181A; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
 .panel-dark .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); }
+
+/* ============================================================
+   Dark theme — remaps the shared design vocabulary in one place
+   ============================================================ */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] body{
+  background:#0C0D0F;
+  background-image:
+    radial-gradient(ellipse 70% 45% at 20% -10%, rgba(200,245,66,0.10), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(10,132,255,0.08), transparent);
+  color:#EDF2E4;
+}
+:root[data-theme="dark"] .glass{ background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.09); backdrop-filter:blur(20px) saturate(1.2); -webkit-backdrop-filter:blur(20px) saturate(1.2); }
+:root[data-theme="dark"] .glass-strong{ background:rgba(28,31,34,0.82); border-color:rgba(255,255,255,0.10); }
+:root[data-theme="dark"] .glass-card{ background:rgba(255,255,255,0.045); border-color:rgba(255,255,255,0.08); box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05); }
+
+/* text */
+:root[data-theme="dark"] .text-\[\#16181A\]{ color:#EDF2E4 !important; }
+:root[data-theme="dark"] .text-black\/70{ color:rgba(237,242,228,0.78) !important; }
+:root[data-theme="dark"] .text-black\/60{ color:rgba(237,242,228,0.66) !important; }
+:root[data-theme="dark"] .text-black\/55{ color:rgba(237,242,228,0.60) !important; }
+:root[data-theme="dark"] .text-black\/50{ color:rgba(237,242,228,0.55) !important; }
+:root[data-theme="dark"] .text-black\/45{ color:rgba(237,242,228,0.50) !important; }
+:root[data-theme="dark"] .text-black\/40{ color:rgba(237,242,228,0.45) !important; }
+:root[data-theme="dark"] .text-black\/35{ color:rgba(237,242,228,0.40) !important; }
+:root[data-theme="dark"] .text-black\/30{ color:rgba(237,242,228,0.35) !important; }
+:root[data-theme="dark"] .text-\[\#5B7A08\]{ color:#C8F542 !important; }
+:root[data-theme="dark"] .hover\:text-black:hover{ color:#EDF2E4 !important; }
+
+/* surfaces / fills */
+:root[data-theme="dark"] .bg-white{ background-color:#171A1D !important; }
+:root[data-theme="dark"] .bg-white\/60{ background-color:rgba(255,255,255,0.10) !important; }
+:root[data-theme="dark"] .bg-white\/70{ background-color:rgba(255,255,255,0.10) !important; }
+:root[data-theme="dark"] .bg-black\/\[0\.03\]{ background-color:rgba(255,255,255,0.04) !important; }
+:root[data-theme="dark"] .bg-black\/\[0\.04\]{ background-color:rgba(255,255,255,0.05) !important; }
+:root[data-theme="dark"] .bg-black\/\[0\.05\]{ background-color:rgba(255,255,255,0.06) !important; }
+:root[data-theme="dark"] .bg-black\/\[0\.06\]{ background-color:rgba(255,255,255,0.07) !important; }
+:root[data-theme="dark"] .bg-\[\#16181A\]{ background-color:rgba(255,255,255,0.14) !important; }
+:root[data-theme="dark"] .hover\:bg-black\/\[0\.03\]:hover{ background-color:rgba(255,255,255,0.05) !important; }
+:root[data-theme="dark"] .hover\:bg-black\/\[0\.04\]:hover{ background-color:rgba(255,255,255,0.06) !important; }
+:root[data-theme="dark"] .hover\:bg-black\/\[0\.05\]:hover{ background-color:rgba(255,255,255,0.07) !important; }
+:root[data-theme="dark"] .hover\:bg-black\/\[0\.06\]:hover{ background-color:rgba(255,255,255,0.08) !important; }
+
+/* borders / rings / dividers */
+:root[data-theme="dark"] .border-black\/\[0\.06\]{ border-color:rgba(255,255,255,0.08) !important; }
+:root[data-theme="dark"] .border-black\/\[0\.07\]{ border-color:rgba(255,255,255,0.09) !important; }
+:root[data-theme="dark"] .border-black\/\[0\.08\]{ border-color:rgba(255,255,255,0.10) !important; }
+:root[data-theme="dark"] .border-black\/10{ border-color:rgba(255,255,255,0.12) !important; }
+:root[data-theme="dark"] .border-black\/15{ border-color:rgba(255,255,255,0.16) !important; }
+:root[data-theme="dark"] .ring-black\/10{ --tw-ring-color:rgba(255,255,255,0.14) !important; }
+:root[data-theme="dark"] .ring-black\/\[0\.08\]{ --tw-ring-color:rgba(255,255,255,0.10) !important; }
+:root[data-theme="dark"] .divide-black\/\[0\.05\] > :not([hidden]) ~ :not([hidden]){ border-color:rgba(255,255,255,0.06) !important; }
+:root[data-theme="dark"] .divide-black\/\[0\.06\] > :not([hidden]) ~ :not([hidden]){ border-color:rgba(255,255,255,0.07) !important; }
+
+/* inputs */
+:root[data-theme="dark"] .placeholder-black\/30::placeholder{ color:rgba(237,242,228,0.32) !important; }
+:root[data-theme="dark"] select option{ background-color:#171A1D; color:#EDF2E4; }

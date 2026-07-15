@@ -34,6 +34,7 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light'`;
 
     // ---- Invitations ----
     await sql`
@@ -185,8 +186,47 @@ export async function GET() {
         category_id INTEGER,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
+        checklist JSONB DEFAULT '[]',
         created_by INTEGER NOT NULL,
         updated_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`;
+
+    // ---- Procedures / checklists ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS procedures (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        icon TEXT DEFAULT 'check',
+        color TEXT DEFAULT 'lime',
+        items JSONB DEFAULT '[]',
+        created_by INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS procedure_runs (
+        id SERIAL PRIMARY KEY,
+        procedure_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        checked_items JSONB DEFAULT '[]',
+        total_items INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'running',
+        started_at TIMESTAMP DEFAULT NOW(),
+        completed_at TIMESTAMP,
+        duration_seconds INTEGER
+      )`;
+
+    // ---- Inventory categories ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS inventory_categories (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
       )`;
 

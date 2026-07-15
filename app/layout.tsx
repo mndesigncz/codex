@@ -20,6 +20,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="cs">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('pangea-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
+          }}
+        />
+      </head>
       <body>
         <SessionProvider>{children}</SessionProvider>
       </body>

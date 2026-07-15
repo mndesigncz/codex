@@ -27,6 +27,7 @@ export const users = pgTable('users', {
   shiftPreference: shiftTypeEnum('shift_preference').default('flexible'),
   employerId: integer('employer_id'),
   teamId: integer('team_id'),
+  theme: text('theme').default('light'), // light | dark | system
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -174,6 +175,7 @@ export const guides = pgTable('guides', {
   categoryId: integer('category_id'),
   title: text('title').notNull(),
   content: text('content').notNull(),
+  checklist: jsonb('checklist').default([]), // string[] optional checklist steps
   createdBy: integer('created_by').notNull(),
   updatedAt: timestamp('updated_at').defaultNow(),
   createdAt: timestamp('created_at').defaultNow(),
@@ -245,5 +247,42 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   endpoint: text('endpoint').notNull().unique(),
   p256dh: text('p256dh').notNull(),
   auth: text('auth').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Procedures / checklists (otevíračka, zavíračka, custom postupy)
+// ---------------------------------------------------------------------------
+export const procedures = pgTable('procedures', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon').default('check'),
+  color: text('color').default('lime'),
+  items: jsonb('items').default([]), // string[] of step texts
+  createdBy: integer('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const procedureRuns = pgTable('procedure_runs', {
+  id: serial('id').primaryKey(),
+  procedureId: integer('procedure_id').notNull(),
+  teamId: integer('team_id').notNull(),
+  userId: integer('user_id').notNull(),
+  checkedItems: jsonb('checked_items').default([]), // number[] indexes checked
+  totalItems: integer('total_items').default(0),
+  status: text('status').default('running'), // running | completed
+  startedAt: timestamp('started_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  durationSeconds: integer('duration_seconds'),
+});
+
+// Custom inventory categories per team
+export const inventoryCategories = pgTable('inventory_categories', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  name: text('name').notNull(),
+  position: integer('position').default(0),
   createdAt: timestamp('created_at').defaultNow(),
 });
