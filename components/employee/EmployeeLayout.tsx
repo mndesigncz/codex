@@ -79,26 +79,31 @@ export default function EmployeeLayout({ user }: Props) {
         </nav>
         <div className="p-3 border-t border-black/[0.07]">
           {sidebarOpen ? (
-            <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-black/[0.04]">
+            <div className="flex items-center gap-1 p-1.5 rounded-2xl bg-black/[0.04]">
+              <button onClick={() => setCurrentView('settings')} title="Účet a nastavení" className="flex items-center gap-3 flex-1 min-w-0 p-1.5 rounded-xl hover:bg-black/[0.05] transition-colors">
               <span className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-black/[0.05]">{user.avatar ?? '👤'}</span>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-semibold truncate">{user.name}</p>
                 <p className="text-[11px] text-black/45">{user.jobTitle ?? 'Barista'}</p>
               </div>
+              </button>
               <button onClick={() => signOut({ callbackUrl: '/login' })} title="Odhlásit se" className="rounded-full p-2 text-black/40 hover:text-black hover:bg-black/[0.06] transition-colors">
                 <Icon name="logout" size={18} />
               </button>
             </div>
           ) : (
-            <button onClick={() => signOut({ callbackUrl: '/login' })} title="Odhlásit se" className="w-full flex justify-center p-2.5 rounded-2xl text-black/40 hover:text-black hover:bg-black/[0.05] transition-colors">
-              <Icon name="logout" size={20} />
-            </button>
+            <div className="space-y-1">
+              <button onClick={() => setCurrentView('settings')} title="Účet a nastavení" className="w-full flex justify-center p-2.5 rounded-2xl text-black/40 hover:text-black hover:bg-black/[0.05] transition-colors"><span className="text-lg">{user.avatar ?? '👤'}</span></button>
+              <button onClick={() => signOut({ callbackUrl: '/login' })} title="Odhlásit se" className="w-full flex justify-center p-2.5 rounded-2xl text-black/40 hover:text-black hover:bg-black/[0.05] transition-colors">
+                <Icon name="logout" size={20} />
+              </button>
+            </div>
           )}
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="glass-strong m-4 mb-0 rounded-[28px] px-5 py-3.5 flex items-center gap-4 flex-shrink-0">
+        <header className="px-6 pt-5 pb-1 flex items-center gap-3 flex-shrink-0">
           <button onClick={() => setSidebarOpen(v => !v)} className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="menu" size={20} />
           </button>
@@ -107,13 +112,6 @@ export default function EmployeeLayout({ user }: Props) {
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{active?.label}</h2>
           </div>
           <NotificationBell />
-          <button onClick={() => setCurrentView('settings')} className="flex items-center gap-2.5" title="Nastavení účtu">
-            <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-black/[0.05]">{user.avatar ?? '👤'}</span>
-            <div className="hidden sm:block text-left">
-              <p className="text-sm font-semibold text-[#16181A] leading-tight">{user.name}</p>
-              <p className="text-[11px] text-black/45">{user.jobTitle ?? 'Barista'}</p>
-            </div>
-          </button>
         </header>
 
         <main className={`flex-1 pb-28 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
