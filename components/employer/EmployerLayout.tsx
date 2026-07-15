@@ -8,6 +8,7 @@ import ChatView from '../chat/ChatView';
 import MessengerDock from '../chat/MessengerDock';
 import Guides from '../Guides';
 import Settings from '../Settings';
+import TeamManagement from '../TeamManagement';
 import EmployerDashboard from './EmployerDashboard';
 import ScheduleBuilder from '../scheduling/ScheduleBuilder';
 import Inventory from './Inventory';
@@ -37,11 +38,8 @@ export default function EmployerLayout({ user }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'account' | 'app' | 'team'>('account');
-
-  const openSettings = (tab: 'account' | 'app' | 'team') => {
-    setSettingsTab(tab); setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false);
-  };
+  const openSettings = () => { setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
+  const openTeam = () => { setCurrentView('team-settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
     switch (currentView) {
@@ -53,27 +51,25 @@ export default function EmployerLayout({ user }: Props) {
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
       case 'reports':   return <DailyReports />;
-      case 'settings':  return <Settings user={user as any} initialTab={settingsTab} key={settingsTab} />;
+      case 'settings':  return <Settings user={user as any} initialTab="account" />;
+      case 'team-settings': return <TeamManagement user={user as any} />;
       default:          return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
     }
   };
 
   const active = navItems.find(n => n.id === currentView);
-  const title = currentView === 'settings'
-    ? (settingsTab === 'team' ? 'Správa týmu' : settingsTab === 'app' ? 'Aplikace' : 'Nastavení')
+  const title = currentView === 'settings' ? 'Nastavení'
+    : currentView === 'team-settings' ? 'Nastavení týmu'
     : active?.label;
   const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
 
   const AccountMenu = () => (
     <div className="glass rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(25,35,15,0.14)]">
-      <button onClick={() => openSettings('account')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
-        <Icon name="settings" size={18} /> Nastavení účtu
+      <button onClick={openSettings} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
+        <Icon name="settings" size={18} /> Nastavení
       </button>
-      <button onClick={() => openSettings('app')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
-        <Icon name="leaf" size={18} /> Vzhled a aplikace
-      </button>
-      <button onClick={() => openSettings('team')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
-        <Icon name="users" size={18} /> Správa týmu
+      <button onClick={openTeam} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
+        <Icon name="users" size={18} /> Nastavení týmu
       </button>
       <div className="h-px bg-black/[0.06] my-1" />
       <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-600 hover:bg-red-500/[0.06] transition-colors">
@@ -157,7 +153,7 @@ export default function EmployerLayout({ user }: Props) {
             </button>
           ))}
           <button onClick={() => setMoreOpen(v => !v)} title="Více"
-            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${moreOpen || currentView === 'settings' || mobileSecondary.some(n => n.id === currentView) ? 'text-[#16181A]' : 'text-black/40'}`}>
+            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${moreOpen || currentView === 'settings' || currentView === 'team-settings' || mobileSecondary.some(n => n.id === currentView) ? 'text-[#16181A]' : 'text-black/40'}`}>
             <Icon name="menu" size={22} />
             <span className="h-1 w-1 rounded-full bg-transparent" />
           </button>
@@ -171,14 +167,11 @@ export default function EmployerLayout({ user }: Props) {
                 <Icon name={item.icon} size={20} /> {item.label}
               </button>
             ))}
-            <button onClick={() => openSettings('account')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
+            <button onClick={openSettings} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
               <Icon name="settings" size={20} /> Nastavení
             </button>
-            <button onClick={() => openSettings('app')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
-              <Icon name="leaf" size={20} /> Aplikace
-            </button>
-            <button onClick={() => openSettings('team')} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
-              <Icon name="users" size={20} /> Správa týmu
+            <button onClick={openTeam} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
+              <Icon name="users" size={20} /> Nastavení týmu
             </button>
             <button onClick={() => signOut({ callbackUrl: '/login' })} className="col-span-2 flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-red-600 hover:bg-red-500/[0.06]">
               <Icon name="logout" size={20} /> Odhlásit se
