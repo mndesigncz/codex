@@ -261,10 +261,9 @@ export default function Settings({ user, initialTab }: Props) {
 
   const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
     { id: 'account', label: 'Účet', icon: 'settings', desc: 'Profil a osobní údaje' },
-    { id: 'app', label: 'Aplikace', icon: 'leaf', desc: 'Vzhled, notifikace, jazyk' },
+    { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
-    ...(isEmployer ? [{ id: 'team' as SectionId, label: 'Tým', icon: 'users', desc: 'Správa členů a pozvánek' }] : []),
   ];
 
   const unreadCount = notifs.filter(n => !n.is_read).length;
