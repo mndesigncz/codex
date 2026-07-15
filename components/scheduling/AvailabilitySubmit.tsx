@@ -1,0 +1,272 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../Icons';
+
+interface Props {
+  user: { id?: string; name?: string | null; avatar?: string; role?: string };
+}
+
+const CZ_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+const SHIFTS = [
+  { id: 'morning', label: 'Ranní' },
+  { id: 'afternoon', label: 'Odpolední' },
+  { id: 'flexible', label: 'Flexibilní' },
+];
+
+function ym(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function monthLabel(month: string) {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+}
+// Build calendar cells (Monday-first). Returns array of {date|null}.
+function buildGrid(month: string) {
+  const [y, m] = month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const lead = (first.getDay() + 6) % 7; // Monday = 0
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${month}-${String(d).padStart(2, '0')}`);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+export default function AvailabilitySubmit({ user }: Props) {
+  const now = new Date();
+  const currentMonth = ym(now);
+  const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+
+  const [month, setMonth] = useState(nextMonth);
+  const [unavailable, setUnavailable] = useState<Set<string>>(new Set());
+  const [preferredShift, setPreferredShift] = useState<string>('flexible');
+  const [maxShifts, setMaxShifts] = useState<string>('');
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [existing, setExisting] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const grid = useMemo(() => buildGrid(month), [month]);
+  const todayStr = ym(now) === month ? `${month}-${String(now.getDate()).padStart(2, '0')}` : null;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setConfirmed(false);
+    fetch(`/api/availability?month=${month}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!active) return;
+        if (data && data.id) {
+          setExisting(true);
+          setUnavailable(new Set(data.unavailableDates ?? []));
+          setPreferredShift(data.preferredShift ?? 'flexible');
+          setMaxShifts(data.maxShifts != null ? String(data.maxShifts) : '');
+          setNote(data.note ?? '');
+        } else {
+          setExisting(false);
+          setUnavailable(new Set());
+          setPreferredShift('flexible');
+          setMaxShifts('');
+          setNote('');
+        }
+      })
+      .catch(() => {})
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [month]);
+
+  const toggleDay = (date: string) => {
+    setConfirmed(false);
+    setUnavailable((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month,
+          unavailableDates: Array.from(unavailable).sort(),
+          preferredShift,
+          maxShifts: maxShifts === '' ? null : parseInt(maxShifts),
+          note: note.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setExisting(true);
+        setConfirmed(true);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const availableCount = grid.filter((c) => c && !unavailable.has(c)).length;
+
+  return (
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Moje dostupnost</h1>
+        <p className="text-white/40 mt-1">
+          Označ dny, kdy <span className="text-white/70 font-medium">nemůžeš</span> pracovat. Zbytek se bere jako dostupný.
+        </p>
+      </div>
+
+      {/* Month selector */}
+      <div className="flex gap-1 glass rounded-full p-1 w-fit">
+        {[currentMonth, nextMonth].map((m) => (
+          <button
+            key={m}
+            onClick={() => setMonth(m)}
+            className={`px-5 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 ${
+              month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            {monthLabel(m)}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-[#C8F542] animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Calendar */}
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-white capitalize flex items-center gap-2">
+                <Icon name="calendar" size={20} />
+                {monthLabel(month)}
+              </h2>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1.5 text-white/50">
+                  <span className="h-3 w-3 rounded-md bg-[#C8F542]/25 ring-1 ring-[#C8F542]/40" /> Dostupný
+                </span>
+                <span className="flex items-center gap-1.5 text-white/50">
+                  <span className="h-3 w-3 rounded-md bg-red-500/25 ring-1 ring-red-500/40" /> Nemůžu
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+              {CZ_DAYS.map((d) => (
+                <div key={d} className="text-center text-[11px] font-medium text-white/35 py-1">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {grid.map((cell, i) => {
+                if (!cell) return <div key={i} />;
+                const day = parseInt(cell.split('-')[2]);
+                const off = unavailable.has(cell);
+                const isToday = cell === todayStr;
+                return (
+                  <button
+                    key={cell}
+                    onClick={() => toggleDay(cell)}
+                    className={`aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-all duration-200 border ${
+                      off
+                        ? 'bg-red-500/20 border-red-500/40 text-red-300 line-through'
+                        : 'bg-[#C8F542]/12 border-[#C8F542]/25 text-white hover:bg-[#C8F542]/20'
+                    } ${isToday ? 'ring-2 ring-white/50' : ''}`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-white/40 mt-3">
+              Dostupných dní: <span className="text-white/70 font-medium">{availableCount}</span> · Nemůžu:{' '}
+              <span className="text-red-300 font-medium">{unavailable.size}</span>
+            </p>
+          </div>
+
+          {/* Preferences */}
+          <div className="glass-card p-5 space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Preferovaná směna</label>
+              <div className="flex gap-1 glass rounded-full p-1 w-fit">
+                {SHIFTS.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setPreferredShift(s.id)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                      preferredShift === s.id
+                        ? 'bg-[#C8F542] text-black font-semibold'
+                        : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Maximální počet směn <span className="text-white/35">(nepovinné)</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={maxShifts}
+                onChange={(e) => setMaxShifts(e.target.value)}
+                placeholder="např. 12"
+                className="w-40 rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 outline-none focus:border-[#C8F542]/50 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Poznámka <span className="text-white/35">(nepovinné)</span>
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                placeholder="Např. preferuji víkendy, ve středu mám školu…"
+                className="w-full rounded-2xl bg-white/[0.06] border border-white/10 px-4 py-3 text-white placeholder-white/30 outline-none focus:border-[#C8F542]/50 transition-colors resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Submit */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={submit}
+              disabled={saving}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition disabled:opacity-50"
+            >
+              {saving ? 'Ukládám…' : existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
+            </button>
+            {confirmed && (
+              <span className="flex items-center gap-1.5 text-[#C8F542] text-sm font-medium">
+                <Icon name="check" size={18} /> Uloženo!
+              </span>
+            )}
+            {existing && !confirmed && (
+              <span className="text-white/40 text-sm">Dostupnost už jsi odeslal/a — můžeš ji upravit.</span>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

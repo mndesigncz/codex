@@ -3,31 +3,36 @@
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
-import Overview from './Overview';
-import ShiftManagement from './ShiftManagement';
+import NotificationBell from '../NotificationBell';
+import ChatView from '../chat/ChatView';
+import MessengerDock from '../chat/MessengerDock';
+import Guides from '../Guides';
+import Settings from '../Settings';
+import EmployerDashboard from './EmployerDashboard';
+import ScheduleBuilder from '../scheduling/ScheduleBuilder';
 import Inventory from './Inventory';
 import Team from './Team';
-import EmployerChat from './EmployerChat';
 import PlanningBoard from './PlanningBoard';
 import Recipes from './Recipes';
 import DailyReports from './DailyReports';
 
 const navItems = [
   { id: 'overview',  label: 'Přehled',    icon: 'overview' },
-  { id: 'shifts',    label: 'Směny',      icon: 'calendar' },
+  { id: 'shifts',    label: 'Rozvrh',     icon: 'calendar' },
   { id: 'inventory', label: 'Sklad',      icon: 'box' },
   { id: 'team',      label: 'Tým',        icon: 'users' },
   { id: 'chat',      label: 'Chat',       icon: 'chat' },
+  { id: 'guides',    label: 'Návody',     icon: 'book' },
   { id: 'planning',  label: 'Plánování',  icon: 'kanban' },
-  { id: 'recipes',   label: 'Recepty',    icon: 'book' },
+  { id: 'recipes',   label: 'Recepty',    icon: 'leaf' },
   { id: 'reports',   label: 'Zprávy',     icon: 'trend' },
+  { id: 'settings',  label: 'Nastavení',  icon: 'settings' },
 ];
 
-// Mobile dock shows 5 primary tabs; the rest live under "více"
-const mobilePrimary = ['overview', 'shifts', 'inventory', 'team', 'chat'];
+const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
 
 interface Props {
-  user: { name?: string | null; email?: string | null; role?: string; avatar?: string };
+  user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string };
 }
 
 export default function EmployerLayout({ user }: Props) {
@@ -37,15 +42,17 @@ export default function EmployerLayout({ user }: Props) {
 
   const renderView = () => {
     switch (currentView) {
-      case 'overview':  return <Overview onNavigate={setCurrentView} />;
-      case 'shifts':    return <ShiftManagement />;
-      case 'inventory': return <Inventory />;
+      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
+      case 'shifts':    return <ScheduleBuilder user={user as any} />;
+      case 'inventory': return <Inventory user={user as any} />;
       case 'team':      return <Team />;
-      case 'chat':      return <EmployerChat user={user} />;
+      case 'chat':      return <ChatView user={user as any} />;
+      case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
       case 'recipes':   return <Recipes />;
       case 'reports':   return <DailyReports />;
-      default:          return <Overview onNavigate={setCurrentView} />;
+      case 'settings':  return <Settings user={user as any} />;
+      default:          return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
     }
   };
 
@@ -55,7 +62,7 @@ export default function EmployerLayout({ user }: Props) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar — floating glass rail */}
+      {/* Desktop sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-[28px] text-white flex-col transition-all duration-300 flex-shrink-0 overflow-hidden`}>
         <div className={`flex items-center gap-3 py-5 border-b border-white/[0.08] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
           <LogoMark size={40} />
@@ -66,16 +73,14 @@ export default function EmployerLayout({ user }: Props) {
             </div>
           )}
         </div>
-        <nav className="flex-1 py-4 space-y-1 px-3">
+        <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto scrollbar-thin">
           {navItems.map(item => (
             <button
               key={item.id}
               onClick={() => setCurrentView(item.id)}
               title={item.label}
               className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
-                currentView === item.id
-                  ? 'bg-[#C8F542]/12 text-[#C8F542]'
-                  : 'text-white/45 hover:text-white hover:bg-white/[0.05]'
+                currentView === item.id ? 'bg-[#C8F542]/12 text-[#C8F542]' : 'text-white/45 hover:text-white hover:bg-white/[0.05]'
               }`}
             >
               <Icon name={item.icon} size={21} className="flex-shrink-0" />
@@ -96,11 +101,7 @@ export default function EmployerLayout({ user }: Props) {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
-              title="Odhlásit se"
-              className="w-full flex justify-center p-2.5 rounded-2xl text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
-            >
+            <button onClick={() => signOut({ callbackUrl: '/login' })} title="Odhlásit se" className="w-full flex justify-center p-2.5 rounded-2xl text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors">
               <Icon name="logout" size={20} />
             </button>
           )}
@@ -109,7 +110,6 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Floating glass topbar — matches the rail */}
         <header className="glass-strong m-4 mb-0 rounded-[28px] px-5 py-3.5 flex items-center gap-4 flex-shrink-0">
           <button onClick={() => setSidebarOpen(v => !v)} className="hidden md:flex rounded-full p-2 text-white/45 hover:text-white hover:bg-white/[0.06] transition-colors">
             <Icon name="menu" size={20} />
@@ -118,13 +118,14 @@ export default function EmployerLayout({ user }: Props) {
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-white text-lg tracking-tight truncate">{active?.label}</h2>
           </div>
-          <div className="flex items-center gap-2.5">
+          <NotificationBell />
+          <button onClick={() => setCurrentView('settings')} className="flex items-center gap-2.5" title="Nastavení účtu">
             <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-white/15 bg-white/[0.08]">{user.avatar ?? '👤'}</span>
-            <div className="hidden sm:block">
+            <div className="hidden sm:block text-left">
               <p className="text-sm font-semibold text-white leading-tight">{user.name}</p>
               <p className="text-[11px] text-white/40">Zaměstnavatel</p>
             </div>
-          </div>
+          </button>
         </header>
 
         <main className={`flex-1 pb-28 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
@@ -132,45 +133,31 @@ export default function EmployerLayout({ user }: Props) {
         </main>
       </div>
 
-      {/* Mobile bottom dock — floating glass pill */}
+      {/* Messenger dock (desktop) */}
+      <MessengerDock user={user as any} />
+
+      {/* Mobile bottom dock */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
         <nav className="glass-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
-            <button
-              key={item.id}
-              onClick={() => { setCurrentView(item.id); setMoreOpen(false); }}
-              title={item.label}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${
-                currentView === item.id ? 'text-[#C8F542]' : 'text-white/40'
-              }`}
-            >
+            <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
+              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${currentView === item.id ? 'text-[#C8F542]' : 'text-white/40'}`}>
               <Icon name={item.icon} size={22} strokeWidth={currentView === item.id ? 2 : 1.7} />
               <span className={`h-1 w-1 rounded-full transition-all ${currentView === item.id ? 'bg-[#C8F542]' : 'bg-transparent'}`} />
             </button>
           ))}
-          <button
-            onClick={() => setMoreOpen(v => !v)}
-            title="Více"
-            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${
-              isSecondaryActive || moreOpen ? 'text-[#C8F542]' : 'text-white/40'
-            }`}
-          >
+          <button onClick={() => setMoreOpen(v => !v)} title="Více"
+            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${isSecondaryActive || moreOpen ? 'text-[#C8F542]' : 'text-white/40'}`}>
             <Icon name="menu" size={22} strokeWidth={isSecondaryActive || moreOpen ? 2 : 1.7} />
             <span className={`h-1 w-1 rounded-full transition-all ${isSecondaryActive ? 'bg-[#C8F542]' : 'bg-transparent'}`} />
           </button>
         </nav>
 
-        {/* "More" sheet */}
         {moreOpen && (
-          <div className="glass-strong mx-auto max-w-md rounded-3xl mt-0 mb-2 p-2 absolute bottom-full left-4 right-4">
+          <div className="glass-strong mx-auto max-w-md rounded-3xl mb-2 p-2 absolute bottom-full left-4 right-4 grid grid-cols-2 gap-1">
             {mobileSecondary.map(item => (
-              <button
-                key={item.id}
-                onClick={() => { setCurrentView(item.id); setMoreOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${
-                  currentView === item.id ? 'bg-[#C8F542]/12 text-[#C8F542]' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
-                }`}
-              >
+              <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${currentView === item.id ? 'bg-[#C8F542]/12 text-[#C8F542]' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'}`}>
                 <Icon name={item.icon} size={20} />
                 {item.label}
               </button>
