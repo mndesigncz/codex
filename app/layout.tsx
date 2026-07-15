@@ -4,7 +4,13 @@ import { SessionProvider } from './providers';
 
 export const metadata: Metadata = {
   title: 'Pangea',
-  description: 'Správa čajovny',
+  description: 'Systém pro správu podniku',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'Pangea', statusBarStyle: 'default' },
+};
+
+export const viewport = {
+  themeColor: '#C8F542',
 };
 
 export default function RootLayout({

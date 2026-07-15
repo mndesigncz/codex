@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="g" x1="34" y1="8" x2="86" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EEFFB4"/><stop offset="0.38" stop-color="#C8F542"/>
+      <stop offset="0.72" stop-color="#79D06B"/><stop offset="1" stop-color="#2FA968"/>
+    </linearGradient>
+    <linearGradient id="m" x1="60" y1="34" x2="60" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/><stop offset="1" stop-color="#EDF3F6"/>
+    </linearGradient>
+    <linearGradient id="s" x1="44" y1="34" x2="70" y2="82" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.9"/><stop offset="0.5" stop-color="#ffffff" stop-opacity="0.16"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="t" cx="50" cy="20" r="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.5"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="c"><rect x="10" y="10" width="100" height="100" rx="27"/></clipPath>
+    <clipPath id="mc"><path d="M44 38 Q44 34 48 34 H72 Q76 34 76 38 V86.5 Q76 89 73.6 87.5 L60 79 L46.4 87.5 Q44 89 44 86.5 Z"/></clipPath>
+  </defs>
+  <rect x="10" y="10" width="100" height="100" rx="27" fill="#17181B"/>
+  <rect x="10" y="10" width="100" height="100" rx="27" fill="url(#g)"/>
+  <g clip-path="url(#c)">
+    <rect x="10" y="10" width="100" height="100" fill="url(#t)"/>
+    <rect x="10.8" y="10.8" width="98.4" height="98.4" rx="26.3" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.1"/>
+  </g>
+  <path d="M44 38 Q44 34 48 34 H72 Q76 34 76 38 V86.5 Q76 89 73.6 87.5 L60 79 L46.4 87.5 Q44 89 44 86.5 Z" fill="url(#m)" fill-opacity="0.96"/>
+  <g clip-path="url(#mc)">
+    <path d="M44 34 H64 L50 62 V90 H44 Z" fill="url(#s)"/>
+    <rect x="40" y="34" width="40" height="13" fill="#ffffff" fill-opacity="0.55"/>
+  </g>
+  <path d="M49 35.4 H71" stroke="#ffffff" stroke-opacity="0.95" stroke-width="1.6" stroke-linecap="round"/>
+</svg>
