@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
+import NoisiumConnect from './NoisiumConnect';
 
 interface Member {
   id: number;
@@ -421,6 +422,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       </div>
 
       {/* Remove confirm modal */}
+      <NoisiumConnect />
+
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4"
           onClick={() => !removing && setRemoveTarget(null)}>
