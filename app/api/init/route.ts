@@ -324,6 +324,29 @@ export async function GET() {
     await sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_url TEXT`;
 
+    // ---- Cash closings (uzávěrky) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS cash_closings (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER,
+        created_by INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        shift_label TEXT,
+        opening_cash INTEGER NOT NULL DEFAULT 0,
+        cash_revenue INTEGER NOT NULL DEFAULT 0,
+        card_revenue INTEGER NOT NULL DEFAULT 0,
+        tips INTEGER NOT NULL DEFAULT 0,
+        expenses INTEGER NOT NULL DEFAULT 0,
+        cash_removed INTEGER NOT NULL DEFAULT 0,
+        self_payout INTEGER NOT NULL DEFAULT 0,
+        closing_cash INTEGER NOT NULL DEFAULT 0,
+        customers INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    // team payout mode: whether staff are paid daily in cash (enables self_payout field)
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_daily_cash BOOLEAN DEFAULT FALSE`;
+
     // ---- Noisium integration (per-team) ----
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_project_id TEXT`;

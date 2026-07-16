@@ -20,6 +20,7 @@ interface Team {
   name: string;
   owner_id: number;
   join_code: string;
+  pay_daily_cash?: boolean;
 }
 
 interface Invitation {
@@ -120,6 +121,26 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       }
     } finally {
       setSavingName(false);
+    }
+  };
+
+  const [savingPayout, setSavingPayout] = useState(false);
+  const togglePayDailyCash = async (value: boolean) => {
+    setSavingPayout(true);
+    setTeam(t => (t ? { ...t, pay_daily_cash: value } : t)); // optimistic
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payDailyCash: value }),
+      });
+      if (res.ok) flash(value ? 'Denní hotovostní výplata zapnuta.' : 'Denní hotovostní výplata vypnuta.');
+      else { setTeam(t => (t ? { ...t, pay_daily_cash: !value } : t)); setError('Nastavení se nepodařilo uložit.'); }
+    } catch {
+      setTeam(t => (t ? { ...t, pay_daily_cash: !value } : t));
+      setError('Nastavení se nepodařilo uložit.');
+    } finally {
+      setSavingPayout(false);
     }
   };
 
@@ -421,7 +442,33 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
       </div>
 
-      {/* Remove confirm modal */}
+      {/* Payout / cash settings */}
+      <div className="glass-card p-6 space-y-4">
+        <div>
+          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+            <Icon name="trend" size={18} /> Výplaty a uzávěrka
+          </h3>
+          <p className="text-black/45 text-sm mt-1">Nastavení, které ovlivňuje denní uzávěrku zaměstnanců.</p>
+        </div>
+        <label className="flex items-start justify-between gap-4 cursor-pointer">
+          <div className="min-w-0">
+            <p className="font-semibold text-sm text-[#16181A]">Výplaty denně v hotovosti</p>
+            <p className="text-xs text-black/45 mt-0.5">Když je zapnuto, zaměstnanci v uzávěrce vyplní i kolik si dnes vyplatili z kasy.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!team?.pay_daily_cash}
+            disabled={savingPayout}
+            onClick={() => togglePayDailyCash(!team?.pay_daily_cash)}
+            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
+          </button>
+        </label>
+      </div>
+
+      {/* Noisium integration */}
       <NoisiumConnect />
 
       {removeTarget && (

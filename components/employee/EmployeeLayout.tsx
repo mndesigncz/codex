@@ -13,6 +13,7 @@ import MyShifts from './MyShifts';
 import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
 import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
+import CashClosing from './CashClosing';
 import Procedures from '../procedures/Procedures';
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { id: 'procedures',  label: 'Postupy',    icon: 'clipboard' },
   { id: 'availability',label: 'Dostupnost', icon: 'swap' },
   { id: 'inventory',   label: 'Sklad',      icon: 'box' },
+  { id: 'closing',     label: 'Uzávěrka',   icon: 'trend' },
   { id: 'tasks',       label: 'Úkoly',      icon: 'check' },
   { id: 'chat',        label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',      label: 'Návody',     icon: 'book' },
@@ -45,6 +47,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'my-shifts':    return <MyShifts user={user as any} />;
       case 'availability': return <AvailabilitySubmit user={user as any} />;
       case 'inventory':    return <InventoryReport user={user as any} />;
+      case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;
       case 'tasks':        return <Tasks user={user as any} />;
       case 'chat':         return <ChatView user={user as any} />;
