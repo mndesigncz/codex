@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
+import StepTimeline from './StepTimeline';
+import { parseSteps, totalMinutes, fmtMinutes, timeRange, type Step } from '@/lib/steps';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -39,13 +41,27 @@ const SEEDS = [
     name: 'Otevírání',
     description: 'Ranní příprava provozovny před otevřením.',
     icon: 'clock',
-    items: ['Odemknout provozovnu', 'Zapnout světla a hudbu', 'Spustit kávovar a ohřev vody', 'Zkontrolovat pokladnu', 'Doplnit vitrínu', 'Otočit ceduli OTEVŘENO'],
+    items: [
+      { text: 'Odemknout provozovnu', emoji: '🔑', minutes: 1 },
+      { text: 'Zapnout světla a hudbu', emoji: '💡', minutes: 1 },
+      { text: 'Spustit kávovar a ohřev vody', emoji: '☕', minutes: 10, note: 'Nechat nahřát před prvním kafem.' },
+      { text: 'Zkontrolovat pokladnu', emoji: '💰', minutes: 3, note: 'Ověřit počáteční hotovost.' },
+      { text: 'Doplnit vitrínu', emoji: '🧁', minutes: 8 },
+      { text: 'Otočit ceduli OTEVŘENO', emoji: '🚪', minutes: 1 },
+    ],
   },
   {
     name: 'Zavírání',
     description: 'Večerní uzavření provozovny.',
     icon: 'check',
-    items: ['Otočit ceduli ZAVŘENO', 'Uklidit a vytřít', 'Vypnout spotřebiče', 'Spočítat pokladnu', 'Vynést odpadky', 'Zamknout a zapnout alarm'],
+    items: [
+      { text: 'Otočit ceduli ZAVŘENO', emoji: '🚪', minutes: 1 },
+      { text: 'Uklidit a vytřít', emoji: '🧹', minutes: 15 },
+      { text: 'Vypnout spotřebiče', emoji: '🔌', minutes: 3 },
+      { text: 'Spočítat pokladnu', emoji: '💰', minutes: 8, note: 'Provést uzávěrku.' },
+      { text: 'Vynést odpadky', emoji: '🗑️', minutes: 3 },
+      { text: 'Zamknout a zapnout alarm', emoji: '🔒', minutes: 2 },
+    ],
   },
 ];
 
@@ -72,6 +88,10 @@ function stepsWord(n: number) {
   return 'kroků';
 }
 
+const playGlyph = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+);
+
 export default function Procedures({ user }: Props) {
   const isEmployer = user.role === 'employer';
   const { active, startRun, starting } = useProcedures();
@@ -82,6 +102,7 @@ export default function Procedures({ user }: Props) {
   const [seeding, setSeeding] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Procedure | null>(null);
+  const [detail, setDetail] = useState<Procedure | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -162,18 +183,23 @@ export default function Procedures({ user }: Props) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {procedures.map(p => {
             const running = active?.procedureId === p.id;
+            const mins = totalMinutes(parseSteps(p.items));
             return (
-              <div key={p.id} className="glass-card rounded-3xl p-5 flex flex-col group">
+              <div
+                key={p.id}
+                onClick={() => setDetail(p)}
+                className="glass-card rounded-3xl p-5 flex flex-col group cursor-pointer hover:border-black/15 transition"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">
                     <Icon name={p.icon || 'check'} size={24} />
                   </div>
                   {isEmployer && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button onClick={() => openEdit(p)} title="Upravit" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-black/[0.06] hover:text-black transition">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(p); }} title="Upravit" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-black/[0.06] hover:text-black transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
                       </button>
-                      <button onClick={() => removeProcedure(p.id)} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-red-500/10 hover:text-red-600 transition">
+                      <button onClick={(e) => { e.stopPropagation(); removeProcedure(p.id); }} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-red-500/10 hover:text-red-600 transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
                       </button>
                     </div>
@@ -185,6 +211,11 @@ export default function Procedures({ user }: Props) {
                   <span className="inline-flex items-center gap-1.5">
                     <Icon name="check" size={14} /> {p.items.length} {stepsWord(p.items.length)}
                   </span>
+                  {mins > 0 && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon name="clock" size={13} /> {fmtMinutes(mins)}
+                    </span>
+                  )}
                   {p.remindAt && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2 py-0.5 font-medium text-[#5B7A08]">
                       <Icon name="clock" size={12} /> {p.remindAt}
@@ -193,15 +224,15 @@ export default function Procedures({ user }: Props) {
                 </div>
                 <div className="mt-4 pt-1 flex-1 flex items-end">
                   <button
-                    onClick={() => startRun(p)}
-                    disabled={running || starting}
-                    className={`w-full rounded-full px-5 py-2.5 font-semibold transition ${
+                    onClick={(e) => { e.stopPropagation(); running ? setDetail(p) : startRun(p); }}
+                    disabled={starting}
+                    className={`w-full rounded-full px-5 py-2.5 font-semibold transition inline-flex items-center justify-center gap-2 ${
                       running
-                        ? 'bg-[#C8F542]/25 text-[#5B7A08] cursor-default'
+                        ? 'bg-[#C8F542]/25 text-[#5B7A08]'
                         : 'bg-[#16181A] text-white hover:brightness-110'
                     }`}
                   >
-                    {running ? 'Probíhá…' : 'Spustit'}
+                    {running ? 'Probíhá…' : <>{playGlyph} Spustit</>}
                   </button>
                 </div>
               </div>
@@ -263,6 +294,18 @@ export default function Procedures({ user }: Props) {
         </div>
       )}
 
+      {detail && (
+        <ProcedureDetail
+          procedure={detail}
+          isEmployer={isEmployer}
+          running={active?.procedureId === detail.id}
+          starting={starting}
+          onRun={() => { startRun(detail); setDetail(null); }}
+          onEdit={() => { const p = detail; setDetail(null); openEdit(p); }}
+          onClose={() => setDetail(null)}
+        />
+      )}
+
       {editorOpen && (
         <ProcedureEditor
           key={editing?.id ?? 'new'}
@@ -277,6 +320,74 @@ export default function Procedures({ user }: Props) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function ProcedureDetail({
+  procedure, isEmployer, running, starting, onRun, onEdit, onClose,
+}: {
+  procedure: Procedure;
+  isEmployer: boolean;
+  running: boolean;
+  starting: boolean;
+  onRun: () => void;
+  onEdit: () => void;
+  onClose: () => void;
+}) {
+  const steps = parseSteps(procedure.items);
+  const mins = totalMinutes(steps);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4" onClick={onClose}>
+      <div className="glass-strong w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">
+                <Icon name={procedure.icon || 'check'} size={24} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{procedure.name}</h2>
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-black/50">
+                  <span>{steps.length} {stepsWord(steps.length)}</span>
+                  {mins > 0 && <><span className="text-black/25">•</span><span className="inline-flex items-center gap-1"><Icon name="clock" size={12} /> {fmtMinutes(mins)}</span></>}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {isEmployer && (
+                <button onClick={onEdit} title="Upravit" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
+                </button>
+              )}
+              <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </div>
+          </div>
+          {procedure.description && <p className="mt-3 text-sm leading-relaxed text-black/60">{procedure.description}</p>}
+        </div>
+
+        {/* Timeline preview */}
+        <div className="overflow-y-auto scrollbar-thin px-5 pb-2">
+          <StepTimeline steps={steps} />
+        </div>
+
+        {/* Play */}
+        <div className="px-5 py-4 border-t border-black/[0.07]">
+          <button
+            onClick={onRun}
+            disabled={starting}
+            className={`w-full rounded-full px-5 py-3 font-semibold transition inline-flex items-center justify-center gap-2 ${
+              running ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-[#16181A] text-white hover:brightness-110'
+            } disabled:opacity-60`}
+          >
+            {playGlyph} {running ? 'Pokračovat v průběhu' : 'Spustit postup'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -323,13 +434,17 @@ function ProcedureEditor({
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
-  const [steps, setSteps] = useState<string[]>(initial?.items?.length ? [...initial.items] : ['']);
+  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null });
+  const [steps, setSteps] = useState<Step[]>(() => {
+    const parsed = parseSteps(initial?.items);
+    return parsed.length ? parsed : [blankStep()];
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const setStep = (i: number, v: string) => setSteps(prev => prev.map((s, idx) => (idx === i ? v : s)));
-  const addStep = () => setSteps(prev => [...prev, '']);
-  const removeStep = (i: number) => setSteps(prev => (prev.length === 1 ? [''] : prev.filter((_, idx) => idx !== i)));
+  const patchStep = (i: number, patch: Partial<Step>) => setSteps(prev => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const addStep = () => setSteps(prev => [...prev, blankStep()]);
+  const removeStep = (i: number) => setSteps(prev => (prev.length === 1 ? [blankStep()] : prev.filter((_, idx) => idx !== i)));
   const toggleDay = (d: number) =>
     setRemindDays(prev => (prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort((a, b) => a - b)));
   const move = (i: number, dir: -1 | 1) => setSteps(prev => {
@@ -343,7 +458,9 @@ function ProcedureEditor({
   const save = async () => {
     setError('');
     const cleanName = name.trim();
-    const items = steps.map(s => s.trim()).filter(Boolean);
+    const items = steps
+      .map(s => ({ text: s.text.trim(), minutes: s.minutes, note: s.note?.trim() || null, emoji: s.emoji?.trim() || null }))
+      .filter(s => s.text.length > 0);
     if (!cleanName) { setError('Zadejte název postupu.'); return; }
     if (items.length === 0) { setError('Přidejte alespoň jeden krok.'); return; }
     setSaving(true);
@@ -426,26 +543,53 @@ function ProcedureEditor({
 
           <div>
             <label className="block text-xs font-medium text-black/50 mb-1.5">Kroky</label>
-            <div className="space-y-2">
+            <p className="mb-2 text-xs text-black/40">Emoji a čas jsou nepovinné. Poznámka se zobrazí pod krokem.</p>
+            <div className="space-y-2.5">
               {steps.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-black/[0.05] text-xs font-semibold text-black/50 tabular-nums">{i + 1}</span>
-                  <input
-                    value={s}
-                    onChange={e => setStep(i, e.target.value)}
-                    placeholder={`Krok ${i + 1}`}
-                    className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-                  />
-                  <div className="flex flex-shrink-0 items-center">
-                    <button onClick={() => move(i, -1)} disabled={i === 0} title="Nahoru" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>
-                    </button>
-                    <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} title="Dolů" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-                    </button>
-                    <button onClick={() => removeStep(i)} title="Odebrat" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-red-600 hover:bg-red-500/10 transition">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                    </button>
+                <div key={i} className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-2.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={s.emoji ?? ''}
+                      onChange={e => patchStep(i, { emoji: e.target.value })}
+                      placeholder="🙂"
+                      maxLength={4}
+                      className="w-11 flex-shrink-0 text-center rounded-xl bg-white/70 border border-black/[0.08] px-1 py-2.5 text-lg focus:border-[#C8F542]/50 focus:outline-none"
+                    />
+                    <input
+                      value={s.text}
+                      onChange={e => patchStep(i, { text: e.target.value })}
+                      placeholder={`Krok ${i + 1}`}
+                      className="flex-1 min-w-0 rounded-xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                    />
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="number" min={0} inputMode="numeric"
+                        value={s.minutes ?? ''}
+                        onChange={e => patchStep(i, { minutes: e.target.value ? Math.max(0, parseInt(e.target.value)) : null })}
+                        placeholder="min"
+                        className="w-[68px] rounded-xl bg-white/70 border border-black/[0.08] pl-3 pr-7 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-black/35">m</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={s.note ?? ''}
+                      onChange={e => patchStep(i, { note: e.target.value })}
+                      placeholder="Poznámka (nepovinné)"
+                      className="flex-1 min-w-0 rounded-xl bg-white/50 border border-black/[0.06] px-3.5 py-2 text-xs text-black/70 placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
+                    />
+                    <div className="flex flex-shrink-0 items-center">
+                      <button onClick={() => move(i, -1)} disabled={i === 0} title="Nahoru" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>
+                      </button>
+                      <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} title="Dolů" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                      </button>
+                      <button onClick={() => removeStep(i)} title="Odebrat" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-red-600 hover:bg-red-500/10 transition">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
+import StepTimeline from './procedures/StepTimeline';
+import { parseSteps } from '@/lib/steps';
 
 interface User {
   id: number;
@@ -542,32 +544,12 @@ function ReaderChecklist({ steps }: { steps: string[] }) {
         />
       </div>
 
-      <ul className="space-y-2">
-        {steps.map((s, i) => {
-          const checked = done[i];
-          return (
-            <li key={i}>
-              <button
-                onClick={() => toggle(i)}
-                className={`w-full flex items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition-all ${
-                  checked ? 'bg-[#C8F542]/10' : 'bg-black/[0.03] hover:bg-black/[0.05]'
-                }`}
-              >
-                <span
-                  className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all ${
-                    checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'
-                  }`}
-                >
-                  <Icon name="check" size={13} strokeWidth={3} />
-                </span>
-                <span className={`text-sm leading-relaxed ${checked ? 'text-black/40 line-through' : 'text-black/80'}`}>
-                  {s}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <StepTimeline
+        steps={parseSteps(steps)}
+        statuses={Object.fromEntries(done.map((v, i) => [i, v ? 'done' : 'pending']))}
+        onToggle={toggle}
+        interactive
+      />
 
       {allDone && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-4 py-3">

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { sanitizeSteps } from '@/lib/steps';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,9 +58,7 @@ export async function POST(request: Request) {
   const description = body.description ? String(body.description).trim() : null;
   const icon = body.icon ? String(body.icon) : 'check';
   const color = body.color ? String(body.color) : 'lime';
-  const items: string[] = Array.isArray(body.items)
-    ? body.items.map((s: any) => String(s).trim()).filter((s: string) => s.length > 0)
-    : [];
+  const items = sanitizeSteps(body.items);
 
   const remindAt = parseRemindAt(body.remindAt);
   const remindDays = parseRemindDays(body.remindDays);
