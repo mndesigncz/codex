@@ -207,8 +207,8 @@ export default function FloatingRunner() {
 
         {/* Confirm cancel */}
         {confirmClose && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-3xl bg-black/60 backdrop-blur-xl p-4">
-            <div className="glass-strong rounded-3xl p-5 text-center w-full">
+          <div className="absolute inset-0 flex items-center justify-center rounded-3xl modal-overlay p-4">
+            <div className="modal-sheet rounded-3xl p-5 text-center w-full">
               <p className="text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
               <p className="mt-1 text-xs text-black/55">Odškrtnuté kroky se neuloží.</p>
               <div className="mt-4 flex gap-2">

@@ -55,7 +55,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         setShifts(allShifts);
         setTasks(Array.isArray(tk) ? tk : []);
         setInventory(Array.isArray(inv) ? inv : []);
-        setAvailability(Array.isArray(av) ? av : []);
+        setAvailability(Array.isArray(av) ? av : (av?.submissions ?? []));
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
       } catch {}

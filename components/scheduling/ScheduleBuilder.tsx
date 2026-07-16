@@ -773,8 +773,8 @@ export default function ScheduleBuilder({ user }: Props) {
 
       {/* Import preview modal */}
       {importPreview && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-xl p-0 md:p-4">
-          <div className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
+          <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-[#16181A]">Náhled importu</h3>
               <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none">
@@ -1414,8 +1414,8 @@ function DayModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-xl p-0 md:p-4">
-      <div className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
+      <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-[#16181A] capitalize">{dayLabel(date)}</h3>
           <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none">

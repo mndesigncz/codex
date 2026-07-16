@@ -472,9 +472,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       <NoisiumConnect />
 
       {removeTarget && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4"
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4"
           onClick={() => !removing && setRemoveTarget(null)}>
-          <div className="glass-strong rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4"
+          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">
