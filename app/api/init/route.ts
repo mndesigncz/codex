@@ -324,6 +324,12 @@ export async function GET() {
     await sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_url TEXT`;
 
+    // ---- Noisium integration (per-team) ----
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_project_id TEXT`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_base_url TEXT`;
+    await sql`ALTER TABLE planning_cards ADD COLUMN IF NOT EXISTS noisium_task_id TEXT`;
+
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {
     console.error('Init error:', error);

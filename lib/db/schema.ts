@@ -310,3 +310,9 @@ export const fixedAssignments = pgTable('fixed_assignments', {
   shiftTypeId: integer('shift_type_id'),   // optional preferred shift type
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Noisium (Plan app) integration — per-team connection
+// ---------------------------------------------------------------------------
+// Note: these live on the teams table via ALTER in the init route:
+//   teams.noisium_token TEXT, teams.noisium_project_id TEXT, teams.noisium_base_url TEXT

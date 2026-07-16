@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Icon } from '../Icons';
 
 interface PlanningCard {
   id: number;
@@ -25,6 +26,26 @@ export default function PlanningBoard() {
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<number | null>(null);
+  const [noisium, setNoisium] = useState(false);
+  const [publishing, setPublishing] = useState<number | null>(null);
+  const [flash, setFlash] = useState('');
+
+  useEffect(() => {
+    fetch('/api/noisium').then(r => r.json()).then(d => setNoisium(!!d.connected)).catch(() => {});
+  }, []);
+
+  const publishToNoisium = async (card: PlanningCard) => {
+    setPublishing(card.id); setMenuId(null);
+    try {
+      const res = await fetch('/api/noisium/publish', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardId: card.id }),
+      });
+      const d = await res.json();
+      setFlash(res.ok ? `„${card.title}" publikováno do Noisium ✓` : (d.error || 'Publikování selhalo.'));
+    } catch { setFlash('Chyba při publikování.'); }
+    setPublishing(null);
+    setTimeout(() => setFlash(''), 4000);
+  };
 
   useEffect(() => {
     fetch('/api/planning')
@@ -100,6 +121,9 @@ export default function PlanningBoard() {
 
   return (
     <div className="p-6">
+      {flash && (
+        <div className="mb-4 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-3 text-[#5B7A08] text-sm">{flash}</div>
+      )}
       {loading ? (
         <div className="flex items-center justify-center h-48">
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
@@ -160,6 +184,18 @@ export default function PlanningBoard() {
                               {c.label}
                             </button>
                           ))}
+                          {noisium && (
+                            <>
+                              <div className="h-px bg-black/[0.08] my-1" />
+                              <button
+                                onClick={() => publishToNoisium(card)}
+                                disabled={publishing === card.id}
+                                className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#5B7A08] hover:bg-[#C8F542]/10 flex items-center gap-2 transition-colors disabled:opacity-50"
+                              >
+                                <Icon name="kanban" size={15} /> {publishing === card.id ? 'Publikuji…' : 'Publikovat do Noisium'}
+                              </button>
+                            </>
+                          )}
                           <div className="h-px bg-black/[0.08] my-1" />
                           <button
                             onClick={() => deleteCard(card)}
