@@ -286,3 +286,27 @@ export const inventoryCategories = pgTable('inventory_categories', {
   position: integer('position').default(0),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Shift types, opening hours, scheduling preferences (v2)
+// ---------------------------------------------------------------------------
+export const shiftTypes = pgTable('shift_types', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  name: text('name').notNull(),          // e.g. "Ranní"
+  startTime: text('start_time').notNull(), // "06:00"
+  endTime: text('end_time').notNull(),     // "14:00"
+  color: text('color').default('lime'),
+  position: integer('position').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Employer-assigned recurring days ("this day is theirs")
+export const fixedAssignments = pgTable('fixed_assignments', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').notNull(),
+  employeeId: integer('employee_id').notNull(),
+  weekday: integer('weekday').notNull(),   // 0=Mon .. 6=Sun
+  shiftTypeId: integer('shift_type_id'),   // optional preferred shift type
+  createdAt: timestamp('created_at').defaultNow(),
+});
