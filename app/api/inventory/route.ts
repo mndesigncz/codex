@@ -33,6 +33,7 @@ export async function GET() {
       i.max_quantity      AS "maxQuantity",
       i.unit,
       i.supplier,
+      i.supplier_url      AS "supplierUrl",
       i.updated_at        AS "updatedAt",
       i.updated_by        AS "updatedBy",
       u.name              AS "updatedByName"
@@ -61,12 +62,13 @@ export async function POST(request: Request) {
   const maxQuantity = Number(body.maxQuantity) || 0;
   const unit = body.unit ?? 'ks';
   const supplier = body.supplier ?? null;
+  const supplierUrl = body.supplierUrl ? String(body.supplierUrl).trim() || null : null;
 
   const [item] = await sql`
     INSERT INTO inventory_items
-      (team_id, name, category, quantity, min_quantity, critical_quantity, max_quantity, unit, supplier, created_by, updated_by, updated_at)
+      (team_id, name, category, quantity, min_quantity, critical_quantity, max_quantity, unit, supplier, supplier_url, created_by, updated_by, updated_at)
     VALUES
-      (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${me.meId}, ${me.meId}, NOW())
+      (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${me.meId}, ${me.meId}, NOW())
     RETURNING id`;
 
   return NextResponse.json({ ok: true, id: item.id });

@@ -22,6 +22,9 @@ export default function PlanningBoard() {
   const [loading, setLoading] = useState(true);
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
   const [adding, setAdding] = useState(false);
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch('/api/planning')
@@ -53,6 +56,48 @@ export default function PlanningBoard() {
     }
   };
 
+  const moveCard = async (card: PlanningCard, targetCol: string) => {
+    if (card.column === targetCol) return;
+    const newPosition = getColumnCards(targetCol).length;
+    // Optimistic
+    const prev = cards;
+    setCards(cs => cs.map(c => c.id === card.id ? { ...c, column: targetCol, position: newPosition } : c));
+    setMenuId(null);
+    try {
+      const res = await fetch(`/api/planning/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column: targetCol, position: newPosition }),
+      });
+      if (!res.ok) throw new Error('patch failed');
+    } catch (e) {
+      console.error(e);
+      setCards(prev); // rollback
+    }
+  };
+
+  const deleteCard = async (card: PlanningCard) => {
+    if (!confirm(`Smazat kartu „${card.title}"?`)) return;
+    const prev = cards;
+    setCards(cs => cs.filter(c => c.id !== card.id));
+    setMenuId(null);
+    try {
+      const res = await fetch(`/api/planning/${card.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+    } catch (e) {
+      console.error(e);
+      setCards(prev); // rollback
+    }
+  };
+
+  const handleDrop = (colId: string) => {
+    setDragOverCol(null);
+    if (dragId === null) return;
+    const card = cards.find(c => c.id === dragId);
+    setDragId(null);
+    if (card) moveCard(card, colId);
+  };
+
   return (
     <div className="p-6">
       {loading ? (
@@ -62,7 +107,13 @@ export default function PlanningBoard() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {COLUMNS.map(col => (
-            <div key={col.id} className="glass rounded-3xl p-4 flex flex-col gap-3">
+            <div
+              key={col.id}
+              onDragOver={e => { e.preventDefault(); setDragOverCol(col.id); }}
+              onDragLeave={() => setDragOverCol(c => (c === col.id ? null : c))}
+              onDrop={() => handleDrop(col.id)}
+              className={`glass rounded-3xl p-4 flex flex-col gap-3 transition-all ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.04]' : ''}`}
+            >
               <div className="flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${col.dot}`} />
@@ -73,9 +124,52 @@ export default function PlanningBoard() {
 
               <div className="space-y-3 min-h-24">
                 {getColumnCards(col.id).map(card => (
-                  <div key={card.id} className="bg-black/[0.04] border border-black/[0.07] rounded-2xl p-4 hover:bg-black/[0.06] transition-all duration-300">
-                    <p className="font-semibold text-[#16181A] text-sm">{card.title}</p>
-                    {card.description && <p className="text-xs text-black/45 mt-1.5">{card.description}</p>}
+                  <div
+                    key={card.id}
+                    draggable
+                    onDragStart={() => setDragId(card.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
+                    className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-4 hover:bg-black/[0.06] transition-all duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#16181A] text-sm">{card.title}</p>
+                        {card.description && <p className="text-xs text-black/45 mt-1.5">{card.description}</p>}
+                      </div>
+                      <button
+                        onClick={() => setMenuId(m => (m === card.id ? null : card.id))}
+                        className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/50 hover:text-black shrink-0 leading-none"
+                        title="Možnosti"
+                      >
+                        ···
+                      </button>
+                    </div>
+
+                    {menuId === card.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
+                        <div className="absolute right-3 top-11 z-20 glass-strong rounded-2xl p-2 w-48 shadow-lg space-y-0.5">
+                          <p className="text-[10px] uppercase tracking-wider text-black/40 px-2 py-1">Přesunout do →</p>
+                          {COLUMNS.filter(c => c.id !== card.column).map(c => (
+                            <button
+                              key={c.id}
+                              onClick={() => moveCard(card, c.id)}
+                              className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] flex items-center gap-2 transition-colors"
+                            >
+                              <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                              {c.label}
+                            </button>
+                          ))}
+                          <div className="h-px bg-black/[0.08] my-1" />
+                          <button
+                            onClick={() => deleteCard(card)}
+                            className="w-full text-left px-2 py-2 rounded-xl text-sm text-red-600 hover:bg-red-500/10 transition-colors"
+                          >
+                            Smazat kartu
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
