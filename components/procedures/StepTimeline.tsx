@@ -27,16 +27,8 @@ const infoGlyph = (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
 );
 
-// Soft rotating tints for the step tile, so a routine reads like the
-// reference's colorful cards without any per-step configuration.
-const TILES = [
-  'bg-[#C8F542]/30 text-[#5B7A08]',
-  'bg-[#0A84FF]/12 text-[#0A6FE0]',
-  'bg-[#FF9F0A]/16 text-[#C77700]',
-  'bg-[#BF5AF2]/14 text-[#8E3FC0]',
-  'bg-[#FF6482]/14 text-[#D63A5C]',
-  'bg-[#30D158]/16 text-[#1E9E45]',
-];
+// One consistent on-brand tile (lime + lime-text) for every step.
+const TILE = 'bg-[#C8F542]/30 text-[#5B7A08]';
 
 export default function StepTimeline({ steps, statuses = {}, onToggle, onFail, interactive = false, compact = false }: Props) {
   return (
@@ -67,7 +59,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onFail, i
                 } ${interactive ? 'cursor-pointer active:scale-[0.99]' : ''}`}
               >
                 <div className="flex items-center gap-3">
-                  <span className={`flex ${compact ? 'h-8 w-8 text-base' : 'h-10 w-10 text-xl'} flex-shrink-0 items-center justify-center rounded-2xl ${TILES[i % TILES.length]}`}>
+                  <span className={`flex ${compact ? 'h-8 w-8 text-base' : 'h-10 w-10 text-xl'} flex-shrink-0 items-center justify-center rounded-2xl ${TILE}`}>
                     {s.emoji || <span className="text-sm font-bold">{i + 1}</span>}
                   </span>
                   <div className="min-w-0 flex-1">
