@@ -407,44 +407,6 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
               </div>
 
-              {/* Notification preferences */}
-              <div className="glass-card p-6 space-y-1">
-                <div className="pb-2">
-                  <h3 className={cardTitle}>Notifikace</h3>
-                  <p className="text-black/45 text-sm mt-1">Nastavte, o čem chcete být informováni.</p>
-                </div>
-                <div className="divide-y divide-black/[0.06]">
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#16181A]">Push notifikace</p>
-                      <p className="text-xs text-black/45 mt-0.5">Povolte oznámení v tomto prohlížeči.</p>
-                    </div>
-                    <Toggle on={prefs.push} onChange={togglePush} />
-                  </div>
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#16181A]">Nové zprávy</p>
-                      <p className="text-xs text-black/45 mt-0.5">Upozornění na nové zprávy v chatu.</p>
-                    </div>
-                    <Toggle on={prefs.messages} onChange={v => setPref('messages', v)} />
-                  </div>
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#16181A]">Nízké zásoby</p>
-                      <p className="text-xs text-black/45 mt-0.5">Když skladová položka klesne pod limit.</p>
-                    </div>
-                    <Toggle on={prefs.lowStock} onChange={v => setPref('lowStock', v)} />
-                  </div>
-                  <div className="flex items-center justify-between gap-4 py-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#16181A]">Směny</p>
-                      <p className="text-xs text-black/45 mt-0.5">Změny v rozvrhu a nové směny.</p>
-                    </div>
-                    <Toggle on={prefs.shifts} onChange={v => setPref('shifts', v)} />
-                  </div>
-                </div>
-              </div>
-
               {/* Language */}
               <div className="glass-card p-6 space-y-4">
                 <div>
@@ -459,6 +421,46 @@ export default function Settings({ user, initialTab }: Props) {
               </div>
             </div>
           ) : section === 'notifications' ? (
+            <div className="space-y-6">
+            {/* Notification preferences */}
+            <div className="glass-card p-6 space-y-1">
+              <div className="pb-2">
+                <h3 className={cardTitle}>Předvolby notifikací</h3>
+                <p className="text-black/45 text-sm mt-1">Nastavte, o čem chcete být informováni.</p>
+              </div>
+              <div className="divide-y divide-black/[0.06]">
+                <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#16181A]">Push notifikace</p>
+                    <p className="text-xs text-black/45 mt-0.5">Povolte oznámení v tomto prohlížeči.</p>
+                  </div>
+                  <Toggle on={prefs.push} onChange={togglePush} />
+                </div>
+                <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#16181A]">Nové zprávy</p>
+                    <p className="text-xs text-black/45 mt-0.5">Upozornění na nové zprávy v chatu.</p>
+                  </div>
+                  <Toggle on={prefs.messages} onChange={v => setPref('messages', v)} />
+                </div>
+                <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#16181A]">Nízké zásoby</p>
+                    <p className="text-xs text-black/45 mt-0.5">Když skladová položka klesne pod limit.</p>
+                  </div>
+                  <Toggle on={prefs.lowStock} onChange={v => setPref('lowStock', v)} />
+                </div>
+                <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#16181A]">Směny</p>
+                    <p className="text-xs text-black/45 mt-0.5">Změny v rozvrhu a nové směny.</p>
+                  </div>
+                  <Toggle on={prefs.shifts} onChange={v => setPref('shifts', v)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Notification center */}
             <div className="glass-card p-6 space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -507,6 +509,7 @@ export default function Settings({ user, initialTab }: Props) {
                   ))}
                 </div>
               )}
+            </div>
             </div>
           ) : section === 'security' ? (
             <form onSubmit={savePassword} className="glass-card p-6 space-y-6">

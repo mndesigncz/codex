@@ -24,6 +24,29 @@ function statusOf(quantity: number, min: number, critical: number): 'ok' | 'low'
   return 'ok';
 }
 
+// Return the item in the same shape the list endpoint uses (camelCase fields).
+async function mappedItem(id: number) {
+  const [row] = await sql`
+    SELECT
+      i.id,
+      i.name,
+      i.category,
+      i.quantity,
+      i.min_quantity      AS "minQuantity",
+      i.critical_quantity AS "criticalQuantity",
+      i.max_quantity      AS "maxQuantity",
+      i.unit,
+      i.supplier,
+      i.supplier_url      AS "supplierUrl",
+      i.updated_at        AS "updatedAt",
+      i.updated_by        AS "updatedBy",
+      u.name              AS "updatedByName"
+    FROM inventory_items i
+    LEFT JOIN users u ON u.id = i.updated_by
+    WHERE i.id = ${id}`;
+  return row;
+}
+
 // PATCH: employees may only change quantity; employers may edit all fields.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const me = await currentUser();
@@ -63,7 +86,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           employers.map((e: any) =>
             notifyUser(e.id, {
               title: 'Nízké zásoby',
-              body: `${item.name} kleslo na ${newQty} ${item.unit}`,
+              body: `${item.name} je na ${newQty} ${item.unit}`,
               type: 'inventory',
               link: '/',
             }),
@@ -72,7 +95,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(await mappedItem(id));
   }
 
   // Employer: full edit.
@@ -86,6 +109,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const maxQuantity = body.maxQuantity !== undefined ? Number(body.maxQuantity) : Number(item.max_quantity);
   const unit = body.unit !== undefined ? body.unit : item.unit;
   const supplier = body.supplier !== undefined ? body.supplier : item.supplier;
+  const supplierUrl = body.supplierUrl !== undefined
+    ? (body.supplierUrl ? String(body.supplierUrl).trim() || null : null)
+    : item.supplier_url;
 
   await sql`
     UPDATE inventory_items SET
@@ -97,6 +123,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       max_quantity = ${maxQuantity},
       unit = ${unit},
       supplier = ${supplier},
+      supplier_url = ${supplierUrl},
       updated_by = ${me.meId},
       updated_at = NOW()
     WHERE id = ${id}`;
@@ -108,7 +135,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       VALUES (${id}, ${me.meId}, ${Number(item.quantity)}, ${quantity}, ${note}, NOW())`;
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(await mappedItem(id));
 }
 
 // DELETE (employer): remove item.

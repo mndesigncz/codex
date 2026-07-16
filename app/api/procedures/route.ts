@@ -7,6 +7,19 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// 'HH:MM' (24h) or null.
+function parseRemindAt(v: any): string | null {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
+}
+
+// Weekdays 0=Mon..6=Sun, de-duped and sorted; [] means "every day".
+function parseRemindDays(v: any): number[] {
+  if (!Array.isArray(v)) return [];
+  return Array.from(
+    new Set(v.map((n: any) => parseInt(n)).filter((n: number) => Number.isInteger(n) && n >= 0 && n <= 6)),
+  ).sort((a, b) => a - b);
+}
+
 async function currentUser() {
   const s = await getServerSession(authOptions);
   if (!s?.user) return null;
@@ -23,7 +36,8 @@ export async function GET() {
   if (!me.teamId) return NextResponse.json({ procedures: [] });
 
   const procedures = await sql`
-    SELECT id, name, description, icon, color, items
+    SELECT id, name, description, icon, color, items,
+           remind_at AS "remindAt", remind_days AS "remindDays"
     FROM procedures
     WHERE team_id = ${me.teamId}
     ORDER BY created_at ASC`;
@@ -47,13 +61,16 @@ export async function POST(request: Request) {
     ? body.items.map((s: any) => String(s).trim()).filter((s: string) => s.length > 0)
     : [];
 
+  const remindAt = parseRemindAt(body.remindAt);
+  const remindDays = parseRemindDays(body.remindDays);
+
   if (!name) return NextResponse.json({ error: 'Zadejte název postupu' }, { status: 400 });
   if (items.length === 0) return NextResponse.json({ error: 'Přidejte alespoň jeden krok' }, { status: 400 });
 
   const [created] = await sql`
-    INSERT INTO procedures (team_id, name, description, icon, color, items, created_by)
-    VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${me.id})
-    RETURNING id, name, description, icon, color, items`;
+    INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, created_by)
+    VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${me.id})
+    RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
 
   return NextResponse.json({ procedure: created });
 }

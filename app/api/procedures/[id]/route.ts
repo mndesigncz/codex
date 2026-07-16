@@ -7,6 +7,19 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// 'HH:MM' (24h) or null.
+function parseRemindAt(v: any): string | null {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
+}
+
+// Weekdays 0=Mon..6=Sun, de-duped and sorted; [] means "every day".
+function parseRemindDays(v: any): number[] {
+  if (!Array.isArray(v)) return [];
+  return Array.from(
+    new Set(v.map((n: any) => parseInt(n)).filter((n: number) => Number.isInteger(n) && n >= 0 && n <= 6)),
+  ).sort((a, b) => a - b);
+}
+
 async function currentUser() {
   const s = await getServerSession(authOptions);
   if (!s?.user) return null;
@@ -37,14 +50,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     ? body.items.map((s: any) => String(s).trim()).filter((s: string) => s.length > 0)
     : [];
 
+  const remindAt = parseRemindAt(body.remindAt);
+  const remindDays = parseRemindDays(body.remindDays);
+
   if (!name) return NextResponse.json({ error: 'Zadejte název postupu' }, { status: 400 });
   if (items.length === 0) return NextResponse.json({ error: 'Přidejte alespoň jeden krok' }, { status: 400 });
 
   const [updated] = await sql`
     UPDATE procedures
-    SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)}
+    SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
+        remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}
     WHERE id = ${id}
-    RETURNING id, name, description, icon, color, items`;
+    RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
 
   return NextResponse.json({ procedure: updated });
 }

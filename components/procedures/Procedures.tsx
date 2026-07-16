@@ -12,7 +12,11 @@ interface Procedure extends ProcedureLite {
   description?: string | null;
   icon: string;
   color: string;
+  remindAt?: string | null;
+  remindDays?: number[] | null;
 }
+
+const WEEKDAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
 interface RunRow {
   id: number;
@@ -177,8 +181,15 @@ export default function Procedures({ user }: Props) {
                 </div>
                 <h3 className="mt-4 text-lg font-bold tracking-tight text-[#16181A]">{p.name}</h3>
                 {p.description && <p className="mt-1 text-sm text-black/50 line-clamp-2">{p.description}</p>}
-                <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-black/45">
-                  <Icon name="check" size={14} /> {p.items.length} {stepsWord(p.items.length)}
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-black/45">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="check" size={14} /> {p.items.length} {stepsWord(p.items.length)}
+                  </span>
+                  {p.remindAt && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2 py-0.5 font-medium text-[#5B7A08]">
+                      <Icon name="clock" size={12} /> {p.remindAt}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-4 pt-1 flex-1 flex items-end">
                   <button
@@ -308,6 +319,10 @@ function ProcedureEditor({
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [icon, setIcon] = useState(initial?.icon ?? 'check');
+  const [remindAt, setRemindAt] = useState(initial?.remindAt ?? '');
+  const [remindDays, setRemindDays] = useState<number[]>(
+    Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
+  );
   const [steps, setSteps] = useState<string[]>(initial?.items?.length ? [...initial.items] : ['']);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -315,6 +330,8 @@ function ProcedureEditor({
   const setStep = (i: number, v: string) => setSteps(prev => prev.map((s, idx) => (idx === i ? v : s)));
   const addStep = () => setSteps(prev => [...prev, '']);
   const removeStep = (i: number) => setSteps(prev => (prev.length === 1 ? [''] : prev.filter((_, idx) => idx !== i)));
+  const toggleDay = (d: number) =>
+    setRemindDays(prev => (prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort((a, b) => a - b)));
   const move = (i: number, dir: -1 | 1) => setSteps(prev => {
     const j = i + dir;
     if (j < 0 || j >= prev.length) return prev;
@@ -331,7 +348,14 @@ function ProcedureEditor({
     if (items.length === 0) { setError('Přidejte alespoň jeden krok.'); return; }
     setSaving(true);
     try {
-      const payload = { name: cleanName, description: description.trim(), icon, items };
+      const payload = {
+        name: cleanName,
+        description: description.trim(),
+        icon,
+        items,
+        remindAt: remindAt || null,
+        remindDays: remindAt ? remindDays : [],
+      };
       const res = await fetch(initial ? `/api/procedures/${initial.id}` : '/api/procedures', {
         method: initial ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -429,6 +453,54 @@ function ProcedureEditor({
             <button onClick={addStep} className="mt-2.5 inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-black/[0.05] transition">
               <Icon name="plus" size={16} /> Přidat krok
             </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-black/50 mb-1.5">Připomínka (nepovinné)</label>
+            <p className="mb-2 text-xs text-black/40">Postup se v daný čas sám otevře a zaměstnancům přijde upozornění.</p>
+            <div className="flex items-center gap-2">
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-black/[0.04] border border-black/[0.08] text-[#5B7A08]">
+                <Icon name="clock" size={20} />
+              </span>
+              <input
+                type="time"
+                value={remindAt ?? ''}
+                onChange={e => setRemindAt(e.target.value)}
+                className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+              />
+              {remindAt && (
+                <button
+                  onClick={() => { setRemindAt(''); setRemindDays([]); }}
+                  title="Zrušit připomínku"
+                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-black/40 hover:bg-black/[0.06] hover:text-black transition"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+              )}
+            </div>
+            {remindAt && (
+              <div className="mt-2.5">
+                <p className="mb-1.5 text-xs text-black/40">Ve dnech (nevybráno = každý den)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((label, d) => {
+                    const on = remindDays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => toggleDay(d)}
+                        className={`h-9 min-w-[2.5rem] px-1 rounded-full text-sm font-medium border transition ${
+                          on
+                            ? 'bg-[#C8F542] border-[#C8F542] text-black'
+                            : 'bg-black/[0.04] border-black/[0.08] text-black/50 hover:text-black hover:bg-black/[0.06]'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

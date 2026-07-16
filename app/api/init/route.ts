@@ -297,6 +297,33 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )`;
 
+    // ---- v2: shift types, opening hours, scheduling prefs, supplier links, procedure reminders ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS shift_types (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        color TEXT DEFAULT 'lime',
+        position INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS fixed_assignments (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        weekday INTEGER NOT NULL,
+        shift_type_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS opening_hours JSONB DEFAULT '{}'`;
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_at TEXT`;
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_days JSONB DEFAULT '[]'`;
+    await sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_url TEXT`;
+
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {
     console.error('Init error:', error);

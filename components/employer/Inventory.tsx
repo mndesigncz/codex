@@ -13,6 +13,7 @@ interface Item {
   maxQuantity: number;
   unit: string;
   supplier?: string;
+  supplierUrl?: string;
   updatedAt?: string;
   updatedByName?: string;
 }
@@ -28,7 +29,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '' };
+const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '' };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -134,7 +135,7 @@ export default function Inventory({ user }: { user?: any }) {
   };
   const openEdit = (i: Item) => {
     setEditing(i);
-    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '' });
+    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '' });
     setNewCatInline('');
     setShowForm(true);
   };
@@ -170,7 +171,7 @@ export default function Inventory({ user }: { user?: any }) {
     e.preventDefault();
     setSaving(true);
     const payload = {
-      name: form.name, category: form.category, unit: form.unit, supplier: form.supplier,
+      name: form.name, category: form.category, unit: form.unit, supplier: form.supplier, supplierUrl: form.supplierUrl,
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
     };
@@ -312,6 +313,10 @@ export default function Inventory({ user }: { user?: any }) {
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Dodavatel (volitelné)</label>
                 <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} className={inputClass} />
               </div>
+              <div className="col-span-2">
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na dodavatele (volitelné)</label>
+                <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={inputClass} />
+              </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-orange-600/70 mb-1.5">Upozornit při</label>
                 <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={inputClass} />
@@ -381,6 +386,9 @@ function ListView({ items, step, openEdit, remove }: {
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[10px] text-black/40 ml-0.5">{i.unit}</span></span>
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+                {i.supplierUrl && (
+                  <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+                )}
                 <button onClick={() => openEdit(i)} title="Upravit" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
                 <button onClick={() => remove(i)} title="Smazat" className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
@@ -422,6 +430,9 @@ function GridView({ items, step, openEdit, remove }: {
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">+</button>
               </div>
               <div className="flex items-center gap-1">
+                {i.supplierUrl && (
+                  <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+                )}
                 <button onClick={() => openEdit(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
                 <button onClick={() => remove(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
