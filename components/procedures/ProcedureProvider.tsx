@@ -9,7 +9,7 @@ export interface ActiveRun {
   name: string;
   icon: string;
   color: string;
-  items: string[];
+  items: any[];
   checkedItems: number[];
   totalItems: number;
   startedAt: string;
@@ -22,7 +22,7 @@ export interface ProcedureLite {
   description?: string | null;
   icon?: string;
   color?: string;
-  items: string[];
+  items: any[];
   remindAt?: string | null;
   remindDays?: number[] | null;
 }

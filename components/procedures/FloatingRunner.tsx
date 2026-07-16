@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProcedures } from './ProcedureProvider';
+import { parseSteps } from '@/lib/steps';
+import StepTimeline from './StepTimeline';
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -174,33 +176,15 @@ export default function FloatingRunner() {
             </button>
           </div>
 
-          {/* Steps */}
-          <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-2.5 pb-2">
-            {active.items.map((item, i) => {
-              const isDone = active.checkedItems.includes(i);
-              return (
-                <button
-                  key={i}
-                  onClick={() => toggleItem(i)}
-                  className={`group flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition ${
-                    isDone ? 'bg-[#C8F542]/[0.10]' : 'hover:bg-black/[0.04]'
-                  }`}
-                >
-                  <span
-                    className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 transition ${
-                      isDone
-                        ? 'bg-[#C8F542] border-[#C8F542] text-black'
-                        : 'border-black/20 text-transparent group-hover:border-black/35'
-                    }`}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
-                  </span>
-                  <span className={`text-sm leading-snug ${isDone ? 'text-black/40 line-through' : 'text-[#16181A]'}`}>
-                    {item}
-                  </span>
-                </button>
-              );
-            })}
+          {/* Steps timeline */}
+          <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
+            <StepTimeline
+              steps={parseSteps(active.items)}
+              statuses={Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const]))}
+              onToggle={toggleItem}
+              interactive
+              compact
+            />
           </div>
 
           {/* Footer / complete */}
