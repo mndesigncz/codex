@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import ReminderWatcher from './ReminderWatcher';
 
 export interface ActiveRun {
   id: number;
@@ -22,6 +23,8 @@ export interface ProcedureLite {
   icon?: string;
   color?: string;
   items: string[];
+  remindAt?: string | null;
+  remindDays?: number[] | null;
 }
 
 export interface Celebration {
@@ -160,6 +163,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{ active, justCompleted, starting, startRun, toggleItem, complete, cancel, dismissCelebration }}>
       {children}
+      <ReminderWatcher />
     </Ctx.Provider>
   );
 }
