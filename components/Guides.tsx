@@ -418,11 +418,11 @@ export default function Guides({ user }: { user: User }) {
       {/* Reader modal */}
       {reader && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-end md:items-center justify-center md:p-4"
+          className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4"
           onClick={() => setReader(null)}
         >
           <div
-            className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
+            className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 mb-4">
@@ -660,9 +660,9 @@ function GuideEditor({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
+    <div className="fixed inset-0 modal-overlay z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
       <div
-        className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
+        className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
@@ -851,9 +851,9 @@ function ManageCategories({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
+    <div className="fixed inset-0 modal-overlay z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
       <div
-        className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
+        className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">

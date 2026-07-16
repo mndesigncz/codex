@@ -71,8 +71,8 @@ export default function Recipes() {
 
       {/* Detail modal */}
       {selected && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-end md:items-center justify-center md:p-4" onClick={() => setSelected(null)}>
-          <div className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6 scrollbar-thin" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={() => setSelected(null)}>
+          <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold tracking-tight text-[#16181A]">{selected.name}</h2>
               <button onClick={() => setSelected(null)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black transition-all">✕</button>

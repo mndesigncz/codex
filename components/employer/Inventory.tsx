@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 
 interface Item {
@@ -68,7 +68,7 @@ export default function Inventory({ user }: { user?: any }) {
   const [cat, setCat] = useState('Vše');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('name');
-  const [view, setView] = useState<View>('list');
+  const [view, setView] = useState<View>('grid');
   const [showForm, setShowForm] = useState(false);
   const [showCats, setShowCats] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
@@ -238,9 +238,7 @@ export default function Inventory({ user }: { user?: any }) {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku nebo dodavatele..." className={`${inputClass} pl-10`} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <select value={sort} onChange={e => setSort(e.target.value as SortKey)} className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none">
-              {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
+            <SortMenu sort={sort} setSort={setSort} />
             <div className="glass rounded-full p-1 flex items-center gap-1 shrink-0">
               <button onClick={() => setView('list')} title="Seznam" className={`w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all ${view === 'list' ? 'bg-[#16181A] text-white' : 'text-black/50 hover:text-black'}`}>
                 <Icon name="box" size={16} />
@@ -274,61 +272,135 @@ export default function Inventory({ user }: { user?: any }) {
 
       {/* Item form modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-end md:items-center justify-center md:p-4" onClick={() => setShowForm(false)}>
-          <form onClick={e => e.stopPropagation()} onSubmit={save} className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{editing ? 'Upravit položku' : 'Nová položka'}</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název</label>
-                <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inputClass} />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Kategorie</label>
-                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inputClass}>
-                  {catNames.length === 0 && <option value="">— žádná —</option>}
-                  {catNames.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <div className="flex gap-2 mt-2">
-                  <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder="+ nová kategorie"
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
-                    className={`${inputClass} py-2`} />
-                  <button type="button" onClick={addInlineCategory} disabled={addingCat || !newCatInline.trim()} className="shrink-0 rounded-2xl glass border border-black/10 text-[#16181A] px-4 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-40">
-                    {addingCat ? '…' : 'Přidat'}
-                  </button>
+        <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={() => setShowForm(false)}>
+          <form onClick={e => e.stopPropagation()} onSubmit={save} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin">
+            {/* Sticky header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-6 py-4 bg-white/70 backdrop-blur-xl border-b border-black/[0.06]">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="shrink-0 w-10 h-10 rounded-2xl bg-[#C8F542] text-black flex items-center justify-center">
+                  <Icon name={editing ? 'box' : 'plus'} size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold tracking-tight text-[#16181A] leading-tight truncate">{editing ? 'Upravit položku' : 'Nová položka'}</h3>
+                  <p className="text-xs text-black/45 truncate">{editing ? editing.name : 'Přidejte novou zásobu do skladu'}</p>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Jednotka</label>
-                <input value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className={inputClass} />
+              <button type="button" onClick={() => setShowForm(false)} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Section: základ */}
+              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
+                  <Icon name="leaf" size={14} className="text-[#5B7A08]" /> Základní informace
+                </p>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název</label>
+                  <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Sencha Gyokuro" className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
+                  {catNames.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      {catNames.map(c => {
+                        const active = form.category === c;
+                        return (
+                          <button type="button" key={c} onClick={() => setForm(f => ({ ...f, category: c }))}
+                            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
+                            {active && <Icon name="check" size={13} />}{c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 min-w-0">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="plus" size={14} /></span>
+                      <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder="Nová kategorie"
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
+                        className={`${inputClass} py-2 pl-8`} />
+                    </div>
+                    <button type="button" onClick={addInlineCategory} disabled={addingCat || !newCatInline.trim()} className="shrink-0 rounded-2xl glass border border-black/10 text-[#16181A] px-4 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-40">
+                      {addingCat ? '…' : 'Přidat'}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Aktuální množství</label>
-                <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} className={inputClass} />
+
+              {/* Section: množství */}
+              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
+                  <Icon name="box" size={14} className="text-black/40" /> Množství
+                </p>
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Aktuální množství</label>
+                    <div className="flex items-center rounded-2xl bg-black/[0.04] border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
+                      <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
+                        className="rounded-xl bg-black/[0.04] hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
+                      <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                        className="flex-1 min-w-0 bg-transparent text-center text-sm font-semibold text-[#16181A] focus:outline-none tabular-nums" />
+                      <button type="button" aria-label="Přidat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))}
+                        className="rounded-xl bg-[#C8F542] hover:brightness-110 w-9 h-9 flex items-center justify-center text-lg leading-none text-black shrink-0">+</button>
+                    </div>
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Jednotka</label>
+                    <input value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} placeholder="ks" className={inputClass} />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
+                    <input type="number" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
-                <input type="number" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
+
+              {/* Section: upozornění */}
+              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
+                  <Icon name="warning" size={14} className="text-orange-500" /> Hlídání zásob
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-600/70 mb-1.5">
+                      <span className="w-2 h-2 rounded-full bg-orange-400" /> Upozornit při
+                    </label>
+                    <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-red-600/70 mb-1.5">
+                      <span className="w-2 h-2 rounded-full bg-red-500" /> Kriticky málo při
+                    </label>
+                    <input type="number" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={inputClass} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Dodavatel (volitelné)</label>
-                <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} className={inputClass} />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na dodavatele (volitelné)</label>
-                <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-orange-600/70 mb-1.5">Upozornit při</label>
-                <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-red-600/70 mb-1.5">Kriticky málo při</label>
-                <input type="number" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={inputClass} />
+
+              {/* Section: dodavatel */}
+              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
+                  <Icon name="send" size={14} className="text-black/40" /> Dodavatel <span className="normal-case tracking-normal text-black/30 font-normal">· volitelné</span>
+                </p>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název dodavatele</label>
+                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="send" size={15} /></span>
+                    <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={`${inputClass} pl-10`} />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 pt-2">
+
+            {/* Sticky footer */}
+            <div className="sticky bottom-0 z-10 flex gap-3 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06]">
               <button type="button" onClick={() => setShowForm(false)} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Zrušit</button>
-              <button type="submit" disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-50">{saving ? 'Ukládám…' : 'Uložit'}</button>
+              <button type="submit" disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2">
+                <Icon name="check" size={16} />{saving ? 'Ukládám…' : 'Uložit položku'}
+              </button>
             </div>
           </form>
         </div>
@@ -341,6 +413,46 @@ export default function Inventory({ user }: { user?: any }) {
           onChanged={load}
           createCategory={createCategory}
         />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Sort dropdown (custom popover) ---------- */
+function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  const current = SORTS.find(s => s.key === sort) ?? SORTS[0];
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}
+        className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 text-sm flex items-center gap-2 font-medium">
+        <Icon name="swap" size={15} className="text-black/40" />
+        <span className="whitespace-nowrap">{current.label}</span>
+        <Icon name="chevron" size={14} className={`text-black/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div role="listbox" className="absolute right-0 mt-2 w-56 z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
+          {SORTS.map(s => {
+            const active = s.key === sort;
+            return (
+              <button key={s.key} role="option" aria-selected={active} type="button"
+                onClick={() => { setSort(s.key); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-sm flex items-center justify-between gap-2 transition-colors ${active ? 'bg-[#C8F542]/20 text-[#5B7A08] font-semibold' : 'text-[#16181A] hover:bg-black/[0.04]'}`}>
+                <span>{s.label}</span>
+                {active && <Icon name="check" size={15} />}
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -511,8 +623,8 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xl z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="glass-strong rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
+    <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Kategorie</h3>
           <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>

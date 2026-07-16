@@ -103,6 +103,8 @@ export default function Procedures({ user }: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Procedure | null>(null);
   const [detail, setDetail] = useState<Procedure | null>(null);
+  const [confirmDel, setConfirmDel] = useState<Procedure | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -153,6 +155,17 @@ export default function Procedures({ user }: Props) {
     await fetch(`/api/procedures/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
+  const doConfirmDelete = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await removeProcedure(confirmDel.id);
+    } finally {
+      setDeleting(false);
+      setConfirmDel(null);
+    }
+  };
+
   const openNew = () => { setEditing(null); setEditorOpen(true); };
   const openEdit = (p: Procedure) => { setEditing(p); setEditorOpen(true); };
 
@@ -199,7 +212,7 @@ export default function Procedures({ user }: Props) {
                       <button onClick={(e) => { e.stopPropagation(); openEdit(p); }} title="Upravit" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-black/[0.06] hover:text-black transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); removeProcedure(p.id); }} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-red-500/10 hover:text-red-600 transition">
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-red-500/10 hover:text-red-600 transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
                       </button>
                     </div>
@@ -294,6 +307,31 @@ export default function Procedures({ user }: Props) {
         </div>
       )}
 
+      {confirmDel && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => !deleting && setConfirmDel(null)}>
+          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-bold tracking-tight text-[#16181A]">Smazat postup?</h3>
+                <p className="text-sm text-black/55 truncate">„{confirmDel.name}"</p>
+              </div>
+            </div>
+            <p className="text-sm text-black/55">Tento postup se odstraní. Akci nelze vzít zpět.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDel(null)} disabled={deleting} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition disabled:opacity-50">
+                Zrušit
+              </button>
+              <button onClick={doConfirmDelete} disabled={deleting} className="flex-1 rounded-full bg-red-500 text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition disabled:opacity-50">
+                {deleting ? 'Mažu…' : 'Smazat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detail && (
         <ProcedureDetail
           procedure={detail}
@@ -339,8 +377,8 @@ function ProcedureDetail({
   const mins = totalMinutes(steps);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4" onClick={onClose}>
-      <div className="glass-strong w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
+      <div className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-start justify-between gap-3">
@@ -489,9 +527,9 @@ function ProcedureEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div
-        className="glass-strong w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col"
+        className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
