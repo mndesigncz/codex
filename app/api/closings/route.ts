@@ -29,8 +29,12 @@ export async function GET() {
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!c.teamId) return NextResponse.json({ closings: [], canSeeAll: false, payDailyCash: false });
 
-  const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
-  const payDailyCash = !!team?.pay_daily_cash;
+  // Defensive: a not-yet-migrated column must not break the whole view.
+  let payDailyCash = false;
+  try {
+    const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
+    payDailyCash = !!team?.pay_daily_cash;
+  } catch { /* column not migrated yet */ }
 
   const rows = c.role === 'employer'
     ? await sql`
