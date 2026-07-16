@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
   if (ctx.role === 'employer') {
     const rows = await sql`
-      SELECT a.id, a.employee_id, a.month, a.unavailable_dates, a.preferred_shift,
+      SELECT a.id, a.employee_id, a.month, a.unavailable_dates, a.day_preferences, a.preferred_shift,
              a.max_shifts, a.note, a.status, a.created_at,
              u.name AS employee_name, u.avatar AS employee_avatar
       FROM availability_requests a
@@ -45,6 +45,7 @@ export async function GET(req: Request) {
       employeeAvatar: r.employee_avatar ?? '👤',
       month: r.month,
       unavailableDates: r.unavailable_dates ?? [],
+      dayPreferences: r.day_preferences ?? {},
       preferredShift: r.preferred_shift,
       maxShifts: r.max_shifts,
       note: r.note,
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
 
   // employee — own submission
   const [r] = await sql`
-    SELECT id, employee_id, month, unavailable_dates, preferred_shift, max_shifts, note, status, created_at
+    SELECT id, employee_id, month, unavailable_dates, day_preferences, preferred_shift, max_shifts, note, status, created_at
     FROM availability_requests
     WHERE team_id = ${ctx.teamId} AND employee_id = ${ctx.meId} AND month = ${month}
     LIMIT 1`;
@@ -66,6 +67,7 @@ export async function GET(req: Request) {
     employeeId: r.employee_id,
     month: r.month,
     unavailableDates: r.unavailable_dates ?? [],
+    dayPreferences: r.day_preferences ?? {},
     preferredShift: r.preferred_shift,
     maxShifts: r.max_shifts,
     note: r.note,
@@ -84,6 +86,8 @@ export async function POST(req: Request) {
   const body = await req.json();
   const month: string = body.month;
   const unavailableDates: string[] = Array.isArray(body.unavailableDates) ? body.unavailableDates : [];
+  const dayPreferences: Record<string, string> =
+    body.dayPreferences && typeof body.dayPreferences === 'object' ? body.dayPreferences : {};
   const preferredShift: string | null = body.preferredShift ?? null;
   const maxShifts: number | null =
     body.maxShifts === null || body.maxShifts === undefined || body.maxShifts === ''
@@ -102,10 +106,10 @@ export async function POST(req: Request) {
 
   const [inserted] = await sql`
     INSERT INTO availability_requests
-      (team_id, employee_id, month, unavailable_dates, preferred_shift, max_shifts, note, status)
+      (team_id, employee_id, month, unavailable_dates, day_preferences, preferred_shift, max_shifts, note, status)
     VALUES
       (${ctx.teamId}, ${ctx.meId}, ${month}, ${JSON.stringify(unavailableDates)},
-       ${preferredShift}, ${maxShifts}, ${note}, 'submitted')
+       ${JSON.stringify(dayPreferences)}, ${preferredShift}, ${maxShifts}, ${note}, 'submitted')
     RETURNING id`;
 
   // Notify the employer(s) of the team
