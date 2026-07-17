@@ -11,5 +11,8 @@ export default async function Home() {
   if (role === 'employer') {
     redirect('/employer/overview');
   }
+  if (role === 'kiosk') {
+    redirect('/kiosk');
+  }
   redirect('/employee/shifts');
 }
