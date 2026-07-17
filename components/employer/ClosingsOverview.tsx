@@ -5,16 +5,17 @@ import { Icon } from '../Icons';
 import { Closing, expectedCash, cashDifference, czk } from '@/lib/closing';
 
 export default function ClosingsOverview() {
-  const [closings, setClosings] = useState<Closing[]>([]);
+  const [allClosings, setAllClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
 
   const load = async () => {
     try {
       const d = await fetch('/api/closings').then(r => r.json());
-      setClosings(Array.isArray(d.closings) ? d.closings : []);
+      setAllClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
     } catch { /* ignore */ }
     setLoading(false);
@@ -24,13 +25,37 @@ export default function ClosingsOverview() {
   const remove = async (c: Closing) => {
     if (!confirm(`Smazat uzávěrku z ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ')}?`)) return;
     setDeleting(c.id);
-    const prev = closings;
-    setClosings(cs => cs.filter(x => x.id !== c.id));
+    const prev = allClosings;
+    setAllClosings(cs => cs.filter(x => x.id !== c.id));
     try {
       const res = await fetch(`/api/closings/${c.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
-    } catch { setClosings(prev); }
+    } catch { setAllClosings(prev); }
     setDeleting(null);
+  };
+
+  // Months present in the data, newest first (dates are 'YYYY-MM-DD').
+  const months = Array.from(new Set(allClosings.map(c => c.date?.slice(0, 7)).filter(Boolean))).sort().reverse() as string[];
+  const closings = month === 'all' ? allClosings : allClosings.filter(c => c.date?.slice(0, 7) === month);
+  const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+
+  const exportCsv = () => {
+    const head = ['Datum', 'Směna', 'Zaměstnanec', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Zákazníků', 'Poznámka'];
+    const rows = closings.map(c => [
+      c.date, c.shift_label ?? '', c.author_name ?? '',
+      c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.expenses,
+      c.cash_removed, c.self_payout, c.closing_cash, expectedCash(c), cashDifference(c),
+      c.customers, (c.notes ?? '').replace(/\n/g, ' '),
+    ]);
+    const csv = [head, ...rows]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+      .join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `uzaverky${month === 'all' ? '' : '-' + month}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   // Totals across all closings.
@@ -77,7 +102,30 @@ export default function ClosingsOverview() {
         </div>
       </div>
 
-      <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({closings.length})</h3>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({closings.length})</h3>
+        {closings.length > 0 && (
+          <button onClick={exportCsv}
+            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
+            Export CSV ↓
+          </button>
+        )}
+      </div>
+
+      {months.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+          <button onClick={() => setMonth('all')}
+            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${month === 'all' ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+            Vše
+          </button>
+          {months.map(m => (
+            <button key={m} onClick={() => setMonth(m)}
+              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all capitalize ${month === m ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+              {monthLabel(m)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-48">

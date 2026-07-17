@@ -176,58 +176,61 @@ export default function FloatingRunner() {
             </button>
           </div>
 
-          {/* Steps timeline */}
-          <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
-            <StepTimeline
-              steps={parseSteps(active.items)}
-              statuses={Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const]))}
-              onToggle={toggleItem}
-              interactive
-              compact
-            />
-          </div>
-
-          {/* Footer / complete */}
-          <div className="px-3 pb-3 pt-1">
-            {allDone ? (
-              <button
-                onClick={doComplete}
-                disabled={completing}
-                className="w-full rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 hover:brightness-110 transition disabled:opacity-60 motion-safe:animate-[pr-pop_0.3s_ease-out] flex items-center justify-center gap-2"
-              >
-                {completing ? 'Ukládám…' : <>Dokončit {checkGlyph}</>}
-              </button>
-            ) : (
-              <p className="text-center text-xs text-black/40 py-1">
-                Odškrtávejte kroky, jak je plníte
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Confirm cancel */}
-        {confirmClose && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-3xl modal-overlay p-4">
-            <div className="modal-sheet rounded-3xl p-5 text-center w-full">
-              <p className="text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
+          {confirmClose ? (
+            /* Confirm cancel — replaces the card body cleanly (no foggy overlay) */
+            <div className="px-5 pb-5 pt-4 text-center motion-safe:animate-[pr-pop_0.2s_ease-out]">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-500/12 text-red-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
               <p className="mt-1 text-xs text-black/55">Odškrtnuté kroky se neuloží.</p>
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => setConfirmClose(false)}
-                  className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition"
+                  className="flex-1 rounded-full bg-black/[0.05] border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.08] transition whitespace-nowrap"
                 >
                   Pokračovat
                 </button>
                 <button
                   onClick={doCancel}
-                  className="flex-1 rounded-full bg-red-500 text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition"
+                  className="flex-1 rounded-full bg-red-500 text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap"
                 >
                   Zrušit
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <>
+              {/* Steps timeline */}
+              <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
+                <StepTimeline
+                  steps={parseSteps(active.items)}
+                  statuses={Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const]))}
+                  onToggle={toggleItem}
+                  interactive
+                  compact
+                />
+              </div>
+
+              {/* Footer / complete */}
+              <div className="px-3 pb-3 pt-1">
+                {allDone ? (
+                  <button
+                    onClick={doComplete}
+                    disabled={completing}
+                    className="w-full rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 hover:brightness-110 transition disabled:opacity-60 motion-safe:animate-[pr-pop_0.3s_ease-out] flex items-center justify-center gap-2"
+                  >
+                    {completing ? 'Ukládám…' : <>Dokončit {checkGlyph}</>}
+                  </button>
+                ) : (
+                  <p className="text-center text-xs text-black/40 py-1">
+                    Odškrtávejte kroky, jak je plníte
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </>
   );
