@@ -342,10 +342,15 @@ export async function GET() {
         closing_cash INTEGER NOT NULL DEFAULT 0,
         customers INTEGER NOT NULL DEFAULT 0,
         notes TEXT,
+        shift_id INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
       )`;
     // team payout mode: whether staff are paid daily in cash (enables self_payout field)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_daily_cash BOOLEAN DEFAULT FALSE`;
+    // link a closing to the shift it belongs to
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_id INTEGER`;
+    // whether closings are locked to shifts (default on)
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
 
     // ---- Noisium integration (per-team) ----
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`;

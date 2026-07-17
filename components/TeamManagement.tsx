@@ -21,6 +21,7 @@ interface Team {
   owner_id: number;
   join_code: string;
   pay_daily_cash?: boolean;
+  closing_requires_shift?: boolean;
 }
 
 interface Invitation {
@@ -148,6 +149,26 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       setError('Nastavení se nepodařilo uložit.');
     } finally {
       setSavingPayout(false);
+    }
+  };
+
+  const [savingRequiresShift, setSavingRequiresShift] = useState(false);
+  const toggleRequiresShift = async (value: boolean) => {
+    setSavingRequiresShift(true);
+    setTeam(t => (t ? { ...t, closing_requires_shift: value } : t)); // optimistic
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ closingRequiresShift: value }),
+      });
+      if (res.ok) flash(value ? 'Uzávěrka je nyní vázaná na směnu.' : 'Uzávěrku může nyní vyplnit kdokoliv.');
+      else { setTeam(t => (t ? { ...t, closing_requires_shift: !value } : t)); setError('Nastavení se nepodařilo uložit.'); }
+    } catch {
+      setTeam(t => (t ? { ...t, closing_requires_shift: !value } : t));
+      setError('Nastavení se nepodařilo uložit.');
+    } finally {
+      setSavingRequiresShift(false);
     }
   };
 
@@ -486,6 +507,25 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
+          </button>
+        </label>
+
+        <div className="h-px bg-black/[0.06]" />
+
+        <label className="flex items-start justify-between gap-4 cursor-pointer">
+          <div className="min-w-0">
+            <p className="font-semibold text-sm text-[#16181A]">Uzávěrka jen po směně</p>
+            <p className="text-xs text-black/45 mt-0.5">Když je zapnuto, zaměstnanec může odeslat uzávěrku jen za den, kdy měl naplánovanou směnu.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={team?.closing_requires_shift !== false}
+            disabled={savingRequiresShift}
+            onClick={() => toggleRequiresShift(!(team?.closing_requires_shift !== false))}
+            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
           </button>
         </label>
       </div>

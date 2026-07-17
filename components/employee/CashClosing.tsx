@@ -64,9 +64,14 @@ function Step({
   );
 }
 
+type EligibleShift = { id: number; date: string; startTime: string; endTime: string; type: string };
+
 export default function CashClosing({ user }: { user: { id: number; name: string } }) {
   const [closings, setClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
+  const [isEmployer, setIsEmployer] = useState(false);
+  const [requiresShift, setRequiresShift] = useState(true);
+  const [eligible, setEligible] = useState<EligibleShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
@@ -78,10 +83,25 @@ export default function CashClosing({ user }: { user: { id: number; name: string
       const d = await fetch('/api/closings').then(r => r.json());
       setClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
+      setIsEmployer(!!d.isEmployer);
+      setRequiresShift(d.requiresShift !== false);
+      const shifts: EligibleShift[] = Array.isArray(d.eligibleShifts) ? d.eligibleShifts : [];
+      setEligible(shifts);
+      // Preselect the most recent unclosed shift for employees.
+      if (!d.isEmployer && shifts[0]) {
+        setForm(f => ({ ...f, date: shifts[0].date, shiftLabel: `${shifts[0].startTime}–${shifts[0].endTime}` }));
+      }
     } catch { /* ignore */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  // Employees are gated to days they had a shift; employers may close any day.
+  const gated = !isEmployer && requiresShift;
+  const canSubmit = isEmployer || !requiresShift || eligible.length > 0;
+
+  const pickShift = (s: EligibleShift) =>
+    setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -157,6 +177,19 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         </div>
       )}
 
+      {!canSubmit && (
+        <div className="glass-card p-8 text-center space-y-2">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
+            <Icon name="calendar" size={26} />
+          </div>
+          <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-2">Žádná směna k uzavření</h3>
+          <p className="text-sm text-black/50 max-w-sm mx-auto">
+            Uzávěrku vyplníš po své směně. Jakmile budeš mít odpracovanou směnu, objeví se tu formulář na uzavření kasy.
+          </p>
+        </div>
+      )}
+
+      {canSubmit && (
       <form onSubmit={submit} className="glass-card p-6 sm:p-7 space-y-6">
         {/* Header + visual step progress */}
         <div>
@@ -198,20 +231,51 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                 ? `Minulá uzávěrka (${new Date(closings[0].date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}) skončila s ${czk(closings[0].closing_cash)} v kase.`
                 : 'Počáteční stav hotovosti v kase.',
             })}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+            {gated ? (
               <div className="min-w-0">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
-                {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
-                    width and overflow the card without it */}
-                <input type="date" value={form.date} onChange={set('date')}
-                  className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
-                  style={{ WebkitAppearance: 'none' }} />
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kterou směnu uzavíráš?</label>
+                <div className="flex flex-col gap-2">
+                  {eligible.map(s => {
+                    const active = form.date === s.date;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => pickShift(s)}
+                        className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                          active ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40' : 'bg-white border-black/[0.08] hover:border-black/20'
+                        }`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-[#16181A] capitalize truncate">
+                            {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+                          </span>
+                          <span className="block text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</span>
+                        </span>
+                        <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full border-2 ${active ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="min-w-0">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Směna</label>
-                <input type="text" value={form.shiftLabel} onChange={set('shiftLabel')} placeholder="Ranní…" className={inputClass} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+                <div className="min-w-0">
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
+                  {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
+                      width and overflow the card without it */}
+                  <input type="date" value={form.date} onChange={set('date')}
+                    className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
+                    style={{ WebkitAppearance: 'none' }} />
+                </div>
+                <div className="min-w-0">
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Směna</label>
+                  <input type="text" value={form.shiftLabel} onChange={set('shiftLabel')} placeholder="Ranní…" className={inputClass} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </Step>
 
@@ -282,6 +346,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           {submitting ? 'Odesílám…' : <>Odeslat uzávěrku <Icon name="check" size={17} /></>}
         </button>
       </form>
+      )}
 
       {/* My past closings */}
       <div className="space-y-3">

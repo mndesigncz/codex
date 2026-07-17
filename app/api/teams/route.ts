@@ -34,17 +34,19 @@ export async function GET() {
 
     // Optional/newer columns fetched defensively; missing column ⇒ safe default.
     let payDailyCash = false;
+    let closingRequiresShift = true;
     try {
-      const [extra] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${teamId}`;
+      const [extra] = await sql`SELECT pay_daily_cash, closing_requires_shift FROM teams WHERE id = ${teamId}`;
       payDailyCash = !!extra?.pay_daily_cash;
-    } catch { /* column not migrated yet */ }
+      closingRequiresShift = extra?.closing_requires_shift !== false;
+    } catch { /* columns not migrated yet */ }
 
     const members = await sql`
       SELECT id, name, email, role, avatar, phone, job_title, shift_preference
       FROM users WHERE team_id = ${teamId} ORDER BY role DESC, name ASC`;
 
     return NextResponse.json({
-      team: { ...team, pay_daily_cash: payDailyCash },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -59,13 +61,14 @@ export async function PATCH(request: Request) {
   const me = await currentUser();
   if (!me || me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const sql = neon(process.env.DATABASE_URL!);
-  const { name, regenerateCode, payDailyCash } = await request.json();
+  const { name, regenerateCode, payDailyCash, closingRequiresShift } = await request.json();
 
   const [team] = await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
   if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
   if (typeof payDailyCash === 'boolean') await sql`UPDATE teams SET pay_daily_cash = ${payDailyCash} WHERE id = ${team.id}`;
+  if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;
 
   let joinCode: string | undefined;
   if (regenerateCode) {
