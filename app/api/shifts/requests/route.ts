@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { shiftRequests } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
   try {
+  const __s = await getServerSession(authOptions);
+  if (!__s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const employeeId = searchParams.get('employeeId');
 
@@ -23,6 +27,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+  const __s = await getServerSession(authOptions);
+  if (!__s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
     const body = await req.json();
     const [request] = await db.insert(shiftRequests).values({
       employeeId: body.employeeId,

@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   try {
     const all = await db.select().from(recipes);
     return NextResponse.json(all);

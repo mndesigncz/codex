@@ -86,9 +86,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon="users" label="Zaměstnanci" value={members.length} onClick={() => onNavigate('team')} />
+        <StatCard icon="users" label="Zaměstnanci" value={members.length} onClick={() => onNavigate('team-settings')} />
         <StatCard icon="calendar" label="Směny dnes" value={todayShifts.length} onClick={() => onNavigate('shifts')} />
-        <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('team')} />
+        <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('team-settings')} />
         <StatCard icon="warning" label="Kriticky málo" value={critical.length} onClick={() => onNavigate('inventory')} alert={critical.length > 0} />
       </div>
 
@@ -99,7 +99,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             <h3 className="font-bold tracking-tight text-[#16181A]">Dostupnost — {monthLabel}</h3>
             <p className="text-sm text-black/45">{submittedIds.size} z {members.length} zaměstnanců zadalo dostupnost</p>
           </div>
-          <button onClick={() => onNavigate('schedule')} className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110">Sestavit rozvrh</button>
+          <button onClick={() => onNavigate('shifts')} className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110">Sestavit rozvrh</button>
         </div>
         {notSubmitted.length > 0 ? (
           <div>
