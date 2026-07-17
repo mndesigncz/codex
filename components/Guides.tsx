@@ -222,8 +222,8 @@ export default function Guides({ user }: { user: User }) {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] flex items-center gap-3">
             <span className="inline-flex items-center justify-center rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] w-11 h-11">
               <Icon name="book" size={22} />
@@ -360,9 +360,9 @@ export default function Guides({ user }: { user: User }) {
                     className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition-all duration-300 flex flex-col group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-bold tracking-tight text-[#16181A] leading-snug">{g.title}</h3>
+                      <h3 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0 flex-1 break-words">{g.title}</h3>
                       {isEmployer && (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -425,8 +425,8 @@ export default function Guides({ user }: { user: User }) {
             className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
+            <div className="flex items-start justify-between gap-3 sm:gap-4 mb-4">
+              <div className="min-w-0 flex-1">
                 {(() => {
                   const cat = reader.categoryId != null ? catById.get(reader.categoryId) : undefined;
                   return cat ? (
@@ -436,7 +436,7 @@ export default function Guides({ user }: { user: User }) {
                     </span>
                   ) : null;
                 })()}
-                <h2 className="text-2xl font-bold tracking-tight text-[#16181A]">{reader.title || '…'}</h2>
+                <h2 className="text-2xl font-bold tracking-tight text-[#16181A] break-words">{reader.title || '…'}</h2>
                 {(reader.author || reader.updatedAt) && (
                   <p className="text-xs text-black/45 mt-1.5">
                     {reader.author ? `${reader.author} · ` : ''}
@@ -452,7 +452,7 @@ export default function Guides({ user }: { user: User }) {
                         openEditor(reader);
                         setReader(null);
                       }}
-                      className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-3 py-1.5 text-sm transition-all"
+                      className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-3 py-1.5 text-sm transition-all whitespace-nowrap"
                     >
                       Upravit
                     </button>
@@ -552,14 +552,14 @@ function ReaderChecklist({ steps }: { steps: string[] }) {
       />
 
       {allDone && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-4 py-3">
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#5B7A08]">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-4 py-3">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#5B7A08] min-w-0">
             <Icon name="check" size={16} strokeWidth={2.5} />
             Hotovo! Všechny kroky splněny.
           </span>
           <button
             onClick={reset}
-            className="text-xs text-[#5B7A08]/80 hover:text-[#5B7A08] transition-colors underline underline-offset-2"
+            className="text-xs text-[#5B7A08]/80 hover:text-[#5B7A08] transition-colors underline underline-offset-2 whitespace-nowrap flex-shrink-0"
           >
             Znovu
           </button>
@@ -665,9 +665,9 @@ function GuideEditor({
         className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-[#16181A]">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
+          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0">
             ✕
           </button>
         </div>
@@ -783,17 +783,17 @@ function GuideEditor({
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
-        <div className="flex items-center justify-end gap-3 mt-6">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 mt-6">
           <button
             onClick={onClose}
-            className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition-all"
+            className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition-all whitespace-nowrap"
           >
             Zrušit
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition-all disabled:opacity-50"
+            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition-all disabled:opacity-50 whitespace-nowrap"
           >
             {saving ? 'Ukládám…' : editing ? 'Uložit změny' : 'Vytvořit návod'}
           </button>
@@ -856,9 +856,9 @@ function ManageCategories({
         className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-[#16181A]">Kategorie</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">Kategorie</h2>
+          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0">
             ✕
           </button>
         </div>
@@ -910,12 +910,12 @@ function ManageCategories({
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Název kategorie"
-              className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
             <button
               onClick={add}
               disabled={busy || !newName.trim()}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition-all disabled:opacity-50 flex-shrink-0"
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition-all disabled:opacity-50 flex-shrink-0 whitespace-nowrap"
             >
               Přidat
             </button>

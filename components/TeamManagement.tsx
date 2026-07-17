@@ -318,10 +318,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-2xl font-bold tracking-tight text-[#16181A]">{team.name}</p>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{team.name}</p>
             <button onClick={() => setEditingName(true)}
-              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
+              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all flex-shrink-0 whitespace-nowrap">
               Přejmenovat
             </button>
           </div>
@@ -334,16 +334,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <Icon name="check" size={16} /> Připojovací kód
         </div>
         <p className="text-sm text-black/45">Zaměstnanci se připojí zadáním tohoto kódu na stránce <span className="font-medium text-[#16181A]">/join</span>.</p>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-6 py-5 flex items-center justify-between">
-            <span className="text-3xl md:text-4xl font-bold tracking-[0.3em] text-[#5B7A08]">{team.join_code}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.25em] sm:tracking-[0.3em] text-[#5B7A08] break-all min-w-0">{team.join_code}</span>
             <button onClick={copyCode} title="Kopírovat"
-              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
+              className="w-full sm:w-auto rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">
               {copied ? 'Zkopírováno ✓' : 'Kopírovat'}
             </button>
           </div>
           <button onClick={regenerate} disabled={regenerating}
-            className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all disabled:opacity-50 whitespace-nowrap">
+            className="w-full sm:w-auto rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all disabled:opacity-50 whitespace-nowrap flex-shrink-0">
             {regenerating ? 'Generuji…' : 'Vygenerovat nový'}
           </button>
         </div>
@@ -406,7 +406,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             const editing = editMemberId === m.id;
             return (
               <div key={m.id} className="py-4">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                   <div className="w-11 h-11 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/20 flex items-center justify-center text-xl flex-shrink-0">
                     {m.avatar ?? '👤'}
                   </div>
@@ -421,11 +421,11 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   {!owner && !editing && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => startEdit(m)}
-                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all">
+                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
                         Upravit
                       </button>
                       <button onClick={() => setRemoveTarget(m)}
-                        className="rounded-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition-all">
+                        className="rounded-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition-all whitespace-nowrap">
                         Odebrat
                       </button>
                     </div>
@@ -508,7 +508,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               Opravdu chcete odebrat <span className="text-[#16181A] font-medium">{removeTarget.name}</span> z týmu?
               Ztratí přístup k týmu.
             </p>
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
               <button onClick={confirmRemove} disabled={removing}
                 className="rounded-full bg-red-500 text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
                 {removing ? 'Odebírám…' : 'Odebrat'}
