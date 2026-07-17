@@ -349,6 +349,21 @@ export async function GET() {
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_daily_cash BOOLEAN DEFAULT FALSE`;
     // link a closing to the shift it belongs to
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_id INTEGER`;
+
+    // ---- Attendance / time tracking (kiosk / tablet) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS time_entries (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER,
+        employee_id INTEGER NOT NULL,
+        clock_in TIMESTAMP NOT NULL DEFAULT NOW(),
+        clock_out TIMESTAMP,
+        source TEXT DEFAULT 'kiosk',
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    // optional per-employee PIN for the shared kiosk device
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`;
     // whether closings are locked to shifts (default on)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
 

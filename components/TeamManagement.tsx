@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 import NoisiumConnect from './NoisiumConnect';
+import KioskSettings from './KioskSettings';
 
 interface Member {
   id: number;
@@ -531,6 +532,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       </div>
 
       {/* Noisium integration */}
+      <KioskSettings />
+
       <NoisiumConnect />
 
       {removeTarget && (

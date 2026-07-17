@@ -15,6 +15,7 @@ import Inventory from './Inventory';
 import PlanningBoard from './PlanningBoard';
 import ClosingsOverview from './ClosingsOverview';
 import TaskManager from './TaskManager';
+import Attendance from './Attendance';
 import Procedures from '../procedures/Procedures';
 
 const navItems = [
@@ -27,6 +28,7 @@ const navItems = [
   { id: 'guides',     label: 'Návody',     icon: 'book' },
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
   { id: 'reports',    label: 'Uzávěrky',   icon: 'trend' },
+  { id: 'attendance', label: 'Docházka',   icon: 'clock' },
 ];
 
 const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
@@ -53,6 +55,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
       case 'tasks':     return <TaskManager user={user as any} />;
+      case 'attendance': return <Attendance user={user as any} />;
       case 'reports':   return <ClosingsOverview />;
       case 'settings':  return <Settings user={user as any} initialTab="account" />;
       case 'team-settings': return <TeamManagement user={user as any} />;
