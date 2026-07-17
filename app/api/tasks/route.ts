@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,40 @@ export async function POST(req: NextRequest) {
     VALUES (${title}, ${b.description ?? null}, ${assignedTo}, ${c.meId},
             ${b.priority ?? 'medium'}, ${b.status ?? 'pending'}, ${b.dueDate ?? null})
     RETURNING *`;
+
+  // Let the assignee know when someone else assigned them a task.
+  if (assignedTo !== c.meId) {
+    try {
+      await notifyUser(assignedTo, {
+        title: 'Nový úkol',
+        body: title,
+        type: b.priority === 'high' ? 'warning' : 'info',
+      });
+    } catch { /* best-effort */ }
+  }
+
   return NextResponse.json(shape(row));
+}
+
+// DELETE — remove a task (creator or a team employer).
+export async function DELETE(req: NextRequest) {
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const id = parseInt(searchParams.get('id') ?? '');
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
+
+  const [task] = await sql`
+    SELECT t.created_by, u.team_id AS assignee_team FROM tasks t
+    LEFT JOIN users u ON u.id = t.assigned_to WHERE t.id = ${id}`;
+  if (!task) return NextResponse.json({ error: 'Úkol nenalezen' }, { status: 404 });
+
+  const allowed = task.created_by === c.meId || (c.role === 'employer' && task.assignee_team === c.teamId);
+  if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+
+  await sql`DELETE FROM tasks WHERE id = ${id}`;
+  return NextResponse.json({ ok: true });
 }
 
 // PATCH — update status; only the assignee, the creator, or a team employer.
