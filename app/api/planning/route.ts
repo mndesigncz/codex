@@ -1,34 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { planningCards } from '@/lib/db/schema';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { neon } from '@neondatabase/serverless';
 
-export async function GET() {
-  try {
-    const cards = await db.select().from(planningCards);
-    return NextResponse.json(cards);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch planning cards' }, { status: 500 });
-  }
+export const dynamic = 'force-dynamic';
+
+const sql = neon(process.env.DATABASE_URL!);
+
+async function ctx() {
+  const s = await getServerSession(authOptions);
+  if (!s?.user) return null;
+  const meId = parseInt((s.user as any).id);
+  const role = (s.user as any).role as string;
+  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
+  return { meId, role, teamId: u?.team_id as number | null };
 }
 
+// GET — cards created by members of my team (cards have no team_id; scope via creator).
+export async function GET() {
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (!c.teamId) return NextResponse.json([]);
+
+  const cards = await sql`
+    SELECT p.* FROM planning_cards p
+    JOIN users u ON u.id = p.created_by
+    WHERE u.team_id = ${c.teamId}
+    ORDER BY p.position ASC, p.created_at ASC`;
+  return NextResponse.json(cards);
+}
+
+// POST — create a card (any team member; board UI is employer-side).
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    const body = await req.json();
-    const createdBy = parseInt((session?.user as any)?.id ?? '1');
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-    const [card] = await db.insert(planningCards).values({
-      title: body.title,
-      description: body.description,
-      column: body.column ?? 'ideas',
-      position: body.position ?? 0,
-      createdBy,
-    }).returning();
+  const body = await req.json().catch(() => ({}));
+  const title = String(body.title ?? '').trim();
+  if (!title) return NextResponse.json({ error: 'Chybí název karty' }, { status: 400 });
 
-    return NextResponse.json(card);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to create card' }, { status: 500 });
-  }
+  const [card] = await sql`
+    INSERT INTO planning_cards (title, description, "column", position, created_by)
+    VALUES (${title}, ${body.description ?? null}, ${body.column ?? 'ideas'}, ${body.position ?? 0}, ${c.meId})
+    RETURNING *`;
+  return NextResponse.json(card);
 }

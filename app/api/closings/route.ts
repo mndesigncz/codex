@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { notifyUser } from '@/lib/push';
+import { cashDifference, czk } from '@/lib/closing';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +74,24 @@ export async function POST(request: Request) {
       ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
       ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
     ) RETURNING *`;
+
+  // Notify team employers (except the author) — flag manko/přebytek up front.
+  try {
+    const employers = await sql`
+      SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${c.meId}`;
+    if (employers.length) {
+      const [author] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
+      const diff = cashDifference(row as any);
+      const verdict = diff === 0 ? 'kasa sedí' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
+      await Promise.allSettled(employers.map((e: any) => notifyUser(e.id, {
+        title: 'Nová uzávěrka',
+        body: `${author?.name ?? 'Zaměstnanec'} odeslal uzávěrku (${row.date}) — ${verdict}.`,
+        type: diff < 0 ? 'warning' : 'info',
+      })));
+    }
+  } catch (e) {
+    console.error('notify employers failed', e);
+  }
 
   return NextResponse.json({ ok: true, closing: row });
 }

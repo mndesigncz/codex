@@ -106,9 +106,21 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         </button>
       </div>
 
+      {/* End-of-shift closing quick action */}
+      <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542]"><Icon name="trend" size={18} /></span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[#16181A]">Uzávěrka směny</p>
+            <p className="text-sm text-black/55">Na konci směny spočítej kasu a odešli uzávěrku.</p>
+          </div>
+          <Icon name="chevron" size={16} className="text-black/35 -rotate-90" />
+        </div>
+      </button>
+
       {/* Availability reminder */}
       {availabilitySubmitted === false && (
-        <button onClick={() => onNavigate('shift-requests')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
+        <button onClick={() => onNavigate('availability')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="calendar" size={18} /></span>
             <div>
