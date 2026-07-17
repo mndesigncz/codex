@@ -380,10 +380,10 @@ export default function Guides({ user }: { user: User }) {
                               e.stopPropagation();
                               deleteGuide(g.id);
                             }}
-                            className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all text-xs"
+                            className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
                             title="Smazat"
                           >
-                            ✕
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
                           </button>
                         </div>
                       )}
@@ -458,21 +458,20 @@ export default function Guides({ user }: { user: User }) {
                     </button>
                     <button
                       onClick={() => deleteGuide(reader.id)}
-                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
+                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 hover:bg-red-500/[0.06] transition-all"
                       title="Smazat"
                     >
-                      ✕
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
                     </button>
                   </>
                 )}
-                {(!isEmployer || readerLoading) && (
-                  <button
-                    onClick={() => setReader(null)}
-                    className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all"
-                  >
-                    ✕
-                  </button>
-                )}
+                <button
+                  onClick={() => setReader(null)}
+                  title="Zavřít"
+                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
