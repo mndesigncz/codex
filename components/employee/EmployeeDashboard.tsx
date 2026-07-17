@@ -21,17 +21,19 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [inventory, setInventory] = useState<any[]>([]);
   const [availabilitySubmitted, setAvailabilitySubmitted] = useState<boolean | null>(null);
   const [unreadChats, setUnreadChats] = useState(0);
+  const [closingsDue, setClosingsDue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [sh, tk, inv, av, conv] = await Promise.all([
+        const [sh, tk, inv, av, conv, cl] = await Promise.all([
           fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
           fetch(`/api/tasks?assignedTo=${meId}`).then(r => r.json()).catch(() => []),
           fetch('/api/inventory').then(r => r.json()).catch(() => []),
           fetch(`/api/availability?month=${nextMonthStr()}`).then(r => r.json()).catch(() => null),
           fetch('/api/conversations').then(r => r.json()).catch(() => []),
+          fetch('/api/closings').then(r => r.json()).catch(() => ({})),
         ]);
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));
@@ -40,6 +42,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         setAvailabilitySubmitted(av && !av.error ? !!av : false);
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
+        setClosingsDue(Array.isArray(cl?.eligibleShifts) ? cl.eligibleShifts : []);
       } catch {}
       setLoading(false);
     })();
@@ -106,17 +109,32 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         </button>
       </div>
 
-      {/* End-of-shift closing quick action */}
-      <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542]"><Icon name="trend" size={18} /></span>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[#16181A]">Uzávěrka směny</p>
-            <p className="text-sm text-black/55">Na konci směny spočítej kasu a odešli uzávěrku.</p>
+      {/* End-of-shift closing quick action — highlighted when a shift is unclosed */}
+      {closingsDue.length > 0 ? (
+        <button onClick={() => onNavigate('closing')} className="w-full text-left rounded-3xl bg-[#C8F542]/15 border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/20 transition-all">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[#16181A]">
+                {closingsDue.length === 1 ? 'Vyplň uzávěrku ze své směny' : `Máš ${closingsDue.length} neuzavřené směny`}
+              </p>
+              <p className="text-sm text-[#5B7A08]">Spočítej kasu a odešli uzávěrku — vedení ji uvidí hned.</p>
+            </div>
+            <Icon name="chevron" size={16} className="text-[#5B7A08] -rotate-90 shrink-0" />
           </div>
-          <Icon name="chevron" size={16} className="text-black/35 -rotate-90" />
-        </div>
-      </button>
+        </button>
+      ) : (
+        <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[#16181A]">Uzávěrka směny</p>
+              <p className="text-sm text-black/55">Na konci směny spočítej kasu a odešli uzávěrku.</p>
+            </div>
+            <Icon name="chevron" size={16} className="text-black/35 -rotate-90 shrink-0" />
+          </div>
+        </button>
+      )}
 
       {/* Availability reminder */}
       {availabilitySubmitted === false && (
