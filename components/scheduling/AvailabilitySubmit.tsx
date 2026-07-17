@@ -194,12 +194,12 @@ export default function AvailabilitySubmit({ user }: Props) {
       </div>
 
       {/* Month selector */}
-      <div className="flex gap-1 glass rounded-full p-1 w-fit">
+      <div className="flex gap-1 glass rounded-full p-1 w-fit max-w-full overflow-x-auto">
         {[currentMonth, nextMonth].map((m) => (
           <button
             key={m}
             onClick={() => setMonth(m)}
-            className={`px-5 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 ${
+            className={`px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap transition-all duration-300 ${
               month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
             }`}
           >
@@ -277,12 +277,12 @@ export default function AvailabilitySubmit({ user }: Props) {
           <div className="glass-card p-5 space-y-5">
             <div>
               <label className="block text-sm font-medium text-black/70 mb-2">Preferovaná směna (obecně)</label>
-              <div className="flex gap-1 glass rounded-full p-1 w-fit">
+              <div className="flex gap-1 glass rounded-full p-1 w-fit max-w-full overflow-x-auto">
                 {SHIFTS.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => setPreferredShift(s.id)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${
                       preferredShift === s.id
                         ? 'bg-[#C8F542] text-black font-semibold'
                         : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
@@ -304,7 +304,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                 value={maxShifts}
                 onChange={(e) => setMaxShifts(e.target.value)}
                 placeholder="např. 12"
-                className="w-40 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
+                className="w-40 max-w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>
 
@@ -323,11 +323,11 @@ export default function AvailabilitySubmit({ user }: Props) {
           </div>
 
           {/* Submit */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={submit}
               disabled={saving}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition disabled:opacity-50"
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
             >
               {saving ? 'Ukládám…' : existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
             </button>
