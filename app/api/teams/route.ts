@@ -21,17 +21,37 @@ export async function GET() {
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const sql = neon(process.env.DATABASE_URL!);
 
-  // Resolve team from the user record (session teamId may be stale)
-  const [dbUser] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const teamId = dbUser?.team_id ?? me.teamId;
-  if (!teamId) return NextResponse.json({ team: null });
+  try {
+    // Resolve team from the user record (session teamId may be stale)
+    const [dbUser] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
+    const teamId = dbUser?.team_id ?? me.teamId;
+    if (!teamId) return NextResponse.json({ team: null });
 
-  const [team] = await sql`SELECT id, name, owner_id, join_code, pay_daily_cash, created_at FROM teams WHERE id = ${teamId}`;
-  const members = await sql`
-    SELECT id, name, email, role, avatar, phone, job_title, shift_preference
-    FROM users WHERE team_id = ${teamId} ORDER BY role DESC, name ASC`;
+    // Core columns only — never depend on newer optional columns here, so a
+    // pending migration can NEVER make a team look like it disappeared.
+    const [team] = await sql`SELECT id, name, owner_id, join_code, created_at FROM teams WHERE id = ${teamId}`;
+    if (!team) return NextResponse.json({ team: null });
 
-  return NextResponse.json({ team, members, isOwner: team?.owner_id === me.id });
+    // Optional/newer columns fetched defensively; missing column ⇒ safe default.
+    let payDailyCash = false;
+    try {
+      const [extra] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${teamId}`;
+      payDailyCash = !!extra?.pay_daily_cash;
+    } catch { /* column not migrated yet */ }
+
+    const members = await sql`
+      SELECT id, name, email, role, avatar, phone, job_title, shift_preference
+      FROM users WHERE team_id = ${teamId} ORDER BY role DESC, name ASC`;
+
+    return NextResponse.json({
+      team: { ...team, pay_daily_cash: payDailyCash },
+      members,
+      isOwner: team?.owner_id === me.id,
+    });
+  } catch (e) {
+    // Never surface a 500 as "no team"; report a real error the UI can show.
+    return NextResponse.json({ error: 'Tým se nepodařilo načíst. Zkuste to prosím znovu.' }, { status: 500 });
+  }
 }
 
 // PATCH: rename team or regenerate join code (employer only)

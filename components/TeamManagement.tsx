@@ -60,6 +60,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const [teamName, setTeamName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -85,12 +86,18 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const flash = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(''), 4000); };
 
   const loadTeam = async () => {
-    const res = await fetch('/api/teams');
-    const data = await res.json();
-    if (data.team) {
-      setTeam(data.team);
-      setTeamName(data.team.name);
-      setMembers(data.members ?? []);
+    try {
+      const res = await fetch('/api/teams');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setLoadError(true); return; }
+      setLoadError(false);
+      if (data.team) {
+        setTeam(data.team);
+        setTeamName(data.team.name);
+        setMembers(data.members ?? []);
+      }
+    } catch {
+      setLoadError(true);
     }
   };
   const loadInvites = async () => {
@@ -248,6 +255,21 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     return (
       <div className="flex items-center justify-center h-48">
         <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="glass-card p-8 text-center space-y-3">
+        <p className="text-[#16181A] font-medium">Tým se nepodařilo načíst.</p>
+        <p className="text-black/45 text-sm">Vaše data jsou v pořádku — jen se je nepodařilo teď načíst.</p>
+        <button
+          onClick={() => { setLoading(true); Promise.all([loadTeam(), loadInvites()]).finally(() => setLoading(false)); }}
+          className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black transition"
+        >
+          Zkusit znovu
+        </button>
       </div>
     );
   }
