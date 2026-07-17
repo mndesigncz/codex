@@ -153,12 +153,12 @@ export default function PlanningBoard() {
                     draggable
                     onDragStart={() => setDragId(card.id)}
                     onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
-                    className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-4 hover:bg-black/[0.06] transition-all duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''}`}
+                    className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-4 hover:bg-black/[0.06] transition-all duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''} ${menuId === card.id ? 'z-30' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-[#16181A] text-sm">{card.title}</p>
-                        {card.description && <p className="text-xs text-black/45 mt-1.5">{card.description}</p>}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[#16181A] text-sm break-words">{card.title}</p>
+                        {card.description && <p className="text-xs text-black/45 mt-1.5 break-words">{card.description}</p>}
                       </div>
                       <button
                         onClick={() => setMenuId(m => (m === card.id ? null : card.id))}
@@ -172,7 +172,7 @@ export default function PlanningBoard() {
                     {menuId === card.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
-                        <div className="absolute right-3 top-11 z-20 glass-strong rounded-2xl p-2 w-48 shadow-lg space-y-0.5">
+                        <div className="absolute right-3 top-11 z-20 glass-strong rounded-2xl p-2 w-48 max-w-[calc(100vw-5rem)] shadow-lg space-y-0.5">
                           <p className="text-[10px] uppercase tracking-wider text-black/40 px-2 py-1">Přesunout do →</p>
                           {COLUMNS.filter(c => c.id !== card.column).map(c => (
                             <button

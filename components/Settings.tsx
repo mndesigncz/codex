@@ -279,7 +279,7 @@ export default function Settings({ user, initialTab }: Props) {
       <div className="md:hidden -mx-1 flex gap-1 overflow-x-auto scrollbar-thin pb-1 px-1">
         {sections.map(s => (
           <button key={s.id} onClick={() => setSection(s.id)}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
+            className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
               section === s.id ? 'bg-[#C8F542] text-black font-semibold' : 'glass text-black/60 hover:text-black'
             }`}>
             <Icon name={s.icon} size={16} /> {s.label}
@@ -334,7 +334,7 @@ export default function Settings({ user, initialTab }: Props) {
                   <div className="w-16 h-16 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/20 flex items-center justify-center text-3xl flex-shrink-0">
                     {avatar}
                   </div>
-                  <div className="grid grid-cols-6 gap-2">
+                  <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
                     {AVATARS.map(a => (
                       <button key={a} type="button" onClick={() => setAvatar(a)}
                         className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${
@@ -462,8 +462,8 @@ export default function Settings({ user, initialTab }: Props) {
 
             {/* Notification center */}
             <div className="glass-card p-6 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
+              <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+                <div className="min-w-0">
                   <h3 className={cardTitle}>Centrum oznámení</h3>
                   <p className="text-black/45 text-sm mt-1">
                     {unreadCount > 0 ? `${unreadCount} nepřečtených oznámení` : 'Vše přečteno'}
@@ -502,7 +502,7 @@ export default function Settings({ user, initialTab }: Props) {
                           <p className={`text-sm truncate ${!n.is_read ? 'font-bold text-[#16181A]' : 'font-semibold text-[#16181A]'}`}>{n.title}</p>
                           {!n.is_read && <span className="mt-1.5 h-2 w-2 rounded-full bg-[#C8F542] flex-shrink-0" />}
                         </div>
-                        {n.body && <p className="text-xs text-black/55 mt-0.5">{n.body}</p>}
+                        {n.body && <p className="text-xs text-black/55 mt-0.5 break-words">{n.body}</p>}
                         <p className="text-[11px] text-black/35 mt-1">{relativeCzech(n.created_at)}</p>
                       </div>
                     </div>

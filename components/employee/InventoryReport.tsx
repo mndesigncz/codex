@@ -124,10 +124,10 @@ export default function InventoryReport({ user }: Props) {
   const Stepper = ({ item }: { item: InventoryItem }) => {
     const dirty = isDirty(item);
     return (
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) - 1)}
-            className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
+            className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
           <input
             type="number"
             value={qtyOf(item)}
@@ -135,7 +135,7 @@ export default function InventoryReport({ user }: Props) {
             className="w-16 text-center rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2 text-sm font-semibold text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
           />
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) + 1)}
-            className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">+</button>
+            className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">+</button>
           <span className="text-xs text-black/40 w-6">{item.unit}</span>
         </div>
         {item.supplierUrl && (
@@ -233,12 +233,12 @@ export default function InventoryReport({ user }: Props) {
           {/* Secondary: multi-select report flow */}
           <div className="glass-card overflow-hidden">
             <button onClick={() => setShowReport(s => !s)}
-              className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-black/[0.02] transition-colors">
-              <div>
+              className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-black/[0.02] transition-colors">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-[#16181A]">Nahlásit chybějící položky</p>
                 <p className="text-xs text-black/45">Pošli vedení seznam s poznámkou</p>
               </div>
-              <span className="text-black/40 text-sm">{showReport ? '▲' : '▼'}</span>
+              <span className="text-black/40 text-sm shrink-0">{showReport ? '▲' : '▼'}</span>
             </button>
 
             {showReport && (
@@ -258,7 +258,7 @@ export default function InventoryReport({ user }: Props) {
                           <p className="text-sm font-medium text-[#16181A] truncate">{item.name}</p>
                           <p className="text-xs text-black/45 truncate">{item.category}</p>
                         </div>
-                        <span className={`text-xs font-medium ${isLow ? 'text-red-600' : 'text-black/55'}`}>
+                        <span className={`text-xs font-medium shrink-0 whitespace-nowrap ${isLow ? 'text-red-600' : 'text-black/55'}`}>
                           {item.quantity} {item.unit}{isLow && ' ⚠️'}
                         </span>
                       </label>

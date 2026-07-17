@@ -410,12 +410,12 @@ export default function ScheduleBuilder({ user }: Props) {
           <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
         </div>
         {/* Month selector */}
-        <div className="flex gap-1 glass rounded-full p-1">
+        <div className="flex gap-1 glass rounded-full p-1 max-w-full overflow-x-auto">
           {[currentMonth, nextMonth].map((m) => (
             <button
               key={m}
               onClick={() => setMonth(m)}
-              className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 ${
+              className={`px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap transition-all duration-300 ${
                 month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
               }`}
             >
@@ -475,25 +475,25 @@ export default function ScheduleBuilder({ user }: Props) {
                     <button
                       key={s.employeeId}
                       onClick={() => setExpanded(expanded === s.employeeId ? null : s.employeeId)}
-                      className={`flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-sm border transition-all ${
+                      className={`flex items-center gap-2 max-w-full rounded-full pl-1.5 pr-3 py-1.5 text-sm border transition-all ${
                         expanded === s.employeeId
                           ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#16181A]'
                           : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-black/80 hover:bg-[#C8F542]/15'
                       }`}
                     >
-                      <span className="text-base">{s.employeeAvatar}</span>
-                      {s.employeeName}
-                      <Icon name="check" size={15} className="text-[#5B7A08]" />
+                      <span className="text-base flex-shrink-0">{s.employeeAvatar}</span>
+                      <span className="min-w-0 truncate">{s.employeeName}</span>
+                      <Icon name="check" size={15} className="text-[#5B7A08] flex-shrink-0" />
                     </button>
                   ))}
                   {notSubmitted.map((e) => (
                     <span
                       key={e.id}
-                      className="flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45"
+                      className="flex items-center gap-2 max-w-full rounded-full pl-1.5 pr-3 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45"
                     >
-                      <span className="text-base opacity-60">{e.avatar ?? '👤'}</span>
-                      {e.name}
-                      <span className="text-[10px] uppercase tracking-wide text-black/30">čeká</span>
+                      <span className="text-base opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
+                      <span className="min-w-0 truncate">{e.name}</span>
+                      <span className="text-[10px] uppercase tracking-wide text-black/30 flex-shrink-0">čeká</span>
                     </span>
                   ))}
                 </div>
@@ -549,26 +549,26 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={generate}
               disabled={generating}
-              className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 hover:brightness-125 transition inline-flex items-center gap-2 disabled:opacity-50"
+              className="rounded-full bg-[#16181A] text-white font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-125 transition inline-flex items-center gap-2 disabled:opacity-50"
             >
               <span>✨</span> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
             </button>
             <button
               onClick={() => setPublishNote(true)}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition inline-flex items-center gap-2"
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2"
             >
               <Icon name="check" size={18} /> Publikovat rozvrh
             </button>
             <button
               onClick={exportCsv}
               disabled={shifts.length === 0}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-5 py-2.5 transition inline-flex items-center gap-2 disabled:opacity-40"
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 disabled:opacity-40"
             >
               <Icon name="trend" size={18} /> Export CSV
             </button>
             <button
               onClick={() => fileRef.current?.click()}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-5 py-2.5 transition inline-flex items-center gap-2"
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2"
             >
               <Icon name="plus" size={18} /> Import CSV
             </button>
@@ -585,7 +585,7 @@ export default function ScheduleBuilder({ user }: Props) {
             />
             <button
               onClick={() => (confirmClear ? clearMonth() : setConfirmClear(true))}
-              className={`rounded-full px-5 py-2.5 transition inline-flex items-center gap-2 border ${
+              className={`rounded-full px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 border ${
                 confirmClear
                   ? 'bg-red-500/20 border-red-500/40 text-red-500'
                   : 'glass border-black/10 text-black/70 hover:bg-black/[0.05]'
@@ -614,7 +614,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {preview && (
             <div className="glass-card p-5 border border-[#C8F542]/40 space-y-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-bold text-[#16181A] flex items-center gap-2">
                     <span>✨</span> Navržený rozvrh
                   </h3>
@@ -624,7 +624,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     kalendáři (zvýrazněno) a ulož.
                   </p>
                 </div>
-                <button onClick={() => setPreview(null)} className="text-black/45 hover:text-black text-sm">
+                <button onClick={() => setPreview(null)} className="text-black/45 hover:text-black text-sm whitespace-nowrap flex-shrink-0">
                   Zahodit náhled
                 </button>
               </div>
@@ -655,17 +655,17 @@ export default function ScheduleBuilder({ user }: Props) {
                 Před uložením vymazat stávající směny měsíce
               </label>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={commitPreview}
                   disabled={committing || preview.proposed.length === 0}
-                  className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition disabled:opacity-40 inline-flex items-center gap-2"
+                  className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-40 inline-flex items-center gap-2"
                 >
                   <Icon name="check" size={18} /> {committing ? 'Ukládám…' : 'Potvrdit a uložit'}
                 </button>
                 <button
                   onClick={() => setPreview(null)}
-                  className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-5 py-2.5 transition"
+                  className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition"
                 >
                   Zrušit
                 </button>
@@ -710,15 +710,15 @@ export default function ScheduleBuilder({ user }: Props) {
                   <button
                     key={cell}
                     onClick={() => setDayModal(cell)}
-                    className="min-h-[84px] rounded-xl bg-black/[0.03] border border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04] p-1.5 text-left transition-all flex flex-col gap-1"
+                    className="min-h-[84px] min-w-0 rounded-xl bg-black/[0.03] border border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04] p-1 sm:p-1.5 text-left transition-all flex flex-col gap-1 overflow-hidden"
                   >
-                    <span className="text-xs font-medium text-black/55">{day}</span>
-                    <div className="flex flex-col gap-1 overflow-hidden">
+                    <span className="text-[11px] sm:text-xs font-medium text-black/55">{day}</span>
+                    <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
                       {dayShifts.slice(0, 3).map((s) => (
                         <span
                           key={s.id}
                           title={`${s.employeeName} · ${s.startTime}–${s.endTime}`}
-                          className={`flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-medium truncate ${
+                          className={`flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden ${
                             s.type === 'morning'
                               ? 'bg-[#C8F542]/20 text-[#5B7A08]'
                               : s.type === 'afternoon'
@@ -726,8 +726,8 @@ export default function ScheduleBuilder({ user }: Props) {
                               : 'bg-black/[0.06] text-black/70'
                           }`}
                         >
-                          <span>{s.employeeAvatar}</span>
-                          <span className="truncate">{s.startTime}</span>
+                          <span className="flex-shrink-0">{s.employeeAvatar}</span>
+                          <span className="truncate min-w-0">{s.startTime}</span>
                         </span>
                       ))}
                       {dayShifts.length > 3 && (
@@ -738,10 +738,10 @@ export default function ScheduleBuilder({ user }: Props) {
                         <span
                           key={`p-${idx}`}
                           title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}`}
-                          className="flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-medium truncate border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
                         >
-                          <span>✨{p.employeeAvatar}</span>
-                          <span className="truncate">{p.startTime}</span>
+                          <span className="flex-shrink-0">✨{p.employeeAvatar}</span>
+                          <span className="truncate min-w-0">{p.startTime}</span>
                         </span>
                       ))}
                       {dayProposed.length > 3 && (
@@ -775,9 +775,9 @@ export default function ScheduleBuilder({ user }: Props) {
       {importPreview && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
           <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-[#16181A]">Náhled importu</h3>
-              <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xl font-bold text-[#16181A] min-w-0 truncate">Náhled importu</h3>
+              <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
                 ×
               </button>
             </div>
@@ -791,7 +791,8 @@ export default function ScheduleBuilder({ user }: Props) {
               <div>
                 <p className="text-sm font-medium text-[#5B7A08] mb-2">{importPreview.rows.length} platných směn k importu</p>
                 <div className="rounded-2xl border border-black/[0.08] overflow-hidden">
-                  <table className="w-full text-xs">
+                  <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] text-xs">
                     <thead className="bg-black/[0.04] text-black/55">
                       <tr>
                         <th className="text-left px-3 py-2">Datum</th>
@@ -813,6 +814,7 @@ export default function ScheduleBuilder({ user }: Props) {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                   {importPreview.rows.length > 40 && (
                     <p className="text-[11px] text-black/45 px-3 py-2">…a dalších {importPreview.rows.length - 40}</p>
                   )}
@@ -833,17 +835,17 @@ export default function ScheduleBuilder({ user }: Props) {
               </div>
             )}
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
                 onClick={confirmImport}
                 disabled={importing || importPreview.rows.length === 0}
-                className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition disabled:opacity-40"
+                className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-40"
               >
                 {importing ? 'Importuji…' : `Importovat ${importPreview.rows.length} směn`}
               </button>
               <button
                 onClick={() => setImportPreview(null)}
-                className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-5 py-2.5 transition"
+                className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition"
               >
                 Zrušit
               </button>
@@ -916,14 +918,14 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
 
   return (
     <div className="glass-card p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon name="clock" size={20} className="text-black/70" />
-          <h2 className="font-bold text-[#16181A]">Typy směn</h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon name="clock" size={20} className="text-black/70 flex-shrink-0" />
+          <h2 className="font-bold text-[#16181A] truncate">Typy směn</h2>
         </div>
         <button
           onClick={beginNew}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 hover:brightness-105 transition inline-flex items-center gap-1.5 text-sm"
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 whitespace-nowrap flex-shrink-0 hover:brightness-105 transition inline-flex items-center gap-1.5 text-sm"
         >
           <Icon name="plus" size={16} /> Přidat
         </button>
@@ -962,10 +964,10 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
                   {t.startTime}–{t.endTime}
                 </p>
               </div>
-              <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5" title="Upravit">
+              <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5 flex-shrink-0" title="Upravit">
                 <Icon name="settings" size={18} />
               </button>
-              <button onClick={() => remove(t.id)} className="text-black/30 hover:text-red-600 p-1.5" title="Smazat">
+              <button onClick={() => remove(t.id)} className="text-black/30 hover:text-red-600 p-1.5 flex-shrink-0" title="Smazat">
                 ×
               </button>
             </div>
@@ -1058,15 +1060,15 @@ function TypeForm({
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <button
           onClick={onSave}
           disabled={busy || !name.trim()}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-105 transition disabled:opacity-40"
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm whitespace-nowrap hover:brightness-105 transition disabled:opacity-40"
         >
           {busy ? 'Ukládám…' : 'Uložit'}
         </button>
-        <button onClick={onCancel} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm transition">
+        <button onClick={onCancel} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm whitespace-nowrap transition">
           Zrušit
         </button>
       </div>
@@ -1138,10 +1140,10 @@ function OpeningHoursEditor({
               key={d}
               className="flex items-center gap-3 rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3 flex-wrap"
             >
-              <span className="w-24 font-medium text-[#16181A]">{label}</span>
+              <span className="w-24 font-medium text-[#16181A] truncate">{label}</span>
               <button
                 onClick={() => update(d, { closed: !day.closed })}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium border transition-all ${
+                className={`rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition-all ${
                   day.closed
                     ? 'bg-red-500/15 border-red-500/30 text-red-600'
                     : 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
@@ -1171,16 +1173,16 @@ function OpeningHoursEditor({
         })}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition disabled:opacity-50"
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
         >
           {saving ? 'Ukládám…' : 'Uložit otevírací dobu'}
         </button>
         {saved && (
-          <span className="flex items-center gap-1.5 text-[#5B7A08] text-sm font-medium">
+          <span className="flex items-center gap-1.5 text-[#5B7A08] text-sm font-medium whitespace-nowrap">
             <Icon name="check" size={18} /> Uloženo!
           </span>
         )}
@@ -1333,16 +1335,16 @@ function FixedAssignmentsManager({
                     {list.map((a) => (
                       <span
                         key={a.id}
-                        className="flex items-center gap-2 rounded-full pl-1.5 pr-2 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-[#16181A]"
+                        className="flex items-center gap-2 max-w-full rounded-full pl-1.5 pr-2 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-[#16181A]"
                       >
-                        <span className="text-base">{a.employeeAvatar}</span>
-                        {a.employeeName}
-                        <span className="text-xs text-black/45">
+                        <span className="text-base flex-shrink-0">{a.employeeAvatar}</span>
+                        <span className="min-w-0 truncate">{a.employeeName}</span>
+                        <span className="text-xs text-black/45 whitespace-nowrap flex-shrink-0">
                           {a.shiftTypeName ? `· ${a.shiftTypeName}` : '· libovolná'}
                         </span>
                         <button
                           onClick={() => remove(a.id)}
-                          className="text-black/30 hover:text-red-600 pl-1"
+                          className="text-black/30 hover:text-red-600 pl-1 flex-shrink-0"
                           title="Odebrat"
                         >
                           ×
@@ -1416,9 +1418,9 @@ function DayModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
       <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-[#16181A] capitalize">{dayLabel(date)}</h3>
-          <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xl font-bold text-[#16181A] capitalize min-w-0 truncate">{dayLabel(date)}</h3>
+          <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
             ×
           </button>
         </div>
@@ -1429,7 +1431,7 @@ function DayModal({
             <p className="text-xs uppercase tracking-wide text-black/45">Přiřazené směny</p>
             {shifts.map((s) => (
               <div key={s.id} className="flex items-center gap-3 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2">
-                <span className="text-lg">{s.employeeAvatar}</span>
+                <span className="text-lg flex-shrink-0">{s.employeeAvatar}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#16181A] truncate">{s.employeeName}</p>
                   <p className="text-xs text-black/45">
@@ -1437,7 +1439,7 @@ function DayModal({
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 ${
                     s.type === 'morning'
                       ? 'bg-[#C8F542]/15 text-[#5B7A08]'
                       : s.type === 'afternoon'
@@ -1447,7 +1449,7 @@ function DayModal({
                 >
                   {SHIFT_LABEL[s.type] ?? s.type}
                 </span>
-                <button onClick={() => onRemove(s.id)} className="text-black/30 hover:text-red-600 transition p-1" title="Odebrat">
+                <button onClick={() => onRemove(s.id)} className="text-black/30 hover:text-red-600 transition p-1 flex-shrink-0" title="Odebrat">
                   ×
                 </button>
               </div>
@@ -1480,14 +1482,14 @@ function DayModal({
                           : 'bg-black/[0.03] border-black/[0.08] hover:bg-black/[0.05]'
                       }`}
                     >
-                      <span className="text-lg">{e.avatar ?? '👤'}</span>
-                      <span className="flex-1 text-sm text-[#16181A]">{e.name}</span>
+                      <span className="text-lg flex-shrink-0">{e.avatar ?? '👤'}</span>
+                      <span className="flex-1 min-w-0 truncate text-sm text-[#16181A]">{e.name}</span>
                       {blocked && (
-                        <span className="flex items-center gap-1 text-xs text-orange-600 font-medium">
+                        <span className="flex items-center gap-1 text-xs text-orange-600 font-medium whitespace-nowrap flex-shrink-0">
                           <Icon name="warning" size={14} /> nemůže
                         </span>
                       )}
-                      {!blocked && sub?.preferredShift === type && <span className="text-xs text-[#5B7A08]/80">preferuje</span>}
+                      {!blocked && sub?.preferredShift === type && <span className="text-xs text-[#5B7A08]/80 whitespace-nowrap flex-shrink-0">preferuje</span>}
                     </button>
                   );
                 })}
@@ -1511,11 +1513,11 @@ function DayModal({
                     <button
                       key={t.id}
                       onClick={() => applyShiftType(t)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-medium border transition-all inline-flex items-center gap-1.5 ${
+                      className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
                         active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
                       }`}
                     >
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color ?? '#C8F542' }} />
+                      <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
                       {t.name}
                     </button>
                   );

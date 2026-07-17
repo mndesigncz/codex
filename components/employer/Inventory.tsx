@@ -208,11 +208,11 @@ export default function Inventory({ user }: { user?: any }) {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
           <p className="text-black/45 text-sm">{items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'} · přidávejte a hlídejte limity</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowCats(true)} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-medium px-4 py-2.5 text-sm flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setShowCats(true)} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-medium px-4 py-2.5 text-sm flex items-center gap-2 whitespace-nowrap">
             <Icon name="settings" size={16} /> Kategorie
           </button>
-          <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2">
+          <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
             <Icon name="plus" size={16} /> Přidat položku
           </button>
         </div>
@@ -220,7 +220,7 @@ export default function Inventory({ user }: { user?: any }) {
 
       {(critical.length > 0 || low.length > 0) && (
         <div className="glass-card border-orange-500/20 bg-orange-500/[0.06] p-5">
-          <p className="font-semibold text-sm flex items-center gap-2 text-orange-700">
+          <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-orange-700">
             <Icon name="warning" size={16} />
             {critical.length > 0 && <span className="text-red-600">{critical.length} kriticky málo</span>}
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
@@ -237,7 +237,7 @@ export default function Inventory({ user }: { user?: any }) {
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={16} /></span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku nebo dodavatele..." className={`${inputClass} pl-10`} />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
             <SortMenu sort={sort} setSort={setSort} />
             <div className="glass rounded-full p-1 flex items-center gap-1 shrink-0">
               <button onClick={() => setView('list')} title="Seznam" className={`w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all ${view === 'list' ? 'bg-[#16181A] text-white' : 'text-black/50 hover:text-black'}`}>
@@ -397,8 +397,8 @@ export default function Inventory({ user }: { user?: any }) {
 
             {/* Sticky footer */}
             <div className="sticky bottom-0 z-10 flex gap-3 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06]">
-              <button type="button" onClick={() => setShowForm(false)} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Zrušit</button>
-              <button type="submit" disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2">
+              <button type="button" onClick={() => setShowForm(false)} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">Zrušit</button>
+              <button type="submit" disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap">
                 <Icon name="check" size={16} />{saving ? 'Ukládám…' : 'Uložit položku'}
               </button>
             </div>
@@ -432,15 +432,15 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
   }, [open]);
   const current = SORTS.find(s => s.key === sort) ?? SORTS[0];
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div ref={ref} className="relative min-w-0">
       <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}
-        className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 text-sm flex items-center gap-2 font-medium">
-        <Icon name="swap" size={15} className="text-black/40" />
-        <span className="whitespace-nowrap">{current.label}</span>
+        className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 text-sm flex items-center gap-2 font-medium min-w-0 max-w-full">
+        <Icon name="swap" size={15} className="text-black/40 shrink-0" />
+        <span className="truncate min-w-0">{current.label}</span>
         <Icon name="chevron" size={14} className={`text-black/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div role="listbox" className="absolute right-0 mt-2 w-56 z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
+        <div role="listbox" className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
           {SORTS.map(s => {
             const active = s.key === sort;
             return (

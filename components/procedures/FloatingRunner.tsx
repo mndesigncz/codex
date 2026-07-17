@@ -76,7 +76,7 @@ export default function FloatingRunner() {
     return (
       <>
         <StyleBlock />
-        <div className="fixed z-50 bottom-3 inset-x-3 md:inset-x-auto md:bottom-4 md:right-4 md:w-[340px]">
+        <div className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:right-4 md:w-[340px]">
           <div className="relative overflow-hidden glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-pop_0.4s_ease-out]">
             <Confetti />
             <div className="relative px-6 py-7 text-center">
@@ -121,7 +121,7 @@ export default function FloatingRunner() {
         <StyleBlock />
         <button
           onClick={() => setMinimized(false)}
-          className="fixed z-50 bottom-4 right-4 flex items-center gap-2.5 rounded-full bg-[#C8F542] text-black font-semibold pl-4 pr-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:brightness-110 transition"
+          className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] right-4 md:bottom-4 flex items-center gap-2.5 rounded-full bg-[#C8F542] text-black font-semibold pl-4 pr-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:brightness-110 transition"
         >
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full rounded-full bg-black/60 opacity-75 motion-safe:animate-ping" />
@@ -138,7 +138,7 @@ export default function FloatingRunner() {
   return (
     <>
       <StyleBlock />
-      <div className="fixed z-50 bottom-3 inset-x-3 md:inset-x-auto md:bottom-4 md:right-4 md:w-[340px]">
+      <div className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:right-4 md:w-[340px]">
         <div className="overflow-hidden glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-pop_0.28s_ease-out]">
           {/* Progress bar */}
           <div className="h-1 w-full bg-black/[0.06]">
