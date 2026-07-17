@@ -14,6 +14,7 @@ import ScheduleBuilder from '../scheduling/ScheduleBuilder';
 import Inventory from './Inventory';
 import PlanningBoard from './PlanningBoard';
 import ClosingsOverview from './ClosingsOverview';
+import TaskManager from './TaskManager';
 import Procedures from '../procedures/Procedures';
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { id: 'shifts',     label: 'Rozvrh',     icon: 'calendar' },
   { id: 'inventory',  label: 'Sklad',      icon: 'box' },
   { id: 'procedures', label: 'Postupy',    icon: 'clipboard' },
+  { id: 'tasks',      label: 'Úkoly',      icon: 'check' },
   { id: 'chat',       label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',     label: 'Návody',     icon: 'book' },
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
@@ -50,6 +52,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
+      case 'tasks':     return <TaskManager user={user as any} />;
       case 'reports':   return <ClosingsOverview />;
       case 'settings':  return <Settings user={user as any} initialTab="account" />;
       case 'team-settings': return <TeamManagement user={user as any} />;

@@ -88,7 +88,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon="users" label="Zaměstnanci" value={members.length} onClick={() => onNavigate('team-settings')} />
         <StatCard icon="calendar" label="Směny dnes" value={todayShifts.length} onClick={() => onNavigate('shifts')} />
-        <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('team-settings')} />
+        <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('tasks')} />
         <StatCard icon="warning" label="Kriticky málo" value={critical.length} onClick={() => onNavigate('inventory')} alert={critical.length > 0} />
       </div>
 
