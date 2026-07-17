@@ -48,32 +48,32 @@ export default function ClosingsOverview() {
     <div className="p-6 space-y-6">
       {/* Summary tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-card p-5">
-          <p className="text-xs uppercase tracking-wider text-black/45">Tržba celkem</p>
-          <p className="text-2xl font-bold tracking-tight text-[#16181A] mt-1.5">{czk(totalRevenue)}</p>
-          <p className="text-[11px] text-black/40 mt-1">Hotově {czk(totals.cash)} · Kartou {czk(totals.card)}</p>
+        <div className="glass-card p-5 min-w-0">
+          <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržba celkem</p>
+          <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totalRevenue)}</p>
+          <p className="text-[11px] text-black/40 mt-1 truncate">Hotově {czk(totals.cash)} · Kartou {czk(totals.card)}</p>
         </div>
-        <div className="glass-card p-5">
-          <p className="text-xs uppercase tracking-wider text-black/45">Odvedeno / odloženo</p>
-          <p className="text-2xl font-bold tracking-tight text-[#16181A] mt-1.5">{czk(totals.removed)}</p>
+        <div className="glass-card p-5 min-w-0">
+          <p className="text-xs uppercase tracking-wider text-black/45 truncate">Odvedeno / odloženo</p>
+          <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totals.removed)}</p>
         </div>
         {payDailyCash ? (
-          <div className="glass-card p-5">
-            <p className="text-xs uppercase tracking-wider text-black/45">Vyplaceno v hotovosti</p>
-            <p className="text-2xl font-bold tracking-tight text-[#16181A] mt-1.5">{czk(totals.payout)}</p>
+          <div className="glass-card p-5 min-w-0">
+            <p className="text-xs uppercase tracking-wider text-black/45 truncate">Vyplaceno v hotovosti</p>
+            <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totals.payout)}</p>
           </div>
         ) : (
-          <div className="glass-card p-5">
-            <p className="text-xs uppercase tracking-wider text-black/45">Spropitné celkem</p>
-            <p className="text-2xl font-bold tracking-tight text-[#16181A] mt-1.5">{czk(totals.tips)}</p>
+          <div className="glass-card p-5 min-w-0">
+            <p className="text-xs uppercase tracking-wider text-black/45 truncate">Spropitné celkem</p>
+            <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totals.tips)}</p>
           </div>
         )}
-        <div className="glass-card p-5">
-          <p className="text-xs uppercase tracking-wider text-black/45">Rozdíl kasy</p>
-          <p className={`text-2xl font-bold tracking-tight mt-1.5 ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-red-600'}`}>
+        <div className="glass-card p-5 min-w-0">
+          <p className="text-xs uppercase tracking-wider text-black/45 truncate">Rozdíl kasy</p>
+          <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-red-600'}`}>
             {totals.diff > 0 ? '+' : ''}{czk(totals.diff)}
           </p>
-          <p className="text-[11px] text-black/40 mt-1">Manko/přebytek souhrnně</p>
+          <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
         </div>
       </div>
 
@@ -104,8 +104,8 @@ export default function ClosingsOverview() {
                       <p className="text-xs text-black/45 truncate">{c.author_name ?? 'Neznámý'} · Tržba {czk(c.cash_revenue + c.card_revenue)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                     }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${czk(d)}` : czk(d)}</span>
                     <Icon name="chevron" size={16} className={`text-black/35 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -125,18 +125,18 @@ export default function ClosingsOverview() {
                         ...(payDailyCash ? [['Výplata zaměstnance', c.self_payout] as [string, number]] : []),
                         ['Zákazníků', c.customers],
                       ].map(([label, val]) => (
-                        <div key={label as string}>
-                          <span className="text-black/40 text-xs">{label}</span>
-                          <p className="font-semibold text-[#16181A]">{label === 'Zákazníků' ? val : czk(val as number)}</p>
+                        <div key={label as string} className="min-w-0">
+                          <span className="block text-black/40 text-xs truncate">{label}</span>
+                          <p className="font-semibold text-[#16181A] tabular-nums truncate">{label === 'Zákazníků' ? val : czk(val as number)}</p>
                         </div>
                       ))}
                     </div>
                     <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-black/55">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A]">{czk(expected)}</span></div>
-                      <div className="flex justify-between"><span className="text-black/55">Skutečný stav kasy</span><span className="font-semibold text-[#16181A]">{czk(c.closing_cash)}</span></div>
-                      <div className={`flex justify-between rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
-                        <span className="font-medium">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
-                        <span className="font-bold">{d > 0 ? '+' : ''}{czk(d)}</span>
+                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{czk(expected)}</span></div>
+                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{czk(c.closing_cash)}</span></div>
+                      <div className={`flex justify-between gap-3 rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
+                        <span className="font-medium min-w-0">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
+                        <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{czk(d)}</span>
                       </div>
                     </div>
                     {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3">{c.notes}</p>}
