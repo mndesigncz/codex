@@ -193,13 +193,21 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         <Step num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
           subtitle="Kolik bylo v kase, když směna začala.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Kasa na začátku', 'openingCash', { hint: 'Počáteční stav hotovosti v kase.' })}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+            {field('Kasa na začátku', 'openingCash', {
+              hint: closings[0]
+                ? `Minulá uzávěrka (${new Date(closings[0].date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}) skončila s ${czk(closings[0].closing_cash)} v kase.`
+                : 'Počáteční stav hotovosti v kase.',
+            })}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+              <div className="min-w-0">
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
-                <input type="date" value={form.date} onChange={set('date')} className={inputClass} />
+                {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
+                    width and overflow the card without it */}
+                <input type="date" value={form.date} onChange={set('date')}
+                  className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
+                  style={{ WebkitAppearance: 'none' }} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Směna</label>
                 <input type="text" value={form.shiftLabel} onChange={set('shiftLabel')} placeholder="Ranní…" className={inputClass} />
               </div>
