@@ -225,7 +225,7 @@ function Thread({
           </svg>
         </button>
         <Avatar conv={conv} size={38} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-semibold text-[#16181A] truncate">{conv.name}</div>
           {conv.type === 'team' && (
             <div className="text-[11px] text-black/45">Týmový kanál</div>
@@ -281,7 +281,7 @@ function Thread({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Napište zprávu…"
-          className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+          className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
         <button
           type="submit"
@@ -322,7 +322,7 @@ export function MessageBubble({
             <img
               src={msg.attachmentUrl}
               alt={msg.attachmentName ?? 'obrázek'}
-              className="max-w-[220px] max-h-[220px] rounded-2xl object-cover"
+              className="max-w-[min(220px,100%)] max-h-[220px] rounded-2xl object-cover"
             />
           </a>
         )}
@@ -332,12 +332,12 @@ export function MessageBubble({
             target="_blank"
             rel="noreferrer"
             download={msg.attachmentName ?? undefined}
-            className={`flex items-center gap-2 rounded-2xl px-3 py-2 ${
+            className={`flex items-center gap-2 rounded-2xl px-3 py-2 max-w-full ${
               own ? 'bg-black/10' : 'bg-black/[0.04]'
             }`}
           >
             <FileIcon />
-            <span className="text-sm truncate max-w-[160px] underline">
+            <span className="text-sm truncate min-w-0 max-w-[min(160px,100%)] underline">
               {msg.attachmentName ?? 'Soubor'}
             </span>
           </a>

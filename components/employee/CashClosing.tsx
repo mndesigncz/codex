@@ -136,7 +136,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
         <div className="relative">
           <input type="number" inputMode="numeric" value={form[key]} onChange={set(key)}
-            placeholder={opts?.placeholder ?? '0'} className={`${inputClass} ${unit ? 'pr-10' : ''}`} />
+            placeholder={opts?.placeholder ?? '0'} className={`${inputClass} ${unit ? 'pr-12' : ''}`} />
           {unit && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{unit}</span>}
         </div>
         {opts?.hint && <p className="text-[11px] text-black/40 mt-1.5">{opts.hint}</p>}
@@ -170,10 +170,10 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           </div>
           <div className="mt-5 flex items-center gap-2">
             {['Kasa', 'Tržby', 'Výdaje', 'Kontrola'].map((lbl, i) => (
-              <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial">
-                <div className="flex items-center gap-2">
+              <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial min-w-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`grid place-items-center h-6 w-6 rounded-full text-[11px] font-bold ${
+                    className={`grid place-items-center h-6 w-6 shrink-0 rounded-full text-[11px] font-bold ${
                       i === totalSteps - 1
                         ? 'bg-[#C8F542] text-[#16181A]'
                         : 'bg-[#16181A] text-white'
@@ -194,7 +194,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           subtitle="Kolik bylo v kase, když směna začala.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Kasa na začátku', 'openingCash', { hint: 'Počáteční stav hotovosti v kase.' })}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
                 <input type="date" value={form.date} onChange={set('date')} className={inputClass} />
@@ -231,16 +231,16 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         {/* Step 4 — the climax: expected vs counted */}
         <Step num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
-          <div className="flex items-center justify-between rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3">
-            <span className="text-sm text-black/55">Očekávaný stav kasy</span>
-            <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums">{czk(expected)}</span>
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3">
+            <span className="text-sm text-black/55 min-w-0">Očekávaný stav kasy</span>
+            <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{czk(expected)}</span>
           </div>
 
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Skutečný stav kasy na konci *</label>
             <div className="relative">
               <input type="number" inputMode="numeric" required value={form.closingCash} onChange={set('closingCash')}
-                placeholder="0" className={`${inputClass} pr-10 !py-4 text-base font-semibold`} />
+                placeholder="0" className={`${inputClass} pr-12 !py-4 text-base font-semibold`} />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">Kč</span>
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           {diff === null ? (
             <p className="text-[13px] text-black/40 text-center py-1">Zadej skutečný stav a hned uvidíš výsledek.</p>
           ) : (
-            <div className={`flex items-center justify-between rounded-2xl px-4 py-3.5 border ${
+            <div className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3.5 border ${
               diff === 0
                 ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
                 : diff > 0
@@ -259,7 +259,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                 <Icon name={diff === 0 ? 'check' : diff > 0 ? 'trend' : 'warning'} size={18} />
                 {diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek v kase' : 'Manko v kase'}
               </span>
-              <span className="text-lg font-bold tabular-nums">{diff > 0 ? '+' : ''}{czk(diff)}</span>
+              <span className="text-lg font-bold tabular-nums whitespace-nowrap">{diff > 0 ? '+' : ''}{czk(diff)}</span>
             </div>
           )}
         </Step>
@@ -291,20 +291,20 @@ export default function CashClosing({ user }: { user: { id: number; name: string
             const d = cashDifference(c);
             return (
               <div key={c.id} className="glass-card p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-bold tracking-tight text-[#16181A]">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <p className="font-bold tracking-tight text-[#16181A] min-w-0">
                     {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                     {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                   </p>
-                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${
+                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${czk(d)}` : `Manko ${czk(d)}`}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <div><span className="text-black/40">Tržba hotově</span><p className="font-semibold text-[#16181A]">{czk(c.cash_revenue)}</p></div>
-                  <div><span className="text-black/40">Tržba kartou</span><p className="font-semibold text-[#16181A]">{czk(c.card_revenue)}</p></div>
-                  <div><span className="text-black/40">Odloženo</span><p className="font-semibold text-[#16181A]">{czk(c.cash_removed)}</p></div>
-                  {payDailyCash && <div><span className="text-black/40">Moje výplata</span><p className="font-semibold text-[#16181A]">{czk(c.self_payout)}</p></div>}
+                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba hotově</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.cash_revenue)}</p></div>
+                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba kartou</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.card_revenue)}</p></div>
+                  <div className="min-w-0"><span className="block text-black/40 truncate">Odloženo</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.cash_removed)}</p></div>
+                  {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.self_payout)}</p></div>}
                 </div>
                 {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3 mt-3">{c.notes}</p>}
               </div>

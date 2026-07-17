@@ -52,19 +52,20 @@ export default function MessengerDock({ user }: Props) {
     .filter((c): c is Conversation => !!c);
 
   return (
-    <div className="hidden md:block fixed bottom-4 right-4 z-40">
+    <div className="fixed bottom-[calc(92px+env(safe-area-inset-bottom))] right-3 md:bottom-4 md:right-4 z-40 max-w-[calc(100vw-1.5rem)]">
       <style>{`@keyframes chatDockIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
-      <div className="flex items-end gap-3">
-        {/* Open chat windows */}
+      <div className="flex flex-col md:flex-row items-end gap-3">
+        {/* Open chat windows (mobile shows only the most recent one) */}
         {openConvs.map((conv, i) => (
-          <ChatWindow
-            key={conv.id}
-            conv={conv}
-            meId={meId}
-            onClose={() => closeWindow(conv.id)}
-            onSent={refresh}
-            offset={i}
-          />
+          <div key={conv.id} className={i === openConvs.length - 1 ? 'max-w-full' : 'hidden md:block max-w-full'}>
+            <ChatWindow
+              conv={conv}
+              meId={meId}
+              onClose={() => closeWindow(conv.id)}
+              onSent={refresh}
+              offset={i}
+            />
+          </div>
         ))}
 
         {/* Right column: list popover + launcher */}
@@ -125,7 +126,7 @@ function ConversationPopover({
   onClose: () => void;
 }) {
   return (
-    <div className="w-80 max-h-[70vh] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]">
+    <div className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(70vh,calc(100dvh-200px))] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]">
       <div className="px-4 py-3 flex items-center justify-between border-b border-black/[0.06]">
         <span className="font-semibold text-[#16181A]">Zprávy</span>
         <button
@@ -233,7 +234,7 @@ function ChatWindow({
 
   return (
     <div
-      className="w-80 h-[440px] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]"
+      className="w-80 max-w-[calc(100vw-1.5rem)] h-[440px] max-h-[calc(100dvh-200px)] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]"
       style={{ zIndex: 40 - offset }}
     >
       <header className="px-3 py-2.5 flex items-center gap-2 border-b border-black/[0.06]">
