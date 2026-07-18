@@ -21,6 +21,7 @@ const shape = (r: any) => ({
   id: r.id, title: r.title, description: r.description,
   assignedTo: r.assigned_to, createdBy: r.created_by,
   priority: r.priority, status: r.status, dueDate: r.due_date,
+  assigneeName: r.assignee_name ?? null, assigneeAvatar: r.assignee_avatar ?? null,
 });
 
 // GET — employee: own tasks; employer: every task in the team.
@@ -28,9 +29,11 @@ export async function GET() {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  const rows = c.role === 'employer' && c.teamId
+  // Employers and the shared kiosk see the whole team's tasks.
+  const teamWide = (c.role === 'employer' || c.role === 'kiosk') && c.teamId;
+  const rows = teamWide
     ? await sql`
-        SELECT t.* FROM tasks t
+        SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar FROM tasks t
         JOIN users u ON u.id = t.assigned_to
         WHERE u.team_id = ${c.teamId} OR t.created_by = ${c.meId}
         ORDER BY t.created_at DESC`
@@ -114,7 +117,7 @@ export async function PATCH(req: NextRequest) {
   if (!task) return NextResponse.json({ error: 'Úkol nenalezen' }, { status: 404 });
 
   const allowed = task.assigned_to === c.meId || task.created_by === c.meId
-    || (c.role === 'employer' && task.assignee_team === c.teamId);
+    || ((c.role === 'employer' || c.role === 'kiosk') && task.assignee_team === c.teamId);
   if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   const [row] = await sql`UPDATE tasks SET status = ${b.status} WHERE id = ${id} RETURNING *`;

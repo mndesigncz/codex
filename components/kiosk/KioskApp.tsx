@@ -3,6 +3,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
+import KioskInventory from './KioskInventory';
+import KioskTasks from './KioskTasks';
+import Procedures from '../procedures/Procedures';
+import Guides from '../Guides';
+
+const TABS = [
+  { id: 'clock',      label: 'Píchačky', icon: 'clock' },
+  { id: 'tasks',      label: 'Úkoly',    icon: 'check' },
+  { id: 'inventory',  label: 'Sklad',    icon: 'box' },
+  { id: 'procedures', label: 'Postupy',  icon: 'clipboard' },
+  { id: 'guides',     label: 'Návody',   icon: 'book' },
+] as const;
 
 interface RosterMember {
   id: number;
@@ -33,7 +45,10 @@ export default function KioskApp({ teamName }: { teamName: string }) {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<RosterMember | null>(null);
   const [flash, setFlash] = useState('');
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('clock');
   const now = useNow();
+  // The shared device acts as a pseudo-user for the reused views (read/run only).
+  const kioskUser = { id: 0, name: teamName, role: 'kiosk', avatar: '📟' } as any;
 
   const load = useCallback(async () => {
     try {
@@ -73,13 +88,31 @@ export default function KioskApp({ teamName }: { teamName: string }) {
         </div>
       </header>
 
+      {/* Tabs — everything the shift needs on one shared device */}
+      <nav className="mt-5 flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition ${
+              tab === t.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+            }`}>
+            <Icon name={t.icon} size={16} /> {t.label}
+          </button>
+        ))}
+      </nav>
+
       {flash && (
         <div className="mt-4 p-4 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] font-medium text-center">
           {flash}
         </div>
       )}
 
+      {tab === 'inventory' && <main className="flex-1 mt-5"><KioskInventory /></main>}
+      {tab === 'tasks' && <main className="flex-1 mt-5"><KioskTasks /></main>}
+      {tab === 'procedures' && <main className="flex-1 mt-2 -mx-1"><Procedures user={kioskUser} /></main>}
+      {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} /></main>}
+
       {/* Roster */}
+      {tab === 'clock' && (
       <main className="flex-1 mt-6">
         {loading ? (
           <div className="flex items-center justify-center h-64"><div className="h-9 w-9 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
@@ -114,6 +147,7 @@ export default function KioskApp({ teamName }: { teamName: string }) {
           </div>
         )}
       </main>
+      )}
 
       {active && (
         <PunchDialog
