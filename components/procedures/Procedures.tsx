@@ -197,6 +197,7 @@ export default function Procedures({ user }: Props) {
           {procedures.map(p => {
             const running = active?.procedureId === p.id;
             const mins = totalMinutes(parseSteps(p.items));
+            const lastRun = runs.find(r => r.status === 'completed' && r.procedure_name === p.name);
             return (
               <div
                 key={p.id}
@@ -235,6 +236,13 @@ export default function Procedures({ user }: Props) {
                     </span>
                   )}
                 </div>
+                {lastRun && (
+                  <p className="mt-2 text-[11px] text-black/40 truncate">
+                    Naposledy {fmtWhen(lastRun.completed_at || lastRun.started_at)}
+                    {lastRun.duration_seconds != null && ` · ${fmtDuration(lastRun.duration_seconds)}`}
+                    {lastRun.user_name && ` · ${lastRun.user_name}`}
+                  </p>
+                )}
                 <div className="mt-4 pt-1 flex-1 flex items-end">
                   <button
                     onClick={(e) => { e.stopPropagation(); running ? setDetail(p) : startRun(p); }}

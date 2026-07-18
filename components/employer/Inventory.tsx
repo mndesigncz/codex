@@ -46,6 +46,15 @@ function statusOf(i: Item): 'ok' | 'low' | 'critical' {
 }
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
+// Suggested order amount: refill up to maxQuantity; if max is not set,
+// aim for twice the minimum. Always suggest at least 1.
+function suggestedAmount(i: Item): number {
+  const base = i.maxQuantity && i.maxQuantity > 0
+    ? i.maxQuantity - i.quantity
+    : i.minQuantity * 2 - i.quantity;
+  return Math.max(1, Math.max(0, base));
+}
+
 function relTime(iso?: string) {
   if (!iso) return '';
   const d = new Date(iso).getTime();
@@ -76,6 +85,7 @@ export default function Inventory({ user }: { user?: any }) {
   const [saving, setSaving] = useState(false);
   const [newCatInline, setNewCatInline] = useState('');
   const [addingCat, setAddingCat] = useState(false);
+  const [showShopping, setShowShopping] = useState(false);
 
   const load = async () => {
     try {
@@ -126,6 +136,16 @@ export default function Inventory({ user }: { user?: any }) {
 
   const critical = items.filter(i => statusOf(i) === 'critical');
   const low = items.filter(i => statusOf(i) === 'low');
+
+  // Items to (re)order: critical first, then low, alphabetically within each group.
+  const toBuy = useMemo(() =>
+    items
+      .filter(i => statusOf(i) !== 'ok')
+      .sort((a, b) => {
+        const d = statusRank[statusOf(a)] - statusRank[statusOf(b)];
+        return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
+      }),
+  [items]);
 
   const openNew = () => {
     setEditing(null);
@@ -208,7 +228,12 @@ export default function Inventory({ user }: { user?: any }) {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
           <p className="text-black/45 text-sm">{items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'} · přidávejte a hlídejte limity</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          {toBuy.length > 0 && (
+            <button onClick={() => setShowShopping(true)} className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
+              🛒 Nákupní seznam ({toBuy.length})
+            </button>
+          )}
           <button onClick={() => setShowCats(true)} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-medium px-4 py-2.5 text-sm flex items-center gap-2 whitespace-nowrap">
             <Icon name="settings" size={16} /> Kategorie
           </button>
@@ -414,6 +439,10 @@ export default function Inventory({ user }: { user?: any }) {
           createCategory={createCategory}
         />
       )}
+
+      {showShopping && (
+        <ShoppingListModal items={toBuy} onClose={() => setShowShopping(false)} />
+      )}
     </div>
   );
 }
@@ -553,6 +582,101 @@ function GridView({ items, step, openEdit, remove }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ---------- Shopping list modal ---------- */
+function ShoppingListModal({ items, onClose }: { items: Item[]; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+
+  const hasSuppliers = items.some(i => (i.supplier ?? '').trim() !== '');
+
+  // Group by supplier (keeps the critical-first ordering inside each group).
+  const groups = useMemo(() => {
+    const map = new Map<string, Item[]>();
+    items.forEach(i => {
+      const key = (i.supplier ?? '').trim() || 'Bez dodavatele';
+      const arr = map.get(key);
+      if (arr) arr.push(i); else map.set(key, [i]);
+    });
+    return Array.from(map.entries());
+  }, [items]);
+
+  const buildText = () => {
+    const date = new Date().toLocaleDateString('cs-CZ');
+    const lines: string[] = [`Nákupní seznam – Pangea (${date})`];
+    groups.forEach(([supplier, list]) => {
+      lines.push('');
+      lines.push(`${supplier}:`);
+      list.forEach(i => {
+        lines.push(`• ${i.name} — objednat ${suggestedAmount(i)} ${i.unit} (zbývá ${i.quantity})`);
+      });
+    });
+    return lines.join('\n');
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(buildText());
+      setCopied(true);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
+  const share = async () => {
+    try { await navigator.share({ title: 'Nákupní seznam', text: buildText() }); } catch {}
+  };
+
+  return (
+    <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
+          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+        </div>
+
+        <div className="space-y-4">
+          {groups.map(([supplier, list]) => (
+            <div key={supplier} className="space-y-1">
+              {hasSuppliers && (
+                <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">{supplier}</p>
+              )}
+              <div className="divide-y divide-black/[0.06]">
+                {list.map(i => {
+                  const st = statusOf(i);
+                  return (
+                    <div key={i.id} className="flex items-center gap-2.5 py-2.5">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} title={st === 'critical' ? 'Kriticky málo' : 'Dochází'} />
+                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-[#16181A]">{i.name}</span>
+                      <span className="shrink-0 text-xs text-black/45 tabular-nums whitespace-nowrap">{i.quantity} {i.unit}</span>
+                      <span className="shrink-0 text-sm font-bold text-[#16181A] tabular-nums whitespace-nowrap">objednat +{suggestedAmount(i)} {i.unit}</span>
+                      {i.supplierUrl && (
+                        <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-xs text-[#5B7A08] hover:bg-black/[0.05]">↗</a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
+            {copied ? 'Zkopírováno ✓' : 'Zkopírovat seznam'}
+          </button>
+          {canShare && (
+            <button onClick={share} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">
+              Sdílet
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
