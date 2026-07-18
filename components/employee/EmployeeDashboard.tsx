@@ -22,18 +22,20 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [availabilitySubmitted, setAvailabilitySubmitted] = useState<boolean | null>(null);
   const [unreadChats, setUnreadChats] = useState(0);
   const [closingsDue, setClosingsDue] = useState<any[]>([]);
+  const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [sh, tk, inv, av, conv, cl] = await Promise.all([
+        const [sh, tk, inv, av, conv, cl, att] = await Promise.all([
           fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
           fetch(`/api/tasks?assignedTo=${meId}`).then(r => r.json()).catch(() => []),
           fetch('/api/inventory').then(r => r.json()).catch(() => []),
           fetch(`/api/availability?month=${nextMonthStr()}`).then(r => r.json()).catch(() => null),
           fetch('/api/conversations').then(r => r.json()).catch(() => []),
           fetch('/api/closings').then(r => r.json()).catch(() => ({})),
+          fetch('/api/attendance').then(r => r.json()).catch(() => ({})),
         ]);
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));
@@ -43,6 +45,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
         setClosingsDue(Array.isArray(cl?.eligibleShifts) ? cl.eligibleShifts : []);
+        setTimeEntries(Array.isArray(att?.entries) ? att.entries : []);
       } catch {}
       setLoading(false);
     })();
@@ -56,6 +59,17 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const activeTasks = tasks.filter(t => t.status !== 'done');
   const lowStock = inventory.filter(i => i.quantity <= i.minQuantity);
 
+  // Hours worked this calendar month (open shift counts up to now).
+  const monthKey = today.slice(0, 7);
+  const workedMs = timeEntries.reduce((sum, e) => {
+    const inT = new Date(e.clockIn).getTime();
+    if (Number.isNaN(inT) || String(e.clockIn).slice(0, 7) !== monthKey) return sum;
+    const outT = e.clockOut ? new Date(e.clockOut).getTime() : Date.now();
+    return sum + Math.max(0, outT - inT);
+  }, 0);
+  const workedH = Math.floor(workedMs / 3600000);
+  const workedM = Math.floor((workedMs % 3600000) / 60000);
+
   const greeting = (() => {
     const h = new Date().getHours();
     if (h < 10) return 'Dobré ráno';
@@ -64,7 +78,17 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   })();
 
   if (loading) {
-    return <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>;
+    return (
+      <div className="p-6 space-y-6">
+        <div className="h-7 w-56 rounded-full bg-black/[0.05] animate-pulse" />
+        <div className="glass-card h-32 animate-pulse" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="glass-card h-28 animate-pulse" />
+          <div className="glass-card h-28 animate-pulse" />
+        </div>
+        <div className="glass-card h-20 animate-pulse" />
+      </div>
+    );
   }
 
   return (
@@ -96,7 +120,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       </button>
 
       {/* Stat row */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
           <p className="text-xs uppercase tracking-wider text-black/45">Moje úkoly</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{activeTasks.length}</p>
@@ -107,6 +131,13 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{unreadChats}</p>
           <p className="text-xs text-black/45 mt-1">v chatu</p>
         </button>
+        <div className="text-left glass-card p-5 col-span-2 sm:col-span-1">
+          <p className="text-xs uppercase tracking-wider text-black/45">Odpracováno</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">
+            {workedH}<span className="text-lg font-semibold text-black/45"> h </span>{workedM > 0 && <>{workedM}<span className="text-lg font-semibold text-black/45"> min</span></>}
+          </p>
+          <p className="text-xs text-black/45 mt-1">tento měsíc (píchačky)</p>
+        </div>
       </div>
 
       {/* End-of-shift closing quick action — highlighted when a shift is unclosed */}

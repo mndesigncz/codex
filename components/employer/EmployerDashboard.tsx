@@ -77,7 +77,19 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   if (loading) {
-    return <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>;
+    return (
+      <div className="p-6 space-y-6">
+        <div className="h-7 w-64 rounded-full bg-black/[0.05] animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map(i => <div key={i} className="glass-card h-28 animate-pulse" />)}
+        </div>
+        <div className="glass-card h-36 animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="glass-card h-48 animate-pulse" />
+          <div className="glass-card h-48 animate-pulse" />
+        </div>
+      </div>
+    );
   }
 
   return (

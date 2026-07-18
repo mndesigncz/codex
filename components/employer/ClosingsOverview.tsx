@@ -69,6 +69,16 @@ export default function ClosingsOverview() {
   }), { cash: 0, card: 0, tips: 0, payout: 0, removed: 0, diff: 0 });
   const totalRevenue = totals.cash + totals.card;
 
+  // Daily revenue trend: sum of cash + card per day, chronological (oldest first).
+  const daily = Array.from(
+    closings.reduce((m, c) => {
+      if (c.date) m.set(c.date, (m.get(c.date) ?? 0) + c.cash_revenue + c.card_revenue);
+      return m;
+    }, new Map<string, number>()),
+  )
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, total]) => ({ date, total }));
+
   return (
     <div className="p-6 space-y-6">
       {/* Summary tiles */}
@@ -101,6 +111,53 @@ export default function ClosingsOverview() {
           <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
         </div>
       </div>
+
+      {/* Revenue trend chart */}
+      {daily.length >= 2 && (() => {
+        const barW = 26, barGap = 10, padX = 14;
+        const chartH = 160, plotTop = 18, plotBottom = 138, labelY = 152;
+        const chartW = padX * 2 + daily.length * barW + (daily.length - 1) * barGap;
+        const maxVal = Math.max(...daily.map(d => d.total), 1);
+        const maxIdx = daily.findIndex(d => d.total === maxVal);
+        const avg = daily.reduce((s, d) => s + d.total, 0) / daily.length;
+        const avgY = plotBottom - (avg / maxVal) * (plotBottom - plotTop);
+        const labelEvery = daily.length > 24 ? 3 : daily.length > 14 ? 2 : 1;
+        return (
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Icon name="trend" size={18} className="text-[#5B7A08]" />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Trend tržeb</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-36 sm:h-44" style={{ minWidth: chartW }} role="img" aria-label="Denní tržby">
+                <clipPath id="trend-bars-clip"><rect x="0" y="0" width={chartW} height={plotBottom} /></clipPath>
+                {daily.map((d, i) => {
+                  const x = padX + i * (barW + barGap);
+                  const h = Math.max((d.total / maxVal) * (plotBottom - plotTop), 2);
+                  const y = plotBottom - h;
+                  const day = parseInt(d.date.slice(8, 10), 10);
+                  const mon = parseInt(d.date.slice(5, 7), 10);
+                  return (
+                    <g key={d.date}>
+                      <title>{`${day}. ${mon}. — ${czk(d.total)}`}</title>
+                      {/* rx rounds both ends; the bottom radius is clipped flat at the baseline */}
+                      <rect x={x} y={y} width={barW} height={h + 4} rx={3} fill={i === maxIdx ? '#8FB811' : '#C8F542'} clipPath="url(#trend-bars-clip)" />
+                      {i === maxIdx && (
+                        <text x={Math.min(Math.max(x + barW / 2, 30), chartW - 30)} y={y - 5} textAnchor="middle" className="text-[9px] font-semibold fill-black/55 tabular-nums">{czk(d.total)}</text>
+                      )}
+                      {i % labelEvery === 0 && (
+                        <text x={x + barW / 2} y={labelY} textAnchor="middle" className="text-[9px] sm:text-[10px] fill-black/40">{day}.</text>
+                      )}
+                    </g>
+                  );
+                })}
+                <line x1={padX} y1={avgY} x2={chartW - padX} y2={avgY} stroke="#16181A" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="4 4" />
+                <text x={padX} y={avgY - 4} className="text-[9px] fill-black/45 tabular-nums">Ø {czk(avg)}</text>
+              </svg>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({closings.length})</h3>
