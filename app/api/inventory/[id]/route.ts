@@ -59,8 +59,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const body = await request.json();
   const note = body.note ?? null;
 
-  if (me.role === 'employee') {
-    // Employees may only change the stock count.
+  if (me.role !== 'employer') {
+    // Employees and the shared kiosk may only change the stock count.
     if (body.quantity === undefined || body.quantity === null) {
       return NextResponse.json({ error: 'Zaměstnanec může upravit pouze množství' }, { status: 403 });
     }
