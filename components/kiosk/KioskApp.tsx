@@ -10,6 +10,8 @@ interface RosterMember {
   avatar?: string;
   hasPin: boolean;
   openSince: string | null;
+  shiftStart?: string | null;
+  shiftEnd?: string | null;
 }
 
 function useNow(intervalMs = 1000) {
@@ -30,6 +32,7 @@ export default function KioskApp({ teamName }: { teamName: string }) {
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<RosterMember | null>(null);
+  const [flash, setFlash] = useState('');
   const now = useNow();
 
   const load = useCallback(async () => {
@@ -70,6 +73,12 @@ export default function KioskApp({ teamName }: { teamName: string }) {
         </div>
       </header>
 
+      {flash && (
+        <div className="mt-4 p-4 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] font-medium text-center">
+          {flash}
+        </div>
+      )}
+
       {/* Roster */}
       <main className="flex-1 mt-6">
         {loading ? (
@@ -94,6 +103,8 @@ export default function KioskApp({ teamName }: { teamName: string }) {
                   <p className="font-bold text-[#16181A] mt-3 truncate">{m.name}</p>
                   {on ? (
                     <p className="text-sm font-semibold text-[#5B7A08] tabular-nums mt-0.5">{elapsed(m.openSince!, now)}</p>
+                  ) : m.shiftStart ? (
+                    <p className="text-sm text-[#0A6FE0] tabular-nums mt-0.5">Dnes {m.shiftStart}–{m.shiftEnd}</p>
                   ) : (
                     <p className="text-sm text-black/40 mt-0.5">Mimo směnu</p>
                   )}
@@ -105,14 +116,23 @@ export default function KioskApp({ teamName }: { teamName: string }) {
       </main>
 
       {active && (
-        <PunchDialog member={active} now={now} onClose={() => setActive(null)} onDone={() => { setActive(null); load(); }} />
+        <PunchDialog
+          member={active}
+          now={now}
+          onClose={() => setActive(null)}
+          onDone={(msg) => {
+            setActive(null);
+            load();
+            if (msg) { setFlash(msg); setTimeout(() => setFlash(''), 8000); }
+          }}
+        />
       )}
     </div>
   );
 }
 
 function PunchDialog({ member, now, onClose, onDone }: {
-  member: RosterMember; now: number; onClose: () => void; onDone: () => void;
+  member: RosterMember; now: number; onClose: () => void; onDone: (flashMsg?: string) => void;
 }) {
   const on = !!member.openSince;
   const needPin = member.hasPin && !on; // PIN only required to clock in
@@ -128,7 +148,13 @@ function PunchDialog({ member, now, onClose, onDone }: {
         body: JSON.stringify({ employeeId: member.id, action: on ? 'out' : 'in', pin: needPin ? pin : undefined }),
       });
       const d = await res.json();
-      if (res.ok) onDone();
+      if (res.ok) {
+        if (d.action === 'out' && d.closingDone === false) {
+          onDone(`${member.name}: odchod zaznamenán ✓ — nezapomeň vyplnit uzávěrku směny!`);
+        } else {
+          onDone();
+        }
+      }
       else { setErr(d.error || 'Nepodařilo se zaznamenat.'); setPin(''); }
     } catch { setErr('Chyba serveru.'); }
     setBusy(false);
@@ -142,6 +168,11 @@ function PunchDialog({ member, now, onClose, onDone }: {
         <p className="text-sm text-black/50 mt-1">
           {on ? `Na směně od ${new Date(member.openSince!).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })} · ${elapsed(member.openSince!, now)}` : 'Zaznamenej příchod na směnu'}
         </p>
+        {!on && member.shiftStart && (
+          <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] px-3 py-1 text-xs font-medium tabular-nums">
+            <Icon name="calendar" size={13} /> Dnes máš směnu {member.shiftStart}–{member.shiftEnd}
+          </p>
+        )}
 
         {needPin && (
           <div className="mt-5">

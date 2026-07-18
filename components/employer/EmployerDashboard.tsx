@@ -35,6 +35,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [inventory, setInventory] = useState<any[]>([]);
   const [availability, setAvailability] = useState<any[]>([]);
   const [unreadChats, setUnreadChats] = useState(0);
+  const [onShift, setOnShift] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const month = nextMonthStr();
@@ -42,13 +43,14 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const [team, sh, tk, inv, av, conv] = await Promise.all([
+        const [team, sh, tk, inv, av, conv, att] = await Promise.all([
           fetch('/api/teams').then(r => r.json()).catch(() => ({})),
           fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
           fetch('/api/tasks').then(r => r.json()).catch(() => []),
           fetch('/api/inventory').then(r => r.json()).catch(() => []),
           fetch(`/api/availability?month=${month}`).then(r => r.json()).catch(() => []),
           fetch('/api/conversations').then(r => r.json()).catch(() => []),
+          fetch('/api/attendance?days=1').then(r => r.json()).catch(() => ({})),
         ]);
         setMembers((team?.members ?? []).filter((m: any) => m.role === 'employee'));
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
@@ -58,6 +60,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         setAvailability(Array.isArray(av) ? av : (av?.submissions ?? []));
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
+        setOnShift((att?.roster ?? []).filter((r: any) => r.openSince));
       } catch {}
       setLoading(false);
     })();
@@ -91,6 +94,33 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('tasks')} />
         <StatCard icon="warning" label="Kriticky málo" value={critical.length} onClick={() => onNavigate('inventory')} alert={critical.length > 0} />
       </div>
+
+      {/* Live: who's clocked in right now */}
+      {onShift.length > 0 && (
+        <button onClick={() => onNavigate('attendance')} className="w-full text-left rounded-3xl bg-[#C8F542]/[0.12] border border-[#C8F542]/35 p-5 hover:bg-[#C8F542]/[0.18] transition-all">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-[#5B9E00] opacity-60 motion-safe:animate-ping" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#5B9E00]" />
+              </span>
+              <p className="font-bold text-[#16181A] truncate">Právě na směně ({onShift.length})</p>
+            </div>
+            <span className="text-sm text-[#5B7A08] shrink-0">Docházka →</span>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {onShift.map((r: any) => (
+              <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/70 border border-black/[0.06] px-3 py-1.5 text-sm font-medium text-[#16181A] max-w-full">
+                <span className="shrink-0">{r.avatar ?? '👤'}</span>
+                <span className="truncate">{r.name}</span>
+                <span className="text-xs text-[#5B7A08] tabular-nums shrink-0 whitespace-nowrap">
+                  od {new Date(r.openSince).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </span>
+            ))}
+          </div>
+        </button>
+      )}
 
       {/* Availability status for next month */}
       <div className="glass-card p-6">

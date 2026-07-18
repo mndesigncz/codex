@@ -120,6 +120,24 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     }));
   }, [entries]);
 
+  // A shift open longer than 12 h is almost certainly a forgotten clock-out.
+  const STALE_MS = 12 * 3600 * 1000;
+
+  const closeEntry = async (e: Entry) => {
+    if (!confirm(`Ukončit směnu ${e.employeeName ?? ''} teď? Čas pak případně uprav smazáním záznamu.`)) return;
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: e.id }),
+      });
+      const d = await res.json();
+      if (res.ok && d.entry) {
+        setEntries(list => list.map(x => x.id === e.id ? { ...x, clockOut: d.entry.clockOut } : x));
+        setRoster(rs => rs.map(r => String(r.id) === String(e.employeeId) ? { ...r, openSince: null } : r));
+      }
+    } catch { /* ignore */ }
+  };
+
   const remove = async (e: Entry) => {
     if (!confirm(`Smazat záznam ${e.employeeName ?? ''} z ${new Date(e.clockIn).toLocaleDateString('cs-CZ')}?`)) return;
     setDeleting(e.id);
@@ -260,6 +278,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                       const open = !e.clockOut;
                       const start = new Date(e.clockIn).getTime();
                       const end = open ? now : new Date(e.clockOut as string).getTime();
+                      const stale = open && (now - start) > STALE_MS;
                       return (
                         <div key={e.id} className="flex items-center gap-3 flex-wrap p-3 sm:p-4">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -271,6 +290,17 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                               </p>
                             </div>
                           </div>
+                          {stale && (
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 whitespace-nowrap">
+                                <Icon name="warning" size={12} /> Zapomenutý odchod?
+                              </span>
+                              <button onClick={() => closeEntry(e)}
+                                className="rounded-full bg-[#16181A] text-white text-xs font-semibold px-3 py-1.5 hover:bg-black transition whitespace-nowrap">
+                                Ukončit
+                              </button>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 shrink-0 ml-auto">
                             <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
                               {e.source === 'kiosk' ? 'kiosk' : 'ručně'}

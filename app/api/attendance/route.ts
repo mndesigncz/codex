@@ -24,17 +24,25 @@ export async function GET(req: NextRequest) {
   if (!c.teamId) return NextResponse.json({ roster: [], entries: [] });
 
   if (c.role === 'kiosk' || c.role === 'employer') {
-    // Roster: every employee + their currently-open entry (if clocked in).
+    // Roster: every employee + their currently-open entry (if clocked in)
+    // + today's planned shift so the kiosk can show plan vs reality.
+    const today = new Date().toISOString().split('T')[0];
     const roster = await sql`
       SELECT u.id, u.name, u.avatar,
              (u.pin IS NOT NULL AND u.pin <> '') AS "hasPin",
-             te.clock_in AS "openSince"
+             te.clock_in AS "openSince",
+             sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
       FROM users u
       LEFT JOIN LATERAL (
         SELECT clock_in FROM time_entries
         WHERE employee_id = u.id AND clock_out IS NULL
         ORDER BY clock_in DESC LIMIT 1
       ) te ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT start_time, end_time FROM shifts
+        WHERE employee_id = u.id AND date = ${today}
+        ORDER BY start_time ASC LIMIT 1
+      ) sh ON TRUE
       WHERE u.team_id = ${c.teamId} AND u.role = 'employee'
       ORDER BY u.name ASC`;
 
@@ -109,7 +117,46 @@ export async function POST(req: NextRequest) {
   const [row] = await sql`
     UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
     RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
-  return NextResponse.json({ ok: true, action: 'out', entry: row });
+
+  // Nudge: does today's cash closing still need to be filled in?
+  let closingDone = true;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const [cl] = await sql`SELECT id FROM cash_closings WHERE created_by = ${employeeId} AND date = ${today}`;
+    closingDone = !!cl;
+  } catch { /* ignore */ }
+
+  return NextResponse.json({ ok: true, action: 'out', entry: row, closingDone });
+}
+
+// PATCH — employer fixes a forgotten clock-out: { id, clockOut?: ISO } (default now).
+export async function PATCH(req: NextRequest) {
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+
+  const b = await req.json().catch(() => ({}));
+  const id = parseInt(b.id);
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
+
+  const [entry] = await sql`SELECT id, clock_in FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;
+  if (!entry) return NextResponse.json({ error: 'Záznam nenalezen' }, { status: 404 });
+
+  // Custom timestamp must be valid and after clock-in; otherwise use now.
+  let out = new Date();
+  if (b.clockOut) {
+    const parsed = new Date(b.clockOut);
+    if (Number.isNaN(parsed.getTime())) return NextResponse.json({ error: 'Neplatný čas' }, { status: 400 });
+    out = parsed;
+  }
+  if (out.getTime() <= new Date(entry.clock_in).getTime()) {
+    return NextResponse.json({ error: 'Odchod musí být po příchodu.' }, { status: 400 });
+  }
+
+  const [row] = await sql`
+    UPDATE time_entries SET clock_out = ${out.toISOString()} WHERE id = ${id}
+    RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+  return NextResponse.json({ ok: true, entry: row });
 }
 
 // DELETE ?id= — employer removes an attendance entry (corrections).
