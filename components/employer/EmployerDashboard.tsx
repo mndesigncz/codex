@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
+import ClockWidget from './ClockWidget';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -98,6 +99,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         <p className="text-black/45 text-sm">Přehled podniku</p>
         <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Vítejte zpět, {user.name}</h1>
       </div>
+
+      {/* Employer can work a shift too */}
+      {user.id && <ClockWidget userId={parseInt(String(user.id))} />}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

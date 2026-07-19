@@ -148,6 +148,8 @@ export default function ScheduleBuilder({ user }: Props) {
   const [importing, setImporting] = useState(false);
 
   const employees = useMemo(() => members.filter((m) => m.role === 'employee'), [members]);
+  // Assignable to shifts = employees + the employer (who can also work a shift).
+  const assignable = useMemo(() => members.filter((m) => m.role === 'employee' || m.role === 'employer'), [members]);
   const grid = useMemo(() => buildGrid(month), [month]);
 
   const load = async () => {
@@ -450,7 +452,7 @@ export default function ScheduleBuilder({ user }: Props) {
         <OpeningHoursEditor value={openingHours} onSaved={(v) => setOpeningHours(v)} />
       ) : tab === 'pevne' ? (
         <FixedAssignmentsManager
-          employees={employees}
+          employees={assignable}
           shiftTypes={shiftTypes}
           assignments={fixed}
           onReload={reloadFixed}
@@ -760,7 +762,7 @@ export default function ScheduleBuilder({ user }: Props) {
       {dayModal && (
         <DayModal
           date={dayModal}
-          employees={employees}
+          employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
           shiftTypes={shiftTypes}
           unavailable={unavailableOn(dayModal)}

@@ -76,7 +76,7 @@ export async function PATCH(req: NextRequest) {
   const pin = b.pin === null || b.pin === '' ? null : String(b.pin).replace(/\D/g, '').slice(0, 6);
   if (pin !== null && pin.length < 4) return NextResponse.json({ error: 'PIN musí mít 4–6 číslic.' }, { status: 400 });
 
-  const [target] = await sql`SELECT id FROM users WHERE id = ${userId} AND team_id = ${c.teamId} AND role = 'employee'`;
+  const [target] = await sql`SELECT id FROM users WHERE id = ${userId} AND team_id = ${c.teamId} AND role <> 'kiosk'`;
   if (!target) return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
 
   await sql`UPDATE users SET pin = ${pin} WHERE id = ${userId}`;
