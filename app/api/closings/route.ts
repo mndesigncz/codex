@@ -44,7 +44,10 @@ export async function GET() {
     requiresShift = team?.closing_requires_shift !== false;
   } catch { /* column not migrated yet */ }
 
-  const rows = c.role === 'employer'
+  // The shared kiosk never sees financial history — it only submits.
+  const rows = c.role === 'kiosk'
+    ? []
+    : c.role === 'employer'
     ? await sql`
         SELECT cc.*, u.name AS author_name, u.avatar AS author_avatar
         FROM cash_closings cc
@@ -59,11 +62,28 @@ export async function GET() {
         ORDER BY cc.date DESC, cc.created_at DESC`;
 
   // Shifts the current user may still close: their own past/today shifts in
-  // the last 14 days that don't yet have a closing. Employers can close any
-  // date, so they get an empty list (the UI shows a free date picker).
+  // the last 14 days that don't yet have a closing. The kiosk gets the whole
+  // team's unclosed recent shifts (it picks who is closing). Employers can
+  // close any date, so they get an empty list (the UI shows a free date picker).
   let eligibleShifts: any[] = [];
-  if (c.role !== 'employer') {
-    const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  if (c.role === 'kiosk') {
+    const cutoff = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
+    try {
+      eligibleShifts = await sql`
+        SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type,
+               u.id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar"
+        FROM shifts s
+        JOIN users u ON u.id = s.employee_id
+        WHERE u.team_id = ${c.teamId}
+          AND s.date <= ${today} AND s.date >= ${cutoff}
+          AND NOT EXISTS (
+            SELECT 1 FROM cash_closings cc
+            WHERE cc.created_by = s.employee_id AND cc.date = s.date
+          )
+        ORDER BY s.date DESC, s.start_time ASC`;
+    } catch { /* shifts table issue — leave empty */ }
+  } else if (c.role !== 'employer') {
     const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
     try {
       eligibleShifts = await sql`
@@ -85,6 +105,7 @@ export async function GET() {
     payDailyCash,
     requiresShift,
     isEmployer: c.role === 'employer',
+    isKiosk: c.role === 'kiosk',
     eligibleShifts,
   });
 }
@@ -99,6 +120,22 @@ export async function POST(request: Request) {
   const today = new Date().toISOString().split('T')[0];
   const date = typeof b.date === 'string' && b.date ? b.date : today;
   const isEmployer = c.role === 'employer';
+  const isKiosk = c.role === 'kiosk';
+
+  // The shared kiosk submits ON BEHALF of a chosen team employee — the
+  // closing is attributed to them (author, one-per-day, notifications).
+  let actorId = c.meId;
+  if (isKiosk) {
+    const employeeId = parseInt(b.employeeId);
+    if (!Number.isFinite(employeeId)) {
+      return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
+    }
+    const [emp] = await sql`SELECT id, team_id, role FROM users WHERE id = ${employeeId}`;
+    if (!emp || emp.team_id !== c.teamId || emp.role !== 'employee') {
+      return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
+    }
+    actorId = employeeId;
+  }
 
   // No closing a day that hasn't happened yet.
   if (date > today) {
@@ -107,13 +144,13 @@ export async function POST(request: Request) {
 
   // One closing per person per day.
   const [dupe] = await sql`
-    SELECT id FROM cash_closings WHERE created_by = ${c.meId} AND date = ${date}`;
+    SELECT id FROM cash_closings WHERE created_by = ${actorId} AND date = ${date}`;
   if (dupe) {
-    return NextResponse.json({ error: 'Za tento den už jsi uzávěrku odeslal/a.' }, { status: 409 });
+    return NextResponse.json({ error: 'Za tento den už je uzávěrka odeslaná.' }, { status: 409 });
   }
 
-  // Employees may only close a day on which they actually had a shift
-  // (unless the team turned this requirement off). Employers can close any day.
+  // Employees (and kiosk submissions) may only close a day with an actual
+  // shift (unless the team turned this off). Employers can close any day.
   let shiftId: number | null = null;
   let shiftLabel: string | null = b.shiftLabel || null;
   if (!isEmployer) {
@@ -125,11 +162,11 @@ export async function POST(request: Request) {
 
     const [shift] = await sql`
       SELECT id, start_time, end_time FROM shifts
-      WHERE employee_id = ${c.meId} AND date = ${date}
+      WHERE employee_id = ${actorId} AND date = ${date}
       ORDER BY start_time ASC LIMIT 1`;
     if (requiresShift && !shift) {
       return NextResponse.json(
-        { error: 'Uzávěrku můžeš odeslat jen za den, kdy jsi měl/a směnu.' },
+        { error: 'Uzávěrku lze odeslat jen za den, kdy byla směna.' },
         { status: 403 },
       );
     }
@@ -147,7 +184,7 @@ export async function POST(request: Request) {
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${c.meId}, ${date}, ${shiftLabel}, ${shiftId},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId},
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
@@ -159,7 +196,7 @@ export async function POST(request: Request) {
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${c.meId}, ${date}, ${shiftLabel},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel},
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
@@ -168,9 +205,9 @@ export async function POST(request: Request) {
   // Notify team employers (except the author) — flag manko/přebytek up front.
   try {
     const employers = await sql`
-      SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${c.meId}`;
+      SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${actorId}`;
     if (employers.length) {
-      const [author] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
+      const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
       const diff = cashDifference(row as any);
       const verdict = diff === 0 ? 'kasa sedí' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
       await Promise.allSettled(employers.map((e: any) => notifyUser(e.id, {

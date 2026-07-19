@@ -7,11 +7,14 @@ import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
 import Guides from '../Guides';
+import CashClosing from '../employee/CashClosing';
+import MessengerDock from '../chat/MessengerDock';
 
 const TABS = [
   { id: 'clock',      label: 'Píchačky', icon: 'clock' },
   { id: 'tasks',      label: 'Úkoly',    icon: 'check' },
   { id: 'inventory',  label: 'Sklad',    icon: 'box' },
+  { id: 'closing',    label: 'Uzávěrka', icon: 'trend' },
   { id: 'procedures', label: 'Postupy',  icon: 'clipboard' },
   { id: 'guides',     label: 'Návody',   icon: 'book' },
 ] as const;
@@ -40,15 +43,18 @@ function elapsed(fromIso: string, now: number) {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function KioskApp({ teamName }: { teamName: string }) {
+interface KioskUser { id?: string | number; name: string; role: string; avatar?: string }
+
+export default function KioskApp({ user }: { user: KioskUser }) {
+  const teamName = user.name;
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<RosterMember | null>(null);
   const [flash, setFlash] = useState('');
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('clock');
   const now = useNow();
-  // The shared device acts as a pseudo-user for the reused views (read/run only).
-  const kioskUser = { id: 0, name: teamName, role: 'kiosk', avatar: '📟' } as any;
+  // The real kiosk session user, reused by the embedded views (read/run only).
+  const kioskUser = { id: user.id ?? 0, name: teamName, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;
 
   const load = useCallback(async () => {
     try {
@@ -107,6 +113,7 @@ export default function KioskApp({ teamName }: { teamName: string }) {
       )}
 
       {tab === 'inventory' && <main className="flex-1 mt-5"><KioskInventory /></main>}
+      {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
       {tab === 'tasks' && <main className="flex-1 mt-5"><KioskTasks /></main>}
       {tab === 'procedures' && <main className="flex-1 mt-2 -mx-1"><Procedures user={kioskUser} /></main>}
       {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} /></main>}
@@ -148,6 +155,8 @@ export default function KioskApp({ teamName }: { teamName: string }) {
         )}
       </main>
       )}
+
+      <MessengerDock user={kioskUser} />
 
       {active && (
         <PunchDialog
