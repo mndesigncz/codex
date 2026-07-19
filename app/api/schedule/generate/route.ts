@@ -83,8 +83,19 @@ export async function POST(req: Request) {
   }
 
   // ---- Preview path: run the algorithm ----
+  // Employees always; employers only when they submitted availability for
+  // the month (i.e. they want to be scheduled too).
   const employeeRows = await sql`
-    SELECT id, name, avatar FROM users WHERE team_id = ${ctx.teamId} AND role = 'employee' ORDER BY name ASC`;
+    SELECT u.id, u.name, u.avatar FROM users u
+    WHERE u.team_id = ${ctx.teamId} AND (
+      u.role = 'employee' OR (
+        u.role = 'employer' AND EXISTS (
+          SELECT 1 FROM availability_requests a
+          WHERE a.employee_id = u.id AND a.month = ${month}
+        )
+      )
+    )
+    ORDER BY u.name ASC`;
   const availRows = await sql`
     SELECT employee_id, unavailable_dates, day_preferences, preferred_shift, max_shifts
     FROM availability_requests WHERE team_id = ${ctx.teamId} AND month = ${month}`;

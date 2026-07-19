@@ -90,7 +90,7 @@ export default function AvailabilitySubmit({ user }: Props) {
     let active = true;
     setLoading(true);
     setConfirmed(false);
-    fetch(`/api/availability?month=${month}`)
+    fetch(`/api/availability?mine=1&month=${month}`)
       .then((r) => r.json())
       .then((data) => {
         if (!active) return;

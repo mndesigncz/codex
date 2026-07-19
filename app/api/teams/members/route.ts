@@ -13,9 +13,12 @@ async function currentEmployer() {
   return { id: parseInt((session.user as any).id) };
 }
 
-// Resolve the team owned by the current employer + confirm target is a member.
-async function ownedTeam(ownerId: number) {
-  const [team] = await sql`SELECT id, owner_id FROM teams WHERE owner_id = ${ownerId}`;
+// Resolve the employer's team — ANY employer of the team may manage members
+// (multi-employer teams); the original owner stays protected below.
+async function ownedTeam(employerId: number) {
+  const [u] = await sql`SELECT team_id FROM users WHERE id = ${employerId}`;
+  if (!u?.team_id) return null;
+  const [team] = await sql`SELECT id, owner_id FROM teams WHERE id = ${u.team_id}`;
   return team ?? null;
 }
 

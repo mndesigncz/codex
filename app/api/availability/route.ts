@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   const month = searchParams.get('month');
   if (!month) return NextResponse.json({ error: 'Chybí měsíc' }, { status: 400 });
 
-  if (ctx.role === 'employer') {
+  if (ctx.role === 'employer' && !searchParams.get('mine')) {
     const rows = await sql`
       SELECT a.id, a.employee_id, a.month, a.unavailable_dates, a.day_preferences, a.preferred_shift,
              a.max_shifts, a.note, a.status, a.created_at,
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const ctx = await context();
   if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employee') return NextResponse.json({ error: 'Pouze pro zaměstnance' }, { status: 403 });
+  if (ctx.role !== 'employee' && ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro členy týmu' }, { status: 403 });
   if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
 
   const body = await req.json();
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
   // Notify the employer(s) of the team
   try {
     const employers = await sql`
-      SELECT id FROM users WHERE team_id = ${ctx.teamId} AND role = 'employer'`;
+      SELECT id FROM users WHERE team_id = ${ctx.teamId} AND role = 'employer' AND id <> ${ctx.meId}`;
     const [my, ye] = month.split('-');
     const monthLabel = new Date(parseInt(my), parseInt(ye) - 1, 1).toLocaleDateString('cs-CZ', {
       month: 'long',

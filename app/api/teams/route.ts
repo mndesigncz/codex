@@ -63,7 +63,11 @@ export async function PATCH(request: Request) {
   const sql = neon(process.env.DATABASE_URL!);
   const { name, regenerateCode, payDailyCash, closingRequiresShift } = await request.json();
 
-  const [team] = await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
+  // Any employer of the team may manage settings (multi-employer teams).
+  const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
+  const [team] = dbMe?.team_id
+    ? await sql`SELECT id FROM teams WHERE id = ${dbMe.team_id}`
+    : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
   if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
