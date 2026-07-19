@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
         WHERE employee_id = u.id AND date = ${today}
         ORDER BY start_time ASC LIMIT 1
       ) sh ON TRUE
-      WHERE u.team_id = ${c.teamId} AND u.role = 'employee'
-      ORDER BY u.name ASC`;
+      WHERE u.team_id = ${c.teamId} AND u.role IN ('employee','employer')
+      ORDER BY u.role DESC, u.name ASC`;
 
     let entries: any[] = [];
     if (c.role === 'employer') {

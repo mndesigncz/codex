@@ -45,7 +45,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         fetch('/api/teams').then(r => r.json()).catch(() => ({})),
       ]);
       setTasks(Array.isArray(tk) ? tk : []);
-      setMembers((tm?.members ?? []).filter((m: Member) => m.role === 'employee'));
+      setMembers((tm?.members ?? []).filter((m: Member) => m.role === 'employee' || m.role === 'employer'));
     } catch { /* ignore */ }
     setLoading(false);
   };

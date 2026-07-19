@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
     }
     const [emp] = await sql`SELECT id, team_id, role FROM users WHERE id = ${employeeId}`;
-    if (!emp || emp.team_id !== c.teamId || emp.role !== 'employee') {
+    if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') {
       return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
     }
     actorId = employeeId;
