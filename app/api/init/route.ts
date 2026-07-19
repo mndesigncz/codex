@@ -362,6 +362,8 @@ export async function GET() {
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )`;
+    // invited members may come in with an elevated role
+    await sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`;
     // optional per-employee PIN for the shared kiosk device
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`;
     // whether closings are locked to shifts (default on)

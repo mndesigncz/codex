@@ -16,6 +16,8 @@ import PlanningBoard from './PlanningBoard';
 import ClosingsOverview from './ClosingsOverview';
 import TaskManager from './TaskManager';
 import Attendance from './Attendance';
+import MyShifts from '../employee/MyShifts';
+import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
 import Procedures from '../procedures/Procedures';
 
 const navItems = [
@@ -29,6 +31,7 @@ const navItems = [
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
   { id: 'reports',    label: 'Uzávěrky',   icon: 'trend' },
   { id: 'attendance', label: 'Docházka',   icon: 'clock' },
+  { id: 'my-shifts',  label: 'Moje směny', icon: 'swap' },
 ];
 
 const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
@@ -56,6 +59,12 @@ export default function EmployerLayout({ user }: Props) {
       case 'planning':  return <PlanningBoard />;
       case 'tasks':     return <TaskManager user={user as any} />;
       case 'attendance': return <Attendance user={user as any} />;
+      case 'my-shifts': return (
+        <div className="space-y-2">
+          <MyShifts user={user as any} />
+          <AvailabilitySubmit user={user as any} />
+        </div>
+      );
       case 'reports':   return <ClosingsOverview />;
       case 'settings':  return <Settings user={user as any} initialTab="account" />;
       case 'team-settings': return <TeamManagement user={user as any} />;

@@ -35,9 +35,10 @@ export async function POST(request: Request) {
     if (existing.length > 0) return NextResponse.json({ error: 'Účet už existuje' }, { status: 409 });
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const newRole = inv.role === 'employer' ? 'employer' : 'employee';
     const [user] = await sql`
       INSERT INTO users (name, email, password_hash, role, avatar, job_title, team_id, employer_id)
-      VALUES (${name}, ${inv.email}, ${passwordHash}, 'employee', '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
+      VALUES (${name}, ${inv.email}, ${passwordHash}, ${newRole}, '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
       RETURNING id, name, email, role`;
 
     await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;

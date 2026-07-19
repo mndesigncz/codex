@@ -73,6 +73,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteJob, setInviteJob] = useState('Barista');
+  const [inviteRole, setInviteRole] = useState('employee');
   const [inviting, setInviting] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -209,7 +210,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       const res = await fetch('/api/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim(), jobTitle: inviteJob.trim() || 'Barista' }),
+        body: JSON.stringify({ email: inviteEmail.trim(), jobTitle: inviteJob.trim() || 'Barista', role: inviteRole }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -376,15 +377,32 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
           <Icon name="plus" size={16} /> Pozvat nového člena
         </div>
-        <form onSubmit={sendInvite} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-3">
-          <input type="email" required placeholder="email@priklad.cz" value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)} className={inputClass} />
-          <input placeholder="Pozice" value={inviteJob}
-            onChange={e => setInviteJob(e.target.value)} className={inputClass} />
-          <button type="submit" disabled={inviting}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50 whitespace-nowrap">
-            {inviting ? 'Odesílám…' : 'Odeslat pozvánku'}
-          </button>
+        <form onSubmit={sendInvite} className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input type="email" required placeholder="email@priklad.cz" value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value)} className={inputClass} />
+            <input placeholder="Pozice" value={inviteJob}
+              onChange={e => setInviteJob(e.target.value)} className={inputClass} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex gap-1 glass rounded-full p-1">
+              {[['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']].map(([val, label]) => (
+                <button key={val} type="button" onClick={() => setInviteRole(val)}
+                  className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${inviteRole === val ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button type="submit" disabled={inviting}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50 whitespace-nowrap ml-auto">
+              {inviting ? 'Odesílám…' : 'Odeslat pozvánku'}
+            </button>
+          </div>
+          {inviteRole === 'employer' && (
+            <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/20 rounded-xl px-3 py-2">
+              Vedoucí má plný přístup: správa týmu, rozvrhy, sklad, uzávěrky i docházka.
+            </p>
+          )}
         </form>
 
         <div className="pt-2">

@@ -28,11 +28,15 @@ export async function GET() {
 export async function POST(request: Request) {
   const me = await currentEmployer();
   if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  const { email, jobTitle } = await request.json();
+  const { email, jobTitle, role } = await request.json();
   if (!email) return NextResponse.json({ error: 'Email je povinný' }, { status: 400 });
 
   const sql = neon(process.env.DATABASE_URL!);
-  const [team] = await sql`SELECT id, name FROM teams WHERE owner_id = ${me.id}`;
+  // Any employer of the team can invite (multi-employer teams).
+  const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
+  const [team] = dbMe?.team_id
+    ? await sql`SELECT id, name FROM teams WHERE id = ${dbMe.team_id}`
+    : await sql`SELECT id, name FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
   const existingUser = await sql`SELECT id FROM users WHERE email = ${email}`;
@@ -41,9 +45,17 @@ export async function POST(request: Request) {
   }
 
   const token = generateInviteToken();
-  await sql`
-    INSERT INTO invitations (team_id, email, token, job_title, invited_by, status)
-    VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${me.id}, 'pending')`;
+  const invRole = role === 'employer' ? 'employer' : 'employee';
+  try {
+    await sql`
+      INSERT INTO invitations (team_id, email, token, job_title, role, invited_by, status)
+      VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${invRole}, ${me.id}, 'pending')`;
+  } catch {
+    // role column not migrated yet — invite as a regular employee
+    await sql`
+      INSERT INTO invitations (team_id, email, token, job_title, invited_by, status)
+      VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${me.id}, 'pending')`;
+  }
 
   try {
     await sendTeamInvitation(email, team.name, me.name, token);
