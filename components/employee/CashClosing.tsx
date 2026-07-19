@@ -64,12 +64,17 @@ function Step({
   );
 }
 
-type EligibleShift = { id: number; date: string; startTime: string; endTime: string; type: string };
+type EligibleShift = {
+  id: number; date: string; startTime: string; endTime: string; type: string;
+  employeeId?: number; employeeName?: string; employeeAvatar?: string;
+};
 
 export default function CashClosing({ user }: { user: { id: number; name: string } }) {
   const [closings, setClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [isEmployer, setIsEmployer] = useState(false);
+  const [isKiosk, setIsKiosk] = useState(false);
+  const [selEmployee, setSelEmployee] = useState<number | null>(null);
   const [requiresShift, setRequiresShift] = useState(true);
   const [eligible, setEligible] = useState<EligibleShift[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,24 +89,29 @@ export default function CashClosing({ user }: { user: { id: number; name: string
       setClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
       setIsEmployer(!!d.isEmployer);
+      setIsKiosk(!!d.isKiosk);
       setRequiresShift(d.requiresShift !== false);
       const shifts: EligibleShift[] = Array.isArray(d.eligibleShifts) ? d.eligibleShifts : [];
       setEligible(shifts);
       // Preselect the most recent unclosed shift for employees.
       if (!d.isEmployer && shifts[0]) {
         setForm(f => ({ ...f, date: shifts[0].date, shiftLabel: `${shifts[0].startTime}–${shifts[0].endTime}` }));
+        if (d.isKiosk) setSelEmployee(shifts[0].employeeId ?? null);
       }
     } catch { /* ignore */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
-  // Employees are gated to days they had a shift; employers may close any day.
-  const gated = !isEmployer && requiresShift;
-  const canSubmit = isEmployer || !requiresShift || eligible.length > 0;
+  // Employees are gated to days they had a shift; the shared kiosk always
+  // picks a shift (it defines WHO submits); employers may close any day.
+  const gated = isKiosk || (!isEmployer && requiresShift);
+  const canSubmit = isEmployer || (isKiosk ? eligible.length > 0 : (!requiresShift || eligible.length > 0));
 
-  const pickShift = (s: EligibleShift) =>
+  const pickShift = (s: EligibleShift) => {
     setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
+    if (isKiosk) setSelEmployee(s.employeeId ?? null);
+  };
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -130,6 +140,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           tips: n(form.tips), expenses: n(form.expenses), cashRemoved: n(form.cashRemoved),
           selfPayout: payDailyCash ? n(form.selfPayout) : 0, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
+          employeeId: isKiosk ? selEmployee : undefined,
         }),
       });
       if (res.ok) {
@@ -236,7 +247,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kterou směnu uzavíráš?</label>
                 <div className="flex flex-col gap-2">
                   {eligible.map(s => {
-                    const active = form.date === s.date;
+                    const active = form.date === s.date && (!isKiosk || selEmployee === (s.employeeId ?? null));
                     return (
                       <button
                         key={s.id}
@@ -246,11 +257,15 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                           active ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40' : 'bg-white border-black/[0.08] hover:border-black/20'
                         }`}
                       >
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-[#16181A] capitalize truncate">
-                            {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        <span className="min-w-0 flex items-center gap-2.5">
+                          {s.employeeName && <span className="text-xl shrink-0">{s.employeeAvatar ?? '👤'}</span>}
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-[#16181A] capitalize truncate">
+                              {s.employeeName ? `${s.employeeName} · ` : ''}
+                              {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </span>
+                            <span className="block text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</span>
                           </span>
-                          <span className="block text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</span>
                         </span>
                         <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full border-2 ${active ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
@@ -348,7 +363,8 @@ export default function CashClosing({ user }: { user: { id: number; name: string
       </form>
       )}
 
-      {/* My past closings */}
+      {/* My past closings (hidden on the shared kiosk) */}
+      {!isKiosk && (
       <div className="space-y-3">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
           <Icon name="clock" size={18} /> Moje uzávěrky
@@ -385,6 +401,7 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           })
         )}
       </div>
+      )}
     </div>
   );
 }

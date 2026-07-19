@@ -10,5 +10,6 @@ export default async function KioskPage() {
   // Only the dedicated tablet account gets the kiosk; others go to their app.
   if (role === 'employer') redirect('/employer/overview');
   if (role !== 'kiosk') redirect('/employee/shifts');
-  return <KioskApp teamName={(session.user as any)?.name ?? 'Tablet'} />;
+  const u = session.user as any;
+  return <KioskApp user={{ id: u?.id, name: u?.name ?? 'Tablet', role: 'kiosk', avatar: u?.avatar ?? '📟' }} />;
 }
