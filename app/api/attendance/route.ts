@@ -27,8 +27,9 @@ export async function GET(req: NextRequest) {
     // Roster: every employee + their currently-open entry (if clocked in)
     // + today's planned shift so the kiosk can show plan vs reality.
     const today = new Date().toISOString().split('T')[0];
-    const roster = await sql`
+    const rosterQuery = (withRate: boolean) => sql`
       SELECT u.id, u.name, u.avatar,
+             CASE WHEN ${withRate} THEN COALESCE(u.hourly_rate, 0) ELSE NULL END AS "hourlyRate",
              (u.pin IS NOT NULL AND u.pin <> '') AS "hasPin",
              te.clock_in AS "openSince",
              sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
@@ -45,6 +46,30 @@ export async function GET(req: NextRequest) {
       ) sh ON TRUE
       WHERE u.team_id = ${c.teamId} AND u.role IN ('employee','employer')
       ORDER BY u.role DESC, u.name ASC`;
+    let roster: any[];
+    try {
+      roster = await rosterQuery(c.role === 'employer');
+    } catch {
+      // hourly_rate not migrated yet — retry without touching the column
+      roster = await sql`
+        SELECT u.id, u.name, u.avatar, NULL AS "hourlyRate",
+               (u.pin IS NOT NULL AND u.pin <> '') AS "hasPin",
+               te.clock_in AS "openSince",
+               sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT clock_in FROM time_entries
+          WHERE employee_id = u.id AND clock_out IS NULL
+          ORDER BY clock_in DESC LIMIT 1
+        ) te ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT start_time, end_time FROM shifts
+          WHERE employee_id = u.id AND date = ${today}
+          ORDER BY start_time ASC LIMIT 1
+        ) sh ON TRUE
+        WHERE u.team_id = ${c.teamId} AND u.role IN ('employee','employer')
+        ORDER BY u.role DESC, u.name ASC`;
+    }
 
     let entries: any[] = [];
     if (c.role === 'employer') {

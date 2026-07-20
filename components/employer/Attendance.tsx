@@ -9,6 +9,13 @@ type RosterMember = {
   avatar: string | null;
   hasPin: boolean;
   openSince: string | null;
+  hourlyRate: number | null;
+};
+
+type Closing = {
+  date: string; // 'YYYY-MM-DD'
+  cash_revenue: number;
+  card_revenue: number;
 };
 
 type Entry = {
@@ -52,6 +59,11 @@ function hMM(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}`;
 }
 
+// Gross earned amount in Kč for a worked duration at an hourly rate.
+function earned(ms: number, rate: number): number {
+  return Math.round(ms / 3600000 * rate);
+}
+
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
 }
@@ -63,6 +75,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [deleting, setDeleting] = useState<Entry['id'] | null>(null);
+  const [closings, setClosings] = useState<Closing[]>([]);
 
   const load = async (d: number) => {
     setLoading(true);
@@ -76,6 +89,16 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   useEffect(() => { load(days); }, [days]);
 
+  // Revenue for the "Podíl na tržbách" tile — refetch when the period changes.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/closings')
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setClosings(Array.isArray(d.closings) ? d.closings : []); })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, [days]);
+
   // Tick every second so live timers advance.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -84,16 +107,25 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   const onShift = roster.filter(r => r.openSince);
 
+  // employeeId -> hourly rate (Kč/h); 0/null means no wage is shown.
+  const rateById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of roster) {
+      if (typeof r.hourlyRate === 'number' && r.hourlyRate > 0) map.set(String(r.id), r.hourlyRate);
+    }
+    return map;
+  }, [roster]);
+
   // Total worked time per employee. Open (still-on-shift) entries are counted
   // up to `now` so the summary keeps ticking with the live shift.
   const summary = useMemo(() => {
-    const map = new Map<string, { name: string; avatar: string | null; ms: number; count: number; hasOpen: boolean }>();
+    const map = new Map<string, { id: string; name: string; avatar: string | null; ms: number; count: number; hasOpen: boolean }>();
     for (const e of entries) {
       const key = String(e.employeeId);
       const start = new Date(e.clockIn).getTime();
       const open = !e.clockOut;
       const end = open ? now : new Date(e.clockOut as string).getTime();
-      const prev = map.get(key) ?? { name: e.employeeName ?? 'Neznámý', avatar: e.employeeAvatar ?? null, ms: 0, count: 0, hasOpen: false };
+      const prev = map.get(key) ?? { id: key, name: e.employeeName ?? 'Neznámý', avatar: e.employeeAvatar ?? null, ms: 0, count: 0, hasOpen: false };
       prev.ms += Math.max(0, end - start);
       prev.count += 1;
       prev.hasOpen = prev.hasOpen || open;
@@ -102,6 +134,33 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     }
     return Array.from(map.values()).sort((a, b) => b.ms - a.ms);
   }, [entries, now]);
+
+  // Gross labor cost over the period (only employees with a rate > 0).
+  const laborCost = useMemo(() => {
+    let sum = 0;
+    for (const s of summary) {
+      const rate = rateById.get(s.id);
+      if (rate) sum += earned(s.ms, rate);
+    }
+    return sum;
+  }, [summary, rateById]);
+
+  // Revenue (cash + card) from closings whose date falls within the selected period.
+  const revenue = useMemo(() => {
+    const toKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(from.getDate() - (days - 1));
+    const fromKey = toKey(from);
+    const toKeyStr = toKey(today);
+    let sum = 0;
+    for (const c of closings) {
+      if (c.date >= fromKey && c.date <= toKeyStr) sum += (c.cash_revenue || 0) + (c.card_revenue || 0);
+    }
+    return sum;
+  }, [closings, days]);
+
+  const hasRates = rateById.size > 0;
 
   // Group entries by calendar day (newest first — API already sorts DESC).
   const grouped = useMemo(() => {
@@ -151,10 +210,11 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   };
 
   const exportCsv = () => {
-    const head = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj'];
+    const head = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', 'Mzda (Kč)'];
     const rows = entries.map(e => {
       const start = new Date(e.clockIn).getTime();
       const end = e.clockOut ? new Date(e.clockOut).getTime() : now;
+      const rate = rateById.get(String(e.employeeId));
       return [
         new Date(e.clockIn).toLocaleDateString('cs-CZ'),
         e.employeeName ?? 'Neznámý',
@@ -162,6 +222,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         e.clockOut ? fmtTime(e.clockOut) : '',
         hMM(end - start),
         e.source === 'kiosk' ? 'kiosk' : 'ručně',
+        rate ? String(earned(Math.max(0, end - start), rate)) : '',
       ];
     });
     const csv = [head, ...rows]
@@ -237,24 +298,56 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         </div>
       ) : (
         <>
+          {/* Mzdové náklady */}
+          {hasRates && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Mzdy</h3>
+              <div className="grid grid-cols-2 gap-4 max-w-md">
+                <div className="glass-card p-5 min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Mzdové náklady</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">
+                    {laborCost.toLocaleString('cs-CZ')} Kč
+                  </p>
+                </div>
+                <div className="glass-card p-5 min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Podíl na tržbách</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">
+                    {revenue > 0 ? `${(laborCost / revenue * 100).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %` : '—'}
+                  </p>
+                  <p className="text-[11px] text-black/40">z tržeb za období</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Souhrn hodin */}
           {summary.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Souhrn hodin</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {summary.map(s => (
-                  <div key={s.name} className="glass-card p-4 flex items-center gap-3 min-w-0">
-                    {avatar(s.avatar)}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
-                      <p className="text-xs text-black/45 truncate">
-                        {s.count} {s.count === 1 ? 'směna' : s.count >= 2 && s.count <= 4 ? 'směny' : 'směn'}
-                        {s.hasOpen && <span className="text-[#5B7A08]"> · právě běží</span>}
-                      </p>
+                {summary.map(s => {
+                  const rate = rateById.get(s.id);
+                  return (
+                    <div key={s.id} className="glass-card p-4 flex items-center gap-3 min-w-0">
+                      {avatar(s.avatar)}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
+                        <p className="text-xs text-black/45 truncate">
+                          {s.count} {s.count === 1 ? 'směna' : s.count >= 2 && s.count <= 4 ? 'směny' : 'směn'}
+                          {s.hasOpen && <span className="text-[#5B7A08]"> · právě běží</span>}
+                        </p>
+                      </div>
+                      <div className="shrink-0 flex flex-col items-end">
+                        <span className="whitespace-nowrap tabular-nums font-bold text-[#16181A]">{humanDuration(s.ms)}</span>
+                        {rate ? (
+                          <span className="whitespace-nowrap tabular-nums text-[#5B7A08] font-semibold text-sm">
+                            {earned(s.ms, rate).toLocaleString('cs-CZ')} Kč
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <span className="shrink-0 whitespace-nowrap tabular-nums font-bold text-[#16181A]">{humanDuration(s.ms)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

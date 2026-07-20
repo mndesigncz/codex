@@ -18,6 +18,8 @@ import TaskManager from './TaskManager';
 import Attendance from './Attendance';
 import MyShifts from '../employee/MyShifts';
 import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
+import TimeOffRequest from '../scheduling/TimeOffRequest';
+import TimeOffApprovals from '../scheduling/TimeOffApprovals';
 import Procedures from '../procedures/Procedures';
 
 const navItems = [
@@ -51,7 +53,12 @@ export default function EmployerLayout({ user }: Props) {
   const renderView = () => {
     switch (currentView) {
       case 'overview':  return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
-      case 'shifts':    return <ScheduleBuilder user={user as any} />;
+      case 'shifts':    return (
+        <div>
+          <ScheduleBuilder user={user as any} />
+          <div className="px-4 md:px-6 pb-6 max-w-5xl mx-auto w-full"><TimeOffApprovals /></div>
+        </div>
+      );
       case 'inventory': return <Inventory user={user as any} />;
       case 'chat':      return <ChatView user={user as any} />;
       case 'procedures': return <Procedures user={user as any} />;
@@ -63,6 +70,7 @@ export default function EmployerLayout({ user }: Props) {
         <div className="space-y-2">
           <MyShifts user={user as any} />
           <AvailabilitySubmit user={user as any} />
+          <div className="px-6 pb-6"><TimeOffRequest /></div>
         </div>
       );
       case 'reports':   return <ClosingsOverview />;

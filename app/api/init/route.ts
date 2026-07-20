@@ -362,6 +362,35 @@ export async function GET() {
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )`;
+    // wages: hourly rate per member (Kc/h)
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`;
+
+    // ---- Announcements (pinned team board) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        author_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        pinned BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+
+    // ---- Time off (vacation / sick day) requests ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS time_off_requests (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        from_date TEXT NOT NULL,
+        to_date TEXT NOT NULL,
+        type TEXT DEFAULT 'vacation',
+        note TEXT,
+        status TEXT DEFAULT 'pending',
+        decided_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+
     // invited members may come in with an elevated role
     await sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`;
     // optional per-employee PIN for the shared kiosk device

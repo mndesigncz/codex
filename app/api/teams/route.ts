@@ -41,9 +41,17 @@ export async function GET() {
       closingRequiresShift = extra?.closing_requires_shift !== false;
     } catch { /* columns not migrated yet */ }
 
-    const members = await sql`
-      SELECT id, name, email, role, avatar, phone, job_title, shift_preference
-      FROM users WHERE team_id = ${teamId} ORDER BY role DESC, name ASC`;
+    let members: any[];
+    try {
+      members = await sql`
+        SELECT id, name, email, role, avatar, phone, job_title, shift_preference,
+               CASE WHEN ${me.role === 'employer'} THEN COALESCE(hourly_rate, 0) ELSE NULL END AS hourly_rate
+        FROM users WHERE team_id = ${teamId} AND role <> 'kiosk' ORDER BY role DESC, name ASC`;
+    } catch {
+      members = await sql`
+        SELECT id, name, email, role, avatar, phone, job_title, shift_preference
+        FROM users WHERE team_id = ${teamId} AND role <> 'kiosk' ORDER BY role DESC, name ASC`;
+    }
 
     return NextResponse.json({
       team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift },
