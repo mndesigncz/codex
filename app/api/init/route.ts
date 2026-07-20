@@ -391,6 +391,21 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )`;
 
+    // ---- Supplier orders (from the shopping list) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        supplier TEXT,
+        items JSONB DEFAULT '[]',
+        total_cost INTEGER,
+        status TEXT DEFAULT 'ordered',
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        received_at TIMESTAMP
+      )`;
+
     // invited members may come in with an elevated role
     await sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`;
     // optional per-employee PIN for the shared kiosk device
