@@ -16,6 +16,7 @@ import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
 import CashClosing from './CashClosing';
 import Procedures from '../procedures/Procedures';
+import MobileMoreSheet from '../MobileMoreSheet';
 
 const navItems = [
   { id: 'home',        label: 'Přehled',    icon: 'overview' },
@@ -153,23 +154,19 @@ export default function EmployeeLayout({ user }: Props) {
           </button>
         </nav>
 
-        {moreOpen && (
-          <div className="glass-strong mx-auto max-w-md rounded-3xl mb-2 p-2 absolute bottom-full left-4 right-4 grid grid-cols-2 gap-1">
-            {mobileSecondary.map(item => (
-              <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }}
-                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${currentView === item.id ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>
-                <Icon name={item.icon} size={20} /> {item.label}
-              </button>
-            ))}
-            <button onClick={openSettings} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-black/60 hover:text-black hover:bg-black/[0.05]">
-              <Icon name="settings" size={20} /> Nastavení
-            </button>
-            <button onClick={() => signOut({ callbackUrl: '/login' })} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium text-red-600 hover:bg-red-500/[0.06]">
-              <Icon name="logout" size={20} /> Odhlásit se
-            </button>
-          </div>
-        )}
       </div>
+
+      <MobileMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        items={mobileSecondary}
+        activeId={currentView}
+        onSelect={setCurrentView}
+        actions={[
+          { label: 'Nastavení', icon: 'settings', onClick: openSettings },
+          { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
+        ]}
+      />
     </div>
   );
 }
