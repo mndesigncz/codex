@@ -24,6 +24,25 @@ interface Category {
   position: number;
 }
 
+interface OrderItem {
+  name: string;
+  qty: number;
+  unit: string;
+  itemId?: number | null;
+}
+
+interface Order {
+  id: number;
+  supplier?: string | null;
+  items: OrderItem[];
+  totalCost?: number | null;
+  status: 'ordered' | 'received' | 'cancelled';
+  note?: string | null;
+  createdAt: string;
+  receivedAt?: string | null;
+  createdByName?: string;
+}
+
 type SortKey = 'name' | 'qtyAsc' | 'qtyDesc' | 'status' | 'updated';
 type View = 'list' | 'grid';
 
@@ -86,6 +105,23 @@ export default function Inventory({ user }: { user?: any }) {
   const [newCatInline, setNewCatInline] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [notice, setNotice] = useState('');
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showNotice = (msg: string) => {
+    setNotice(msg);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(''), 4000);
+  };
+  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+
+  const loadOrders = async () => {
+    try {
+      const data = await fetch('/api/orders').then(r => r.json());
+      if (Array.isArray(data?.orders)) setOrders(data.orders);
+    } catch {}
+  };
 
   const load = async () => {
     try {
@@ -98,7 +134,7 @@ export default function Inventory({ user }: { user?: any }) {
     } catch {}
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadOrders(); }, []);
 
   // Category names available for the pick-list: custom categories, plus any
   // category strings already used by items (so nothing gets orphaned in the UI).
@@ -243,6 +279,12 @@ export default function Inventory({ user }: { user?: any }) {
         </div>
       </div>
 
+      {notice && (
+        <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm font-semibold px-4 py-3">
+          {notice}
+        </div>
+      )}
+
       {(critical.length > 0 || low.length > 0) && (
         <div className="glass-card border-orange-500/20 bg-orange-500/[0.06] p-5">
           <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-orange-700">
@@ -280,6 +322,10 @@ export default function Inventory({ user }: { user?: any }) {
           ))}
         </div>
       </div>
+
+      {orders.length > 0 && (
+        <OrdersPanel orders={orders} refreshOrders={loadOrders} refreshItems={load} notify={showNotice} />
+      )}
 
       <div className="flex items-center justify-between text-xs text-black/45">
         <span>{filtered.length} {filtered.length === 1 ? 'položka' : filtered.length >= 2 && filtered.length <= 4 ? 'položky' : 'položek'}{cat !== 'Vše' ? ` v „${cat}"` : ''}</span>
@@ -441,7 +487,19 @@ export default function Inventory({ user }: { user?: any }) {
       )}
 
       {showShopping && (
-        <ShoppingListModal items={toBuy} onClose={() => setShowShopping(false)} />
+        <ShoppingListModal
+          items={toBuy}
+          onClose={() => setShowShopping(false)}
+          onOrdered={async (count) => {
+            setShowShopping(false);
+            if (count > 0) {
+              showNotice(count === 1 ? 'Objednávka vytvořena ✓' : count <= 4 ? `Vytvořeny ${count} objednávky ✓` : `Vytvořeno ${count} objednávek ✓`);
+              await loadOrders();
+            } else {
+              showNotice('Objednávku se nepodařilo vytvořit');
+            }
+          }}
+        />
       )}
     </div>
   );
@@ -586,9 +644,212 @@ function GridView({ items, step, openEdit, remove }: {
   );
 }
 
+/* ---------- Orders panel ---------- */
+function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
+  orders: Order[];
+  refreshOrders: () => Promise<void> | void;
+  refreshItems: () => Promise<void> | void;
+  notify: (msg: string) => void;
+}) {
+  const open = orders.filter(o => o.status === 'ordered');
+  const history = orders.filter(o => o.status !== 'ordered');
+
+  // Default: expanded when any open order exists, collapsed otherwise.
+  // null = user has not toggled yet.
+  const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
+  const expanded = expandedOverride ?? open.length > 0;
+  const [showHistory, setShowHistory] = useState(false);
+  const [receivingId, setReceivingId] = useState<number | null>(null);
+  const [costInput, setCostInput] = useState('');
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const now = new Date();
+  const monthlySpend = orders
+    .filter(o => o.status === 'received' && typeof o.totalCost === 'number' && o.totalCost > 0 && o.receivedAt)
+    .filter(o => {
+      const d = new Date(o.receivedAt as string);
+      return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    })
+    .reduce((sum, o) => sum + (o.totalCost as number), 0);
+
+  const summary = (o: Order) => o.items.map(it => `${it.name} ×${it.qty}`).join(', ');
+  const fmtDate = (iso?: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('cs-CZ');
+  };
+  const fmtKc = (n: number) => `${n.toLocaleString('cs-CZ')} Kč`;
+
+  const markReceived = async (o: Order) => {
+    setBusyId(o.id);
+    try {
+      const cost = parseFloat(costInput.replace(',', '.'));
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: o.id, action: 'received', ...(isNaN(cost) ? {} : { totalCost: cost }) }),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        const n = typeof data?.restocked === 'number' ? data.restocked : o.items.length;
+        notify(`Naskladněno ${n} ${n === 1 ? 'položka' : n >= 2 && n <= 4 ? 'položky' : 'položek'} ✓`);
+        setReceivingId(null);
+        setCostInput('');
+        await Promise.all([refreshOrders(), refreshItems()]);
+      }
+    } catch {}
+    setBusyId(null);
+  };
+
+  const cancelOrder = async (o: Order) => {
+    if (!confirm(`Zrušit objednávku${o.supplier ? ` u „${o.supplier}"` : ''}?`)) return;
+    setBusyId(o.id);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: o.id, action: 'cancelled' }),
+      });
+      if (res.ok) await refreshOrders();
+    } catch {}
+    setBusyId(null);
+  };
+
+  const deleteOrder = async (o: Order) => {
+    if (!confirm('Smazat objednávku z historie?')) return;
+    setBusyId(o.id);
+    try {
+      const res = await fetch(`/api/orders?id=${o.id}`, { method: 'DELETE' });
+      if (res.ok) await refreshOrders();
+    } catch {}
+    setBusyId(null);
+  };
+
+  return (
+    <div className="glass-card p-5">
+      {/* Header */}
+      <button type="button" onClick={() => setExpandedOverride(!expanded)} className="w-full flex items-center gap-2 text-left min-w-0">
+        <span className="font-bold tracking-tight text-[#16181A] flex items-center gap-2 min-w-0">
+          <span aria-hidden>📦</span> <span className="truncate">Objednávky</span>
+        </span>
+        {open.length > 0 && (
+          <span className="shrink-0 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-0.5 text-xs font-semibold tabular-nums">{open.length}</span>
+        )}
+        <span className="flex-1" />
+        <Icon name="chevron" size={16} className={`shrink-0 text-black/40 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {expanded && (
+        <div className="mt-4 space-y-4">
+          {/* Open orders */}
+          {open.length === 0 ? (
+            <p className="text-sm text-black/45">Žádné otevřené objednávky.</p>
+          ) : (
+            <div className="divide-y divide-black/[0.06]">
+              {open.map(o => (
+                <div key={o.id} className="py-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[#16181A] truncate">
+                        {o.supplier || 'Bez dodavatele'}
+                        <span className="font-normal text-black/40"> · {fmtDate(o.createdAt)}</span>
+                      </p>
+                      <p className="text-xs text-black/50 min-w-0 truncate">{summary(o)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => { setReceivingId(receivingId === o.id ? null : o.id); setCostInput(''); }}
+                        disabled={busyId === o.id}
+                        className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 whitespace-nowrap shrink-0">
+                        Přišlo ✓
+                      </button>
+                      <button
+                        onClick={() => cancelOrder(o)}
+                        disabled={busyId === o.id}
+                        className="rounded-full glass border border-black/10 text-black/50 hover:text-red-600 px-4 py-2 text-xs font-medium disabled:opacity-50 whitespace-nowrap shrink-0">
+                        Zrušit
+                      </button>
+                    </div>
+                  </div>
+                  {receivingId === o.id && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                      <label className="text-xs text-black/50 whitespace-nowrap">Celková cena (Kč, nepovinné)</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        autoFocus
+                        value={costInput}
+                        onChange={e => setCostInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); markReceived(o); } }}
+                        placeholder="např. 1250"
+                        className="flex-1 min-w-[6rem] rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+                      <button
+                        onClick={() => markReceived(o)}
+                        disabled={busyId === o.id}
+                        className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-semibold hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0">
+                        {busyId === o.id ? 'Naskladňuji…' : 'Potvrdit příjem'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* History */}
+          {history.length > 0 && (
+            <div>
+              <button type="button" onClick={() => setShowHistory(h => !h)} className="flex items-center gap-1.5 text-xs font-semibold text-black/45 hover:text-black">
+                <Icon name="chevron" size={13} className={`transition-transform ${showHistory ? 'rotate-180' : ''}`} />
+                Historie ({history.length})
+              </button>
+              {showHistory && (
+                <div className="mt-2 divide-y divide-black/[0.06]">
+                  {history.map(o => (
+                    <div key={o.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
+                      <span className="text-xs text-black/45 tabular-nums whitespace-nowrap shrink-0">{fmtDate(o.receivedAt ?? o.createdAt)}</span>
+                      <span className="text-sm text-[#16181A] min-w-0 flex-1 truncate">{o.supplier || 'Bez dodavatele'}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold shrink-0 whitespace-nowrap ${o.status === 'received' ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
+                        {o.status === 'received' ? 'Přijato' : 'Zrušeno'}
+                      </span>
+                      {typeof o.totalCost === 'number' && o.totalCost > 0 && (
+                        <span className="text-xs font-semibold text-[#16181A] tabular-nums whitespace-nowrap shrink-0">{fmtKc(o.totalCost)}</span>
+                      )}
+                      <button
+                        onClick={() => deleteOrder(o)}
+                        disabled={busyId === o.id}
+                        title="Smazat"
+                        className="rounded-full glass w-7 h-7 flex items-center justify-center text-red-600/60 hover:text-red-600 text-xs disabled:opacity-50 shrink-0">
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Monthly spend */}
+          {monthlySpend > 0 && (
+            <p className="text-xs text-black/50 border-t border-black/[0.06] pt-3">
+              Tento měsíc utraceno za zboží: <span className="font-semibold text-[#16181A] tabular-nums">{fmtKc(monthlySpend)}</span>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Shopping list modal ---------- */
-function ShoppingListModal({ items, onClose }: { items: Item[]; onClose: () => void }) {
+function ShoppingListModal({ items, onClose, onOrdered }: {
+  items: Item[];
+  onClose: () => void;
+  onOrdered: (createdCount: number) => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [ordering, setOrdering] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
@@ -632,6 +893,28 @@ function ShoppingListModal({ items, onClose }: { items: Item[]; onClose: () => v
     try { await navigator.share({ title: 'Nákupní seznam', text: buildText() }); } catch {}
   };
 
+  // One order per supplier group.
+  const createOrders = async () => {
+    if (ordering) return;
+    setOrdering(true);
+    let created = 0;
+    for (const [supplier, list] of groups) {
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            supplier: supplier === 'Bez dodavatele' ? null : supplier,
+            items: list.map(i => ({ name: i.name, qty: suggestedAmount(i), unit: i.unit, itemId: i.id })),
+          }),
+        });
+        if (res.ok) created++;
+      } catch {}
+    }
+    setOrdering(false);
+    onOrdered(created);
+  };
+
   return (
     <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
       <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
@@ -666,12 +949,15 @@ function ShoppingListModal({ items, onClose }: { items: Item[]; onClose: () => v
           ))}
         </div>
 
-        <div className="flex gap-3 pt-1">
-          <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
+        <div className="flex flex-wrap gap-3 pt-1">
+          <button onClick={createOrders} disabled={ordering} className="flex-1 basis-full sm:basis-auto rounded-full bg-[#C8F542] text-black py-3 px-4 text-sm font-semibold hover:brightness-110 disabled:opacity-50 whitespace-nowrap">
+            {ordering ? 'Vytvářím…' : 'Vytvořit objednávku'}
+          </button>
+          <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 px-4 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
             {copied ? 'Zkopírováno ✓' : 'Zkopírovat seznam'}
           </button>
           {canShare && (
-            <button onClick={share} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">
+            <button onClick={share} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 px-4 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">
               Sdílet
             </button>
           )}
