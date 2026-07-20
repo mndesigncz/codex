@@ -69,6 +69,8 @@ type EligibleShift = {
   employeeId?: number; employeeName?: string; employeeAvatar?: string;
 };
 
+type Member = { id: number; name: string; avatar?: string };
+
 export default function CashClosing({ user }: { user: { id: number; name: string } }) {
   const [closings, setClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
@@ -77,9 +79,12 @@ export default function CashClosing({ user }: { user: { id: number; name: string
   const [selEmployee, setSelEmployee] = useState<number | null>(null);
   const [requiresShift, setRequiresShift] = useState(true);
   const [eligible, setEligible] = useState<EligibleShift[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [meId, setMeId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
@@ -93,7 +98,12 @@ export default function CashClosing({ user }: { user: { id: number; name: string
       setRequiresShift(d.requiresShift !== false);
       const shifts: EligibleShift[] = Array.isArray(d.eligibleShifts) ? d.eligibleShifts : [];
       setEligible(shifts);
-      // Preselect the most recent unclosed shift for employees.
+      setMembers(Array.isArray(d.members) ? d.members : []);
+      const myId = typeof d.meId === 'number' ? d.meId : null;
+      setMeId(myId);
+      // Employer submits on behalf of themselves by default.
+      if (d.isEmployer) setSelEmployee(myId);
+      // Preselect the most recent unclosed shift for employees / kiosk.
       if (!d.isEmployer && shifts[0]) {
         setForm(f => ({ ...f, date: shifts[0].date, shiftLabel: `${shifts[0].startTime}–${shifts[0].endTime}` }));
         if (d.isKiosk) setSelEmployee(shifts[0].employeeId ?? null);
@@ -103,10 +113,11 @@ export default function CashClosing({ user }: { user: { id: number; name: string
   };
   useEffect(() => { load(); }, []);
 
-  // Employees are gated to days they had a shift; the shared kiosk always
-  // picks a shift (it defines WHO submits); employers may close any day.
-  const gated = isKiosk || (!isEmployer && requiresShift);
-  const canSubmit = isEmployer || (isKiosk ? eligible.length > 0 : (!requiresShift || eligible.length > 0));
+  // The shared kiosk always picks a shift (it defines WHO submits). Employees
+  // and employers get a free date; the form is always visible for everyone.
+  const isSelf = !isEmployer && !isKiosk;
+  // Employee submitting for a day they weren't scheduled ⇒ goes to approval.
+  const onShift = eligible.some(s => s.date === form.date);
 
   const pickShift = (s: EligibleShift) => {
     setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
@@ -127,9 +138,16 @@ export default function CashClosing({ user }: { user: { id: number; name: string
 
   const totalSteps = 4;
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setMsg('');
     if (form.closingCash === '') { setErr('Zadej skutečný stav kasy na konci směny.'); return; }
+    // Employee closing a day they weren't on shift ⇒ confirm the approval path.
+    if (isSelf && !onShift) { setShowConfirm(true); return; }
+    doSubmit();
+  };
+
+  const doSubmit = async () => {
+    setShowConfirm(false); setErr(''); setMsg('');
     setSubmitting(true);
     try {
       const res = await fetch('/api/closings', {
@@ -140,11 +158,12 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           tips: n(form.tips), expenses: n(form.expenses), cashRemoved: n(form.cashRemoved),
           selfPayout: payDailyCash ? n(form.selfPayout) : 0, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
-          employeeId: isKiosk ? selEmployee : undefined,
+          employeeId: isSelf ? undefined : selEmployee,
         }),
       });
       if (res.ok) {
-        setMsg('Uzávěrka byla odeslána. ✓');
+        const d = await res.json().catch(() => ({}));
+        setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : 'Uzávěrka byla odeslána. ✓');
         setForm(emptyForm());
         await load();
         setTimeout(() => setMsg(''), 4000);
@@ -188,19 +207,6 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         </div>
       )}
 
-      {!canSubmit && (
-        <div className="glass-card p-8 text-center space-y-2">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
-            <Icon name="calendar" size={26} />
-          </div>
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-2">Žádná směna k uzavření</h3>
-          <p className="text-sm text-black/50 max-w-sm mx-auto">
-            Uzávěrku vyplníš po své směně. Jakmile budeš mít odpracovanou směnu, objeví se tu formulář na uzavření kasy.
-          </p>
-        </div>
-      )}
-
-      {canSubmit && (
       <form onSubmit={submit} className="glass-card p-6 sm:p-7 space-y-6">
         {/* Header + visual step progress */}
         <div>
@@ -242,12 +248,12 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                 ? `Minulá uzávěrka (${new Date(closings[0].date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}) skončila s ${czk(closings[0].closing_cash)} v kase.`
                 : 'Počáteční stav hotovosti v kase.',
             })}
-            {gated ? (
+            {isKiosk ? (
               <div className="min-w-0">
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kterou směnu uzavíráš?</label>
                 <div className="flex flex-col gap-2">
                   {eligible.map(s => {
-                    const active = form.date === s.date && (!isKiosk || selEmployee === (s.employeeId ?? null));
+                    const active = form.date === s.date && selEmployee === (s.employeeId ?? null);
                     return (
                       <button
                         key={s.id}
@@ -275,8 +281,17 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                   })}
                 </div>
               </div>
-            ) : (
+            ) : isEmployer ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+                <div className="min-w-0">
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Za koho</label>
+                  <select value={selEmployee ?? ''} onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
+                    className={`${inputClass} appearance-none min-w-0 h-[46px]`} style={{ WebkitAppearance: 'none' }}>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>{m.avatar ? `${m.avatar} ` : ''}{m.name}{m.id === meId ? ' (já)' : ''}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="min-w-0">
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
@@ -285,9 +300,36 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                     className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
                     style={{ WebkitAppearance: 'none' }} />
                 </div>
-                <div className="min-w-0">
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Směna</label>
-                  <input type="text" value={form.shiftLabel} onChange={set('shiftLabel')} placeholder="Ranní…" className={inputClass} />
+              </div>
+            ) : (
+              <div className="min-w-0 space-y-3">
+                {eligible.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {eligible.map(s => {
+                      const active = form.date === s.date;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => pickShift(s)}
+                          className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
+                            active ? 'bg-[#C8F542]/[0.18] border-[#C8F542]/50 text-[#5B7A08]' : 'bg-white border-black/[0.08] text-[#16181A] hover:border-black/20'
+                          }`}
+                        >
+                          {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                          <span className="text-black/40 font-normal"> · {s.startTime}–{s.endTime}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
+                  {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
+                      width and overflow the card without it */}
+                  <input type="date" value={form.date} onChange={set('date')}
+                    className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
+                    style={{ WebkitAppearance: 'none' }} />
                 </div>
               </div>
             )}
@@ -361,7 +403,6 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           {submitting ? 'Odesílám…' : <>Odeslat uzávěrku <Icon name="check" size={17} /></>}
         </button>
       </form>
-      )}
 
       {/* My past closings (hidden on the shared kiosk) */}
       {!isKiosk && (
@@ -378,6 +419,8 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         ) : (
           closings.map(c => {
             const d = cashDifference(c);
+            // `approved` isn't on the shared Closing type; old rows omit it (⇒ approved).
+            const pending = (c as { approved?: boolean }).approved === false;
             return (
               <div key={c.id} className="glass-card p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -385,9 +428,14 @@ export default function CashClosing({ user }: { user: { id: number; name: string
                     {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                     {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                   </p>
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  {pending && (
+                    <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                  )}
                   <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${czk(d)}` : `Manko ${czk(d)}`}</span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div className="min-w-0"><span className="block text-black/40 truncate">Tržba hotově</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.cash_revenue)}</p></div>
@@ -401,6 +449,30 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           })
         )}
       </div>
+      )}
+
+      {/* Off-shift confirmation — closing a day the employee wasn't scheduled
+          goes to management for approval. */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowConfirm(false)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/15 text-2xl">⚠️</div>
+            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-3">Nejsi na směně v tento den</h3>
+            <p className="text-sm text-black/55 mt-1.5">
+              Uzávěrku můžeš odeslat, ale půjde vedení ke schválení. Opravdu ji chceš odeslat?
+            </p>
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setShowConfirm(false)}
+                className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">
+                Zpět
+              </button>
+              <button type="button" onClick={doSubmit} disabled={submitting}
+                className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                Odeslat ke schválení
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
