@@ -11,6 +11,7 @@ import Settings from '../Settings';
 import EmployeeDashboard from './EmployeeDashboard';
 import MyShifts from './MyShifts';
 import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
+import TimeOffRequest from '../scheduling/TimeOffRequest';
 import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
 import CashClosing from './CashClosing';
@@ -45,7 +46,12 @@ export default function EmployeeLayout({ user }: Props) {
     switch (currentView) {
       case 'home':         return <EmployeeDashboard user={user as any} onNavigate={setCurrentView} />;
       case 'my-shifts':    return <MyShifts user={user as any} />;
-      case 'availability': return <AvailabilitySubmit user={user as any} />;
+      case 'availability': return (
+        <div className="space-y-2">
+          <AvailabilitySubmit user={user as any} />
+          <div className="px-6 pb-6"><TimeOffRequest /></div>
+        </div>
+      );
       case 'inventory':    return <InventoryReport user={user as any} />;
       case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;

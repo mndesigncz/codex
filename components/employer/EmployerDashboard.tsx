@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import ClockWidget from './ClockWidget';
+import AnnouncementsManager from './AnnouncementsManager';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -137,6 +138,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           </div>
         </button>
       )}
+
+      <AnnouncementsManager />
 
       {/* Availability status for next month */}
       <div className="glass-card p-6">

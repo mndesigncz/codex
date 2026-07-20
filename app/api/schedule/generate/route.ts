@@ -99,6 +99,24 @@ export async function POST(req: Request) {
   const availRows = await sql`
     SELECT employee_id, unavailable_dates, day_preferences, preferred_shift, max_shifts
     FROM availability_requests WHERE team_id = ${ctx.teamId} AND month = ${month}`;
+  // Approved time off blocks those days regardless of submitted availability.
+  let timeOffRows: any[] = [];
+  try {
+    timeOffRows = await sql`
+      SELECT employee_id, from_date, to_date FROM time_off_requests
+      WHERE team_id = ${ctx.teamId} AND status = 'approved'
+        AND to_date >= ${month + '-01'} AND from_date <= ${month + '-31'}`;
+  } catch { /* table not migrated yet */ }
+  const timeOffByEmp = new Map<number, Set<string>>();
+  for (const t of timeOffRows) {
+    const set = timeOffByEmp.get(t.employee_id) ?? new Set<string>();
+    const from = new Date(t.from_date + 'T00:00:00');
+    const to = new Date(t.to_date + 'T00:00:00');
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      set.add(d.toISOString().split('T')[0]);
+    }
+    timeOffByEmp.set(t.employee_id, set);
+  }
   const shiftTypes = await sql`
     SELECT id, name, start_time, end_time, color, position
     FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
@@ -128,7 +146,7 @@ export async function POST(req: Request) {
       id: u.id,
       name: u.name,
       avatar: u.avatar ?? '👤',
-      unavailable: new Set<string>(a?.unavailable_dates ?? []),
+      unavailable: new Set<string>([...(a?.unavailable_dates ?? []), ...Array.from(timeOffByEmp.get(u.id) ?? new Set<string>())]),
       dayPrefs: (a?.day_preferences ?? {}) as Record<string, string>,
       preferredShift: a?.preferred_shift ?? null,
       maxShifts: a?.max_shifts ?? null,

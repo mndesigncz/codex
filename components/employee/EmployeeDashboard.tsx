@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
+import AnnouncementBanner from '../AnnouncementBanner';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -139,6 +140,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <p className="text-xs text-black/45 mt-1">tento měsíc (píchačky)</p>
         </div>
       </div>
+
+      <AnnouncementBanner />
 
       {/* End-of-shift closing quick action — highlighted when a shift is unclosed */}
       {closingsDue.length > 0 ? (

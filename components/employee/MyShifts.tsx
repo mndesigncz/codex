@@ -39,6 +39,35 @@ export default function MyShifts({ user }: Props) {
 
   const shiftLabel = (type: string) => type === 'morning' ? '🌅 Ranní' : type === 'afternoon' ? '🌆 Odpolední' : '🔄 Flexibilní';
 
+  // Client-side iCalendar export of upcoming shifts (opens in Apple/Google Calendar).
+  const exportIcs = () => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const lines = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pangea//Smeny//CS', 'CALSCALE:GREGORIAN',
+    ];
+    for (const s of upcoming) {
+      const d = s.date.replace(/-/g, '');
+      const st = (s.startTime || '08:00').replace(':', '') + '00';
+      const en = (s.endTime || '16:00').replace(':', '') + '00';
+      lines.push(
+        'BEGIN:VEVENT',
+        `UID:pangea-shift-${s.id}@pangea`,
+        `DTSTART;TZID=Europe/Prague:${d}T${st}`,
+        `DTEND;TZID=Europe/Prague:${d}T${en}`,
+        'SUMMARY:Směna — Pangea',
+        `DESCRIPTION:${s.startTime}–${s.endTime}`,
+        'END:VEVENT',
+      );
+    }
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'moje-smeny.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Stats */}
@@ -71,7 +100,15 @@ export default function MyShifts({ user }: Props) {
       ) : (
         <>
           <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-            <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📅 Nadcházející směny</h3>
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+              <h3 className="font-bold tracking-tight text-[#16181A]">📅 Nadcházející směny</h3>
+              {upcoming.length > 0 && (
+                <button onClick={exportIcs}
+                  className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
+                  Do kalendáře (.ics) ↓
+                </button>
+              )}
+            </div>
             {upcoming.length === 0 ? (
               <p className="text-black/45 text-sm">Žádné nadcházející směny.</p>
             ) : (

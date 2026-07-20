@@ -14,6 +14,7 @@ interface Member {
   phone?: string;
   job_title?: string;
   shift_preference?: string;
+  hourly_rate?: number | null;
 }
 
 interface Team {
@@ -82,6 +83,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [editMemberId, setEditMemberId] = useState<number | null>(null);
   const [editRole, setEditRole] = useState<string>('employee');
   const [editJob, setEditJob] = useState<string>('');
+  const [editRate, setEditRate] = useState<string>('');
   const [savingMember, setSavingMember] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -230,6 +232,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     setEditMemberId(m.id);
     setEditRole(m.role);
     setEditJob(m.job_title ?? '');
+    setEditRate(m.hourly_rate ? String(m.hourly_rate) : '');
     setError('');
   };
 
@@ -240,11 +243,11 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       const res = await fetch('/api/teams/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: editMemberId, role: editRole, jobTitle: editJob }),
+        body: JSON.stringify({ userId: editMemberId, role: editRole, jobTitle: editJob, hourlyRate: editRate === '' ? 0 : parseInt(editRate) || 0 }),
       });
       const data = await res.json();
       if (res.ok) {
-        setMembers(ms => ms.map(m => (m.id === editMemberId ? { ...m, role: editRole, job_title: editJob } : m)));
+        setMembers(ms => ms.map(m => (m.id === editMemberId ? { ...m, role: editRole, job_title: editJob, hourly_rate: editRate === '' ? 0 : parseInt(editRate) || 0 } : m)));
         setEditMemberId(null);
         flash('Změny člena byly uloženy.');
       } else {
@@ -485,6 +488,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <div>
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Pozice</label>
                       <input value={editJob} onChange={e => setEditJob(e.target.value)} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Hodinová sazba</label>
+                      <div className="relative">
+                        <input value={editRate} inputMode="numeric"
+                          onChange={e => setEditRate(e.target.value.replace(/\D/g, ''))}
+                          placeholder="0" className={`${inputClass} pr-14`} />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">Kč/h</span>
+                      </div>
+                      <p className="text-[11px] text-black/40 mt-1.5">Použije se pro výpočet mezd v Docházce.</p>
                     </div>
                     <div className="sm:col-span-2 flex gap-2">
                       <button onClick={saveMember} disabled={savingMember}

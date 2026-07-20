@@ -9,6 +9,7 @@ import Procedures from '../procedures/Procedures';
 import Guides from '../Guides';
 import CashClosing from '../employee/CashClosing';
 import MessengerDock from '../chat/MessengerDock';
+import AnnouncementBanner from '../AnnouncementBanner';
 
 const TABS = [
   { id: 'clock',      label: 'Píchačky', icon: 'clock' },
@@ -120,7 +121,8 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 
       {/* Roster */}
       {tab === 'clock' && (
-      <main className="flex-1 mt-6">
+      <main className="flex-1 mt-6 space-y-5">
+        <AnnouncementBanner />
         {loading ? (
           <div className="flex items-center justify-center h-64"><div className="h-9 w-9 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
         ) : roster.length === 0 ? (

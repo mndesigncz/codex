@@ -26,14 +26,16 @@ export async function PATCH(request: Request) {
   const me = await currentEmployer();
   if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
-  const { userId, role, jobTitle } = await request.json();
+  const { userId, role, jobTitle, hourlyRate } = await request.json();
   if (!userId) return NextResponse.json({ error: 'Chybí userId' }, { status: 400 });
 
   const team = await ownedTeam(me.id);
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
   const targetId = parseInt(String(userId));
-  if (targetId === team.owner_id) {
+  const onlyRate = role === undefined && jobTitle === undefined && hourlyRate !== undefined;
+  // The owner's role/job stays protected, but their hourly rate may be set.
+  if (targetId === team.owner_id && !onlyRate) {
     return NextResponse.json({ error: 'Vlastníka týmu nelze upravit.' }, { status: 400 });
   }
 
@@ -45,6 +47,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Neplatná role.' }, { status: 400 });
     }
     await sql`UPDATE users SET role = ${role} WHERE id = ${targetId} AND team_id = ${team.id}`;
+  }
+
+  if (hourlyRate !== undefined) {
+    const rate = Math.max(0, Math.round(Number(hourlyRate)) || 0);
+    try {
+      await sql`UPDATE users SET hourly_rate = ${rate} WHERE id = ${targetId} AND team_id = ${team.id}`;
+    } catch { /* column not migrated yet */ }
   }
 
   if (jobTitle !== undefined) {
