@@ -4,12 +4,16 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import { Closing, expectedCash, cashDifference, czk } from '@/lib/closing';
 
+// Rows may carry an `approved` flag; older rows omit it (treated as approved).
+type ClosingRow = Closing & { approved?: boolean };
+
 export default function ClosingsOverview() {
-  const [allClosings, setAllClosings] = useState<Closing[]>([]);
+  const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [approving, setApproving] = useState<number | null>(null);
   const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
 
   const load = async () => {
@@ -22,7 +26,7 @@ export default function ClosingsOverview() {
   };
   useEffect(() => { load(); }, []);
 
-  const remove = async (c: Closing) => {
+  const remove = async (c: ClosingRow) => {
     if (!confirm(`Smazat uzávěrku z ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ')}?`)) return;
     setDeleting(c.id);
     const prev = allClosings;
@@ -33,6 +37,21 @@ export default function ClosingsOverview() {
     } catch { setAllClosings(prev); }
     setDeleting(null);
   };
+
+  const approve = async (c: ClosingRow) => {
+    setApproving(c.id);
+    const prev = allClosings;
+    // Optimistically flip so the row leaves the approval panel.
+    setAllClosings(cs => cs.map(x => (x.id === c.id ? { ...x, approved: true } : x)));
+    try {
+      const res = await fetch(`/api/closings/${c.id}`, { method: 'PATCH' });
+      if (!res.ok) throw new Error();
+    } catch { setAllClosings(prev); }
+    setApproving(null);
+  };
+
+  // Closings submitted by someone not on shift; awaiting the employer's approval.
+  const pending = allClosings.filter(c => c.approved === false);
 
   // Months present in the data, newest first (dates are 'YYYY-MM-DD').
   const months = Array.from(new Set(allClosings.map(c => c.date?.slice(0, 7)).filter(Boolean))).sort().reverse() as string[];
@@ -81,6 +100,47 @@ export default function ClosingsOverview() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Uzávěrky ke schválení */}
+      {pending.length > 0 && (
+        <div className="rounded-3xl bg-orange-500/[0.08] border border-orange-500/25 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg" aria-hidden>⚠️</span>
+            <h3 className="font-bold text-[#16181A]">Uzávěrky ke schválení</h3>
+            <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
+          </div>
+          {pending.map(c => {
+            const d = cashDifference(c);
+            return (
+              <div key={c.id} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+                  <span className="text-lg flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</span>
+                  <div className="min-w-0">
+                    <p className="font-bold tracking-tight text-[#16181A] truncate">{c.author_name ?? 'Neznámý'}</p>
+                    <p className="text-xs text-black/45 truncate">
+                      {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
+                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
+                  }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${czk(d)}` : czk(d)}</span>
+                </div>
+                <p className="text-xs text-black/45">Odesláno bez směny — zkontroluj a schval.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => approve(c)} disabled={approving === c.id}
+                    className="rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 disabled:opacity-50 shrink-0">
+                    {approving === c.id ? 'Schvaluji…' : 'Schválit'}
+                  </button>
+                  <button onClick={() => remove(c)} disabled={deleting === c.id}
+                    className="rounded-full bg-black/[0.05] border border-black/10 text-red-600 text-sm px-4 py-2 disabled:opacity-50 shrink-0">
+                    {deleting === c.id ? 'Mažu…' : 'Smazat'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Summary tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-5 min-w-0">
@@ -210,6 +270,9 @@ export default function ClosingsOverview() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {c.approved === false && (
+                      <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                    )}
                     <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                     }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${czk(d)}` : czk(d)}</span>

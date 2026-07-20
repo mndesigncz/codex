@@ -349,6 +349,9 @@ export async function GET() {
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_daily_cash BOOLEAN DEFAULT FALSE`;
     // link a closing to the shift it belongs to
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_id INTEGER`;
+    // approval flow for closings submitted by someone who wasn't on shift
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
 
     // ---- Attendance / time tracking (kiosk / tablet) ----
     await sql`

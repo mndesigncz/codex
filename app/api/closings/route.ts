@@ -99,6 +99,17 @@ export async function GET() {
     } catch { /* shifts table issue — leave empty */ }
   }
 
+  // For the employer's "submit on behalf" selector.
+  let members: any[] = [];
+  if (c.role === 'employer') {
+    try {
+      members = await sql`
+        SELECT id, name, avatar FROM users
+        WHERE team_id = ${c.teamId} AND role IN ('employee','employer')
+        ORDER BY role DESC, name ASC`;
+    } catch { /* ignore */ }
+  }
+
   return NextResponse.json({
     closings: rows,
     canSeeAll: c.role === 'employer',
@@ -107,6 +118,8 @@ export async function GET() {
     isEmployer: c.role === 'employer',
     isKiosk: c.role === 'kiosk',
     eligibleShifts,
+    members,
+    meId: c.meId,
   });
 }
 
@@ -122,19 +135,19 @@ export async function POST(request: Request) {
   const isEmployer = c.role === 'employer';
   const isKiosk = c.role === 'kiosk';
 
-  // The shared kiosk submits ON BEHALF of a chosen team employee — the
-  // closing is attributed to them (author, one-per-day, notifications).
+  // The kiosk AND the employer can submit ON BEHALF of a chosen team member —
+  // the closing is attributed to them (author, one-per-day, notifications).
   let actorId = c.meId;
-  if (isKiosk) {
-    const employeeId = parseInt(b.employeeId);
-    if (!Number.isFinite(employeeId)) {
-      return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
-    }
-    const [emp] = await sql`SELECT id, team_id, role FROM users WHERE id = ${employeeId}`;
+  const wantEmployeeId = parseInt(b.employeeId);
+  if (isKiosk && !Number.isFinite(wantEmployeeId)) {
+    return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
+  }
+  if ((isKiosk || isEmployer) && Number.isFinite(wantEmployeeId) && wantEmployeeId !== c.meId) {
+    const [emp] = await sql`SELECT id, team_id, role FROM users WHERE id = ${wantEmployeeId}`;
     if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') {
       return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
     }
-    actorId = employeeId;
+    actorId = wantEmployeeId;
   }
 
   // No closing a day that hasn't happened yet.
@@ -149,47 +162,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Za tento den už je uzávěrka odeslaná.' }, { status: 409 });
   }
 
-  // Employees (and kiosk submissions) may only close a day with an actual
-  // shift (unless the team turned this off). Employers can close any day.
-  let shiftId: number | null = null;
-  let shiftLabel: string | null = b.shiftLabel || null;
-  if (!isEmployer) {
-    let requiresShift = true;
-    try {
-      const [team] = await sql`SELECT closing_requires_shift FROM teams WHERE id = ${c.teamId}`;
-      requiresShift = team?.closing_requires_shift !== false;
-    } catch { /* not migrated */ }
+  // Did the person the closing is FOR actually have a shift that day?
+  const [shift] = await sql`
+    SELECT id, start_time, end_time FROM shifts
+    WHERE employee_id = ${actorId} AND date = ${date}
+    ORDER BY start_time ASC LIMIT 1`;
+  const shiftId: number | null = shift?.id ?? null;
+  const shiftLabel: string | null = b.shiftLabel || (shift ? `${shift.start_time}–${shift.end_time}` : null);
 
-    const [shift] = await sql`
-      SELECT id, start_time, end_time FROM shifts
-      WHERE employee_id = ${actorId} AND date = ${date}
-      ORDER BY start_time ASC LIMIT 1`;
-    if (requiresShift && !shift) {
-      return NextResponse.json(
-        { error: 'Uzávěrku lze odeslat jen za den, kdy byla směna.' },
-        { status: 403 },
-      );
-    }
-    if (shift) {
-      shiftId = shift.id;
-      if (!shiftLabel) shiftLabel = `${shift.start_time}–${shift.end_time}`;
-    }
-  }
+  // An employer-submitted closing is always trusted. Otherwise it needs the
+  // employer's approval when the person wasn't on shift that day.
+  const approved = isEmployer || !!shift;
 
   let row: any;
   try {
     [row] = await sql`
       INSERT INTO cash_closings (
-        team_id, created_by, date, shift_label, shift_id,
+        team_id, created_by, date, shift_label, shift_id, approved, approved_by,
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null},
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
   } catch {
-    // shift_id column not migrated yet — insert without it so closings still work.
+    // approval/shift columns not migrated yet — insert the core row so closings still work.
     [row] = await sql`
       INSERT INTO cash_closings (
         team_id, created_by, date, shift_label,
@@ -202,7 +200,7 @@ export async function POST(request: Request) {
       ) RETURNING *`;
   }
 
-  // Notify team employers (except the author) — flag manko/přebytek up front.
+  // Notify team employers (except the author).
   try {
     const employers = await sql`
       SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${actorId}`;
@@ -210,15 +208,18 @@ export async function POST(request: Request) {
       const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
       const diff = cashDifference(row as any);
       const verdict = diff === 0 ? 'kasa sedí' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
+      const name = author?.name ?? 'Zaměstnanec';
       await Promise.allSettled(employers.map((e: any) => notifyUser(e.id, {
-        title: 'Nová uzávěrka',
-        body: `${author?.name ?? 'Zaměstnanec'} odeslal uzávěrku (${row.date}) — ${verdict}.`,
-        type: diff < 0 ? 'warning' : 'info',
+        title: approved ? 'Nová uzávěrka' : '⚠️ Uzávěrka ke schválení',
+        body: approved
+          ? `${name} odeslal uzávěrku (${row.date}) — ${verdict}.`
+          : `${name} odeslal uzávěrku (${row.date}) bez směny — schval ji v Uzávěrkách.`,
+        type: approved ? (diff < 0 ? 'warning' : 'info') : 'warning',
       })));
     }
   } catch (e) {
     console.error('notify employers failed', e);
   }
 
-  return NextResponse.json({ ok: true, closing: row });
+  return NextResponse.json({ ok: true, closing: row, approved });
 }
