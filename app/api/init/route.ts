@@ -110,6 +110,19 @@ export async function GET() {
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS critical_quantity INTEGER NOT NULL DEFAULT 2`;
     // unit cost → stock valuation (quantity × unit_cost)
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS unit_cost INTEGER`;
+
+    // ---- Shift swap marketplace ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS shift_offers (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        shift_id INTEGER NOT NULL,
+        offered_by INTEGER NOT NULL,
+        claimed_by INTEGER,
+        status TEXT DEFAULT 'open',   -- open | claimed | approved | cancelled
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS created_by INTEGER`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_by INTEGER`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`;
