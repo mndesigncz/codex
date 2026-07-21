@@ -15,6 +15,7 @@ interface Item {
   unit: string;
   supplier?: string;
   supplierUrl?: string;
+  unitCost?: number | null;
   updatedAt?: string;
   updatedByName?: string;
 }
@@ -49,7 +50,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '' };
+const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '' };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -103,6 +104,8 @@ export default function Inventory({ user }: { user?: any }) {
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const money = useMoney();
+  const symbol = useSymbol();
   const [newCatInline, setNewCatInline] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
@@ -192,7 +195,7 @@ export default function Inventory({ user }: { user?: any }) {
   };
   const openEdit = (i: Item) => {
     setEditing(i);
-    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '' });
+    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '' });
     setNewCatInline('');
     setShowForm(true);
   };
@@ -231,6 +234,7 @@ export default function Inventory({ user }: { user?: any }) {
       name: form.name, category: form.category, unit: form.unit, supplier: form.supplier, supplierUrl: form.supplierUrl,
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
+      unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
     };
     try {
       if (editing) {
@@ -263,7 +267,13 @@ export default function Inventory({ user }: { user?: any }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
-          <p className="text-black/45 text-sm">{items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'} · přidávejte a hlídejte limity</p>
+          <p className="text-black/45 text-sm">
+            {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
+            {(() => {
+              const val = items.reduce((s, i) => s + (i.unitCost ? i.quantity * i.unitCost : 0), 0);
+              return val > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(val)}</span></> : ' · přidávejte a hlídejte limity';
+            })()}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           {toBuy.length > 0 && (
@@ -339,7 +349,7 @@ export default function Inventory({ user }: { user?: any }) {
       ) : view === 'list' ? (
         <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} />
+        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} />
       )}
 
       {/* Item form modal */}
@@ -453,6 +463,14 @@ export default function Inventory({ user }: { user?: any }) {
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
                   <Icon name="send" size={14} className="text-black/40" /> Dodavatel <span className="normal-case tracking-normal text-black/30 font-normal">· volitelné</span>
                 </p>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Cena za jednotku</label>
+                  <div className="relative">
+                    <input type="number" inputMode="numeric" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}/{form.unit || 'ks'}</span>
+                  </div>
+                  <p className="text-[11px] text-black/40 mt-1.5">Slouží k výpočtu hodnoty zásob.</p>
+                </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název dodavatele</label>
                   <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} />
@@ -601,8 +619,9 @@ function ListView({ items, step, openEdit, remove }: {
 }
 
 /* ---------- Grid view (glass cards) ---------- */
-function GridView({ items, step, openEdit, remove }: {
+function GridView({ items, step, openEdit, remove, money }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
+  money: (n: number) => string;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -637,7 +656,7 @@ function GridView({ items, step, openEdit, remove }: {
                 <button onClick={() => remove(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
             </div>
-            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {i.unit}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
+            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {i.unit}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
           </div>
         );
       })}
