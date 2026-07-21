@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import KioskApp from '@/components/kiosk/KioskApp';
+import { CurrencyProvider } from '@/components/CurrencyProvider';
 
 export default async function KioskPage() {
   const session = await getServerSession(authOptions);
@@ -11,5 +12,9 @@ export default async function KioskPage() {
   if (role === 'employer') redirect('/employer/overview');
   if (role !== 'kiosk') redirect('/employee/shifts');
   const u = session.user as any;
-  return <KioskApp user={{ id: u?.id, name: u?.name ?? 'Tablet', role: 'kiosk', avatar: u?.avatar ?? '📟' }} />;
+  return (
+    <CurrencyProvider>
+      <KioskApp user={{ id: u?.id, name: u?.name ?? 'Tablet', role: 'kiosk', avatar: u?.avatar ?? '📟' }} />
+    </CurrencyProvider>
+  );
 }

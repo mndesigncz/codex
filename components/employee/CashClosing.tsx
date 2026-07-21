@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
-import { Closing, expectedCash, cashDifference, czk } from '@/lib/closing';
+import { Closing, expectedCash, cashDifference } from '@/lib/closing';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const inputClass =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
@@ -95,6 +96,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
   const [err, setErr] = useState('');
   const [coworkers, setCoworkers] = useState<Coworker[]>([]);
   const [coworkerSel, setCoworkerSel] = useState<Record<number, { on: boolean; payout: string }>>({});
+  const money = useMoney();
+  const symbol = useSymbol();
 
   const load = async () => {
     try {
@@ -213,7 +216,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
     label: string, key: keyof FormState,
     opts?: { hint?: string; placeholder?: string; unit?: string | null },
   ) => {
-    const unit = opts?.unit === undefined ? 'Kč' : opts.unit;
+    const unit = opts?.unit === undefined ? symbol : opts.unit;
     return (
       <div>
         <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
@@ -278,7 +281,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Kasa na začátku', 'openingCash', {
               hint: closings[0]
-                ? `Minulá uzávěrka (${new Date(closings[0].date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}) skončila s ${czk(closings[0].closing_cash)} v kase.`
+                ? `Minulá uzávěrka (${new Date(closings[0].date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}) skončila s ${money(closings[0].closing_cash)} v kase.`
                 : 'Počáteční stav hotovosti v kase.',
             })}
             {isKiosk ? (
@@ -432,7 +435,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
                             value={sel?.payout ?? ''}
                             onChange={e => setCoworkerSel(s => ({ ...s, [cw.id]: { on: true, payout: e.target.value } }))}
                             placeholder="výplata" className={`${inputClass} pr-9 !py-2.5 text-sm`} />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">Kč</span>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
                         </div>
                       )}
                     </div>
@@ -448,7 +451,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
           <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3">
             <span className="text-sm text-black/55 min-w-0">Očekávaný stav kasy</span>
-            <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{czk(expected)}</span>
+            <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{money(expected)}</span>
           </div>
 
           <div>
@@ -456,7 +459,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
             <div className="relative">
               <input type="number" inputMode="numeric" required value={form.closingCash} onChange={set('closingCash')}
                 placeholder="0" className={`${inputClass} pr-12 !py-4 text-base font-semibold`} />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">Kč</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
             </div>
           </div>
 
@@ -474,7 +477,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
                 <Icon name={diff === 0 ? 'check' : diff > 0 ? 'trend' : 'warning'} size={18} />
                 {diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek v kase' : 'Manko v kase'}
               </span>
-              <span className="text-lg font-bold tabular-nums whitespace-nowrap">{diff > 0 ? '+' : ''}{czk(diff)}</span>
+              <span className="text-lg font-bold tabular-nums whitespace-nowrap">{diff > 0 ? '+' : ''}{money(diff)}</span>
             </div>
           )}
         </Step>
@@ -520,14 +523,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
                   )}
                   <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
-                  }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${czk(d)}` : `Manko ${czk(d)}`}</span>
+                  }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba hotově</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.cash_revenue)}</p></div>
-                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba kartou</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.card_revenue)}</p></div>
-                  <div className="min-w-0"><span className="block text-black/40 truncate">Odloženo</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.cash_removed)}</p></div>
-                  {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{czk(c.self_payout)}</p></div>}
+                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba hotově</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_revenue)}</p></div>
+                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba kartou</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.card_revenue)}</p></div>
+                  <div className="min-w-0"><span className="block text-black/40 truncate">Odloženo</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_removed)}</p></div>
+                  {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.self_payout)}</p></div>}
                 </div>
                 {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3 mt-3">{c.notes}</p>}
               </div>

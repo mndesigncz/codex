@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
-import { Closing, expectedCash, cashDifference, czk } from '@/lib/closing';
+import { Closing, expectedCash, cashDifference } from '@/lib/closing';
+import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
@@ -10,6 +11,7 @@ import CashClosing from '../employee/CashClosing';
 type ClosingRow = Closing & { approved?: boolean; covered_by?: number | null };
 
 export default function ClosingsOverview() {
+  const money = useMoney();
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -143,7 +145,7 @@ export default function ClosingsOverview() {
                   </div>
                   <span className={`shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
-                  }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${czk(d)}` : czk(d)}</span>
+                  }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                 </div>
                 <p className="text-xs text-black/45">Odesláno bez směny — zkontroluj a schval.</p>
                 <div className="flex flex-wrap gap-2">
@@ -166,28 +168,28 @@ export default function ClosingsOverview() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-5 min-w-0">
           <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržba celkem</p>
-          <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totalRevenue)}</p>
-          <p className="text-[11px] text-black/40 mt-1 truncate">Hotově {czk(totals.cash)} · Kartou {czk(totals.card)}</p>
+          <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totalRevenue)}</p>
+          <p className="text-[11px] text-black/40 mt-1 truncate">Hotově {money(totals.cash)} · Kartou {money(totals.card)}</p>
         </div>
         <div className="glass-card p-5 min-w-0">
           <p className="text-xs uppercase tracking-wider text-black/45 truncate">Odvedeno / odloženo</p>
-          <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totals.removed)}</p>
+          <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totals.removed)}</p>
         </div>
         {payDailyCash ? (
           <div className="glass-card p-5 min-w-0">
             <p className="text-xs uppercase tracking-wider text-black/45 truncate">Vyplaceno v hotovosti</p>
-            <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totals.payout)}</p>
+            <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totals.payout)}</p>
           </div>
         ) : (
           <div className="glass-card p-5 min-w-0">
             <p className="text-xs uppercase tracking-wider text-black/45 truncate">Spropitné celkem</p>
-            <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{czk(totals.tips)}</p>
+            <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totals.tips)}</p>
           </div>
         )}
         <div className="glass-card p-5 min-w-0">
           <p className="text-xs uppercase tracking-wider text-black/45 truncate">Rozdíl kasy</p>
           <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-red-600'}`}>
-            {totals.diff > 0 ? '+' : ''}{czk(totals.diff)}
+            {totals.diff > 0 ? '+' : ''}{money(totals.diff)}
           </p>
           <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
         </div>
@@ -220,11 +222,11 @@ export default function ClosingsOverview() {
                   const mon = parseInt(d.date.slice(5, 7), 10);
                   return (
                     <g key={d.date}>
-                      <title>{`${day}. ${mon}. — ${czk(d.total)}`}</title>
+                      <title>{`${day}. ${mon}. — ${money(d.total)}`}</title>
                       {/* rx rounds both ends; the bottom radius is clipped flat at the baseline */}
                       <rect x={x} y={y} width={barW} height={h + 4} rx={3} fill={i === maxIdx ? '#8FB811' : '#C8F542'} clipPath="url(#trend-bars-clip)" />
                       {i === maxIdx && (
-                        <text x={Math.min(Math.max(x + barW / 2, 30), chartW - 30)} y={y - 5} textAnchor="middle" className="text-[9px] font-semibold fill-black/55 tabular-nums">{czk(d.total)}</text>
+                        <text x={Math.min(Math.max(x + barW / 2, 30), chartW - 30)} y={y - 5} textAnchor="middle" className="text-[9px] font-semibold fill-black/55 tabular-nums">{money(d.total)}</text>
                       )}
                       {i % labelEvery === 0 && (
                         <text x={x + barW / 2} y={labelY} textAnchor="middle" className="text-[9px] sm:text-[10px] fill-black/40">{day}.</text>
@@ -233,7 +235,7 @@ export default function ClosingsOverview() {
                   );
                 })}
                 <line x1={padX} y1={avgY} x2={chartW - padX} y2={avgY} stroke="#16181A" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="4 4" />
-                <text x={padX} y={avgY - 4} className="text-[9px] fill-black/45 tabular-nums">Ø {czk(avg)}</text>
+                <text x={padX} y={avgY - 4} className="text-[9px] fill-black/45 tabular-nums">Ø {money(avg)}</text>
               </svg>
             </div>
           </div>
@@ -294,7 +296,7 @@ export default function ClosingsOverview() {
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                       </p>
-                      <p className="text-xs text-black/45 truncate">{c.author_name ?? 'Neznámý'} · Tržba {czk(c.cash_revenue + c.card_revenue)}</p>
+                      <p className="text-xs text-black/45 truncate">{c.author_name ?? 'Neznámý'} · Tržba {money(c.cash_revenue + c.card_revenue)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -308,7 +310,7 @@ export default function ClosingsOverview() {
                     )}
                     <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
-                    }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${czk(d)}` : czk(d)}</span>
+                    }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                     <Icon name="chevron" size={16} className={`text-black/35 transition-transform ${open ? 'rotate-180' : ''}`} />
                   </div>
                 </button>
@@ -328,16 +330,16 @@ export default function ClosingsOverview() {
                       ].map(([label, val]) => (
                         <div key={label as string} className="min-w-0">
                           <span className="block text-black/40 text-xs truncate">{label}</span>
-                          <p className="font-semibold text-[#16181A] tabular-nums truncate">{label === 'Zákazníků' ? val : czk(val as number)}</p>
+                          <p className="font-semibold text-[#16181A] tabular-nums truncate">{label === 'Zákazníků' ? val : money(val as number)}</p>
                         </div>
                       ))}
                     </div>
                     <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 space-y-2 text-sm">
-                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{czk(expected)}</span></div>
-                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{czk(c.closing_cash)}</span></div>
+                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
+                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(c.closing_cash)}</span></div>
                       <div className={`flex justify-between gap-3 rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
                         <span className="font-medium min-w-0">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
-                        <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{czk(d)}</span>
+                        <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{money(d)}</span>
                       </div>
                     </div>
                     {covered.length > 0 && (
@@ -353,7 +355,7 @@ export default function ClosingsOverview() {
                                 <span className="font-medium text-[#16181A] truncate">{cv.author_name ?? 'Neznámý'}</span>
                               </span>
                               {payDailyCash && cv.self_payout > 0 && (
-                                <span className="shrink-0 text-black/55 tabular-nums whitespace-nowrap">Výplata {czk(cv.self_payout)}</span>
+                                <span className="shrink-0 text-black/55 tabular-nums whitespace-nowrap">Výplata {money(cv.self_payout)}</span>
                               )}
                             </div>
                           ))}
