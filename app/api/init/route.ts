@@ -411,6 +411,24 @@ export async function GET() {
         received_at TIMESTAMP
       )`;
 
+    // ---- Improvement suggestions (team idea board) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS suggestions (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        author_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT,
+        status TEXT DEFAULT 'new',
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS suggestion_votes (
+        suggestion_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        PRIMARY KEY (suggestion_id, user_id)
+      )`;
+
     // invited members may come in with an elevated role
     await sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`;
     // optional per-employee PIN for the shared kiosk device

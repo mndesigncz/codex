@@ -15,6 +15,7 @@ import TimeOffRequest from '../scheduling/TimeOffRequest';
 import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
 import CashClosing from './CashClosing';
+import SuggestionsBoard from '../SuggestionsBoard';
 import Procedures from '../procedures/Procedures';
 import MobileMoreSheet from '../MobileMoreSheet';
 
@@ -28,6 +29,7 @@ const navItems = [
   { id: 'tasks',       label: 'Úkoly',      icon: 'check' },
   { id: 'chat',        label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',      label: 'Návody',     icon: 'book' },
+  { id: 'suggestions', label: 'Nápady',     icon: 'bulb' },
 ];
 
 const mobilePrimary = ['home', 'my-shifts', 'inventory', 'chat'];
@@ -59,6 +61,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'tasks':        return <Tasks user={user as any} />;
       case 'chat':         return <ChatView user={user as any} />;
       case 'guides':       return <Guides user={user as any} />;
+      case 'suggestions':  return <SuggestionsBoard />;
       case 'settings':     return <Settings user={user as any} initialTab="account" />;
       default:             return <EmployeeDashboard user={user as any} onNavigate={setCurrentView} />;
     }

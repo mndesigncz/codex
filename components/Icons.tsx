@@ -93,6 +93,12 @@ const paths: Record<string, React.ReactNode> = {
   plus: (
     <path d="M12 5v14M5 12h14" />
   ),
+  bulb: (
+    <>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.6 10.8c.6.45 1 1.15 1.1 1.9l.1.8h4.8l.1-.8c.1-.75.5-1.45 1.1-1.9A6 6 0 0 0 12 3Z" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />
