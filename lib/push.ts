@@ -24,9 +24,34 @@ interface PushPayload {
   tag?: string;
 }
 
+// User-toggleable notification categories (Settings → Notifikace). Anything not
+// in one of these categories is 'general' and always delivered.
+export type NotifCategory = 'message' | 'stock' | 'shift' | 'general';
+
+const CATEGORY_PREF: Record<Exclude<NotifCategory, 'general'>, string> = {
+  message: 'messages',
+  stock: 'lowStock',
+  shift: 'shifts',
+};
+
+// Has this user opted OUT of a given category? Missing prefs ⇒ everything on.
+async function categoryMuted(sql: any, userId: number, category?: NotifCategory): Promise<boolean> {
+  if (!category || category === 'general') return false;
+  try {
+    const [row] = await sql`SELECT notif_prefs FROM users WHERE id = ${userId}`;
+    const prefs = row?.notif_prefs ?? {};
+    return prefs[CATEGORY_PREF[category]] === false;
+  } catch {
+    return false; // column not migrated yet — deliver as before
+  }
+}
+
 // Persist an in-app notification AND fire a web push to all the user's devices.
-export async function notifyUser(userId: number, payload: PushPayload & { type?: string }) {
+export async function notifyUser(userId: number, payload: PushPayload & { type?: string; category?: NotifCategory }) {
   const sql = neon(process.env.DATABASE_URL!);
+
+  // Respect the user's category preferences — a muted category is fully skipped.
+  if (await categoryMuted(sql, userId, payload.category)) return;
 
   try {
     await sql`
@@ -69,6 +94,6 @@ export async function notifyUser(userId: number, payload: PushPayload & { type?:
   );
 }
 
-export async function notifyUsers(userIds: number[], payload: PushPayload & { type?: string }) {
+export async function notifyUsers(userIds: number[], payload: PushPayload & { type?: string; category?: NotifCategory }) {
   await Promise.all(userIds.map((id) => notifyUser(id, payload)));
 }

@@ -88,6 +88,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               title: 'Nízké zásoby',
               body: `${item.name} je na ${newQty} ${item.unit}`,
               type: 'inventory',
+              category: 'stock',
               link: '/',
             }),
           ),

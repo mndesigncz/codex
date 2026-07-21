@@ -136,6 +136,9 @@ export default function Settings({ user, initialTab }: Props) {
           setPhone(u.phone ?? '');
           setJobTitle(u.jobTitle ?? '');
           setShiftPreference(u.shiftPreference ?? 'flexible');
+          // Category prefs live on the server (synced across devices); push
+          // stays a per-browser toggle tied to the actual subscription.
+          if ((u as any).notifPrefs) setPrefs(p => ({ ...p, ...(u as any).notifPrefs }));
         }
       })
       .finally(() => setLoading(false));
@@ -168,6 +171,13 @@ export default function Settings({ user, initialTab }: Props) {
       try { localStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+    // Category prefs (not the browser-only push toggle) persist to the server.
+    if (key !== 'push') {
+      fetch('/api/account', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notifPrefs: { [key]: value } }),
+      }).catch(() => { /* best-effort; localStorage keeps the optimistic value */ });
+    }
   };
 
   const togglePush = async (value: boolean) => {
