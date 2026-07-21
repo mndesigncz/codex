@@ -41,6 +41,24 @@ export async function GET() {
       closingRequiresShift = extra?.closing_requires_shift !== false;
     } catch { /* columns not migrated yet */ }
 
+    // Business/localization settings (defensive — safe defaults before migration).
+    let biz = { currency: 'CZK', locale: 'cs-CZ', week_start: 1, labor_target_pct: null as number | null,
+                low_stock_default: 5, critical_stock_default: 2, business_type: null as string | null };
+    try {
+      const [b] = await sql`
+        SELECT currency, locale, week_start, labor_target_pct, low_stock_default, critical_stock_default, business_type
+        FROM teams WHERE id = ${teamId}`;
+      if (b) biz = {
+        currency: b.currency || 'CZK',
+        locale: b.locale || 'cs-CZ',
+        week_start: b.week_start ?? 1,
+        labor_target_pct: b.labor_target_pct ?? null,
+        low_stock_default: b.low_stock_default ?? 5,
+        critical_stock_default: b.critical_stock_default ?? 2,
+        business_type: b.business_type ?? null,
+      };
+    } catch { /* columns not migrated yet */ }
+
     let members: any[];
     try {
       members = await sql`
@@ -54,7 +72,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, ...biz },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -69,7 +87,9 @@ export async function PATCH(request: Request) {
   const me = await currentUser();
   if (!me || me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const sql = neon(process.env.DATABASE_URL!);
-  const { name, regenerateCode, payDailyCash, closingRequiresShift } = await request.json();
+  const body = await request.json();
+  const { name, regenerateCode, payDailyCash, closingRequiresShift,
+          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body;
 
   // Any employer of the team may manage settings (multi-employer teams).
   const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
@@ -81,6 +101,16 @@ export async function PATCH(request: Request) {
   if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
   if (typeof payDailyCash === 'boolean') await sql`UPDATE teams SET pay_daily_cash = ${payDailyCash} WHERE id = ${team.id}`;
   if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;
+  // Business/localization settings — each guarded so a pending migration degrades gracefully.
+  try {
+    if (typeof currency === 'string' && currency) await sql`UPDATE teams SET currency = ${currency} WHERE id = ${team.id}`;
+    if (typeof locale === 'string' && locale) await sql`UPDATE teams SET locale = ${locale} WHERE id = ${team.id}`;
+    if (weekStart === 0 || weekStart === 1) await sql`UPDATE teams SET week_start = ${weekStart} WHERE id = ${team.id}`;
+    if (laborTargetPct === null || Number.isFinite(laborTargetPct)) await sql`UPDATE teams SET labor_target_pct = ${laborTargetPct} WHERE id = ${team.id}`;
+    if (Number.isFinite(lowStockDefault)) await sql`UPDATE teams SET low_stock_default = ${lowStockDefault} WHERE id = ${team.id}`;
+    if (Number.isFinite(criticalStockDefault)) await sql`UPDATE teams SET critical_stock_default = ${criticalStockDefault} WHERE id = ${team.id}`;
+    if (typeof businessType === 'string') await sql`UPDATE teams SET business_type = ${businessType} WHERE id = ${team.id}`;
+  } catch { /* columns not migrated yet — ignore until /api/init runs */ }
 
   let joinCode: string | undefined;
   if (regenerateCode) {
