@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
+import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
 
 interface Task {
   id: number;
@@ -12,6 +13,8 @@ interface Task {
   priority: string;
   status: string;
   dueDate?: string | null;
+  recurrence?: string | null;
+  checklist?: ChecklistItem[];
 }
 interface Member { id: number; name: string; role: string; avatar?: string }
 
@@ -26,7 +29,7 @@ const PRIORITIES = [
 const statusLabel = (s: string) => s === 'done' ? 'Hotovo' : s === 'in_progress' ? 'Probíhá' : 'Čeká';
 const statusChip = (s: string) => s === 'done' ? 'bg-[#C8F542]/15 text-[#5B7A08]' : s === 'in_progress' ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-black/[0.05] text-black/55';
 
-const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '' });
+const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[] });
 
 export default function TaskManager({ user }: { user: { id?: string | number } }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -69,6 +72,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         body: JSON.stringify({
           title: form.title.trim(), description: form.description.trim() || null,
           assignedTo: parseInt(form.assignedTo), priority: form.priority, dueDate: form.dueDate || null,
+          recurrence: form.recurrence || null,
+          checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: false })),
         }),
       });
       const d = await res.json();
@@ -87,6 +92,24 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       if (!res.ok) throw new Error();
     } catch { setTasks(prev); }
   };
+
+  const toggleChecklistItem = async (t: Task, index: number) => {
+    const next = (t.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it);
+    const prev = tasks;
+    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, checklist: next } : x));
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: t.id, checklist: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch { setTasks(prev); }
+  };
+
+  // Create-form checklist editing helpers.
+  const addChecklistLine = () => setForm(f => ({ ...f, checklist: [...f.checklist, { text: '', done: false }] }));
+  const setChecklistLine = (i: number, text: string) => setForm(f => ({ ...f, checklist: f.checklist.map((it, idx) => idx === i ? { ...it, text } : it) }));
+  const removeChecklistLine = (i: number) => setForm(f => ({ ...f, checklist: f.checklist.filter((_, idx) => idx !== i) }));
 
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
   const counts = {
@@ -144,6 +167,37 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               ))}
             </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Opakování</label>
+              <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
+                className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }}>
+                {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {form.recurrence && <p className="text-[11px] text-black/40 mt-1.5">Po splnění se úkol automaticky založí na další termín.</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kontrolní seznam (nepovinné)</label>
+            <div className="space-y-2">
+              {form.checklist.map((it, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input value={it.text} onChange={e => setChecklistLine(i, e.target.value)}
+                    placeholder={`Bod ${i + 1}`} className={`${inputClass} !py-2.5`} />
+                  <button type="button" onClick={() => removeChecklistLine(i)}
+                    className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/45 hover:text-red-600 shrink-0">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={addChecklistLine}
+                className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] text-black/60 px-4 py-2 text-sm font-medium hover:bg-black/[0.07] transition">
+                <Icon name="plus" size={15} /> Přidat bod
+              </button>
+            </div>
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={saving} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
@@ -177,19 +231,33 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             const m = memberById.get(t.assignedTo);
             const prio = PRIORITIES.find(p => p.value === t.priority) ?? PRIORITIES[1];
             return (
-              <div key={t.id} className="glass-card p-4 flex items-center gap-3">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${prio.dot}`} title={`Priorita: ${prio.label}`} />
-                <div className="min-w-0 flex-1">
-                  <p className={`font-semibold text-sm text-[#16181A] truncate ${t.status === 'done' ? 'line-through text-black/40' : ''}`}>{t.title}</p>
-                  <p className="text-xs text-black/45 truncate">
-                    {m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý'}
-                    {t.dueDate ? ` · do ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}` : ''}
-                  </p>
+              <div key={t.id} className="glass-card p-4">
+                <div className="flex items-center gap-3">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${prio.dot}`} title={`Priorita: ${prio.label}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className={`font-semibold text-sm text-[#16181A] truncate ${t.status === 'done' ? 'line-through text-black/40' : ''}`}>{t.title}</p>
+                    <p className="text-xs text-black/45 truncate flex items-center gap-1.5">
+                      <span className="truncate">
+                        {m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý'}
+                        {t.dueDate ? ` · do ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}` : ''}
+                      </span>
+                      {recurrenceLabel(t.recurrence) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[10px] font-semibold shrink-0">
+                          <Icon name="swap" size={11} /> {recurrenceLabel(t.recurrence)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <span className={`text-xs font-medium rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap ${statusChip(t.status)}`}>{statusLabel(t.status)}</span>
+                  <button onClick={() => remove(t)} title="Smazat" className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-red-600 shrink-0">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+                  </button>
                 </div>
-                <span className={`text-xs font-medium rounded-full px-2.5 py-1 shrink-0 whitespace-nowrap ${statusChip(t.status)}`}>{statusLabel(t.status)}</span>
-                <button onClick={() => remove(t)} title="Smazat" className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-red-600 shrink-0">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-                </button>
+                {t.checklist && t.checklist.length > 0 && (
+                  <div className="pl-5">
+                    <TaskChecklist items={t.checklist} onToggle={i => toggleChecklistItem(t, i)} />
+                  </div>
+                )}
               </div>
             );
           })}

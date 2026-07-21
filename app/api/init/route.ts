@@ -435,6 +435,9 @@ export async function GET() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`;
     // per-user notification category preferences (server-side, synced across devices)
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_prefs JSONB DEFAULT '{}'`;
+    // recurring tasks + per-task checklists
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence TEXT`;          // null | 'daily' | 'weekdays' | 'weekly'
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`;
     // whether closings are locked to shifts (default on)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
 
