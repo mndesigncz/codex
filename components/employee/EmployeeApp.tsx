@@ -1,7 +1,12 @@
 'use client';
 
+import { CurrencyProvider } from '../CurrencyProvider';
 import EmployeeLayout from './EmployeeLayout';
 
 export default function EmployeeApp({ user }: { user: any }) {
-  return <EmployeeLayout user={user} />;
+  return (
+    <CurrencyProvider>
+      <EmployeeLayout user={user} />
+    </CurrencyProvider>
+  );
 }

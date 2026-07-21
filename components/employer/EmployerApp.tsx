@@ -1,8 +1,12 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { CurrencyProvider } from '../CurrencyProvider';
 import EmployerLayout from './EmployerLayout';
 
 export default function EmployerApp({ user }: { user: any }) {
-  return <EmployerLayout user={user} />;
+  return (
+    <CurrencyProvider>
+      <EmployerLayout user={user} />
+    </CurrencyProvider>
+  );
 }

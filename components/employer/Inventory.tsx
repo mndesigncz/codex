@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
   id: number;
@@ -662,6 +663,8 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
   const [receivingId, setReceivingId] = useState<number | null>(null);
   const [costInput, setCostInput] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
+  const money = useMoney();
+  const symbol = useSymbol();
 
   const now = new Date();
   const monthlySpend = orders
@@ -678,7 +681,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
     const d = new Date(iso);
     return isNaN(d.getTime()) ? '' : d.toLocaleDateString('cs-CZ');
   };
-  const fmtKc = (n: number) => `${n.toLocaleString('cs-CZ')} Kč`;
+  const fmtKc = (n: number) => money(n);
 
   const markReceived = async (o: Order) => {
     setBusyId(o.id);
@@ -773,7 +776,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                   </div>
                   {receivingId === o.id && (
                     <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
-                      <label className="text-xs text-black/50 whitespace-nowrap">Celková cena (Kč, nepovinné)</label>
+                      <label className="text-xs text-black/50 whitespace-nowrap">Celková cena ({symbol}, nepovinné)</label>
                       <input
                         type="number"
                         inputMode="decimal"

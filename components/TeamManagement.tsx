@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
+import { CURRENCIES, LOCALES } from '@/lib/money';
+import { useSymbol } from './CurrencyProvider';
 
 interface Member {
   id: number;
@@ -24,6 +26,11 @@ interface Team {
   join_code: string;
   pay_daily_cash?: boolean;
   closing_requires_shift?: boolean;
+  currency?: string;
+  locale?: string;
+  week_start?: number;
+  labor_target_pct?: number | null;
+  business_type?: string | null;
 }
 
 interface Invitation {
@@ -59,6 +66,7 @@ function statusLabel(status: string) {
 }
 
 export default function TeamManagement({ user }: { user: { id: number; name: string; role: string; avatar?: string } }) {
+  const symbol = useSymbol();
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -87,6 +95,12 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [savingMember, setSavingMember] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
   const [removing, setRemoving] = useState(false);
+
+  // Labor-target input mirrors the saved value but stays editable while typing.
+  const [laborInput, setLaborInput] = useState('');
+  useEffect(() => {
+    setLaborInput(team?.labor_target_pct != null ? String(team.labor_target_pct) : '');
+  }, [team?.labor_target_pct]);
 
   const flash = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(''), 4000); };
 
@@ -175,6 +189,35 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       setSavingRequiresShift(false);
     }
   };
+
+  // Business / localization settings (currency, locale, week start, labor target).
+  const [savingBiz, setSavingBiz] = useState(false);
+  const saveBiz = async (patch: Record<string, unknown>) => {
+    setSavingBiz(true);
+    const prev = team;
+    setTeam(t => (t ? { ...t, ...mapBizToTeam(patch) } : t)); // optimistic
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) flash('Nastavení provozu uloženo.');
+      else { setTeam(prev); setError('Nastavení se nepodařilo uložit.'); }
+    } catch {
+      setTeam(prev);
+      setError('Nastavení se nepodařilo uložit.');
+    } finally {
+      setSavingBiz(false);
+    }
+  };
+  // Map PATCH keys (camelCase) back onto the local Team shape (snake_case).
+  const mapBizToTeam = (p: Record<string, unknown>) => ({
+    ...(p.currency !== undefined ? { currency: p.currency as string } : {}),
+    ...(p.locale !== undefined ? { locale: p.locale as string } : {}),
+    ...(p.weekStart !== undefined ? { week_start: p.weekStart as number } : {}),
+    ...(p.laborTargetPct !== undefined ? { labor_target_pct: p.laborTargetPct as number | null } : {}),
+    ...(p.businessType !== undefined ? { business_type: p.businessType as string } : {}),
+  });
 
   const regenerate = async () => {
     setRegenerating(true);
@@ -495,7 +538,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         <input value={editRate} inputMode="numeric"
                           onChange={e => setEditRate(e.target.value.replace(/\D/g, ''))}
                           placeholder="0" className={`${inputClass} pr-14`} />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">Kč/h</span>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}/h</span>
                       </div>
                       <p className="text-[11px] text-black/40 mt-1.5">Použije se pro výpočet mezd v Docházce.</p>
                     </div>
@@ -514,6 +557,58 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Business / localization settings — makes the app fit any team */}
+      <div className="glass-card p-6 space-y-5">
+        <div>
+          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+            <Icon name="settings" size={18} /> Provoz podniku
+          </h3>
+          <p className="text-black/45 text-sm mt-1">Měna, formát čísel a cíle — přizpůsob appku svému podniku.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="min-w-0">
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Měna</label>
+            <select value={team?.currency ?? 'CZK'} disabled={savingBiz}
+              onChange={e => saveBiz({ currency: e.target.value })}
+              className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
+              {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Formát čísel (jazyk)</label>
+            <select value={team?.locale ?? 'cs-CZ'} disabled={savingBiz}
+              onChange={e => saveBiz({ locale: e.target.value })}
+              className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
+              {LOCALES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Začátek týdne</label>
+            <select value={String(team?.week_start ?? 1)} disabled={savingBiz}
+              onChange={e => saveBiz({ weekStart: Number(e.target.value) })}
+              className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
+              <option value="1">Pondělí</option>
+              <option value="0">Neděle</option>
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Cíl mzdových nákladů</label>
+            <div className="relative">
+              <input type="number" inputMode="numeric" min={0} max={100} value={laborInput} disabled={savingBiz}
+                onChange={e => setLaborInput(e.target.value)}
+                onBlur={() => {
+                  const v = laborInput.trim() === '' ? null : Math.max(0, Math.min(100, Math.round(Number(laborInput))));
+                  if ((team?.labor_target_pct ?? null) !== v) saveBiz({ laborTargetPct: v });
+                }}
+                placeholder="např. 30" className={`${inputClass} pr-10 h-[46px]`} />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">%</span>
+            </div>
+            <p className="text-[11px] text-black/40 mt-1.5">Podíl mezd na tržbách — v Docházce se zvýrazní překročení.</p>
+          </div>
         </div>
       </div>
 

@@ -436,6 +436,15 @@ export async function GET() {
     // whether closings are locked to shifts (default on)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
 
+    // ---- Business/localization settings (make the app fit ANY team) ----
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'CZK'`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS locale TEXT DEFAULT 'cs-CZ'`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS week_start INTEGER DEFAULT 1`; // 1 = Monday, 0 = Sunday
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`;      // target labor cost as % of revenue
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`;
+
     // ---- Noisium integration (per-team) ----
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_project_id TEXT`;

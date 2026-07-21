@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
+import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 
 type RosterMember = {
   id: number | string;
@@ -76,6 +77,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [now, setNow] = useState(() => Date.now());
   const [deleting, setDeleting] = useState<Entry['id'] | null>(null);
   const [closings, setClosings] = useState<Closing[]>([]);
+  const money = useMoney();
+  const symbol = useSymbol();
+  const { laborTargetPct } = useCurrency();
 
   const load = async (d: number) => {
     setLoading(true);
@@ -210,7 +214,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   };
 
   const exportCsv = () => {
-    const head = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', 'Mzda (Kč)'];
+    const head = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', `Mzda (${symbol})`];
     const rows = entries.map(e => {
       const start = new Date(e.clockIn).getTime();
       const end = e.clockOut ? new Date(e.clockOut).getTime() : now;
@@ -306,16 +310,31 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 <div className="glass-card p-5 min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Mzdové náklady</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">
-                    {laborCost.toLocaleString('cs-CZ')} Kč
+                    {money(laborCost)}
                   </p>
                 </div>
-                <div className="glass-card p-5 min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Podíl na tržbách</p>
-                  <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">
-                    {revenue > 0 ? `${(laborCost / revenue * 100).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %` : '—'}
-                  </p>
-                  <p className="text-[11px] text-black/40">z tržeb za období</p>
-                </div>
+                {(() => {
+                  const pct = revenue > 0 ? laborCost / revenue * 100 : null;
+                  const over = pct != null && laborTargetPct != null && pct > laborTargetPct;
+                  const tone = pct == null || laborTargetPct == null
+                    ? 'text-[#16181A]'
+                    : over ? 'text-red-600' : 'text-[#5B7A08]';
+                  return (
+                    <div className={`glass-card p-5 min-w-0 ${over ? 'ring-1 ring-red-500/30' : ''}`}>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Podíl na tržbách</p>
+                      <p className={`mt-1 text-xl font-bold tabular-nums whitespace-nowrap ${tone}`}>
+                        {pct != null ? `${pct.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %` : '—'}
+                      </p>
+                      {laborTargetPct != null ? (
+                        <p className="text-[11px] text-black/40">
+                          cíl {laborTargetPct} % · {over ? 'nad cílem' : 'v cíli'}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-black/40">z tržeb za období</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -341,7 +360,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                         <span className="whitespace-nowrap tabular-nums font-bold text-[#16181A]">{humanDuration(s.ms)}</span>
                         {rate ? (
                           <span className="whitespace-nowrap tabular-nums text-[#5B7A08] font-semibold text-sm">
-                            {earned(s.ms, rate).toLocaleString('cs-CZ')} Kč
+                            {money(earned(s.ms, rate))}
                           </span>
                         ) : null}
                       </div>
