@@ -71,7 +71,13 @@ type EligibleShift = {
 
 type Member = { id: number; name: string; avatar?: string };
 
-export default function CashClosing({ user }: { user: { id: number; name: string } }) {
+type Coworker = { id: number; name: string; avatar?: string; startTime: string; endTime: string };
+
+export default function CashClosing({ user, hideHistory, onSubmitted }: {
+  user: { id: number; name: string };
+  hideHistory?: boolean;
+  onSubmitted?: () => void;
+}) {
   const [closings, setClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [isEmployer, setIsEmployer] = useState(false);
@@ -87,6 +93,8 @@ export default function CashClosing({ user }: { user: { id: number; name: string
   const [showConfirm, setShowConfirm] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [coworkers, setCoworkers] = useState<Coworker[]>([]);
+  const [coworkerSel, setCoworkerSel] = useState<Record<number, { on: boolean; payout: string }>>({});
 
   const load = async () => {
     try {
@@ -119,6 +127,24 @@ export default function CashClosing({ user }: { user: { id: number; name: string
   // Employee submitting for a day they weren't scheduled ⇒ goes to approval.
   const onShift = eligible.some(s => s.date === form.date);
 
+  // Who is this closing FOR? Employee ⇒ themselves; employer/kiosk ⇒ the picked
+  // member (null on employer means "me").
+  const actorId = isSelf ? user.id : (selEmployee ?? meId);
+
+  // Team members who ALSO had a shift that day and don't have their own closing
+  // yet — one person can close for the whole crew.
+  useEffect(() => {
+    if (!form.date || actorId == null) { setCoworkers([]); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const d = await fetch(`/api/closings/coworkers?date=${form.date}&exclude=${actorId}`).then(r => r.json());
+        if (!cancelled) setCoworkers(Array.isArray(d.coworkers) ? d.coworkers : []);
+      } catch { if (!cancelled) setCoworkers([]); }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [form.date, actorId]);
+
   const pickShift = (s: EligibleShift) => {
     setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
     if (isKiosk) setSelEmployee(s.employeeId ?? null);
@@ -149,6 +175,9 @@ export default function CashClosing({ user }: { user: { id: number; name: string
   const doSubmit = async () => {
     setShowConfirm(false); setErr(''); setMsg('');
     setSubmitting(true);
+    const includedCoworkers = coworkers
+      .filter(c => coworkerSel[c.id]?.on)
+      .map(c => ({ employeeId: c.id, payout: n(coworkerSel[c.id]?.payout ?? '') }));
     try {
       const res = await fetch('/api/closings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -159,12 +188,16 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           selfPayout: payDailyCash ? n(form.selfPayout) : 0, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
           employeeId: isSelf ? undefined : selEmployee,
+          coworkers: includedCoworkers,
         }),
       });
       if (res.ok) {
         const d = await res.json().catch(() => ({}));
-        setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : 'Uzávěrka byla odeslána. ✓');
+        const forCoworkers = includedCoworkers.length > 0 ? ' (i za kolegy)' : '';
+        setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
         setForm(emptyForm());
+        setCoworkerSel({});
+        onSubmitted?.();
         await load();
         setTimeout(() => setMsg(''), 4000);
       } else {
@@ -357,6 +390,59 @@ export default function CashClosing({ user }: { user: { id: number; name: string
           </div>
         </Step>
 
+        {/* Kolegové na směně — one person closes for the whole crew */}
+        {coworkers.length > 0 && (
+          <section className="relative rounded-3xl border border-[#C8F542]/40 bg-[#C8F542]/[0.06] p-5 sm:p-6 space-y-4">
+            <div className="flex items-start gap-3.5">
+              <div className="flex-shrink-0 grid place-items-center h-11 w-11 rounded-2xl bg-white text-[#16181A] border border-black/[0.06] shadow-sm">
+                <Icon name="users" size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold tracking-tight text-[#16181A] leading-tight">Kolegové na téže směně</h4>
+                <p className="text-black/45 text-[13px] mt-0.5">
+                  Uzavři to i za ně — vytvoří se jim vlastní uzávěrka{payDailyCash ? ' i s výplatou' : ''}.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {coworkers.map(cw => {
+                const sel = coworkerSel[cw.id];
+                const on = !!sel?.on;
+                return (
+                  <div key={cw.id} className={`rounded-2xl border px-4 py-3 transition ${on ? 'bg-white border-[#C8F542]/50' : 'bg-white/50 border-black/[0.08]'}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setCoworkerSel(s => ({ ...s, [cw.id]: { on: !on, payout: s[cw.id]?.payout ?? '' } }))}
+                        className="flex items-center gap-2.5 min-w-0 text-left"
+                      >
+                        <span className={`shrink-0 flex h-6 w-6 items-center justify-center rounded-full border-2 transition ${on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+                        </span>
+                        <span className="text-lg shrink-0">{cw.avatar ?? '👤'}</span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
+                          <span className="block text-xs text-black/45 tabular-nums">{cw.startTime}–{cw.endTime}</span>
+                        </span>
+                      </button>
+                      {on && payDailyCash && (
+                        <div className="relative shrink-0 w-32">
+                          <input
+                            type="number" inputMode="numeric"
+                            value={sel?.payout ?? ''}
+                            onChange={e => setCoworkerSel(s => ({ ...s, [cw.id]: { on: true, payout: e.target.value } }))}
+                            placeholder="výplata" className={`${inputClass} pr-9 !py-2.5 text-sm`} />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">Kč</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Step 4 — the climax: expected vs counted */}
         <Step num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
@@ -404,8 +490,8 @@ export default function CashClosing({ user }: { user: { id: number; name: string
         </button>
       </form>
 
-      {/* My past closings (hidden on the shared kiosk) */}
-      {!isKiosk && (
+      {/* My past closings (hidden on the shared kiosk and when embedded) */}
+      {!isKiosk && !hideHistory && (
       <div className="space-y-3">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
           <Icon name="clock" size={18} /> Moje uzávěrky

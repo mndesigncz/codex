@@ -3,14 +3,17 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import { Closing, expectedCash, cashDifference, czk } from '@/lib/closing';
+import CashClosing from '../employee/CashClosing';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
-type ClosingRow = Closing & { approved?: boolean };
+// `covered_by` links a stub row to the parent closing that also closed for them.
+type ClosingRow = Closing & { approved?: boolean; covered_by?: number | null };
 
 export default function ClosingsOverview() {
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [approving, setApproving] = useState<number | null>(null);
@@ -51,11 +54,16 @@ export default function ClosingsOverview() {
   };
 
   // Closings submitted by someone not on shift; awaiting the employer's approval.
-  const pending = allClosings.filter(c => c.approved === false);
+  // Stub rows (covered_by set) are auto-handled with their parent — never pending.
+  const pending = allClosings.filter(c => c.approved === false && !c.covered_by);
 
   // Months present in the data, newest first (dates are 'YYYY-MM-DD').
   const months = Array.from(new Set(allClosings.map(c => c.date?.slice(0, 7)).filter(Boolean))).sort().reverse() as string[];
   const closings = month === 'all' ? allClosings : allClosings.filter(c => c.date?.slice(0, 7) === month);
+  // Covered stubs grouped under the parent closing they were filed alongside.
+  const coveredBy = (parentId: number) => closings.filter(c => c.covered_by === parentId);
+  // Only top-level closings appear as their own cards; stubs nest inside.
+  const topLevel = closings.filter(c => !c.covered_by);
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   const exportCsv = () => {
@@ -97,6 +105,19 @@ export default function ClosingsOverview() {
   )
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, total]) => ({ date, total }));
+
+  // Employer fills a closing themselves (e.g. nobody on the crew did it today).
+  if (creating) {
+    return (
+      <div className="p-6 space-y-4">
+        <button onClick={() => setCreating(false)}
+          className="inline-flex items-center gap-2 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition">
+          <Icon name="chevron" size={16} className="rotate-90" /> Zpět na přehled
+        </button>
+        <CashClosing user={{ id: 0, name: 'Vedení' }} hideHistory onSubmitted={() => { setCreating(false); load(); }} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -220,13 +241,19 @@ export default function ClosingsOverview() {
       })()}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({closings.length})</h3>
-        {closings.length > 0 && (
-          <button onClick={exportCsv}
-            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
-            Export CSV ↓
+        <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
+            <Icon name="plus" size={16} /> Nová uzávěrka
           </button>
-        )}
+          {topLevel.length > 0 && (
+            <button onClick={exportCsv}
+              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
+              Export CSV ↓
+            </button>
+          )}
+        </div>
       </div>
 
       {months.length > 1 && (
@@ -248,14 +275,15 @@ export default function ClosingsOverview() {
         <div className="flex items-center justify-center h-48">
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
-      ) : closings.length === 0 ? (
+      ) : topLevel.length === 0 ? (
         <div className="glass-card p-8 text-center"><p className="text-black/45">Zatím žádné uzávěrky od zaměstnanců.</p></div>
       ) : (
         <div className="space-y-3">
-          {closings.map(c => {
+          {topLevel.map(c => {
             const d = cashDifference(c);
             const expected = expectedCash(c);
             const open = openId === c.id;
+            const covered = coveredBy(c.id);
             return (
               <div key={c.id} className="glass-card overflow-hidden">
                 <button onClick={() => setOpenId(open ? null : c.id)} className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors">
@@ -270,6 +298,11 @@ export default function ClosingsOverview() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {covered.length > 0 && (
+                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium whitespace-nowrap">
+                        <Icon name="users" size={12} /> +{covered.length}
+                      </span>
+                    )}
                     {c.approved === false && (
                       <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                     )}
@@ -307,6 +340,26 @@ export default function ClosingsOverview() {
                         <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{czk(d)}</span>
                       </div>
                     </div>
+                    {covered.length > 0 && (
+                      <div className="rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/30 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-[#5B7A08] mb-2 flex items-center gap-1.5">
+                          <Icon name="users" size={14} /> Uzávěrka i za
+                        </p>
+                        <div className="space-y-1.5">
+                          {covered.map(cv => (
+                            <div key={cv.id} className="flex items-center justify-between gap-3 text-sm">
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span className="text-base shrink-0">{cv.author_avatar ?? '👤'}</span>
+                                <span className="font-medium text-[#16181A] truncate">{cv.author_name ?? 'Neznámý'}</span>
+                              </span>
+                              {payDailyCash && cv.self_payout > 0 && (
+                                <span className="shrink-0 text-black/55 tabular-nums whitespace-nowrap">Výplata {czk(cv.self_payout)}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3">{c.notes}</p>}
                     <button onClick={() => remove(c)} disabled={deleting === c.id}
                       className="text-sm text-red-600 hover:bg-red-500/[0.06] rounded-full px-4 py-2 font-medium transition-colors disabled:opacity-50">
