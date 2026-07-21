@@ -22,6 +22,8 @@ import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
 import TimeOffRequest from '../scheduling/TimeOffRequest';
 import TimeOffApprovals from '../scheduling/TimeOffApprovals';
 import Procedures from '../procedures/Procedures';
+import ShiftSwap from '../scheduling/ShiftSwap';
+import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
 import MobileMoreSheet from '../MobileMoreSheet';
 
 const navItems = [
@@ -59,7 +61,10 @@ export default function EmployerLayout({ user }: Props) {
       case 'shifts':    return (
         <div>
           <ScheduleBuilder user={user as any} />
-          <div className="px-4 md:px-6 pb-6 max-w-5xl mx-auto w-full"><TimeOffApprovals /></div>
+          <div className="px-4 md:px-6 pb-6 max-w-5xl mx-auto w-full space-y-4">
+            <ShiftSwapApprovals />
+            <TimeOffApprovals />
+          </div>
         </div>
       );
       case 'inventory': return <Inventory user={user as any} />;
@@ -72,6 +77,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'my-shifts': return (
         <div className="space-y-2">
           <MyShifts user={user as any} />
+          <ShiftSwap user={user as any} />
           <AvailabilitySubmit user={user as any} />
           <div className="px-6 pb-6"><TimeOffRequest /></div>
         </div>

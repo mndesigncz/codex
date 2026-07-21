@@ -16,6 +16,7 @@ import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
 import CashClosing from './CashClosing';
 import SuggestionsBoard from '../SuggestionsBoard';
+import ShiftSwap from '../scheduling/ShiftSwap';
 import Procedures from '../procedures/Procedures';
 import MobileMoreSheet from '../MobileMoreSheet';
 
@@ -48,7 +49,12 @@ export default function EmployeeLayout({ user }: Props) {
   const renderView = () => {
     switch (currentView) {
       case 'home':         return <EmployeeDashboard user={user as any} onNavigate={setCurrentView} />;
-      case 'my-shifts':    return <MyShifts user={user as any} />;
+      case 'my-shifts':    return (
+        <div className="space-y-2">
+          <MyShifts user={user as any} />
+          <ShiftSwap user={user as any} />
+        </div>
+      );
       case 'availability': return (
         <div className="space-y-2">
           <AvailabilitySubmit user={user as any} />
