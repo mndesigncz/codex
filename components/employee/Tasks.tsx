@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { TaskChecklist, recurrenceLabel, ChecklistItem } from '../TaskChecklist';
 
 interface Task {
   id: number;
@@ -9,6 +10,8 @@ interface Task {
   priority: string;
   status: string;
   dueDate?: string;
+  recurrence?: string | null;
+  checklist?: ChecklistItem[];
 }
 
 interface Props {
@@ -45,10 +48,29 @@ export default function Tasks({ user }: Props) {
       });
       if (res.ok) {
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+        // A recurring task respawns server-side on completion — refetch to see it.
+        const done = newStatus === 'done';
+        if (done && tasks.find(t => t.id === taskId)?.recurrence) {
+          fetch(`/api/tasks?assignedTo=${userId}`).then(r => r.json())
+            .then(d => { if (Array.isArray(d)) setTasks(d); }).catch(() => {});
+        }
       }
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const toggleChecklistItem = async (task: Task, index: number) => {
+    const next = (task.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it);
+    const prev = tasks;
+    setTasks(ts => ts.map(x => x.id === task.id ? { ...x, checklist: next } : x));
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, checklist: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch { setTasks(prev); }
   };
 
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
@@ -106,11 +128,21 @@ export default function Tasks({ user }: Props) {
                       </select>
                     </div>
                     {task.description && <p className="text-sm text-black/55 mt-1.5">{task.description}</p>}
-                    {task.dueDate && (
-                      <p className={`text-xs mt-2 ${new Date(task.dueDate) < new Date() && task.status !== 'done' ? 'text-red-600 font-medium' : 'text-black/45'}`}>
-                        Do: {task.dueDate}
-                        {new Date(task.dueDate) < new Date() && task.status !== 'done' && ' · Po termínu'}
-                      </p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {task.dueDate && (
+                        <p className={`text-xs ${new Date(task.dueDate) < new Date() && task.status !== 'done' ? 'text-red-600 font-medium' : 'text-black/45'}`}>
+                          Do: {task.dueDate}
+                          {new Date(task.dueDate) < new Date() && task.status !== 'done' && ' · Po termínu'}
+                        </p>
+                      )}
+                      {recurrenceLabel(task.recurrence) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[10px] font-semibold">
+                          ↻ {recurrenceLabel(task.recurrence)}
+                        </span>
+                      )}
+                    </div>
+                    {task.checklist && task.checklist.length > 0 && (
+                      <TaskChecklist items={task.checklist} onToggle={i => toggleChecklistItem(task, i)} />
                     )}
                   </div>
                 </div>

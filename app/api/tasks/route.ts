@@ -21,8 +21,28 @@ const shape = (r: any) => ({
   id: r.id, title: r.title, description: r.description,
   assignedTo: r.assigned_to, createdBy: r.created_by,
   priority: r.priority, status: r.status, dueDate: r.due_date,
+  recurrence: r.recurrence ?? null,
+  checklist: Array.isArray(r.checklist) ? r.checklist : [],
   assigneeName: r.assignee_name ?? null, assigneeAvatar: r.assignee_avatar ?? null,
 });
+
+const RECURRENCES = ['daily', 'weekdays', 'weekly'];
+
+// Advance a 'YYYY-MM-DD' date to the next occurrence for the given recurrence.
+function nextDueDate(due: string | null, recurrence: string): string | null {
+  const base = due && /^\d{4}-\d{2}-\d{2}$/.test(due) ? new Date(due + 'T00:00:00') : new Date();
+  const d = new Date(base);
+  if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
+  else if (recurrence === 'weekdays') {
+    do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  } else d.setDate(d.getDate() + 1); // daily
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Strip the `done` flags so a respawned recurring task starts fresh.
+function resetChecklist(cl: any): any[] {
+  return Array.isArray(cl) ? cl.map((i: any) => ({ text: String(i?.text ?? ''), done: false })).filter(i => i.text) : [];
+}
 
 // GET — employee: own tasks; employer: every task in the team.
 export async function GET() {
@@ -60,11 +80,27 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const [row] = await sql`
-    INSERT INTO tasks (title, description, assigned_to, created_by, priority, status, due_date)
-    VALUES (${title}, ${b.description ?? null}, ${assignedTo}, ${c.meId},
-            ${b.priority ?? 'medium'}, ${b.status ?? 'pending'}, ${b.dueDate ?? null})
-    RETURNING *`;
+  const recurrence = RECURRENCES.includes(b.recurrence) ? b.recurrence : null;
+  const checklist = Array.isArray(b.checklist)
+    ? b.checklist.map((i: any) => ({ text: String(i?.text ?? '').slice(0, 300), done: !!i?.done })).filter((i: any) => i.text).slice(0, 50)
+    : [];
+
+  let row: any;
+  try {
+    [row] = await sql`
+      INSERT INTO tasks (title, description, assigned_to, created_by, priority, status, due_date, recurrence, checklist)
+      VALUES (${title}, ${b.description ?? null}, ${assignedTo}, ${c.meId},
+              ${b.priority ?? 'medium'}, ${b.status ?? 'pending'}, ${b.dueDate ?? null},
+              ${recurrence}, ${JSON.stringify(checklist)}::jsonb)
+      RETURNING *`;
+  } catch {
+    // recurrence/checklist columns not migrated yet — insert the core row.
+    [row] = await sql`
+      INSERT INTO tasks (title, description, assigned_to, created_by, priority, status, due_date)
+      VALUES (${title}, ${b.description ?? null}, ${assignedTo}, ${c.meId},
+              ${b.priority ?? 'medium'}, ${b.status ?? 'pending'}, ${b.dueDate ?? null})
+      RETURNING *`;
+  }
 
   // Let the assignee know when someone else assigned them a task.
   if (assignedTo !== c.meId) {
@@ -120,6 +156,33 @@ export async function PATCH(req: NextRequest) {
     || ((c.role === 'employer' || c.role === 'kiosk') && task.assignee_team === c.teamId);
   if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
+  // Checklist edit (tick items / replace the list) — independent of status.
+  if (Array.isArray(b.checklist)) {
+    const cl = b.checklist
+      .map((i: any) => ({ text: String(i?.text ?? '').slice(0, 300), done: !!i?.done }))
+      .filter((i: any) => i.text).slice(0, 50);
+    try {
+      const [row] = await sql`UPDATE tasks SET checklist = ${JSON.stringify(cl)}::jsonb WHERE id = ${id} RETURNING *`;
+      return NextResponse.json(shape(row));
+    } catch {
+      return NextResponse.json(shape(task)); // column not migrated yet
+    }
+  }
+
+  if (b.status === undefined) return NextResponse.json(shape(task));
   const [row] = await sql`UPDATE tasks SET status = ${b.status} WHERE id = ${id} RETURNING *`;
+
+  // Completing a recurring task spawns the next occurrence with a fresh checklist.
+  if (b.status === 'done' && task.recurrence && RECURRENCES.includes(task.recurrence)) {
+    try {
+      const nextDue = nextDueDate(task.due_date, task.recurrence);
+      await sql`
+        INSERT INTO tasks (title, description, assigned_to, created_by, priority, status, due_date, recurrence, checklist)
+        VALUES (${task.title}, ${task.description}, ${task.assigned_to}, ${task.created_by},
+                ${task.priority}, 'pending', ${nextDue}, ${task.recurrence},
+                ${JSON.stringify(resetChecklist(task.checklist))}::jsonb)`;
+    } catch { /* columns missing or insert failed — the done task still stands */ }
+  }
+
   return NextResponse.json(shape(row));
 }
