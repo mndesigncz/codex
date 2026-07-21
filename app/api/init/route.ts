@@ -108,6 +108,8 @@ export async function GET() {
       )`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS team_id INTEGER`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS critical_quantity INTEGER NOT NULL DEFAULT 2`;
+    // unit cost → stock valuation (quantity × unit_cost)
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS unit_cost INTEGER`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS created_by INTEGER`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_by INTEGER`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`;

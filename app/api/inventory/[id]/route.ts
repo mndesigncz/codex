@@ -26,25 +26,38 @@ function statusOf(quantity: number, min: number, critical: number): 'ok' | 'low'
 
 // Return the item in the same shape the list endpoint uses (camelCase fields).
 async function mappedItem(id: number) {
-  const [row] = await sql`
-    SELECT
-      i.id,
-      i.name,
-      i.category,
-      i.quantity,
-      i.min_quantity      AS "minQuantity",
-      i.critical_quantity AS "criticalQuantity",
-      i.max_quantity      AS "maxQuantity",
-      i.unit,
-      i.supplier,
-      i.supplier_url      AS "supplierUrl",
-      i.updated_at        AS "updatedAt",
-      i.updated_by        AS "updatedBy",
-      u.name              AS "updatedByName"
-    FROM inventory_items i
-    LEFT JOIN users u ON u.id = i.updated_by
-    WHERE i.id = ${id}`;
-  return row;
+  try {
+    const [row] = await sql`
+      SELECT
+        i.id, i.name, i.category, i.quantity,
+        i.min_quantity      AS "minQuantity",
+        i.critical_quantity AS "criticalQuantity",
+        i.max_quantity      AS "maxQuantity",
+        i.unit, i.supplier,
+        i.supplier_url      AS "supplierUrl",
+        i.unit_cost         AS "unitCost",
+        i.updated_at        AS "updatedAt",
+        i.updated_by        AS "updatedBy",
+        u.name              AS "updatedByName"
+      FROM inventory_items i LEFT JOIN users u ON u.id = i.updated_by
+      WHERE i.id = ${id}`;
+    return row;
+  } catch {
+    const [row] = await sql`
+      SELECT
+        i.id, i.name, i.category, i.quantity,
+        i.min_quantity      AS "minQuantity",
+        i.critical_quantity AS "criticalQuantity",
+        i.max_quantity      AS "maxQuantity",
+        i.unit, i.supplier,
+        i.supplier_url      AS "supplierUrl",
+        i.updated_at        AS "updatedAt",
+        i.updated_by        AS "updatedBy",
+        u.name              AS "updatedByName"
+      FROM inventory_items i LEFT JOIN users u ON u.id = i.updated_by
+      WHERE i.id = ${id}`;
+    return row;
+  }
 }
 
 // PATCH: employees may only change quantity; employers may edit all fields.
@@ -128,6 +141,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       updated_by = ${me.meId},
       updated_at = NOW()
     WHERE id = ${id}`;
+
+  // unit_cost updated separately so a not-yet-migrated column can't fail the edit.
+  if (body.unitCost !== undefined) {
+    const uc = body.unitCost === '' || body.unitCost === null ? null : Math.max(0, Math.round(Number(body.unitCost)));
+    try { await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${id}`; } catch { /* column not migrated yet */ }
+  }
 
   // Log any employer-driven quantity change too.
   if (body.quantity !== undefined && Number(item.quantity) !== quantity) {

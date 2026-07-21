@@ -22,25 +22,42 @@ export async function GET() {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  const items = await sql`
-    SELECT
-      i.id,
-      i.name,
-      i.category,
-      i.quantity,
-      i.min_quantity      AS "minQuantity",
-      i.critical_quantity AS "criticalQuantity",
-      i.max_quantity      AS "maxQuantity",
-      i.unit,
-      i.supplier,
-      i.supplier_url      AS "supplierUrl",
-      i.updated_at        AS "updatedAt",
-      i.updated_by        AS "updatedBy",
-      u.name              AS "updatedByName"
-    FROM inventory_items i
-    LEFT JOIN users u ON u.id = i.updated_by
-    WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
-    ORDER BY i.name ASC`;
+  // unit_cost is newer — try to include it, fall back if not yet migrated.
+  let items: any[];
+  try {
+    items = await sql`
+      SELECT
+        i.id, i.name, i.category, i.quantity,
+        i.min_quantity      AS "minQuantity",
+        i.critical_quantity AS "criticalQuantity",
+        i.max_quantity      AS "maxQuantity",
+        i.unit, i.supplier,
+        i.supplier_url      AS "supplierUrl",
+        i.unit_cost         AS "unitCost",
+        i.updated_at        AS "updatedAt",
+        i.updated_by        AS "updatedBy",
+        u.name              AS "updatedByName"
+      FROM inventory_items i
+      LEFT JOIN users u ON u.id = i.updated_by
+      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      ORDER BY i.name ASC`;
+  } catch {
+    items = await sql`
+      SELECT
+        i.id, i.name, i.category, i.quantity,
+        i.min_quantity      AS "minQuantity",
+        i.critical_quantity AS "criticalQuantity",
+        i.max_quantity      AS "maxQuantity",
+        i.unit, i.supplier,
+        i.supplier_url      AS "supplierUrl",
+        i.updated_at        AS "updatedAt",
+        i.updated_by        AS "updatedBy",
+        u.name              AS "updatedByName"
+      FROM inventory_items i
+      LEFT JOIN users u ON u.id = i.updated_by
+      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      ORDER BY i.name ASC`;
+  }
 
   return NextResponse.json(items);
 }
@@ -64,12 +81,19 @@ export async function POST(request: Request) {
   const supplier = body.supplier ?? null;
   const supplierUrl = body.supplierUrl ? String(body.supplierUrl).trim() || null : null;
 
+  const unitCost = body.unitCost === '' || body.unitCost == null ? null : Math.max(0, Math.round(Number(body.unitCost)));
+
   const [item] = await sql`
     INSERT INTO inventory_items
       (team_id, name, category, quantity, min_quantity, critical_quantity, max_quantity, unit, supplier, supplier_url, created_by, updated_by, updated_at)
     VALUES
       (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${me.meId}, ${me.meId}, NOW())
     RETURNING id`;
+
+  // unit_cost applied separately so a not-yet-migrated column can't fail the insert.
+  if (unitCost !== null && Number.isFinite(unitCost)) {
+    try { await sql`UPDATE inventory_items SET unit_cost = ${unitCost} WHERE id = ${item.id}`; } catch { /* column not migrated yet */ }
+  }
 
   return NextResponse.json({ ok: true, id: item.id });
 }
