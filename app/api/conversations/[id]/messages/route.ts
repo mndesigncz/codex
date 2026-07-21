@@ -100,6 +100,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         title: sender?.name ?? 'Nová zpráva',
         body: notifBody,
         type: 'chat',
+        category: 'message',
         link: '/',
       }),
     ),

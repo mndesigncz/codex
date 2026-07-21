@@ -127,6 +127,7 @@ export async function POST(req: Request) {
           title: 'Zadaná dostupnost',
           body: `${ctx.name ?? 'Zaměstnanec'} zadal/a dostupnost na ${monthLabel}`,
           type: 'shift',
+          category: 'shift',
         }),
       ),
     );

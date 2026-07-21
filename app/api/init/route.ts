@@ -433,6 +433,8 @@ export async function GET() {
     await sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`;
     // optional per-employee PIN for the shared kiosk device
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`;
+    // per-user notification category preferences (server-side, synced across devices)
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_prefs JSONB DEFAULT '{}'`;
     // whether closings are locked to shifts (default on)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
 

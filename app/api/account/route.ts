@@ -14,6 +14,8 @@ async function meId() {
   return parseInt((session.user as any).id);
 }
 
+const DEFAULT_NOTIF_PREFS = { messages: true, lowStock: true, shifts: true };
+
 function serialize(u: any) {
   return {
     id: u.id,
@@ -24,6 +26,7 @@ function serialize(u: any) {
     jobTitle: u.job_title,
     shiftPreference: u.shift_preference,
     theme: u.theme ?? 'light',
+    notifPrefs: { ...DEFAULT_NOTIF_PREFS, ...(u.notif_prefs ?? {}) },
     role: u.role,
   };
 }
@@ -32,9 +35,17 @@ export async function GET() {
   const id = await meId();
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  const [user] = await sql`
-    SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role
-    FROM users WHERE id = ${id}`;
+  // notif_prefs fetched defensively so a pending migration can't 500 the account.
+  let user: any;
+  try {
+    [user] = await sql`
+      SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, notif_prefs, role
+      FROM users WHERE id = ${id}`;
+  } catch {
+    [user] = await sql`
+      SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role
+      FROM users WHERE id = ${id}`;
+  }
   if (!user) return NextResponse.json({ error: 'Uživatel nenalezen' }, { status: 404 });
 
   return NextResponse.json({ user: serialize(user) });
@@ -45,7 +56,7 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const { name, avatar, phone, jobTitle, shiftPreference, theme, currentPassword, newPassword } = body;
+  const { name, avatar, phone, jobTitle, shiftPreference, theme, notifPrefs, currentPassword, newPassword } = body;
 
   // Password change flow
   if (currentPassword !== undefined || newPassword !== undefined) {
@@ -75,6 +86,15 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Neplatný motiv vzhledu.' }, { status: 400 });
   }
 
+  // Notification preferences — merged onto whatever is stored (partial updates ok).
+  if (notifPrefs && typeof notifPrefs === 'object') {
+    try {
+      const [cur] = await sql`SELECT notif_prefs FROM users WHERE id = ${id}`;
+      const merged = { ...DEFAULT_NOTIF_PREFS, ...(cur?.notif_prefs ?? {}), ...notifPrefs };
+      await sql`UPDATE users SET notif_prefs = ${JSON.stringify(merged)}::jsonb WHERE id = ${id}`;
+    } catch { /* column not migrated yet — ignore until /api/init runs */ }
+  }
+
   // Profile update flow (only provided fields)
   await sql`
     UPDATE users SET
@@ -86,9 +106,16 @@ export async function PATCH(request: Request) {
       theme = COALESCE(${theme ?? null}, theme)
     WHERE id = ${id}`;
 
-  const [updated] = await sql`
-    SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role
-    FROM users WHERE id = ${id}`;
+  let updated: any;
+  try {
+    [updated] = await sql`
+      SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, notif_prefs, role
+      FROM users WHERE id = ${id}`;
+  } catch {
+    [updated] = await sql`
+      SELECT id, name, email, avatar, phone, job_title, shift_preference, theme, role
+      FROM users WHERE id = ${id}`;
+  }
 
   return NextResponse.json({ ok: true, user: serialize(updated) });
 }
