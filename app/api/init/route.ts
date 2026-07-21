@@ -352,6 +352,8 @@ export async function GET() {
     // approval flow for closings submitted by someone who wasn't on shift
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
+    // a closing filled by one colleague on behalf of another points to the main one
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS covered_by INTEGER`;
 
     // ---- Attendance / time tracking (kiosk / tablet) ----
     await sql`

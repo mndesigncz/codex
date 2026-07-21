@@ -134,6 +134,11 @@ export async function POST(request: Request) {
   const date = typeof b.date === 'string' && b.date ? b.date : today;
   const isEmployer = c.role === 'employer';
   const isKiosk = c.role === 'kiosk';
+  let payDailyCash = false;
+  try {
+    const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
+    payDailyCash = !!team?.pay_daily_cash;
+  } catch { /* not migrated */ }
 
   // The kiosk AND the employer can submit ON BEHALF of a chosen team member —
   // the closing is attributed to them (author, one-per-day, notifications).
@@ -221,5 +226,41 @@ export async function POST(request: Request) {
     console.error('notify employers failed', e);
   }
 
-  return NextResponse.json({ ok: true, closing: row, approved });
+  // Co-workers: when several people were on shift, one closing can cover them.
+  // We record a lightweight covered stub per colleague (their payout only) so
+  // they don't get reminded / can't double-submit, and their wage is tracked.
+  let covered = 0;
+  if (Array.isArray(b.coworkers) && b.coworkers.length && row?.id) {
+    for (const cw of b.coworkers) {
+      const cid = parseInt(cw?.employeeId);
+      if (!Number.isFinite(cid) || cid === actorId) continue;
+      try {
+        const [emp] = await sql`SELECT id, team_id, role, name FROM users WHERE id = ${cid}`;
+        if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') continue;
+        // Must have had a shift that day and not already have a closing.
+        const [cwShift] = await sql`SELECT id FROM shifts WHERE employee_id = ${cid} AND date = ${date} LIMIT 1`;
+        if (!cwShift) continue;
+        const [cwDupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${cid} AND date = ${date}`;
+        if (cwDupe) continue;
+        const cwPayout = payDailyCash ? num(cw?.payout) : 0;
+        await sql`
+          INSERT INTO cash_closings (
+            team_id, created_by, date, shift_label, shift_id, covered_by, approved, approved_by, self_payout
+          ) VALUES (
+            ${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${cwShift.id}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${cwPayout}
+          )`;
+        covered++;
+        try {
+          const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
+          await notifyUser(cid, {
+            title: 'Uzávěrka za tebe',
+            body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${date}).`,
+            type: 'info',
+          });
+        } catch { /* best-effort */ }
+      } catch { /* skip this coworker */ }
+    }
+  }
+
+  return NextResponse.json({ ok: true, closing: row, approved, covered });
 }
