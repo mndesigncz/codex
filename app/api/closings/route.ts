@@ -38,6 +38,12 @@ export async function GET() {
     payDailyCash = !!team?.pay_daily_cash;
   } catch { /* column not migrated yet */ }
 
+  let payoutFromRegister = true;
+  try {
+    const [team] = await sql`SELECT payout_from_register FROM teams WHERE id = ${c.teamId}`;
+    payoutFromRegister = team?.payout_from_register !== false;
+  } catch { /* column not migrated yet */ }
+
   let requiresShift = true;
   try {
     const [team] = await sql`SELECT closing_requires_shift FROM teams WHERE id = ${c.teamId}`;
@@ -101,6 +107,11 @@ export async function GET() {
 
   // For the employer's "submit on behalf" selector.
   let members: any[] = [];
+  // Which team members were scheduled each recent day, and which of those days
+  // still have NO closing at all — so the employer sees who was on shift and
+  // where a closing is missing.
+  let scheduledByDate: Record<string, any[]> = {};
+  let missingClosings: { date: string; employees: any[] }[] = [];
   if (c.role === 'employer') {
     try {
       members = await sql`
@@ -108,17 +119,38 @@ export async function GET() {
         WHERE team_id = ${c.teamId} AND role IN ('employee','employer')
         ORDER BY role DESC, name ASC`;
     } catch { /* ignore */ }
+
+    try {
+      const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      const sched = await sql`
+        SELECT DISTINCT s.date, u.id, u.name, u.avatar
+        FROM shifts s JOIN users u ON u.id = s.employee_id
+        WHERE u.team_id = ${c.teamId} AND s.date >= ${cutoff} AND s.date <= ${today}
+        ORDER BY s.date DESC, u.name ASC`;
+      for (const r of sched as any[]) {
+        (scheduledByDate[r.date] ??= []).push({ id: r.id, name: r.name, avatar: r.avatar });
+      }
+      // Dates that had at least one shift but not a single closing row.
+      const closedDates = new Set((rows as any[]).map(r => r.date));
+      missingClosings = Object.keys(scheduledByDate)
+        .filter(d => !closedDates.has(d))
+        .sort().reverse()
+        .map(date => ({ date, employees: scheduledByDate[date] }));
+    } catch { /* shifts table issue — leave empty */ }
   }
 
   return NextResponse.json({
     closings: rows,
     canSeeAll: c.role === 'employer',
     payDailyCash,
+    payoutFromRegister,
     requiresShift,
     isEmployer: c.role === 'employer',
     isKiosk: c.role === 'kiosk',
     eligibleShifts,
     members,
+    scheduledByDate,
+    missingClosings,
     meId: c.meId,
   });
 }
@@ -138,6 +170,13 @@ export async function POST(request: Request) {
   try {
     const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
     payDailyCash = !!team?.pay_daily_cash;
+  } catch { /* not migrated */ }
+  // Snapshot the payout-source policy onto the closing so historical rows keep
+  // their own expected-cash math even if the team later flips the switch.
+  let payoutFromRegister = true;
+  try {
+    const [team] = await sql`SELECT payout_from_register FROM teams WHERE id = ${c.teamId}`;
+    payoutFromRegister = team?.payout_from_register !== false;
   } catch { /* not migrated */ }
 
   // The kiosk AND the employer can submit ON BEHALF of a chosen team member —
@@ -183,11 +222,11 @@ export async function POST(request: Request) {
   try {
     [row] = await sql`
       INSERT INTO cash_closings (
-        team_id, created_by, date, shift_label, shift_id, approved, approved_by,
+        team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
@@ -245,9 +284,9 @@ export async function POST(request: Request) {
         const cwPayout = payDailyCash ? num(cw?.payout) : 0;
         await sql`
           INSERT INTO cash_closings (
-            team_id, created_by, date, shift_label, shift_id, covered_by, approved, approved_by, self_payout
+            team_id, created_by, date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout
           ) VALUES (
-            ${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${cwShift.id}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${cwPayout}
+            ${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${cwShift.id}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister}, ${cwPayout}
           )`;
         covered++;
         try {

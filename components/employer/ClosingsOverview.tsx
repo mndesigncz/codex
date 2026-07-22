@@ -10,12 +10,18 @@ import CashClosing from '../employee/CashClosing';
 // `covered_by` links a stub row to the parent closing that also closed for them.
 type ClosingRow = Closing & { approved?: boolean; covered_by?: number | null };
 
+type Person = { id: number; name: string; avatar?: string };
+type MissingDay = { date: string; employees: Person[] };
+
 export default function ClosingsOverview() {
   const money = useMoney();
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
+  const [missing, setMissing] = useState<MissingDay[]>([]);
+  const [scheduledByDate, setScheduledByDate] = useState<Record<string, Person[]>>({});
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [creatingDate, setCreatingDate] = useState<string | undefined>(undefined);
   const [openId, setOpenId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [approving, setApproving] = useState<number | null>(null);
@@ -26,6 +32,8 @@ export default function ClosingsOverview() {
       const d = await fetch('/api/closings').then(r => r.json());
       setAllClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
+      setMissing(Array.isArray(d.missingClosings) ? d.missingClosings : []);
+      setScheduledByDate(d.scheduledByDate && typeof d.scheduledByDate === 'object' ? d.scheduledByDate : {});
     } catch { /* ignore */ }
     setLoading(false);
   };
@@ -112,17 +120,53 @@ export default function ClosingsOverview() {
   if (creating) {
     return (
       <div className="p-6 space-y-4">
-        <button onClick={() => setCreating(false)}
+        <button onClick={() => { setCreating(false); setCreatingDate(undefined); }}
           className="inline-flex items-center gap-2 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="rotate-90" /> Zpět na přehled
         </button>
-        <CashClosing user={{ id: 0, name: 'Vedení' }} hideHistory onSubmitted={() => { setCreating(false); load(); }} />
+        <CashClosing user={{ id: 0, name: 'Vedení' }} hideHistory initialDate={creatingDate}
+          onSubmitted={() => { setCreating(false); setCreatingDate(undefined); load(); }} />
       </div>
     );
   }
 
+  const openCreate = (date?: string) => { setCreatingDate(date); setCreating(true); };
+
+  const fmtMissing = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
     <div className="p-6 space-y-6">
+      {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
+      {missing.length > 0 && (
+        <div className="rounded-3xl bg-red-500/[0.06] border border-red-500/25 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg" aria-hidden>🚨</span>
+            <h3 className="font-bold text-[#16181A]">Chybí uzávěrka</h3>
+            <span className="rounded-full bg-red-500/15 text-red-600 px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
+          </div>
+          <p className="text-xs text-black/50">Tyto dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí, když ji vyplní jeden za všechny.</p>
+          {missing.map(m => (
+            <div key={m.date} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-bold tracking-tight text-[#16181A] capitalize">{fmtMissing(m.date)}</p>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <span className="text-xs text-black/45">Na směně:</span>
+                  {m.employees.map(e => (
+                    <span key={e.id} className="inline-flex items-center gap-1 rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-black/60">
+                      <span>{e.avatar ?? '👤'}</span> {e.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button onClick={() => openCreate(m.date)}
+                className="shrink-0 rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black transition inline-flex items-center gap-1.5">
+                <Icon name="plus" size={15} /> Vyplnit
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Uzávěrky ke schválení */}
       {pending.length > 0 && (
         <div className="rounded-3xl bg-orange-500/[0.08] border border-orange-500/25 p-5 space-y-3">
@@ -245,7 +289,7 @@ export default function ClosingsOverview() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => setCreating(true)}
+          <button onClick={() => openCreate()}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
             <Icon name="plus" size={16} /> Nová uzávěrka
           </button>
@@ -286,6 +330,9 @@ export default function ClosingsOverview() {
             const expected = expectedCash(c);
             const open = openId === c.id;
             const covered = coveredBy(c.id);
+            // Everyone scheduled that day, and who is / isn't covered by a closing.
+            const scheduled = scheduledByDate[c.date] ?? [];
+            const coveredIds = new Set<number>([c.created_by, ...covered.map(cv => cv.created_by)]);
             return (
               <div key={c.id} className="glass-card overflow-hidden">
                 <button onClick={() => setOpenId(open ? null : c.id)} className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors">
@@ -359,6 +406,25 @@ export default function ClosingsOverview() {
                               )}
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    )}
+                    {scheduled.length > 0 && (
+                      <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
+                          <Icon name="users" size={14} /> Na směně ten den
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {scheduled.map(p => {
+                            const has = coveredIds.has(p.id);
+                            return (
+                              <span key={p.id} title={has ? 'Má uzávěrku' : 'Bez uzávěrky'}
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${has ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
+                                <span>{p.avatar ?? '👤'}</span> {p.name}
+                                {has ? ' ✓' : ' — chybí'}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
