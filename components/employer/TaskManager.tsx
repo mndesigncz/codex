@@ -8,13 +8,18 @@ interface Task {
   id: number;
   title: string;
   description?: string | null;
-  assignedTo: number;
+  assignedTo: number | null;
+  teamTask?: boolean;
   createdBy: number;
   priority: string;
   status: string;
   dueDate?: string | null;
   recurrence?: string | null;
+  seriesId?: string | null;
   checklist?: ChecklistItem[];
+  completedBy?: number | null;
+  completedByName?: string | null;
+  completedByAvatar?: string | null;
 }
 interface Member { id: number; name: string; role: string; avatar?: string }
 
@@ -64,29 +69,33 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     e.preventDefault();
     setError('');
     if (!form.title.trim()) { setError('Zadejte název úkolu.'); return; }
-    if (!form.assignedTo) { setError('Vyberte, komu úkol přiřadit.'); return; }
+    // assignedTo '' ⇒ a day task anyone on the team can do (no specific person).
+    if (form.assignedTo === '' && !form.dueDate) { setError('U úkolu pro kohokoliv vyber den (termín).'); return; }
     setSaving(true);
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: form.title.trim(), description: form.description.trim() || null,
-          assignedTo: parseInt(form.assignedTo), priority: form.priority, dueDate: form.dueDate || null,
+          assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
+          priority: form.priority, dueDate: form.dueDate || null,
           recurrence: form.recurrence || null,
           checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: false })),
         }),
       });
       const d = await res.json();
-      if (res.ok) { setTasks(prev => [d, ...prev]); setForm(emptyForm()); setShowForm(false); }
+      if (res.ok) { setForm(emptyForm()); setShowForm(false); load(); } // reload to include generated upcoming occurrences
       else setError(d.error || 'Úkol se nepodařilo vytvořit.');
     } catch { setError('Chyba serveru.'); }
     setSaving(false);
   };
 
   const remove = async (t: Task) => {
-    if (!confirm(`Smazat úkol „${t.title}"?`)) return;
+    const isSeries = !!t.seriesId;
+    if (!confirm(isSeries ? `Smazat celý opakovaný úkol „${t.title}" (i nadcházející)?` : `Smazat úkol „${t.title}"?`)) return;
     const prev = tasks;
-    setTasks(ts => ts.filter(x => x.id !== t.id));
+    // A series delete removes every occurrence of it.
+    setTasks(ts => ts.filter(x => isSeries ? x.seriesId !== t.seriesId : x.id !== t.id));
     try {
       const res = await fetch(`/api/tasks?id=${t.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
@@ -144,15 +153,21 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Přiřadit komu</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
               <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
-                <option value="">— vyber zaměstnance —</option>
+                <option value="">🗓️ Kdokoliv (podle dne)</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
               </select>
-              {members.length === 0 && <p className="text-[11px] text-black/40 mt-1.5">Zatím nemáš žádné zaměstnance — pozvi je v Nastavení týmu.</p>}
+              <p className="text-[11px] text-black/40 mt-1.5">
+                {form.assignedTo === ''
+                  ? 'Úkol na daný den — splní ho kdokoliv z týmu.'
+                  : 'Úkol pro konkrétního člověka.'}
+              </p>
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Termín (nepovinné)</label>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">
+                Termín {form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}
+              </label>
               <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             </div>
           </div>
@@ -228,7 +243,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       ) : (
         <div className="space-y-2.5">
           {filtered.map(t => {
-            const m = memberById.get(t.assignedTo);
+            const m = t.assignedTo != null ? memberById.get(t.assignedTo) : undefined;
+            const who = t.teamTask ? '🗓️ Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
             const prio = PRIORITIES.find(p => p.value === t.priority) ?? PRIORITIES[1];
             return (
               <div key={t.id} className="glass-card p-4">
@@ -238,8 +254,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                     <p className={`font-semibold text-sm text-[#16181A] truncate ${t.status === 'done' ? 'line-through text-black/40' : ''}`}>{t.title}</p>
                     <p className="text-xs text-black/45 truncate flex items-center gap-1.5">
                       <span className="truncate">
-                        {m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý'}
-                        {t.dueDate ? ` · do ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}` : ''}
+                        {who}
+                        {t.dueDate ? ` · ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}` : ''}
+                        {t.status === 'done' && t.completedByName ? ` · splnil ${t.completedByName}` : ''}
                       </span>
                       {recurrenceLabel(t.recurrence) && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[10px] font-semibold shrink-0">
