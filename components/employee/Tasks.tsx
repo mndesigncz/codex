@@ -11,6 +11,8 @@ interface Task {
   status: string;
   dueDate?: string;
   recurrence?: string | null;
+  teamTask?: boolean;
+  completedByName?: string | null;
   checklist?: ChecklistItem[];
 }
 
@@ -135,10 +137,18 @@ export default function Tasks({ user }: Props) {
                           {new Date(task.dueDate) < new Date() && task.status !== 'done' && ' · Po termínu'}
                         </p>
                       )}
+                      {task.teamTask && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[10px] font-semibold">
+                          🗓️ Pro kohokoliv
+                        </span>
+                      )}
                       {recurrenceLabel(task.recurrence) && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[10px] font-semibold">
                           ↻ {recurrenceLabel(task.recurrence)}
                         </span>
+                      )}
+                      {task.status === 'done' && task.completedByName && (
+                        <span className="text-[10px] text-black/40">splnil {task.completedByName}</span>
                       )}
                     </div>
                     {task.checklist && task.checklist.length > 0 && (

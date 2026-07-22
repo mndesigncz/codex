@@ -453,6 +453,12 @@ export async function GET() {
     // recurring tasks + per-task checklists
     await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence TEXT`;          // null | 'daily' | 'weekdays' | 'weekly'
     await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`;
+    // day-bound tasks (assigned_to NULL = anyone on the team can do it), team
+    // scoping, recurring-series grouping, and who actually completed it.
+    await sql`ALTER TABLE tasks ALTER COLUMN assigned_to DROP NOT NULL`;
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS team_id INTEGER`;
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS series_id TEXT`;
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_by INTEGER`;
     // whether closings are locked to shifts (default on)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
     // whether the daily cash payout is taken FROM the register (true) or from
