@@ -277,6 +277,39 @@ export async function PATCH(req: NextRequest) {
     || (task.assigned_to == null && taskTeam === c.teamId); // day task — anyone on the team
   if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
+  // Edit task fields — creator or a team employer only. For a recurring series
+  // the shared fields (title/desc/priority) apply to every occurrence.
+  if (b.edit) {
+    const canEdit = task.created_by === c.meId || (c.role === 'employer' && taskTeam === c.teamId);
+    if (!canEdit) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+    const title = b.title !== undefined ? String(b.title).trim() || task.title : task.title;
+    const description = b.description !== undefined ? (b.description || null) : task.description;
+    const priority = b.priority !== undefined ? b.priority : task.priority;
+    if (task.series_id) {
+      await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority} WHERE series_id = ${task.series_id}`;
+    } else {
+      let assignedTo = task.assigned_to;
+      if (b.assignedTo !== undefined) {
+        if (b.assignedTo === null || b.assignedTo === '' || b.assignedTo === 0) assignedTo = null;
+        else {
+          const a = parseInt(b.assignedTo);
+          if (Number.isFinite(a)) {
+            const [t] = await sql`SELECT team_id FROM users WHERE id = ${a}`;
+            if (t && t.team_id === c.teamId) assignedTo = a;
+          }
+        }
+      }
+      const dueDate = b.dueDate !== undefined ? (b.dueDate || null) : task.due_date;
+      await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority}, assigned_to = ${assignedTo}, due_date = ${dueDate} WHERE id = ${id}`;
+    }
+    const [row] = await sql`
+      SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar,
+             cu.name AS completed_by_name, cu.avatar AS completed_by_avatar
+      FROM tasks t LEFT JOIN users u ON u.id = t.assigned_to LEFT JOIN users cu ON cu.id = t.completed_by
+      WHERE t.id = ${id}`;
+    return NextResponse.json(shape(row));
+  }
+
   // Checklist edit (tick items) — independent of status.
   if (Array.isArray(b.checklist)) {
     const cl = b.checklist
