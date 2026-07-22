@@ -4,9 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
-
-const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const WD = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
+import TaskWeekBoard from '../TaskWeekBoard';
 
 interface Task {
   id: number;
@@ -51,7 +49,6 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingSeries, setEditingSeries] = useState(false);
   const [view, setView] = useState<'list' | 'week'>('list');
-  const [weekOffset, setWeekOffset] = useState(0);
   const { weekStart } = useCurrency();
   const today = new Date().toISOString().split('T')[0];
 
@@ -184,21 +181,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
   const doneTasks = tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 30);
 
-  // The 7 days of the selected week for the kanban view (respects week start).
-  const weekDays = useMemo(() => {
-    const base = new Date();
-    base.setHours(0, 0, 0, 0);
-    const dow = base.getDay();
-    const toMonday = (dow - weekStart + 7) % 7;
-    const start = new Date(base);
-    start.setDate(base.getDate() - toMonday + weekOffset * 7);
-    return Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
-  }, [weekStart, weekOffset]);
-  const tasksByDay = useMemo(() => {
-    const m = new Map<string, Task[]>();
-    for (const t of tasks) if (t.dueDate) (m.get(t.dueDate) ?? m.set(t.dueDate, []).get(t.dueDate)!).push(t);
-    return m;
-  }, [tasks]);
+  const labelFor = (t: Task) => t.teamTask ? 'Kdokoliv' : (t.assignedTo != null ? (memberById.get(t.assignedTo)?.name ?? '') : '');
 
   const renderCard = (t: Task, compact = false) => {
     const m = t.assignedTo != null ? memberById.get(t.assignedTo) : undefined;
@@ -376,39 +359,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       {loading ? (
         <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
       ) : view === 'week' ? (
-        /* Týdenní kanban — sloupce = dny, karty = úkoly toho dne */
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <button onClick={() => setWeekOffset(o => o - 1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
-              <Icon name="chevron" size={16} className="rotate-90" />
-            </button>
-            <p className="text-sm font-semibold text-[#16181A]">
-              {weekDays[0].toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })} – {weekDays[6].toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
-              {weekOffset === 0 && <span className="text-black/40 font-normal"> · tento týden</span>}
-            </p>
-            <button onClick={() => setWeekOffset(o => o + 1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
-              <Icon name="chevron" size={16} className="-rotate-90" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-            {weekDays.map(d => {
-              const key = ymd(d);
-              const list = (tasksByDay.get(key) ?? []).sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done'));
-              const isToday = key === today;
-              return (
-                <div key={key} className={`rounded-2xl border p-2 min-h-[7rem] ${isToday ? 'bg-[#C8F542]/[0.08] border-[#C8F542]/40' : 'bg-black/[0.02] border-black/[0.06]'}`}>
-                  <p className={`text-[11px] font-bold uppercase tracking-wide px-1 pb-1.5 ${isToday ? 'text-[#5B7A08]' : 'text-black/40'}`}>
-                    {WD[d.getDay()]} {d.getDate()}.
-                  </p>
-                  <div className="space-y-1.5">
-                    {list.map(t => renderCard(t, true))}
-                    {list.length === 0 && <p className="text-[11px] text-black/25 px-1 py-2">—</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <TaskWeekBoard tasks={tasks} weekStart={weekStart}
+          onComplete={(t, done) => completeTask(t as Task, done)}
+          labelFor={(t) => labelFor(t as Task)}
+          onOpen={(t) => openEdit(t as Task)} />
       ) : tasks.length === 0 ? (
         <div className="glass-card p-8 text-center text-black/45">Zatím žádné úkoly. Vytvoř první tlačítkem „Nový úkol".</div>
       ) : (
