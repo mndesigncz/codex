@@ -193,20 +193,35 @@ export default function AvailabilitySubmit({ user }: Props) {
         </p>
       </div>
 
-      {/* Month selector */}
-      <div className="flex gap-1 glass rounded-full p-1 w-fit max-w-full overflow-x-auto">
-        {[currentMonth, nextMonth].map((m) => (
-          <button
-            key={m}
-            onClick={() => setMonth(m)}
-            className={`px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap transition-all duration-300 ${
-              month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
-            }`}
-          >
-            {monthLabel(m)}
-          </button>
-        ))}
-      </div>
+      {/* Month selector — navigate freely into the future (no limit), but not
+          before the current month (submitting availability for the past makes
+          no sense). */}
+      {(() => {
+        const [my, mm] = month.split('-').map(Number);
+        const prevM = ym(new Date(my, mm - 2, 1));
+        const nextM = ym(new Date(my, mm, 1));
+        const atFloor = month <= currentMonth;
+        return (
+          <div className="flex items-center gap-1 glass rounded-full p-1 w-fit">
+            <button
+              onClick={() => !atFloor && setMonth(prevM)}
+              disabled={atFloor}
+              aria-label="Předchozí měsíc"
+              className="rounded-full w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.06] disabled:opacity-30 disabled:hover:bg-transparent transition"
+            >
+              <Icon name="chevron" size={16} className="rotate-90" />
+            </button>
+            <span className="px-3 min-w-[9.5rem] text-center text-sm font-semibold capitalize text-[#16181A]">{monthLabel(month)}</span>
+            <button
+              onClick={() => setMonth(nextM)}
+              aria-label="Další měsíc"
+              className="rounded-full w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.06] transition"
+            >
+              <Icon name="chevron" size={16} className="-rotate-90" />
+            </button>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
