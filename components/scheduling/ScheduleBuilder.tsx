@@ -41,6 +41,8 @@ interface ShiftType {
   endTime: string;
   color: string;
   position: number;
+  startsAtOpen?: boolean;
+  endsAtClose?: boolean;
 }
 interface FixedAssignment {
   id: number;
@@ -84,6 +86,28 @@ const SHIFT_PRESETS: Record<string, { start: string; end: string; label: string 
   afternoon: { start: '14:00', end: '22:00', label: 'Odpolední' },
 };
 const SHIFT_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Odpolední', flexible: 'Vlastní' };
+
+// Resolve a shift's display name + colour from the team's configured shift
+// types — matched by name first, then by exact times — so the calendar always
+// shows the configured naming instead of the legacy morning/afternoon labels.
+function resolveShiftType(
+  s: { type?: string; startTime?: string; endTime?: string },
+  types: ShiftType[],
+): { label: string; color: string } {
+  const byName = types.find((t) => t.name === s.type);
+  if (byName) return { label: byName.name, color: byName.color || '#64748B' };
+  const byTime = types.find((t) => t.startTime === s.startTime && t.endTime === s.endTime);
+  if (byTime) return { label: byTime.name, color: byTime.color || '#64748B' };
+  const legacy = s.type ? SHIFT_LABEL[s.type] : undefined;
+  if (legacy) return { label: legacy, color: s.type === 'morning' ? '#C8F542' : s.type === 'afternoon' ? '#3B82F6' : '#64748B' };
+  return { label: s.type || 'Směna', color: '#64748B' };
+}
+
+// Opening hours are keyed 0=Mon..6=Sun; convert a 'YYYY-MM-DD' to that index.
+function weekdayKey(date: string): string {
+  const d = new Date(date + 'T00:00:00');
+  return String((d.getDay() + 6) % 7);
+}
 
 function ym(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -716,22 +740,20 @@ export default function ScheduleBuilder({ user }: Props) {
                   >
                     <span className="text-[11px] sm:text-xs font-medium text-black/55">{day}</span>
                     <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
-                      {dayShifts.slice(0, 3).map((s) => (
-                        <span
-                          key={s.id}
-                          title={`${s.employeeName} · ${s.startTime}–${s.endTime}`}
-                          className={`flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden ${
-                            s.type === 'morning'
-                              ? 'bg-[#C8F542]/20 text-[#5B7A08]'
-                              : s.type === 'afternoon'
-                              ? 'bg-blue-500/20 text-blue-600'
-                              : 'bg-black/[0.06] text-black/70'
-                          }`}
-                        >
-                          <span className="flex-shrink-0">{s.employeeAvatar}</span>
-                          <span className="truncate min-w-0">{s.startTime}</span>
-                        </span>
-                      ))}
+                      {dayShifts.slice(0, 3).map((s) => {
+                        const rt = resolveShiftType(s, shiftTypes);
+                        return (
+                          <span
+                            key={s.id}
+                            title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
+                            className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden bg-black/[0.05] text-black/70"
+                          >
+                            <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: rt.color }} />
+                            <span className="flex-shrink-0">{s.employeeAvatar}</span>
+                            <span className="truncate min-w-0">{s.startTime}</span>
+                          </span>
+                        );
+                      })}
                       {dayShifts.length > 3 && (
                         <span className="text-[10px] text-black/45">+{dayShifts.length - 3} další</span>
                       )}
@@ -765,6 +787,7 @@ export default function ScheduleBuilder({ user }: Props) {
           employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
           shiftTypes={shiftTypes}
+          openingHours={openingHours}
           unavailable={unavailableOn(dayModal)}
           submissions={submissions}
           onClose={() => setDayModal(null)}
@@ -866,6 +889,8 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
   const [start, setStart] = useState('06:00');
   const [end, setEnd] = useState('14:00');
   const [color, setColor] = useState(COLORS[0]);
+  const [startsAtOpen, setStartsAtOpen] = useState(false);
+  const [endsAtClose, setEndsAtClose] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const beginNew = () => {
@@ -874,6 +899,8 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     setStart('06:00');
     setEnd('14:00');
     setColor(COLORS[0]);
+    setStartsAtOpen(false);
+    setEndsAtClose(false);
   };
   const beginEdit = (t: ShiftType) => {
     setEditing(t.id);
@@ -881,13 +908,15 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     setStart(t.startTime);
     setEnd(t.endTime);
     setColor(t.color ?? COLORS[0]);
+    setStartsAtOpen(!!t.startsAtOpen);
+    setEndsAtClose(!!t.endsAtClose);
   };
 
   const save = async () => {
     if (!name.trim()) return;
     setBusy(true);
     try {
-      const payload = { name: name.trim(), startTime: start, endTime: end, color };
+      const payload = { name: name.trim(), startTime: start, endTime: end, color, startsAtOpen, endsAtClose };
       if (editing === 'new') {
         await fetch('/api/shift-types', {
           method: 'POST',
@@ -946,11 +975,15 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
               start={start}
               end={end}
               color={color}
+              startsAtOpen={startsAtOpen}
+              endsAtClose={endsAtClose}
               busy={busy}
               setName={setName}
               setStart={setStart}
               setEnd={setEnd}
               setColor={setColor}
+              setStartsAtOpen={setStartsAtOpen}
+              setEndsAtClose={setEndsAtClose}
               onSave={save}
               onCancel={() => setEditing(null)}
             />
@@ -963,7 +996,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-[#16181A] truncate">{t.name}</p>
                 <p className="text-xs text-black/45">
-                  {t.startTime}–{t.endTime}
+                  {t.startsAtOpen ? 'otevření' : t.startTime}–{t.endsAtClose ? 'zavření' : t.endTime}
                 </p>
               </div>
               <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5 flex-shrink-0" title="Upravit">
@@ -982,11 +1015,15 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
             start={start}
             end={end}
             color={color}
+            startsAtOpen={startsAtOpen}
+            endsAtClose={endsAtClose}
             busy={busy}
             setName={setName}
             setStart={setStart}
             setEnd={setEnd}
             setColor={setColor}
+            setStartsAtOpen={setStartsAtOpen}
+            setEndsAtClose={setEndsAtClose}
             onSave={save}
             onCancel={() => setEditing(null)}
           />
@@ -1001,11 +1038,15 @@ function TypeForm({
   start,
   end,
   color,
+  startsAtOpen,
+  endsAtClose,
   busy,
   setName,
   setStart,
   setEnd,
   setColor,
+  setStartsAtOpen,
+  setEndsAtClose,
   onSave,
   onCancel,
 }: {
@@ -1013,11 +1054,15 @@ function TypeForm({
   start: string;
   end: string;
   color: string;
+  startsAtOpen: boolean;
+  endsAtClose: boolean;
   busy: boolean;
   setName: (v: string) => void;
   setStart: (v: string) => void;
   setEnd: (v: string) => void;
   setColor: (v: string) => void;
+  setStartsAtOpen: (v: boolean) => void;
+  setEndsAtClose: (v: boolean) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
@@ -1032,22 +1077,32 @@ function TypeForm({
       <div className="flex gap-3">
         <div className="flex-1">
           <label className="block text-xs font-medium text-black/55 mb-1">Od</label>
-          <input
-            type="time"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-            className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-          />
+          {startsAtOpen ? (
+            <div className="w-full rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3 text-sm text-black/45">Otevření podniku</div>
+          ) : (
+            <input type="time" value={start} onChange={(e) => setStart(e.target.value)}
+              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+          )}
         </div>
         <div className="flex-1">
           <label className="block text-xs font-medium text-black/55 mb-1">Do</label>
-          <input
-            type="time"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-            className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-          />
+          {endsAtClose ? (
+            <div className="w-full rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3 text-sm text-black/45">Zavření podniku</div>
+          ) : (
+            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)}
+              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+          )}
         </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2 text-sm text-black/70 cursor-pointer">
+          <input type="checkbox" checked={startsAtOpen} onChange={(e) => setStartsAtOpen(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
+          Začíná otevřením podniku
+        </label>
+        <label className="flex items-center gap-2 text-sm text-black/70 cursor-pointer">
+          <input type="checkbox" checked={endsAtClose} onChange={(e) => setEndsAtClose(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
+          Končí zavřením podniku <span className="text-black/35">(do konce směny)</span>
+        </label>
       </div>
       <div>
         <label className="block text-xs font-medium text-black/55 mb-1.5">Barva</label>
@@ -1370,6 +1425,7 @@ function DayModal({
   employees,
   shifts,
   shiftTypes,
+  openingHours,
   unavailable,
   submissions,
   onClose,
@@ -1380,37 +1436,45 @@ function DayModal({
   employees: Member[];
   shifts: Shift[];
   shiftTypes: ShiftType[];
+  openingHours: Record<string, OpeningDay>;
   unavailable: Set<number>;
   submissions: Submission[];
   onClose: () => void;
   onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<void>;
   onRemove: (id: number) => void;
 }) {
+  // Opening hours for THIS day (keyed 0=Mon..6=Sun).
+  const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
+  const dayOpen = oh && !oh.closed ? oh.open : null;
+  const dayClose = oh && !oh.closed ? oh.close : null;
+
+  // Resolve a shift type's concrete times for this day (following open/close).
+  const resolveTimes = (t: ShiftType) => ({
+    start: t.startsAtOpen && dayOpen ? dayOpen : t.startTime,
+    end: t.endsAtClose && dayClose ? dayClose : t.endTime,
+  });
+
+  const first = shiftTypes[0];
   const [employeeId, setEmployeeId] = useState<number | ''>('');
-  const [type, setType] = useState<'morning' | 'afternoon' | 'flexible'>('morning');
-  const [start, setStart] = useState(SHIFT_PRESETS.morning.start);
-  const [end, setEnd] = useState(SHIFT_PRESETS.morning.end);
+  // The chosen type name ('' = manual custom time).
+  const [typeName, setTypeName] = useState<string>(first ? first.name : '');
+  const [start, setStart] = useState(first ? resolveTimes(first).start : '08:00');
+  const [end, setEnd] = useState(first ? resolveTimes(first).end : '16:00');
   const [saving, setSaving] = useState(false);
 
-  const pickType = (t: 'morning' | 'afternoon' | 'flexible') => {
-    setType(t);
-    if (t !== 'flexible') {
-      setStart(SHIFT_PRESETS[t].start);
-      setEnd(SHIFT_PRESETS[t].end);
-    }
-  };
-
   const applyShiftType = (t: ShiftType) => {
-    setStart(t.startTime);
-    setEnd(t.endTime);
-    setType(t.startTime < '12:00' ? 'morning' : 'afternoon');
+    const rt = resolveTimes(t);
+    setStart(rt.start);
+    setEnd(rt.end);
+    setTypeName(t.name);
   };
+  const pickCustom = () => setTypeName('');
 
   const save = async () => {
     if (!employeeId || !start || !end) return;
     setSaving(true);
     try {
-      await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type });
+      await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
       setEmployeeId('');
     } finally {
       setSaving(false);
@@ -1431,7 +1495,9 @@ function DayModal({
         {shifts.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-wide text-black/45">Přiřazené směny</p>
-            {shifts.map((s) => (
+            {shifts.map((s) => {
+              const rt = resolveShiftType(s, shiftTypes);
+              return (
               <div key={s.id} className="flex items-center gap-3 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2">
                 <span className="text-lg flex-shrink-0">{s.employeeAvatar}</span>
                 <div className="flex-1 min-w-0">
@@ -1440,22 +1506,16 @@ function DayModal({
                     {s.startTime}–{s.endTime}
                   </p>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 ${
-                    s.type === 'morning'
-                      ? 'bg-[#C8F542]/15 text-[#5B7A08]'
-                      : s.type === 'afternoon'
-                      ? 'bg-blue-500/15 text-blue-600'
-                      : 'bg-black/[0.06] text-black/60'
-                  }`}
-                >
-                  {SHIFT_LABEL[s.type] ?? s.type}
+                <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-black/[0.05] text-black/70">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: rt.color }} />
+                  {rt.label}
                 </span>
                 <button onClick={() => onRemove(s.id)} className="text-black/30 hover:text-red-600 transition p-1 flex-shrink-0" title="Odebrat">
                   ×
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -1491,7 +1551,9 @@ function DayModal({
                           <Icon name="warning" size={14} /> nemůže
                         </span>
                       )}
-                      {!blocked && sub?.preferredShift === type && <span className="text-xs text-[#5B7A08]/80 whitespace-nowrap flex-shrink-0">preferuje</span>}
+                      {!blocked && sub?.preferredShift && sub.preferredShift !== 'flexible' && (
+                        <span className="text-xs text-[#5B7A08]/80 whitespace-nowrap flex-shrink-0">preferuje {sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'}</span>
+                      )}
                     </button>
                   );
                 })}
@@ -1504,29 +1566,41 @@ function DayModal({
             )}
           </div>
 
-          {/* Shift type quick-picks */}
-          {shiftTypes.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-black/70 mb-2">Typ směny</label>
-              <div className="flex flex-wrap gap-1.5">
-                {shiftTypes.map((t) => {
-                  const active = start === t.startTime && end === t.endTime;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => applyShiftType(t)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
-                        active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
-                      }`}
-                    >
-                      <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Shift type quick-picks — from the team's configured types */}
+          <div>
+            <label className="block text-sm font-medium text-black/70 mb-2">Typ směny</label>
+            <div className="flex flex-wrap gap-1.5">
+              {shiftTypes.map((t) => {
+                const rt = resolveTimes(t);
+                const active = typeName === t.name;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => applyShiftType(t)}
+                    title={`${rt.start}–${rt.end}`}
+                    className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
+                      active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
+                    }`}
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
+                    {t.name}
+                    {(t.startsAtOpen || t.endsAtClose) && <span className={`text-[10px] ${active ? 'text-black/50' : 'text-black/35'}`}>{rt.start}–{rt.end}</span>}
+                  </button>
+                );
+              })}
+              <button
+                onClick={pickCustom}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all ${
+                  typeName === '' ? 'bg-[#16181A] text-white border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
+                }`}
+              >
+                Vlastní čas
+              </button>
             </div>
-          )}
+            {typeName !== '' && (shiftTypes.find(t => t.name === typeName)?.endsAtClose) && !dayClose && (
+              <p className="text-[11px] text-orange-600 mt-1.5">Tento den je zavřeno — použije se výchozí konec typu.</p>
+            )}
+          </div>
 
           <div className="flex gap-3">
             <div className="flex-1">
@@ -1534,10 +1608,7 @@ function DayModal({
               <input
                 type="time"
                 value={start}
-                onChange={(e) => {
-                  setStart(e.target.value);
-                  setType('flexible');
-                }}
+                onChange={(e) => { setStart(e.target.value); pickCustom(); }}
                 className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>
@@ -1546,10 +1617,7 @@ function DayModal({
               <input
                 type="time"
                 value={end}
-                onChange={(e) => {
-                  setEnd(e.target.value);
-                  setType('flexible');
-                }}
+                onChange={(e) => { setEnd(e.target.value); pickCustom(); }}
                 className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>

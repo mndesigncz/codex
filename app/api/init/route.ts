@@ -336,6 +336,9 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS opening_hours JSONB DEFAULT '{}'`;
+    // shift types can follow opening hours: start at open / end at close (per day)
+    await sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS starts_at_open BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS ends_at_close BOOLEAN DEFAULT FALSE`;
     await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_at TEXT`;
     await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_days JSONB DEFAULT '[]'`;
     await sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`;
