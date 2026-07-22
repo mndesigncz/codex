@@ -72,7 +72,7 @@ type EligibleShift = {
 
 type Member = { id: number; name: string; avatar?: string };
 
-type Coworker = { id: number; name: string; avatar?: string; startTime: string; endTime: string };
+type Coworker = { id: number; name: string; avatar?: string; startTime: string | null; endTime: string | null; hadShift?: boolean };
 
 export default function CashClosing({ user, hideHistory, onSubmitted, initialDate }: {
   user: { id: number; name: string };
@@ -457,9 +457,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 <Icon name="users" size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <h4 className="font-bold tracking-tight text-[#16181A] leading-tight">Kolegové na téže směně</h4>
+                <h4 className="font-bold tracking-tight text-[#16181A] leading-tight">Byl někdo další na směně?</h4>
                 <p className="text-black/45 text-[13px] mt-0.5">
-                  Uzavři to i za ně — vytvoří se jim vlastní uzávěrka{payDailyCash ? ' i s výplatou' : ''}.
+                  Zaškrtni kolegy a uzavři to i za ně{payDailyCash ? ' i s výplatou' : ''}. Kdo neměl směnu, tomu se automaticky přidá a dostane stejný čas jako ty (vedení pak může upravit).
                 </p>
               </div>
             </div>
@@ -481,7 +481,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                         <span className="text-lg shrink-0">{cw.avatar ?? '👤'}</span>
                         <span className="min-w-0">
                           <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
-                          <span className="block text-xs text-black/45 tabular-nums">{cw.startTime}–{cw.endTime}</span>
+                          {cw.hadShift
+                            ? <span className="block text-xs text-black/45 tabular-nums">{cw.startTime}–{cw.endTime}</span>
+                            : <span className="block text-xs text-orange-600">bez naplánované směny — přidá se</span>}
                         </span>
                       </button>
                       {on && payDailyCash && (

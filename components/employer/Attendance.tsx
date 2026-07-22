@@ -27,7 +27,17 @@ type Entry = {
   clockIn: string;
   clockOut: string | null;
   source: 'kiosk' | 'self' | string;
+  note?: string | null;
 };
+
+// ISO → 'YYYY-MM-DDTHH:MM' for a datetime-local input (in local time).
+function toLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 const PERIODS = [7, 30, 90] as const;
 
@@ -80,6 +90,37 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const money = useMoney();
   const symbol = useSymbol();
   const { laborTargetPct } = useCurrency();
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
+  const [editIn, setEditIn] = useState('');
+  const [editOut, setEditOut] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editErr, setEditErr] = useState('');
+
+  const openEdit = (e: Entry) => {
+    setEditEntry(e); setEditErr('');
+    setEditIn(toLocalInput(e.clockIn));
+    setEditOut(toLocalInput(e.clockOut));
+  };
+  const saveEdit = async () => {
+    if (!editEntry) return;
+    setSavingEdit(true); setEditErr('');
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editEntry.id,
+          clockIn: editIn ? new Date(editIn).toISOString() : undefined,
+          clockOut: editOut ? new Date(editOut).toISOString() : null,
+        }),
+      });
+      const d = await res.json();
+      if (res.ok && d.entry) {
+        setEntries(list => list.map(x => x.id === editEntry.id ? { ...x, clockIn: d.entry.clockIn, clockOut: d.entry.clockOut } : x));
+        setEditEntry(null);
+      } else setEditErr(d.error || 'Nepodařilo se uložit.');
+    } catch { setEditErr('Chyba serveru.'); }
+    setSavingEdit(false);
+  };
 
   const load = async (d: number) => {
     setLoading(true);
@@ -414,12 +455,16 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </div>
                           )}
                           <div className="flex items-center gap-2 shrink-0 ml-auto">
-                            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
-                              {e.source === 'kiosk' ? 'kiosk' : 'ručně'}
+                            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : e.source === 'closing' ? 'bg-orange-500/15 text-orange-600' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
+                              {e.source === 'kiosk' ? 'kiosk' : e.source === 'closing' ? 'z uzávěrky' : 'ručně'}
                             </span>
                             <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${open ? 'text-[#5B7A08]' : 'text-[#16181A]'}`}>
                               {open ? hms(end - start) : humanDuration(end - start)}
                             </span>
+                            <button onClick={() => openEdit(e)} aria-label="Upravit čas"
+                              className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-[#16181A] hover:bg-black/[0.05] transition-colors">
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                            </button>
                             <button onClick={() => remove(e)} disabled={deleting === e.id}
                               aria-label="Smazat záznam"
                               className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-red-600 hover:bg-red-500/[0.08] transition-colors disabled:opacity-40">
@@ -428,6 +473,13 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                               </svg>
                             </button>
                           </div>
+                          {e.note && (
+                            <div className="w-full flex items-center gap-1.5 rounded-xl bg-orange-500/[0.07] border border-orange-500/20 px-3 py-2 text-xs text-orange-700">
+                              <Icon name="warning" size={13} className="shrink-0" />
+                              <span className="min-w-0">{e.note}</span>
+                              <button onClick={() => openEdit(e)} className="ml-auto shrink-0 font-semibold text-orange-700 hover:underline whitespace-nowrap">Zkontrolovat čas</button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -437,6 +489,38 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             )}
           </div>
         </>
+      )}
+
+      {/* Edit time modal */}
+      {editEntry && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditEntry(null)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2.5 mb-1">
+              <Icon name="clock" size={20} className="text-[#16181A]" />
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Upravit čas na směně</h3>
+            </div>
+            <p className="text-sm text-black/50 mb-4">{editEntry.employeeName}</p>
+            {editErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{editErr}</div>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>
+                <input type="datetime-local" value={editIn} onChange={e => setEditIn(e.target.value)}
+                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odchod <span className="normal-case text-black/35">(prázdné = stále na směně)</span></label>
+                <input type="datetime-local" value={editOut} onChange={e => setEditOut(e.target.value)}
+                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setEditEntry(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+              <button onClick={saveEdit} disabled={savingEdit} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                {savingEdit ? 'Ukládám…' : 'Uložit'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
