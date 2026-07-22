@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { TaskChecklist, recurrenceLabel, ChecklistItem } from '../TaskChecklist';
+import { useCurrency } from '../CurrencyProvider';
+import TaskWeekBoard from '../TaskWeekBoard';
 
 interface Task {
   id: number;
@@ -29,6 +31,8 @@ const STATUS_OPTIONS = [
 export default function Tasks({ user }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'list' | 'week'>('list');
+  const { weekStart } = useCurrency();
 
   const userId = parseInt(user.id ?? '0');
 
@@ -147,8 +151,24 @@ export default function Tasks({ user }: Props) {
 
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto w-full">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Úkoly</h1>
+        <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
+          {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+      ) : view === 'week' ? (
+        <TaskWeekBoard tasks={tasks} weekStart={weekStart}
+          onComplete={(t, done) => updateStatus(t as Task, done ? 'done' : 'pending')}
+          labelFor={(t) => (t.teamTask ? 'Pro kohokoliv' : '')} />
       ) : tasks.length === 0 ? (
         <div className="glass-card p-8 text-center"><p className="text-black/45">Zatím žádné úkoly.</p></div>
       ) : (
