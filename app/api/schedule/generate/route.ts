@@ -25,6 +25,14 @@ function weekdayOf(date: string) {
 function categoryOf(startTime: string) {
   return startTime < '12:00' ? 'morning' : 'afternoon';
 }
+// A shift type's concrete times for a given day, following opening hours when
+// the type is set to start at open / end at close.
+function resolveTimes(st: any, oh: { open: string; close: string }) {
+  return {
+    start: st.starts_at_open && oh.open ? oh.open : st.start_time,
+    end: st.ends_at_close && oh.close ? oh.close : st.end_time,
+  };
+}
 // does a shift [start,end] fit inside opening [open,close]?
 function fitsWithin(start: string, end: string, open: string, close: string) {
   // overnight shift (end <= start): only require start within open window
@@ -117,9 +125,16 @@ export async function POST(req: Request) {
     }
     timeOffByEmp.set(t.employee_id, set);
   }
-  const shiftTypes = await sql`
-    SELECT id, name, start_time, end_time, color, position
-    FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+  let shiftTypes: any[];
+  try {
+    shiftTypes = await sql`
+      SELECT id, name, start_time, end_time, color, position, starts_at_open, ends_at_close
+      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+  } catch {
+    shiftTypes = await sql`
+      SELECT id, name, start_time, end_time, color, position
+      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+  }
   const fixedRows = await sql`
     SELECT employee_id, weekday, shift_type_id FROM fixed_assignments WHERE team_id = ${ctx.teamId}`;
   const [team] = await sql`SELECT opening_hours FROM teams WHERE id = ${ctx.teamId}`;
@@ -181,8 +196,12 @@ export async function POST(req: Request) {
     const oh = openingHours[String(wd)] ?? { open: '08:00', close: '20:00', closed: false };
     if (oh.closed) continue;
 
-    // shift types that fit within this day's opening hours
-    const fitting = shiftTypes.filter((st: any) => fitsWithin(st.start_time, st.end_time, oh.open, oh.close));
+    // shift types that fit within this day's opening hours (times resolved to
+    // the day's open/close where the type follows them)
+    const fitting = shiftTypes.filter((st: any) => {
+      const rt = resolveTimes(st, oh);
+      return fitsWithin(rt.start, rt.end, oh.open, oh.close);
+    });
     if (fitting.length === 0) continue;
 
     const assignedToday = new Set<number>(); // employee ids already placed this day
@@ -257,14 +276,15 @@ export async function POST(req: Request) {
         continue;
       }
       const emp = empById.get(empId)!;
+      const rt = resolveTimes(st, oh);
       proposed.push({
         employeeId: emp.id,
         employeeName: emp.name,
         employeeAvatar: emp.avatar,
         date,
-        startTime: st.start_time,
-        endTime: st.end_time,
-        type: categoryOf(st.start_time),
+        startTime: rt.start,
+        endTime: rt.end,
+        type: st.name, // store the configured type name so the calendar shows it
         shiftTypeId: st.id,
         shiftTypeName: st.name,
         color: st.color,

@@ -113,7 +113,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
             <p className="text-3xl font-bold tracking-tight text-[#16181A]">
               {new Date((nextShift.date) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-            <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna'}</p>
+            <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.typeLabel ?? (nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna')}</p>
           </div>
         ) : (
           <p className="text-black/45">Žádná nadcházející směna.</p>

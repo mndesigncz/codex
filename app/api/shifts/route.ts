@@ -16,11 +16,37 @@ async function ctx() {
   return { meId, role, teamId: u?.team_id as number | null };
 }
 
-const shape = (r: any) => ({
-  id: r.id, teamId: r.team_id, employeeId: r.employee_id, date: r.date,
-  startTime: r.start_time, endTime: r.end_time, type: r.type,
-  start_time: r.start_time, end_time: r.end_time,
-});
+const LEGACY_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Odpolední', flexible: 'Vlastní' };
+
+// Resolve a shift's display name + colour from the team's configured shift
+// types (by name, then by exact times), falling back to the legacy labels.
+async function typeResolver(teamId: number | null) {
+  let types: any[] = [];
+  if (teamId) {
+    try {
+      types = await sql`SELECT name, start_time, end_time, color FROM shift_types WHERE team_id = ${teamId} ORDER BY position ASC, id ASC`;
+    } catch { /* table issue */ }
+  }
+  return (r: any): { label: string; color: string } => {
+    const byName = types.find((t) => t.name === r.type);
+    if (byName) return { label: byName.name, color: byName.color || '#64748B' };
+    const byTime = types.find((t) => t.start_time === r.start_time && t.end_time === r.end_time);
+    if (byTime) return { label: byTime.name, color: byTime.color || '#64748B' };
+    const legacy = LEGACY_LABEL[r.type as string];
+    if (legacy) return { label: legacy, color: r.type === 'morning' ? '#C8F542' : r.type === 'afternoon' ? '#3B82F6' : '#64748B' };
+    return { label: r.type || 'Směna', color: '#64748B' };
+  };
+}
+
+const shape = (r: any, resolve?: (r: any) => { label: string; color: string }) => {
+  const rt = resolve ? resolve(r) : null;
+  return {
+    id: r.id, teamId: r.team_id, employeeId: r.employee_id, date: r.date,
+    startTime: r.start_time, endTime: r.end_time, type: r.type,
+    start_time: r.start_time, end_time: r.end_time,
+    typeLabel: rt?.label ?? r.type, typeColor: rt?.color ?? '#64748B',
+  };
+};
 
 // GET — employee: own shifts; employer: the whole team's shifts.
 export async function GET(req: NextRequest) {
@@ -40,21 +66,23 @@ export async function GET(req: NextRequest) {
       const [target] = await sql`SELECT team_id FROM users WHERE id = ${employeeId}`;
       if (!target || target.team_id !== c.teamId) return NextResponse.json([]);
     }
+    const resolve = await typeResolver(c.teamId);
     const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${employeeId} ORDER BY date ASC`;
-    return NextResponse.json(rows.map(shape));
+    return NextResponse.json(rows.map((r: any) => shape(r, resolve)));
   }
 
+  const resolve = await typeResolver(c.teamId);
   if (c.role === 'employer' && c.teamId) {
     const rows = await sql`
       SELECT s.* FROM shifts s
       JOIN users u ON u.id = s.employee_id
       WHERE u.team_id = ${c.teamId} OR s.team_id = ${c.teamId}
       ORDER BY s.date ASC`;
-    return NextResponse.json({ shifts: rows.map(shape), requests: [] });
+    return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
   }
 
   const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${c.meId} ORDER BY date ASC`;
-  return NextResponse.json({ shifts: rows.map(shape), requests: [] });
+  return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
 }
 
 // POST (employer) — create a shift for a team member.
