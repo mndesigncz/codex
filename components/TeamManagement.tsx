@@ -191,23 +191,6 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     }
   };
 
-  const [savingPayoutSrc, setSavingPayoutSrc] = useState(false);
-  const togglePayoutFromRegister = async (value: boolean) => {
-    setSavingPayoutSrc(true);
-    setTeam(t => (t ? { ...t, payout_from_register: value } : t));
-    try {
-      const res = await fetch('/api/teams', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payoutFromRegister: value }),
-      });
-      if (res.ok) flash(value ? 'Výplata se bere z kasy.' : 'Výplata se bere bokem (mimo kasu).');
-      else { setTeam(t => (t ? { ...t, payout_from_register: !value } : t)); setError('Nastavení se nepodařilo uložit.'); }
-    } catch {
-      setTeam(t => (t ? { ...t, payout_from_register: !value } : t));
-      setError('Nastavení se nepodařilo uložit.');
-    } finally { setSavingPayoutSrc(false); }
-  };
-
   // Business / localization settings (currency, locale, week start, labor target).
   const [savingBiz, setSavingBiz] = useState(false);
   const saveBiz = async (patch: Record<string, unknown>) => {
@@ -654,33 +637,6 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
           </button>
         </label>
-
-        {/* Payout source — only relevant when daily cash payout is on. */}
-        {team?.pay_daily_cash && (
-          <>
-            <div className="h-px bg-black/[0.06]" />
-            <label className="flex items-start justify-between gap-4 cursor-pointer">
-              <div className="min-w-0">
-                <p className="font-semibold text-sm text-[#16181A]">Výplata se bere z kasy <span className="text-black/35 font-normal">· výchozí</span></p>
-                <p className="text-xs text-black/45 mt-0.5">
-                  {team?.payout_from_register !== false
-                    ? 'Výchozí: výplata se odečítá z očekávaného stavu kasy. V každé uzávěrce lze přepnout.'
-                    : 'Výchozí: výplata se bere bokem (mimo kasu). V každé uzávěrce lze přepnout.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={team?.payout_from_register !== false}
-                disabled={savingPayoutSrc}
-                onClick={() => togglePayoutFromRegister(!(team?.payout_from_register !== false))}
-                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.payout_from_register !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.payout_from_register !== false ? 'translate-x-5' : ''}`} />
-              </button>
-            </label>
-          </>
-        )}
 
         <div className="h-px bg-black/[0.06]" />
 

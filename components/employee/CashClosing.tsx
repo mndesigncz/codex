@@ -106,7 +106,6 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       const d = await fetch('/api/closings').then(r => r.json());
       setClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
-      setPayoutFromRegister(d.payoutFromRegister !== false);
       setIsEmployer(!!d.isEmployer);
       setIsKiosk(!!d.isKiosk);
       setRequiresShift(d.requiresShift !== false);
@@ -209,6 +208,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
         setForm(emptyForm());
         setCoworkerSel({});
+        setPayoutFromRegister(true);
         onSubmitted?.();
         await load();
         setTimeout(() => setMsg(''), 4000);
