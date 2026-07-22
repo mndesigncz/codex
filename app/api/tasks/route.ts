@@ -310,6 +310,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(shape(row));
   }
 
+  // Move a single occurrence to another day (drag & drop in the week board).
+  if (b.move && b.dueDate !== undefined) {
+    const canMove = task.created_by === c.meId || (c.role === 'employer' && taskTeam === c.teamId);
+    if (!canMove) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+    const [row] = await sql`UPDATE tasks SET due_date = ${b.dueDate || null} WHERE id = ${id} RETURNING *`;
+    return NextResponse.json(shape(row));
+  }
+
   // Checklist edit (tick items) — independent of status.
   if (Array.isArray(b.checklist)) {
     const cl = b.checklist
