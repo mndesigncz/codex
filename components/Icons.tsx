@@ -99,6 +99,13 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M12 3a6 6 0 0 0-3.6 10.8c.6.45 1 1.15 1.1 1.9l.1.8h4.8l.1-.8c.1-.75.5-1.45 1.1-1.9A6 6 0 0 0 12 3Z" />
     </>
   ),
+  calendarCheck: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="3" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+      <path d="m9 15.5 2 2 4-4" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />
