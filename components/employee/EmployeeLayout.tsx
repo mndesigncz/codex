@@ -17,6 +17,7 @@ import Tasks from './Tasks';
 import CashClosing from './CashClosing';
 import SuggestionsBoard from '../SuggestionsBoard';
 import ShiftSwap from '../scheduling/ShiftSwap';
+import ShiftCalendar from '../scheduling/ShiftCalendar';
 import Procedures from '../procedures/Procedures';
 import MobileMoreSheet from '../MobileMoreSheet';
 
@@ -52,6 +53,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'my-shifts':    return (
         <div className="space-y-2">
           <MyShifts user={user as any} />
+          <div className="px-6 pb-2"><ShiftCalendar scope="me" /></div>
           <ShiftSwap user={user as any} />
         </div>
       );

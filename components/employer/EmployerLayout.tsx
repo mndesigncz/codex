@@ -24,6 +24,7 @@ import TimeOffApprovals from '../scheduling/TimeOffApprovals';
 import Procedures from '../procedures/Procedures';
 import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
+import ShiftCalendar from '../scheduling/ShiftCalendar';
 import MobileMoreSheet from '../MobileMoreSheet';
 
 const navItems = [
@@ -36,6 +37,7 @@ const navItems = [
   { id: 'guides',     label: 'Návody',     icon: 'book' },
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
   { id: 'reports',    label: 'Uzávěrky',   icon: 'trend' },
+  { id: 'calendar',   label: 'Kalendář',   icon: 'calendarCheck' },
   { id: 'suggestions',label: 'Nápady',     icon: 'bulb' },
   { id: 'attendance', label: 'Docházka',   icon: 'clock' },
   { id: 'my-shifts',  label: 'Moje směny', icon: 'swap' },
@@ -83,6 +85,16 @@ export default function EmployerLayout({ user }: Props) {
         </div>
       );
       case 'reports':   return <ClosingsOverview />;
+      case 'calendar':  return (
+        <div className="p-6 max-w-4xl mx-auto w-full space-y-4">
+          <div className="flex items-center gap-2.5">
+            <Icon name="calendarCheck" size={22} className="text-[#16181A]" />
+            <h2 className="text-xl font-bold tracking-tight text-[#16181A]">Kalendář směn a uzávěrek</h2>
+          </div>
+          <p className="text-black/50 text-sm -mt-2">Kdo kdy pracoval, kdo udělal uzávěrku a kde chybí.</p>
+          <ShiftCalendar />
+        </div>
+      );
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab="account" />;
       case 'team-settings': return <TeamManagement user={user as any} />;
