@@ -661,11 +661,11 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <div className="h-px bg-black/[0.06]" />
             <label className="flex items-start justify-between gap-4 cursor-pointer">
               <div className="min-w-0">
-                <p className="font-semibold text-sm text-[#16181A]">Výplata se bere z kasy</p>
+                <p className="font-semibold text-sm text-[#16181A]">Výplata se bere z kasy <span className="text-black/35 font-normal">· výchozí</span></p>
                 <p className="text-xs text-black/45 mt-0.5">
                   {team?.payout_from_register !== false
-                    ? 'Denní výplata se odečítá z očekávaného stavu kasy.'
-                    : 'Denní výplata se bere bokem (mimo kasu) — očekávaný stav kasy neovlivní.'}
+                    ? 'Výchozí: výplata se odečítá z očekávaného stavu kasy. V každé uzávěrce lze přepnout.'
+                    : 'Výchozí: výplata se bere bokem (mimo kasu). V každé uzávěrce lze přepnout.'}
                 </p>
               </div>
               <button

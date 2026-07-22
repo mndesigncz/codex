@@ -198,6 +198,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           tips: n(form.tips), expenses: n(form.expenses), cashRemoved: n(form.cashRemoved),
           selfPayout: payDailyCash ? n(form.selfPayout) : 0, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
+          payoutFromRegister,
           employeeId: isSelf ? undefined : selEmployee,
           coworkers: includedCoworkers,
         }),
@@ -425,6 +426,27 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 : 'Vyplaceno bokem (ne z kasy) — očekávaný stav kasy neovlivní.',
             })}
           </div>
+          {payDailyCash && (
+            <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#16181A]">Výplatu beru z kasy</p>
+                <p className="text-xs text-black/45 mt-0.5">
+                  {payoutFromRegister
+                    ? 'Zapnuto — výplata se odečte z očekávaného stavu kasy.'
+                    : 'Vypnuto — bereš ji bokem, kasy se netýká.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={payoutFromRegister}
+                onClick={() => setPayoutFromRegister(v => !v)}
+                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${payoutFromRegister ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${payoutFromRegister ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+          )}
         </Step>
 
         {/* Kolegové na směně — one person closes for the whole crew */}
