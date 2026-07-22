@@ -24,6 +24,8 @@ function mapRow(r: any) {
     endTime: r.end_time,
     color: r.color,
     position: r.position,
+    startsAtOpen: !!r.starts_at_open,
+    endsAtClose: !!r.ends_at_close,
   };
 }
 
@@ -33,11 +35,16 @@ export async function GET() {
   if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!ctx.teamId) return NextResponse.json({ shiftTypes: [] });
 
-  const rows = await sql`
-    SELECT id, team_id, name, start_time, end_time, color, position
-    FROM shift_types
-    WHERE team_id = ${ctx.teamId}
-    ORDER BY position ASC, id ASC`;
+  let rows: any[];
+  try {
+    rows = await sql`
+      SELECT id, team_id, name, start_time, end_time, color, position, starts_at_open, ends_at_close
+      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+  } catch {
+    rows = await sql`
+      SELECT id, team_id, name, start_time, end_time, color, position
+      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+  }
   return NextResponse.json({ shiftTypes: rows.map(mapRow) });
 }
 
@@ -61,10 +68,20 @@ export async function POST(req: Request) {
 
   const [{ max }] = await sql`SELECT COALESCE(MAX(position), -1) AS max FROM shift_types WHERE team_id = ${ctx.teamId}`;
   const position = Number(max) + 1;
+  const startsAtOpen = !!body.startsAtOpen;
+  const endsAtClose = !!body.endsAtClose;
 
-  const [row] = await sql`
-    INSERT INTO shift_types (team_id, name, start_time, end_time, color, position)
-    VALUES (${ctx.teamId}, ${name}, ${startTime}, ${endTime}, ${color}, ${position})
-    RETURNING id, team_id, name, start_time, end_time, color, position`;
+  let row: any;
+  try {
+    [row] = await sql`
+      INSERT INTO shift_types (team_id, name, start_time, end_time, color, position, starts_at_open, ends_at_close)
+      VALUES (${ctx.teamId}, ${name}, ${startTime}, ${endTime}, ${color}, ${position}, ${startsAtOpen}, ${endsAtClose})
+      RETURNING id, team_id, name, start_time, end_time, color, position, starts_at_open, ends_at_close`;
+  } catch {
+    [row] = await sql`
+      INSERT INTO shift_types (team_id, name, start_time, end_time, color, position)
+      VALUES (${ctx.teamId}, ${name}, ${startTime}, ${endTime}, ${color}, ${position})
+      RETURNING id, team_id, name, start_time, end_time, color, position`;
+  }
   return NextResponse.json({ shiftType: mapRow(row) });
 }

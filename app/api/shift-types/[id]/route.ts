@@ -24,6 +24,8 @@ function mapRow(r: any) {
     endTime: r.end_time,
     color: r.color,
     position: r.position,
+    startsAtOpen: !!r.starts_at_open,
+    endsAtClose: !!r.ends_at_close,
   };
 }
 
@@ -51,11 +53,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Neplatný čas' }, { status: 400 });
   }
 
-  const [row] = await sql`
-    UPDATE shift_types
-    SET name = ${name}, start_time = ${startTime}, end_time = ${endTime}, color = ${color}
-    WHERE id = ${id} AND team_id = ${ctx.teamId}
-    RETURNING id, team_id, name, start_time, end_time, color, position`;
+  const startsAtOpen = body.startsAtOpen != null ? !!body.startsAtOpen : !!existing.starts_at_open;
+  const endsAtClose = body.endsAtClose != null ? !!body.endsAtClose : !!existing.ends_at_close;
+
+  let row: any;
+  try {
+    [row] = await sql`
+      UPDATE shift_types
+      SET name = ${name}, start_time = ${startTime}, end_time = ${endTime}, color = ${color},
+          starts_at_open = ${startsAtOpen}, ends_at_close = ${endsAtClose}
+      WHERE id = ${id} AND team_id = ${ctx.teamId}
+      RETURNING id, team_id, name, start_time, end_time, color, position, starts_at_open, ends_at_close`;
+  } catch {
+    [row] = await sql`
+      UPDATE shift_types
+      SET name = ${name}, start_time = ${startTime}, end_time = ${endTime}, color = ${color}
+      WHERE id = ${id} AND team_id = ${ctx.teamId}
+      RETURNING id, team_id, name, start_time, end_time, color, position`;
+  }
   return NextResponse.json({ shiftType: mapRow(row) });
 }
 
