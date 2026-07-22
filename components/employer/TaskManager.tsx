@@ -125,6 +125,25 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     setSaving(false);
   };
 
+  // Drag a card to another day → change that occurrence's due date.
+  const moveTask = async (t: Task, date: string) => {
+    const prev = tasks;
+    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, dueDate: date } : x));
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: t.id, move: true, dueDate: date }),
+      });
+      if (!res.ok) throw new Error();
+    } catch { setTasks(prev); }
+  };
+
+  const openCreateForDay = (date: string) => {
+    setEditingId(null); setEditingSeries(false);
+    setForm({ ...emptyForm(), dueDate: date });
+    setShowForm(true); setError('');
+  };
+
   // Toggle done, warning first if it isn't the task's day.
   const completeTask = async (t: Task, done: boolean) => {
     if (done && t.dueDate && t.dueDate !== today) {
@@ -362,7 +381,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <TaskWeekBoard tasks={tasks} weekStart={weekStart}
           onComplete={(t, done) => completeTask(t as Task, done)}
           labelFor={(t) => labelFor(t as Task)}
-          onOpen={(t) => openEdit(t as Task)} />
+          onOpen={(t) => openEdit(t as Task)}
+          onMove={(t, date) => moveTask(t as Task, date)}
+          onAddForDay={openCreateForDay} />
       ) : tasks.length === 0 ? (
         <div className="glass-card p-8 text-center text-black/45">Zatím žádné úkoly. Vytvoř první tlačítkem „Nový úkol".</div>
       ) : (
