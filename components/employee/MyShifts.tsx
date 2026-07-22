@@ -9,6 +9,8 @@ interface Shift {
   startTime: string;
   endTime: string;
   type: string;
+  typeLabel?: string;
+  typeColor?: string;
 }
 
 interface Props {
@@ -37,7 +39,8 @@ export default function MyShifts({ user }: Props) {
 
   const formatDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'short' });
 
-  const shiftLabel = (type: string) => type === 'morning' ? '🌅 Ranní' : type === 'afternoon' ? '🌆 Odpolední' : '🔄 Flexibilní';
+  // Prefer the server-resolved configured type name; fall back to legacy labels.
+  const shiftLabel = (s: Shift) => s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna');
 
   // Client-side iCalendar export of upcoming shifts (opens in Apple/Google Calendar).
   const exportIcs = () => {
@@ -117,15 +120,15 @@ export default function MyShifts({ user }: Props) {
                   const isToday = s.date === today;
                   return (
                     <div key={s.id} className={`flex items-center gap-3 p-3 rounded-2xl transition-colors hover:bg-black/[0.03] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
-                      <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-lg ${isToday ? 'bg-[#C8F542]/15' : 'bg-black/[0.04]'}`}>
-                        {s.type === 'morning' ? '🌅' : '🌆'}
+                      <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center ${isToday ? 'bg-[#C8F542]/15' : 'bg-black/[0.04]'}`}>
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-[#16181A] text-sm truncate min-w-0">{formatDate(s.date)}</p>
                           {isToday && <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
                         </div>
-                        <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s.type)}</p>
+                        <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                       </div>
                     </div>
                   );
@@ -140,10 +143,10 @@ export default function MyShifts({ user }: Props) {
               <div className="divide-y divide-black/[0.06]">
                 {past.slice(0, 5).map(s => (
                   <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
-                    <span className="text-lg flex-shrink-0">{s.type === 'morning' ? '🌅' : '🌆'}</span>
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-[#16181A] font-medium truncate">{formatDate(s.date)}</p>
-                      <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime}</p>
+                      <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                     </div>
                     <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">✓ Splněno</span>
                   </div>

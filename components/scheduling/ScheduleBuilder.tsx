@@ -265,7 +265,11 @@ export default function ScheduleBuilder({ user }: Props) {
   }, [preview]);
 
   const unavailableOn = (date: string) =>
-    new Set(submissions.filter((s) => (s.unavailableDates ?? []).includes(date)).map((s) => s.employeeId));
+    new Set(
+      submissions
+        .filter((s) => (s.unavailableDates ?? []).includes(date) || s.dayPreferences?.[date] === 'off')
+        .map((s) => s.employeeId),
+    );
 
   const addShift = async (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
     const res = await fetch('/api/schedule', {
@@ -706,12 +710,11 @@ export default function ScheduleBuilder({ user }: Props) {
                 <Icon name="calendar" size={20} /> {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs flex-wrap">
-                <span className="flex items-center gap-1.5 text-black/55">
-                  <span className="h-3 w-3 rounded-md bg-[#C8F542]" /> Ranní
-                </span>
-                <span className="flex items-center gap-1.5 text-black/55">
-                  <span className="h-3 w-3 rounded-md bg-blue-500" /> Odpolední
-                </span>
+                {shiftTypes.map((t) => (
+                  <span key={t.id} className="flex items-center gap-1.5 text-black/55">
+                    <span className="h-3 w-3 rounded-md" style={{ backgroundColor: t.color ?? '#C8F542' }} /> {t.name}
+                  </span>
+                ))}
                 {preview && (
                   <span className="flex items-center gap-1.5 text-black/55">
                     <span className="h-3 w-3 rounded-md border-2 border-dashed border-[#5B7A08]" /> Návrh
@@ -834,7 +837,7 @@ export default function ScheduleBuilder({ user }: Props) {
                           <td className="px-3 py-1.5">{r.employeeName}</td>
                           <td className="px-3 py-1.5">{r.startTime}</td>
                           <td className="px-3 py-1.5">{r.endTime}</td>
-                          <td className="px-3 py-1.5">{SHIFT_LABEL[r.type] ?? r.type}</td>
+                          <td className="px-3 py-1.5">{resolveShiftType(r, shiftTypes).label}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1472,9 +1475,23 @@ function DayModal({
 
   const save = async () => {
     if (!employeeId || !start || !end) return;
+    // Warn if the chosen person marked this day off / unavailable, or prefers a
+    // different kind of shift than the one being assigned.
+    const emp = Number(employeeId);
+    const sub = submissions.find((s) => s.employeeId === emp);
+    const empName = employees.find((e) => e.id === emp)?.name ?? 'Zaměstnanec';
+    const shiftCat = start < '12:00' ? 'morning' : 'afternoon';
+    const dayPref = sub?.dayPreferences?.[date];
+    if (unavailable.has(emp)) {
+      if (!confirm(`⚠️ ${empName} označil/a tento den jako NEDOSTUPNÝ. Opravdu ho/ji na směnu přiřadit?`)) return;
+    } else if (dayPref && dayPref !== 'off' && dayPref !== 'flexible' && dayPref !== shiftCat) {
+      if (!confirm(`⚠️ ${empName} preferuje ${dayPref === 'morning' ? 'ranní' : 'odpolední'} směnu, ne tuhle. Přesto přiřadit?`)) return;
+    } else if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
+      if (!confirm(`⚠️ ${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny. Přesto přiřadit na tuhle?`)) return;
+    }
     setSaving(true);
     try {
-      await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
+      await onAdd({ employeeId: emp, date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
       setEmployeeId('');
     } finally {
       setSaving(false);
