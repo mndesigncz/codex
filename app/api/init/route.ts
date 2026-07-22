@@ -62,6 +62,8 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )`;
     await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS team_id INTEGER`;
+    // shift created automatically from a clock-in / added via a closing (not planned)
+    await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT FALSE`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS shift_requests (

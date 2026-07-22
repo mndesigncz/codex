@@ -7,6 +7,27 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Current wall-clock time in Prague as "HH:MM".
+function hhmmPrague(d = new Date()): string {
+  return d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+}
+
+// Ensure the employee has a shift for `date`; create an auto one if not, so the
+// closing counts it. Returns silently on any error (e.g. column not migrated).
+async function ensureShift(teamId: number, employeeId: number, date: string, start: string, end: string) {
+  try {
+    const [sh] = await sql`SELECT id FROM shifts WHERE employee_id = ${employeeId} AND date = ${date} LIMIT 1`;
+    if (sh) return;
+    try {
+      await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, auto_created)
+                VALUES (${teamId}, ${employeeId}, ${date}, ${start}, ${end}, 'auto', TRUE)`;
+    } catch {
+      await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
+                VALUES (${teamId}, ${employeeId}, ${date}, ${start}, ${end}, 'auto')`;
+    }
+  } catch { /* best-effort */ }
+}
+
 async function ctx() {
   const s = await getServerSession(authOptions);
   if (!s?.user) return null;
@@ -77,7 +98,7 @@ export async function GET(req: NextRequest) {
       const days = Math.min(180, Math.max(1, parseInt(searchParams.get('days') ?? '30')));
       entries = await sql`
         SELECT te.id, te.employee_id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar",
-               te.clock_in AS "clockIn", te.clock_out AS "clockOut", te.source
+               te.clock_in AS "clockIn", te.clock_out AS "clockOut", te.source, te.note
         FROM time_entries te
         LEFT JOIN users u ON u.id = te.employee_id
         WHERE te.team_id = ${c.teamId}
@@ -128,12 +149,17 @@ export async function POST(req: NextRequest) {
     WHERE employee_id = ${employeeId} AND clock_out IS NULL
     ORDER BY clock_in DESC LIMIT 1`;
 
+  const today = new Date().toISOString().split('T')[0];
+
   if (action === 'in') {
     if (open) return NextResponse.json({ error: 'Příchod už je zaznamenaný.' }, { status: 409 });
     const [row] = await sql`
       INSERT INTO time_entries (team_id, employee_id, source)
       VALUES (${c.teamId}, ${employeeId}, ${isKiosk ? 'kiosk' : 'self'})
       RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    // No planned shift for today? Create one from the clock-in so the closing counts it.
+    const now = hhmmPrague();
+    await ensureShift(c.teamId, employeeId, today, now, now);
     return NextResponse.json({ ok: true, action: 'in', entry: row });
   }
 
@@ -142,6 +168,8 @@ export async function POST(req: NextRequest) {
   const [row] = await sql`
     UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
     RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+  // Extend the auto-created shift's end to the real clock-out time.
+  try { await sql`UPDATE shifts SET end_time = ${hhmmPrague()} WHERE employee_id = ${employeeId} AND date = ${today} AND auto_created = TRUE`; } catch { /* not migrated */ }
 
   // Nudge: does today's cash closing still need to be filled in?
   let closingDone = true;
@@ -164,22 +192,35 @@ export async function PATCH(req: NextRequest) {
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  const [entry] = await sql`SELECT id, clock_in FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;
+  const [entry] = await sql`SELECT id, clock_in, clock_out FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;
   if (!entry) return NextResponse.json({ error: 'Záznam nenalezen' }, { status: 404 });
 
-  // Custom timestamp must be valid and after clock-in; otherwise use now.
-  let out = new Date();
-  if (b.clockOut) {
-    const parsed = new Date(b.clockOut);
-    if (Number.isNaN(parsed.getTime())) return NextResponse.json({ error: 'Neplatný čas' }, { status: 400 });
-    out = parsed;
+  // clockIn optional (edit). clockOut given ⇒ set it; clockOut omitted with no
+  // clockIn ⇒ force-close to now (the "Ukončit" button).
+  let inTs = new Date(entry.clock_in);
+  if (b.clockIn !== undefined) {
+    const p = new Date(b.clockIn);
+    if (Number.isNaN(p.getTime())) return NextResponse.json({ error: 'Neplatný čas příchodu.' }, { status: 400 });
+    inTs = p;
   }
-  if (out.getTime() <= new Date(entry.clock_in).getTime()) {
+  let outTs: Date | null = entry.clock_out ? new Date(entry.clock_out) : null;
+  if (b.clockOut !== undefined) {
+    if (b.clockOut === null || b.clockOut === '') outTs = null;
+    else {
+      const p = new Date(b.clockOut);
+      if (Number.isNaN(p.getTime())) return NextResponse.json({ error: 'Neplatný čas odchodu.' }, { status: 400 });
+      outTs = p;
+    }
+  } else if (b.clockIn === undefined) {
+    outTs = new Date(); // force-close to now
+  }
+  if (outTs && outTs.getTime() <= inTs.getTime()) {
     return NextResponse.json({ error: 'Odchod musí být po příchodu.' }, { status: 400 });
   }
 
   const [row] = await sql`
-    UPDATE time_entries SET clock_out = ${out.toISOString()} WHERE id = ${id}
+    UPDATE time_entries SET clock_in = ${inTs.toISOString()}, clock_out = ${outTs ? outTs.toISOString() : null}
+    WHERE id = ${id}
     RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
   return NextResponse.json({ ok: true, entry: row });
 }

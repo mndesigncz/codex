@@ -267,9 +267,20 @@ export async function POST(request: Request) {
     console.error('notify employers failed', e);
   }
 
-  // Co-workers: when several people were on shift, one closing can cover them.
-  // We record a lightweight covered stub per colleague (their payout only) so
-  // they don't get reminded / can't double-submit, and their wage is tracked.
+  // Co-workers: one closing can cover everyone who worked. A colleague who has
+  // no planned shift can still be added manually — we then create an auto shift
+  // and give them the SAME clocked time as the person who filed the closing,
+  // flagged in attendance so the employer can check/edit it.
+  const refStart: string = shift?.start_time ?? '08:00';
+  const refEnd: string = shift?.end_time ?? '16:00';
+  let refEntry: any = null;
+  try {
+    [refEntry] = await sql`
+      SELECT clock_in, clock_out FROM time_entries
+      WHERE employee_id = ${actorId} AND clock_in::date = ${date}::date
+      ORDER BY clock_in ASC LIMIT 1`;
+  } catch { /* ignore */ }
+
   let covered = 0;
   if (Array.isArray(b.coworkers) && b.coworkers.length && row?.id) {
     for (const cw of b.coworkers) {
@@ -278,26 +289,44 @@ export async function POST(request: Request) {
       try {
         const [emp] = await sql`SELECT id, team_id, role, name FROM users WHERE id = ${cid}`;
         if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') continue;
-        // Must have had a shift that day and not already have a closing.
-        const [cwShift] = await sql`SELECT id FROM shifts WHERE employee_id = ${cid} AND date = ${date} LIMIT 1`;
-        if (!cwShift) continue;
         const [cwDupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${cid} AND date = ${date}`;
         if (cwDupe) continue;
+
+        // Their shift that day, or create an auto one if they weren't scheduled.
+        let cwShift: any = (await sql`SELECT id FROM shifts WHERE employee_id = ${cid} AND date = ${date} LIMIT 1`)[0];
+        const noShift = !cwShift;
+        if (noShift) {
+          try {
+            try { cwShift = (await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, auto_created) VALUES (${c.teamId}, ${cid}, ${date}, ${refStart}, ${refEnd}, 'auto', TRUE) RETURNING id`)[0]; }
+            catch { cwShift = (await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type) VALUES (${c.teamId}, ${cid}, ${date}, ${refStart}, ${refEnd}, 'auto') RETURNING id`)[0]; }
+          } catch { cwShift = null; }
+        }
+
         const cwPayout = payDailyCash ? num(cw?.payout) : 0;
-        await sql`
-          INSERT INTO cash_closings (
-            team_id, created_by, date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout
-          ) VALUES (
-            ${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${cwShift.id}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister}, ${cwPayout}
-          )`;
+        try {
+          await sql`
+            INSERT INTO cash_closings (team_id, created_by, date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout)
+            VALUES (${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${cwShift?.id ?? null}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister}, ${cwPayout})`;
+        } catch {
+          await sql`INSERT INTO cash_closings (team_id, created_by, date, shift_label, covered_by, self_payout) VALUES (${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${row.id}, ${cwPayout})`;
+        }
         covered++;
+
+        // Attendance record with the same time as the closing author + a note.
+        if (noShift) {
+          try {
+            const note = 'Přidán v uzávěrce — neměl naplánovanou směnu (zkontroluj čas)';
+            if (refEntry?.clock_in) {
+              await sql`INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note) VALUES (${c.teamId}, ${cid}, ${refEntry.clock_in}, ${refEntry.clock_out ?? null}, 'closing', ${note})`;
+            } else {
+              await sql`INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note) VALUES (${c.teamId}, ${cid}, ${`${date} ${refStart}`}, ${`${date} ${refEnd}`}, 'closing', ${note})`;
+            }
+          } catch { /* best-effort */ }
+        }
+
         try {
           const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
-          await notifyUser(cid, {
-            title: 'Uzávěrka za tebe',
-            body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${date}).`,
-            type: 'info',
-          });
+          await notifyUser(cid, { title: 'Uzávěrka za tebe', body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${date}).`, type: 'info' });
         } catch { /* best-effort */ }
       } catch { /* skip this coworker */ }
     }
