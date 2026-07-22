@@ -4,21 +4,23 @@ import { useEffect } from 'react';
 import { Icon } from './Icons';
 
 export interface MoreItem { id: string; label: string; icon: string }
+export interface MoreGroup { title?: string | null; items: MoreItem[] }
 export interface MoreAction { label: string; icon: string; onClick: () => void; danger?: boolean }
 
 interface Props {
   open: boolean;
   onClose: () => void;
   title?: string;
-  items: MoreItem[];
+  items?: MoreItem[];
+  groups?: MoreGroup[];
   activeId: string;
   onSelect: (id: string) => void;
   actions?: MoreAction[];
 }
 
 // A premium bottom sheet for the mobile "Více" menu — large tap targets,
-// icon tiles, clear grouping, slides up over a dimmed scrim.
-export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, activeId, onSelect, actions = [] }: Props) {
+// icon tiles, grouped into labelled categories, slides up over a dimmed scrim.
+export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, groups, activeId, onSelect, actions = [] }: Props) {
   // Lock body scroll while open.
   useEffect(() => {
     if (!open) return;
@@ -29,6 +31,26 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
 
   if (!open) return null;
 
+  // Normalise to groups so we always render the same way.
+  const renderGroups: MoreGroup[] = groups && groups.length
+    ? groups.filter(g => g.items.length)
+    : [{ title: null, items: items ?? [] }];
+
+  const Tile = (item: MoreItem) => {
+    const active = item.id === activeId;
+    return (
+      <button key={item.id} onClick={() => { onSelect(item.id); onClose(); }}
+        className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl py-2.5 px-1 transition active:scale-[0.96] ${
+          active ? 'bg-[#16181A] text-white' : 'text-[#16181A] hover:bg-black/[0.04]'
+        }`}>
+        <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
+          <Icon name={item.icon} size={20} className={active ? 'text-[#C8F542]' : 'text-[#16181A]'} />
+        </span>
+        <span className="text-[10.5px] font-medium text-center leading-tight truncate w-full">{item.label}</span>
+      </button>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 md:hidden">
       <div className="absolute inset-0 modal-overlay animate-[fade_0.2s_ease-out]" onClick={onClose} />
@@ -38,24 +60,20 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
         role="dialog" aria-modal="true"
       >
         {/* Grabber */}
-        <div className="mx-auto mb-2.5 h-1.5 w-9 rounded-full bg-black/15" />
+        <div className="mx-auto mb-2 h-1.5 w-9 rounded-full bg-black/15" />
 
-        {/* Compact item tiles — 4 across so everything fits without scrolling */}
-        <div className="grid grid-cols-4 gap-2">
-          {items.map(item => {
-            const active = item.id === activeId;
-            return (
-              <button key={item.id} onClick={() => { onSelect(item.id); onClose(); }}
-                className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl py-2.5 px-1 transition active:scale-[0.96] ${
-                  active ? 'bg-[#16181A] text-white' : 'text-[#16181A] hover:bg-black/[0.04]'
-                }`}>
-                <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
-                  <Icon name={item.icon} size={20} className={active ? 'text-[#C8F542]' : 'text-[#16181A]'} />
-                </span>
-                <span className="text-[10.5px] font-medium text-center leading-tight truncate w-full">{item.label}</span>
-              </button>
-            );
-          })}
+        {/* Category groups — compact 4-across tiles under a small label */}
+        <div className="max-h-[62vh] overflow-y-auto scrollbar-thin space-y-2.5">
+          {renderGroups.map((g, gi) => (
+            <div key={g.title ?? gi}>
+              {g.title && (
+                <p className="px-1 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/35">{g.title}</p>
+              )}
+              <div className="grid grid-cols-4 gap-2">
+                {g.items.map(Tile)}
+              </div>
+            </div>
+          ))}
         </div>
 
         {actions.length > 0 && (
