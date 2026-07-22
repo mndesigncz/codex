@@ -34,6 +34,15 @@ const navItems = [
   { id: 'suggestions', label: 'Nápady',     icon: 'bulb' },
 ];
 
+// Grouped navigation categories for the menus.
+const navSections: { title: string | null; ids: string[] }[] = [
+  { title: null,        ids: ['home'] },
+  { title: 'Směny',     ids: ['my-shifts', 'availability'] },
+  { title: 'Práce',     ids: ['closing', 'inventory', 'tasks', 'procedures'] },
+  { title: 'Tým',       ids: ['chat', 'guides', 'suggestions'] },
+];
+const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
+
 const mobilePrimary = ['home', 'my-shifts', 'inventory', 'chat'];
 
 interface Props {
@@ -78,6 +87,9 @@ export default function EmployeeLayout({ user }: Props) {
   const active = navItems.find(n => n.id === currentView);
   const title = currentView === 'settings' ? 'Nastavení' : active?.label;
   const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
+  const mobileGroups = navSections
+    .map(sec => ({ title: sec.title, items: sec.ids.map(id => byId[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
+    .filter(g => g.items.length);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -91,16 +103,30 @@ export default function EmployeeLayout({ user }: Props) {
             </div>
           )}
         </div>
-        <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto scrollbar-thin">
-          {navItems.filter(n => n.id !== 'chat').map(item => (
-            <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
-              className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
-                currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
-              }`}>
-              <Icon name={item.icon} size={21} className="flex-shrink-0" />
-              {sidebarOpen && <span className="truncate">{item.label}</span>}
-            </button>
-          ))}
+        <nav className="flex-1 py-3 space-y-0.5 px-3 overflow-y-auto scrollbar-thin">
+          {navSections.map((sec, si) => {
+            const items = sec.ids.map(id => byId[id]).filter(n => n && n.id !== 'chat');
+            if (!items.length) return null;
+            return (
+              <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
+                {sec.title && (sidebarOpen
+                  ? <p className="px-3.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>
+                  : <div className="mx-3 mb-1.5 h-px bg-black/[0.07]" />
+                )}
+                <div className="space-y-0.5">
+                  {items.map(item => (
+                    <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
+                      className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
+                        currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
+                      }`}>
+                      <Icon name={item.icon} size={21} className="flex-shrink-0" />
+                      {sidebarOpen && <span className="truncate">{item.label}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
         <div className="p-3 border-t border-black/[0.07] relative">
           {accountOpen && (
@@ -170,7 +196,7 @@ export default function EmployeeLayout({ user }: Props) {
       <MobileMoreSheet
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
-        items={mobileSecondary}
+        groups={mobileGroups}
         activeId={currentView}
         onSelect={setCurrentView}
         actions={[

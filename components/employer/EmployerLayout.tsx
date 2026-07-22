@@ -43,6 +43,17 @@ const navItems = [
   { id: 'my-shifts',  label: 'Moje směny', icon: 'swap' },
 ];
 
+// Grouped navigation — the flat list above still drives view lookup, these
+// sections just organise it into readable categories in the menus.
+const navSections: { title: string | null; ids: string[] }[] = [
+  { title: null,           ids: ['overview'] },
+  { title: 'Směny',        ids: ['shifts', 'my-shifts', 'calendar', 'attendance'] },
+  { title: 'Kasa & sklad', ids: ['reports', 'inventory'] },
+  { title: 'Práce',        ids: ['tasks', 'procedures', 'planning'] },
+  { title: 'Tým',          ids: ['chat', 'guides', 'suggestions'] },
+];
+const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
+
 const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
 
 interface Props {
@@ -107,6 +118,10 @@ export default function EmployerLayout({ user }: Props) {
     : currentView === 'team-settings' ? 'Nastavení týmu'
     : active?.label;
   const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
+  // Same categories as the sidebar, minus whatever is already in the bottom dock.
+  const mobileGroups = navSections
+    .map(sec => ({ title: sec.title, items: sec.ids.map(id => byId[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
+    .filter(g => g.items.length);
 
   const AccountMenu = () => (
     <div className="glass rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(25,35,15,0.14)]">
@@ -136,16 +151,31 @@ export default function EmployerLayout({ user }: Props) {
             </div>
           )}
         </div>
-        <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto scrollbar-thin">
-          {navItems.filter(n => n.id !== 'chat').map(item => (
-            <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
-              className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
-                currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
-              }`}>
-              <Icon name={item.icon} size={21} className="flex-shrink-0" />
-              {sidebarOpen && <span className="truncate">{item.label}</span>}
-            </button>
-          ))}
+        <nav className="flex-1 py-3 space-y-0.5 px-3 overflow-y-auto scrollbar-thin">
+          {navSections.map((sec, si) => {
+            // Chat lives in the Messenger dock on desktop, so drop it here.
+            const items = sec.ids.map(id => byId[id]).filter(n => n && n.id !== 'chat');
+            if (!items.length) return null;
+            return (
+              <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
+                {sec.title && (sidebarOpen
+                  ? <p className="px-3.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>
+                  : <div className="mx-3 mb-1.5 h-px bg-black/[0.07]" />
+                )}
+                <div className="space-y-0.5">
+                  {items.map(item => (
+                    <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
+                      className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
+                        currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
+                      }`}>
+                      <Icon name={item.icon} size={21} className="flex-shrink-0" />
+                      {sidebarOpen && <span className="truncate">{item.label}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
         <div className="p-3 border-t border-black/[0.07] relative">
           {accountOpen && (
@@ -209,7 +239,7 @@ export default function EmployerLayout({ user }: Props) {
       <MobileMoreSheet
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
-        items={mobileSecondary}
+        groups={mobileGroups}
         activeId={currentView}
         onSelect={setCurrentView}
         actions={[
