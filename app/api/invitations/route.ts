@@ -19,8 +19,10 @@ export async function GET() {
   const sql = neon(process.env.DATABASE_URL!);
   const [team] = await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ invitations: [] });
+  // token is included so the employer can copy a working join link and share
+  // it directly (email delivery is best-effort and may be unconfigured).
   const invitations = await sql`
-    SELECT id, email, job_title, status, created_at FROM invitations
+    SELECT id, email, job_title, status, token, created_at FROM invitations
     WHERE team_id = ${team.id} ORDER BY created_at DESC`;
   return NextResponse.json({ invitations });
 }
@@ -57,12 +59,15 @@ export async function POST(request: Request) {
       VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${me.id}, 'pending')`;
   }
 
+  // The join link always works and is returned so the UI can offer it for
+  // manual sharing. The email is a best-effort convenience on top.
+  let emailSent = false;
   try {
     await sendTeamInvitation(email, team.name, me.name, token);
+    emailSent = true;
   } catch (e) {
     console.error('invite email failed', e);
-    return NextResponse.json({ ok: true, warning: 'Pozvánka uložena, ale email se nepodařilo odeslat.' });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, token, path: `/join?token=${token}`, emailSent });
 }
