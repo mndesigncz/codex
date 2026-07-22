@@ -171,13 +171,15 @@ export async function POST(request: Request) {
     const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
     payDailyCash = !!team?.pay_daily_cash;
   } catch { /* not migrated */ }
-  // Snapshot the payout-source policy onto the closing so historical rows keep
-  // their own expected-cash math even if the team later flips the switch.
+  // Payout source is chosen per closing (the form defaults it to the team's
+  // policy, but the person can override it). Snapshot the chosen value so the
+  // row keeps its own expected-cash math regardless of later changes.
   let payoutFromRegister = true;
   try {
     const [team] = await sql`SELECT payout_from_register FROM teams WHERE id = ${c.teamId}`;
     payoutFromRegister = team?.payout_from_register !== false;
   } catch { /* not migrated */ }
+  if (typeof b.payoutFromRegister === 'boolean') payoutFromRegister = b.payoutFromRegister;
 
   // The kiosk AND the employer can submit ON BEHALF of a chosen team member —
   // the closing is attributed to them (author, one-per-day, notifications).
