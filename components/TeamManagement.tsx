@@ -39,6 +39,7 @@ interface Invitation {
   email: string;
   job_title?: string;
   status: string;
+  token?: string;
   created_at: string;
 }
 
@@ -85,6 +86,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [inviteJob, setInviteJob] = useState('Barista');
   const [inviteRole, setInviteRole] = useState('employee');
   const [inviting, setInviting] = useState(false);
+  const [lastInvite, setLastInvite] = useState<{ email: string; token?: string; emailSent: boolean } | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -247,6 +249,21 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     } catch { /* ignore */ }
   };
 
+  // Build a working join link from a token, using the current origin so it's
+  // correct regardless of any server-side APP_URL config.
+  const inviteLink = (token?: string) =>
+    token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join?token=${token}` : '';
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const copyInviteLink = async (token?: string) => {
+    const link = inviteLink(token);
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedToken(token ?? null);
+      setTimeout(() => setCopiedToken(null), 2000);
+    } catch { /* clipboard blocked */ }
+  };
+
   const sendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -260,9 +277,13 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       });
       const data = await res.json();
       if (res.ok) {
+        const email = inviteEmail.trim();
         setInviteEmail('');
         setInviteJob('Barista');
-        flash(data.warning || `Pozvánka byla odeslána na ${inviteEmail.trim()}.`);
+        setLastInvite({ email, token: data.token, emailSent: !!data.emailSent });
+        flash(data.emailSent
+          ? `Pozvánka odeslána na ${email}. Pro jistotu můžeš poslat i odkaz níže.`
+          : `Pozvánka připravena — zkopíruj odkaz níže a pošli ho ${email}.`);
         loadInvites();
       } else {
         setError(data.error || 'Pozvánku se nepodařilo odeslat.');
@@ -452,6 +473,29 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           )}
         </form>
 
+        {/* Freshly created invite — offer the join link for manual sharing. */}
+        {lastInvite?.token && (
+          <div className="rounded-2xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-4 space-y-2.5">
+            <p className="text-sm font-semibold text-[#16181A] flex items-center gap-1.5">
+              <Icon name="send" size={15} /> Pošli tento odkaz {lastInvite.email}
+            </p>
+            <p className="text-xs text-black/50">
+              {lastInvite.emailSent
+                ? 'E-mail jsme odeslali, ale nemusí vždy dorazit — nejjistější je poslat odkaz přímo (WhatsApp, SMS…).'
+                : 'E-mail není nastavený, takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.'}
+            </p>
+            <div className="flex items-center gap-2">
+              <input readOnly value={inviteLink(lastInvite.token)}
+                onFocus={e => e.currentTarget.select()}
+                className={`${inputClass} !py-2.5 text-xs font-mono`} />
+              <button type="button" onClick={() => copyInviteLink(lastInvite.token)}
+                className="shrink-0 rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2.5 hover:bg-black transition whitespace-nowrap">
+                {copiedToken === lastInvite.token ? 'Zkopírováno ✓' : 'Kopírovat'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="pt-2">
           <p className="text-xs uppercase tracking-wider text-black/45 mb-3">Odeslané pozvánky ({pending.length})</p>
           {invitations.length === 0 ? (
@@ -465,10 +509,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <p className="text-xs text-black/45">{inv.job_title || 'Barista'}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    {inv.status === 'pending' && (
-                      <button type="button" onClick={() => { setInviteEmail(inv.email); setInviteJob(inv.job_title || 'Barista'); }}
-                        className="text-xs text-[#5B7A08] hover:underline whitespace-nowrap">
-                        Odeslat znovu
+                    {inv.status === 'pending' && inv.token && (
+                      <button type="button" onClick={() => copyInviteLink(inv.token)}
+                        className="text-xs font-medium text-[#5B7A08] hover:underline whitespace-nowrap">
+                        {copiedToken === inv.token ? 'Zkopírováno ✓' : 'Kopírovat odkaz'}
                       </button>
                     )}
                     <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
