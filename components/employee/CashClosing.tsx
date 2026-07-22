@@ -74,13 +74,15 @@ type Member = { id: number; name: string; avatar?: string };
 
 type Coworker = { id: number; name: string; avatar?: string; startTime: string; endTime: string };
 
-export default function CashClosing({ user, hideHistory, onSubmitted }: {
+export default function CashClosing({ user, hideHistory, onSubmitted, initialDate }: {
   user: { id: number; name: string };
   hideHistory?: boolean;
   onSubmitted?: () => void;
+  initialDate?: string;
 }) {
   const [closings, setClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
+  const [payoutFromRegister, setPayoutFromRegister] = useState(true);
   const [isEmployer, setIsEmployer] = useState(false);
   const [isKiosk, setIsKiosk] = useState(false);
   const [selEmployee, setSelEmployee] = useState<number | null>(null);
@@ -104,6 +106,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
       const d = await fetch('/api/closings').then(r => r.json());
       setClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
+      setPayoutFromRegister(d.payoutFromRegister !== false);
       setIsEmployer(!!d.isEmployer);
       setIsKiosk(!!d.isKiosk);
       setRequiresShift(d.requiresShift !== false);
@@ -123,6 +126,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  // Employer opened the form for a specific missing day → preselect that date.
+  useEffect(() => {
+    if (initialDate) setForm(f => ({ ...f, date: initialDate }));
+  }, [initialDate]);
 
   // The shared kiosk always picks a shift (it defines WHO submits). Employees
   // and employers get a free date; the form is always visible for everyone.
@@ -160,7 +168,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
   const preview = {
     opening_cash: n(form.openingCash), cash_revenue: n(form.cashRevenue),
     expenses: n(form.expenses), cash_removed: n(form.cashRemoved), self_payout: payDailyCash ? n(form.selfPayout) : 0,
-    closing_cash: n(form.closingCash),
+    closing_cash: n(form.closingCash), payout_from_register: payoutFromRegister,
   };
   const expected = expectedCash(preview);
   const diff = form.closingCash === '' ? null : cashDifference(preview);
@@ -240,6 +248,28 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
       {err && (
         <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2">
           <Icon name="warning" size={17} /> {err}
+        </div>
+      )}
+
+      {/* Missing-closing nudge: shifts the employee worked but never closed. */}
+      {isSelf && eligible.length > 0 && (
+        <div className="p-4 rounded-2xl bg-orange-500/[0.09] border border-orange-500/30 space-y-2.5">
+          <p className="flex items-center gap-2 font-semibold text-[#16181A] text-sm">
+            <span className="text-lg" aria-hidden>⚠️</span>
+            {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${eligible.length} uzávěrky za dny, kdy jsi měl/a směnu`}
+          </p>
+          <p className="text-xs text-black/55">Vyplň ji prosím — vyber den a projdi formulář níže.</p>
+          <div className="flex flex-wrap gap-2">
+            {eligible.map(s => (
+              <button key={s.id} type="button" onClick={() => pickShift(s)}
+                className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
+                  form.date === s.date ? 'bg-orange-500 text-white border-orange-500' : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
+                }`}>
+                {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -389,7 +419,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Výdaje z kasy', 'expenses', { hint: 'Nákupy apod. placené z kasy.' })}
             {field('Odloženo ven', 'cashRemoved', { hint: 'Do trezoru / odvod.' })}
-            {payDailyCash && field('Moje výplata dnes', 'selfPayout', { hint: 'Kolik sis dnes vyplatil/a z kasy.' })}
+            {payDailyCash && field('Moje výplata dnes', 'selfPayout', {
+              hint: payoutFromRegister
+                ? 'Vyplaceno z kasy — odečte se z očekávaného stavu.'
+                : 'Vyplaceno bokem (ne z kasy) — očekávaný stav kasy neovlivní.',
+            })}
           </div>
         </Step>
 

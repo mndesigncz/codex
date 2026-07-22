@@ -35,11 +35,16 @@ export async function GET() {
     // Optional/newer columns fetched defensively; missing column ⇒ safe default.
     let payDailyCash = false;
     let closingRequiresShift = true;
+    let payoutFromRegister = true;
     try {
       const [extra] = await sql`SELECT pay_daily_cash, closing_requires_shift FROM teams WHERE id = ${teamId}`;
       payDailyCash = !!extra?.pay_daily_cash;
       closingRequiresShift = extra?.closing_requires_shift !== false;
     } catch { /* columns not migrated yet */ }
+    try {
+      const [extra] = await sql`SELECT payout_from_register FROM teams WHERE id = ${teamId}`;
+      payoutFromRegister = extra?.payout_from_register !== false;
+    } catch { /* column not migrated yet */ }
 
     // Business/localization settings (defensive — safe defaults before migration).
     let biz = { currency: 'CZK', locale: 'cs-CZ', week_start: 1, labor_target_pct: null as number | null,
@@ -72,7 +77,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, ...biz },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, ...biz },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -88,7 +93,7 @@ export async function PATCH(request: Request) {
   if (!me || me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const sql = neon(process.env.DATABASE_URL!);
   const body = await request.json();
-  const { name, regenerateCode, payDailyCash, closingRequiresShift,
+  const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister,
           currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body;
 
   // Any employer of the team may manage settings (multi-employer teams).
@@ -101,6 +106,9 @@ export async function PATCH(request: Request) {
   if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
   if (typeof payDailyCash === 'boolean') await sql`UPDATE teams SET pay_daily_cash = ${payDailyCash} WHERE id = ${team.id}`;
   if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;
+  if (typeof payoutFromRegister === 'boolean') {
+    try { await sql`UPDATE teams SET payout_from_register = ${payoutFromRegister} WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  }
   // Business/localization settings — each guarded so a pending migration degrades gracefully.
   try {
     if (typeof currency === 'string' && currency) await sql`UPDATE teams SET currency = ${currency} WHERE id = ${team.id}`;

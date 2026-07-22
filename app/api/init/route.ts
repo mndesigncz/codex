@@ -455,6 +455,10 @@ export async function GET() {
     await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`;
     // whether closings are locked to shifts (default on)
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
+    // whether the daily cash payout is taken FROM the register (true) or from
+    // money set aside (false). Drives whether the expected-cash math deducts it.
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS payout_from_register BOOLEAN DEFAULT TRUE`;
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS payout_from_register BOOLEAN`;
 
     // ---- Business/localization settings (make the app fit ANY team) ----
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'CZK'`;
