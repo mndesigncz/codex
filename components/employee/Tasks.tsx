@@ -32,6 +32,7 @@ export default function Tasks({ user }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'week'>('list');
+  const [showLater, setShowLater] = useState(false);
   const { weekStart } = useCurrency();
 
   const userId = parseInt(user.id ?? '0');
@@ -45,6 +46,11 @@ export default function Tasks({ user }: Props) {
   }, [userId]);
 
   const today = new Date().toISOString().split('T')[0];
+  const weekAhead = (() => {
+    const d = new Date(today + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  })();
 
   const updateStatus = async (task: Task, newStatus: string) => {
     // Completing a task on a day that isn't its due day → warn first.
@@ -86,12 +92,18 @@ export default function Tasks({ user }: Props) {
   const overdue = undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate);
   const todayTasks = undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate);
   const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
+  // Week-ahead by default: tasks due within the next 7 days show up front (greyed as inactive);
+  // anything further out sits behind a "show later" toggle so the list stays focused.
+  const upcomingSoon = upcoming.filter(t => t.dueDate! <= weekAhead);
+  const upcomingLater = upcoming.filter(t => t.dueDate! > weekAhead);
   const done = tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 20);
 
   const card = (task: Task) => {
     const statusOpt = getStatusOption(task.status);
+    // Future occurrences aren't active yet → show them greyed until their day comes.
+    const inactive = task.status !== 'done' && !!task.dueDate && task.dueDate > today;
     return (
-      <div key={task.id} className={`glass-card p-5 sm:p-6 transition-all ${task.status === 'done' ? 'opacity-50' : ''}`}>
+      <div key={task.id} className={`glass-card p-5 sm:p-6 transition-all ${task.status === 'done' ? 'opacity-50' : inactive ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-3">
           <button
             onClick={() => updateStatus(task, task.status === 'done' ? 'pending' : 'done')}
@@ -175,7 +187,19 @@ export default function Tasks({ user }: Props) {
         <>
           {section('Po termínu', overdue, 'text-red-600')}
           {section('Dnes', todayTasks, 'text-[#5B7A08]')}
-          {section('Budoucí úkoly', upcoming)}
+          {section('Tento týden', upcomingSoon)}
+          {upcomingLater.length > 0 && (
+            showLater ? (
+              section('Později', upcomingLater)
+            ) : (
+              <button
+                onClick={() => setShowLater(true)}
+                className="w-full rounded-2xl border border-dashed border-black/15 py-2.5 text-xs font-semibold text-black/45 hover:text-[#5B7A08] hover:border-[#C8F542]/60 transition"
+              >
+                Zobrazit další úkoly ({upcomingLater.length}) →
+              </button>
+            )
+          )}
           {section('Hotové', done)}
           {overdue.length + todayTasks.length + upcoming.length === 0 && (
             <div className="glass-card p-8 text-center"><p className="text-black/45">Vše hotovo. 🎉</p></div>
