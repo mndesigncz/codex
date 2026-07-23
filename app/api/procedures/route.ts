@@ -36,14 +36,39 @@ export async function GET() {
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!me.teamId) return NextResponse.json({ procedures: [] });
 
-  const procedures = await sql`
-    SELECT id, name, description, icon, color, items,
-           remind_at AS "remindAt", remind_days AS "remindDays"
-    FROM procedures
-    WHERE team_id = ${me.teamId}
-    ORDER BY created_at ASC`;
+  let procedures: any[];
+  try {
+    procedures = await sql`
+      SELECT id, name, description, icon, color, items,
+             remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"
+      FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
+  } catch {
+    procedures = await sql`
+      SELECT id, name, description, icon, color, items,
+             remind_at AS "remindAt", remind_days AS "remindDays"
+      FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
+  }
 
-  return NextResponse.json({ procedures });
+  // Does the current user work today? (kiosk = shared device, always yes.)
+  const today = new Date().toISOString().split('T')[0];
+  let hasShiftToday = me.role === 'kiosk';
+  if (!hasShiftToday) {
+    try {
+      const [sh] = await sql`SELECT id FROM shifts WHERE employee_id = ${me.id} AND date = ${today} LIMIT 1`;
+      hasShiftToday = !!sh;
+    } catch { /* ignore */ }
+  }
+
+  // Today's opening hours (for open/close-anchored reminders).
+  let openingToday: { open: string; close: string; closed: boolean } = { open: '08:00', close: '20:00', closed: false };
+  try {
+    const [team] = await sql`SELECT opening_hours FROM teams WHERE id = ${me.teamId}`;
+    const oh = team?.opening_hours;
+    const wd = String((new Date(today + 'T00:00:00').getDay() + 6) % 7);
+    if (oh && oh[wd]) openingToday = oh[wd];
+  } catch { /* ignore */ }
+
+  return NextResponse.json({ procedures, hasShiftToday, openingToday });
 }
 
 // POST (employer): create a procedure
@@ -60,16 +85,26 @@ export async function POST(request: Request) {
   const color = body.color ? String(body.color) : 'lime';
   const items = sanitizeSteps(body.items);
 
-  const remindAt = parseRemindAt(body.remindAt);
+  const remindAnchor = ['open', 'close', 'time'].includes(body.remindAnchor) ? body.remindAnchor : 'time';
+  // For open/close anchors the fixed time is irrelevant.
+  const remindAt = remindAnchor === 'time' ? parseRemindAt(body.remindAt) : null;
   const remindDays = parseRemindDays(body.remindDays);
 
   if (!name) return NextResponse.json({ error: 'Zadejte název postupu' }, { status: 400 });
   if (items.length === 0) return NextResponse.json({ error: 'Přidejte alespoň jeden krok' }, { status: 400 });
 
-  const [created] = await sql`
-    INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, created_by)
-    VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${me.id})
-    RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+  let created: any;
+  try {
+    [created] = await sql`
+      INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, remind_anchor, created_by)
+      VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${remindAnchor}, ${me.id})
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"`;
+  } catch {
+    [created] = await sql`
+      INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, created_by)
+      VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${me.id})
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+  }
 
   return NextResponse.json({ procedure: created });
 }

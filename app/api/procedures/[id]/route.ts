@@ -49,18 +49,29 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const color = body.color ? String(body.color) : 'lime';
   const items = sanitizeSteps(body.items);
 
-  const remindAt = parseRemindAt(body.remindAt);
+  const remindAnchor = ['open', 'close', 'time'].includes(body.remindAnchor) ? body.remindAnchor : 'time';
+  const remindAt = remindAnchor === 'time' ? parseRemindAt(body.remindAt) : null;
   const remindDays = parseRemindDays(body.remindDays);
 
   if (!name) return NextResponse.json({ error: 'Zadejte název postupu' }, { status: 400 });
   if (items.length === 0) return NextResponse.json({ error: 'Přidejte alespoň jeden krok' }, { status: 400 });
 
-  const [updated] = await sql`
-    UPDATE procedures
-    SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
-        remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}
-    WHERE id = ${id}
-    RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+  let updated: any;
+  try {
+    [updated] = await sql`
+      UPDATE procedures
+      SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
+          remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}, remind_anchor = ${remindAnchor}
+      WHERE id = ${id}
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"`;
+  } catch {
+    [updated] = await sql`
+      UPDATE procedures
+      SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
+          remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}
+      WHERE id = ${id}
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+  }
 
   return NextResponse.json({ procedure: updated });
 }

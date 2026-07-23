@@ -25,6 +25,7 @@ export interface ProcedureLite {
   items: any[];
   remindAt?: string | null;
   remindDays?: number[] | null;
+  remindAnchor?: string | null;
 }
 
 export interface Celebration {
