@@ -277,37 +277,119 @@ export async function PATCH(req: NextRequest) {
     || (task.assigned_to == null && taskTeam === c.teamId); // day task — anyone on the team
   if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
-  // Edit task fields — creator or a team employer only. For a recurring series
-  // the shared fields (title/desc/priority) apply to every occurrence.
+  // Edit task fields — creator or a team employer only. Everything is editable,
+  // just like when creating. For a recurring series, schedule/assignee/checklist
+  // changes rewrite all FUTURE occurrences (past & done ones stay as history).
   if (b.edit) {
     const canEdit = task.created_by === c.meId || (c.role === 'employer' && taskTeam === c.teamId);
     if (!canEdit) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-    const title = b.title !== undefined ? String(b.title).trim() || task.title : task.title;
+
+    const today = todayStr();
+    const title = b.title !== undefined ? (String(b.title).trim() || task.title) : task.title;
     const description = b.description !== undefined ? (b.description || null) : task.description;
     const priority = b.priority !== undefined ? b.priority : task.priority;
-    if (task.series_id) {
-      await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority} WHERE series_id = ${task.series_id}`;
-    } else {
-      let assignedTo = task.assigned_to;
-      if (b.assignedTo !== undefined) {
-        if (b.assignedTo === null || b.assignedTo === '' || b.assignedTo === 0) assignedTo = null;
-        else {
-          const a = parseInt(b.assignedTo);
-          if (Number.isFinite(a)) {
-            const [t] = await sql`SELECT team_id FROM users WHERE id = ${a}`;
-            if (t && t.team_id === c.teamId) assignedTo = a;
-          }
+
+    // Resolve the assignee (null = team/day task; only employers may set that).
+    let assignedTo = task.assigned_to;
+    if (b.assignedTo !== undefined) {
+      if (b.assignedTo === null || b.assignedTo === '' || b.assignedTo === 0) {
+        assignedTo = c.role === 'employer' ? null : task.assigned_to;
+      } else {
+        const a = parseInt(b.assignedTo);
+        if (Number.isFinite(a)) {
+          const [t] = await sql`SELECT team_id FROM users WHERE id = ${a}`;
+          if (t && t.team_id === c.teamId) assignedTo = a;
         }
       }
-      const dueDate = b.dueDate !== undefined ? (b.dueDate || null) : task.due_date;
-      await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority}, assigned_to = ${assignedTo}, due_date = ${dueDate} WHERE id = ${id}`;
     }
-    const [row] = await sql`
+
+    // Checklist from the form. Keep done-state for a plain task; fresh occurrences reset it.
+    const clInput = b.checklist !== undefined && Array.isArray(b.checklist)
+      ? b.checklist.map((i: any) => ({ text: String(i?.text ?? '').slice(0, 300), done: !!i?.done })).filter((i: any) => i.text).slice(0, 50)
+      : (Array.isArray(task.checklist) ? task.checklist : []);
+    const freshChecklist = resetChecklist(clInput);
+
+    const newRecurrence = b.recurrence !== undefined
+      ? (RECURRENCES.includes(b.recurrence) ? b.recurrence : null)
+      : (task.recurrence ?? null);
+    const dueDate = b.dueDate !== undefined ? (b.dueDate || null) : task.due_date;
+
+    if (task.series_id) {
+      const sid = task.series_id;
+      // Shared text fields propagate to every occurrence for consistency.
+      await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority} WHERE series_id = ${sid}`;
+
+      const anchor = dueDate || today;
+      const anchorChanged = b.dueDate !== undefined && (b.dueDate || null) !== task.due_date;
+      const recurrenceChanged = newRecurrence !== (task.recurrence ?? null);
+
+      if (recurrenceChanged || anchorChanged) {
+        // Rebuild the future schedule; keep past/done occurrences as history.
+        await sql`DELETE FROM tasks WHERE series_id = ${sid} AND due_date >= ${today} AND status <> 'done'`;
+        if (!newRecurrence) {
+          // No longer recurring → one standalone task on the anchor date.
+          await sql`
+            INSERT INTO tasks (title, description, assigned_to, created_by, team_id, priority, status, due_date, recurrence, checklist, series_id)
+            VALUES (${title}, ${description}, ${assignedTo}, ${task.created_by}, ${c.teamId}, ${priority}, 'pending', ${anchor}, NULL, ${JSON.stringify(freshChecklist)}::jsonb, NULL)`;
+        } else {
+          const dates = [anchor];
+          let cursor = anchor;
+          while (dates.length < TARGET_UPCOMING) { cursor = nextDueDate(cursor, newRecurrence); dates.push(cursor); }
+          for (const d of dates) {
+            if (d < today) continue;
+            await sql`
+              INSERT INTO tasks (title, description, assigned_to, created_by, team_id, priority, status, due_date, recurrence, checklist, series_id)
+              VALUES (${title}, ${description}, ${assignedTo}, ${task.created_by}, ${c.teamId}, ${priority}, 'pending', ${d}, ${newRecurrence}, ${JSON.stringify(freshChecklist)}::jsonb, ${sid})`;
+          }
+        }
+      } else {
+        // Schedule unchanged — refresh assignee & checklist on future undone occurrences.
+        await sql`
+          UPDATE tasks SET assigned_to = ${assignedTo}, checklist = ${JSON.stringify(freshChecklist)}::jsonb
+          WHERE series_id = ${sid} AND due_date >= ${today} AND status <> 'done'`;
+      }
+      try { if (c.teamId) await topUpSeries(c.teamId); } catch { /* best-effort */ }
+    } else {
+      // Single task. Adding a recurrence turns it into a series.
+      if (newRecurrence) {
+        const sid = genSeriesId();
+        try {
+          await sql`
+            UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority},
+              assigned_to = ${assignedTo}, due_date = ${dueDate || today}, recurrence = ${newRecurrence},
+              series_id = ${sid}, checklist = ${JSON.stringify(freshChecklist)}::jsonb
+            WHERE id = ${id}`;
+          if (c.teamId) await topUpSeries(c.teamId);
+        } catch {
+          await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority}, assigned_to = ${assignedTo}, due_date = ${dueDate || today} WHERE id = ${id}`;
+        }
+      } else {
+        try {
+          await sql`
+            UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority},
+              assigned_to = ${assignedTo}, due_date = ${dueDate}, checklist = ${JSON.stringify(clInput)}::jsonb
+            WHERE id = ${id}`;
+        } catch {
+          await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority}, assigned_to = ${assignedTo}, due_date = ${dueDate} WHERE id = ${id}`;
+        }
+      }
+    }
+
+    // Return a representative row (the edited one if it survived, else the series' next occurrence).
+    let [row] = await sql`
       SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar,
              cu.name AS completed_by_name, cu.avatar AS completed_by_avatar
       FROM tasks t LEFT JOIN users u ON u.id = t.assigned_to LEFT JOIN users cu ON cu.id = t.completed_by
       WHERE t.id = ${id}`;
-    return NextResponse.json(shape(row));
+    if (!row && task.series_id) {
+      [row] = await sql`
+        SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar,
+               cu.name AS completed_by_name, cu.avatar AS completed_by_avatar
+        FROM tasks t LEFT JOIN users u ON u.id = t.assigned_to LEFT JOIN users cu ON cu.id = t.completed_by
+        WHERE t.series_id = ${task.series_id}
+        ORDER BY (t.due_date < ${today}), t.due_date ASC NULLS LAST LIMIT 1`;
+    }
+    return NextResponse.json(row ? shape(row) : { ok: true });
   }
 
   // Move a single occurrence to another day (drag & drop in the week board).

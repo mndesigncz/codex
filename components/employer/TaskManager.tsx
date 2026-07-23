@@ -96,17 +96,22 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     e.preventDefault();
     setError('');
     if (!form.title.trim()) { setError('Zadejte název úkolu.'); return; }
-    if (!editingId && form.assignedTo === '' && !form.dueDate) { setError('U úkolu pro kohokoliv vyber den (termín).'); return; }
+    if (form.assignedTo === '' && !form.dueDate) { setError('U úkolu pro kohokoliv vyber den (termín).'); return; }
     setSaving(true);
     try {
       if (editingId) {
-        // Edit — shared fields for a series; also date/assignee for a single task.
+        // Edit — everything is editable, just like creating. For a recurring
+        // task the server rewrites all future occurrences when the schedule,
+        // assignee or checklist changes.
         const res = await fetch('/api/tasks', {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: editingId, edit: true,
             title: form.title.trim(), description: form.description.trim() || null, priority: form.priority,
-            ...(editingSeries ? {} : { assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo), dueDate: form.dueDate || null }),
+            assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
+            dueDate: form.dueDate || null,
+            recurrence: form.recurrence || null,
+            checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: !!i.done })),
           }),
         });
         const d = await res.json();
@@ -302,31 +307,30 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Popis (nepovinné)</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className={`${inputClass} resize-none`} />
           </div>
-          {editingSeries ? (
-            <p className="text-xs text-black/50 bg-black/[0.03] border border-black/[0.06] rounded-xl px-3 py-2.5">
-              U opakovaného úkolu se úprava názvu, popisu a priority projeví u všech výskytů. Termín a přiřazení se u opakovaného úkolu nemění zde — případně ho smaž a založ znovu.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
-                <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
-                  <option value="">🗓️ Kdokoliv (podle dne)</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
-                </select>
-                <p className="text-[11px] text-black/40 mt-1.5">
-                  {form.assignedTo === ''
-                    ? 'Úkol na daný den — splní ho kdokoliv z týmu.'
-                    : 'Úkol pro konkrétního člověka.'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">
-                  Termín {form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}
-                </label>
-                <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
+              <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
+                <option value="">🗓️ Kdokoliv (podle dne)</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
+              </select>
+              <p className="text-[11px] text-black/40 mt-1.5">
+                {form.assignedTo === ''
+                  ? 'Úkol na daný den — splní ho kdokoliv z týmu.'
+                  : 'Úkol pro konkrétního člověka.'}
+              </p>
             </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">
+                {editingSeries ? 'Termín (od kdy)' : `Termín ${form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}`}
+              </label>
+              <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
+            </div>
+          </div>
+          {editingSeries && (
+            <p className="text-xs text-black/50 bg-[#C8F542]/[0.12] border border-[#C8F542]/25 rounded-xl px-3 py-2.5">
+              Jde o opakovaný úkol. Úpravy názvu, popisu a priority se projeví u všech výskytů. Změna termínu, opakování, přiřazení nebo kroků <strong>přepíše všechny budoucí výskyty</strong> (hotové a minulé zůstanou beze změny).
+            </p>
           )}
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Priorita</label>
@@ -339,9 +343,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               ))}
             </div>
           </div>
-          {/* Recurrence + checklist definition only when creating a new task. */}
-          {!editingId && (
-            <>
+          {/* Recurrence + checklist definition — editable when creating or editing. */}
+          <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Opakování</label>
@@ -383,7 +386,6 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                 </div>
               </div>
             </>
-          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2">
