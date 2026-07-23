@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import AnnouncementBanner from '../AnnouncementBanner';
+import { isWidgetOn } from '@/lib/dashboardWidgets';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -24,12 +25,14 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [unreadChats, setUnreadChats] = useState(0);
   const [closingsDue, setClosingsDue] = useState<any[]>([]);
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
+  const [cfg, setCfg] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const show = (id: string) => isWidgetOn(cfg, id);
 
   useEffect(() => {
     (async () => {
       try {
-        const [sh, tk, inv, av, conv, cl, att] = await Promise.all([
+        const [sh, tk, inv, av, conv, cl, att, tm] = await Promise.all([
           fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
           fetch(`/api/tasks?assignedTo=${meId}`).then(r => r.json()).catch(() => []),
           fetch('/api/inventory').then(r => r.json()).catch(() => []),
@@ -37,7 +40,9 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           fetch('/api/conversations').then(r => r.json()).catch(() => []),
           fetch('/api/closings').then(r => r.json()).catch(() => ({})),
           fetch('/api/attendance').then(r => r.json()).catch(() => ({})),
+          fetch('/api/teams').then(r => r.json()).catch(() => ({})),
         ]);
+        setCfg(tm?.team?.dashboard_config?.employee ?? {});
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));
         setTasks(Array.isArray(tk) ? tk : []);
@@ -103,6 +108,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       </div>
 
       {/* Next shift — hero card */}
+      {show('nextShift') && (
       <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs uppercase tracking-wider text-black/45">Nejbližší směna</p>
@@ -119,8 +125,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <p className="text-black/45">Žádná nadcházející směna.</p>
         )}
       </button>
+      )}
 
       {/* Stat row */}
+      {show('stats') && (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
           <p className="text-xs uppercase tracking-wider text-black/45">Moje úkoly</p>
@@ -140,11 +148,12 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <p className="text-xs text-black/45 mt-1">tento měsíc (píchačky)</p>
         </div>
       </div>
+      )}
 
-      <AnnouncementBanner />
+      {show('announcements') && <AnnouncementBanner />}
 
       {/* End-of-shift closing quick action — highlighted when a shift is unclosed */}
-      {closingsDue.length > 0 ? (
+      {show('closing') && (closingsDue.length > 0 ? (
         <button onClick={() => onNavigate('closing')} className="w-full text-left rounded-3xl bg-[#C8F542]/15 border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/20 transition-all">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
@@ -168,10 +177,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
             <Icon name="chevron" size={16} className="text-black/35 -rotate-90 shrink-0" />
           </div>
         </button>
-      )}
+      ))}
 
       {/* Availability reminder */}
-      {availabilitySubmitted === false && (
+      {show('availability') && availabilitySubmitted === false && (
         <button onClick={() => onNavigate('availability')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="calendar" size={18} /></span>
@@ -184,7 +193,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       )}
 
       {/* Low stock to watch */}
-      {lowStock.length > 0 && (
+      {show('lowStock') && lowStock.length > 0 && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold tracking-tight text-[#16181A]">Zásoby, které docházejí</h3>
