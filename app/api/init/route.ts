@@ -490,6 +490,9 @@ export async function GET() {
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_base_url TEXT`;
     await sql`ALTER TABLE planning_cards ADD COLUMN IF NOT EXISTS noisium_task_id TEXT`;
 
+    // ---- Procedure runs: allow skipping steps ----
+    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skipped_items JSONB DEFAULT '[]'`;
+
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {
     console.error('Init error:', error);
