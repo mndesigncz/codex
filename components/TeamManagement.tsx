@@ -5,6 +5,7 @@ import { Icon } from './Icons';
 import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
 import { CURRENCIES, LOCALES } from '@/lib/money';
+import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn } from '@/lib/dashboardWidgets';
 import { useSymbol } from './CurrencyProvider';
 
 interface Member {
@@ -32,6 +33,7 @@ interface Team {
   week_start?: number;
   labor_target_pct?: number | null;
   business_type?: string | null;
+  dashboard_config?: { employer?: Record<string, boolean>; employee?: Record<string, boolean> };
 }
 
 interface Invitation {
@@ -190,6 +192,26 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       setError('Nastavení se nepodařilo uložit.');
     } finally {
       setSavingRequiresShift(false);
+    }
+  };
+
+  // Dashboard widget visibility per role.
+  const toggleWidget = async (role: 'employer' | 'employee', id: string, on: boolean) => {
+    const current = team?.dashboard_config ?? {};
+    const next = {
+      ...current,
+      [role]: { ...(current[role] ?? {}), [id]: on },
+    };
+    setTeam(t => (t ? { ...t, dashboard_config: next } : t)); // optimistic
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboardConfig: next }),
+      });
+      if (!res.ok) { setTeam(t => (t ? { ...t, dashboard_config: current } : t)); setError('Nastavení se nepodařilo uložit.'); }
+    } catch {
+      setTeam(t => (t ? { ...t, dashboard_config: current } : t));
+      setError('Nastavení se nepodařilo uložit.');
     }
   };
 
@@ -655,6 +677,42 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <p className="text-[11px] text-black/40 mt-1.5">Podíl mezd na tržbách — v Docházce se zvýrazní překročení.</p>
           </div>
         </div>
+      </div>
+
+      {/* Dashboard customization */}
+      <div className="glass-card p-6 space-y-5">
+        <div>
+          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+            <Icon name="overview" size={18} /> Dashboardy
+          </h3>
+          <p className="text-black/45 text-sm mt-1">Vyber, co se zobrazí na přehledu — tvém i zaměstnanců.</p>
+        </div>
+        {([['employer', 'Můj přehled (vedení)', EMPLOYER_WIDGETS], ['employee', 'Přehled zaměstnanců', EMPLOYEE_WIDGETS]] as const).map(([role, title, widgets]) => (
+          <div key={role}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40 mb-2">{title}</p>
+            <div className="divide-y divide-black/[0.06]">
+              {widgets.map(w => {
+                const on = isWidgetOn(team?.dashboard_config?.[role], w.id);
+                return (
+                  <label key={w.id} className="flex items-center justify-between gap-4 py-2.5 cursor-pointer">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[#16181A]">{w.label}</p>
+                      {w.hint && <p className="text-xs text-black/40 mt-0.5">{w.hint}</p>}
+                    </div>
+                    <button
+                      type="button" role="switch" aria-checked={on}
+                      onClick={() => toggleWidget(role, w.id, !on)}
+                      className={`relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+                      style={{ width: '2.75rem', height: '1.6rem' }}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
+                    </button>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Payout / cash settings */}

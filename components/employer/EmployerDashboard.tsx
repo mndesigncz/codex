@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import ClockWidget from './ClockWidget';
 import AnnouncementsManager from './AnnouncementsManager';
+import { isWidgetOn } from '@/lib/dashboardWidgets';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -38,7 +39,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [availability, setAvailability] = useState<any[]>([]);
   const [unreadChats, setUnreadChats] = useState(0);
   const [onShift, setOnShift] = useState<any[]>([]);
+  const [cfg, setCfg] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const show = (id: string) => isWidgetOn(cfg, id);
 
   const month = nextMonthStr();
 
@@ -54,6 +57,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           fetch('/api/conversations').then(r => r.json()).catch(() => []),
           fetch('/api/attendance?days=1').then(r => r.json()).catch(() => ({})),
         ]);
+        setCfg(team?.team?.dashboard_config?.employer ?? {});
         setMembers((team?.members ?? []).filter((m: any) => m.role === 'employee'));
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts);
@@ -102,18 +106,20 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       </div>
 
       {/* Employer can work a shift too */}
-      {user.id && <ClockWidget userId={parseInt(String(user.id))} />}
+      {show('clock') && user.id && <ClockWidget userId={parseInt(String(user.id))} />}
 
       {/* KPIs */}
+      {show('kpis') && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon="users" label="Zaměstnanci" value={members.length} onClick={() => onNavigate('team-settings')} />
         <StatCard icon="calendar" label="Směny dnes" value={todayShifts.length} onClick={() => onNavigate('shifts')} />
         <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('tasks')} />
         <StatCard icon="warning" label="Kriticky málo" value={critical.length} onClick={() => onNavigate('inventory')} alert={critical.length > 0} />
       </div>
+      )}
 
       {/* Live: who's clocked in right now */}
-      {onShift.length > 0 && (
+      {show('onShift') && onShift.length > 0 && (
         <button onClick={() => onNavigate('attendance')} className="w-full text-left rounded-3xl bg-[#C8F542]/[0.12] border border-[#C8F542]/35 p-5 hover:bg-[#C8F542]/[0.18] transition-all">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
@@ -139,9 +145,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         </button>
       )}
 
-      <AnnouncementsManager />
+      {show('announcements') && <AnnouncementsManager />}
 
       {/* Availability status for next month */}
+      {show('availability') && (
       <div className="glass-card p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="min-w-0">
@@ -165,9 +172,12 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           <p className="text-sm text-black/45">Zatím žádní zaměstnanci. Pozvěte tým v sekci Nastavení.</p>
         )}
       </div>
+      )}
 
+      {(show('lowStock') || show('todayShifts')) && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Low stock */}
+        {show('lowStock') && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold tracking-tight text-[#16181A]">Nízké zásoby</h3>
@@ -189,8 +199,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             </div>
           )}
         </div>
+        )}
 
         {/* Today's shifts */}
+        {show('todayShifts') && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold tracking-tight text-[#16181A]">Dnešní směny</h3>
@@ -212,7 +224,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             </div>
           )}
         </div>
+        )}
       </div>
+      )}
     </div>
   );
 }

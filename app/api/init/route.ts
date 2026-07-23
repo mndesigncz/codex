@@ -481,6 +481,8 @@ export async function GET() {
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`;
+    // per-team dashboard customization: { employer: {widgetId:false}, employee: {...} }
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dashboard_config JSONB DEFAULT '{}'`;
 
     // ---- Noisium integration (per-team) ----
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`;
