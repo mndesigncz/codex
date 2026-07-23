@@ -59,15 +59,16 @@ function Confetti() {
 }
 
 export default function FloatingRunner() {
-  const { active, justCompleted, toggleItem, complete, cancel, dismissCelebration } = useProcedures();
+  const { active, justCompleted, toggleItem, toggleSkip, complete, cancel, dismissCelebration } = useProcedures();
   const [minimized, setMinimized] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [confirmFinish, setConfirmFinish] = useState(false);
   const [completing, setCompleting] = useState(false);
   const elapsed = useElapsed(active?.startedAt);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Reset transient UI when a new run starts / celebration appears.
-  useEffect(() => { if (active) { setMinimized(false); setConfirmClose(false); } }, [active?.id]);
+  useEffect(() => { if (active) { setMinimized(false); setConfirmClose(false); setConfirmFinish(false); } }, [active?.id]);
 
   if (!active && !justCompleted) return null;
 
@@ -87,9 +88,16 @@ export default function FloatingRunner() {
                 <span className="text-5xl font-bold tracking-tight text-[#5B7A08]">{fmt(justCompleted.duration)}</span>
               </div>
               <p className="mt-1 text-xs uppercase tracking-[0.14em] text-black/40">Celkový čas</p>
-              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 px-3 py-1 text-sm font-medium text-[#5B7A08]">
-                {checkGlyph}
-                {justCompleted.total} {stepsWord(justCompleted.total)} splněno
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 px-3 py-1 text-sm font-medium text-[#5B7A08]">
+                  {checkGlyph}
+                  {justCompleted.done} {stepsWord(justCompleted.done)} splněno
+                </span>
+                {justCompleted.skipped > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-sm font-medium text-amber-700">
+                    {justCompleted.skipped} přeskočeno
+                  </span>
+                )}
               </div>
               <button
                 onClick={dismissCelebration}
@@ -108,11 +116,16 @@ export default function FloatingRunner() {
 
   const total = active.totalItems || active.items.length;
   const done = active.checkedItems.length;
+  const skipped = active.skippedItems.length;
+  const remaining = Math.max(0, total - done - skipped); // neither done nor skipped
   const allDone = total > 0 && done >= total;
+  const unfinished = skipped + remaining; // everything not actually done
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const doCancel = () => { cancel(); setConfirmClose(false); };
   const doComplete = async () => { setCompleting(true); await complete(); setCompleting(false); };
+  // Finishing: straight through when everything's done, otherwise ask first.
+  const onFinishClick = () => { if (allDone) doComplete(); else setConfirmFinish(true); };
 
   // ---- Minimized pill ----
   if (minimized) {
@@ -199,34 +212,74 @@ export default function FloatingRunner() {
                 </button>
               </div>
             </div>
+          ) : confirmFinish ? (
+            /* Confirm finishing with unfinished steps */
+            <div className="px-5 pb-5 pt-4 text-center motion-safe:animate-[pr-pop_0.2s_ease-out]">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-[#16181A]">Dokončit, i když není vše hotové?</p>
+              <p className="mt-1 text-xs text-black/55">
+                {skipped > 0 && <>{skipped} {skipped === 1 ? 'krok přeskočen' : skipped <= 4 ? 'kroky přeskočeny' : 'kroků přeskočeno'}</>}
+                {skipped > 0 && remaining > 0 && ', '}
+                {remaining > 0 && <>{remaining} {remaining === 1 ? 'krok neodškrtnut' : remaining <= 4 ? 'kroky neodškrtnuty' : 'kroků neodškrtnuto'}</>}
+                . Vedení uvidí, co zůstalo nedokončené.
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setConfirmFinish(false)}
+                  disabled={completing}
+                  className="flex-1 rounded-full bg-black/[0.05] border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.08] transition whitespace-nowrap disabled:opacity-60"
+                >
+                  Pokračovat
+                </button>
+                <button
+                  onClick={doComplete}
+                  disabled={completing}
+                  className="flex-1 rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap disabled:opacity-60"
+                >
+                  {completing ? 'Ukládám…' : 'Přesto dokončit'}
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               {/* Steps timeline */}
               <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
                 <StepTimeline
                   steps={parseSteps(active.items)}
-                  statuses={Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const]))}
+                  statuses={{
+                    ...Object.fromEntries(active.skippedItems.map(i => [i, 'skipped' as const])),
+                    ...Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const])),
+                  }}
                   onToggle={toggleItem}
+                  onSkip={toggleSkip}
                   interactive
                   compact
                 />
               </div>
 
               {/* Footer / complete */}
-              <div className="px-3 pb-3 pt-1">
-                {allDone ? (
-                  <button
-                    onClick={doComplete}
-                    disabled={completing}
-                    className="w-full rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 hover:brightness-110 transition disabled:opacity-60 motion-safe:animate-[pr-pop_0.3s_ease-out] flex items-center justify-center gap-2"
-                  >
-                    {completing ? 'Ukládám…' : <>Dokončit {checkGlyph}</>}
-                  </button>
-                ) : (
-                  <p className="text-center text-xs text-black/40 py-1">
-                    Odškrtávejte kroky, jak je plníte
+              <div className="px-3 pb-3 pt-1 space-y-2">
+                {/* Live tally — highlights anything not yet finished */}
+                {unfinished > 0 && (
+                  <p className="text-center text-[11px] font-medium text-black/50">
+                    <span className="text-[#5B7A08]">{done} hotovo</span>
+                    {skipped > 0 && <span className="text-amber-600"> · {skipped} přeskočeno</span>}
+                    {remaining > 0 && <span className="text-black/45"> · {remaining} zbývá</span>}
                   </p>
                 )}
+                <button
+                  onClick={onFinishClick}
+                  disabled={completing}
+                  className={`w-full rounded-full font-semibold px-5 py-3 transition disabled:opacity-60 flex items-center justify-center gap-2 ${
+                    allDone
+                      ? 'bg-[#C8F542] text-black hover:brightness-110 motion-safe:animate-[pr-pop_0.3s_ease-out]'
+                      : 'bg-[#16181A] text-white hover:brightness-110'
+                  }`}
+                >
+                  {completing ? 'Ukládám…' : <>Dokončit {checkGlyph}</>}
+                </button>
               </div>
             </>
           )}

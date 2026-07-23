@@ -29,6 +29,7 @@ interface RunRow {
   status: string;
   total_items: number;
   checked_items: number[];
+  skipped_items?: number[];
   started_at: string;
   completed_at: string | null;
   duration_seconds: number | null;
@@ -286,6 +287,8 @@ export default function Procedures({ user }: Props) {
             <div className="mt-3 glass-card rounded-3xl divide-y divide-black/[0.06] overflow-hidden">
               {runs.map(r => {
                 const done = r.status === 'completed';
+                const checkedCount = Array.isArray(r.checked_items) ? r.checked_items.length : 0;
+                const missing = Math.max(0, (r.total_items ?? 0) - checkedCount);
                 return (
                   <div key={r.id} className="flex items-center gap-3 px-4 py-3">
                     <span className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{r.user_avatar || '👤'}</span>
@@ -298,9 +301,16 @@ export default function Procedures({ user }: Props) {
                       </p>
                     </div>
                     {done ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2.5 py-1 text-xs font-medium text-[#5B7A08] tabular-nums flex-shrink-0">
-                        <Icon name="clock" size={13} /> {fmtDuration(r.duration_seconds)}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {missing > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 tabular-nums">
+                            <Icon name="warning" size={12} /> {missing} nedokončeno
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2.5 py-1 text-xs font-medium text-[#5B7A08] tabular-nums">
+                          <Icon name="clock" size={13} /> {fmtDuration(r.duration_seconds)}
+                        </span>
+                      </div>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-medium text-black/55 flex-shrink-0">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] motion-safe:animate-pulse" />

@@ -29,6 +29,7 @@ function shapeActive(row: any) {
     color: row.color ?? 'lime',
     items: Array.isArray(row.items) ? row.items : [],
     checkedItems: Array.isArray(row.checked_items) ? row.checked_items : [],
+    skippedItems: Array.isArray(row.skipped_items) ? row.skipped_items : [],
     totalItems: row.total_items ?? 0,
     startedAt: row.started_at,
     status: row.status,
@@ -44,19 +45,74 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   if (searchParams.get('active')) {
-    const [row] = await sql`
-      SELECT r.id, r.procedure_id, r.checked_items, r.total_items, r.status, r.started_at,
-             p.name, p.icon, p.color, p.items
-      FROM procedure_runs r
-      JOIN procedures p ON p.id = r.procedure_id
-      WHERE r.user_id = ${me.id} AND r.status = 'running'
-      ORDER BY r.started_at DESC
-      LIMIT 1`;
+    let row;
+    try {
+      [row] = await sql`
+        SELECT r.id, r.procedure_id, r.checked_items, r.skipped_items, r.total_items, r.status, r.started_at,
+               p.name, p.icon, p.color, p.items
+        FROM procedure_runs r
+        JOIN procedures p ON p.id = r.procedure_id
+        WHERE r.user_id = ${me.id} AND r.status = 'running'
+        ORDER BY r.started_at DESC
+        LIMIT 1`;
+    } catch {
+      [row] = await sql`
+        SELECT r.id, r.procedure_id, r.checked_items, r.total_items, r.status, r.started_at,
+               p.name, p.icon, p.color, p.items
+        FROM procedure_runs r
+        JOIN procedures p ON p.id = r.procedure_id
+        WHERE r.user_id = ${me.id} AND r.status = 'running'
+        ORDER BY r.started_at DESC
+        LIMIT 1`;
+    }
     return NextResponse.json({ active: shapeActive(row) });
   }
 
   if (me.role === 'employer') {
-    const runs = await sql`
+    let runs;
+    try {
+      runs = await sql`
+        SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.skipped_items, r.total_items, r.status,
+               r.started_at, r.completed_at, r.duration_seconds,
+               p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
+               u.name AS user_name, u.avatar AS user_avatar
+        FROM procedure_runs r
+        JOIN procedures p ON p.id = r.procedure_id
+        JOIN users u ON u.id = r.user_id
+        WHERE r.team_id = ${me.teamId}
+        ORDER BY COALESCE(r.completed_at, r.started_at) DESC
+        LIMIT 50`;
+    } catch {
+      runs = await sql`
+        SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.total_items, r.status,
+               r.started_at, r.completed_at, r.duration_seconds,
+               p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
+               u.name AS user_name, u.avatar AS user_avatar
+        FROM procedure_runs r
+        JOIN procedures p ON p.id = r.procedure_id
+        JOIN users u ON u.id = r.user_id
+        WHERE r.team_id = ${me.teamId}
+        ORDER BY COALESCE(r.completed_at, r.started_at) DESC
+        LIMIT 50`;
+    }
+    return NextResponse.json({ runs });
+  }
+
+  let runs;
+  try {
+    runs = await sql`
+      SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.skipped_items, r.total_items, r.status,
+             r.started_at, r.completed_at, r.duration_seconds,
+             p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
+             u.name AS user_name, u.avatar AS user_avatar
+      FROM procedure_runs r
+      JOIN procedures p ON p.id = r.procedure_id
+      JOIN users u ON u.id = r.user_id
+      WHERE r.user_id = ${me.id}
+      ORDER BY COALESCE(r.completed_at, r.started_at) DESC
+      LIMIT 50`;
+  } catch {
+    runs = await sql`
       SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.total_items, r.status,
              r.started_at, r.completed_at, r.duration_seconds,
              p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
@@ -64,23 +120,10 @@ export async function GET(request: Request) {
       FROM procedure_runs r
       JOIN procedures p ON p.id = r.procedure_id
       JOIN users u ON u.id = r.user_id
-      WHERE r.team_id = ${me.teamId}
+      WHERE r.user_id = ${me.id}
       ORDER BY COALESCE(r.completed_at, r.started_at) DESC
       LIMIT 50`;
-    return NextResponse.json({ runs });
   }
-
-  const runs = await sql`
-    SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.total_items, r.status,
-           r.started_at, r.completed_at, r.duration_seconds,
-           p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
-           u.name AS user_name, u.avatar AS user_avatar
-    FROM procedure_runs r
-    JOIN procedures p ON p.id = r.procedure_id
-    JOIN users u ON u.id = r.user_id
-    WHERE r.user_id = ${me.id}
-    ORDER BY COALESCE(r.completed_at, r.started_at) DESC
-    LIMIT 50`;
   return NextResponse.json({ runs });
 }
 
@@ -155,25 +198,43 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const checked: number[] = Array.isArray(body.checkedItems)
-    ? Array.from(new Set(body.checkedItems.map((n: any) => parseInt(n)).filter((n: number) => !isNaN(n))))
-    : [];
+  const cleanIndices = (arr: any): number[] =>
+    Array.isArray(arr)
+      ? Array.from(new Set(arr.map((n: any) => parseInt(n)).filter((n: number) => !isNaN(n))))
+      : [];
+  const checked = cleanIndices(body.checkedItems);
+  // A step can't be both done and skipped — done wins.
+  const skipped = cleanIndices(body.skippedItems).filter(i => !checked.includes(i));
 
   if (body.complete) {
-    const [updated] = await sql`
-      UPDATE procedure_runs
-      SET checked_items = ${JSON.stringify(checked)}, status = 'completed', completed_at = NOW(),
-          duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
-      WHERE id = ${runId}
-      RETURNING id, procedure_id, checked_items, total_items, status, started_at, completed_at, duration_seconds`;
+    let updated;
+    try {
+      [updated] = await sql`
+        UPDATE procedure_runs
+        SET checked_items = ${JSON.stringify(checked)}, skipped_items = ${JSON.stringify(skipped)},
+            status = 'completed', completed_at = NOW(),
+            duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
+        WHERE id = ${runId}
+        RETURNING id, procedure_id, checked_items, skipped_items, total_items, status, started_at, completed_at, duration_seconds`;
+    } catch {
+      [updated] = await sql`
+        UPDATE procedure_runs
+        SET checked_items = ${JSON.stringify(checked)}, status = 'completed', completed_at = NOW(),
+            duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
+        WHERE id = ${runId}
+        RETURNING id, procedure_id, checked_items, total_items, status, started_at, completed_at, duration_seconds`;
+    }
 
-    // Notify the team owner (employer).
+    // Notify the team owner (employer) — flag any steps that weren't completed.
     const [team] = await sql`SELECT owner_id FROM teams WHERE id = ${run.team_id}`;
     if (team?.owner_id) {
       const dur = fmtDuration(updated.duration_seconds ?? 0);
+      const missing = Math.max(0, (run.total_items ?? 0) - checked.length);
       notifyUser(team.owner_id, {
-        title: 'Postup dokončen',
-        body: `${me.name} dokončil/a ${run.procedure_name} za ${dur}`,
+        title: missing > 0 ? 'Postup dokončen s výhradami' : 'Postup dokončen',
+        body: missing > 0
+          ? `${me.name} dokončil/a ${run.procedure_name} za ${dur} — ${missing} ${missing === 1 ? 'krok nedokončen' : missing <= 4 ? 'kroky nedokončeny' : 'kroků nedokončeno'}`
+          : `${me.name} dokončil/a ${run.procedure_name} za ${dur}`,
         type: 'shift',
       });
     }
@@ -181,11 +242,20 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ run: updated });
   }
 
-  const [updated] = await sql`
-    UPDATE procedure_runs
-    SET checked_items = ${JSON.stringify(checked)}
-    WHERE id = ${runId} AND status = 'running'
-    RETURNING id, procedure_id, checked_items, total_items, status, started_at`;
+  let updated;
+  try {
+    [updated] = await sql`
+      UPDATE procedure_runs
+      SET checked_items = ${JSON.stringify(checked)}, skipped_items = ${JSON.stringify(skipped)}
+      WHERE id = ${runId} AND status = 'running'
+      RETURNING id, procedure_id, checked_items, skipped_items, total_items, status, started_at`;
+  } catch {
+    [updated] = await sql`
+      UPDATE procedure_runs
+      SET checked_items = ${JSON.stringify(checked)}
+      WHERE id = ${runId} AND status = 'running'
+      RETURNING id, procedure_id, checked_items, total_items, status, started_at`;
+  }
 
   return NextResponse.json({ run: updated ?? run });
 }
