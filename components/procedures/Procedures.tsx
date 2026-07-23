@@ -493,6 +493,7 @@ function ProcedureEditor({
 
   const patchStep = (i: number, patch: Partial<Step>) => setSteps(prev => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const addStep = () => setSteps(prev => [...prev, blankStep()]);
+  const insertStep = (i: number) => setSteps(prev => { const n = [...prev]; n.splice(i + 1, 0, blankStep()); return n; });
   const removeStep = (i: number) => setSteps(prev => (prev.length === 1 ? [blankStep()] : prev.filter((_, idx) => idx !== i)));
   const toggleDay = (d: number) =>
     setRemindDays(prev => (prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort((a, b) => a - b)));
@@ -597,7 +598,8 @@ function ProcedureEditor({
             <p className="mb-2 text-xs text-black/40">Emoji a čas jsou nepovinné. Poznámka se zobrazí pod krokem.</p>
             <div className="space-y-2.5">
               {steps.map((s, i) => (
-                <div key={i} className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-2.5 space-y-2">
+                <div key={i} className="space-y-2.5">
+                <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-2.5 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={s.emoji ?? ''}
@@ -642,6 +644,15 @@ function ProcedureEditor({
                       </button>
                     </div>
                   </div>
+                </div>
+                {i < steps.length - 1 && (
+                  <div className="flex justify-center">
+                    <button type="button" onClick={() => insertStep(i)} title="Přidat krok sem"
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-black/10 text-black/40 hover:text-[#5B7A08] hover:border-[#C8F542]/60 shadow-sm transition">
+                      <Icon name="plus" size={13} />
+                    </button>
+                  </div>
+                )}
                 </div>
               ))}
             </div>

@@ -49,8 +49,14 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingSeries, setEditingSeries] = useState(false);
   const [view, setView] = useState<'list' | 'week'>('list');
+  const [showLater, setShowLater] = useState(false);
   const { weekStart } = useCurrency();
   const today = new Date().toISOString().split('T')[0];
+  const weekAhead = (() => {
+    const d = new Date(today + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  })();
 
   const load = async () => {
     try {
@@ -189,6 +195,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   // Create-form checklist editing helpers.
   const addChecklistLine = () => setForm(f => ({ ...f, checklist: [...f.checklist, { text: '', done: false }] }));
+  const insertChecklistLine = (i: number) => setForm(f => { const n = [...f.checklist]; n.splice(i + 1, 0, { text: '', done: false }); return { ...f, checklist: n }; });
   const setChecklistLine = (i: number, text: string) => setForm(f => ({ ...f, checklist: f.checklist.map((it, idx) => idx === i ? { ...it, text } : it) }));
   const removeChecklistLine = (i: number) => setForm(f => ({ ...f, checklist: f.checklist.filter((_, idx) => idx !== i) }));
 
@@ -198,6 +205,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const overdue = undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate);
   const todayTasks = undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate);
   const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
+  // Week ahead up front (greyed as inactive); anything further out sits behind a toggle.
+  const upcomingSoon = upcoming.filter(t => t.dueDate! <= weekAhead);
+  const upcomingLater = upcoming.filter(t => t.dueDate! > weekAhead);
   const doneTasks = tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 30);
 
   const labelFor = (t: Task) => t.teamTask ? 'Kdokoliv' : (t.assignedTo != null ? (memberById.get(t.assignedTo)?.name ?? '') : '');
@@ -207,8 +217,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     const who = t.teamTask ? '🗓️ Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
     const prio = PRIORITIES.find(p => p.value === t.priority) ?? PRIORITIES[1];
     const done = t.status === 'done';
+    // Future occurrences aren't active yet → show them greyed until their day comes.
+    const inactive = !done && !!t.dueDate && t.dueDate > today;
     return (
-      <div key={t.id} className={`glass-card ${compact ? 'p-3' : 'p-4'}`}>
+      <div key={t.id} className={`glass-card ${compact ? 'p-3' : 'p-4'} ${inactive ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-2.5">
           <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
             className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
@@ -345,13 +357,23 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kontrolní seznam (nepovinné)</label>
                 <div className="space-y-2">
                   {form.checklist.map((it, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input value={it.text} onChange={e => setChecklistLine(i, e.target.value)}
-                        placeholder={`Bod ${i + 1}`} className={`${inputClass} !py-2.5`} />
-                      <button type="button" onClick={() => removeChecklistLine(i)}
-                        className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/45 hover:text-red-600 shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
-                      </button>
+                    <div key={i} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input value={it.text} onChange={e => setChecklistLine(i, e.target.value)}
+                          placeholder={`Bod ${i + 1}`} className={`${inputClass} !py-2.5`} />
+                        <button type="button" onClick={() => removeChecklistLine(i)}
+                          className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/45 hover:text-red-600 shrink-0">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
+                        </button>
+                      </div>
+                      {i < form.checklist.length - 1 && (
+                        <div className="flex justify-center">
+                          <button type="button" onClick={() => insertChecklistLine(i)} title="Přidat bod sem"
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-black/10 text-black/40 hover:text-[#5B7A08] hover:border-[#C8F542]/60 shadow-sm transition">
+                            <Icon name="plus" size={13} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                   <button type="button" onClick={addChecklistLine}
@@ -390,7 +412,19 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <div className="space-y-6">
           {section('Po termínu', overdue, 'text-red-600')}
           {section('Dnes', todayTasks, 'text-[#5B7A08]')}
-          {section('Budoucí úkoly', upcoming)}
+          {section('Tento týden', upcomingSoon)}
+          {upcomingLater.length > 0 && (
+            showLater ? (
+              section('Později', upcomingLater)
+            ) : (
+              <button
+                onClick={() => setShowLater(true)}
+                className="w-full rounded-2xl border border-dashed border-black/15 py-2.5 text-xs font-semibold text-black/45 hover:text-[#5B7A08] hover:border-[#C8F542]/60 transition"
+              >
+                Zobrazit další úkoly ({upcomingLater.length}) →
+              </button>
+            )
+          )}
           {section('Hotové', doneTasks)}
         </div>
       )}
