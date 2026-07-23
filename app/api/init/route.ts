@@ -341,6 +341,8 @@ export async function GET() {
     await sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS ends_at_close BOOLEAN DEFAULT FALSE`;
     await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_at TEXT`;
     await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_days JSONB DEFAULT '[]'`;
+    // reminder can be anchored to opening / closing time instead of a fixed time
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_anchor TEXT DEFAULT 'time'`; // 'time' | 'open' | 'close'
     await sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_url TEXT`;
 

@@ -230,9 +230,9 @@ export default function Procedures({ user }: Props) {
                       <Icon name="clock" size={13} /> {fmtMinutes(mins)}
                     </span>
                   )}
-                  {p.remindAt && (
+                  {(p.remindAt || p.remindAnchor === 'open' || p.remindAnchor === 'close') && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2 py-0.5 font-medium text-[#5B7A08]">
-                      <Icon name="clock" size={12} /> {p.remindAt}
+                      <Icon name="clock" size={12} /> {p.remindAnchor === 'open' ? 'Při otevření' : p.remindAnchor === 'close' ? 'Při zavření' : p.remindAt}
                     </span>
                   )}
                 </div>
@@ -477,6 +477,9 @@ function ProcedureEditor({
   const [description, setDescription] = useState(initial?.description ?? '');
   const [icon, setIcon] = useState(initial?.icon ?? 'check');
   const [remindAt, setRemindAt] = useState(initial?.remindAt ?? '');
+  const [remindAnchor, setRemindAnchor] = useState<'time' | 'open' | 'close'>(
+    (initial?.remindAnchor as 'time' | 'open' | 'close') ?? 'time'
+  );
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
@@ -511,13 +514,15 @@ function ProcedureEditor({
     if (items.length === 0) { setError('Přidejte alespoň jeden krok.'); return; }
     setSaving(true);
     try {
+      const reminderOn = remindAnchor !== 'time' || !!remindAt;
       const payload = {
         name: cleanName,
         description: description.trim(),
         icon,
         items,
-        remindAt: remindAt || null,
-        remindDays: remindAt ? remindDays : [],
+        remindAnchor,
+        remindAt: remindAnchor === 'time' ? (remindAt || null) : null,
+        remindDays: reminderOn ? remindDays : [],
       };
       const res = await fetch(initial ? `/api/procedures/${initial.id}` : '/api/procedures', {
         method: initial ? 'PATCH' : 'POST',
@@ -647,28 +652,48 @@ function ProcedureEditor({
 
           <div>
             <label className="block text-xs font-medium text-black/50 mb-1.5">Připomínka (nepovinné)</label>
-            <p className="mb-2 text-xs text-black/40">Postup se v daný čas sám otevře a zaměstnancům přijde upozornění.</p>
-            <div className="flex items-center gap-2">
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-black/[0.04] border border-black/[0.08] text-[#5B7A08]">
-                <Icon name="clock" size={20} />
-              </span>
-              <input
-                type="time"
-                value={remindAt ?? ''}
-                onChange={e => setRemindAt(e.target.value)}
-                className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-              />
-              {remindAt && (
+            <p className="mb-2 text-xs text-black/40">Postup se v daný čas sám otevře a lidem na směně přijde upozornění.</p>
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {([['time', 'V určený čas'], ['open', 'Při otevření'], ['close', 'Při zavření']] as const).map(([val, label]) => (
                 <button
-                  onClick={() => { setRemindAt(''); setRemindDays([]); }}
-                  title="Zrušit připomínku"
-                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-black/40 hover:bg-black/[0.06] hover:text-black transition"
+                  key={val}
+                  type="button"
+                  onClick={() => setRemindAnchor(val)}
+                  className={`rounded-full px-3.5 py-2 text-sm font-medium border transition ${
+                    remindAnchor === val ? 'bg-[#16181A] text-white border-transparent' : 'bg-black/[0.04] border-black/[0.08] text-black/60 hover:text-black'
+                  }`}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                  {label}
                 </button>
-              )}
+              ))}
             </div>
-            {remindAt && (
+            {remindAnchor === 'time' ? (
+              <div className="flex items-center gap-2">
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-black/[0.04] border border-black/[0.08] text-[#5B7A08]">
+                  <Icon name="clock" size={20} />
+                </span>
+                <input
+                  type="time"
+                  value={remindAt ?? ''}
+                  onChange={e => setRemindAt(e.target.value)}
+                  className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                />
+                {remindAt && (
+                  <button
+                    onClick={() => { setRemindAt(''); setRemindDays([]); }}
+                    title="Zrušit připomínku"
+                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-black/40 hover:bg-black/[0.06] hover:text-black transition"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/20 rounded-xl px-3 py-2.5">
+                Připomene se podle otevírací doby daného dne{remindAnchor === 'open' ? ' (při otevření)' : ' (při zavření)'} — pokud je zavřeno, ten den se nepřipomene.
+              </p>
+            )}
+            {(remindAnchor !== 'time' || remindAt) && (
               <div className="mt-2.5">
                 <p className="mb-1.5 text-xs text-black/40">Ve dnech (nevybráno = každý den)</p>
                 <div className="flex flex-wrap gap-1.5">

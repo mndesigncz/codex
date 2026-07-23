@@ -53,21 +53,35 @@ function markFired(key: string) {
 export default function ReminderWatcher() {
   const { active, startRun, starting } = useProcedures();
   const proceduresRef = useRef<ProcedureLite[]>([]);
+  const hasShiftTodayRef = useRef(false);
+  const openingRef = useRef<{ open: string; close: string; closed: boolean }>({ open: '08:00', close: '20:00', closed: false });
   const [due, setDue] = useState<ProcedureLite | null>(null);
+  const [dueTime, setDueTime] = useState<string | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
 
-  // Load the team's procedures (with reminder config) and keep them fresh.
+  // Load the team's procedures (with reminder config), whether the current user
+  // works today, and today's opening hours. Kept fresh.
   const loadProcedures = useCallback(async () => {
     try {
       const res = await fetch('/api/procedures');
       if (!res.ok) return;
       const data = await res.json();
       proceduresRef.current = Array.isArray(data.procedures) ? data.procedures : [];
+      hasShiftTodayRef.current = !!data.hasShiftToday;
+      if (data.openingToday) openingRef.current = data.openingToday;
     } catch {
       /* offline — ignore */
     }
   }, []);
+
+  // A procedure's effective reminder time today: fixed, or the day's open/close.
+  const effectiveTime = (p: ProcedureLite): string | null => {
+    const oh = openingRef.current;
+    if (p.remindAnchor === 'open') return oh.closed ? null : oh.open;
+    if (p.remindAnchor === 'close') return oh.closed ? null : oh.close;
+    return p.remindAt ?? null;
+  };
 
   const fireRemind = useCallback((procedureId: number) => {
     fetch('/api/procedures/remind', {
@@ -80,6 +94,8 @@ export default function ReminderWatcher() {
   const check = useCallback(() => {
     // Never interrupt a run in progress.
     if (activeRef.current) return;
+    // Only nudge people who actually work today (kiosk always does).
+    if (!hasShiftTodayRef.current) return;
 
     const now = new Date();
     const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -88,7 +104,8 @@ export default function ReminderWatcher() {
     const fired = readFired();
 
     for (const p of proceduresRef.current) {
-      if (!p.remindAt || p.remindAt !== hhmm) continue;
+      const eff = effectiveTime(p);
+      if (!eff || eff !== hhmm) continue;
       const days = p.remindDays;
       if (Array.isArray(days) && days.length > 0 && !days.includes(weekday)) continue;
 
@@ -99,6 +116,7 @@ export default function ReminderWatcher() {
       // the same minute (or a dismiss) never re-fires today.
       markFired(key);
       fireRemind(p.id);
+      setDueTime(eff);
       setDue(p);
       return; // one prompt at a time
     }
@@ -148,9 +166,10 @@ export default function ReminderWatcher() {
             <p className="mt-0.5 text-lg font-bold leading-snug tracking-tight text-[#16181A]">
               Je čas na {due.name}!
             </p>
-            {due.remindAt && (
+            {dueTime && (
               <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-black/45">
-                <Icon name="clock" size={13} /> {due.remindAt}
+                <Icon name="clock" size={13} /> {dueTime}
+                {due.remindAnchor === 'open' ? ' · otevření' : due.remindAnchor === 'close' ? ' · zavření' : ''}
               </p>
             )}
           </div>
