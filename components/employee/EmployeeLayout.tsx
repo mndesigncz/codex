@@ -14,6 +14,7 @@ import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
 import TimeOffRequest from '../scheduling/TimeOffRequest';
 import InventoryReport from './InventoryReport';
 import Tasks from './Tasks';
+import MyRewards from './MyRewards';
 import CashClosing from './CashClosing';
 import SuggestionsBoard from '../SuggestionsBoard';
 import ShiftSwap from '../scheduling/ShiftSwap';
@@ -29,6 +30,7 @@ const navItems = [
   { id: 'inventory',   label: 'Sklad',      icon: 'box' },
   { id: 'closing',     label: 'Uzávěrka',   icon: 'trend' },
   { id: 'tasks',       label: 'Úkoly',      icon: 'check' },
+  { id: 'rewards',     label: 'Odměny',     icon: 'award' },
   { id: 'chat',        label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',      label: 'Návody',     icon: 'book' },
   { id: 'suggestions', label: 'Nápady',     icon: 'bulb' },
@@ -39,7 +41,7 @@ const navSections: { title: string | null; ids: string[] }[] = [
   { title: null,        ids: ['home'] },
   { title: 'Směny',     ids: ['my-shifts', 'availability'] },
   { title: 'Práce',     ids: ['closing', 'inventory', 'tasks', 'procedures'] },
-  { title: 'Tým',       ids: ['chat', 'guides', 'suggestions'] },
+  { title: 'Tým',       ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
 const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
 
@@ -76,6 +78,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;
       case 'tasks':        return <Tasks user={user as any} />;
+      case 'rewards':      return <MyRewards />;
       case 'chat':         return <ChatView user={user as any} />;
       case 'guides':       return <Guides user={user as any} />;
       case 'suggestions':  return <SuggestionsBoard />;
