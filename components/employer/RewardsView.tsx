@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
 import type { RewardLevel, PointsConfig } from '@/lib/rewardLevels';
+import ShiftReviewModal from './ShiftReviewModal';
 
 interface Standing {
   id: number; name: string; avatar?: string;
@@ -10,23 +11,6 @@ interface Standing {
   breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number };
   levelName: string; levelIndex: number;
   next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number;
-}
-
-const todayStr = () => new Date().toISOString().split('T')[0];
-
-function StarPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  return (
-    <div className="flex gap-1.5">
-      {[1, 2, 3, 4, 5].map(i => (
-        <button key={i} type="button" onClick={() => onChange(i === value ? 0 : i)} title={`${i} z 5`}
-          className="transition active:scale-90">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill={i <= value ? '#C8F542' : 'none'} stroke={i <= value ? '#8FB811' : 'currentColor'} strokeWidth="1.5" className={i <= value ? '' : 'text-black/25 hover:text-black/40'}>
-            <path d="m12 3 2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9 6.7 19.2l1-5.8-4.2-4.1 5.9-.9L12 3Z" strokeLinejoin="round" />
-          </svg>
-        </button>
-      ))}
-    </div>
-  );
 }
 
 const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
@@ -80,7 +64,11 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
       )}
 
       {rating && (
-        <RatingModal employee={rating} points={points} onClose={() => setRating(null)} onSaved={() => { setRating(null); load(); }} />
+        <ShiftReviewModal
+          employee={{ id: rating.id, name: rating.name, avatar: rating.avatar }}
+          onClose={() => setRating(null)}
+          onSaved={() => { setRating(null); load(); }}
+        />
       )}
     </div>
   );
@@ -132,196 +120,6 @@ function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: 
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-interface Summary {
-  employee: { id: number; name: string; avatar?: string };
-  date: string; hadShift: boolean;
-  tasks: { id: number; title: string; priority: string }[];
-  procedures: { id: number; name: string; status: string; done: number; skipped: number; total: number }[];
-  closing: { id: number; approved: boolean; shiftLabel: string | null } | null;
-  review: { rating: number; note: string | null; points: number } | null;
-}
-
-function RatingModal({ employee, points, onClose, onSaved }:
-  { employee: Standing; points: PointsConfig | null; onClose: () => void; onSaved: () => void }) {
-  const [date, setDate] = useState(todayStr());
-  const [shiftDates, setShiftDates] = useState<string[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [note, setNote] = useState('');
-  const [pts, setPts] = useState(0);
-  const [ptsTouched, setPtsTouched] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  // Recent shift dates for quick-pick.
-  useEffect(() => {
-    fetch(`/api/shifts?employeeId=${employee.id}`).then(r => r.json()).then(d => {
-      const arr = Array.isArray(d?.shifts) ? d.shifts : Array.isArray(d) ? d : [];
-      const today = todayStr();
-      const dates = Array.from(new Set(arr.map((s: any) => s.date).filter((x: string) => x && x <= today)))
-        .sort((a, b) => String(b).localeCompare(String(a))).slice(0, 8) as string[];
-      setShiftDates(dates);
-    }).catch(() => {});
-  }, [employee.id]);
-
-  // Load the day summary whenever the date changes.
-  useEffect(() => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-    setLoadingSummary(true);
-    fetch(`/api/shift-reviews?employeeId=${employee.id}&date=${date}`).then(r => r.json()).then((d: Summary) => {
-      if (d && !(d as any).error) {
-        setSummary(d);
-        setRating(d.review?.rating ?? 0);
-        setNote(d.review?.note ?? '');
-        if (d.review) { setPts(d.review.points ?? 0); setPtsTouched(true); }
-        else { setPtsTouched(false); }
-      }
-    }).catch(() => {}).finally(() => setLoadingSummary(false));
-  }, [date, employee.id]);
-
-  // Suggest points from the star rating until the employer overrides them.
-  useEffect(() => {
-    if (!ptsTouched) setPts(rating * (points?.ratingStar ?? 4));
-  }, [rating, ptsTouched, points]);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch('/api/shift-reviews', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: employee.id, date, rating, note: note.trim() || null, points: pts }),
-      });
-      if (res.ok) onSaved();
-    } finally { setSaving(false); }
-  };
-
-  const fmtChip = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
-  const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 bg-white/80 backdrop-blur border-b border-black/[0.06]">
-          <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{employee.avatar || '👤'}</span>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-bold tracking-tight text-[#16181A] truncate">Hodnotit směnu — {employee.name}</h3>
-            <p className="text-xs text-black/45">Vyber den a projdi, co udělal/a.</p>
-          </div>
-          <button onClick={onClose} className="rounded-full w-8 h-8 flex items-center justify-center text-black/45 hover:bg-black/[0.06]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-        </div>
-
-        <div className="p-5 space-y-5">
-          {/* Date picker */}
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Den směny</label>
-            <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
-            {shiftDates.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {shiftDates.map(d => (
-                  <button key={d} onClick={() => setDate(d)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${date === d ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:bg-black/[0.09]'}`}>
-                    {fmtChip(d)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Day summary */}
-          {loadingSummary ? (
-            <div className="glass-card h-24 animate-pulse" />
-          ) : summary && (
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.05] p-4 space-y-3">
-              <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">Co udělal/a</p>
-
-              {/* Closing */}
-              <div className="flex items-center gap-2 text-sm">
-                <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${summary.closing ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-red-500/12 text-red-600'}`}>
-                  <Icon name={summary.closing ? 'check' : 'warning'} size={13} />
-                </span>
-                <span className="text-[#16181A]">
-                  {summary.closing ? <>Uzávěrka hotová{summary.closing.approved ? '' : ' (čeká na schválení)'}</> : 'Uzávěrka nevyplněna'}
-                </span>
-              </div>
-
-              {/* Tasks */}
-              <div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="check" size={13} /></span>
-                  <span className="text-[#16181A]">{summary.tasks.length} {summary.tasks.length === 1 ? 'splněný úkol' : summary.tasks.length <= 4 ? 'splněné úkoly' : 'splněných úkolů'}</span>
-                </div>
-                {summary.tasks.length > 0 && (
-                  <div className="mt-1.5 ml-8 flex flex-wrap gap-1.5">
-                    {summary.tasks.map(t => (
-                      <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full bg-white border border-black/[0.06] px-2.5 py-1 text-[11px] text-[#16181A]">
-                        <span className={`w-1.5 h-1.5 rounded-full ${prioDot(t.priority)}`} />{t.title}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Procedures */}
-              <div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="clipboard" size={13} /></span>
-                  <span className="text-[#16181A]">{summary.procedures.length} {summary.procedures.length === 1 ? 'postup' : summary.procedures.length <= 4 ? 'postupy' : 'postupů'}</span>
-                </div>
-                {summary.procedures.length > 0 && (
-                  <div className="mt-1.5 ml-8 space-y-1">
-                    {summary.procedures.map(p => (
-                      <div key={p.id} className="flex items-center justify-between gap-2 text-[11px]">
-                        <span className="text-[#16181A] truncate">{p.name}</span>
-                        <span className="shrink-0 tabular-nums text-black/50">
-                          {p.status === 'completed' ? <span className="text-[#5B7A08] font-medium">{p.done}/{p.total} hotovo</span> : <span className="text-black/40">probíhá</span>}
-                          {p.skipped > 0 && <span className="text-amber-600"> · {p.skipped} přeskočeno</span>}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {!summary.hadShift && !summary.closing && summary.tasks.length === 0 && summary.procedures.length === 0 && (
-                <p className="text-xs text-black/40">Pro tento den nemáme žádnou aktivitu ani naplánovanou směnu.</p>
-              )}
-            </div>
-          )}
-
-          {/* Rating */}
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Hodnocení směny</label>
-              <StarPicker value={rating} onChange={setRating} />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zpětná vazba (uvidí zaměstnanec)</label>
-              <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Co bylo super, co příště zlepšit…" className={`${inputCls} resize-none`} />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Body za směnu</label>
-              <div className="flex items-center gap-2">
-                <input type="number" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
-                <span className="text-xs text-black/45">bodů {!ptsTouched && rating > 0 && '(návrh z hvězd)'}</span>
-              </div>
-              <p className="text-[11px] text-black/40 mt-1.5">Kladné body posouvají zaměstnance výš. Můžeš přidat bonus za něco extra užitečného.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 flex gap-2 px-5 py-4 bg-white/85 backdrop-blur border-t border-black/[0.06]">
-          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition">Zavřít</button>
-          <button onClick={save} disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition">
-            {saving ? 'Ukládám…' : 'Uložit hodnocení'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -511,6 +511,10 @@ export async function GET() {
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (employee_id, work_date)
       )`;
+    // Employer review notes attached directly to individual items.
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_note TEXT`;
+    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS review_note TEXT`;
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS review_note TEXT`;
 
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {

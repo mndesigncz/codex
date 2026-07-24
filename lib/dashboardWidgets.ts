@@ -8,6 +8,7 @@ export const EMPLOYER_WIDGETS: Widget[] = [
   { id: 'clock', label: 'Píchačky vedení', hint: 'Příchod/odchod pro tebe.' },
   { id: 'kpis', label: 'Klíčové metriky', hint: 'Zaměstnanci, směny, úkoly, sklad.' },
   { id: 'onShift', label: 'Právě na směně', hint: 'Kdo je zrovna napíchnutý.' },
+  { id: 'rateShifts', label: 'Ohodnotit směny', hint: 'Rychlé hodnocení dnešních směn.' },
   { id: 'announcements', label: 'Nástěnka oznámení' },
   { id: 'availability', label: 'Dostupnost týmu' },
   { id: 'lowStock', label: 'Nízké zásoby' },

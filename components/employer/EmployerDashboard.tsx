@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import ClockWidget from './ClockWidget';
 import AnnouncementsManager from './AnnouncementsManager';
+import ShiftReviewModal from './ShiftReviewModal';
 import { isWidgetOn } from '@/lib/dashboardWidgets';
+
+interface RosterEntry { id: number; name: string; avatar?: string; worked: boolean; reviewed: boolean; rating: number; }
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -39,9 +42,18 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [availability, setAvailability] = useState<any[]>([]);
   const [unreadChats, setUnreadChats] = useState(0);
   const [onShift, setOnShift] = useState<any[]>([]);
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [rating, setRating] = useState<RosterEntry | null>(null);
   const [cfg, setCfg] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const show = (id: string) => isWidgetOn(cfg, id);
+  const today = new Date().toISOString().split('T')[0];
+
+  const loadRoster = () => {
+    fetch(`/api/shift-reviews?date=${today}`).then(r => r.json()).then(d => {
+      if (Array.isArray(d?.list)) setRoster(d.list);
+    }).catch(() => {});
+  };
 
   const month = nextMonthStr();
 
@@ -67,12 +79,12 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
         setOnShift((att?.roster ?? []).filter((r: any) => r.openSince));
+        loadRoster();
       } catch {}
       setLoading(false);
     })();
   }, [month]);
 
-  const today = new Date().toISOString().split('T')[0];
   const todayShifts = shifts.filter(s => (s.date ?? '') === today);
   const activeTasks = tasks.filter(t => t.status !== 'done');
   const lowStock = inventory.filter(i => i.quantity <= i.minQuantity);
@@ -143,6 +155,40 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             ))}
           </div>
         </button>
+      )}
+
+      {/* Rate today's shifts — quick access straight from the dashboard */}
+      {show('rateShifts') && roster.some(r => r.worked) && (
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08] shrink-0"><Icon name="award" size={17} /></span>
+              <div className="min-w-0">
+                <h3 className="font-bold tracking-tight text-[#16181A]">Ohodnotit dnešní směny</h3>
+                <p className="text-xs text-black/45">Projdi, co kdo udělal, a dej hodnocení.</p>
+              </div>
+            </div>
+            <button onClick={() => onNavigate('rewards')} className="text-sm text-[#5B7A08] hover:brightness-110 shrink-0">Vše →</button>
+          </div>
+          <div className="space-y-2">
+            {roster.filter(r => r.worked).map(r => (
+              <div key={r.id} className="flex items-center gap-3 p-2.5 rounded-2xl bg-black/[0.03]">
+                <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{r.avatar ?? '👤'}</span>
+                <span className="flex-1 min-w-0 text-sm font-medium text-[#16181A] truncate">{r.name}</span>
+                {r.reviewed ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
+                    {r.rating > 0 ? `${r.rating}★` : ''} Hodnoceno
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
+                )}
+                <button onClick={() => setRating(r)} className="rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
+                  {r.reviewed ? 'Upravit' : 'Ohodnotit'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {show('announcements') && <AnnouncementsManager />}
@@ -226,6 +272,15 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         </div>
         )}
       </div>
+      )}
+
+      {rating && (
+        <ShiftReviewModal
+          employee={{ id: rating.id, name: rating.name, avatar: rating.avatar }}
+          initialDate={today}
+          onClose={() => setRating(null)}
+          onSaved={() => { setRating(null); loadRoster(); }}
+        />
       )}
     </div>
   );
