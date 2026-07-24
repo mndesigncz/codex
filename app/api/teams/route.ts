@@ -52,6 +52,14 @@ export async function GET() {
       dashboardConfig = dc?.dashboard_config && typeof dc.dashboard_config === 'object' ? dc.dashboard_config : {};
     } catch { /* column not migrated yet */ }
 
+    let levelsConfig: any = [];
+    let pointsConfig: any = {};
+    try {
+      const [rc] = await sql`SELECT levels_config, points_config FROM teams WHERE id = ${teamId}`;
+      levelsConfig = Array.isArray(rc?.levels_config) ? rc.levels_config : [];
+      pointsConfig = rc?.points_config && typeof rc.points_config === 'object' ? rc.points_config : {};
+    } catch { /* columns not migrated yet */ }
+
     // Business/localization settings (defensive — safe defaults before migration).
     let biz = { currency: 'CZK', locale: 'cs-CZ', week_start: 1, labor_target_pct: null as number | null,
                 low_stock_default: 5, critical_stock_default: 2, business_type: null as string | null };
@@ -83,7 +91,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, dashboard_config: dashboardConfig, ...biz },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -100,6 +108,7 @@ export async function PATCH(request: Request) {
   const sql = neon(process.env.DATABASE_URL!);
   const body = await request.json();
   const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, dashboardConfig,
+          levelsConfig, pointsConfig,
           currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body;
 
   // Any employer of the team may manage settings (multi-employer teams).
@@ -117,6 +126,12 @@ export async function PATCH(request: Request) {
   }
   if (dashboardConfig && typeof dashboardConfig === 'object') {
     try { await sql`UPDATE teams SET dashboard_config = ${JSON.stringify(dashboardConfig)}::jsonb WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  }
+  if (Array.isArray(levelsConfig)) {
+    try { await sql`UPDATE teams SET levels_config = ${JSON.stringify(levelsConfig)}::jsonb WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  }
+  if (pointsConfig && typeof pointsConfig === 'object') {
+    try { await sql`UPDATE teams SET points_config = ${JSON.stringify(pointsConfig)}::jsonb WHERE id = ${team.id}`; } catch { /* not migrated */ }
   }
   // Business/localization settings — each guarded so a pending migration degrades gracefully.
   try {

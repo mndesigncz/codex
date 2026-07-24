@@ -16,6 +16,7 @@ import PlanningBoard from './PlanningBoard';
 import ClosingsOverview from './ClosingsOverview';
 import SuggestionsBoard from '../SuggestionsBoard';
 import TaskManager from './TaskManager';
+import RewardsView from './RewardsView';
 import Attendance from './Attendance';
 import MyShifts from '../employee/MyShifts';
 import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
@@ -41,6 +42,7 @@ const navItems = [
   { id: 'suggestions',label: 'Nápady',     icon: 'bulb' },
   { id: 'attendance', label: 'Docházka',   icon: 'clock' },
   { id: 'my-shifts',  label: 'Moje směny', icon: 'swap' },
+  { id: 'rewards',    label: 'Odměny',     icon: 'award' },
 ];
 
 // Grouped navigation — the flat list above still drives view lookup, these
@@ -50,7 +52,7 @@ const navSections: { title: string | null; ids: string[] }[] = [
   { title: 'Směny',        ids: ['shifts', 'my-shifts', 'calendar', 'attendance'] },
   { title: 'Kasa & sklad', ids: ['reports', 'inventory'] },
   { title: 'Práce',        ids: ['tasks', 'procedures', 'planning'] },
-  { title: 'Tým',          ids: ['chat', 'guides', 'suggestions'] },
+  { title: 'Tým',          ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
 const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
 
@@ -86,6 +88,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
       case 'tasks':     return <TaskManager user={user as any} />;
+      case 'rewards':   return <RewardsView user={user as any} />;
       case 'attendance': return <Attendance user={user as any} />;
       case 'my-shifts': return (
         <div className="space-y-2">

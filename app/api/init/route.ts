@@ -493,6 +493,25 @@ export async function GET() {
     // ---- Procedure runs: allow skipping steps ----
     await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skipped_items JSONB DEFAULT '[]'`;
 
+    // ---- Employee rewards / leveling ----
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS levels_config JSONB DEFAULT '[]'`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS points_config JSONB DEFAULT '{}'`;
+    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS shift_reviews (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        work_date TEXT NOT NULL,
+        rating INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        points INTEGER NOT NULL DEFAULT 0,
+        reviewed_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (employee_id, work_date)
+      )`;
+
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {
     console.error('Init error:', error);

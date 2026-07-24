@@ -420,12 +420,20 @@ export async function PATCH(req: NextRequest) {
   // Record who completed it (cleared when re-opened). Falls back if the column
   // isn't there yet.
   let row: any;
+  const done = b.status === 'done';
   try {
     [row] = await sql`
-      UPDATE tasks SET status = ${b.status}, completed_by = ${b.status === 'done' ? c.meId : null}
+      UPDATE tasks SET status = ${b.status}, completed_by = ${done ? c.meId : null},
+        completed_at = ${done ? new Date().toISOString() : null}
       WHERE id = ${id} RETURNING *`;
   } catch {
-    [row] = await sql`UPDATE tasks SET status = ${b.status} WHERE id = ${id} RETURNING *`;
+    try {
+      [row] = await sql`
+        UPDATE tasks SET status = ${b.status}, completed_by = ${done ? c.meId : null}
+        WHERE id = ${id} RETURNING *`;
+    } catch {
+      [row] = await sql`UPDATE tasks SET status = ${b.status} WHERE id = ${id} RETURNING *`;
+    }
   }
   return NextResponse.json(shape(row));
 }
