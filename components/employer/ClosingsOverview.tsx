@@ -65,6 +65,7 @@ export default function ClosingsOverview() {
     try {
       const res = await fetch(`/api/closings/${c.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
+      setDataVersion(v => v + 1);   // the calendar must forget the removed day
     } catch { setAllClosings(prev); }
     setDeleting(null);
   };
@@ -98,10 +99,10 @@ export default function ClosingsOverview() {
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   const exportCsv = () => {
-    const head = ['Datum', 'Směna', 'Zaměstnanec', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Zákazníků', 'Poznámka'];
+    const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Zákazníků', 'Poznámka'];
     const rows = closings.map(c => [
-      c.date, c.shift_label ?? '', c.author_name ?? '',
-      c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.expenses,
+      c.date, c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
+      c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.tips_in_drawer ? 'ano' : 'ne', c.expenses,
       c.cash_removed, c.self_payout, c.closing_cash, expectedCash(c), cashDifference(c),
       c.customers, (c.notes ?? '').replace(/\n/g, ' '),
     ]);

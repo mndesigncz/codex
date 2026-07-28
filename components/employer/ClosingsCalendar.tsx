@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency, useMoney } from '../CurrencyProvider';
 
@@ -65,15 +65,19 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
   const [days, setDays] = useState<Days>({});
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const d = await fetch(`/api/closings/calendar?month=${month}`).then(r => r.json());
-      setDays(d.days && typeof d.days === 'object' ? d.days : {});
-    } catch { setDays({}); }
-    setLoading(false);
+  // reloadKey lets the parent refresh the grid after a closing is filed/deleted.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const d = await fetch(`/api/closings/calendar?month=${month}`).then(r => r.json());
+        if (!cancelled) setDays(d.days && typeof d.days === 'object' ? d.days : {});
+      } catch { if (!cancelled) setDays({}); }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [month, reloadKey]);
-  useEffect(() => { load(); }, [load]);
 
   // Keep the grid on the month of whatever day the parent has selected.
   useEffect(() => {

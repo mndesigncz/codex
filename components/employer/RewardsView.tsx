@@ -2,13 +2,18 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
-import type { RewardLevel, PointsConfig } from '@/lib/rewardLevels';
+import { DEFAULT_POINTS, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
 import ShiftReviewModal from './ShiftReviewModal';
+import ShiftReviewCalendar from './ShiftReviewCalendar';
 
 interface Standing {
   id: number; name: string; avatar?: string;
   points: number;
-  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number };
+  breakdown: {
+    tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number;
+    autoPoints?: number; itemPoints?: number; flagged?: number;
+  };
+  flagged?: number; pending?: number;
   levelName: string; levelIndex: number;
   next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number;
 }
@@ -16,7 +21,7 @@ interface Standing {
 const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 export default function RewardsView({ user }: { user: { id?: string } }) {
-  const [tab, setTab] = useState<'board' | 'settings'>('board');
+  const [tab, setTab] = useState<'board' | 'calendar' | 'settings'>('board');
   const [standings, setStandings] = useState<Standing[]>([]);
   const [levels, setLevels] = useState<RewardLevel[]>([]);
   const [points, setPoints] = useState<PointsConfig | null>(null);
@@ -46,7 +51,7 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
           </div>
         </div>
         <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
-          {([['board', 'Žebříček'], ['settings', 'Nastavení']] as const).map(([v, lbl]) => (
+          {([['board', 'Žebříček'], ['calendar', 'Kalendář'], ['settings', 'Nastavení']] as const).map(([v, lbl]) => (
             <button key={v} onClick={() => setTab(v)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${tab === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
               {lbl}
@@ -55,7 +60,9 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
         </div>
       </div>
 
-      {loading ? (
+      {tab === 'calendar' ? (
+        <ShiftReviewCalendar onSaved={load} />
+      ) : loading ? (
         <div className="space-y-3">{[0, 1, 2].map(i => <div key={i} className="glass-card h-24 animate-pulse" />)}</div>
       ) : tab === 'board' ? (
         <StandingsBoard standings={standings} onRate={setRating} />
@@ -90,6 +97,16 @@ function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: 
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-0.5 text-[11px] font-bold">{s.levelName}</span>
+                {!!s.flagged && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/12 text-red-600 px-2 py-0.5 text-[11px] font-semibold">
+                    <Icon name="warning" size={11} /> {s.flagged}
+                  </span>
+                )}
+                {!!s.pending && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 text-[11px] font-semibold">
+                    {s.pending} k hodnocení
+                  </span>
+                )}
               </div>
               <p className="text-xs text-black/45 mt-0.5 tabular-nums">
                 {s.points} bodů
@@ -107,12 +124,14 @@ function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: 
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {[
+            {([
               ['Úkoly', s.breakdown.tasks],
               ['Postupy', s.breakdown.procedures],
               ['Uzávěrky', s.breakdown.closings],
               ['Body z hodnocení', s.breakdown.reviewPoints],
-            ].map(([label, val]) => (
+              ...(s.breakdown.autoPoints ? [['Automatické body', s.breakdown.autoPoints]] as [string, number][] : []),
+              ...(s.breakdown.itemPoints ? [['Body u položek', s.breakdown.itemPoints]] as [string, number][] : []),
+            ] as [string, number][]).map(([label, val]) => (
               <span key={label as string} className="inline-flex items-center gap-1 rounded-full bg-black/[0.04] px-2.5 py-1 text-[11px] font-medium text-black/55 tabular-nums">
                 {label}: <strong className="text-[#16181A]">{val}</strong>
               </span>
@@ -127,7 +146,7 @@ function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: 
 function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
   { levels: RewardLevel[]; points: PointsConfig | null; onSaved: () => void }) {
   const [levels, setLevels] = useState<RewardLevel[]>(initLevels);
-  const [pts, setPts] = useState<PointsConfig>(initPoints ?? { task: 5, procedure: 10, closing: 15, ratingStar: 4 });
+  const [pts, setPts] = useState<PointsConfig>(initPoints ?? DEFAULT_POINTS);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
