@@ -72,7 +72,7 @@ export default function MyShifts({ user }: Props) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-3xl mx-auto w-full">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">

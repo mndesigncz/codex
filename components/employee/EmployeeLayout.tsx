@@ -64,7 +64,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'my-shifts':    return (
         <div className="space-y-2">
           <MyShifts user={user as any} />
-          <div className="px-6 pb-2"><ShiftCalendar scope="me" /></div>
+          <div className="px-6 pb-2 max-w-3xl mx-auto w-full"><ShiftCalendar scope="me" /></div>
           <ShiftSwap user={user as any} />
         </div>
       );

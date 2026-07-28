@@ -171,9 +171,9 @@ export default function Procedures({ user }: Props) {
   const openEdit = (p: Procedure) => { setEditing(p); setEditorOpen(true); };
 
   return (
-    <div className="px-4 md:px-6 pb-6 max-w-5xl mx-auto w-full">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto w-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 pt-1 pb-5">
+      <div className="flex items-start justify-between gap-3 pb-5">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Postupy</h1>
           <p className="mt-1 text-sm text-black/50">Krok za krokem — otevírání, zavírání a další rutiny.</p>

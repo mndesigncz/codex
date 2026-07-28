@@ -76,7 +76,9 @@ export default function EmployerLayout({ user }: Props) {
       case 'shifts':    return (
         <div>
           <ScheduleBuilder user={user as any} />
-          <div className="px-4 md:px-6 pb-6 max-w-5xl mx-auto w-full space-y-4">
+          {/* Same horizontal rhythm as ScheduleBuilder's p-6 shell, so nothing
+              inside the tab looks wider than its neighbour. */}
+          <div className="px-6 pb-6 w-full space-y-4">
             <ShiftSwapApprovals />
             <TimeOffApprovals />
           </div>
@@ -95,7 +97,7 @@ export default function EmployerLayout({ user }: Props) {
           <MyShifts user={user as any} />
           <ShiftSwap user={user as any} />
           <AvailabilitySubmit user={user as any} />
-          <div className="px-6 pb-6"><TimeOffRequest /></div>
+          <div className="px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>
         </div>
       );
       case 'reports':   return <ClosingsOverview />;
