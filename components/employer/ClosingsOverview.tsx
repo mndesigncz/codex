@@ -1,17 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Closing, expectedCash, cashDifference } from '@/lib/closing';
+import { Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference } from '@/lib/closing';
 import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
+import ClosingsCalendar from './ClosingsCalendar';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
 // `covered_by` links a stub row to the parent closing that also closed for them.
 type ClosingRow = Closing & { approved?: boolean; covered_by?: number | null };
 
-type Person = { id: number; name: string; avatar?: string };
+type Person = { id: number; name: string; avatar?: string | null };
 type MissingDay = { date: string; employees: Person[] };
+
+// Everyone the closing belongs to. New rows carry the whole shift crew; older
+// ones only have an author, so fall back to them.
+const crewOf = (c: ClosingRow): ShiftPerson[] =>
+  c.shiftEmployees && c.shiftEmployees.length
+    ? c.shiftEmployees
+    : [{ id: c.created_by, name: c.author_name ?? 'Neznámý', avatar: c.author_avatar ?? null }];
 
 export default function ClosingsOverview() {
   const money = useMoney();
@@ -26,6 +34,9 @@ export default function ClosingsOverview() {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [approving, setApproving] = useState<number | null>(null);
   const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dataVersion, setDataVersion] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     try {
@@ -34,10 +45,17 @@ export default function ClosingsOverview() {
       setPayDailyCash(!!d.payDailyCash);
       setMissing(Array.isArray(d.missingClosings) ? d.missingClosings : []);
       setScheduledByDate(d.scheduledByDate && typeof d.scheduledByDate === 'object' ? d.scheduledByDate : {});
+      setDataVersion(v => v + 1);
     } catch { /* ignore */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  // Picking a day in the calendar scopes the list below it; picking it again clears.
+  const pickDate = (date: string) => {
+    setSelectedDate(prev => (prev === date ? null : date));
+    requestAnimationFrame(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const remove = async (c: ClosingRow) => {
     if (!confirm(`Smazat uzávěrku z ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ')}?`)) return;
@@ -69,11 +87,14 @@ export default function ClosingsOverview() {
 
   // Months present in the data, newest first (dates are 'YYYY-MM-DD').
   const months = Array.from(new Set(allClosings.map(c => c.date?.slice(0, 7)).filter(Boolean))).sort().reverse() as string[];
+  // Totals, chart and export always follow the month tabs; only the list below
+  // narrows further to a day picked in the calendar.
   const closings = month === 'all' ? allClosings : allClosings.filter(c => c.date?.slice(0, 7) === month);
+  const listed = selectedDate ? allClosings.filter(c => c.date === selectedDate) : closings;
   // Covered stubs grouped under the parent closing they were filed alongside.
-  const coveredBy = (parentId: number) => closings.filter(c => c.covered_by === parentId);
+  const coveredBy = (parentId: number) => allClosings.filter(c => c.covered_by === parentId);
   // Only top-level closings appear as their own cards; stubs nest inside.
-  const topLevel = closings.filter(c => !c.covered_by);
+  const topLevel = listed.filter(c => !c.covered_by);
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   const exportCsv = () => {
@@ -286,7 +307,10 @@ export default function ClosingsOverview() {
         );
       })()}
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      {/* Month calendar — done / missing / pending at a glance; a click scopes the list. */}
+      <ClosingsCalendar selectedDate={selectedDate} onSelectDate={pickDate} reloadKey={dataVersion} />
+
+      <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => openCreate()}
@@ -302,7 +326,28 @@ export default function ClosingsOverview() {
         </div>
       </div>
 
-      {months.length > 1 && (
+      {selectedDate && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#C8F542]/[0.10] border border-[#C8F542]/35 px-4 py-3">
+          <p className="text-sm font-semibold text-[#16181A] capitalize min-w-0">
+            {fmtMissing(selectedDate)}
+            <span className="font-normal text-black/45"> · {topLevel.length === 0 ? 'bez uzávěrky' : `${topLevel.length}× uzávěrka`}</span>
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            {topLevel.length === 0 && (
+              <button onClick={() => openCreate(selectedDate)}
+                className="rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black transition inline-flex items-center gap-1.5">
+                <Icon name="plus" size={15} /> Vyplnit
+              </button>
+            )}
+            <button onClick={() => setSelectedDate(null)}
+              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition">
+              Zrušit výběr
+            </button>
+          </div>
+        </div>
+      )}
+
+      {months.length > 1 && !selectedDate && (
         <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
           <button onClick={() => setMonth('all')}
             className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${month === 'all' ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
@@ -322,7 +367,9 @@ export default function ClosingsOverview() {
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : topLevel.length === 0 ? (
-        <div className="glass-card p-8 text-center"><p className="text-black/45">Zatím žádné uzávěrky od zaměstnanců.</p></div>
+        <div className="glass-card p-8 text-center">
+          <p className="text-black/45">{selectedDate ? 'Za tento den není žádná uzávěrka.' : 'Zatím žádné uzávěrky od zaměstnanců.'}</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {topLevel.map(c => {
