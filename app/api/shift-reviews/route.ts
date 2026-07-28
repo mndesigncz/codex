@@ -424,10 +424,11 @@ export async function POST(req: NextRequest) {
     const extra = explicitIds.length ? explicitIds : coworkerIdsFor(await shiftsOnDay(c.teamId, date), employeeId);
     targetIds = Array.from(new Set([employeeId, ...extra]));
   }
-  const targets = targetIds.length > 1
-    ? await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`
-        .then((rows: any[]) => rows.filter((r: any) => targetIds.includes(r.id)))
-    : [{ id: emp.id, name: emp.name, avatar: emp.avatar }];
+  let targets: any[] = [{ id: emp.id, name: emp.name, avatar: emp.avatar }];
+  if (targetIds.length > 1) {
+    const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
+    targets = members.filter((m: any) => targetIds.includes(m.id));
+  }
   if (!targets.length) return NextResponse.json({ error: 'Žádný zaměstnanec k hodnocení' }, { status: 400 });
 
   const scope = wholeShift ? 'shift' : 'individual';
@@ -465,7 +466,7 @@ export async function POST(req: NextRequest) {
       await notifyUser(t.id, {
         title: flagged ? 'Hodnocení směny — něco k nápravě' : 'Hodnocení směny',
         body: `Vedení ohodnotilo tvou směnu ${dLabel}${rating ? ` — ${rating}★` : ''}${pointsAwarded ? `, ${pointsAwarded > 0 ? '+' : ''}${pointsAwarded} bodů` : ''}`,
-        type: flagged ? 'warning' : 'info',
+        type: 'info',
       });
     } catch { /* best-effort */ }
   }

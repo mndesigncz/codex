@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { cashDifference, czk } from '@/lib/closing';
+import { cashDifference, czk, ShiftPerson } from '@/lib/closing';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +21,18 @@ async function ctx() {
 const num = (v: any) => {
   const n = Math.round(Number(v));
   return Number.isFinite(n) ? n : 0;
+};
+
+// cash_closings.shift_employees holds raw user ids; normalise whatever the
+// column gives us (missing column ⇒ undefined, older rows ⇒ empty array).
+const idsOf = (v: any): number[] => {
+  if (!Array.isArray(v)) return [];
+  const out: number[] = [];
+  for (const raw of v) {
+    const id = Number(raw);
+    if (Number.isFinite(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
 };
 
 // GET — list closings.
@@ -42,6 +54,12 @@ export async function GET() {
   try {
     const [team] = await sql`SELECT payout_from_register FROM teams WHERE id = ${c.teamId}`;
     payoutFromRegister = team?.payout_from_register !== false;
+  } catch { /* column not migrated yet */ }
+
+  let tipsInDrawer = false;
+  try {
+    const [team] = await sql`SELECT tips_in_drawer FROM teams WHERE id = ${c.teamId}`;
+    tipsInDrawer = team?.tips_in_drawer === true;
   } catch { /* column not migrated yet */ }
 
   let requiresShift = true;
@@ -67,10 +85,29 @@ export async function GET() {
         WHERE cc.team_id = ${c.teamId} AND cc.created_by = ${c.meId}
         ORDER BY cc.date DESC, cc.created_at DESC`;
 
+  // A closing belongs to the whole shift — resolve the stored ids into people
+  // so the UI can render "Směna: Anna + Petr".
+  const peopleById = new Map<number, ShiftPerson>();
+  if (rows.length) {
+    try {
+      const team = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId}`;
+      for (const u of team as any[]) peopleById.set(u.id, { id: u.id, name: u.name, avatar: u.avatar });
+    } catch { /* fall back to ids only */ }
+  }
+  const closings = (rows as any[]).map(r => ({
+    ...r,
+    shiftEmployees: idsOf(r.shift_employees)
+      .map(id => peopleById.get(id) ?? { id, name: 'Neznámý', avatar: null }),
+  }));
+
   // Shifts the current user may still close: their own past/today shifts in
   // the last 14 days that don't yet have a closing. The kiosk gets the whole
   // team's unclosed recent shifts (it picks who is closing). Employers can
   // close any date, so they get an empty list (the UI shows a free date picker).
+  //
+  // "Unclosed" is per SHIFT, not per person: once anyone on the shift filed a
+  // closing, everyone listed in its shift_employees is done. Older rows have no
+  // shift_employees, so the created_by check still covers them.
   let eligibleShifts: any[] = [];
   const today = new Date().toISOString().split('T')[0];
   if (c.role === 'kiosk') {
@@ -85,10 +122,26 @@ export async function GET() {
           AND s.date <= ${today} AND s.date >= ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
-            WHERE cc.created_by = s.employee_id AND cc.date = s.date
+            WHERE cc.team_id = ${c.teamId} AND cc.date = s.date
+              AND (cc.created_by = s.employee_id OR cc.shift_employees @> to_jsonb(s.employee_id))
           )
         ORDER BY s.date DESC, s.start_time ASC`;
-    } catch { /* shifts table issue — leave empty */ }
+    } catch {
+      try {
+        eligibleShifts = await sql`
+          SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type,
+                 u.id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar"
+          FROM shifts s
+          JOIN users u ON u.id = s.employee_id
+          WHERE u.team_id = ${c.teamId}
+            AND s.date <= ${today} AND s.date >= ${cutoff}
+            AND NOT EXISTS (
+              SELECT 1 FROM cash_closings cc
+              WHERE cc.created_by = s.employee_id AND cc.date = s.date
+            )
+          ORDER BY s.date DESC, s.start_time ASC`;
+      } catch { /* shifts table issue — leave empty */ }
+    }
   } else if (c.role !== 'employer') {
     const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
     try {
@@ -99,10 +152,24 @@ export async function GET() {
           AND s.date <= ${today} AND s.date >= ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
-            WHERE cc.created_by = ${c.meId} AND cc.date = s.date
+            WHERE cc.team_id = ${c.teamId} AND cc.date = s.date
+              AND (cc.created_by = s.employee_id OR cc.shift_employees @> to_jsonb(s.employee_id))
           )
         ORDER BY s.date DESC`;
-    } catch { /* shifts table issue — leave empty */ }
+    } catch {
+      try {
+        eligibleShifts = await sql`
+          SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type
+          FROM shifts s
+          WHERE s.employee_id = ${c.meId}
+            AND s.date <= ${today} AND s.date >= ${cutoff}
+            AND NOT EXISTS (
+              SELECT 1 FROM cash_closings cc
+              WHERE cc.created_by = ${c.meId} AND cc.date = s.date
+            )
+          ORDER BY s.date DESC`;
+      } catch { /* shifts table issue — leave empty */ }
+    }
   }
 
   // For the employer's "submit on behalf" selector.
@@ -131,7 +198,7 @@ export async function GET() {
         (scheduledByDate[r.date] ??= []).push({ id: r.id, name: r.name, avatar: r.avatar });
       }
       // Dates that had at least one shift but not a single closing row.
-      const closedDates = new Set((rows as any[]).map(r => r.date));
+      const closedDates = new Set(closings.map(r => r.date));
       missingClosings = Object.keys(scheduledByDate)
         .filter(d => !closedDates.has(d))
         .sort().reverse()
@@ -140,10 +207,11 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    closings: rows,
+    closings,
     canSeeAll: c.role === 'employer',
     payDailyCash,
     payoutFromRegister,
+    tipsInDrawer,
     requiresShift,
     isEmployer: c.role === 'employer',
     isKiosk: c.role === 'kiosk',
@@ -180,6 +248,16 @@ export async function POST(request: Request) {
     payoutFromRegister = team?.payout_from_register !== false;
   } catch { /* not migrated */ }
   if (typeof b.payoutFromRegister === 'boolean') payoutFromRegister = b.payoutFromRegister;
+
+  // Same snapshot logic for cash tips: do they stay in the drawer (and so count
+  // towards the expected cash) or are they kept aside? Team default, per-closing
+  // override; absent everywhere ⇒ false, which matches the historic maths.
+  let tipsInDrawer = false;
+  try {
+    const [team] = await sql`SELECT tips_in_drawer FROM teams WHERE id = ${c.teamId}`;
+    tipsInDrawer = team?.tips_in_drawer === true;
+  } catch { /* not migrated */ }
+  if (typeof b.tipsInDrawer === 'boolean') tipsInDrawer = b.tipsInDrawer;
 
   // The kiosk AND the employer can submit ON BEHALF of a chosen team member —
   // the closing is attributed to them (author, one-per-day, notifications).
@@ -220,30 +298,78 @@ export async function POST(request: Request) {
   // employer's approval when the person wasn't on shift that day.
   const approved = isEmployer || !!shift;
 
+  // The closing covers the whole SHIFT, so record everyone who worked it. The
+  // time window comes from an explicitly passed shift, otherwise the author's
+  // own. A window is only usable when it doesn't wrap past midnight — for an
+  // overnight shift we fall back to everybody scheduled that day.
+  let windowShift: any = shift;
+  const wantShiftId = parseInt(b.shiftId);
+  if (Number.isFinite(wantShiftId)) {
+    try {
+      const [s] = await sql`SELECT id, start_time, end_time FROM shifts WHERE id = ${wantShiftId} AND date = ${date}`;
+      if (s) windowShift = s;
+    } catch { /* ignore — keep the author's own shift */ }
+  }
+  const shiftEmployeeIds: number[] = [actorId];
+  try {
+    const usableWindow = windowShift?.start_time && windowShift?.end_time
+      && String(windowShift.end_time) > String(windowShift.start_time);
+    const crew = usableWindow
+      ? await sql`
+          SELECT DISTINCT s.employee_id AS id
+          FROM shifts s JOIN users u ON u.id = s.employee_id
+          WHERE u.team_id = ${c.teamId} AND s.date = ${date}
+            AND s.start_time < ${windowShift.end_time} AND s.end_time > ${windowShift.start_time}`
+      : await sql`
+          SELECT DISTINCT s.employee_id AS id
+          FROM shifts s JOIN users u ON u.id = s.employee_id
+          WHERE u.team_id = ${c.teamId} AND s.date = ${date}`;
+    for (const r of crew as any[]) {
+      const id = Number(r.id);
+      if (Number.isFinite(id) && !shiftEmployeeIds.includes(id)) shiftEmployeeIds.push(id);
+    }
+  } catch { /* shifts table issue — the author alone owns the closing */ }
+
   let row: any;
   try {
     [row] = await sql`
       INSERT INTO cash_closings (
         team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
+        tips_in_drawer, shift_employees,
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
         ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+        ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
   } catch {
-    // approval/shift columns not migrated yet — insert the core row so closings still work.
-    [row] = await sql`
-      INSERT INTO cash_closings (
-        team_id, created_by, date, shift_label,
-        opening_cash, cash_revenue, card_revenue, tips, expenses,
-        cash_removed, self_payout, closing_cash, customers, notes
-      ) VALUES (
-        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel},
-        ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
-        ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
-      ) RETURNING *`;
+    try {
+      // tips_in_drawer / shift_employees not migrated yet.
+      [row] = await sql`
+        INSERT INTO cash_closings (
+          team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
+          opening_cash, cash_revenue, card_revenue, tips, expenses,
+          cash_removed, self_payout, closing_cash, customers, notes
+        ) VALUES (
+          ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+          ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
+          ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+        ) RETURNING *`;
+    } catch {
+      // approval/shift columns not migrated yet — insert the core row so closings still work.
+      [row] = await sql`
+        INSERT INTO cash_closings (
+          team_id, created_by, date, shift_label,
+          opening_cash, cash_revenue, card_revenue, tips, expenses,
+          cash_removed, self_payout, closing_cash, customers, notes
+        ) VALUES (
+          ${c.teamId}, ${actorId}, ${date}, ${shiftLabel},
+          ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
+          ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+        ) RETURNING *`;
+    }
   }
 
   // Notify team employers (except the author).
@@ -252,7 +378,7 @@ export async function POST(request: Request) {
       SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${actorId}`;
     if (employers.length) {
       const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
-      const diff = cashDifference(row as any);
+      const diff = cashDifference({ ...(row as any), tips_in_drawer: tipsInDrawer });
       const verdict = diff === 0 ? 'kasa sedí' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
       const name = author?.name ?? 'Zaměstnanec';
       await Promise.allSettled(employers.map((e: any) => notifyUser(e.id, {
@@ -281,7 +407,7 @@ export async function POST(request: Request) {
       ORDER BY clock_in ASC LIMIT 1`;
   } catch { /* ignore */ }
 
-  let covered = 0;
+  const coveredIds: number[] = [];
   if (Array.isArray(b.coworkers) && b.coworkers.length && row?.id) {
     for (const cw of b.coworkers) {
       const cid = parseInt(cw?.employeeId);
@@ -310,7 +436,7 @@ export async function POST(request: Request) {
         } catch {
           await sql`INSERT INTO cash_closings (team_id, created_by, date, shift_label, covered_by, self_payout) VALUES (${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${row.id}, ${cwPayout})`;
         }
-        covered++;
+        coveredIds.push(cid);
 
         // Attendance record with the same time as the closing author + a note.
         if (noShift) {
@@ -332,5 +458,14 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, closing: row, approved, covered });
+  // Colleagues added by hand were on the shift too — fold them into the crew.
+  const finalCrew = shiftEmployeeIds.concat(coveredIds.filter(id => !shiftEmployeeIds.includes(id)));
+  if (row?.id && finalCrew.length > shiftEmployeeIds.length) {
+    try {
+      await sql`UPDATE cash_closings SET shift_employees = ${JSON.stringify(finalCrew)}::jsonb WHERE id = ${row.id}`;
+      row.shift_employees = finalCrew;
+    } catch { /* column not migrated yet */ }
+  }
+
+  return NextResponse.json({ ok: true, closing: row, approved, covered: coveredIds.length, tipsInDrawer });
 }
