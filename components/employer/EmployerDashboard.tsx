@@ -1,13 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../Icons';
 import ClockWidget from './ClockWidget';
 import AnnouncementsManager from './AnnouncementsManager';
 import ShiftReviewModal from './ShiftReviewModal';
 import { isWidgetOn } from '@/lib/dashboardWidgets';
 
-interface RosterEntry { id: number; name: string; avatar?: string; worked: boolean; reviewed: boolean; rating: number; }
+// Everything past `rating` is an optional enrichment of the roster response —
+// rendered only when the API sends it, so the row degrades to name + shift.
+interface RosterEntry {
+  id: number; name: string; avatar?: string; worked: boolean; reviewed: boolean; rating: number;
+  points?: number; flagged?: boolean;
+  shiftLabel?: string | null; startTime?: string | null; endTime?: string | null;
+  closingFiled?: boolean; tasksDone?: number; tasksMissed?: number; stepsSkipped?: number;
+}
+
+const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
+const hhmm = (t?: string | null) => (t ? String(t).slice(0, 5) : '');
+
+// Compact "what happened on this shift" line, built from whatever the roster
+// response carries — never a per-person detail request from the dashboard.
+function rosterMeta(r: RosterEntry): string {
+  const parts: string[] = [];
+  const time = r.startTime && r.endTime ? `${hhmm(r.startTime)}–${hhmm(r.endTime)}` : '';
+  if (r.shiftLabel) parts.push(time ? `${r.shiftLabel} · ${time}` : r.shiftLabel);
+  else if (time) parts.push(time);
+  if (r.closingFiled !== undefined) parts.push(r.closingFiled ? 'uzávěrka hotová' : 'bez uzávěrky');
+  if (r.tasksDone !== undefined || r.tasksMissed !== undefined) {
+    const done = r.tasksDone ?? 0;
+    const missed = r.tasksMissed ?? 0;
+    parts.push(missed > 0 ? `${done} splněných · ${missed} nesplněných úkolů` : `${done} splněných úkolů`);
+  }
+  if (r.stepsSkipped) parts.push(`${r.stepsSkipped} přeskočených ${plural(r.stepsSkipped, 'krok', 'kroky', 'kroků')}`);
+  return parts.join(' · ');
+}
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -42,18 +69,30 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [availability, setAvailability] = useState<any[]>([]);
   const [unreadChats, setUnreadChats] = useState(0);
   const [onShift, setOnShift] = useState<any[]>([]);
-  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({});
+  const [reviewDate, setReviewDate] = useState('');
   const [rating, setRating] = useState<RosterEntry | null>(null);
   const [cfg, setCfg] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const show = (id: string) => isWidgetOn(cfg, id);
   const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
-  const loadRoster = () => {
-    fetch(`/api/shift-reviews?date=${today}`).then(r => r.json()).then(d => {
-      if (Array.isArray(d?.list)) setRoster(d.list);
-    }).catch(() => {});
-  };
+  const loadRoster = useCallback(async (autoPick = false) => {
+    const day = (d: string) => fetch(`/api/shift-reviews?date=${d}`).then(r => r.json()).catch(() => null);
+    const [y, t] = await Promise.all([day(yesterday), day(today)]);
+    const next: Record<string, RosterEntry[]> = {
+      [yesterday]: Array.isArray(y?.list) ? y.list : [],
+      [today]: Array.isArray(t?.list) ? t.list : [],
+    };
+    setRosters(next);
+    // The owner usually rates the previous day, so start there when it still
+    // has someone unrated.
+    if (autoPick) {
+      const pendingYesterday = next[yesterday].filter(r => r.worked && !r.reviewed).length;
+      setReviewDate(pendingYesterday > 0 ? yesterday : today);
+    }
+  }, [today, yesterday]);
 
   const month = nextMonthStr();
 
@@ -79,11 +118,16 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
         setOnShift((att?.roster ?? []).filter((r: any) => r.openSince));
-        loadRoster();
+        loadRoster(true);
       } catch {}
       setLoading(false);
     })();
-  }, [month]);
+  }, [month, loadRoster]);
+
+  const activeDate = reviewDate || today;
+  const dayRoster = (rosters[activeDate] ?? []).filter(r => r.worked);
+  const pendingActive = dayRoster.filter(r => !r.reviewed).length;
+  const anyWorked = [yesterday, today].some(d => (rosters[d] ?? []).some(r => r.worked));
 
   const todayShifts = shifts.filter(s => (s.date ?? '') === today);
   const activeTasks = tasks.filter(t => t.status !== 'done');
@@ -157,37 +201,70 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         </button>
       )}
 
-      {/* Rate today's shifts — quick access straight from the dashboard */}
-      {show('rateShifts') && roster.some(r => r.worked) && (
+      {/* Rate shifts — yesterday first, since that's what usually needs rating */}
+      {show('rateShifts') && anyWorked && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08] shrink-0"><Icon name="award" size={17} /></span>
               <div className="min-w-0">
-                <h3 className="font-bold tracking-tight text-[#16181A]">Ohodnotit dnešní směny</h3>
+                <h3 className="font-bold tracking-tight text-[#16181A]">Ohodnotit směny</h3>
                 <p className="text-xs text-black/45">Projdi, co kdo udělal, a dej hodnocení.</p>
               </div>
             </div>
-            <button onClick={() => onNavigate('rewards')} className="text-sm text-[#5B7A08] hover:brightness-110 shrink-0">Vše →</button>
+            <button onClick={() => onNavigate('rewards')} className="text-sm text-[#5B7A08] hover:brightness-110 shrink-0">Kalendář hodnocení →</button>
           </div>
-          <div className="space-y-2">
-            {roster.filter(r => r.worked).map(r => (
-              <div key={r.id} className="flex items-center gap-3 p-2.5 rounded-2xl bg-black/[0.03]">
-                <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{r.avatar ?? '👤'}</span>
-                <span className="flex-1 min-w-0 text-sm font-medium text-[#16181A] truncate">{r.name}</span>
-                {r.reviewed ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
-                    {r.rating > 0 ? `${r.rating}★` : ''} Hodnoceno
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
-                )}
-                <button onClick={() => setRating(r)} className="rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
-                  {r.reviewed ? 'Upravit' : 'Ohodnotit'}
+
+          <div className="grid grid-cols-2 gap-1 rounded-full glass border border-black/[0.07] p-1 mb-3">
+            {([[yesterday, 'Včera'], [today, 'Dnes']] as [string, string][]).map(([d, label]) => {
+              const pending = (rosters[d] ?? []).filter(r => r.worked && !r.reviewed).length;
+              return (
+                <button key={d} onClick={() => setReviewDate(d)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  {label}
+                  {pending > 0 && (
+                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
+                  )}
                 </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {dayRoster.length === 0 ? (
+            <p className="text-sm text-black/45">{activeDate === today ? 'Dnes zatím nikdo nepracoval.' : 'Včera nikdo nepracoval.'}</p>
+          ) : (
+            <div className="space-y-2">
+              {pendingActive === 0 && (
+                <div className="flex items-center gap-2 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-3.5 py-2.5">
+                  <Icon name="check" size={15} className="text-[#5B7A08] shrink-0" />
+                  <p className="text-sm font-medium text-[#5B7A08]">Vše ohodnoceno ✓</p>
+                </div>
+              )}
+              {dayRoster.map(r => {
+                const meta = rosterMeta(r);
+                return (
+                  <div key={r.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${r.flagged ? 'bg-amber-500/[0.1]' : 'bg-black/[0.03]'}`}>
+                    <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{r.avatar ?? '👤'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#16181A] truncate">{r.name}</p>
+                      {meta && <p className="text-[11px] text-black/45 truncate">{meta}</p>}
+                    </div>
+                    {r.flagged && <Icon name="warning" size={14} className="text-amber-600 shrink-0" />}
+                    {r.reviewed ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
+                        {r.rating > 0 ? `${r.rating}★` : ''} Hodnoceno
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
+                    )}
+                    <button onClick={() => setRating(r)} className="rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
+                      {r.reviewed ? 'Upravit' : 'Ohodnotit'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -277,7 +354,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       {rating && (
         <ShiftReviewModal
           employee={{ id: rating.id, name: rating.name, avatar: rating.avatar }}
-          initialDate={today}
+          initialDate={activeDate}
           onClose={() => setRating(null)}
           onSaved={() => { setRating(null); loadRoster(); }}
         />
