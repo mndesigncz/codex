@@ -169,13 +169,22 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
     } finally { setSaving(false); }
   };
 
-  const numField = (label: string, key: keyof PointsConfig, hint: string) => (
+  // Reward fields stay non-negative; penalty fields must accept minus values.
+  const field = (label: string, key: keyof PointsConfig, hint: string, allowNegative = false) => (
     <div>
       <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
-      <input type="number" min={0} value={pts[key]} onChange={e => setPts(p => ({ ...p, [key]: Math.max(0, parseInt(e.target.value) || 0) }))} className={`${inputCls} !py-2.5 tabular-nums`} />
+      <input
+        type="number" min={allowNegative ? -100 : 0} max={100} value={pts[key]}
+        onChange={e => {
+          const raw = parseInt(e.target.value);
+          const n = Number.isFinite(raw) ? raw : 0;
+          setPts(p => ({ ...p, [key]: Math.max(allowNegative ? -100 : 0, Math.min(100, n)) }));
+        }}
+        className={`${inputCls} !py-2.5 tabular-nums ${allowNegative && pts[key] < 0 ? 'text-red-600' : ''}`} />
       <p className="text-[11px] text-black/40 mt-1">{hint}</p>
     </div>
   );
+  const numField = (label: string, key: keyof PointsConfig, hint: string) => field(label, key, hint);
 
   return (
     <div className="space-y-6">
@@ -188,6 +197,19 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
           {numField('Za postup', 'procedure', 'Za každý dokončený postup')}
           {numField('Za uzávěrku', 'closing', 'Za vyplněnou uzávěrku')}
           {numField('Za hvězdu', 'ratingStar', 'Návrh bodů = hvězdy × tohle')}
+        </div>
+      </div>
+
+      {/* Automatic bonuses and penalties */}
+      <div className="glass-card p-5">
+        <h3 className="font-bold tracking-tight text-[#16181A] mb-1">Automatické body za směnu</h3>
+        <p className="text-sm text-black/50 mb-4">Systém je spočítá sám z toho, co se za směnu udělalo (a co ne). Záporná čísla = strhnout body.</p>
+        <div className="grid grid-cols-2 gap-4">
+          {field('Nesplněný úkol', 'taskMissed', 'Za každý úkol, který měl ten den termín a zůstal nesplněný', true)}
+          {field('Přeskočený krok', 'procedureSkipped', 'Za každý krok postupu, který zaměstnanec vědomě přeskočil', true)}
+          {field('Neudělaný krok', 'procedureMissed', 'Za každý krok, kterého se vůbec nedotkl', true)}
+          {field('Chybí uzávěrka', 'closingMissing', 'Když měl směnu, ale uzávěrku nevyplnil', true)}
+          {field('Kasa sedí', 'closingBalanced', 'Bonus, když rozdíl v kase vyjde přesně na nulu')}
         </div>
       </div>
 
