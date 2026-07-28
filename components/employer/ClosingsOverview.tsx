@@ -1,17 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Closing, expectedCash, cashDifference } from '@/lib/closing';
+import { Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference } from '@/lib/closing';
 import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
+import ClosingsCalendar from './ClosingsCalendar';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
 // `covered_by` links a stub row to the parent closing that also closed for them.
 type ClosingRow = Closing & { approved?: boolean; covered_by?: number | null };
 
-type Person = { id: number; name: string; avatar?: string };
+type Person = { id: number; name: string; avatar?: string | null };
 type MissingDay = { date: string; employees: Person[] };
+
+// Everyone the closing belongs to. New rows carry the whole shift crew; older
+// ones only have an author, so fall back to them.
+const crewOf = (c: ClosingRow): ShiftPerson[] =>
+  c.shiftEmployees && c.shiftEmployees.length
+    ? c.shiftEmployees
+    : [{ id: c.created_by, name: c.author_name ?? 'Neznámý', avatar: c.author_avatar ?? null }];
 
 export default function ClosingsOverview() {
   const money = useMoney();
@@ -26,6 +34,9 @@ export default function ClosingsOverview() {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [approving, setApproving] = useState<number | null>(null);
   const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dataVersion, setDataVersion] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     try {
@@ -34,10 +45,17 @@ export default function ClosingsOverview() {
       setPayDailyCash(!!d.payDailyCash);
       setMissing(Array.isArray(d.missingClosings) ? d.missingClosings : []);
       setScheduledByDate(d.scheduledByDate && typeof d.scheduledByDate === 'object' ? d.scheduledByDate : {});
+      setDataVersion(v => v + 1);
     } catch { /* ignore */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  // Picking a day in the calendar scopes the list below it; picking it again clears.
+  const pickDate = (date: string) => {
+    setSelectedDate(prev => (prev === date ? null : date));
+    requestAnimationFrame(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const remove = async (c: ClosingRow) => {
     if (!confirm(`Smazat uzávěrku z ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ')}?`)) return;
@@ -47,6 +65,7 @@ export default function ClosingsOverview() {
     try {
       const res = await fetch(`/api/closings/${c.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
+      setDataVersion(v => v + 1);   // the calendar must forget the removed day
     } catch { setAllClosings(prev); }
     setDeleting(null);
   };
@@ -69,18 +88,21 @@ export default function ClosingsOverview() {
 
   // Months present in the data, newest first (dates are 'YYYY-MM-DD').
   const months = Array.from(new Set(allClosings.map(c => c.date?.slice(0, 7)).filter(Boolean))).sort().reverse() as string[];
+  // Totals, chart and export always follow the month tabs; only the list below
+  // narrows further to a day picked in the calendar.
   const closings = month === 'all' ? allClosings : allClosings.filter(c => c.date?.slice(0, 7) === month);
+  const listed = selectedDate ? allClosings.filter(c => c.date === selectedDate) : closings;
   // Covered stubs grouped under the parent closing they were filed alongside.
-  const coveredBy = (parentId: number) => closings.filter(c => c.covered_by === parentId);
+  const coveredBy = (parentId: number) => allClosings.filter(c => c.covered_by === parentId);
   // Only top-level closings appear as their own cards; stubs nest inside.
-  const topLevel = closings.filter(c => !c.covered_by);
+  const topLevel = listed.filter(c => !c.covered_by);
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   const exportCsv = () => {
-    const head = ['Datum', 'Směna', 'Zaměstnanec', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Zákazníků', 'Poznámka'];
+    const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Zákazníků', 'Poznámka'];
     const rows = closings.map(c => [
-      c.date, c.shift_label ?? '', c.author_name ?? '',
-      c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.expenses,
+      c.date, c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
+      c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.tips_in_drawer ? 'ano' : 'ne', c.expenses,
       c.cash_removed, c.self_payout, c.closing_cash, expectedCash(c), cashDifference(c),
       c.customers, (c.notes ?? '').replace(/\n/g, ' '),
     ]);
@@ -286,7 +308,10 @@ export default function ClosingsOverview() {
         );
       })()}
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      {/* Month calendar — done / missing / pending at a glance; a click scopes the list. */}
+      <ClosingsCalendar selectedDate={selectedDate} onSelectDate={pickDate} reloadKey={dataVersion} />
+
+      <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => openCreate()}
@@ -302,7 +327,28 @@ export default function ClosingsOverview() {
         </div>
       </div>
 
-      {months.length > 1 && (
+      {selectedDate && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#C8F542]/[0.10] border border-[#C8F542]/35 px-4 py-3">
+          <p className="text-sm font-semibold text-[#16181A] capitalize min-w-0">
+            {fmtMissing(selectedDate)}
+            <span className="font-normal text-black/45"> · {topLevel.length === 0 ? 'bez uzávěrky' : `${topLevel.length}× uzávěrka`}</span>
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            {topLevel.length === 0 && (
+              <button onClick={() => openCreate(selectedDate)}
+                className="rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black transition inline-flex items-center gap-1.5">
+                <Icon name="plus" size={15} /> Vyplnit
+              </button>
+            )}
+            <button onClick={() => setSelectedDate(null)}
+              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition">
+              Zrušit výběr
+            </button>
+          </div>
+        </div>
+      )}
+
+      {months.length > 1 && !selectedDate && (
         <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
           <button onClick={() => setMonth('all')}
             className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${month === 'all' ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
@@ -322,17 +368,26 @@ export default function ClosingsOverview() {
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : topLevel.length === 0 ? (
-        <div className="glass-card p-8 text-center"><p className="text-black/45">Zatím žádné uzávěrky od zaměstnanců.</p></div>
+        <div className="glass-card p-8 text-center">
+          <p className="text-black/45">{selectedDate ? 'Za tento den není žádná uzávěrka.' : 'Zatím žádné uzávěrky od zaměstnanců.'}</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {topLevel.map(c => {
             const d = cashDifference(c);
             const expected = expectedCash(c);
+            const lines = expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' });
             const open = openId === c.id;
             const covered = coveredBy(c.id);
+            // The closing belongs to the whole shift; the author only filled it in.
+            const crew = crewOf(c);
+            const crewLabel = crew.map(p => p.name).join(' + ');
             // Everyone scheduled that day, and who is / isn't covered by a closing.
             const scheduled = scheduledByDate[c.date] ?? [];
-            const coveredIds = new Set<number>([c.created_by, ...covered.map(cv => cv.created_by)]);
+            const coveredIds = new Set<number>([c.created_by, ...covered.map(cv => cv.created_by), ...crew.map(p => p.id)]);
+            // Union of the shift crew and the day's roster, de-duplicated.
+            const roster: Person[] = [...crew];
+            for (const p of scheduled) if (!roster.some(r => r.id === p.id)) roster.push(p);
             return (
               <div key={c.id} className="glass-card overflow-hidden">
                 <button onClick={() => setOpenId(open ? null : c.id)} className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors">
@@ -343,7 +398,7 @@ export default function ClosingsOverview() {
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                       </p>
-                      <p className="text-xs text-black/45 truncate">{c.author_name ?? 'Neznámý'} · Tržba {money(c.cash_revenue + c.card_revenue)}</p>
+                      <p className="text-xs text-black/45 truncate">Směna: {crewLabel} · Tržba {money(c.cash_revenue + c.card_revenue)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -382,7 +437,16 @@ export default function ClosingsOverview() {
                       ))}
                     </div>
                     <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 space-y-2 text-sm">
-                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
+                      {/* Where the expectation comes from, line by line. */}
+                      <div className="space-y-1 pb-1">
+                        {lines.map(l => (
+                          <div key={l.label} className="flex justify-between gap-3 text-[13px]">
+                            <span className="text-black/45 min-w-0 truncate">{l.label}</span>
+                            <span className="text-black/60 shrink-0 whitespace-nowrap tabular-nums">{l.sign < 0 ? '− ' : '+ '}{money(l.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between gap-3 border-t border-black/[0.07] pt-2"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
                       <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(c.closing_cash)}</span></div>
                       <div className={`flex justify-between gap-3 rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
                         <span className="font-medium min-w-0">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
@@ -409,18 +473,20 @@ export default function ClosingsOverview() {
                         </div>
                       </div>
                     )}
-                    {scheduled.length > 0 && (
+                    {roster.length > 0 && (
                       <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4">
                         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
-                          <Icon name="users" size={14} /> Na směně ten den
+                          <Icon name="users" size={14} /> Směna ten den
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                          {scheduled.map(p => {
+                          {roster.map(p => {
                             const has = coveredIds.has(p.id);
+                            const isAuthor = p.id === c.created_by;
                             return (
-                              <span key={p.id} title={has ? 'Má uzávěrku' : 'Bez uzávěrky'}
+                              <span key={p.id} title={has ? 'Uzávěrku má' : 'Bez uzávěrky'}
                                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${has ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
                                 <span>{p.avatar ?? '👤'}</span> {p.name}
+                                {isAuthor && <span className="opacity-70">· vyplnil/a</span>}
                                 {has ? ' ✓' : ' — chybí'}
                               </span>
                             );

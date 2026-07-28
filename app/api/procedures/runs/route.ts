@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { resolveActingUser } from '@/lib/kioskActing';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   if (searchParams.get('active')) {
+    // On the shared tablet the "caller" is whoever is currently selected on it.
+    const effectiveId = await resolveActingUser(me.id, me.role, me.teamId, searchParams.get('actingAs'), request);
     let row;
     try {
       [row] = await sql`
@@ -52,7 +55,7 @@ export async function GET(request: Request) {
                p.name, p.icon, p.color, p.items
         FROM procedure_runs r
         JOIN procedures p ON p.id = r.procedure_id
-        WHERE r.user_id = ${me.id} AND r.status = 'running'
+        WHERE r.user_id = ${effectiveId} AND r.status = 'running'
         ORDER BY r.started_at DESC
         LIMIT 1`;
     } catch {
@@ -61,7 +64,7 @@ export async function GET(request: Request) {
                p.name, p.icon, p.color, p.items
         FROM procedure_runs r
         JOIN procedures p ON p.id = r.procedure_id
-        WHERE r.user_id = ${me.id} AND r.status = 'running'
+        WHERE r.user_id = ${effectiveId} AND r.status = 'running'
         ORDER BY r.started_at DESC
         LIMIT 1`;
     }
@@ -144,17 +147,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Postup nenalezen' }, { status: 404 });
   }
 
+  // On the shared tablet the run belongs to the person currently selected on it.
+  const effectiveId = await resolveActingUser(me.id, me.role, me.teamId, body.actingAs, request);
+
   // Close any previous still-running run for this user.
   await sql`
     UPDATE procedure_runs
     SET status = 'completed', completed_at = NOW(),
         duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
-    WHERE user_id = ${me.id} AND status = 'running'`;
+    WHERE user_id = ${effectiveId} AND status = 'running'`;
 
   const total = Array.isArray(proc.items) ? proc.items.length : 0;
   const [run] = await sql`
     INSERT INTO procedure_runs (procedure_id, team_id, user_id, checked_items, total_items, status)
-    VALUES (${procedureId}, ${me.teamId}, ${me.id}, '[]', ${total}, 'running')
+    VALUES (${procedureId}, ${me.teamId}, ${effectiveId}, '[]', ${total}, 'running')
     RETURNING id, procedure_id, checked_items, total_items, status, started_at`;
 
   return NextResponse.json({
@@ -188,7 +194,10 @@ export async function PATCH(request: Request) {
            p.name AS procedure_name
     FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
     WHERE r.id = ${runId}`;
-  if (!run || run.user_id !== me.id) {
+  // The kiosk updates runs it started on behalf of clocked-in staff, so its
+  // session may touch any run belonging to its own team.
+  const owns = run && (run.user_id === me.id || (me.role === 'kiosk' && run.team_id === me.teamId));
+  if (!owns) {
     return NextResponse.json({ error: 'Průběh nenalezen' }, { status: 404 });
   }
 
@@ -230,11 +239,20 @@ export async function PATCH(request: Request) {
     if (team?.owner_id) {
       const dur = fmtDuration(updated.duration_seconds ?? 0);
       const missing = Math.max(0, (run.total_items ?? 0) - checked.length);
+      // Name the run's owner, not the session — on the tablet the session is
+      // the anonymous kiosk account while the run belongs to a real person.
+      let doneBy = me.name;
+      if (run.user_id !== me.id) {
+        try {
+          const [owner] = await sql`SELECT name FROM users WHERE id = ${run.user_id}`;
+          if (owner?.name) doneBy = owner.name;
+        } catch { /* keep session name */ }
+      }
       notifyUser(team.owner_id, {
         title: missing > 0 ? 'Postup dokončen s výhradami' : 'Postup dokončen',
         body: missing > 0
-          ? `${me.name} dokončil/a ${run.procedure_name} za ${dur} — ${missing} ${missing === 1 ? 'krok nedokončen' : missing <= 4 ? 'kroky nedokončeny' : 'kroků nedokončeno'}`
-          : `${me.name} dokončil/a ${run.procedure_name} za ${dur}`,
+          ? `${doneBy} dokončil/a ${run.procedure_name} za ${dur} — ${missing} ${missing === 1 ? 'krok nedokončen' : missing <= 4 ? 'kroky nedokončeny' : 'kroků nedokončeno'}`
+          : `${doneBy} dokončil/a ${run.procedure_name} za ${dur}`,
         type: 'shift',
       });
     }

@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ coworkers: [] });
   const exclude = parseInt(searchParams.get('exclude') ?? '') || meId;
 
+  // A closing covers the whole shift, so someone already listed in an existing
+  // closing's shift_employees is done too — not just its author.
   try {
     const rows = await sql`
       SELECT u.id, u.name, u.avatar,
@@ -39,11 +41,35 @@ export async function GET(req: NextRequest) {
         AND u.id <> ${exclude}
         AND NOT EXISTS (
           SELECT 1 FROM cash_closings cc
-          WHERE cc.created_by = u.id AND cc.date = ${date}
+          WHERE cc.date = ${date} AND cc.team_id = ${teamId}
+            AND (cc.created_by = u.id OR cc.shift_employees @> to_jsonb(u.id))
         )
       ORDER BY (sh.id IS NULL), u.name ASC`;
     return NextResponse.json({ coworkers: rows });
   } catch {
-    return NextResponse.json({ coworkers: [] });
+    try {
+      // shift_employees not migrated yet — per-author attribution only.
+      const rows = await sql`
+        SELECT u.id, u.name, u.avatar,
+               sh.start_time AS "startTime", sh.end_time AS "endTime",
+               (sh.id IS NOT NULL) AS "hadShift"
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT id, start_time, end_time FROM shifts
+          WHERE employee_id = u.id AND date = ${date}
+          ORDER BY start_time ASC LIMIT 1
+        ) sh ON TRUE
+        WHERE u.team_id = ${teamId}
+          AND u.role IN ('employee','employer')
+          AND u.id <> ${exclude}
+          AND NOT EXISTS (
+            SELECT 1 FROM cash_closings cc
+            WHERE cc.created_by = u.id AND cc.date = ${date}
+          )
+        ORDER BY (sh.id IS NULL), u.name ASC`;
+      return NextResponse.json({ coworkers: rows });
+    } catch {
+      return NextResponse.json({ coworkers: [] });
+    }
   }
 }

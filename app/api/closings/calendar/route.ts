@@ -19,8 +19,9 @@ async function ctx() {
 const todayStr = () => new Date().toISOString().split('T')[0];
 
 // GET ?month=YYYY-MM&scope=me — a calendar of who was on shift and who did (or
-// still owes) the closing each day. Employer sees the whole team; employees
-// (and any scope=me request) see only their own days.
+// still owes) the closing each day. Employer sees the whole team (including the
+// day's revenue); employees (and any scope=me request) see only their own days
+// and no money figures.
 export async function GET(req: NextRequest) {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
@@ -48,50 +49,88 @@ export async function GET(req: NextRequest) {
           WHERE u.team_id = ${c.teamId} AND s.date >= ${start} AND s.date <= ${end}
           ORDER BY s.date ASC, s.start_time ASC`;
 
-    const closings = selfOnly
-      ? await sql`
-          SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
-                 u.name, u.avatar
-          FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-          WHERE cc.created_by = ${c.meId} AND cc.date >= ${start} AND cc.date <= ${end}`
-      : await sql`
-          SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
-                 u.name, u.avatar
-          FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-          WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}`;
+    // A closing covers the whole shift, so scope=me must also pick up the days
+    // a colleague closed for me (my id sits in their shift_employees).
+    let closings: any[];
+    try {
+      closings = selfOnly
+        ? await sql`
+            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+                   cc.shift_employees AS "shiftEmployees",
+                   cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
+                   u.name, u.avatar
+            FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
+            WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}
+              AND (cc.created_by = ${c.meId} OR cc.shift_employees @> to_jsonb(${c.meId}::int))`
+        : await sql`
+            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+                   cc.shift_employees AS "shiftEmployees",
+                   cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
+                   u.name, u.avatar
+            FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
+            WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}`;
+    } catch {
+      // shift_employees not migrated yet — per-author attribution only.
+      closings = selfOnly
+        ? await sql`
+            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+                   cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
+                   u.name, u.avatar
+            FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
+            WHERE cc.created_by = ${c.meId} AND cc.date >= ${start} AND cc.date <= ${end}`
+        : await sql`
+            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+                   cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
+                   u.name, u.avatar
+            FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
+            WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}`;
+    }
 
-    // Who has ANY closing that day (author or covered), and who filed a top-level one.
-    const creatorsByDate = new Map<string, Set<number>>();
+    // Who is covered by ANY closing that day (author or shift crew), who filed a
+    // top-level one, and how much the day took.
+    const coveredByDate = new Map<string, Set<number>>();
     const closersByDate = new Map<string, Map<number, { id: number; name: string; avatar: string | null }>>();
-    for (const r of closings as any[]) {
-      (creatorsByDate.get(r.date) ?? creatorsByDate.set(r.date, new Set()).get(r.date)!).add(r.createdBy);
+    const revenueByDate = new Map<string, number>();
+    for (const r of closings) {
+      const set = coveredByDate.get(r.date) ?? coveredByDate.set(r.date, new Set()).get(r.date)!;
+      set.add(r.createdBy);
+      if (Array.isArray(r.shiftEmployees)) {
+        for (const raw of r.shiftEmployees) {
+          const id = Number(raw);
+          if (Number.isFinite(id)) set.add(id);
+        }
+      }
       if (r.coveredBy == null) {
         const map = closersByDate.get(r.date) ?? closersByDate.set(r.date, new Map()).get(r.date)!;
         map.set(r.createdBy, { id: r.createdBy, name: r.name, avatar: r.avatar });
       }
+      revenueByDate.set(r.date, (revenueByDate.get(r.date) ?? 0) + Number(r.cashRevenue ?? 0) + Number(r.cardRevenue ?? 0));
     }
 
     const days: Record<string, any> = {};
+    const ensure = (date: string) => (days[date] ??= { onShift: [], closedBy: [], hasClosing: false, missing: false });
     const tstr = todayStr();
     // De-dupe people per day (someone could have two shift rows).
     const seen = new Map<string, Set<number>>();
     for (const s of shifts as any[]) {
-      const day = (days[s.date] ??= { onShift: [], closedBy: [], hasClosing: false, missing: false });
+      const day = ensure(s.date);
       const seenSet = seen.get(s.date) ?? seen.set(s.date, new Set()).get(s.date)!;
       if (!seenSet.has(s.id)) {
         seenSet.add(s.id);
-        const hadClosing = creatorsByDate.get(s.date)?.has(s.id) ?? false;
+        const hadClosing = coveredByDate.get(s.date)?.has(s.id) ?? false;
         day.onShift.push({ id: s.id, name: s.name, avatar: s.avatar, startTime: s.startTime, endTime: s.endTime, hadClosing });
       }
     }
     for (const [date, closers] of Array.from(closersByDate.entries())) {
-      (days[date] ??= { onShift: [], closedBy: [], hasClosing: false, missing: false });
-      days[date].closedBy = Array.from(closers.values());
+      ensure(date).closedBy = Array.from(closers.values());
     }
+    for (const date of Array.from(coveredByDate.keys())) ensure(date);
     for (const date of Object.keys(days)) {
       const d = days[date];
-      d.hasClosing = (creatorsByDate.get(date)?.size ?? 0) > 0;
+      d.hasClosing = (coveredByDate.get(date)?.size ?? 0) > 0;
       d.missing = d.onShift.length > 0 && !d.hasClosing && date < tstr;
+      // Money stays out of the employee-scoped payload.
+      if (!selfOnly) d.revenue = revenueByDate.get(date) ?? 0;
     }
 
     return NextResponse.json({ days, month, selfOnly });

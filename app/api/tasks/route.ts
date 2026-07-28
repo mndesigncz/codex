@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { resolveActingUser } from '@/lib/kioskActing';
 
 export const dynamic = 'force-dynamic';
 
@@ -417,19 +418,21 @@ export async function PATCH(req: NextRequest) {
 
   if (b.status === undefined) return NextResponse.json(shape(task));
 
-  // Record who completed it (cleared when re-opened). Falls back if the column
-  // isn't there yet.
+  // Record who completed it (cleared when re-opened). On the shared tablet the
+  // completion is attributed to the person currently using it, so their points
+  // land on the right account. Falls back if the column isn't there yet.
+  const effectiveId = await resolveActingUser(c.meId, c.role, c.teamId, b.actingAs, req);
   let row: any;
   const done = b.status === 'done';
   try {
     [row] = await sql`
-      UPDATE tasks SET status = ${b.status}, completed_by = ${done ? c.meId : null},
+      UPDATE tasks SET status = ${b.status}, completed_by = ${done ? effectiveId : null},
         completed_at = ${done ? new Date().toISOString() : null}
       WHERE id = ${id} RETURNING *`;
   } catch {
     try {
       [row] = await sql`
-        UPDATE tasks SET status = ${b.status}, completed_by = ${done ? c.meId : null}
+        UPDATE tasks SET status = ${b.status}, completed_by = ${done ? effectiveId : null}
         WHERE id = ${id} RETURNING *`;
     } catch {
       [row] = await sql`UPDATE tasks SET status = ${b.status} WHERE id = ${id} RETURNING *`;

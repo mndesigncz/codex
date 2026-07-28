@@ -1,16 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import type { RewardLevel } from '@/lib/rewardLevels';
 
-interface Review { work_date: string; rating: number; note: string | null; points: number; created_at: string; }
+interface Review {
+  work_date: string; rating: number; note: string | null; points: number;
+  autoPoints?: number; flagged?: boolean; scope?: string; seen_at?: string | null; created_at?: string | null;
+}
+interface FeedbackItem {
+  work_date: string; kind: string; refId: number; label: string;
+  points: number; note: string | null; flagged: boolean;
+}
 interface Me {
   points: number;
-  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number };
+  breakdown: {
+    tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number;
+    autoPoints?: number; itemPoints?: number; flagged?: number;
+  };
   levelName: string; levelIndex: number; perks: string;
   next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number;
 }
+
+// One day of feedback: the shift rating plus everything the employer marked
+// on individual tasks / procedures / the closing that day.
+interface DayFeedback { date: string; review: Review | null; items: FeedbackItem[]; }
+
+const KIND_LABEL: Record<string, string> = { task: 'Úkol', procedure: 'Postup', closing: 'Uzávěrka' };
+
+const fmtWhen = (s: string) => {
+  const d = new Date(String(s).slice(0, 10) + 'T00:00:00');
+  return isNaN(d.getTime()) ? String(s) : d.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' });
+};
 
 const Stars = ({ n }: { n: number }) => (
   <span className="inline-flex gap-0.5" aria-label={`${n} z 5`}>
@@ -22,17 +43,106 @@ const Stars = ({ n }: { n: number }) => (
   </span>
 );
 
+const PointsBadge = ({ n }: { n: number }) => n === 0 ? null : (
+  <span className={`text-xs font-bold tabular-nums rounded-full px-2 py-0.5 shrink-0 ${n > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-red-500/15 text-red-600'}`}>
+    {n > 0 ? '+' : ''}{n} b
+  </span>
+);
+
+function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
+  const r = day.review;
+  const auto = r?.autoPoints ?? 0;
+  return (
+    <div className={`rounded-2xl p-3.5 border ${alert ? 'bg-white/60 border-red-500/25' : 'bg-black/[0.03] border-transparent'}`}>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-sm font-semibold text-[#16181A]">{fmtWhen(day.date)}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {r && r.rating > 0 && <Stars n={r.rating} />}
+          {r && <PointsBadge n={r.points ?? 0} />}
+          {auto !== 0 && (
+            <span className={`text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5 bg-black/[0.05] ${auto > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+              {auto > 0 ? '+' : ''}{auto} b automaticky
+            </span>
+          )}
+        </div>
+      </div>
+
+      {r?.scope === 'shift' && (
+        <span className="inline-flex items-center gap-1 mt-1.5 rounded-full bg-black/[0.05] text-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+          <Icon name="users" size={11} /> Hodnocení celé směny
+        </span>
+      )}
+
+      {r?.note && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-line">{r.note}</p>}
+
+      {day.items.length > 0 && (
+        <div className="mt-2.5 space-y-1.5">
+          {day.items.map(it => (
+            <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-amber-500/[0.12] border border-amber-500/30' : 'bg-black/[0.03]'}`}>
+              <div className="flex items-center gap-2 flex-wrap">
+                {it.flagged && <Icon name="warning" size={13} className="text-amber-600 shrink-0" />}
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? 'Hodnocení'}</span>
+                <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
+                <PointsBadge n={it.points ?? 0} />
+              </div>
+              {it.note && <p className="text-[13px] text-black/60 mt-1 whitespace-pre-line">{it.note}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MyRewards() {
   const [levels, setLevels] = useState<RewardLevel[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [unseenFlagged, setUnseenFlagged] = useState(0);
+  const [acking, setAcking] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/rewards').then(r => r.json()).then(d => {
-      if (d && !d.error) { setLevels(d.levels ?? []); setMe(d.me ?? null); setReviews(Array.isArray(d.reviews) ? d.reviews : []); }
+      if (d && !d.error) {
+        setLevels(Array.isArray(d.levels) ? d.levels : []);
+        setMe(d.me ?? null);
+        setReviews(Array.isArray(d.reviews) ? d.reviews : []);
+        setItems(Array.isArray(d.items) ? d.items : []);
+        setUnseenFlagged(Number(d.unseenFlagged) || 0);
+      }
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  // Days are built from both sources so a day with only item-level feedback
+  // (no overall rating) still shows up.
+  const days = useMemo(() => {
+    const map = new Map<string, DayFeedback>();
+    const get = (date: string) => {
+      let d = map.get(date);
+      if (!d) { d = { date, review: null, items: [] }; map.set(date, d); }
+      return d;
+    };
+    reviews.forEach(r => { if (r?.work_date) get(String(r.work_date)).review = r; });
+    items.forEach(it => { if (it?.work_date) get(String(it.work_date)).items.push(it); });
+    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [reviews, items]);
+
+  const flaggedDays = days.filter(d => d.review?.flagged === true || d.items.some(i => i.flagged));
+  const normalDays = days.filter(d => !(d.review?.flagged === true || d.items.some(i => i.flagged)));
+
+  const acknowledge = async () => {
+    setAcking(true);
+    try {
+      await fetch('/api/rewards', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markSeen: true }),
+      });
+      setReviews(prev => prev.map(r => r.seen_at ? r : { ...r, seen_at: new Date().toISOString() }));
+      setUnseenFlagged(0);
+    } catch { /* banner stays so the employee can try again */ }
+    setAcking(false);
+  };
 
   if (loading) return (
     <div className="p-6 max-w-2xl mx-auto w-full space-y-4">
@@ -47,7 +157,7 @@ export default function MyRewards() {
   );
 
   const b = me.breakdown;
-  const fmtWhen = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' });
+  const fromReviews = (b.reviewPoints ?? 0) + (b.autoPoints ?? 0) + (b.itemPoints ?? 0);
 
   return (
     <div className="p-6 max-w-2xl mx-auto w-full space-y-6">
@@ -55,6 +165,25 @@ export default function MyRewards() {
         <Icon name="award" size={22} className="text-[#16181A]" />
         <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Moje odměny</h1>
       </div>
+
+      {/* Unacknowledged "fix this" feedback — first thing on the page */}
+      {unseenFlagged > 0 && (
+        <div className="rounded-3xl bg-red-500/[0.08] border border-red-500/30 p-5">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15 text-red-600 shrink-0"><Icon name="warning" size={19} /></span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold tracking-tight text-[#16181A]">Něco je potřeba napravit</p>
+              <p className="text-sm text-black/60 mt-0.5">
+                {unseenFlagged === 1 ? 'U jedné z tvých směn' : `U ${unseenFlagged} tvých směn`} vedení označilo něco k nápravě. Přečti si poznámky níže.
+              </p>
+              <button onClick={acknowledge} disabled={acking}
+                className="mt-3 rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:brightness-125 disabled:opacity-50 transition">
+                {acking ? 'Ukládám…' : 'Beru na vědomí'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero level card */}
       <div className="glass-card p-6 relative overflow-hidden">
@@ -100,11 +229,11 @@ export default function MyRewards() {
             { label: 'Úkoly', value: b.tasks, icon: 'check' },
             { label: 'Postupy', value: b.procedures, icon: 'clipboard' },
             { label: 'Uzávěrky', value: b.closings, icon: 'trend' },
-            { label: 'Z hodnocení', value: b.reviewPoints, icon: 'award', suffix: 'b' },
+            { label: 'Z hodnocení', value: fromReviews, icon: 'award' },
           ].map(s => (
             <div key={s.label} className="rounded-2xl bg-black/[0.03] p-3 text-center">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] mb-1.5"><Icon name={s.icon} size={15} /></span>
-              <p className="text-2xl font-bold tracking-tight text-[#16181A] tabular-nums">{s.value}{s.suffix === 'b' ? '' : ''}</p>
+              <p className="text-2xl font-bold tracking-tight text-[#16181A] tabular-nums">{s.value}</p>
               <p className="text-[11px] text-black/45">{s.label}</p>
             </div>
           ))}
@@ -136,29 +265,32 @@ export default function MyRewards() {
         </div>
       </div>
 
+      {/* What needs fixing — always above the ordinary feedback */}
+      {flaggedDays.length > 0 && (
+        <div className="rounded-3xl bg-red-500/[0.05] border border-red-500/25 p-5">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500/12 text-red-600 shrink-0"><Icon name="warning" size={17} /></span>
+            <div className="min-w-0">
+              <h3 className="font-bold tracking-tight text-[#16181A]">Něco je potřeba napravit</h3>
+              <p className="text-xs text-black/50">Vedení u těchto směn označilo, co příště udělat jinak.</p>
+            </div>
+          </div>
+          <div className="space-y-2.5">
+            {flaggedDays.map(d => <DayCard key={d.date} day={d} alert />)}
+          </div>
+        </div>
+      )}
+
       {/* Feedback from employer */}
       <div className="glass-card p-5">
         <h3 className="font-bold tracking-tight text-[#16181A] mb-3">Hodnocení směn</h3>
-        {reviews.length === 0 ? (
-          <p className="text-sm text-black/45">Zatím žádné hodnocení. Vedení ohodnotí tvé směny průběžně.</p>
+        {normalDays.length === 0 ? (
+          <p className="text-sm text-black/45">
+            {flaggedDays.length > 0 ? 'Další hodnocení zatím nemáš.' : 'Zatím žádné hodnocení. Vedení ohodnotí tvé směny průběžně.'}
+          </p>
         ) : (
           <div className="space-y-2.5">
-            {reviews.map((r, i) => (
-              <div key={i} className="rounded-2xl bg-black/[0.03] p-3.5">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-[#16181A]">{fmtWhen(r.work_date)}</span>
-                  <div className="flex items-center gap-2">
-                    {r.rating > 0 && <Stars n={r.rating} />}
-                    {r.points !== 0 && (
-                      <span className={`text-xs font-bold tabular-nums rounded-full px-2 py-0.5 ${r.points > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-red-500/15 text-red-600'}`}>
-                        {r.points > 0 ? '+' : ''}{r.points} b
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {r.note && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-line">{r.note}</p>}
-              </div>
-            ))}
+            {normalDays.map(d => <DayCard key={d.date} day={d} alert={false} />)}
           </div>
         )}
       </div>

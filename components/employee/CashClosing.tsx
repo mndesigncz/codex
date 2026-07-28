@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
-import { Closing, expectedCash, cashDifference } from '@/lib/closing';
+import { Closing, expectedCash, cashDifference, expectedCashLines } from '@/lib/closing';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const inputClass =
@@ -65,6 +65,31 @@ function Step({
   );
 }
 
+// Labelled on/off switch for the per-closing money-flow options (payout source,
+// where the tips end up). Both directly change the expected-cash maths.
+function Toggle({ title, hint, on, onChange }: {
+  title: string; hint: string; on: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-[#16181A]">{title}</p>
+        <p className="text-xs text-black/45 mt-0.5">{hint}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={title}
+        onClick={() => onChange(!on)}
+        className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+      </button>
+    </div>
+  );
+}
+
 type EligibleShift = {
   id: number; date: string; startTime: string; endTime: string; type: string;
   employeeId?: number; employeeName?: string; employeeAvatar?: string;
@@ -82,7 +107,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 }) {
   const [closings, setClosings] = useState<Closing[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
+  // Per-closing money-flow flags, seeded from the team policy so a reset after
+  // submitting goes back to the team default rather than a hardcoded guess.
+  const [teamPayoutFromRegister, setTeamPayoutFromRegister] = useState(true);
+  const [teamTipsInDrawer, setTeamTipsInDrawer] = useState(false);
   const [payoutFromRegister, setPayoutFromRegister] = useState(true);
+  const [tipsInDrawer, setTipsInDrawer] = useState(false);
   const [isEmployer, setIsEmployer] = useState(false);
   const [isKiosk, setIsKiosk] = useState(false);
   const [selEmployee, setSelEmployee] = useState<number | null>(null);
@@ -102,10 +132,21 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const symbol = useSymbol();
 
   const load = async () => {
+    // The team decides whether cash tips stay in the drawer — it changes the
+    // expected-cash maths, so the form must start from the team's reality.
+    try {
+      const t = await fetch('/api/teams').then(r => r.json());
+      const drawer = t?.team?.tips_in_drawer === true;
+      setTeamTipsInDrawer(drawer);
+      setTipsInDrawer(drawer);
+    } catch { /* keep the safe default: tips are kept aside */ }
     try {
       const d = await fetch('/api/closings').then(r => r.json());
       setClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
+      const payoutDefault = d.payoutFromRegister !== false;
+      setTeamPayoutFromRegister(payoutDefault);
+      setPayoutFromRegister(payoutDefault);
       setIsEmployer(!!d.isEmployer);
       setIsKiosk(!!d.isKiosk);
       setRequiresShift(d.requiresShift !== false);
@@ -165,11 +206,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
   // Live preview of expected drawer cash and difference.
   const preview = {
-    opening_cash: n(form.openingCash), cash_revenue: n(form.cashRevenue),
+    opening_cash: n(form.openingCash), cash_revenue: n(form.cashRevenue), tips: n(form.tips),
     expenses: n(form.expenses), cash_removed: n(form.cashRemoved), self_payout: payDailyCash ? n(form.selfPayout) : 0,
-    closing_cash: n(form.closingCash), payout_from_register: payoutFromRegister,
+    closing_cash: n(form.closingCash), payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer,
   };
   const expected = expectedCash(preview);
+  const expectedLines = expectedCashLines(preview);
   const diff = form.closingCash === '' ? null : cashDifference(preview);
 
   const totalSteps = 4;
@@ -197,7 +239,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           tips: n(form.tips), expenses: n(form.expenses), cashRemoved: n(form.cashRemoved),
           selfPayout: payDailyCash ? n(form.selfPayout) : 0, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
-          payoutFromRegister,
+          payoutFromRegister, tipsInDrawer,
           employeeId: isSelf ? undefined : selEmployee,
           coworkers: includedCoworkers,
         }),
@@ -208,7 +250,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
         setForm(emptyForm());
         setCoworkerSel({});
-        setPayoutFromRegister(true);
+        setPayoutFromRegister(teamPayoutFromRegister);
+        setTipsInDrawer(teamTipsInDrawer);
         onSubmitted?.();
         await load();
         setTimeout(() => setMsg(''), 4000);
@@ -409,9 +452,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Tržba hotově', 'cashRevenue', { hint: 'Hotovost přijatá do kasy.' })}
             {field('Tržba kartou', 'cardRevenue', { hint: 'Nejde do kasy — jen evidence.' })}
-            {field('Spropitné', 'tips')}
+            {field('Spropitné', 'tips', {
+              hint: tipsInDrawer
+                ? 'Zůstává v kase — připočte se k očekávanému stavu.'
+                : 'Bereš ho stranou — očekávaný stav kasy neovlivní.',
+            })}
             {field('Zákazníků (volitelné)', 'customers', { unit: null, placeholder: 'počet' })}
           </div>
+          <Toggle
+            title="Spropitné v hotovosti zůstává v kase"
+            hint="Zapni, když spropitné fyzicky leží v kase — jinak by se pokaždé ukazoval falešný přebytek."
+            on={tipsInDrawer}
+            onChange={setTipsInDrawer}
+          />
         </Step>
 
         {/* Step 3 — expenses & payouts */}
@@ -427,25 +480,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             })}
           </div>
           {payDailyCash && (
-            <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#16181A]">Výplatu beru z kasy</p>
-                <p className="text-xs text-black/45 mt-0.5">
-                  {payoutFromRegister
-                    ? 'Zapnuto — výplata se odečte z očekávaného stavu kasy.'
-                    : 'Vypnuto — bereš ji bokem, kasy se netýká.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={payoutFromRegister}
-                onClick={() => setPayoutFromRegister(v => !v)}
-                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${payoutFromRegister ? 'bg-[#C8F542]' : 'bg-black/15'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${payoutFromRegister ? 'translate-x-5' : ''}`} />
-              </button>
-            </div>
+            <Toggle
+              title="Výplatu beru z kasy"
+              hint={payoutFromRegister
+                ? 'Zapnuto — výplata se odečte z očekávaného stavu kasy.'
+                : 'Vypnuto — bereš ji bokem, kasy se netýká.'}
+              on={payoutFromRegister}
+              onChange={setPayoutFromRegister}
+            />
           )}
         </Step>
 
@@ -507,9 +549,20 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         {/* Step 4 — the climax: expected vs counted */}
         <Step num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
-          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3">
-            <span className="text-sm text-black/55 min-w-0">Očekávaný stav kasy</span>
-            <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{money(expected)}</span>
+          {/* The arithmetic spelled out — no mystery number to argue with. */}
+          <div className="rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3.5 space-y-1.5">
+            {expectedLines.map(l => (
+              <div key={l.label} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="text-black/50 min-w-0 truncate">{l.label}</span>
+                <span className="text-black/70 tabular-nums shrink-0 whitespace-nowrap">
+                  {l.sign < 0 ? '− ' : '+ '}{money(l.amount)}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-3 pt-2.5 mt-1 border-t border-black/[0.08]">
+              <span className="text-sm font-semibold text-[#16181A] min-w-0">Očekávaný stav kasy</span>
+              <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{money(expected)}</span>
+            </div>
           </div>
 
           <div>

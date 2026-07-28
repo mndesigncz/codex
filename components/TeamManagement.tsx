@@ -374,6 +374,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   if (loadError) {
     return (
+      <div className="p-6 max-w-2xl mx-auto w-full">
       <div className="glass-card p-8 text-center space-y-3">
         <p className="text-[#16181A] font-medium">Tým se nepodařilo načíst.</p>
         <p className="text-black/45 text-sm">Vaše data jsou v pořádku — jen se je nepodařilo teď načíst.</p>
@@ -384,13 +385,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           Zkusit znovu
         </button>
       </div>
+      </div>
     );
   }
 
   if (!team) {
     return (
-      <div className="glass-card p-8 text-center">
-        <p className="text-black/45">Zatím nemáte žádný tým.</p>
+      <div className="p-6 max-w-2xl mx-auto w-full">
+        <div className="glass-card p-8 text-center">
+          <p className="text-black/45">Zatím nemáte žádný tým.</p>
+        </div>
       </div>
     );
   }
@@ -399,7 +403,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const pending = invitations.filter(i => i.status === 'pending');
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto w-full">
       {notice && (
         <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={16} /> {notice}

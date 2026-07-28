@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
 
 interface Notif {
@@ -18,9 +19,12 @@ const typeIcon: Record<string, string> = {
 };
 
 export default function NotificationBell() {
+  const { data: session } = useSession();
+  const role = (session?.user as any)?.role as string | undefined;
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
+  const [flaggedFeedback, setFlaggedFeedback] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -32,11 +36,29 @@ export default function NotificationBell() {
     } catch {}
   };
 
+  // Shift feedback the employee hasn't acknowledged yet. Polled far less often
+  // than notifications — the rewards summary is a heavier query.
+  const loadFeedback = useCallback(async () => {
+    if (role !== 'employee') return;
+    try {
+      const res = await fetch('/api/rewards');
+      const data = await res.json();
+      setFlaggedFeedback(Number(data?.unseenFlagged) || 0);
+    } catch {}
+  }, [role]);
+
   useEffect(() => {
     load();
     const t = setInterval(load, 20000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (role !== 'employee') { setFlaggedFeedback(0); return; }
+    loadFeedback();
+    const t = setInterval(loadFeedback, 120000);
+    return () => clearInterval(t);
+  }, [role, loadFeedback]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -59,17 +81,21 @@ export default function NotificationBell() {
     if (n.link && n.link !== '/') window.location.href = n.link;
   };
 
+  // The flagged feedback stays on the badge until it is acknowledged in Odměny,
+  // so "přečíst vše" here can't hide it.
+  const badge = unread + (flaggedFeedback > 0 ? 1 : 0);
+
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { setOpen(o => !o); if (!open && unread) markAllRead(); }}
+        onClick={() => { if (!open) { loadFeedback(); if (unread) markAllRead(); } setOpen(o => !o); }}
         className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
         title="Notifikace"
       >
         <Icon name="bell" size={19} />
-        {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C8F542] text-black text-[10px] font-bold flex items-center justify-center">
-            {unread > 9 ? '9+' : unread}
+        {badge > 0 && (
+          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
+            {badge > 9 ? '9+' : badge}
           </span>
         )}
       </button>
@@ -83,7 +109,20 @@ export default function NotificationBell() {
             )}
           </div>
           <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
-            {notifs.length === 0 ? (
+            {flaggedFeedback > 0 && (
+              <div className="px-4 py-3 flex gap-3 bg-red-500/[0.07]">
+                <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-600">
+                  <Icon name="warning" size={15} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#16181A]">Něco je potřeba napravit</p>
+                  <p className="text-xs text-black/55 mt-0.5">
+                    {flaggedFeedback === 1 ? 'U jedné z tvých směn' : `U ${flaggedFeedback} tvých směn`} máš zpětnou vazbu od vedení. Otevři sekci Odměny.
+                  </p>
+                </div>
+              </div>
+            )}
+            {notifs.length === 0 && flaggedFeedback === 0 ? (
               <div className="p-8 text-center text-black/40 text-sm">Žádné notifikace</div>
             ) : notifs.map(n => (
               <button key={n.id} onClick={() => openNotif(n)}

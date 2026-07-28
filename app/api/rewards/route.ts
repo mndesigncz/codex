@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -18,12 +18,19 @@ async function ctx() {
   return { meId, role, name, teamId: u?.team_id as number | null };
 }
 
-interface Breakdown { tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number; }
+interface Breakdown {
+  tasks: number; procedures: number; closings: number;
+  reviewPoints: number; ratedShifts: number;
+  autoPoints: number;    // points the system derived from the shift itself
+  itemPoints: number;    // points attached to individual tasks/runs/closings
+  flagged: number;       // reviews or items marked "něco je špatně"
+}
 
 // Count the point-earning signals for one user (each guarded so a missing
 // column degrades to zero instead of failing the whole request).
 async function breakdownFor(teamId: number, userId: number): Promise<Breakdown> {
   let tasks = 0, procedures = 0, closings = 0, reviewPoints = 0, ratedShifts = 0;
+  let autoPoints = 0, itemPoints = 0, flagged = 0;
   try {
     const [r] = await sql`SELECT COUNT(*)::int AS n FROM tasks WHERE completed_by = ${userId} AND status = 'done'`;
     tasks = r?.n ?? 0;
@@ -42,15 +49,89 @@ async function breakdownFor(teamId: number, userId: number): Promise<Breakdown> 
     } catch { /* ignore */ }
   }
   try {
-    const [r] = await sql`SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n FROM shift_reviews WHERE employee_id = ${userId} AND team_id = ${teamId}`;
-    reviewPoints = r?.pts ?? 0;
-    ratedShifts = r?.n ?? 0;
+    const [r] = await sql`
+      SELECT COALESCE(SUM(points),0)::int AS pts, COALESCE(SUM(auto_points),0)::int AS auto,
+             COUNT(*)::int AS n, COUNT(*) FILTER (WHERE flagged)::int AS flg
+      FROM shift_reviews WHERE employee_id = ${userId} AND team_id = ${teamId}`;
+    reviewPoints = r?.pts ?? 0; autoPoints = r?.auto ?? 0; ratedShifts = r?.n ?? 0; flagged = r?.flg ?? 0;
+  } catch {
+    try {
+      const [r] = await sql`SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n FROM shift_reviews WHERE employee_id = ${userId} AND team_id = ${teamId}`;
+      reviewPoints = r?.pts ?? 0; ratedShifts = r?.n ?? 0;
+    } catch { /* table missing */ }
+  }
+  try {
+    const [r] = await sql`
+      SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*) FILTER (WHERE flagged)::int AS flg
+      FROM shift_review_items WHERE employee_id = ${userId} AND team_id = ${teamId}`;
+    itemPoints = r?.pts ?? 0; flagged += r?.flg ?? 0;
   } catch { /* table missing */ }
-  return { tasks, procedures, closings, reviewPoints, ratedShifts };
+  return { tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged };
 }
 
 function totalPoints(b: Breakdown, pt: PointsConfig): number {
-  return b.tasks * pt.task + b.procedures * pt.procedure + b.closings * pt.closing + b.reviewPoints;
+  return b.tasks * pt.task + b.procedures * pt.procedure + b.closings * pt.closing
+    + b.reviewPoints + b.autoPoints + b.itemPoints;
+}
+
+// Worked days in the recent past that still have no review — the employer's
+// "to rate" backlog. Older shifts are ignored so the number stays actionable.
+async function pendingFor(userId: number): Promise<number> {
+  const today = new Date();
+  const from = new Date(today.getTime() - 60 * 86400000).toISOString().split('T')[0];
+  const to = today.toISOString().split('T')[0];
+  try {
+    const [r] = await sql`
+      SELECT COUNT(*)::int AS n FROM (
+        SELECT DISTINCT s.date FROM shifts s
+        WHERE s.employee_id = ${userId} AND s.date >= ${from} AND s.date <= ${to}
+          AND NOT EXISTS (SELECT 1 FROM shift_reviews r WHERE r.employee_id = ${userId} AND r.work_date = s.date)
+      ) x`;
+    return r?.n ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Per-item feedback with a human label, one query per kind (neon has no
+// dynamic SQL, so each join is written out in full).
+async function itemsFor(teamId: number, userId: number) {
+  const out: { work_date: string; kind: string; refId: number; label: string; points: number; note: string | null; flagged: boolean }[] = [];
+  const push = (rows: any[], kind: string, fallback: string, decorate?: (l: string) => string) => {
+    rows.forEach((r: any) => out.push({
+      work_date: r.work_date, kind, refId: r.ref_id,
+      label: r.label ? (decorate ? decorate(String(r.label)) : String(r.label)) : fallback,
+      points: r.points ?? 0, note: r.note ?? null, flagged: r.flagged === true,
+    }));
+  };
+  try {
+    const rows = await sql`
+      SELECT i.work_date, i.ref_id, i.points, i.note, i.flagged, t.title AS label
+      FROM shift_review_items i LEFT JOIN tasks t ON t.id = i.ref_id
+      WHERE i.employee_id = ${userId} AND i.team_id = ${teamId} AND i.kind = 'task'
+      ORDER BY i.work_date DESC LIMIT 50`;
+    push(rows, 'task', 'Úkol');
+  } catch { return out; /* table missing */ }
+  try {
+    const rows = await sql`
+      SELECT i.work_date, i.ref_id, i.points, i.note, i.flagged, p.name AS label
+      FROM shift_review_items i
+      LEFT JOIN procedure_runs r ON r.id = i.ref_id
+      LEFT JOIN procedures p ON p.id = r.procedure_id
+      WHERE i.employee_id = ${userId} AND i.team_id = ${teamId} AND i.kind = 'procedure'
+      ORDER BY i.work_date DESC LIMIT 50`;
+    push(rows, 'procedure', 'Postup');
+  } catch { /* ignore */ }
+  try {
+    const rows = await sql`
+      SELECT i.work_date, i.ref_id, i.points, i.note, i.flagged, cc.shift_label AS label
+      FROM shift_review_items i LEFT JOIN cash_closings cc ON cc.id = i.ref_id
+      WHERE i.employee_id = ${userId} AND i.team_id = ${teamId} AND i.kind = 'closing'
+      ORDER BY i.work_date DESC LIMIT 50`;
+    push(rows, 'closing', 'Uzávěrka', l => `Uzávěrka — ${l}`);
+  } catch { /* ignore */ }
+  out.sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)));
+  return out.slice(0, 60);
 }
 
 export async function GET() {
@@ -78,6 +159,7 @@ export async function GET() {
       standings.push({
         id: m.id, name: m.name, avatar: m.avatar,
         points: total, breakdown: b,
+        flagged: b.flagged, pending: await pendingFor(m.id),
         levelName: st.level.name, levelIndex: st.levelIndex,
         next: st.next, pctToNext: st.pctToNext, pointsIntoLevel: st.pointsIntoLevel, pointsForNext: st.pointsForNext,
       });
@@ -93,10 +175,27 @@ export async function GET() {
   let reviews: any[] = [];
   try {
     reviews = await sql`
-      SELECT work_date, rating, note, points, created_at
+      SELECT work_date, rating, note, points, auto_points, flagged, scope, seen_at, created_at
       FROM shift_reviews WHERE employee_id = ${c.meId} AND team_id = ${c.teamId}
       ORDER BY work_date DESC LIMIT 20`;
-  } catch { /* table missing */ }
+  } catch {
+    try {
+      reviews = await sql`
+        SELECT work_date, rating, note, points, created_at
+        FROM shift_reviews WHERE employee_id = ${c.meId} AND team_id = ${c.teamId}
+        ORDER BY work_date DESC LIMIT 20`;
+    } catch { /* table missing */ }
+  }
+  const items = await itemsFor(c.teamId, c.meId);
+  // Counted over all history, not just the 20 rows above.
+  let unseenFlagged = reviews.filter((r: any) => r.flagged === true && !r.seen_at).length;
+  try {
+    const [r] = await sql`
+      SELECT COUNT(*)::int AS n FROM shift_reviews
+      WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} AND flagged = TRUE AND seen_at IS NULL`;
+    unseenFlagged = r?.n ?? unseenFlagged;
+  } catch { /* columns not migrated */ }
+
   return NextResponse.json({
     role: 'employee', levels, points,
     me: {
@@ -104,6 +203,28 @@ export async function GET() {
       levelName: st.level.name, levelIndex: st.levelIndex, perks: st.level.perks,
       next: st.next, pctToNext: st.pctToNext, pointsIntoLevel: st.pointsIntoLevel, pointsForNext: st.pointsForNext,
     },
-    reviews,
+    reviews: reviews.map((r: any) => ({
+      work_date: r.work_date, rating: r.rating ?? 0, note: r.note ?? null,
+      points: r.points ?? 0, autoPoints: r.auto_points ?? 0,
+      flagged: r.flagged === true, scope: r.scope ?? 'individual',
+      seen_at: r.seen_at ?? null, created_at: r.created_at ?? null,
+    })),
+    items,
+    unseenFlagged,
   });
+}
+
+// POST { markSeen: true } — the employee acknowledged their new feedback.
+export async function POST(req: NextRequest) {
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (!c.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
+
+  const b = await req.json().catch(() => ({}));
+  if (b?.markSeen !== true) return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
+
+  try {
+    await sql`UPDATE shift_reviews SET seen_at = NOW() WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} AND seen_at IS NULL`;
+  } catch { /* column not migrated — nothing to acknowledge */ }
+  return NextResponse.json({ ok: true });
 }

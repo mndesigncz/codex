@@ -10,6 +10,11 @@ interface Props {
   onNavigate: (view: string) => void;
 }
 
+interface ShiftReview {
+  work_date: string; rating: number; note: string | null; points: number;
+  flagged?: boolean; scope?: string; seen_at?: string | null;
+}
+
 function nextMonthStr() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -25,6 +30,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [unreadChats, setUnreadChats] = useState(0);
   const [closingsDue, setClosingsDue] = useState<any[]>([]);
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<ShiftReview[]>([]);
+  const [unseenFlagged, setUnseenFlagged] = useState(0);
   const [cfg, setCfg] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const show = (id: string) => isWidgetOn(cfg, id);
@@ -32,7 +39,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const [sh, tk, inv, av, conv, cl, att, tm] = await Promise.all([
+        const [sh, tk, inv, av, conv, cl, att, tm, rw] = await Promise.all([
           fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
           fetch(`/api/tasks?assignedTo=${meId}`).then(r => r.json()).catch(() => []),
           fetch('/api/inventory').then(r => r.json()).catch(() => []),
@@ -41,6 +48,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           fetch('/api/closings').then(r => r.json()).catch(() => ({})),
           fetch('/api/attendance').then(r => r.json()).catch(() => ({})),
           fetch('/api/teams').then(r => r.json()).catch(() => ({})),
+          fetch('/api/rewards').then(r => r.json()).catch(() => ({})),
         ]);
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
@@ -52,6 +60,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
         setClosingsDue(Array.isArray(cl?.eligibleShifts) ? cl.eligibleShifts : []);
         setTimeEntries(Array.isArray(att?.entries) ? att.entries : []);
+        setReviews(Array.isArray(rw?.reviews) ? rw.reviews : []);
+        setUnseenFlagged(Number(rw?.unseenFlagged) || 0);
       } catch {}
       setLoading(false);
     })();
@@ -64,6 +74,23 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const nextShift = upcoming[0];
   const activeTasks = tasks.filter(t => t.status !== 'done');
   const lowStock = inventory.filter(i => i.quantity <= i.minQuantity);
+
+  // Feedback the employee hasn't acknowledged yet. Capped to the last week so a
+  // database without the seen_at column can't keep the card open forever.
+  const feedbackSince = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const freshReviews = reviews
+    .filter(r => !r.seen_at && String(r.work_date ?? '').slice(0, 10) >= feedbackSince)
+    .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)));
+  const latestReview = freshReviews[0] ?? null;
+  const feedbackAlert = unseenFlagged > 0 || freshReviews.some(r => r.flagged === true);
+  const reviewDay = latestReview ? new Date(String(latestReview.work_date).slice(0, 10) + 'T00:00:00') : null;
+  const feedbackDetail = latestReview
+    ? [
+      reviewDay && !isNaN(reviewDay.getTime()) ? reviewDay.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' }) : '',
+      latestReview.rating > 0 ? `${latestReview.rating}★` : '',
+      latestReview.points ? `${latestReview.points > 0 ? '+' : ''}${latestReview.points} bodů` : '',
+    ].filter(Boolean).join(' · ')
+    : '';
 
   // Hours worked this calendar month (open shift counts up to now).
   const monthKey = today.slice(0, 7);
@@ -125,6 +152,29 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <p className="text-black/45">Žádná nadcházející směna.</p>
         )}
       </button>
+      )}
+
+      {/* Feedback from the employer — flagged shifts shout, plain ratings nudge */}
+      {show('feedback') && (latestReview || unseenFlagged > 0) && (
+        <button onClick={() => onNavigate('rewards')}
+          className={`w-full text-left rounded-3xl border p-5 transition-all ${feedbackAlert ? 'bg-red-500/[0.07] border-red-500/30 hover:bg-red-500/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${feedbackAlert ? 'bg-red-500/15 text-red-600' : 'bg-[#16181A] text-[#C8F542]'}`}>
+              <Icon name={feedbackAlert ? 'warning' : 'award'} size={18} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[#16181A]">
+                {feedbackAlert ? 'U tvé směny je něco k nápravě' : 'Vedení ohodnotilo tvou směnu'}
+              </p>
+              <p className={`text-sm ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`}>
+                {feedbackAlert
+                  ? 'Podívej se, co je potřeba probrat, a potvrď, že to víš.'
+                  : feedbackDetail ? `${feedbackDetail} — přečti si zpětnou vazbu.` : 'Přečti si zpětnou vazbu k poslední směně.'}
+              </p>
+            </div>
+            <Icon name="chevron" size={16} className={`-rotate-90 shrink-0 ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`} />
+          </div>
+        </button>
       )}
 
       {/* Stat row */}
