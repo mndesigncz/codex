@@ -144,7 +144,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
             </div>
           )}
 
-          {!loading && Object.keys(days).length === 0 && (
+          {Object.keys(days).length === 0 && (
             <p className="mt-4 text-sm text-black/40 text-center">V tomto měsíci zatím nikdo neměl směnu.</p>
           )}
         </>

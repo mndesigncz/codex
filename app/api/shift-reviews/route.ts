@@ -426,10 +426,11 @@ export async function POST(req: NextRequest) {
   }
   let targets: any[] = [{ id: emp.id, name: emp.name, avatar: emp.avatar }];
   if (targetIds.length > 1) {
+    // Only teammates survive the filter, so a stray id can never be rated.
     const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
     targets = members.filter((m: any) => targetIds.includes(m.id));
+    if (!targets.some((t: any) => t.id === emp.id)) targets.unshift({ id: emp.id, name: emp.name, avatar: emp.avatar });
   }
-  if (!targets.length) return NextResponse.json({ error: 'Žádný zaměstnanec k hodnocení' }, { status: 400 });
 
   const scope = wholeShift ? 'shift' : 'individual';
   const pt = await teamPoints(c.teamId);

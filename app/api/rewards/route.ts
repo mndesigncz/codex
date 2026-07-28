@@ -187,7 +187,14 @@ export async function GET() {
     } catch { /* table missing */ }
   }
   const items = await itemsFor(c.teamId, c.meId);
-  const unseenFlagged = reviews.filter((r: any) => r.flagged === true && !r.seen_at).length;
+  // Counted over all history, not just the 20 rows above.
+  let unseenFlagged = reviews.filter((r: any) => r.flagged === true && !r.seen_at).length;
+  try {
+    const [r] = await sql`
+      SELECT COUNT(*)::int AS n FROM shift_reviews
+      WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} AND flagged = TRUE AND seen_at IS NULL`;
+    unseenFlagged = r?.n ?? unseenFlagged;
+  } catch { /* columns not migrated */ }
 
   return NextResponse.json({
     role: 'employee', levels, points,
