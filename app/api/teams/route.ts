@@ -46,6 +46,13 @@ export async function GET() {
       payoutFromRegister = extra?.payout_from_register !== false;
     } catch { /* column not migrated yet */ }
 
+    // Do cash tips physically stay in the drawer? Drives the expected-cash math.
+    let tipsInDrawer = false;
+    try {
+      const [extra] = await sql`SELECT tips_in_drawer FROM teams WHERE id = ${teamId}`;
+      tipsInDrawer = extra?.tips_in_drawer === true;
+    } catch { /* column not migrated yet */ }
+
     let dashboardConfig: any = {};
     try {
       const [dc] = await sql`SELECT dashboard_config FROM teams WHERE id = ${teamId}`;
@@ -91,7 +98,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -107,7 +114,7 @@ export async function PATCH(request: Request) {
   if (!me || me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const sql = neon(process.env.DATABASE_URL!);
   const body = await request.json();
-  const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, dashboardConfig,
+  const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, tipsInDrawer, dashboardConfig,
           levelsConfig, pointsConfig,
           currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body;
 
@@ -123,6 +130,9 @@ export async function PATCH(request: Request) {
   if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;
   if (typeof payoutFromRegister === 'boolean') {
     try { await sql`UPDATE teams SET payout_from_register = ${payoutFromRegister} WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  }
+  if (typeof tipsInDrawer === 'boolean') {
+    try { await sql`UPDATE teams SET tips_in_drawer = ${tipsInDrawer} WHERE id = ${team.id}`; } catch { /* not migrated */ }
   }
   if (dashboardConfig && typeof dashboardConfig === 'object') {
     try { await sql`UPDATE teams SET dashboard_config = ${JSON.stringify(dashboardConfig)}::jsonb WHERE id = ${team.id}`; } catch { /* not migrated */ }

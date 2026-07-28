@@ -17,6 +17,7 @@ export const EMPLOYER_WIDGETS: Widget[] = [
 
 export const EMPLOYEE_WIDGETS: Widget[] = [
   { id: 'nextShift', label: 'Nejbližší směna' },
+  { id: 'feedback', label: 'Hodnocení směny', hint: 'Zpětná vazba od vedení a co napravit.' },
   { id: 'stats', label: 'Statistiky', hint: 'Úkoly, zprávy, odpracované hodiny.' },
   { id: 'announcements', label: 'Oznámení' },
   { id: 'closing', label: 'Uzávěrka směny' },

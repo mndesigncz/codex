@@ -516,6 +516,37 @@ export async function GET() {
     await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS review_note TEXT`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS review_note TEXT`;
 
+    // ---- Cash tips: do they physically stay in the drawer? ----
+    // Team default + per-closing override (mirrors payout_from_register).
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN`;
+    // A closing belongs to the whole shift, not just its author.
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
+
+    // ---- Shift reviews: whole-shift scope, flags, per-item scoring ----
+    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'individual'`;
+    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS auto_points INTEGER DEFAULT 0`;
+    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS seen_at TIMESTAMP`;
+    // Points/notes/flags attached to one concrete item of a shift.
+    await sql`
+      CREATE TABLE IF NOT EXISTS shift_review_items (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        work_date TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        ref_id INTEGER NOT NULL,
+        points INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        flagged BOOLEAN DEFAULT FALSE,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (employee_id, work_date, kind, ref_id)
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`;
+
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {
     console.error('Init error:', error);
