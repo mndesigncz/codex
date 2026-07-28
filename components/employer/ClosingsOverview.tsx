@@ -472,18 +472,20 @@ export default function ClosingsOverview() {
                         </div>
                       </div>
                     )}
-                    {scheduled.length > 0 && (
+                    {roster.length > 0 && (
                       <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4">
                         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
-                          <Icon name="users" size={14} /> Na směně ten den
+                          <Icon name="users" size={14} /> Směna ten den
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                          {scheduled.map(p => {
+                          {roster.map(p => {
                             const has = coveredIds.has(p.id);
+                            const isAuthor = p.id === c.created_by;
                             return (
-                              <span key={p.id} title={has ? 'Má uzávěrku' : 'Bez uzávěrky'}
+                              <span key={p.id} title={has ? 'Uzávěrku má' : 'Bez uzávěrky'}
                                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${has ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
                                 <span>{p.avatar ?? '👤'}</span> {p.name}
+                                {isAuthor && <span className="opacity-70">· vyplnil/a</span>}
                                 {has ? ' ✓' : ' — chybí'}
                               </span>
                             );
