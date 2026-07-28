@@ -375,11 +375,18 @@ export default function ClosingsOverview() {
           {topLevel.map(c => {
             const d = cashDifference(c);
             const expected = expectedCash(c);
+            const lines = expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' });
             const open = openId === c.id;
             const covered = coveredBy(c.id);
+            // The closing belongs to the whole shift; the author only filled it in.
+            const crew = crewOf(c);
+            const crewLabel = crew.map(p => p.name).join(' + ');
             // Everyone scheduled that day, and who is / isn't covered by a closing.
             const scheduled = scheduledByDate[c.date] ?? [];
-            const coveredIds = new Set<number>([c.created_by, ...covered.map(cv => cv.created_by)]);
+            const coveredIds = new Set<number>([c.created_by, ...covered.map(cv => cv.created_by), ...crew.map(p => p.id)]);
+            // Union of the shift crew and the day's roster, de-duplicated.
+            const roster: Person[] = [...crew];
+            for (const p of scheduled) if (!roster.some(r => r.id === p.id)) roster.push(p);
             return (
               <div key={c.id} className="glass-card overflow-hidden">
                 <button onClick={() => setOpenId(open ? null : c.id)} className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors">
@@ -390,7 +397,7 @@ export default function ClosingsOverview() {
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                       </p>
-                      <p className="text-xs text-black/45 truncate">{c.author_name ?? 'Neznámý'} · Tržba {money(c.cash_revenue + c.card_revenue)}</p>
+                      <p className="text-xs text-black/45 truncate">Směna: {crewLabel} · Tržba {money(c.cash_revenue + c.card_revenue)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -429,7 +436,16 @@ export default function ClosingsOverview() {
                       ))}
                     </div>
                     <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 space-y-2 text-sm">
-                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
+                      {/* Where the expectation comes from, line by line. */}
+                      <div className="space-y-1 pb-1">
+                        {lines.map(l => (
+                          <div key={l.label} className="flex justify-between gap-3 text-[13px]">
+                            <span className="text-black/45 min-w-0 truncate">{l.label}</span>
+                            <span className="text-black/60 shrink-0 whitespace-nowrap tabular-nums">{l.sign < 0 ? '− ' : '+ '}{money(l.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between gap-3 border-t border-black/[0.07] pt-2"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
                       <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(c.closing_cash)}</span></div>
                       <div className={`flex justify-between gap-3 rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
                         <span className="font-medium min-w-0">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
