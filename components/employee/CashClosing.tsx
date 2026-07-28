@@ -480,25 +480,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             })}
           </div>
           {payDailyCash && (
-            <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#16181A]">Výplatu beru z kasy</p>
-                <p className="text-xs text-black/45 mt-0.5">
-                  {payoutFromRegister
-                    ? 'Zapnuto — výplata se odečte z očekávaného stavu kasy.'
-                    : 'Vypnuto — bereš ji bokem, kasy se netýká.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={payoutFromRegister}
-                onClick={() => setPayoutFromRegister(v => !v)}
-                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${payoutFromRegister ? 'bg-[#C8F542]' : 'bg-black/15'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${payoutFromRegister ? 'translate-x-5' : ''}`} />
-              </button>
-            </div>
+            <Toggle
+              title="Výplatu beru z kasy"
+              hint={payoutFromRegister
+                ? 'Zapnuto — výplata se odečte z očekávaného stavu kasy.'
+                : 'Vypnuto — bereš ji bokem, kasy se netýká.'}
+              on={payoutFromRegister}
+              onChange={setPayoutFromRegister}
+            />
           )}
         </Step>
 
@@ -560,9 +549,20 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         {/* Step 4 — the climax: expected vs counted */}
         <Step num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
-          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3">
-            <span className="text-sm text-black/55 min-w-0">Očekávaný stav kasy</span>
-            <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{money(expected)}</span>
+          {/* The arithmetic spelled out — no mystery number to argue with. */}
+          <div className="rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3.5 space-y-1.5">
+            {expectedLines.map(l => (
+              <div key={l.label} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="text-black/50 min-w-0 truncate">{l.label}</span>
+                <span className="text-black/70 tabular-nums shrink-0 whitespace-nowrap">
+                  {l.sign < 0 ? '− ' : '+ '}{money(l.amount)}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-3 pt-2.5 mt-1 border-t border-black/[0.08]">
+              <span className="text-sm font-semibold text-[#16181A] min-w-0">Očekávaný stav kasy</span>
+              <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{money(expected)}</span>
+            </div>
           </div>
 
           <div>
