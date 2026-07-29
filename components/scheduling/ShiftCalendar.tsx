@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
+import { PersonLink } from '../employer/ProfileLinkProvider';
 
 type Person = { id: number; name: string; avatar: string | null; startTime?: string; endTime?: string; hadClosing?: boolean };
 type Day = { onShift: Person[]; closedBy: Person[]; hasClosing: boolean; missing: boolean };
@@ -122,11 +123,11 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.onShift.map(p => (
-                      <span key={p.id} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.05] text-black/60'}`}>
+                      <PersonLink key={p.id} id={p.id} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.05] text-black/60'}`}>
                         <span>{p.avatar ?? '👤'}</span> {p.name}
                         {p.startTime && <span className="opacity-60 tabular-nums">{p.startTime}–{p.endTime}</span>}
                         {p.hadClosing ? ' ✓' : ''}
-                      </span>
+                      </PersonLink>
                     ))}
                   </div>
                 )}
@@ -138,9 +139,9 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (
-                      <span key={p.id} className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-white px-2.5 py-1 text-xs font-medium">
+                      <PersonLink key={p.id} id={p.id} className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-white px-2.5 py-1 text-xs font-medium">
                         <span>{p.avatar ?? '👤'}</span> {p.name}
-                      </span>
+                      </PersonLink>
                     ))}
                   </div>
                 )}

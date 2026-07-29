@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import ClockWidget from './ClockWidget';
 import AnnouncementsManager from './AnnouncementsManager';
 import ShiftReviewModal from './ShiftReviewModal';
+import { PersonLink } from './ProfileLinkProvider';
 import { isWidgetOn } from '@/lib/dashboardWidgets';
 
 // Everything past `rating` is an optional enrichment of the roster response —
@@ -189,13 +190,13 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
             {onShift.map((r: any) => (
-              <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/70 border border-black/[0.06] px-3 py-1.5 text-sm font-medium text-[#16181A] max-w-full">
+              <PersonLink key={r.id} id={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/70 border border-black/[0.06] px-3 py-1.5 text-sm font-medium text-[#16181A] max-w-full">
                 <span className="shrink-0">{r.avatar ?? '👤'}</span>
                 <span className="truncate">{r.name}</span>
                 <span className="text-xs text-[#5B7A08] tabular-nums shrink-0 whitespace-nowrap">
                   od {new Date(r.openSince).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
                 </span>
-              </span>
+              </PersonLink>
             ))}
           </div>
         </button>
@@ -244,9 +245,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 const meta = rosterMeta(r);
                 return (
                   <div key={r.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${r.flagged ? 'bg-amber-500/[0.1]' : 'bg-black/[0.03]'}`}>
-                    <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{r.avatar ?? '👤'}</span>
+                    <PersonLink id={r.id} className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{r.avatar ?? '👤'}</PersonLink>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#16181A] truncate">{r.name}</p>
+                      <PersonLink id={r.id}><p className="text-sm font-medium text-[#16181A] truncate">{r.name}</p></PersonLink>
                       {meta && <p className="text-[11px] text-black/45 truncate">{meta}</p>}
                     </div>
                     {r.flagged && <Icon name="warning" size={14} className="text-amber-600 shrink-0" />}
@@ -285,7 +286,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             <p className="text-xs uppercase tracking-wider text-black/45 mb-2">Ještě nezadali</p>
             <div className="flex flex-wrap gap-2">
               {notSubmitted.map(m => (
-                <span key={m.id} className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</span>
+                <PersonLink key={m.id} id={m.id} className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</PersonLink>
               ))}
             </div>
           </div>
@@ -339,7 +340,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-black/[0.04]">
                   <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-orange-500' : 'text-[#0A6FE0]'} /></span>
                   <div>
-                    <p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p>
+                    <PersonLink id={s.employeeId ?? s.employee_id}><p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p></PersonLink>
                     <p className="text-xs text-black/45">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>
                   </div>
                 </div>

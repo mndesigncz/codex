@@ -27,6 +27,7 @@ import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
 import ShiftCalendar from '../scheduling/ShiftCalendar';
 import MobileMoreSheet from '../MobileMoreSheet';
+import { ProfileLinkProvider } from './ProfileLinkProvider';
 
 const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
@@ -144,6 +145,7 @@ export default function EmployerLayout({ user }: Props) {
   );
 
   return (
+    <ProfileLinkProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-[28px] text-[#16181A] flex-col transition-all duration-300 flex-shrink-0`}>
@@ -254,5 +256,6 @@ export default function EmployerLayout({ user }: Props) {
         ]}
       />
     </div>
+    </ProfileLinkProvider>
   );
 }

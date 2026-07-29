@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
+import { PersonLink } from './ProfileLinkProvider';
 import { Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference } from '@/lib/closing';
 import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
@@ -202,9 +203,9 @@ export default function ClosingsOverview() {
             return (
               <div key={c.id} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
-                  <span className="text-lg flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</span>
+                  <PersonLink id={c.created_by} className="text-lg flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</PersonLink>
                   <div className="min-w-0">
-                    <p className="font-bold tracking-tight text-[#16181A] truncate">{c.author_name ?? 'Neznámý'}</p>
+                    <PersonLink id={c.created_by}><p className="font-bold tracking-tight text-[#16181A] truncate">{c.author_name ?? 'Neznámý'}</p></PersonLink>
                     <p className="text-xs text-black/45 truncate">
                       {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                     </p>
@@ -392,7 +393,7 @@ export default function ClosingsOverview() {
               <div key={c.id} className="glass-card overflow-hidden">
                 <button onClick={() => setOpenId(open ? null : c.id)} className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors">
                   <div className="min-w-0 flex items-center gap-3">
-                    <span className="text-lg flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</span>
+                    <PersonLink id={c.created_by} className="text-lg flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</PersonLink>
                     <div className="min-w-0">
                       <p className="font-bold tracking-tight text-[#16181A] truncate">
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
@@ -461,10 +462,10 @@ export default function ClosingsOverview() {
                         <div className="space-y-1.5">
                           {covered.map(cv => (
                             <div key={cv.id} className="flex items-center justify-between gap-3 text-sm">
-                              <span className="flex items-center gap-2 min-w-0">
+                              <PersonLink id={cv.created_by} className="flex items-center gap-2 min-w-0">
                                 <span className="text-base shrink-0">{cv.author_avatar ?? '👤'}</span>
                                 <span className="font-medium text-[#16181A] truncate">{cv.author_name ?? 'Neznámý'}</span>
-                              </span>
+                              </PersonLink>
                               {payDailyCash && cv.self_payout > 0 && (
                                 <span className="shrink-0 text-black/55 tabular-nums whitespace-nowrap">Výplata {money(cv.self_payout)}</span>
                               )}
@@ -483,12 +484,12 @@ export default function ClosingsOverview() {
                             const has = coveredIds.has(p.id);
                             const isAuthor = p.id === c.created_by;
                             return (
-                              <span key={p.id} title={has ? 'Uzávěrku má' : 'Bez uzávěrky'}
+                              <PersonLink key={p.id} id={p.id}
                                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${has ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
                                 <span>{p.avatar ?? '👤'}</span> {p.name}
                                 {isAuthor && <span className="opacity-70">· vyplnil/a</span>}
                                 {has ? ' ✓' : ' — chybí'}
-                              </span>
+                              </PersonLink>
                             );
                           })}
                         </div>

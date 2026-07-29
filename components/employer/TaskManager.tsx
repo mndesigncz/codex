@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
 import TaskWeekBoard from '../TaskWeekBoard';
+import { PersonLink } from './ProfileLinkProvider';
 
 interface Task {
   id: number;
@@ -238,9 +239,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             </div>
             <p className={`text-xs text-black/45 mt-0.5 flex items-center gap-1.5 ${compact ? 'flex-wrap' : 'truncate'}`}>
               <span className={compact ? '' : 'truncate'}>
-                {who}
+                {t.assignedTo != null ? <PersonLink id={t.assignedTo}>{who}</PersonLink> : who}
                 {!compact && t.dueDate ? ` · ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}` : ''}
-                {done && t.completedByName ? ` · splnil ${t.completedByName}` : ''}
+                {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
               </span>
               {recurrenceLabel(t.recurrence) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[10px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>
