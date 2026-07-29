@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
+import { PersonLink } from '../employer/ProfileLinkProvider';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, timeRange, type Step } from '@/lib/steps';
@@ -24,6 +25,7 @@ interface RunRow {
   id: number;
   procedure_name: string;
   procedure_icon: string;
+  user_id?: number;
   user_name: string;
   user_avatar: string;
   status: string;
@@ -291,13 +293,13 @@ export default function Procedures({ user }: Props) {
                 const missing = Math.max(0, (r.total_items ?? 0) - checkedCount);
                 return (
                   <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-                    <span className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{r.user_avatar || '👤'}</span>
+                    <PersonLink id={r.user_id} className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{r.user_avatar || '👤'}</PersonLink>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-[#16181A] truncate">
                         {r.procedure_name}
                       </p>
                       <p className="text-xs text-black/50 truncate">
-                        {r.user_name} · {done ? fmtWhen(r.completed_at || r.started_at) : 'probíhá'}
+                        <PersonLink id={r.user_id}>{r.user_name}</PersonLink> · {done ? fmtWhen(r.completed_at || r.started_at) : 'probíhá'}
                       </p>
                     </div>
                     {done ? (

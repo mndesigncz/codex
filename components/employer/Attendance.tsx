@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
+import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 
 type RosterMember = {
@@ -323,9 +324,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {onShift.map(r => (
               <div key={r.id} className="flex items-center gap-3 min-w-0 rounded-2xl bg-[#C8F542]/[0.12] border border-[#C8F542]/40 px-4 py-3">
-                {avatar(r.avatar)}
+                <PersonLink id={Number(r.id)}>{avatar(r.avatar)}</PersonLink>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-[#16181A] truncate">{r.name}</p>
+                  <PersonLink id={Number(r.id)}><p className="font-semibold text-[#16181A] truncate">{r.name}</p></PersonLink>
                   <p className="text-xs text-[#5B7A08]">od {fmtTime(r.openSince as string)}</p>
                 </div>
                 <span className="shrink-0 whitespace-nowrap tabular-nums font-bold text-[#16181A] text-lg">
@@ -389,9 +390,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   const rate = rateById.get(s.id);
                   return (
                     <div key={s.id} className="glass-card p-4 flex items-center gap-3 min-w-0">
-                      {avatar(s.avatar)}
+                      <PersonLink id={Number(s.id)}>{avatar(s.avatar)}</PersonLink>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
+                        <PersonLink id={Number(s.id)}><p className="font-semibold text-[#16181A] truncate">{s.name}</p></PersonLink>
                         <p className="text-xs text-black/45 truncate">
                           {s.count} {s.count === 1 ? 'směna' : s.count >= 2 && s.count <= 4 ? 'směny' : 'směn'}
                           {s.hasOpen && <span className="text-[#5B7A08]"> · právě běží</span>}
@@ -435,9 +436,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                       return (
                         <div key={e.id} className="flex items-center gap-3 flex-wrap p-3 sm:p-4">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {avatar(e.employeeAvatar, 'h-9 w-9 text-base')}
+                            <PersonLink id={Number(e.employeeId)}>{avatar(e.employeeAvatar, 'h-9 w-9 text-base')}</PersonLink>
                             <div className="min-w-0">
-                              <p className="font-semibold text-[#16181A] truncate">{e.employeeName ?? 'Neznámý'}</p>
+                              <PersonLink id={Number(e.employeeId)}><p className="font-semibold text-[#16181A] truncate">{e.employeeName ?? 'Neznámý'}</p></PersonLink>
                               <p className="text-xs text-black/45 tabular-nums whitespace-nowrap">
                                 {fmtTime(e.clockIn)} – {open ? '…' : fmtTime(e.clockOut as string)}
                               </p>
