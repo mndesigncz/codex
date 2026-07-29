@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
+import EmployeeProfile from './employer/EmployeeProfile';
 import { CURRENCIES, LOCALES } from '@/lib/money';
 import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn } from '@/lib/dashboardWidgets';
 import { useSymbol } from './CurrencyProvider';
@@ -76,6 +77,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [profileId, setProfileId] = useState<number | null>(null);
 
   const [teamName, setTeamName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -577,6 +579,12 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   </div>
                   {!owner && !editing && (
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {m.role === 'employee' && (
+                        <button onClick={() => setProfileId(m.id)}
+                          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-medium hover:brightness-125 transition-all whitespace-nowrap">
+                          Profil
+                        </button>
+                      )}
                       <button onClick={() => startEdit(m)}
                         className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
                         Upravit
@@ -796,6 +804,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </div>
           </div>
         </div>
+      )}
+
+      {profileId != null && (
+        <EmployeeProfile employeeId={profileId} onClose={() => setProfileId(null)} />
       )}
     </div>
   );

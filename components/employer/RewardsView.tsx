@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { DEFAULT_POINTS, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
+import EmployeeProfile from './EmployeeProfile';
 
 interface Standing {
   id: number; name: string; avatar?: string;
@@ -27,6 +28,7 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
   const [points, setPoints] = useState<PointsConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState<Standing | null>(null); // employee being rated
+  const [profileId, setProfileId] = useState<number | null>(null); // opened employee profile
 
   const load = useCallback(() => {
     setLoading(true);
@@ -65,7 +67,7 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
       ) : loading ? (
         <div className="space-y-3">{[0, 1, 2].map(i => <div key={i} className="glass-card h-24 animate-pulse" />)}</div>
       ) : tab === 'board' ? (
-        <StandingsBoard standings={standings} onRate={setRating} />
+        <StandingsBoard standings={standings} onRate={setRating} onOpen={s => setProfileId(s.id)} />
       ) : (
         <SettingsPanel levels={levels} points={points} onSaved={load} />
       )}
@@ -77,11 +79,15 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
           onSaved={() => { setRating(null); load(); }}
         />
       )}
+
+      {profileId != null && (
+        <EmployeeProfile employeeId={profileId} onClose={() => { setProfileId(null); load(); }} />
+      )}
     </div>
   );
 }
 
-function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: (s: Standing) => void }) {
+function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; onRate: (s: Standing) => void; onOpen: (s: Standing) => void }) {
   if (standings.length === 0) {
     return <div className="glass-card p-8 text-center text-black/45">Zatím žádní zaměstnanci k hodnocení.</div>;
   }
@@ -89,7 +95,7 @@ function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: 
   return (
     <div className="space-y-3">
       {standings.map((s, i) => (
-        <div key={s.id} className="glass-card p-4">
+        <div key={s.id} className="glass-card p-4 cursor-pointer hover:bg-black/[0.02] transition" onClick={() => onOpen(s)} title="Otevřít profil">
           <div className="flex items-center gap-3">
             <span className="w-7 text-center text-sm font-bold text-black/50 tabular-nums shrink-0">{medal(i)}</span>
             <span className="text-xl flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{s.avatar || '👤'}</span>
@@ -118,7 +124,7 @@ function StandingsBoard({ standings, onRate }: { standings: Standing[]; onRate: 
                 </div>
               )}
             </div>
-            <button onClick={() => onRate(s)}
+            <button onClick={e => { e.stopPropagation(); onRate(s); }}
               className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 transition whitespace-nowrap shrink-0">
               Ohodnotit
             </button>
