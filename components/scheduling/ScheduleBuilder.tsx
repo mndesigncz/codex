@@ -112,6 +112,14 @@ function weekdayKey(date: string): string {
 function ym(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+// Step a 'YYYY-MM' string by whole months — lets the employer plan any month
+// ahead (or look back), not just this one and the next.
+function shiftMonth(month: string, delta: number) {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function monthLabel(month: string) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
@@ -439,19 +447,41 @@ export default function ScheduleBuilder({ user }: Props) {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Rozvrh směn</h1>
           <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
         </div>
-        {/* Month selector */}
-        <div className="flex gap-1 glass rounded-full p-1 max-w-full overflow-x-auto">
-          {[currentMonth, nextMonth].map((m) => (
+        {/* Month selector — arrows for any month, chips for the usual ones */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 glass rounded-full p-1">
             <button
-              key={m}
-              onClick={() => setMonth(m)}
-              className={`px-4 py-2 rounded-full text-sm font-medium capitalize whitespace-nowrap transition-all duration-300 ${
-                month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
-              }`}
+              onClick={() => setMonth(shiftMonth(month, -1))}
+              title="Předchozí měsíc"
+              className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
             >
-              {monthLabel(m)}
+              <Icon name="chevron" size={17} className="rotate-90" />
             </button>
-          ))}
+            <span className="px-2 min-w-[9.5rem] text-center text-sm font-semibold capitalize text-[#16181A] tabular-nums">
+              {monthLabel(month)}
+            </span>
+            <button
+              onClick={() => setMonth(shiftMonth(month, 1))}
+              title="Další měsíc"
+              className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
+            >
+              <Icon name="chevron" size={17} className="-rotate-90" />
+            </button>
+          </div>
+          {/* Quick jumps; the current month doubles as "back to today". */}
+          <div className="flex gap-1 glass rounded-full p-1 max-w-full overflow-x-auto">
+            {[currentMonth, nextMonth].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMonth(m)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium capitalize whitespace-nowrap transition ${
+                  month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
+                }`}
+              >
+                {m === currentMonth ? 'Tento měsíc' : 'Příští měsíc'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
