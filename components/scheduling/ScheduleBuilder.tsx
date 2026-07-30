@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import ShiftCalendar from './ShiftCalendar';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -140,9 +141,10 @@ function buildGrid(month: string) {
   return cells;
 }
 
-type Tab = 'rozvrh' | 'typy' | 'oteviraci' | 'pevne';
+type Tab = 'rozvrh' | 'kalendar' | 'typy' | 'oteviraci' | 'pevne';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'rozvrh', label: 'Rozvrh' },
+  { id: 'kalendar', label: 'Kalendář' },
   { id: 'typy', label: 'Typy směn' },
   { id: 'oteviraci', label: 'Otevírací doba' },
   { id: 'pevne', label: 'Pevné dny' },
@@ -447,7 +449,10 @@ export default function ScheduleBuilder({ user }: Props) {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Rozvrh směn</h1>
           <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
         </div>
-        {/* Month selector — arrows for any month, chips for the usual ones */}
+        {/* Month selector — arrows for any month, chips for the usual ones.
+            Only the schedule grid is month-scoped; the calendar and the
+            settings tabs bring their own navigation. */}
+        {tab === 'rozvrh' && (
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 glass rounded-full p-1">
             <button
@@ -483,6 +488,7 @@ export default function ScheduleBuilder({ user }: Props) {
             ))}
           </div>
         </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -503,6 +509,13 @@ export default function ScheduleBuilder({ user }: Props) {
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+        </div>
+      ) : tab === 'kalendar' ? (
+        <div className="space-y-3">
+          <p className="text-sm text-black/50">
+            Kdo kdy pracoval, kdo udělal uzávěrku a kde chybí.
+          </p>
+          <ShiftCalendar />
         </div>
       ) : tab === 'typy' ? (
         <ShiftTypesManager shiftTypes={shiftTypes} onReload={reloadTypes} />
