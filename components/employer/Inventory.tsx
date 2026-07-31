@@ -1149,9 +1149,10 @@ function PackagingEditor({ category, onSaved }: {
   const [steps, setSteps] = useState<ScaleStep[]>(() => normalizeScale(category.scale).steps);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
 
   const save = async () => {
-    setBusy(true); setSaved(false);
+    setBusy(true); setSaved(false); setErr('');
     try {
       const res = await fetch(`/api/inventory/categories/${category.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1162,8 +1163,15 @@ function PackagingEditor({ category, onSaved }: {
           scale: { kind: 'fraction', steps },
         }),
       });
-      if (res.ok) { setSaved(true); await onSaved(); setTimeout(() => setSaved(false), 1800); }
-    } catch { /* keep the form as-is so nothing is lost */ }
+      if (res.ok) {
+        setSaved(true); await onSaved(); setTimeout(() => setSaved(false), 1800);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || 'Nastavení se nepodařilo uložit.');
+      }
+    } catch {
+      setErr('Nepodařilo se spojit se serverem.');
+    }
     setBusy(false);
   };
 
@@ -1234,6 +1242,7 @@ function PackagingEditor({ category, onSaved }: {
           {busy ? 'Ukládám…' : 'Uložit'}
         </button>
         {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
+        {err && <span className="text-xs font-medium text-red-600">{err}</span>}
       </div>
     </div>
   );
