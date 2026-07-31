@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import CategoryStockView from '../inventory/CategoryStockView';
+import { normalizeCategoryPackaging, normalizeScale, CONTENT_UNITS, type ScaleStep } from '@/lib/packaging';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -24,6 +26,10 @@ interface Category {
   id: number;
   name: string;
   position: number;
+  tracksOpen?: boolean;
+  contentUnit?: string | null;
+  defaultPackageSize?: number | null;
+  scale?: any;
 }
 
 interface OrderItem {
@@ -91,11 +97,13 @@ function relTime(iso?: string) {
   return new Date(iso).toLocaleDateString('cs-CZ');
 }
 
-export default function Inventory({ user }: { user?: any }) {
+export default function Inventory({ user, initialCategory }: { user?: any; initialCategory?: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cat, setCat] = useState('Vše');
+  const [cat, setCat] = useState(initialCategory ?? 'Vše');
+  // A quick-access tile can re-target the stock while this view stays mounted.
+  useEffect(() => { if (initialCategory) setCat(initialCategory); }, [initialCategory]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('name');
   const [view, setView] = useState<View>('grid');
@@ -148,6 +156,12 @@ export default function Inventory({ user }: { user?: any }) {
     items.forEach(i => { if (i.category) set.add(i.category); });
     return Array.from(set);
   }, [categories, items]);
+
+  // A category that tracks open packages renders its own two-mode view.
+  const packagedCat = useMemo(
+    () => categories.find(c => c.name === cat && c.tracksOpen) ?? null,
+    [categories, cat],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -346,6 +360,14 @@ export default function Inventory({ user }: { user?: any }) {
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center text-black/45">{items.length === 0 ? 'Žádné položky. Přidejte první.' : 'Žádné položky neodpovídají filtru.'}</div>
+      ) : packagedCat ? (
+        <CategoryStockView
+          category={cat}
+          packaging={normalizeCategoryPackaging(packagedCat)}
+          items={filtered as any}
+          canEdit
+          onChanged={updated => setItems(list => list.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+        />
       ) : view === 'list' ? (
         <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} />
       ) : (
@@ -1000,6 +1022,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
+  const [packId, setPackId] = useState<number | null>(null);
 
   const add = async () => {
     if (!newName.trim()) return;
@@ -1079,7 +1102,8 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
         ) : (
           <div className="divide-y divide-black/[0.06]">
             {categories.map((c, idx) => (
-              <div key={c.id} className="flex items-center gap-2 py-2.5">
+              <div key={c.id} className="py-2.5">
+                <div className="flex items-center gap-2">
                 <div className="flex flex-col">
                   <button onClick={() => move(idx, -1)} disabled={busy || idx === 0} className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▲</button>
                   <button onClick={() => move(idx, 1)} disabled={busy || idx === categories.length - 1} className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▼</button>
@@ -1092,14 +1116,124 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
                 ) : (
                   <span className="flex-1 text-sm text-[#16181A] truncate">{c.name}</span>
                 )}
+                <button onClick={() => setPackId(packId === c.id ? null : c.id)}
+                  title="Balení a zbytky"
+                  className={`rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
+                  <Icon name="box" size={15} />
+                </button>
                 <button onClick={() => { setEditId(c.id); setEditName(c.name); }} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm">✎</button>
                 <button onClick={() => del(c)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+                </div>
+                {packId === c.id && <PackagingEditor category={c} onSaved={onChanged} />}
               </div>
             ))}
           </div>
         )}
 
         <button onClick={onClose} className="w-full rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Hotovo</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Per-category packaging settings ---------- */
+// Turning this on makes every item in the category track how much is left in
+// its open package, and gives staff a tap-scale instead of a scale-and-weigh.
+function PackagingEditor({ category, onSaved }: {
+  category: Category;
+  onSaved: () => Promise<void> | void;
+}) {
+  const [on, setOn] = useState(category.tracksOpen === true);
+  const [unit, setUnit] = useState(category.contentUnit ?? 'g');
+  const [size, setSize] = useState(category.defaultPackageSize != null ? String(category.defaultPackageSize) : '');
+  const [steps, setSteps] = useState<ScaleStep[]>(() => normalizeScale(category.scale).steps);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setBusy(true); setSaved(false);
+    try {
+      const res = await fetch(`/api/inventory/categories/${category.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tracksOpen: on,
+          contentUnit: unit || null,
+          defaultPackageSize: size === '' ? null : Number(size),
+          scale: { kind: 'fraction', steps },
+        }),
+      });
+      if (res.ok) { setSaved(true); await onSaved(); setTimeout(() => setSaved(false), 1800); }
+    } catch { /* keep the form as-is so nothing is lost */ }
+    setBusy(false);
+  };
+
+  const setStep = (i: number, patch: Partial<ScaleStep>) =>
+    setSteps(list => list.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+
+  return (
+    <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#C8F542]" />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[#16181A]">Sledovat zbytek v načatém balení</span>
+          <span className="block text-[11px] text-black/45 mt-0.5">
+            Obsluha na konci směny jen ťukne, jak je krabička plná — nic neváží.
+          </span>
+        </span>
+      </label>
+
+      {on && (
+        <>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Jednotka obsahu</label>
+              <select value={unit} onChange={e => setUnit(e.target.value)}
+                className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+                {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
+              <input type="number" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
+                className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Stupně měřítka</p>
+            <div className="space-y-1.5">
+              {steps.map((s, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input value={s.label} onChange={e => setStep(i, { label: e.target.value })}
+                    className="flex-1 min-w-0 rounded-xl bg-white border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <input type="number" min={0} max={100} value={s.pct ?? 0}
+                      onChange={e => setStep(i, { pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                      className="w-16 rounded-xl bg-white border border-black/[0.08] px-2 py-1.5 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
+                    <span className="text-xs text-black/40">%</span>
+                  </div>
+                  <button onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))}
+                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600">✕</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setSteps(l => [...l, { label: 'Nový stupeň', pct: 50 }])}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
+              <Icon name="plus" size={13} /> Přidat stupeň
+            </button>
+            <p className="text-[11px] text-black/40 mt-1.5">
+              Procenta platí pro jakoukoliv velikost balení — „Půl" je 50 g u stogramové i 25 g u padesátigramové.
+            </p>
+          </div>
+        </>
+      )}
+
+      <div className="flex items-center gap-2">
+        <button onClick={save} disabled={busy}
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 transition">
+          {busy ? 'Ukládám…' : 'Uložit'}
+        </button>
+        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
       </div>
     </div>
   );

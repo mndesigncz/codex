@@ -6,7 +6,8 @@ import ClockWidget from './ClockWidget';
 import AnnouncementsManager from './AnnouncementsManager';
 import ShiftReviewModal from './ShiftReviewModal';
 import { PersonLink } from './ProfileLinkProvider';
-import { isWidgetOn } from '@/lib/dashboardWidgets';
+import { isWidgetOn, readShortcuts } from '@/lib/dashboardWidgets';
+import ShortcutsWidget from '../ShortcutsWidget';
 
 // Everything past `rating` is an optional enrichment of the roster response —
 // rendered only when the API sends it, so the row degrades to name + shift.
@@ -39,7 +40,7 @@ function rosterMeta(r: RosterEntry): string {
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, arg?: string) => void;
 }
 
 function nextMonthStr() {
@@ -161,6 +162,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         <p className="text-black/45 text-sm">Přehled podniku</p>
         <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Vítejte zpět, {user.name}</h1>
       </div>
+
+      {show('shortcuts') && <ShortcutsWidget shortcuts={readShortcuts(cfg)} onNavigate={onNavigate} />}
 
       {/* Employer can work a shift too */}
       {show('clock') && user.id && <ClockWidget userId={parseInt(String(user.id))} />}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { normalizeScale } from '@/lib/packaging';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,10 +34,40 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!name) return NextResponse.json({ error: 'Název kategorie je povinný' }, { status: 400 });
   const position = body.position !== undefined ? Number(body.position) : cat.position;
 
+  const oldName = cat.name as string;
   await sql`
     UPDATE inventory_categories
     SET name = ${name}, position = ${position}
     WHERE id = ${id} AND team_id = ${me.teamId}`;
+
+  // Items reference the category by name, so a rename has to follow through or
+  // they would be orphaned into a category that no longer exists.
+  if (name !== oldName) {
+    try {
+      await sql`UPDATE inventory_items SET category = ${name} WHERE team_id = ${me.teamId} AND category = ${oldName}`;
+    } catch { /* best-effort */ }
+  }
+
+  // Packaging settings — each guarded so a pending migration degrades quietly.
+  if (body.tracksOpen !== undefined || body.contentUnit !== undefined
+      || body.defaultPackageSize !== undefined || body.scale !== undefined) {
+    const tracksOpen = body.tracksOpen !== undefined ? body.tracksOpen === true : cat.tracks_open === true;
+    const contentUnit = body.contentUnit !== undefined
+      ? (body.contentUnit ? String(body.contentUnit).slice(0, 12) : null)
+      : (cat.content_unit ?? null);
+    const rawSize = body.defaultPackageSize !== undefined ? Number(body.defaultPackageSize) : Number(cat.default_package_size);
+    const defaultSize = Number.isFinite(rawSize) && rawSize > 0 ? rawSize : null;
+    const scale = body.scale !== undefined ? normalizeScale(body.scale) : normalizeScale(cat.scale);
+    try {
+      await sql`
+        UPDATE inventory_categories
+        SET tracks_open = ${tracksOpen}, content_unit = ${contentUnit},
+            default_package_size = ${defaultSize}, scale = ${JSON.stringify(scale)}::jsonb
+        WHERE id = ${id} AND team_id = ${me.teamId}`;
+    } catch {
+      return NextResponse.json({ error: 'Nastavení balení není dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

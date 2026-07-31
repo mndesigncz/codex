@@ -22,13 +22,30 @@ export async function GET() {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  const rows = await sql`
-    SELECT id, name, position
-    FROM inventory_categories
-    WHERE team_id = ${me.teamId}
-    ORDER BY position ASC, name ASC`;
+  // Packaging settings are newer columns — fall back so a pre-migration DB
+  // still lists categories instead of erroring out.
+  let rows;
+  try {
+    rows = await sql`
+      SELECT id, name, position, tracks_open, content_unit, default_package_size, scale
+      FROM inventory_categories
+      WHERE team_id = ${me.teamId}
+      ORDER BY position ASC, name ASC`;
+  } catch {
+    rows = await sql`
+      SELECT id, name, position
+      FROM inventory_categories
+      WHERE team_id = ${me.teamId}
+      ORDER BY position ASC, name ASC`;
+  }
 
-  return NextResponse.json(rows);
+  return NextResponse.json(rows.map((r: any) => ({
+    id: r.id, name: r.name, position: r.position,
+    tracksOpen: r.tracks_open === true,
+    contentUnit: r.content_unit ?? null,
+    defaultPackageSize: r.default_package_size != null ? Number(r.default_package_size) : null,
+    scale: r.scale ?? null,
+  })));
 }
 
 // POST (employer): create a new custom category.

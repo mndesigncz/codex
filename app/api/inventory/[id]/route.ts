@@ -36,12 +36,18 @@ async function mappedItem(id: number) {
         i.unit, i.supplier,
         i.supplier_url      AS "supplierUrl",
         i.unit_cost         AS "unitCost",
+        i.package_size      AS "packageSize",
+        i.open_amount       AS "openAmount",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
       FROM inventory_items i LEFT JOIN users u ON u.id = i.updated_by
       WHERE i.id = ${id}`;
-    return row;
+    return row && {
+      ...row,
+      packageSize: row.packageSize != null ? Number(row.packageSize) : null,
+      openAmount: row.openAmount != null ? Number(row.openAmount) : null,
+    };
   } catch {
     const [row] = await sql`
       SELECT
@@ -73,25 +79,49 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const note = body.note ?? null;
 
   if (me.role !== 'employer') {
-    // Employees and the shared kiosk may only change the stock count.
-    if (body.quantity === undefined || body.quantity === null) {
+    // Employees and the shared kiosk may change the stock count and, for
+    // packaged goods, how much is left in the open package.
+    if ((body.quantity === undefined || body.quantity === null) && body.openAmount === undefined) {
       return NextResponse.json({ error: 'Zaměstnanec může upravit pouze množství' }, { status: 403 });
     }
-    const newQty = Number(body.quantity);
     const oldQty = Number(item.quantity);
+    const newQty = body.quantity !== undefined && body.quantity !== null ? Number(body.quantity) : oldQty;
+    const oldOpen = item.open_amount != null ? Number(item.open_amount) : null;
+    const newOpen = body.openAmount !== undefined
+      ? (body.openAmount === null ? null : Math.max(0, Number(body.openAmount) || 0))
+      : oldOpen;
 
-    await sql`
-      UPDATE inventory_items
-      SET quantity = ${newQty}, updated_by = ${me.meId}, updated_at = NOW()
-      WHERE id = ${id}`;
-
-    if (newQty !== oldQty) {
+    if (body.openAmount !== undefined) {
+      try {
+        await sql`
+          UPDATE inventory_items
+          SET quantity = ${newQty}, open_amount = ${newOpen}, updated_by = ${me.meId}, updated_at = NOW()
+          WHERE id = ${id}`;
+      } catch {
+        return NextResponse.json({ error: 'Sledování balení není dostupné — spusť /api/init.' }, { status: 400 });
+      }
+    } else {
       await sql`
-        INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note, created_at)
-        VALUES (${id}, ${me.meId}, ${oldQty}, ${newQty}, ${note}, NOW())`;
+        UPDATE inventory_items
+        SET quantity = ${newQty}, updated_by = ${me.meId}, updated_at = NOW()
+        WHERE id = ${id}`;
+    }
+
+    if (newQty !== oldQty || newOpen !== oldOpen) {
+      try {
+        await sql`
+          INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)
+          VALUES (${id}, ${me.meId}, ${oldQty}, ${newQty}, ${oldOpen}, ${newOpen}, ${note}, NOW())`;
+      } catch {
+        await sql`
+          INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note, created_at)
+          VALUES (${id}, ${me.meId}, ${oldQty}, ${newQty}, ${note}, NOW())`;
+      }
 
       // Alert employer(s) when the item drops to low/critical.
-      const status = statusOf(newQty, Number(item.min_quantity), Number(item.critical_quantity));
+      const size = item.package_size != null ? Number(item.package_size) : 0;
+      const effective = size > 0 ? newQty + (newOpen ?? 0) / size : newQty;
+      const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
       if (status !== 'ok') {
         const employers = await sql`
           SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
@@ -146,6 +176,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.unitCost !== undefined) {
     const uc = body.unitCost === '' || body.unitCost === null ? null : Math.max(0, Math.round(Number(body.unitCost)));
     try { await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${id}`; } catch { /* column not migrated yet */ }
+  }
+
+  // Packaging, same treatment — an un-migrated DB must not block a plain edit.
+  if (body.packageSize !== undefined || body.openAmount !== undefined) {
+    const rawSize = body.packageSize === '' || body.packageSize === null ? null : Number(body.packageSize);
+    const size = body.packageSize !== undefined
+      ? (Number.isFinite(rawSize as number) && (rawSize as number) > 0 ? rawSize : null)
+      : (item.package_size != null ? Number(item.package_size) : null);
+    const open = body.openAmount !== undefined
+      ? (body.openAmount === '' || body.openAmount === null ? null : Math.max(0, Number(body.openAmount) || 0))
+      : (item.open_amount != null ? Number(item.open_amount) : null);
+    try {
+      await sql`UPDATE inventory_items SET package_size = ${size}, open_amount = ${open} WHERE id = ${id}`;
+    } catch { /* columns not migrated yet */ }
   }
 
   // Log any employer-driven quantity change too.

@@ -34,6 +34,8 @@ export async function GET() {
         i.unit, i.supplier,
         i.supplier_url      AS "supplierUrl",
         i.unit_cost         AS "unitCost",
+        i.package_size      AS "packageSize",
+        i.open_amount       AS "openAmount",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
@@ -59,7 +61,11 @@ export async function GET() {
       ORDER BY i.name ASC`;
   }
 
-  return NextResponse.json(items);
+  return NextResponse.json(items.map((i: any) => ({
+    ...i,
+    packageSize: i.packageSize != null ? Number(i.packageSize) : null,
+    openAmount: i.openAmount != null ? Number(i.openAmount) : null,
+  })));
 }
 
 // POST (employer): create a new item

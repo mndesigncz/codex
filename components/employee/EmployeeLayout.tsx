@@ -53,6 +53,12 @@ interface Props {
 
 export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
+  // A quick-access tile can ask for a specific stock category.
+  const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  const navigate = (view: string, arg?: string) => {
+    setInventoryCat(view === 'inventory' ? arg : undefined);
+    setCurrentView(view);
+  };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -60,7 +66,7 @@ export default function EmployeeLayout({ user }: Props) {
 
   const renderView = () => {
     switch (currentView) {
-      case 'home':         return <EmployeeDashboard user={user as any} onNavigate={setCurrentView} />;
+      case 'home':         return <EmployeeDashboard user={user as any} onNavigate={navigate} />;
       case 'my-shifts':    return (
         <div className="space-y-2">
           <MyShifts user={user as any} />
@@ -74,7 +80,7 @@ export default function EmployeeLayout({ user }: Props) {
           <div className="px-6 pb-6"><TimeOffRequest /></div>
         </div>
       );
-      case 'inventory':    return <InventoryReport user={user as any} />;
+      case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} />;
       case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;
       case 'tasks':        return <Tasks user={user as any} />;
@@ -83,7 +89,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'guides':       return <Guides user={user as any} />;
       case 'suggestions':  return <SuggestionsBoard />;
       case 'settings':     return <Settings user={user as any} initialTab="account" />;
-      default:             return <EmployeeDashboard user={user as any} onNavigate={setCurrentView} />;
+      default:             return <EmployeeDashboard user={user as any} onNavigate={navigate} />;
     }
   };
 

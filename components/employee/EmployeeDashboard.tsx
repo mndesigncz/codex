@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import AnnouncementBanner from '../AnnouncementBanner';
-import { isWidgetOn } from '@/lib/dashboardWidgets';
+import { isWidgetOn, readShortcuts } from '@/lib/dashboardWidgets';
+import ShortcutsWidget from '../ShortcutsWidget';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, arg?: string) => void;
 }
 
 interface ShiftReview {
@@ -133,6 +134,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">{user.name}</h1>
         </div>
       </div>
+
+      {show('shortcuts') && <ShortcutsWidget shortcuts={readShortcuts(cfg)} onNavigate={onNavigate} />}
 
       {/* Next shift — hero card */}
       {show('nextShift') && (
