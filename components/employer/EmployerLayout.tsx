@@ -63,6 +63,12 @@ interface Props {
 
 export default function EmployerLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('overview');
+  // A quick-access tile can ask for a specific stock category.
+  const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  const navigate = (view: string, arg?: string) => {
+    setInventoryCat(view === 'inventory' ? arg : undefined);
+    setCurrentView(view);
+  };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -71,7 +77,7 @@ export default function EmployerLayout({ user }: Props) {
 
   const renderView = () => {
     switch (currentView) {
-      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
+      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} />;
       case 'shifts':    return (
         <div>
           <ScheduleBuilder user={user as any} />
@@ -83,7 +89,7 @@ export default function EmployerLayout({ user }: Props) {
           </div>
         </div>
       );
-      case 'inventory': return <Inventory user={user as any} />;
+      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} />;
       case 'chat':      return <ChatView user={user as any} />;
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;
@@ -103,7 +109,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab="account" />;
       case 'team-settings': return <TeamManagement user={user as any} />;
-      default:          return <EmployerDashboard user={user as any} onNavigate={setCurrentView} />;
+      default:          return <EmployerDashboard user={user as any} onNavigate={navigate} />;
     }
   };
 

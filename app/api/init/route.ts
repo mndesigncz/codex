@@ -547,6 +547,19 @@ export async function GET() {
       )`;
     await sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`;
 
+    // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
+    // The category carries the settings; items inherit and only override size.
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS tracks_open BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS content_unit TEXT`;
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS default_package_size NUMERIC`;
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS scale JSONB`;
+    // Per item: how big its package is and how much is left in the open one.
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`;
+    // Audit trail covers the open remainder too, so consumption is derivable.
+    await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`;
+    await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`;
+
     return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
   } catch (error) {
     console.error('Init error:', error);

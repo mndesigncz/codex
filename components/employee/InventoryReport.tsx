@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { Icon } from '../Icons';
+import CategoryStockView from '../inventory/CategoryStockView';
+import { normalizeCategoryPackaging } from '@/lib/packaging';
 
 interface InventoryItem {
   id: number;
@@ -12,10 +15,13 @@ interface InventoryItem {
   maxQuantity: number;
   unit: string;
   supplierUrl?: string;
+  packageSize?: number | null;
+  openAmount?: number | null;
 }
 
 interface Props {
   user: { id?: string; name?: string | null };
+  initialCategory?: string;
 }
 
 function statusOf(i: InventoryItem): 'ok' | 'low' | 'critical' {
@@ -25,8 +31,11 @@ function statusOf(i: InventoryItem): 'ok' | 'low' | 'critical' {
 }
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
-export default function InventoryReport({ user }: Props) {
+export default function InventoryReport({ user, initialCategory }: Props) {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  // Only categories that track open packages — they get the tap-scale view.
+  const [categories, setCategories] = useState<any[]>([]);
+  const [openCat, setOpenCat] = useState<string | null>(initialCategory ?? null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -43,11 +52,18 @@ export default function InventoryReport({ user }: Props) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetch('/api/inventory')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setItems(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch('/api/inventory').then(r => r.json()).catch(() => []),
+      fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
+    ]).then(([data, cats]) => {
+      if (Array.isArray(data)) setItems(data);
+      if (Array.isArray(cats)) setCategories(cats.filter((c: any) => c.tracksOpen));
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
+
+  // Re-target when a quick-access tile points at another category.
+  useEffect(() => { if (initialCategory) setOpenCat(initialCategory); }, [initialCategory]);
 
   const qtyOf = (i: InventoryItem) => (draft[i.id] !== undefined ? draft[i.id] : i.quantity);
   const isDirty = (i: InventoryItem) => draft[i.id] !== undefined && draft[i.id] !== i.quantity;
@@ -160,6 +176,30 @@ export default function InventoryReport({ user }: Props) {
       {success && (
         <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">
           ✅ Hlášení bylo odesláno zaměstnavateli.
+        </div>
+      )}
+
+      {!loading && categories.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex gap-1.5 flex-wrap">
+            {categories.map((c: any) => (
+              <button key={c.id} onClick={() => setOpenCat(openCat === c.name ? null : c.name)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
+                  openCat === c.name ? 'bg-[#16181A] text-white' : 'glass text-black/60 hover:text-black'
+                }`}>
+                <Icon name="box" size={15} /> {c.name}
+              </button>
+            ))}
+          </div>
+          {openCat && (
+            <CategoryStockView
+              category={openCat}
+              packaging={normalizeCategoryPackaging(categories.find((c: any) => c.name === openCat))}
+              items={items.filter(i => i.category === openCat) as any}
+              canEdit
+              onChanged={u => setItems(list => list.map(x => x.id === u.id ? { ...x, ...u } : x))}
+            />
+          )}
         </div>
       )}
 
