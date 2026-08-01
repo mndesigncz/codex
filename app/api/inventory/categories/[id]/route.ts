@@ -48,6 +48,38 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     } catch { /* best-effort */ }
   }
 
+  // Nesting: null puts the category back at the top level, an id files it under
+  // that category. Guarded to keep the tree one level deep and cycle-free.
+  if (body.parentId !== undefined) {
+    const raw = body.parentId;
+    const wanted = raw === null || raw === '' ? null : Number(raw);
+    if (wanted !== null && !Number.isFinite(wanted)) {
+      return NextResponse.json({ error: 'Neplatná nadřazená kategorie' }, { status: 400 });
+    }
+    if (wanted === id) {
+      return NextResponse.json({ error: 'Kategorie nemůže být vlastní nadřazenou' }, { status: 400 });
+    }
+    try {
+      if (wanted === null) {
+        await sql`UPDATE inventory_categories SET parent_id = NULL WHERE id = ${id} AND team_id = ${me.teamId}`;
+      } else {
+        const [p] = await sql`
+          SELECT id FROM inventory_categories
+          WHERE id = ${wanted} AND team_id = ${me.teamId} AND parent_id IS NULL`;
+        if (!p) return NextResponse.json({ error: 'Nadřazená kategorie neexistuje' }, { status: 400 });
+        // Moving a category that itself has subcategories would make three levels.
+        const [child] = await sql`
+          SELECT id FROM inventory_categories WHERE parent_id = ${id} AND team_id = ${me.teamId} LIMIT 1`;
+        if (child) {
+          return NextResponse.json({ error: 'Kategorie s podkategoriemi nejde zanořit' }, { status: 400 });
+        }
+        await sql`UPDATE inventory_categories SET parent_id = ${wanted} WHERE id = ${id} AND team_id = ${me.teamId}`;
+      }
+    } catch {
+      return NextResponse.json({ error: 'Podkategorie nejsou dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
+
   // Packaging settings — each guarded so a pending migration degrades quietly.
   if (body.tracksOpen !== undefined || body.contentUnit !== undefined
       || body.defaultPackageSize !== undefined || body.scale !== undefined) {
@@ -79,6 +111,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   const id = parseInt(params.id);
+  // Subcategories move back to the top level rather than disappearing with their
+  // parent — their items keep their own category label either way.
+  try {
+    await sql`UPDATE inventory_categories SET parent_id = NULL WHERE parent_id = ${id} AND team_id = ${me.teamId}`;
+  } catch { /* pre-migration DB has no parent_id */ }
   await sql`DELETE FROM inventory_categories WHERE id = ${id} AND team_id = ${me.teamId}`;
 
   return NextResponse.json({ ok: true });

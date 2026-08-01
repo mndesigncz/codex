@@ -39,12 +39,17 @@ const TONE = {
   ok: { bar: 'bg-[#C8F542]', text: 'text-[#5B7A08]', chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
 } as const;
 
-export default function CategoryStockView({ category, packaging, items, canEdit, onChanged }: {
+export default function CategoryStockView({
+  category, packaging, items, canEdit, onChanged, onEditItem, onRemoveItem,
+}: {
   category: string;
   packaging: CategoryPackaging;
   items: StockItem[];
   canEdit: boolean;
   onChanged: (item: StockItem) => void;
+  /** Given by the employer view so a packaged item stays as editable as any other. */
+  onEditItem?: (item: StockItem) => void;
+  onRemoveItem?: (item: StockItem) => void;
 }) {
   const [mode, setMode] = useState<Mode>('view');
   const [search, setSearch] = useState('');
@@ -62,6 +67,23 @@ export default function CategoryStockView({ category, packaging, items, canEdit,
         return a.name.localeCompare(b.name, 'cs');
       });
   }, [items, search, mode]);
+
+  // When a parent category is open, its subcategories keep their own heading so
+  // the list stays readable instead of merging into one long block.
+  const groups = useMemo(() => {
+    const map = new Map<string, StockItem[]>();
+    list.forEach(i => {
+      const key = i.category || category;
+      const arr = map.get(key);
+      if (arr) arr.push(i); else map.set(key, [i]);
+    });
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === category) return -1;
+      if (b === category) return 1;
+      return a.localeCompare(b, 'cs');
+    });
+  }, [list, category]);
+  const showHeadings = groups.length > 1;
 
   const sizeOf = (i: StockItem) => Number(i.packageSize) || packaging.defaultPackageSize || 0;
 
@@ -126,35 +148,56 @@ export default function CategoryStockView({ category, packaging, items, canEdit,
           {search ? 'Nic nenalezeno.' : `V kategorii ${category} zatím nic není.`}
         </div>
       ) : mode === 'view' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {list.map(i => {
-            const size = sizeOf(i);
-            const st = statusOf(i);
-            const pct = openPct({ ...i, packageSize: size });
-            return (
-              <div key={i.id} className="glass-card p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-[#16181A] leading-snug min-w-0">{i.name}</p>
-                  {st !== 'ok' && (
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
-                      {st === 'critical' ? 'Dochází' : 'Málo'}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-black/55 mt-1 tabular-nums">
-                  {formatStock({ ...i, packageSize: size }, unit, i.unit)}
+        <div className="space-y-5">
+          {groups.map(([groupName, groupItems]) => (
+            <div key={groupName} className="space-y-2.5">
+              {showHeadings && (
+                <p className="text-[11px] uppercase tracking-wider text-black/40 font-semibold">
+                  {groupName} <span className="text-black/25 tabular-nums">· {groupItems.length}</span>
                 </p>
-                {size > 0 && (i.openAmount ?? 0) > 0 && (
-                  <>
-                    <div className="mt-2.5 h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
-                      <div className={`h-full rounded-full ${TONE[st].bar} transition-[width]`} style={{ width: `${pct}%` }} />
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {groupItems.map(i => {
+                  const size = sizeOf(i);
+                  const st = statusOf(i);
+                  const pct = openPct({ ...i, packageSize: size });
+                  return (
+                    <div key={i.id} className="glass-card p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-[#16181A] leading-snug min-w-0">{i.name}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {st !== 'ok' && (
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
+                              {st === 'critical' ? 'Dochází' : 'Málo'}
+                            </span>
+                          )}
+                          {onEditItem && (
+                            <button onClick={() => onEditItem(i)} title="Upravit položku"
+                              className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/50 hover:text-black text-xs">✎</button>
+                          )}
+                          {onRemoveItem && (
+                            <button onClick={() => onRemoveItem(i)} title="Smazat položku"
+                              className="rounded-full glass w-7 h-7 flex items-center justify-center text-red-600/70 hover:text-red-600 text-xs">✕</button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-black/55 mt-1 tabular-nums">
+                        {formatStock({ ...i, packageSize: size }, unit, i.unit)}
+                      </p>
+                      {size > 0 && (i.openAmount ?? 0) > 0 && (
+                        <>
+                          <div className="mt-2.5 h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
+                            <div className={`h-full rounded-full ${TONE[st].bar} transition-[width]`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-[11px] text-black/40 mt-1">Načaté balení: {pct} %</p>
+                        </>
+                      )}
                     </div>
-                    <p className="text-[11px] text-black/40 mt-1">Načaté balení: {pct} %</p>
-                  </>
-                )}
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -167,18 +210,31 @@ export default function CategoryStockView({ category, packaging, items, canEdit,
               <div key={i.id} className="glass-card p-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[#16181A] leading-snug">{i.name}</p>
+                    <p className="font-semibold text-[#16181A] leading-snug">
+                      {i.name}
+                      {showHeadings && i.category && i.category !== category && (
+                        <span className="ml-2 rounded-full bg-black/[0.05] px-2 py-0.5 text-[10px] font-medium text-black/45 align-middle">{i.category}</span>
+                      )}
+                    </p>
                     <p className="text-xs text-black/45 tabular-nums mt-0.5">
                       {formatStock({ ...i, packageSize: size }, unit, i.unit)}
                       {size > 0 && <span className="text-black/30"> · balení {fmtAmount(size)} {unit}</span>}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {savedId === i.id && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
                     {st !== 'ok' && (
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
                         {st === 'critical' ? 'Dochází' : 'Málo'}
                       </span>
+                    )}
+                    {onEditItem && (
+                      <button onClick={() => onEditItem(i)} title="Upravit položku"
+                        className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm">✎</button>
+                    )}
+                    {onRemoveItem && (
+                      <button onClick={() => onRemoveItem(i)} title="Smazat položku"
+                        className="rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
                     )}
                   </div>
                 </div>

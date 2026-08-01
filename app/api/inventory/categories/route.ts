@@ -22,25 +22,34 @@ export async function GET() {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  // Packaging settings are newer columns — fall back so a pre-migration DB
-  // still lists categories instead of erroring out.
+  // Packaging settings and parent_id are newer columns — fall back step by step
+  // so a pre-migration DB still lists categories instead of erroring out.
   let rows;
   try {
     rows = await sql`
-      SELECT id, name, position, tracks_open, content_unit, default_package_size, scale
+      SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, scale
       FROM inventory_categories
       WHERE team_id = ${me.teamId}
       ORDER BY position ASC, name ASC`;
   } catch {
-    rows = await sql`
-      SELECT id, name, position
-      FROM inventory_categories
-      WHERE team_id = ${me.teamId}
-      ORDER BY position ASC, name ASC`;
+    try {
+      rows = await sql`
+        SELECT id, name, position, tracks_open, content_unit, default_package_size, scale
+        FROM inventory_categories
+        WHERE team_id = ${me.teamId}
+        ORDER BY position ASC, name ASC`;
+    } catch {
+      rows = await sql`
+        SELECT id, name, position
+        FROM inventory_categories
+        WHERE team_id = ${me.teamId}
+        ORDER BY position ASC, name ASC`;
+    }
   }
 
   return NextResponse.json(rows.map((r: any) => ({
     id: r.id, name: r.name, position: r.position,
+    parentId: r.parent_id != null ? Number(r.parent_id) : null,
     tracksOpen: r.tracks_open === true,
     contentUnit: r.content_unit ?? null,
     defaultPackageSize: r.default_package_size != null ? Number(r.default_package_size) : null,
@@ -63,14 +72,52 @@ export async function POST(request: Request) {
     WHERE team_id = ${me.teamId} AND lower(name) = lower(${name})`;
   if (existing) return NextResponse.json({ ok: true, id: existing.id });
 
+  // A subcategory may only hang off a root category of the same team, which is
+  // what keeps the tree exactly one level deep.
+  let parentId: number | null = null;
+  if (body.parentId != null && body.parentId !== '') {
+    const candidate = Number(body.parentId);
+    if (Number.isFinite(candidate)) {
+      try {
+        const [p] = await sql`
+          SELECT id FROM inventory_categories
+          WHERE id = ${candidate} AND team_id = ${me.teamId} AND parent_id IS NULL`;
+        if (!p) return NextResponse.json({ error: 'Nadřazená kategorie neexistuje' }, { status: 400 });
+        parentId = candidate;
+      } catch {
+        return NextResponse.json({ error: 'Podkategorie nejsou dostupné — spusť /api/init.' }, { status: 400 });
+      }
+    }
+  }
+
+  // Position is counted within the parent so each level orders independently.
+  if (parentId == null) {
+    let next = 0;
+    try {
+      const [r] = await sql`
+        SELECT COALESCE(MAX(position), -1) + 1 AS next
+        FROM inventory_categories WHERE team_id = ${me.teamId} AND parent_id IS NULL`;
+      next = r.next;
+    } catch {
+      const [r] = await sql`
+        SELECT COALESCE(MAX(position), -1) + 1 AS next
+        FROM inventory_categories WHERE team_id = ${me.teamId}`;
+      next = r.next;
+    }
+    const [row] = await sql`
+      INSERT INTO inventory_categories (team_id, name, position)
+      VALUES (${me.teamId}, ${name}, ${next})
+      RETURNING id`;
+    return NextResponse.json({ ok: true, id: row.id });
+  }
+
   const [{ next }] = await sql`
     SELECT COALESCE(MAX(position), -1) + 1 AS next
-    FROM inventory_categories WHERE team_id = ${me.teamId}`;
-
+    FROM inventory_categories WHERE team_id = ${me.teamId} AND parent_id = ${parentId}`;
   const [row] = await sql`
-    INSERT INTO inventory_categories (team_id, name, position)
-    VALUES (${me.teamId}, ${name}, ${next})
+    INSERT INTO inventory_categories (team_id, name, position, parent_id)
+    VALUES (${me.teamId}, ${name}, ${next}, ${parentId})
     RETURNING id`;
 
-  return NextResponse.json({ ok: true, id: row.id });
+  return NextResponse.json({ ok: true, id: row.id, parentId });
 }

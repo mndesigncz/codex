@@ -130,7 +130,9 @@ function AddPanel({ spare, onAdd, onClose }: {
   onClose: () => void;
 }) {
   const [source, setSource] = useState<string | null>(null);
-  const [options, setOptions] = useState<{ label: string }[]>([]);
+  // `value` is what the tile targets, `label` is what the employer reads — they
+  // differ for subcategories, which show as "Tabáky → Virginia".
+  const [options, setOptions] = useState<{ label: string; value: string }[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Options for a link source are fetched only when that source is opened.
@@ -140,7 +142,12 @@ function AddPanel({ spare, onAdd, onClose }: {
     setLoading(true);
     fetch(src.url).then(r => r.json()).then(d => {
       const rows = Array.isArray(d) ? d : (d?.procedures ?? d?.guides ?? []);
-      setOptions(rows.map((r: any) => ({ label: String(r[src.nameKey ?? 'name'] ?? '') })).filter((o: any) => o.label));
+      setOptions(rows.map((r: any) => {
+        const value = String(r[src.nameKey ?? 'name'] ?? '');
+        if (source !== 'inventory' || r.parentId == null) return { label: value, value };
+        const parent = rows.find((x: any) => x.id === r.parentId);
+        return { label: parent ? `${parent.name} → ${value}` : value, value };
+      }).filter((o: any) => o.value));
     }).catch(() => setOptions([])).finally(() => setLoading(false));
   }, [source]);
 
@@ -202,8 +209,8 @@ function AddPanel({ spare, onAdd, onClose }: {
               {options.map(o => {
                 const src = LINK_SOURCES.find(s => s.kind === source)!;
                 return (
-                  <button key={o.label}
-                    onClick={() => onAdd({ type: 'link', label: o.label, target: `${source}:${o.label}`, icon: src.icon })}
+                  <button key={o.value}
+                    onClick={() => onAdd({ type: 'link', label: o.label, target: `${source}:${o.value}`, icon: src.icon })}
                     className="rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] hover:border-[#C8F542] transition">
                     {o.label}
                   </button>

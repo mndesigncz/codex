@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging, normalizeScale, CONTENT_UNITS, type ScaleStep } from '@/lib/packaging';
+import { buildTree, categoryScope, categoryPath, childrenOf, possibleParents } from '@/lib/categoryTree';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -26,6 +27,7 @@ interface Category {
   id: number;
   name: string;
   position: number;
+  parentId?: number | null;
   tracksOpen?: boolean;
   contentUnit?: string | null;
   defaultPackageSize?: number | null;
@@ -115,6 +117,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const money = useMoney();
   const symbol = useSymbol();
   const [newCatInline, setNewCatInline] = useState('');
+  // Which parent a category created from inside the item form goes under.
+  const [inlineParent, setInlineParent] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -157,16 +161,51 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     return Array.from(set);
   }, [categories, items]);
 
-  // A category that tracks open packages renders its own two-mode view.
-  const packagedCat = useMemo(
-    () => categories.find(c => c.name === cat && c.tracksOpen) ?? null,
-    [categories, cat],
+  const tree = useMemo(() => buildTree(categories), [categories]);
+  // Category strings used by items but no longer configured — kept at the top
+  // level so nothing becomes unreachable.
+  const orphanNames = useMemo(() => {
+    const known = new Set(categories.map(c => c.name));
+    const set = new Set<string>();
+    items.forEach(i => { if (i.category && !known.has(i.category)) set.add(i.category); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'cs'));
+  }, [categories, items]);
+
+  // The top-level chip that should look selected: a subcategory highlights its
+  // parent and opens the second row next to its siblings.
+  const activeRoot = useMemo(() => {
+    if (cat === 'Vše') return null;
+    const c = categories.find(x => x.name === cat);
+    if (!c) return cat;
+    if (c.parentId == null) return cat;
+    return categories.find(x => x.id === c.parentId)?.name ?? cat;
+  }, [categories, cat]);
+
+  const subCats = useMemo(
+    () => (activeRoot ? childrenOf(categories, activeRoot) : []),
+    [categories, activeRoot],
   );
+
+  // A category that tracks open packages renders its own two-mode view.
+  // Subcategories inherit the setting from their parent, so packaging is
+  // configured once on "Tabáky" and every subcategory under it behaves the same.
+  const packagedCat = useMemo(() => {
+    const c = categories.find(x => x.name === cat);
+    if (!c) return null;
+    if (c.tracksOpen) return c;
+    if (c.parentId != null) {
+      const parent = categories.find(x => x.id === c.parentId);
+      if (parent?.tracksOpen) return parent;
+    }
+    return null;
+  }, [categories, cat]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    // Picking a parent category includes everything filed under its subcategories.
+    const scope = cat === 'Vše' ? null : new Set(categoryScope(categories, cat));
     const list = items.filter(i =>
-      (cat === 'Vše' || i.category === cat) &&
+      (scope === null || scope.has(i.category)) &&
       (q === '' || i.name.toLowerCase().includes(q) || (i.supplier ?? '').toLowerCase().includes(q)));
     const sorted = [...list];
     sorted.sort((a, b) => {
@@ -186,7 +225,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       }
     });
     return sorted;
-  }, [items, cat, search, sort]);
+  }, [items, categories, cat, search, sort]);
 
   const critical = items.filter(i => statusOf(i) === 'critical');
   const low = items.filter(i => statusOf(i) === 'low');
@@ -214,12 +253,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     setShowForm(true);
   };
 
-  const createCategory = async (name: string): Promise<boolean> => {
+  const createCategory = async (name: string, parentId?: number | null): Promise<boolean> => {
     const clean = name.trim();
     if (!clean) return false;
     try {
       const res = await fetch('/api/inventory/categories', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: clean }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: clean, parentId: parentId ?? null }),
       });
       if (!res.ok) return false;
       const cats = await fetch('/api/inventory/categories').then(r => r.json());
@@ -233,7 +273,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     const clean = newCatInline.trim();
     if (!clean) return;
     setAddingCat(true);
-    const ok = await createCategory(clean);
+    const ok = await createCategory(clean, inlineParent ? parseInt(inlineParent) : null);
     setAddingCat(false);
     if (ok) {
       setForm(f => ({ ...f, category: clean }));
@@ -342,10 +382,37 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           </div>
         </div>
         <div className="flex gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1">
-          {['Vše', ...catNames].map(c => (
+          <button onClick={() => setCat('Vše')} className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === 'Vše' ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>Vše</button>
+          {tree.map(({ cat: root, children }) => (
+            <button key={root.id} onClick={() => setCat(root.name)}
+              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${activeRoot === root.name ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
+              {root.name}
+              {children.length > 0 && (
+                <span className={`text-[10px] tabular-nums ${activeRoot === root.name ? 'text-black/45' : 'text-black/30'}`}>{children.length}</span>
+              )}
+            </button>
+          ))}
+          {orphanNames.map(c => (
             <button key={c} onClick={() => setCat(c)} className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === c ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>{c}</button>
           ))}
         </div>
+
+        {/* Second row: the selected category's subcategories. */}
+        {subCats.length > 0 && activeRoot && (
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1">
+            <Icon name="chevron" size={13} className="text-black/20 shrink-0 -rotate-90" />
+            <button onClick={() => setCat(activeRoot)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === activeRoot ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'}`}>
+              Vše v {activeRoot}
+            </button>
+            {subCats.map(s => (
+              <button key={s.id} onClick={() => setCat(s.name)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === s.name ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'}`}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {orders.length > 0 && (
@@ -353,7 +420,11 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       )}
 
       <div className="flex items-center justify-between text-xs text-black/45">
-        <span>{filtered.length} {filtered.length === 1 ? 'položka' : filtered.length >= 2 && filtered.length <= 4 ? 'položky' : 'položek'}{cat !== 'Vše' ? ` v „${cat}"` : ''}</span>
+        <span>
+          {filtered.length} {filtered.length === 1 ? 'položka' : filtered.length >= 2 && filtered.length <= 4 ? 'položky' : 'položek'}
+          {cat !== 'Vše' ? ` v „${categoryPath(categories, cat)}"` : ''}
+          {cat !== 'Vše' && cat === activeRoot && subCats.length > 0 ? ' včetně podkategorií' : ''}
+        </span>
       </div>
 
       {loading ? (
@@ -367,6 +438,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           items={filtered as any}
           canEdit
           onChanged={updated => setItems(list => list.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
+          onEditItem={i => openEdit(items.find(x => x.id === i.id) ?? (i as any))}
+          onRemoveItem={i => remove(items.find(x => x.id === i.id) ?? (i as any))}
         />
       ) : view === 'list' ? (
         <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} />
@@ -404,17 +477,30 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
-                  {catNames.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2.5">
-                      {catNames.map(c => {
-                        const active = form.category === c;
-                        return (
-                          <button type="button" key={c} onClick={() => setForm(f => ({ ...f, category: c }))}
-                            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
-                            {active && <Icon name="check" size={13} />}{c}
-                          </button>
-                        );
-                      })}
+                  {(tree.length > 0 || orphanNames.length > 0) && (
+                    <div className="space-y-2 mb-2.5">
+                      {tree.map(({ cat: root, children }) => (
+                        <div key={root.id}>
+                          <CatChip name={root.name} active={form.category === root.name}
+                            onPick={() => setForm(f => ({ ...f, category: root.name }))} />
+                          {children.length > 0 && (
+                            <div className="mt-1.5 ml-3 pl-2.5 border-l border-black/[0.08] flex flex-wrap gap-1.5">
+                              {children.map(s => (
+                                <CatChip key={s.id} name={s.name} active={form.category === s.name} small
+                                  onPick={() => setForm(f => ({ ...f, category: s.name }))} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {orphanNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {orphanNames.map(c => (
+                            <CatChip key={c} name={c} active={form.category === c}
+                              onPick={() => setForm(f => ({ ...f, category: c }))} />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="flex gap-2">
@@ -424,6 +510,14 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
                         className={`${inputClass} py-2 pl-8`} />
                     </div>
+                    <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
+                      title="Kam novou kategorii zařadit"
+                      className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+                      <option value="">Hlavní</option>
+                      {tree.map(({ cat: root }) => (
+                        <option key={root.id} value={String(root.id)}>pod {root.name}</option>
+                      ))}
+                    </select>
                     <button type="button" onClick={addInlineCategory} disabled={addingCat || !newCatInline.trim()} className="shrink-0 rounded-2xl glass border border-black/10 text-[#16181A] px-4 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-40">
                       {addingCat ? '…' : 'Přidat'}
                     </button>
@@ -543,6 +637,20 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         />
       )}
     </div>
+  );
+}
+
+/* ---------- One category chip in the item form ---------- */
+function CatChip({ name, active, small, onPick }: {
+  name: string; active: boolean; small?: boolean; onPick: () => void;
+}) {
+  return (
+    <button type="button" onClick={onPick}
+      className={`rounded-full font-medium transition-all inline-flex items-center gap-1.5 ${
+        small ? 'px-3 py-1 text-[11px]' : 'px-3.5 py-1.5 text-xs'
+      } ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
+      {active && <Icon name="check" size={small ? 11 : 13} />}{name}
+    </button>
   );
 }
 
@@ -1016,20 +1124,46 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   categories: Category[];
   onClose: () => void;
   onChanged: () => Promise<void> | void;
-  createCategory: (name: string) => Promise<boolean>;
+  createCategory: (name: string, parentId?: number | null) => Promise<boolean>;
 }) {
   const [newName, setNewName] = useState('');
+  const [newParent, setNewParent] = useState('');
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
   const [packId, setPackId] = useState<number | null>(null);
+  const [moveId, setMoveId] = useState<number | null>(null);
+  const [err, setErr] = useState('');
+
+  const tree = useMemo(() => buildTree(categories), [categories]);
+  const roots = tree.map(t => t.cat);
 
   const add = async () => {
     if (!newName.trim()) return;
     setBusy(true);
-    const ok = await createCategory(newName);
+    const ok = await createCategory(newName, newParent ? parseInt(newParent) : null);
     setBusy(false);
     if (ok) { setNewName(''); await onChanged(); }
+    else setErr('Kategorii se nepodařilo vytvořit.');
+  };
+
+  // Re-file a category: null lifts it back to the top level.
+  const setParent = async (c: Category, parentId: number | null) => {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch(`/api/inventory/categories/${c.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || 'Přesun se nepodařil.');
+      } else {
+        setMoveId(null);
+        await onChanged();
+      }
+    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+    setBusy(false);
   };
 
   const seedDefaults = async () => {
@@ -1054,10 +1188,12 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
     await onChanged();
   };
 
-  const move = async (idx: number, dir: -1 | 1) => {
+  // Reordering happens inside a sibling group, so subcategories move within
+  // their parent instead of jumping across the whole list.
+  const move = async (siblings: Category[], idx: number, dir: -1 | 1) => {
     const target = idx + dir;
-    if (target < 0 || target >= categories.length) return;
-    const a = categories[idx], b = categories[target];
+    if (target < 0 || target >= siblings.length) return;
+    const a = siblings[idx], b = siblings[target];
     setBusy(true);
     try {
       await Promise.all([
@@ -1070,7 +1206,9 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   };
 
   const del = async (c: Category) => {
-    if (!confirm(`Smazat kategorii „${c.name}"? Položky si svůj štítek ponechají.`)) return;
+    const kids = categories.filter(x => x.parentId === c.id).length;
+    const extra = kids > 0 ? ` ${kids} ${kids === 1 ? 'podkategorie se přesune' : 'podkategorií se přesune'} na hlavní úroveň.` : '';
+    if (!confirm(`Smazat kategorii „${c.name}"? Položky si svůj štítek ponechají.${extra}`)) return;
     setBusy(true);
     try { await fetch(`/api/inventory/categories/${c.id}`, { method: 'DELETE' }); } catch {}
     setBusy(false);
@@ -1089,8 +1227,18 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Název nové kategorie"
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             className={inputClass} />
+          {roots.length > 0 && (
+            <select value={newParent} onChange={e => setNewParent(e.target.value)}
+              title="Kam ji zařadit"
+              className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+              <option value="">Hlavní</option>
+              {roots.map(r => <option key={r.id} value={String(r.id)}>pod {r.name}</option>)}
+            </select>
+          )}
           <button onClick={add} disabled={busy || !newName.trim()} className="shrink-0 rounded-full bg-[#C8F542] text-black font-semibold px-5 text-sm hover:brightness-110 disabled:opacity-40">Přidat</button>
         </div>
+
+        {err && <p className="text-xs font-medium text-red-600">{err}</p>}
 
         {categories.length === 0 ? (
           <div className="text-center space-y-3 py-4">
@@ -1101,30 +1249,41 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           </div>
         ) : (
           <div className="divide-y divide-black/[0.06]">
-            {categories.map((c, idx) => (
-              <div key={c.id} className="py-2.5">
-                <div className="flex items-center gap-2">
-                <div className="flex flex-col">
-                  <button onClick={() => move(idx, -1)} disabled={busy || idx === 0} className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▲</button>
-                  <button onClick={() => move(idx, 1)} disabled={busy || idx === categories.length - 1} className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▼</button>
-                </div>
-                {editId === c.id ? (
-                  <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveRename(c.id); } if (e.key === 'Escape') setEditId(null); }}
-                    onBlur={() => saveRename(c.id)}
-                    className="flex-1 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
-                ) : (
-                  <span className="flex-1 text-sm text-[#16181A] truncate">{c.name}</span>
+            {tree.map(({ cat: root, children }, rootIdx) => (
+              <div key={root.id} className="py-2.5 space-y-2">
+                <CategoryRow
+                  c={root} siblings={roots} idx={rootIdx} busy={busy}
+                  editing={editId === root.id} editName={editName} setEditName={setEditName}
+                  startEdit={() => { setEditId(root.id); setEditName(root.name); }}
+                  cancelEdit={() => setEditId(null)} saveRename={() => saveRename(root.id)}
+                  move={move} onDelete={() => del(root)}
+                  packOpen={packId === root.id} togglePack={() => setPackId(packId === root.id ? null : root.id)}
+                  moveOpen={moveId === root.id} toggleMove={() => { setMoveId(moveId === root.id ? null : root.id); setErr(''); }}
+                  parentOptions={possibleParents(categories, root.id)} setParent={p => setParent(root, p)}
+                  childCount={children.length}
+                />
+                {packId === root.id && <PackagingEditor category={root} onSaved={onChanged} />}
+
+                {children.length > 0 && (
+                  <div className="ml-3 pl-3 border-l border-black/[0.08] space-y-2">
+                    {children.map((s, i) => (
+                      <div key={s.id} className="space-y-2">
+                        <CategoryRow
+                          c={s} siblings={children} idx={i} busy={busy} nested
+                          editing={editId === s.id} editName={editName} setEditName={setEditName}
+                          startEdit={() => { setEditId(s.id); setEditName(s.name); }}
+                          cancelEdit={() => setEditId(null)} saveRename={() => saveRename(s.id)}
+                          move={move} onDelete={() => del(s)}
+                          packOpen={packId === s.id} togglePack={() => setPackId(packId === s.id ? null : s.id)}
+                          moveOpen={moveId === s.id} toggleMove={() => { setMoveId(moveId === s.id ? null : s.id); setErr(''); }}
+                          parentOptions={roots.filter(r => r.id !== s.parentId)} setParent={p => setParent(s, p)}
+                          childCount={0} inheritsPackaging={root.tracksOpen === true}
+                        />
+                        {packId === s.id && <PackagingEditor category={s} onSaved={onChanged} />}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                <button onClick={() => setPackId(packId === c.id ? null : c.id)}
-                  title="Balení a zbytky"
-                  className={`rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
-                  <Icon name="box" size={15} />
-                </button>
-                <button onClick={() => { setEditId(c.id); setEditName(c.name); }} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm">✎</button>
-                <button onClick={() => del(c)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
-                </div>
-                {packId === c.id && <PackagingEditor category={c} onSaved={onChanged} />}
               </div>
             ))}
           </div>
@@ -1132,6 +1291,82 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
         <button onClick={onClose} className="w-full rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Hotovo</button>
       </div>
+    </div>
+  );
+}
+
+/* ---------- One row in the category manager ---------- */
+function CategoryRow({
+  c, siblings, idx, busy, nested, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
+  move, onDelete, packOpen, togglePack, moveOpen, toggleMove, parentOptions, setParent, childCount,
+  inheritsPackaging,
+}: {
+  c: Category; siblings: Category[]; idx: number; busy: boolean; nested?: boolean;
+  editing: boolean; editName: string; setEditName: (v: string) => void;
+  startEdit: () => void; cancelEdit: () => void; saveRename: () => void;
+  move: (siblings: Category[], idx: number, dir: -1 | 1) => void;
+  onDelete: () => void;
+  packOpen: boolean; togglePack: () => void;
+  moveOpen: boolean; toggleMove: () => void;
+  parentOptions: Category[]; setParent: (parentId: number | null) => void;
+  childCount: number; inheritsPackaging?: boolean;
+}) {
+  // A category with subcategories can't itself be nested — that would make the
+  // tree three levels deep — so the move control only offers what is allowed.
+  const canMove = parentOptions.length > 0 || c.parentId != null;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col shrink-0">
+          <button onClick={() => move(siblings, idx, -1)} disabled={busy || idx === 0}
+            className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▲</button>
+          <button onClick={() => move(siblings, idx, 1)} disabled={busy || idx === siblings.length - 1}
+            className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▼</button>
+        </div>
+        {editing ? (
+          <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveRename(); } if (e.key === 'Escape') cancelEdit(); }}
+            onBlur={saveRename}
+            className="flex-1 min-w-0 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+        ) : (
+          <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
+            {c.name}
+            {childCount > 0 && <span className="text-[11px] text-black/30 ml-1.5">{childCount} podkat.</span>}
+            {inheritsPackaging && !c.tracksOpen && <span className="text-[11px] text-black/30 ml-1.5">balení dědí</span>}
+          </span>
+        )}
+        {canMove && (
+          <button onClick={toggleMove} title="Přesunout pod jinou kategorii"
+            className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${moveOpen ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'}`}>
+            <Icon name="swap" size={14} />
+          </button>
+        )}
+        <button onClick={togglePack} title="Balení a zbytky"
+          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
+          <Icon name="box" size={15} />
+        </button>
+        <button onClick={startEdit} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm">✎</button>
+        <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+      </div>
+
+      {moveOpen && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
+          <span className="text-[11px] text-black/45">Zařadit:</span>
+          <button onClick={() => setParent(null)} disabled={busy || c.parentId == null}
+            className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId == null ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'}`}>
+            Hlavní úroveň
+          </button>
+          {parentOptions.map(p => (
+            <button key={p.id} onClick={() => setParent(p.id)} disabled={busy || c.parentId === p.id}
+              className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId === p.id ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'}`}>
+              pod {p.name}
+            </button>
+          ))}
+          {parentOptions.length === 0 && c.parentId == null && (
+            <span className="text-[11px] text-black/35">Kategorie s podkategoriemi nejde zanořit.</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
