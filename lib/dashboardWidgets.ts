@@ -65,3 +65,57 @@ export function parseTarget(target: string): { kind: string; arg: string } {
   const i = target.indexOf(':');
   return i === -1 ? { kind: target, arg: '' } : { kind: target.slice(0, i), arg: target.slice(i + 1) };
 }
+
+// ---- Dashboard layout ------------------------------------------------------
+// The employer arranges each dashboard like a phone homescreen: order matters,
+// anything absent is hidden, and "link" entries are tiles pointing at a
+// concrete category / procedure / guide / view.
+
+export type LayoutEntry =
+  | { type: 'widget'; id: string }
+  | { type: 'link'; label: string; target: string; icon?: string };
+
+export function normalizeLayout(raw: any): LayoutEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LayoutEntry[] = [];
+  for (const e of raw) {
+    if (e?.type === 'link') {
+      const label = String(e.label ?? '').trim().slice(0, 40);
+      const target = String(e.target ?? '').trim().slice(0, 120);
+      if (label && target) out.push({ type: 'link', label, target, icon: e.icon ? String(e.icon).slice(0, 24) : undefined });
+    } else {
+      const id = String(e?.id ?? e ?? '').trim();
+      if (id) out.push({ type: 'widget', id });
+    }
+  }
+  return out.slice(0, 40);
+}
+
+/**
+ * The layout to render. Falls back to the legacy on/off flags (plus any
+ * shortcuts) in the built-in order, so dashboards configured before the
+ * editor existed keep looking the same.
+ */
+export function readLayout(config: Record<string, any> | undefined | null, widgets: Widget[]): LayoutEntry[] {
+  const explicit = normalizeLayout(config?.layout);
+  if (explicit.length) return explicit;
+  const entries: LayoutEntry[] = widgets
+    .filter(w => isWidgetOn(config, w.id))
+    .map(w => ({ type: 'widget' as const, id: w.id }));
+  readShortcuts(config).forEach(s => entries.push({ type: 'link', label: s.label, target: s.target, icon: s.icon }));
+  return entries;
+}
+
+/** Built-in widgets not currently placed — the "add" menu. */
+export function availableWidgets(layout: LayoutEntry[], widgets: Widget[]): Widget[] {
+  const used = new Set(layout.filter(e => e.type === 'widget').map(e => (e as any).id));
+  return widgets.filter(w => !used.has(w.id) && w.id !== 'shortcuts');
+}
+
+export function moveEntry(layout: LayoutEntry[], from: number, dir: -1 | 1): LayoutEntry[] {
+  const to = from + dir;
+  if (to < 0 || to >= layout.length) return layout;
+  const next = [...layout];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}

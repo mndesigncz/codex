@@ -221,9 +221,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   const toggleWidget = async (role: 'employer' | 'employee', id: string, on: boolean) => {
     const current = team?.dashboard_config ?? {};
+    const roleCfg = current[role] ?? {};
+    const layout = Array.isArray(roleCfg.layout) ? roleCfg.layout : null;
+    const nextLayout = layout
+      ? (on
+          ? (layout.some((e: any) => e?.id === id) ? layout : [...layout, { type: 'widget', id }])
+          : layout.filter((e: any) => e?.id !== id))
+      : undefined;
     const next = {
       ...current,
-      [role]: { ...(current[role] ?? {}), [id]: on },
+      [role]: { ...roleCfg, [id]: on, ...(nextLayout ? { layout: nextLayout } : {}) },
     };
     setTeam(t => (t ? { ...t, dashboard_config: next } : t)); // optimistic
     try {
@@ -726,7 +733,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
             <Icon name="overview" size={18} /> Dashboardy
           </h3>
-          <p className="text-black/45 text-sm mt-1">Vyber, co se zobrazí na přehledu — tvém i zaměstnanců.</p>
+          <p className="text-black/45 text-sm mt-1">
+            Vyber, co se zobrazí na přehledu — tvém i zaměstnanců. Pořadí a dlaždice
+            s odkazy naskládáš přímo na přehledu přes ozubené kolečko vpravo nahoře.
+          </p>
         </div>
         {([['employer', 'Můj přehled (vedení)', EMPLOYER_WIDGETS], ['employee', 'Přehled zaměstnanců', EMPLOYEE_WIDGETS]] as const).map(([role, title, widgets]) => (
           <div key={role}>
@@ -752,13 +762,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 );
               })}
             </div>
-            {isWidgetOn(team?.dashboard_config?.[role], 'shortcuts') && (
-              <ShortcutEditor
-                shortcuts={readShortcuts(team?.dashboard_config?.[role])}
-                categories={invCategories}
-                onChange={list => saveShortcuts(role, list)}
-              />
-            )}
+
           </div>
         ))}
       </div>
