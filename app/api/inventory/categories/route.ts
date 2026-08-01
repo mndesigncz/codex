@@ -71,16 +71,16 @@ export async function POST(request: Request) {
     WHERE team_id = ${me.teamId} AND lower(name) = lower(${name})`;
   if (existing) return NextResponse.json({ ok: true, id: existing.id });
 
-  // A subcategory may only hang off a root category of the same team, which is
-  // what keeps the tree exactly one level deep.
+  // A new category may hang off any category of the same team — nesting has no
+  // fixed depth. A brand-new row can't have descendants, so there is no cycle
+  // to guard against here.
   let parentId: number | null = null;
   if (body.parentId != null && body.parentId !== '') {
     const candidate = Number(body.parentId);
     if (Number.isFinite(candidate)) {
       try {
         const [p] = await sql`
-          SELECT id FROM inventory_categories
-          WHERE id = ${candidate} AND team_id = ${me.teamId} AND parent_id IS NULL`;
+          SELECT id FROM inventory_categories WHERE id = ${candidate} AND team_id = ${me.teamId}`;
         if (!p) return NextResponse.json({ error: 'Nadřazená kategorie neexistuje' }, { status: 400 });
         parentId = candidate;
       } catch {

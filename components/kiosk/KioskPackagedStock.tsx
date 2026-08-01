@@ -10,7 +10,8 @@ import {
   type CategoryPackaging, normalizeCategoryPackaging, resolveSteps, formatStock,
   fmtAmount, openPct, effectivePackages, stockStatus,
 } from '@/lib/packaging';
-import { buildTree, categoryScope } from '@/lib/categoryTree';
+import { categoryScope, packagingSourceOf, branchTracksOpen, childrenOf } from '@/lib/categoryTree';
+import CategoryNav from '../inventory/CategoryNav';
 
 interface Item {
   id: number;
@@ -36,21 +37,17 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
   useEffect(() => { onFocusChange?.(openCat !== null); }, [openCat, onFocusChange]);
 
-  // Categories worth offering: the ones that track open packages, plus any
-  // parent whose subcategories do, so nothing packaged is unreachable.
-  const roots = useMemo(
-    () => buildTree(categories)
-      .filter(({ cat, children }) => cat.tracksOpen || children.some((c: any) => c.tracksOpen))
-      .map(t => t.cat),
+  // Categories worth offering: anything that tracks open packages, anything
+  // inheriting it from an ancestor, and the parents on the way down to them.
+  const navCats = useMemo(
+    () => categories.filter((c: any) =>
+      branchTracksOpen(categories as any, c) || packagingSourceOf(categories as any, c.name) != null),
     [categories],
   );
 
   const packagingOf = (name: string): CategoryPackaging | null => {
-    const c = categories.find((x: any) => x.name === name);
-    if (!c) return null;
-    if (c.tracksOpen) return normalizeCategoryPackaging(c);
-    const parent = c.parentId != null ? categories.find((x: any) => x.id === c.parentId) : null;
-    return parent?.tracksOpen ? normalizeCategoryPackaging(parent) : null;
+    const src = packagingSourceOf(categories as any, name);
+    return src ? normalizeCategoryPackaging(src) : null;
   };
 
   const itemsIn = (name: string) => {
@@ -58,7 +55,14 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
     return items.filter(i => scope.has(i.category)).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   };
 
-  if (roots.length === 0) return null;
+  const countIn = (name: string) => itemsIn(name).length;
+  const alertsIn = (name: string) => {
+    const packaging = packagingOf(name);
+    if (!packaging) return 0;
+    return itemsIn(name).filter(i => stockStatus(withSize(i, packaging), packaging) !== 'ok').length;
+  };
+
+  if (navCats.length === 0) return null;
 
   if (openCat) {
     const packaging = packagingOf(openCat);
@@ -75,27 +79,37 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
       );
     }
 
+    // Items shown here are the ones filed directly in this category; anything
+    // in a subcategory is reached through its own button.
+    const direct = list.filter(i => i.category === openCat);
+    const subs = childrenOf(navCats as any, openCat);
+
     return (
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <button onClick={() => setOpenCat(null)}
-            className="inline-flex items-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-[#16181A] min-h-[48px] active:scale-[0.97] transition">
-            <Icon name="chevron" size={16} className="rotate-90" /> Zpět
-          </button>
-          <p className="font-bold text-lg tracking-tight text-[#16181A] min-w-0 truncate">{openCat}</p>
-          {list.length > 1 && (
-            <button onClick={() => setSweeping(true)}
-              className="inline-flex items-center gap-2 rounded-full bg-[#C8F542] text-black px-5 py-2.5 text-sm font-bold min-h-[48px] active:scale-[0.97] transition">
-              <Icon name="play" size={16} /> Projít vše ({list.length})
-            </button>
-          )}
-        </div>
+        <CategoryNav
+          categories={navCats}
+          current={openCat}
+          onNavigate={name => { setOpenCat(name); setSweeping(false); }}
+          countOf={countIn}
+          alertOf={alertsIn}
+          size="touch"
+          rootLabel="Zbytky"
+        />
 
-        {list.length === 0 ? (
-          <div className="glass-card p-8 text-center text-black/45">V této kategorii zatím nic není.</div>
+        {list.length > 1 && (
+          <button onClick={() => setSweeping(true)}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C8F542] text-black px-5 py-4 text-base font-bold min-h-[56px] active:scale-[0.99] transition">
+            <Icon name="play" size={18} /> Projít vše ({list.length})
+          </button>
+        )}
+
+        {direct.length === 0 ? (
+          subs.length === 0 && (
+            <div className="glass-card p-8 text-center text-black/45">V této kategorii zatím nic není.</div>
+          )
         ) : (
           <div className="space-y-3">
-            {list.map(i => (
+            {direct.map(i => (
               <ItemRow key={i.id} item={i} packaging={packaging} onChanged={onChanged} />
             ))}
           </div>
@@ -107,31 +121,15 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
   return (
     <section className="space-y-2.5">
       <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">Zápis zbytků</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {roots.map((c: any) => {
-          const list = itemsIn(c.name);
-          const packaging = packagingOf(c.name);
-          const needsAttention = packaging
-            ? list.filter(i => stockStatus(withSize(i, packaging), packaging) !== 'ok').length
-            : 0;
-          return (
-            <button key={c.id} onClick={() => { setOpenCat(c.name); setSweeping(false); }}
-              className="glass-card p-4 flex items-center gap-3 text-left active:scale-[0.99] transition min-h-[76px]">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
-                <Icon name="box" size={22} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold text-[#16181A] truncate">{c.name}</span>
-                <span className="block text-xs text-black/45">
-                  {list.length} {list.length === 1 ? 'položka' : list.length >= 2 && list.length <= 4 ? 'položky' : 'položek'}
-                  {needsAttention > 0 && <span className="text-orange-600 font-semibold"> · {needsAttention} dochází</span>}
-                </span>
-              </span>
-              <Icon name="chevron" size={18} className="text-black/25 -rotate-90 shrink-0" />
-            </button>
-          );
-        })}
-      </div>
+      <CategoryNav
+        categories={navCats}
+        current={null}
+        onNavigate={name => { setOpenCat(name); setSweeping(false); }}
+        countOf={countIn}
+        alertOf={alertsIn}
+        size="touch"
+        rootLabel="Zbytky"
+      />
     </section>
   );
 }

@@ -7,7 +7,11 @@ import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
   CONTENT_UNITS, type ScaleStep, type CategoryPackaging,
 } from '@/lib/packaging';
-import { buildTree, categoryScope, categoryPath, childrenOf, possibleParents } from '@/lib/categoryTree';
+import {
+  buildTree, flattenTree, categoryScope, categoryPath, childrenOf, possibleParents,
+  packagingSourceOf, type TreeNode,
+} from '@/lib/categoryTree';
+import CategoryNav from '../inventory/CategoryNav';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -169,7 +173,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     return Array.from(set);
   }, [categories, items]);
 
-  const tree = useMemo(() => buildTree(categories), [categories]);
+  const flatCats = useMemo(() => flattenTree(categories), [categories]);
   // Category strings used by items but no longer configured — kept at the top
   // level so nothing becomes unreachable.
   const orphanNames = useMemo(() => {
@@ -179,31 +183,32 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'cs'));
   }, [categories, items]);
 
-  // The top-level chip that should look selected: a subcategory highlights its
-  // parent and opens the second row next to its siblings.
-  const activeRoot = useMemo(() => {
-    if (cat === 'Vše') return null;
-    const c = categories.find(x => x.name === cat);
-    if (!c) return cat;
-    if (c.parentId == null) return cat;
-    return categories.find(x => x.id === c.parentId)?.name ?? cat;
-  }, [categories, cat]);
-
   const subCats = useMemo(
-    () => (activeRoot ? childrenOf(categories, activeRoot) : []),
-    [categories, activeRoot],
+    () => (cat === 'Vše' ? [] : childrenOf(categories, cat)),
+    [categories, cat],
   );
 
-  // Packaging settings by category name, with subcategories inheriting the
-  // parent's. Everything that judges stock levels goes through this.
+  // Packaging settings by category name, inherited from the nearest ancestor
+  // that has them. Everything that judges stock levels goes through this.
   const pk = useMemo<PackagingLookup>(() => {
     const map = new Map<string, CategoryPackaging>();
     categories.forEach(c => {
-      const own = c.tracksOpen ? c : (c.parentId != null ? categories.find(x => x.id === c.parentId) : null);
-      if (own?.tracksOpen) map.set(c.name, normalizeCategoryPackaging(own));
+      const source = packagingSourceOf(categories, c.name);
+      if (source) map.set(c.name, normalizeCategoryPackaging(source));
     });
     return (name: string) => map.get(name) ?? null;
   }, [categories]);
+
+  // Counts on the navigation buttons include everything nested below.
+  const countIn = useMemo(() => (name: string) => {
+    const scope = new Set(categoryScope(categories, name));
+    return items.filter(i => scope.has(i.category)).length;
+  }, [categories, items]);
+
+  const alertsIn = useMemo(() => (name: string) => {
+    const scope = new Set(categoryScope(categories, name));
+    return items.filter(i => scope.has(i.category) && statusOf(i, pk) !== 'ok').length;
+  }, [categories, items, pk]);
 
   // A category that tracks open packages renders its own two-mode view.
   // Subcategories inherit the setting from their parent, so packaging is
@@ -400,38 +405,14 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
             </div>
           </div>
         </div>
-        <div className="flex gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1">
-          <button onClick={() => setCat('Vše')} className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === 'Vše' ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>Vše</button>
-          {tree.map(({ cat: root, children }) => (
-            <button key={root.id} onClick={() => setCat(root.name)}
-              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${activeRoot === root.name ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
-              {root.name}
-              {children.length > 0 && (
-                <span className={`text-[10px] tabular-nums ${activeRoot === root.name ? 'text-black/45' : 'text-black/30'}`}>{children.length}</span>
-              )}
-            </button>
-          ))}
-          {orphanNames.map(c => (
-            <button key={c} onClick={() => setCat(c)} className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === c ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>{c}</button>
-          ))}
-        </div>
-
-        {/* Second row: the selected category's subcategories. */}
-        {subCats.length > 0 && activeRoot && (
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1">
-            <Icon name="chevron" size={13} className="text-black/20 shrink-0 -rotate-90" />
-            <button onClick={() => setCat(activeRoot)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === activeRoot ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'}`}>
-              Vše v {activeRoot}
-            </button>
-            {subCats.map(s => (
-              <button key={s.id} onClick={() => setCat(s.name)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${cat === s.name ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'}`}>
-                {s.name}
-              </button>
-            ))}
-          </div>
-        )}
+        <CategoryNav
+          categories={categories}
+          current={cat === 'Vše' ? null : cat}
+          onNavigate={name => setCat(name ?? 'Vše')}
+          countOf={countIn}
+          alertOf={alertsIn}
+          extraRoots={orphanNames}
+        />
       </div>
 
       {orders.length > 0 && (
@@ -442,7 +423,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         <span>
           {filtered.length} {filtered.length === 1 ? 'položka' : filtered.length >= 2 && filtered.length <= 4 ? 'položky' : 'položek'}
           {cat !== 'Vše' ? ` v „${categoryPath(categories, cat)}"` : ''}
-          {cat !== 'Vše' && cat === activeRoot && subCats.length > 0 ? ' včetně podkategorií' : ''}
+          {cat !== 'Vše' && subCats.length > 0 ? ' včetně podkategorií' : ''}
         </span>
       </div>
 
@@ -497,24 +478,17 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
-                  {(tree.length > 0 || orphanNames.length > 0) && (
-                    <div className="space-y-2 mb-2.5">
-                      {tree.map(({ cat: root, children }) => (
-                        <div key={root.id}>
-                          <CatChip name={root.name} active={form.category === root.name}
-                            onPick={() => setForm(f => ({ ...f, category: root.name }))} />
-                          {children.length > 0 && (
-                            <div className="mt-1.5 ml-3 pl-2.5 border-l border-black/[0.08] flex flex-wrap gap-1.5">
-                              {children.map(s => (
-                                <CatChip key={s.id} name={s.name} active={form.category === s.name} small
-                                  onPick={() => setForm(f => ({ ...f, category: s.name }))} />
-                              ))}
-                            </div>
-                          )}
+                  {(flatCats.length > 0 || orphanNames.length > 0) && (
+                    <div className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
+                      {flatCats.map(({ cat: c, depth }) => (
+                        <div key={c.id} style={{ paddingLeft: depth * 14 }}
+                          className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
+                          <CatChip name={c.name} active={form.category === c.name} small={depth > 0}
+                            onPick={() => setForm(f => ({ ...f, category: c.name }))} />
                         </div>
                       ))}
                       {orphanNames.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 pt-1">
                           {orphanNames.map(c => (
                             <CatChip key={c} name={c} active={form.category === c}
                               onPick={() => setForm(f => ({ ...f, category: c }))} />
@@ -534,8 +508,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                       title="Kam novou kategorii zařadit"
                       className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
                       <option value="">Hlavní</option>
-                      {tree.map(({ cat: root }) => (
-                        <option key={root.id} value={String(root.id)}>pod {root.name}</option>
+                      {flatCats.map(({ cat: c, depth }) => (
+                        <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
                       ))}
                     </select>
                     <button type="button" onClick={addInlineCategory} disabled={addingCat || !newCatInline.trim()} className="shrink-0 rounded-2xl glass border border-black/10 text-[#16181A] px-4 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-40">
@@ -1173,7 +1147,36 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   const [err, setErr] = useState('');
 
   const tree = useMemo(() => buildTree(categories), [categories]);
-  const roots = tree.map(t => t.cat);
+  const flat = useMemo(() => flattenTree(categories), [categories]);
+
+  // Nesting has no fixed depth, so a branch renders itself.
+  const renderNode = (node: TreeNode<Category>, siblings: Category[], depth: number): React.ReactNode => {
+    const c = node.cat;
+    const idx = siblings.findIndex(s => s.id === c.id);
+    const inherited = packagingSourceOf(categories, c.name);
+    return (
+      <div key={c.id} className={depth === 0 ? 'py-2.5 space-y-2' : 'space-y-2'}>
+        <CategoryRow
+          c={c} siblings={siblings} idx={idx} busy={busy} nested={depth > 0}
+          editing={editId === c.id} editName={editName} setEditName={setEditName}
+          startEdit={() => { setEditId(c.id); setEditName(c.name); }}
+          cancelEdit={() => setEditId(null)} saveRename={() => saveRename(c.id)}
+          move={move} onDelete={() => del(c)}
+          packOpen={packId === c.id} togglePack={() => setPackId(packId === c.id ? null : c.id)}
+          moveOpen={moveId === c.id} toggleMove={() => { setMoveId(moveId === c.id ? null : c.id); setErr(''); }}
+          parentOptions={possibleParents(categories, c.id)} setParent={p => setParent(c, p)}
+          childCount={node.children.length}
+          inheritsPackaging={!c.tracksOpen && inherited != null}
+        />
+        {packId === c.id && <PackagingEditor category={c} onSaved={onChanged} />}
+        {node.children.length > 0 && (
+          <div className="ml-3 pl-3 border-l border-black/[0.08] space-y-2">
+            {node.children.map(child => renderNode(child, node.children.map(n => n.cat), depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const add = async () => {
     if (!newName.trim()) return;
@@ -1264,12 +1267,14 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Název nové kategorie"
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             className={inputClass} />
-          {roots.length > 0 && (
+          {flat.length > 0 && (
             <select value={newParent} onChange={e => setNewParent(e.target.value)}
               title="Kam ji zařadit"
               className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
               <option value="">Hlavní</option>
-              {roots.map(r => <option key={r.id} value={String(r.id)}>pod {r.name}</option>)}
+              {flat.map(({ cat: c, depth }) => (
+                <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
+              ))}
             </select>
           )}
           <button onClick={add} disabled={busy || !newName.trim()} className="shrink-0 rounded-full bg-[#C8F542] text-black font-semibold px-5 text-sm hover:brightness-110 disabled:opacity-40">Přidat</button>
@@ -1286,43 +1291,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           </div>
         ) : (
           <div className="divide-y divide-black/[0.06]">
-            {tree.map(({ cat: root, children }, rootIdx) => (
-              <div key={root.id} className="py-2.5 space-y-2">
-                <CategoryRow
-                  c={root} siblings={roots} idx={rootIdx} busy={busy}
-                  editing={editId === root.id} editName={editName} setEditName={setEditName}
-                  startEdit={() => { setEditId(root.id); setEditName(root.name); }}
-                  cancelEdit={() => setEditId(null)} saveRename={() => saveRename(root.id)}
-                  move={move} onDelete={() => del(root)}
-                  packOpen={packId === root.id} togglePack={() => setPackId(packId === root.id ? null : root.id)}
-                  moveOpen={moveId === root.id} toggleMove={() => { setMoveId(moveId === root.id ? null : root.id); setErr(''); }}
-                  parentOptions={possibleParents(categories, root.id)} setParent={p => setParent(root, p)}
-                  childCount={children.length}
-                />
-                {packId === root.id && <PackagingEditor category={root} onSaved={onChanged} />}
-
-                {children.length > 0 && (
-                  <div className="ml-3 pl-3 border-l border-black/[0.08] space-y-2">
-                    {children.map((s, i) => (
-                      <div key={s.id} className="space-y-2">
-                        <CategoryRow
-                          c={s} siblings={children} idx={i} busy={busy} nested
-                          editing={editId === s.id} editName={editName} setEditName={setEditName}
-                          startEdit={() => { setEditId(s.id); setEditName(s.name); }}
-                          cancelEdit={() => setEditId(null)} saveRename={() => saveRename(s.id)}
-                          move={move} onDelete={() => del(s)}
-                          packOpen={packId === s.id} togglePack={() => setPackId(packId === s.id ? null : s.id)}
-                          moveOpen={moveId === s.id} toggleMove={() => { setMoveId(moveId === s.id ? null : s.id); setErr(''); }}
-                          parentOptions={roots.filter(r => r.id !== s.parentId)} setParent={p => setParent(s, p)}
-                          childCount={0} inheritsPackaging={root.tracksOpen === true}
-                        />
-                        {packId === s.id && <PackagingEditor category={s} onSaved={onChanged} />}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+            {tree.map(node => renderNode(node, tree.map(t => t.cat), 0))}
           </div>
         )}
 
@@ -1348,8 +1317,8 @@ function CategoryRow({
   parentOptions: Category[]; setParent: (parentId: number | null) => void;
   childCount: number; inheritsPackaging?: boolean;
 }) {
-  // A category with subcategories can't itself be nested — that would make the
-  // tree three levels deep — so the move control only offers what is allowed.
+  // Anything can be re-filed except under its own branch, which possibleParents
+  // has already excluded.
   const canMove = parentOptions.length > 0 || c.parentId != null;
   return (
     <div className="space-y-2">
@@ -1400,7 +1369,7 @@ function CategoryRow({
             </button>
           ))}
           {parentOptions.length === 0 && c.parentId == null && (
-            <span className="text-[11px] text-black/35">Kategorie s podkategoriemi nejde zanořit.</span>
+            <span className="text-[11px] text-black/35">Zatím není kam ji zanořit.</span>
           )}
         </div>
       )}

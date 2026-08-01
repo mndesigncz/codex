@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
-import { buildTree, categoryScope, childrenOf } from '@/lib/categoryTree';
+import { categoryScope, packagingSourceOf, branchTracksOpen } from '@/lib/categoryTree';
+import CategoryNav from '../inventory/CategoryNav';
 
 interface InventoryItem {
   id: number;
@@ -68,41 +69,26 @@ export default function InventoryReport({ user, initialCategory }: Props) {
     }).catch(() => setLoading(false));
   }, []);
 
-  // Top-level chips: categories that track open packages, plus any parent whose
-  // subcategories do — otherwise a packaged subcategory would be unreachable.
-  const packagedRoots = useMemo(
-    () => buildTree(allCats)
-      .filter(({ cat, children }) => cat.tracksOpen || children.some((c: any) => c.tracksOpen))
-      .map(t => t.cat),
+  // Offered here: anything that tracks open packages, anything that inherits it
+  // from an ancestor, and any parent on the way down to such a category —
+  // otherwise a nested one would have no path to reach it.
+  const packagedCats = useMemo(
+    () => allCats.filter((c: any) =>
+      branchTracksOpen(allCats as any, c) || packagingSourceOf(allCats as any, c.name) != null),
     [allCats],
   );
 
-  const activeRoot = useMemo(() => {
-    if (!openCat) return null;
-    const c = allCats.find((x: any) => x.name === openCat);
-    if (!c) return openCat;
-    if (c.parentId == null) return openCat;
-    return allCats.find((x: any) => x.id === c.parentId)?.name ?? openCat;
-  }, [allCats, openCat]);
-
-  const subCats = useMemo(
-    () => (activeRoot ? childrenOf(allCats as any, activeRoot) : []),
-    [allCats, activeRoot],
+  // Packaging settings for the open category, inherited from the nearest
+  // ancestor that carries them.
+  const openPackaging = useMemo(
+    () => (openCat ? packagingSourceOf(allCats as any, openCat) : null),
+    [allCats, openCat],
   );
 
-  // Packaging settings for the open category, inherited from the parent when the
-  // subcategory doesn't carry its own.
-  const openPackaging = useMemo(() => {
-    if (!openCat) return null;
-    const c = allCats.find((x: any) => x.name === openCat);
-    if (!c) return null;
-    if (c.tracksOpen) return c;
-    if (c.parentId != null) {
-      const p = allCats.find((x: any) => x.id === c.parentId);
-      if (p?.tracksOpen) return p;
-    }
-    return null;
-  }, [allCats, openCat]);
+  const countIn = (name: string) => {
+    const scope = new Set(categoryScope(allCats as any, name));
+    return items.filter(i => scope.has(i.category)).length;
+  };
 
   // Re-target when a quick-access tile points at another category.
   useEffect(() => { if (initialCategory) setOpenCat(initialCategory); }, [initialCategory]);
@@ -221,39 +207,15 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         </div>
       )}
 
-      {!loading && packagedRoots.length > 0 && (
+      {!loading && packagedCats.length > 0 && (
         <div className="space-y-3">
-          <div className="flex gap-1.5 flex-wrap">
-            {packagedRoots.map((c: any) => (
-              <button key={c.id} onClick={() => setOpenCat(activeRoot === c.name ? null : c.name)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
-                  activeRoot === c.name ? 'bg-[#16181A] text-white' : 'glass text-black/60 hover:text-black'
-                }`}>
-                <Icon name="box" size={15} /> {c.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Subcategories of the open category. */}
-          {activeRoot && subCats.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap items-center">
-              <Icon name="chevron" size={13} className="text-black/20 -rotate-90" />
-              <button onClick={() => setOpenCat(activeRoot)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                  openCat === activeRoot ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
-                }`}>
-                Vše v {activeRoot}
-              </button>
-              {subCats.map((s: any) => (
-                <button key={s.id} onClick={() => setOpenCat(s.name)}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                    openCat === s.name ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
-                  }`}>
-                  {s.name}
-                </button>
-              ))}
-            </div>
-          )}
+          <CategoryNav
+            categories={packagedCats}
+            current={openCat}
+            onNavigate={setOpenCat}
+            countOf={countIn}
+            rootLabel="Zbytky"
+          />
 
           {openCat && openPackaging && (() => {
             const scope = new Set(categoryScope(allCats as any, openCat));
