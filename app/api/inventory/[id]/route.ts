@@ -60,6 +60,7 @@ async function mappedItem(id: number, teamId: number | null) {
         i.unit_cost         AS "unitCost",
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
+        i.brand, i.description, i.archived,
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
@@ -219,6 +220,23 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.unitCost !== undefined) {
     const uc = body.unitCost === '' || body.unitCost === null ? null : Math.max(0, Math.round(Number(body.unitCost)));
     try { await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${id}`; } catch { /* column not migrated yet */ }
+  }
+
+  // Brand, description and the parked flag — separate so an un-migrated DB
+  // still saves the rest of the edit.
+  if (body.brand !== undefined || body.description !== undefined || body.archived !== undefined) {
+    const brand = body.brand !== undefined
+      ? (body.brand ? String(body.brand).trim().slice(0, 120) || null : null)
+      : (item.brand ?? null);
+    const description = body.description !== undefined
+      ? (body.description ? String(body.description).trim().slice(0, 500) || null : null)
+      : (item.description ?? null);
+    const archived = body.archived !== undefined ? body.archived === true : item.archived === true;
+    try {
+      await sql`
+        UPDATE inventory_items SET brand = ${brand}, description = ${description}, archived = ${archived}
+        WHERE id = ${id}`;
+    } catch { /* columns not migrated yet */ }
   }
 
   // Packaging, same treatment — an un-migrated DB must not block a plain edit.

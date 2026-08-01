@@ -38,6 +38,7 @@ export async function GET() {
         i.unit_cost         AS "unitCost",
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
+        i.brand, i.description, i.archived,
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
@@ -46,6 +47,26 @@ export async function GET() {
       WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
       ORDER BY i.name ASC`;
   } catch {
+   try {
+    items = await sql`
+      SELECT
+        i.id, i.name, i.category, i.quantity,
+        i.min_quantity      AS "minQuantity",
+        i.critical_quantity AS "criticalQuantity",
+        i.max_quantity      AS "maxQuantity",
+        i.unit, i.supplier,
+        i.supplier_url      AS "supplierUrl",
+        i.unit_cost         AS "unitCost",
+        i.package_size      AS "packageSize",
+        i.open_amount       AS "openAmount",
+        i.updated_at        AS "updatedAt",
+        i.updated_by        AS "updatedBy",
+        u.name              AS "updatedByName"
+      FROM inventory_items i
+      LEFT JOIN users u ON u.id = i.updated_by
+      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      ORDER BY i.name ASC`;
+   } catch {
     items = await sql`
       SELECT
         i.id, i.name, i.category, i.quantity,
@@ -61,6 +82,7 @@ export async function GET() {
       LEFT JOIN users u ON u.id = i.updated_by
       WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
       ORDER BY i.name ASC`;
+   }
   }
 
   // The category decides whether the thresholds mean packages or content, so the
@@ -104,6 +126,9 @@ export async function GET() {
       : item;
     return {
       ...item,
+      brand: i.brand ?? null,
+      description: i.description ?? null,
+      archived: i.archived === true,
       status: stockStatus(sized as any, packaging),
       thresholdUnit: packaging?.thresholdUnit ?? 'package',
     };
@@ -141,6 +166,19 @@ export async function POST(request: Request) {
   // unit_cost applied separately so a not-yet-migrated column can't fail the insert.
   if (unitCost !== null && Number.isFinite(unitCost)) {
     try { await sql`UPDATE inventory_items SET unit_cost = ${unitCost} WHERE id = ${item.id}`; } catch { /* column not migrated yet */ }
+  }
+
+  // Same treatment for the newer descriptive columns and the package size.
+  const brand = body.brand ? String(body.brand).trim().slice(0, 120) || null : null;
+  const description = body.description ? String(body.description).trim().slice(0, 500) || null : null;
+  if (brand || description) {
+    try {
+      await sql`UPDATE inventory_items SET brand = ${brand}, description = ${description} WHERE id = ${item.id}`;
+    } catch { /* columns not migrated yet */ }
+  }
+  const rawSize = body.packageSize === '' || body.packageSize == null ? null : Number(body.packageSize);
+  if (rawSize !== null && Number.isFinite(rawSize) && rawSize > 0) {
+    try { await sql`UPDATE inventory_items SET package_size = ${rawSize} WHERE id = ${item.id}`; } catch { /* not migrated */ }
   }
 
   return NextResponse.json({ ok: true, id: item.id });

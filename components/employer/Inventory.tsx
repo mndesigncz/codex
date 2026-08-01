@@ -9,9 +9,10 @@ import {
 } from '@/lib/packaging';
 import {
   buildTree, flattenTree, categoryScope, categoryPath, childrenOf, possibleParents,
-  packagingSourceOf, type TreeNode,
+  packagingSourceOf, ancestryOf, type TreeNode,
 } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
+import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -28,6 +29,9 @@ interface Item {
   unitCost?: number | null;
   packageSize?: number | null;
   openAmount?: number | null;
+  brand?: string | null;
+  description?: string | null;
+  archived?: boolean;
   updatedAt?: string;
   updatedByName?: string;
 }
@@ -37,6 +41,7 @@ interface Category {
   name: string;
   position: number;
   parentId?: number | null;
+  defaults?: ItemDefaults;
   tracksOpen?: boolean;
   thresholdUnit?: 'package' | 'content';
   contentUnit?: string | null;
@@ -68,7 +73,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '' };
+const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -133,6 +138,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [inlineParent, setInlineParent] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
+  // Parked items live behind a toggle so they can't clutter the active stock.
+  const [showArchived, setShowArchived] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [notice, setNotice] = useState('');
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,16 +206,21 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     return (name: string) => map.get(name) ?? null;
   }, [categories]);
 
+  // Parked items are out of the active stock entirely — they must not show up
+  // in counts, alerts or the shopping list.
+  const active = useMemo(() => items.filter(i => i.archived !== true), [items]);
+  const archivedCount = items.length - active.length;
+
   // Counts on the navigation buttons include everything nested below.
   const countIn = useMemo(() => (name: string) => {
     const scope = new Set(categoryScope(categories, name));
-    return items.filter(i => scope.has(i.category)).length;
-  }, [categories, items]);
+    return active.filter(i => scope.has(i.category)).length;
+  }, [categories, active]);
 
   const alertsIn = useMemo(() => (name: string) => {
     const scope = new Set(categoryScope(categories, name));
-    return items.filter(i => scope.has(i.category) && statusOf(i, pk) !== 'ok').length;
-  }, [categories, items, pk]);
+    return active.filter(i => scope.has(i.category) && statusOf(i, pk) !== 'ok').length;
+  }, [categories, active, pk]);
 
   // A category that tracks open packages renders its own two-mode view.
   // Subcategories inherit the setting from their parent, so packaging is
@@ -229,8 +241,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     // Picking a parent category includes everything filed under its subcategories.
     const scope = cat === 'Vše' ? null : new Set(categoryScope(categories, cat));
     const list = items.filter(i =>
+      (showArchived ? i.archived === true : i.archived !== true) &&
       (scope === null || scope.has(i.category)) &&
-      (q === '' || i.name.toLowerCase().includes(q) || (i.supplier ?? '').toLowerCase().includes(q)));
+      (q === '' || i.name.toLowerCase().includes(q) || (i.brand ?? '').toLowerCase().includes(q)
+        || (i.supplier ?? '').toLowerCase().includes(q)));
     const sorted = [...list];
     sorted.sort((a, b) => {
       switch (sort) {
@@ -249,30 +263,61 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       }
     });
     return sorted;
-  }, [items, categories, cat, search, sort, pk]);
+  }, [items, categories, cat, search, sort, pk, showArchived]);
 
-  const critical = items.filter(i => statusOf(i, pk) === 'critical');
-  const low = items.filter(i => statusOf(i, pk) === 'low');
+  const critical = active.filter(i => statusOf(i, pk) === 'critical');
+  const low = active.filter(i => statusOf(i, pk) === 'low');
 
   // Items to (re)order: critical first, then low, alphabetically within each group.
   const toBuy = useMemo(() =>
-    items
+    active
       .filter(i => statusOf(i, pk) !== 'ok')
       .sort((a, b) => {
         const d = statusRank[statusOf(a, pk)] - statusRank[statusOf(b, pk)];
         return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
       }),
-  [items, pk]);
+  [active, pk]);
+
+  // Defaults for a category = everything its ancestors set, overridden by its
+  // own, so a rule high up still holds while a subcategory can tweak one field.
+  const defaultsFor = useMemo(() => (name: string): ItemDefaults =>
+    mergeDefaults(ancestryOf(categories, name).map(c => c.defaults)),
+  [categories]);
+
+  // Choosing a category while creating re-applies its prefill; while editing an
+  // existing item it only re-files it, so nothing typed gets overwritten.
+  const pickCategory = (name: string) => {
+    if (editing) { setForm(f => ({ ...f, category: name })); return; }
+    setForm(f => ({ ...seedForm(name), name: f.name, quantity: f.quantity }));
+  };
+
+  const seedForm = (categoryName: string) => {
+    const d = defaultsFor(categoryName);
+    return {
+      ...emptyForm,
+      category: categoryName,
+      brand: d.brand ?? '',
+      description: d.description ?? '',
+      unit: d.unit ?? emptyForm.unit,
+      supplier: d.supplier ?? '',
+      supplierUrl: d.supplierUrl ?? '',
+      unitCost: d.unitCost != null ? String(d.unitCost) : '',
+      packageSize: d.packageSize != null ? String(d.packageSize) : '',
+      minQuantity: d.minQuantity != null ? String(d.minQuantity) : emptyForm.minQuantity,
+      criticalQuantity: d.criticalQuantity != null ? String(d.criticalQuantity) : emptyForm.criticalQuantity,
+      maxQuantity: d.maxQuantity != null ? String(d.maxQuantity) : emptyForm.maxQuantity,
+    };
+  };
 
   const openNew = () => {
     setEditing(null);
-    setForm({ ...emptyForm, category: catNames[0] ?? '' });
+    setForm(seedForm(cat !== 'Vše' ? cat : (catNames[0] ?? '')));
     setNewCatInline('');
     setShowForm(true);
   };
   const openEdit = (i: Item) => {
     setEditing(i);
-    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '' });
+    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
     setNewCatInline('');
     setShowForm(true);
   };
@@ -313,6 +358,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
       unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
+      brand: form.brand, description: form.description, archived: form.archived,
+      packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
     };
     try {
       if (editing) {
@@ -332,6 +379,17 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     try {
       await fetch(`/api/inventory/${i.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quantity: q }) });
     } catch {}
+  };
+
+  // Parking and un-parking an item is one click — no dialog, no form.
+  const setArchived = async (i: Item, archived: boolean) => {
+    setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived } : x));
+    try {
+      await fetch(`/api/inventory/${i.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived }),
+      });
+    } catch { setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x)); }
   };
 
   const remove = async (i: Item) => {
@@ -425,6 +483,14 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           {cat !== 'Vše' ? ` v „${categoryPath(categories, cat)}"` : ''}
           {cat !== 'Vše' && subCats.length > 0 ? ' včetně podkategorií' : ''}
         </span>
+        {(archivedCount > 0 || showArchived) && (
+          <button onClick={() => setShowArchived(v => !v)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+              showArchived ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+            }`}>
+            {showArchived ? 'Zpět na aktivní sklad' : `Momentálně nevedeme (${archivedCount})`}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -443,9 +509,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
         />
       ) : view === 'list' ? (
-        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} />
+        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} />
+        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} />
       )}
 
       {/* Item form modal */}
@@ -472,9 +538,23 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
                   <Icon name="leaf" size={14} className="text-[#5B7A08]" /> Základní informace
                 </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název</label>
+                    <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Sencha Gyokuro" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Značka</label>
+                    <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Např. Stanislaw" className={inputClass} />
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název</label>
-                  <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Sencha Gyokuro" className={inputClass} />
+                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">
+                    Krátký popis <span className="normal-case tracking-normal text-black/30">· uvidí ho obsluha rovnou na kartě</span>
+                  </label>
+                  <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
+                    placeholder="Např. medová, jemná, pro začátečníky"
+                    className={`${inputClass} resize-none`} />
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
@@ -484,14 +564,14 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                         <div key={c.id} style={{ paddingLeft: depth * 14 }}
                           className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
                           <CatChip name={c.name} active={form.category === c.name} small={depth > 0}
-                            onPick={() => setForm(f => ({ ...f, category: c.name }))} />
+                            onPick={() => pickCategory(c.name)} />
                         </div>
                       ))}
                       {orphanNames.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {orphanNames.map(c => (
                             <CatChip key={c} name={c} active={form.category === c}
-                              onPick={() => setForm(f => ({ ...f, category: c }))} />
+                              onPick={() => pickCategory(c)} />
                           ))}
                         </div>
                       )}
@@ -544,6 +624,17 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
                     <input type="number" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
                   </div>
+                  {pk(form.category) && (
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Velikost balení</label>
+                      <div className="relative">
+                        <input type="number" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
+                          placeholder={String(pk(form.category)?.defaultPackageSize ?? '')} className={`${inputClass} pr-12`} />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{pk(form.category)?.contentUnit}</span>
+                      </div>
+                      <p className="text-[11px] text-black/40 mt-1.5">Prázdné = výchozí z kategorie.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -607,6 +698,18 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                   </div>
                 </div>
               </div>
+
+              {/* Section: dostupnost */}
+              <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 cursor-pointer">
+                <input type="checkbox" checked={form.archived} onChange={e => setForm(f => ({ ...f, archived: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 accent-[#C8F542]" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-[#16181A]">Momentálně nevedeme</span>
+                  <span className="block text-[11px] text-black/45 mt-0.5">
+                    Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klikem ji vrátíš zpět.
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Sticky footer */}
@@ -704,9 +807,9 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
 }
 
 /* ---------- List view (dense rows) ---------- */
-function ListView({ items, step, openEdit, remove, pk }: {
+function ListView({ items, step, openEdit, remove, pk, setArchived }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
-  pk: PackagingLookup;
+  pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
 }) {
   return (
     <div className="glass-card overflow-hidden">
@@ -727,7 +830,11 @@ function ListView({ items, step, openEdit, remove, pk }: {
             <div key={i.id} className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_140px_200px_auto] gap-2 md:gap-3 items-center px-4 py-3 hover:bg-black/[0.02] transition-colors">
               <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
               <div className="min-w-0">
-                <p className="font-medium text-sm text-[#16181A] truncate">{i.name}</p>
+                <p className="font-medium text-sm text-[#16181A] truncate">
+                  {i.name}
+                  {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
+                </p>
+                {i.description && <p className="text-[11px] text-black/50 truncate">{i.description}</p>}
                 <p className="text-[11px] text-black/40 truncate md:hidden">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
                 {(i.updatedByName || i.updatedAt) && (
                   <p className="text-[11px] text-black/30 truncate hidden md:block">{relTime(i.updatedAt)}{i.updatedByName ? ` · ${i.updatedByName}` : ''}</p>
@@ -744,9 +851,12 @@ function ListView({ items, step, openEdit, remove, pk }: {
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[10px] text-black/40 ml-0.5">{i.unit}</span></span>
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
-                {i.supplierUrl && (
+                {i.archived ? (
+                  <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
+                    className="rounded-full bg-[#C8F542] text-black px-3.5 h-8 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
+                ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
-                )}
+                ) : null}
                 <button onClick={() => openEdit(i)} title="Upravit" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
                 <button onClick={() => remove(i)} title="Smazat" className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
@@ -759,9 +869,9 @@ function ListView({ items, step, openEdit, remove, pk }: {
 }
 
 /* ---------- Grid view (glass cards) ---------- */
-function GridView({ items, step, openEdit, remove, money, pk }: {
+function GridView({ items, step, openEdit, remove, money, pk, setArchived }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
-  money: (n: number) => string; pk: PackagingLookup;
+  money: (n: number) => string; pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -774,8 +884,12 @@ function GridView({ items, step, openEdit, remove, money, pk }: {
           <div key={i.id} className="glass-card p-5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-semibold text-[#16181A] truncate">{i.name}</p>
-                <p className="text-xs text-black/45 truncate">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
+                <p className="font-semibold text-[#16181A] truncate">
+                  {i.name}
+                  {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
+                </p>
+                {i.description && <p className="text-xs text-black/55 line-clamp-2 mt-0.5">{i.description}</p>}
+                <p className="text-xs text-black/40 truncate mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-medium shrink-0 ${chip}`}>{st === 'critical' ? 'Kriticky' : st === 'low' ? 'Dochází' : 'OK'}</span>
             </div>
@@ -789,9 +903,12 @@ function GridView({ items, step, openEdit, remove, money, pk }: {
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">+</button>
               </div>
               <div className="flex items-center gap-1">
-                {i.supplierUrl && (
+                {i.archived ? (
+                  <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
+                    className="rounded-full bg-[#C8F542] text-black px-4 h-9 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
+                ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
-                )}
+                ) : null}
                 <button onClick={() => openEdit(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
                 <button onClick={() => remove(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
@@ -1144,6 +1261,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   const [editName, setEditName] = useState('');
   const [packId, setPackId] = useState<number | null>(null);
   const [moveId, setMoveId] = useState<number | null>(null);
+  const [prefillId, setPrefillId] = useState<number | null>(null);
   const [err, setErr] = useState('');
 
   const tree = useMemo(() => buildTree(categories), [categories]);
@@ -1167,7 +1285,17 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           parentOptions={possibleParents(categories, c.id)} setParent={p => setParent(c, p)}
           childCount={node.children.length}
           inheritsPackaging={!c.tracksOpen && inherited != null}
+          prefillOpen={prefillId === c.id}
+          togglePrefill={() => setPrefillId(prefillId === c.id ? null : c.id)}
+          hasPrefill={hasDefaults(c.defaults)}
         />
+        {prefillId === c.id && (
+          <DefaultsEditor
+            category={c}
+            inherited={mergeDefaults(ancestryOf(categories, c.name).slice(0, -1).map(a => a.defaults))}
+            onSaved={onChanged}
+          />
+        )}
         {packId === c.id && <PackagingEditor category={c} onSaved={onChanged} />}
         {node.children.length > 0 && (
           <div className="ml-3 pl-3 border-l border-black/[0.08] space-y-2">
@@ -1305,7 +1433,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 function CategoryRow({
   c, siblings, idx, busy, nested, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
   move, onDelete, packOpen, togglePack, moveOpen, toggleMove, parentOptions, setParent, childCount,
-  inheritsPackaging,
+  inheritsPackaging, prefillOpen, togglePrefill, hasPrefill,
 }: {
   c: Category; siblings: Category[]; idx: number; busy: boolean; nested?: boolean;
   editing: boolean; editName: string; setEditName: (v: string) => void;
@@ -1316,6 +1444,7 @@ function CategoryRow({
   moveOpen: boolean; toggleMove: () => void;
   parentOptions: Category[]; setParent: (parentId: number | null) => void;
   childCount: number; inheritsPackaging?: boolean;
+  prefillOpen: boolean; togglePrefill: () => void; hasPrefill: boolean;
 }) {
   // Anything can be re-filed except under its own branch, which possibleParents
   // has already excluded.
@@ -1347,6 +1476,12 @@ function CategoryRow({
             <Icon name="swap" size={14} />
           </button>
         )}
+        <button onClick={togglePrefill} title="Předvyplnění nových položek"
+          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
+            prefillOpen ? 'bg-[#16181A] text-white' : hasPrefill ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
+          }`}>
+          <Icon name="clipboard" size={14} />
+        </button>
         <button onClick={togglePack} title="Balení a zbytky"
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
           <Icon name="box" size={15} />
@@ -1373,6 +1508,85 @@ function CategoryRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- Per-category prefill for new items ---------- */
+// The fields a shop fills in the same way for every product in a category are
+// set here once; a new item in the category starts with them already filled.
+function DefaultsEditor({ category, inherited, onSaved }: {
+  category: Category;
+  inherited: ItemDefaults;
+  onSaved: () => Promise<void> | void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const own = category.defaults ?? {};
+    const out: Record<string, string> = {};
+    DEFAULT_FIELDS.forEach(f => { out[f.key] = (own as any)[f.key] != null ? String((own as any)[f.key]) : ''; });
+    return out;
+  });
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
+
+  const save = async () => {
+    setBusy(true); setSaved(false); setErr('');
+    const payload: Record<string, any> = {};
+    DEFAULT_FIELDS.forEach(f => {
+      const v = values[f.key]?.trim();
+      if (v) payload[f.key] = f.kind === 'number' ? Number(v) : v;
+    });
+    try {
+      const res = await fetch(`/api/inventory/categories/${category.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaults: payload }),
+      });
+      if (res.ok) { setSaved(true); await onSaved(); setTimeout(() => setSaved(false), 1800); }
+      else {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || 'Předvyplnění se nepodařilo uložit.');
+      }
+    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+      <p className="text-[11px] text-black/50">
+        Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {DEFAULT_FIELDS.map(f => {
+          const fromParent = (inherited as any)[f.key];
+          return (
+            <div key={f.key} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}>
+              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">{f.label}</label>
+              {f.kind === 'multiline' ? (
+                <textarea rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                  placeholder={fromParent != null ? String(fromParent) : f.hint}
+                  className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] resize-none focus:outline-none focus:border-[#C8F542]/50" />
+              ) : (
+                <input type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                  value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                  placeholder={fromParent != null ? String(fromParent) : f.hint}
+                  className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+              )}
+              {fromParent != null && !values[f.key] && (
+                <p className="text-[10px] text-black/35 mt-0.5">Zdědí se z nadřazené kategorie.</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={save} disabled={busy}
+          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 transition">
+          {busy ? 'Ukládám…' : 'Uložit'}
+        </button>
+        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
+        {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+      </div>
     </div>
   );
 }

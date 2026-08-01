@@ -21,6 +21,8 @@ export interface StockItem {
   criticalQuantity: number;
   unit: string;
   supplierUrl?: string;
+  brand?: string | null;
+  description?: string | null;
   packageSize?: number | null;
   openAmount?: number | null;
 }
@@ -200,13 +202,17 @@ export default function CategoryStockView({
                   return (
                     <div key={i.id} className="glass-card p-4">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold text-[#16181A] leading-snug min-w-0">{i.name}</p>
+                        <p className="font-semibold text-[#16181A] leading-snug min-w-0">
+                          {i.name}
+                          {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
+                        </p>
                         {st !== 'ok' && (
                           <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
                             {st === 'critical' ? 'Dochází' : 'Málo'}
                           </span>
                         )}
                       </div>
+                      {i.description && <p className="text-xs text-black/55 mt-1 line-clamp-2">{i.description}</p>}
                       <p className="text-sm text-black/55 mt-1 tabular-nums">
                         {formatStock({ ...i, packageSize: size }, unit, i.unit)}
                       </p>
@@ -244,6 +250,7 @@ export default function CategoryStockView({
                   <div className="min-w-0">
                     <p className="font-semibold text-[#16181A] leading-snug">
                       {i.name}
+                      {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                       {showHeadings && i.category && i.category !== category && (
                         <span className="ml-2 rounded-full bg-black/[0.05] px-2 py-0.5 text-[10px] font-medium text-black/45 align-middle">{i.category}</span>
                       )}

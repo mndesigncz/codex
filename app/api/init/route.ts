@@ -557,6 +557,14 @@ export async function GET() {
     await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS parent_id INTEGER`;
     // Whether min/critical are counted in packages or in the content unit.
     await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS threshold_unit TEXT`;
+    // What a new item in this category starts with, so the repeated fields are
+    // filled in once on the category instead of on every product.
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS defaults JSONB`;
+    // Shown on the item preview without opening it.
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS brand TEXT`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS description TEXT`;
+    // Parked items: kept in the catalogue but out of the way until restocked.
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE`;
     // Per item: how big its package is and how much is left in the open one.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`;

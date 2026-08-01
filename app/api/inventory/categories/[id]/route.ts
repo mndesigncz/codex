@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeScale, normalizeThresholdUnit } from '@/lib/packaging';
 import { wouldCycle } from '@/lib/categoryTree';
+import { normalizeDefaults } from '@/lib/itemDefaults';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     } catch {
       return NextResponse.json({ error: 'Podkategorie nejsou dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
+
+  // Per-category prefill for new items — saved on its own so an older DB can
+  // still take the rest of the edit.
+  if (body.defaults !== undefined) {
+    const defaults = normalizeDefaults(body.defaults);
+    try {
+      await sql`
+        UPDATE inventory_categories SET defaults = ${JSON.stringify(defaults)}::jsonb
+        WHERE id = ${id} AND team_id = ${me.teamId}`;
+    } catch {
+      return NextResponse.json({ error: 'Předvyplnění není dostupné — spusť /api/init.' }, { status: 400 });
     }
   }
 

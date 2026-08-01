@@ -21,6 +21,9 @@ interface Item {
   minQuantity: number;
   criticalQuantity: number;
   unit: string;
+  brand?: string | null;
+  description?: string | null;
+  archived?: boolean;
   packageSize?: number | null;
   openAmount?: number | null;
 }
@@ -52,7 +55,10 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
   const itemsIn = (name: string) => {
     const scope = new Set(categoryScope(categories, name));
-    return items.filter(i => scope.has(i.category)).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    // Parked items are not on the shelf, so they must not appear in the sweep.
+    return items
+      .filter(i => scope.has(i.category) && i.archived !== true)
+      .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   };
 
   const countIn = (name: string) => itemsIn(name).length;
@@ -186,7 +192,11 @@ function ItemRow({ item, packaging, onChanged }: {
     <div className="glass-card p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <p className="font-bold text-[#16181A] text-lg leading-snug truncate">{item.name}</p>
+          <p className="font-bold text-[#16181A] text-lg leading-snug truncate">
+            {item.name}
+            {item.brand && <span className="ml-1.5 text-base font-normal text-black/40">{item.brand}</span>}
+          </p>
+          {item.description && <p className="text-xs text-black/50 line-clamp-2">{item.description}</p>}
           <p className="text-sm text-black/45 tabular-nums">
             {formatStock(sized, unit, item.unit)}
             <span className="text-black/25"> · balení {fmtAmount(size)} {unit}</span>
@@ -317,6 +327,8 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
       <div className="glass-card p-6 space-y-5">
         <div className="text-center">
           <p className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A] leading-tight">{item.name}</p>
+          {item.brand && <p className="text-base text-black/45 mt-0.5">{item.brand}</p>}
+          {item.description && <p className="text-sm text-black/50 mt-1">{item.description}</p>}
           <p className="text-sm text-black/45 mt-1 tabular-nums">
             Teď: {formatStock(sized, packaging.contentUnit, item.unit)}
           </p>

@@ -12,6 +12,8 @@ interface Item {
   minQuantity: number;
   criticalQuantity: number;
   unit: string;
+  brand?: string | null;
+  archived?: boolean;
   packageSize?: number | null;
   openAmount?: number | null;
 }
@@ -44,6 +46,7 @@ export default function KioskInventory() {
 
   const cats = useMemo(() => ['Vše', ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
   const filtered = items.filter(i =>
+    i.archived !== true &&
     (cat === 'Vše' || i.category === cat) &&
     (!search.trim() || i.name.toLowerCase().includes(search.trim().toLowerCase())));
 
@@ -102,7 +105,10 @@ export default function KioskInventory() {
                   <div key={i.id} className={`glass-card p-4 flex items-center gap-3 ${st === 'critical' ? 'border-red-500/25' : ''}`}>
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-[#16181A] truncate">{i.name}</p>
+                      <p className="font-semibold text-[#16181A] truncate">
+                        {i.name}
+                        {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
+                      </p>
                       <p className="text-xs text-black/40 truncate">{i.category}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
