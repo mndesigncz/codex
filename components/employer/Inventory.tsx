@@ -3,7 +3,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import CategoryStockView from '../inventory/CategoryStockView';
-import { normalizeCategoryPackaging, normalizeScale, CONTENT_UNITS, type ScaleStep } from '@/lib/packaging';
+import {
+  normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
+  CONTENT_UNITS, type ScaleStep, type CategoryPackaging,
+} from '@/lib/packaging';
 import { buildTree, categoryScope, categoryPath, childrenOf, possibleParents } from '@/lib/categoryTree';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
@@ -19,6 +22,8 @@ interface Item {
   supplier?: string;
   supplierUrl?: string;
   unitCost?: number | null;
+  packageSize?: number | null;
+  openAmount?: number | null;
   updatedAt?: string;
   updatedByName?: string;
 }
@@ -29,6 +34,7 @@ interface Category {
   position: number;
   parentId?: number | null;
   tracksOpen?: boolean;
+  thresholdUnit?: 'package' | 'content';
   contentUnit?: string | null;
   defaultPackageSize?: number | null;
   scale?: any;
@@ -68,10 +74,12 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'updated', label: 'Naposledy upraveno' },
 ];
 
-function statusOf(i: Item): 'ok' | 'low' | 'critical' {
-  if (i.quantity <= i.criticalQuantity) return 'critical';
-  if (i.quantity <= i.minQuantity) return 'low';
-  return 'ok';
+// Packaged categories decide what the thresholds are counted in, so the status
+// always comes from the same helper the stock view and the server alert use.
+type PackagingLookup = (categoryName: string) => CategoryPackaging | null;
+
+function statusOf(i: Item, pk?: PackagingLookup): 'ok' | 'low' | 'critical' {
+  return stockStatus(i as any, pk ? pk(i.category) : null);
 }
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
@@ -186,6 +194,17 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     [categories, activeRoot],
   );
 
+  // Packaging settings by category name, with subcategories inheriting the
+  // parent's. Everything that judges stock levels goes through this.
+  const pk = useMemo<PackagingLookup>(() => {
+    const map = new Map<string, CategoryPackaging>();
+    categories.forEach(c => {
+      const own = c.tracksOpen ? c : (c.parentId != null ? categories.find(x => x.id === c.parentId) : null);
+      if (own?.tracksOpen) map.set(c.name, normalizeCategoryPackaging(own));
+    });
+    return (name: string) => map.get(name) ?? null;
+  }, [categories]);
+
   // A category that tracks open packages renders its own two-mode view.
   // Subcategories inherit the setting from their parent, so packaging is
   // configured once on "Tabáky" and every subcategory under it behaves the same.
@@ -213,7 +232,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         case 'qtyAsc': return a.quantity - b.quantity;
         case 'qtyDesc': return b.quantity - a.quantity;
         case 'status': {
-          const d = statusRank[statusOf(a)] - statusRank[statusOf(b)];
+          const d = statusRank[statusOf(a, pk)] - statusRank[statusOf(b, pk)];
           return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
         }
         case 'updated': {
@@ -225,20 +244,20 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       }
     });
     return sorted;
-  }, [items, categories, cat, search, sort]);
+  }, [items, categories, cat, search, sort, pk]);
 
-  const critical = items.filter(i => statusOf(i) === 'critical');
-  const low = items.filter(i => statusOf(i) === 'low');
+  const critical = items.filter(i => statusOf(i, pk) === 'critical');
+  const low = items.filter(i => statusOf(i, pk) === 'low');
 
   // Items to (re)order: critical first, then low, alphabetically within each group.
   const toBuy = useMemo(() =>
     items
-      .filter(i => statusOf(i) !== 'ok')
+      .filter(i => statusOf(i, pk) !== 'ok')
       .sort((a, b) => {
-        const d = statusRank[statusOf(a)] - statusRank[statusOf(b)];
+        const d = statusRank[statusOf(a, pk)] - statusRank[statusOf(b, pk)];
         return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
       }),
-  [items]);
+  [items, pk]);
 
   const openNew = () => {
     setEditing(null);
@@ -443,9 +462,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
         />
       ) : view === 'list' ? (
-        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} />
+        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} />
+        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} />
       )}
 
       {/* Item form modal */}
@@ -558,21 +577,35 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
               <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
                   <Icon name="warning" size={14} className="text-orange-500" /> Hlídání zásob
+                  <span className="normal-case tracking-normal text-black/35 font-normal">
+                    · v {thresholdUnitLabel(pk(form.category), form.unit || 'ks')}
+                  </span>
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-600/70 mb-1.5">
                       <span className="w-2 h-2 rounded-full bg-orange-400" /> Upozornit při
                     </label>
-                    <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={inputClass} />
+                    <div className="relative">
+                      <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form.category), form.unit || 'ks')}</span>
+                    </div>
                   </div>
                   <div>
                     <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-red-600/70 mb-1.5">
                       <span className="w-2 h-2 rounded-full bg-red-500" /> Kriticky málo při
                     </label>
-                    <input type="number" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={inputClass} />
+                    <div className="relative">
+                      <input type="number" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form.category), form.unit || 'ks')}</span>
+                    </div>
                   </div>
                 </div>
+                {pk(form.category)?.thresholdUnit === 'content' && (
+                  <p className="text-[11px] text-black/45 rounded-xl bg-[#C8F542]/[0.12] border border-[#C8F542]/25 px-3 py-2">
+                    Kategorie „{form.category}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.
+                  </p>
+                )}
               </div>
 
               {/* Section: dodavatel */}
@@ -625,6 +658,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       {showShopping && (
         <ShoppingListModal
           items={toBuy}
+          pk={pk}
           onClose={() => setShowShopping(false)}
           onOrdered={async (count) => {
             setShowShopping(false);
@@ -696,8 +730,9 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
 }
 
 /* ---------- List view (dense rows) ---------- */
-function ListView({ items, step, openEdit, remove }: {
+function ListView({ items, step, openEdit, remove, pk }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
+  pk: PackagingLookup;
 }) {
   return (
     <div className="glass-card overflow-hidden">
@@ -710,7 +745,7 @@ function ListView({ items, step, openEdit, remove }: {
       </div>
       <div className="divide-y divide-black/[0.06]">
         {items.map(i => {
-          const st = statusOf(i);
+          const st = statusOf(i, pk);
           const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
           const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#C8F542]';
           const bar = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-orange-400' : 'bg-[#C8F542]';
@@ -750,14 +785,14 @@ function ListView({ items, step, openEdit, remove }: {
 }
 
 /* ---------- Grid view (glass cards) ---------- */
-function GridView({ items, step, openEdit, remove, money }: {
+function GridView({ items, step, openEdit, remove, money, pk }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
-  money: (n: number) => string;
+  money: (n: number) => string; pk: PackagingLookup;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {items.map(i => {
-        const st = statusOf(i);
+        const st = statusOf(i, pk);
         const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
         const barColor = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-orange-400' : 'bg-[#C8F542]';
         const chip = st === 'critical' ? 'bg-red-500/15 text-red-600' : st === 'low' ? 'bg-orange-500/15 text-orange-600' : 'bg-[#C8F542]/15 text-[#5B7A08]';
@@ -787,7 +822,7 @@ function GridView({ items, step, openEdit, remove, money }: {
                 <button onClick={() => remove(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
             </div>
-            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {i.unit}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
+            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i.category), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
           </div>
         );
       })}
@@ -996,10 +1031,11 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
 }
 
 /* ---------- Shopping list modal ---------- */
-function ShoppingListModal({ items, onClose, onOrdered }: {
+function ShoppingListModal({ items, onClose, onOrdered, pk }: {
   items: Item[];
   onClose: () => void;
   onOrdered: (createdCount: number) => void;
+  pk: PackagingLookup;
 }) {
   const [copied, setCopied] = useState(false);
   const [ordering, setOrdering] = useState(false);
@@ -1084,7 +1120,7 @@ function ShoppingListModal({ items, onClose, onOrdered }: {
               )}
               <div className="divide-y divide-black/[0.06]">
                 {list.map(i => {
-                  const st = statusOf(i);
+                  const st = statusOf(i, pk);
                   return (
                     <div key={i.id} className="flex items-center gap-2.5 py-2.5">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} title={st === 'critical' ? 'Kriticky málo' : 'Dochází'} />
@@ -1383,6 +1419,9 @@ function PackagingEditor({ category, onSaved }: {
   const [unit, setUnit] = useState(category.contentUnit ?? 'g');
   const [size, setSize] = useState(category.defaultPackageSize != null ? String(category.defaultPackageSize) : '');
   const [steps, setSteps] = useState<ScaleStep[]>(() => normalizeScale(category.scale).steps);
+  const [thresholdUnit, setThresholdUnit] = useState<'package' | 'content'>(
+    category.thresholdUnit === 'content' ? 'content' : 'package',
+  );
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState('');
@@ -1396,6 +1435,7 @@ function PackagingEditor({ category, onSaved }: {
           tracksOpen: on,
           contentUnit: unit || null,
           defaultPackageSize: size === '' ? null : Number(size),
+          thresholdUnit,
           scale: { kind: 'fraction', steps },
         }),
       });
@@ -1441,6 +1481,30 @@ function PackagingEditor({ category, onSaved }: {
               <input type="number" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
                 className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
             </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Hlídat zásoby podle</p>
+            <div className="flex gap-1 rounded-full bg-white border border-black/[0.08] p-1 w-fit">
+              {([['package', 'Balení'], ['content', unit ? `Obsahu (${unit})` : 'Obsahu']] as const).map(([v, lbl]) => (
+                <button key={v} type="button" onClick={() => setThresholdUnit(v)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                    thresholdUnit === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                  }`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-black/40 mt-1.5">
+              {thresholdUnit === 'content'
+                ? `„Upozornit při" a „Kriticky málo při" se u položek zadávají v ${unit || 'jednotkách obsahu'} — počítá se všechno dohromady, zavřená balení i zbytek v načatém.`
+                : 'Prahy se zadávají v balení; načaté balení se počítá jako část (půl krabičky = 0,5).'}
+            </p>
+            {thresholdUnit !== (category.thresholdUnit === 'content' ? 'content' : 'package') && (
+              <p className="text-[11px] text-amber-700 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 mt-1.5">
+                Prahy u položek v této kategorii jsou zadané v {thresholdUnit === 'content' ? 'balení' : (unit || 'jednotkách obsahu')} — po uložení je bude potřeba přepsat, jinak budou hlásit nesmysl.
+              </p>
+            )}
           </div>
 
           <div>

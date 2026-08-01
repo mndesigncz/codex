@@ -22,29 +22,27 @@ export async function GET() {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  // Packaging settings and parent_id are newer columns — fall back step by step
-  // so a pre-migration DB still lists categories instead of erroring out.
-  let rows;
-  try {
-    rows = await sql`
+  // Newest column set first, then progressively older ones, so a database that
+  // has not run the latest /api/init still lists categories instead of 500ing.
+  // Columns the query didn't select simply come back undefined below.
+  const attempts = [
+    () => sql`
+      SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
+      FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
+    () => sql`
       SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, scale
-      FROM inventory_categories
-      WHERE team_id = ${me.teamId}
-      ORDER BY position ASC, name ASC`;
-  } catch {
-    try {
-      rows = await sql`
-        SELECT id, name, position, tracks_open, content_unit, default_package_size, scale
-        FROM inventory_categories
-        WHERE team_id = ${me.teamId}
-        ORDER BY position ASC, name ASC`;
-    } catch {
-      rows = await sql`
-        SELECT id, name, position
-        FROM inventory_categories
-        WHERE team_id = ${me.teamId}
-        ORDER BY position ASC, name ASC`;
-    }
+      FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
+    () => sql`
+      SELECT id, name, position, tracks_open, content_unit, default_package_size, scale
+      FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
+    () => sql`
+      SELECT id, name, position
+      FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
+  ];
+
+  let rows: any[] = [];
+  for (const attempt of attempts) {
+    try { rows = await attempt(); break; } catch { /* try the next-oldest shape */ }
   }
 
   return NextResponse.json(rows.map((r: any) => ({
@@ -53,6 +51,7 @@ export async function GET() {
     tracksOpen: r.tracks_open === true,
     contentUnit: r.content_unit ?? null,
     defaultPackageSize: r.default_package_size != null ? Number(r.default_package_size) : null,
+    thresholdUnit: r.threshold_unit === 'content' ? 'content' : 'package',
     scale: r.scale ?? null,
   })));
 }

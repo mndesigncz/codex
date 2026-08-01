@@ -555,6 +555,8 @@ export async function GET() {
     await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS scale JSONB`;
     // Subcategories: a category may sit under another one (one level deep).
     await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS parent_id INTEGER`;
+    // Whether min/critical are counted in packages or in the content unit.
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS threshold_unit TEXT`;
     // Per item: how big its package is and how much is left in the open one.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`;

@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import {
   type CategoryPackaging, resolveSteps, formatStock, fmtAmount, openPct,
-  effectivePackages, totalContent,
+  effectivePackages, totalContent, stockStatus, thresholdUnitLabel,
 } from '@/lib/packaging';
 
 export interface StockItem {
@@ -65,12 +65,6 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
   );
 }
 
-const statusOf = (i: StockItem): 'ok' | 'low' | 'critical' => {
-  const eff = effectivePackages(i);
-  if (eff <= i.criticalQuantity) return 'critical';
-  if (eff <= i.minQuantity) return 'low';
-  return 'ok';
-};
 
 const TONE = {
   critical: { bar: 'bg-red-500', text: 'text-red-600', chip: 'bg-red-500/12 text-red-600' },
@@ -201,7 +195,7 @@ export default function CategoryStockView({
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {groupItems.map(i => {
                   const size = sizeOf(i);
-                  const st = statusOf(i);
+                  const st = stockStatus(i, packaging);
                   const pct = openPct({ ...i, packageSize: size });
                   return (
                     <div key={i.id} className="glass-card p-4">
@@ -224,6 +218,9 @@ export default function CategoryStockView({
                           <p className="text-[11px] text-black/40 mt-1">Načaté balení: {pct} %</p>
                         </>
                       )}
+                      <p className="text-[11px] text-black/30 mt-1.5">
+                        Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(packaging, i.unit)}
+                      </p>
                       {hasControls && (
                         <ItemControls item={i} onStep={onStep} onEditItem={onEditItem} onRemoveItem={onRemoveItem} />
                       )}
@@ -240,7 +237,7 @@ export default function CategoryStockView({
             const size = sizeOf(i);
             const steps = size > 0 ? resolveSteps(packaging.scale, size) : [];
             const current = Number(i.openAmount) || 0;
-            const st = statusOf(i);
+            const st = stockStatus(i, packaging);
             return (
               <div key={i.id} className="glass-card p-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">

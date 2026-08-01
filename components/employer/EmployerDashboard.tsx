@@ -140,8 +140,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
 
   const todayShifts = shifts.filter(s => (s.date ?? '') === today);
   const activeTasks = tasks.filter(t => t.status !== 'done');
-  const lowStock = inventory.filter(i => i.quantity <= i.minQuantity);
-  const critical = inventory.filter(i => i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0));
+  // `status` comes from the API, which knows whether the category counts
+  // packages or grams; the comparison is only a fallback for older payloads.
+  const lowStock = inventory.filter(i => i.status ? i.status !== 'ok' : i.quantity <= i.minQuantity);
+  const critical = inventory.filter(i => i.status ? i.status === 'critical' : i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0));
   const submittedIds = new Set(availability.map((a: any) => a.employeeId ?? a.employee_id));
   const notSubmitted = members.filter(m => !submittedIds.has(m.id));
 
@@ -322,7 +324,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 ) : (
                   <div className="space-y-2">
                     {lowStock.slice(0, 5).map(i => {
-                      const isCritical = i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0);
+                      const isCritical = i.status ? i.status === 'critical' : i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0);
                       return (
                         <div key={i.id} className="flex items-center justify-between p-3 rounded-2xl bg-black/[0.04]">
                           <span className="text-sm text-[#16181A]">{i.name}</span>
