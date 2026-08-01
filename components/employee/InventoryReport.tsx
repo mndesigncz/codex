@@ -17,6 +17,9 @@ interface InventoryItem {
   maxQuantity: number;
   unit: string;
   supplierUrl?: string;
+  brand?: string | null;
+  description?: string | null;
+  archived?: boolean;
   status?: 'ok' | 'low' | 'critical';
   packageSize?: number | null;
   openAmount?: number | null;
@@ -124,13 +127,14 @@ export default function InventoryReport({ user, initialCategory }: Props) {
     }
   };
 
+  // Parked items are not on the shelf — they must not raise alerts either.
   const lowItems = useMemo(
-    () => items.filter(i => statusOf(i) !== 'ok')
+    () => items.filter(i => i.archived !== true && statusOf(i) !== 'ok')
       .sort((a, b) => statusRank[statusOf(a)] - statusRank[statusOf(b)] || a.name.localeCompare(b.name, 'cs')),
     [items],
   );
   const filtered = useMemo(
-    () => items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())),
+    () => items.filter(i => i.archived !== true && i.name.toLowerCase().includes(search.toLowerCase())),
     [items, search],
   );
 
@@ -285,8 +289,11 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                     <div className="flex items-center gap-3 min-w-0">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#16181A] truncate">{item.name}</p>
-                        <p className="text-xs text-black/45 truncate">{item.category}</p>
+                        <p className="text-sm font-medium text-[#16181A] truncate">
+                          {item.name}
+                          {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
+                        </p>
+                        <p className="text-xs text-black/45 truncate">{item.description || item.category}</p>
                       </div>
                     </div>
                     <Stepper item={item} />

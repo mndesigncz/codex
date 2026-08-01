@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { normalizeDefaults } from '@/lib/itemDefaults';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,9 @@ export async function GET() {
   // has not run the latest /api/init still lists categories instead of 500ing.
   // Columns the query didn't select simply come back undefined below.
   const attempts = [
+    () => sql`
+      SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, defaults, scale
+      FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
     () => sql`
       SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
       FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
@@ -52,6 +56,7 @@ export async function GET() {
     contentUnit: r.content_unit ?? null,
     defaultPackageSize: r.default_package_size != null ? Number(r.default_package_size) : null,
     thresholdUnit: r.threshold_unit === 'content' ? 'content' : 'package',
+    defaults: normalizeDefaults(r.defaults),
     scale: r.scale ?? null,
   })));
 }
