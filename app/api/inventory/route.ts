@@ -39,6 +39,7 @@ export async function GET() {
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
         i.brand, i.description, i.archived,
+        i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
@@ -108,10 +109,16 @@ export async function GET() {
     parentId: c.parent_id != null ? Number(c.parent_id) : null,
     tracksOpen: c.tracks_open === true,
   }));
+  // Keyed by id: two categories may share a name under different parents.
+  const packagingById = new Map<number, CategoryPackaging>();
   const packagingByName = new Map<string, CategoryPackaging>();
   nodes.forEach(n => {
-    const src = packagingSourceOf(nodes, n.name);
-    if (src) packagingByName.set(n.name, normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id)));
+    const src = packagingSourceOf(nodes, n);
+    if (!src) return;
+    const settings = normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id));
+    packagingById.set(n.id, settings);
+    // Name lookup stays as the fallback for items with no category_id yet.
+    if (!packagingByName.has(n.name)) packagingByName.set(n.name, settings);
   });
 
   return NextResponse.json(items.map((i: any) => {
@@ -120,12 +127,14 @@ export async function GET() {
       packageSize: i.packageSize != null ? Number(i.packageSize) : null,
       openAmount: i.openAmount != null ? Number(i.openAmount) : null,
     };
-    const packaging = packagingByName.get(i.category) ?? null;
+    const packaging = (i.categoryId != null ? packagingById.get(Number(i.categoryId)) : undefined)
+      ?? packagingByName.get(i.category) ?? null;
     const sized = packaging
       ? { ...item, packageSize: item.packageSize ?? packaging.defaultPackageSize }
       : item;
     return {
       ...item,
+      categoryId: i.categoryId != null ? Number(i.categoryId) : null,
       brand: i.brand ?? null,
       description: i.description ?? null,
       archived: i.archived === true,
@@ -176,6 +185,17 @@ export async function POST(request: Request) {
       await sql`UPDATE inventory_items SET brand = ${brand}, description = ${description} WHERE id = ${item.id}`;
     } catch { /* columns not migrated yet */ }
   }
+  // The category pointer is what filters run on; the text stays as the label.
+  const categoryId = Number(body.categoryId);
+  if (Number.isFinite(categoryId) && categoryId > 0) {
+    try {
+      await sql`
+        UPDATE inventory_items SET category_id = ${categoryId}
+        WHERE id = ${item.id} AND EXISTS (
+          SELECT 1 FROM inventory_categories c WHERE c.id = ${categoryId} AND c.team_id = ${me.teamId})`;
+    } catch { /* column not migrated yet */ }
+  }
+
   const rawSize = body.packageSize === '' || body.packageSize == null ? null : Number(body.packageSize);
   if (rawSize !== null && Number.isFinite(rawSize) && rawSize > 0) {
     try { await sql`UPDATE inventory_items SET package_size = ${rawSize} WHERE id = ${item.id}`; } catch { /* not migrated */ }

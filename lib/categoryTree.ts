@@ -82,6 +82,29 @@ export function findByName<T extends CategoryNode>(categories: T[], name: string
   return categories.find(c => c.name === name);
 }
 
+export function findById<T extends CategoryNode>(categories: T[], id: number | null): T | undefined {
+  return id == null ? undefined : categories.find(c => c.id === id);
+}
+
+/**
+ * The category and every category nested under it, by id. This is what filters
+ * run on: names may repeat under different parents, ids never do.
+ */
+export function scopeIds<T extends CategoryNode>(categories: T[], id: number): number[] {
+  return [id, ...descendantsOf(categories, id).map(c => c.id)];
+}
+
+/** From the root down to a category, by id. */
+export function ancestryOfId<T extends CategoryNode>(categories: T[], id: number | null): T[] {
+  const cat = findById(categories, id);
+  return cat ? ancestryOf(categories, cat) : [];
+}
+
+/** "Tabáky → Virginia → Sladké" for a category resolved by id. */
+export function pathOfId<T extends CategoryNode>(categories: T[], id: number | null, sep = ' → '): string {
+  return ancestryOfId(categories, id).map(c => c.name).join(sep);
+}
+
 /** Direct children of the named category. */
 export function childrenOf<T extends CategoryNode>(categories: T[], name: string): T[] {
   const cat = findByName(categories, name);
@@ -113,9 +136,9 @@ export function categoryScope<T extends CategoryNode>(categories: T[], name: str
   return [name, ...descendantsOf(categories, cat.id).map(c => c.name)];
 }
 
-/** From the root down to the named category: ["Tabáky", "Virginia", "Sladké"]. */
-export function ancestryOf<T extends CategoryNode>(categories: T[], name: string): T[] {
-  const cat = findByName(categories, name);
+/** From the root down to the given category: ["Tabáky", "Virginia", "Sladké"]. */
+export function ancestryOf<T extends CategoryNode>(categories: T[], target: T | string): T[] {
+  const cat = typeof target === 'string' ? findByName(categories, target) : target;
   if (!cat) return [];
   const chain: T[] = [cat];
   const byId = new Map<number, T>();
@@ -157,12 +180,33 @@ export function wouldCycle<T extends CategoryNode>(categories: T[], id: number, 
  * settings, so a deeply nested subcategory inherits from wherever it was
  * configured.
  */
-export function packagingSourceOf<T extends CategoryNode>(categories: T[], name: string): T | null {
-  const chain = ancestryOf(categories, name);
+export function packagingSourceOf<T extends CategoryNode>(categories: T[], target: T | string): T | null {
+  const chain = ancestryOf(categories, target);
   for (let i = chain.length - 1; i >= 0; i--) {
     if (chain[i].tracksOpen) return chain[i];
   }
   return null;
+}
+
+/**
+ * A predicate for "is this item in this category, or anything under it".
+ * Matching is by id; an item created before the id column existed falls back to
+ * its label, so nothing disappears while the backfill is pending. `orphanLabel`
+ * browses items whose category was deleted.
+ */
+export function matcher<T extends CategoryNode>(
+  categories: T[],
+  id: number | null,
+  orphanLabel?: string | null,
+): (item: { category: string; categoryId?: number | null }) => boolean {
+  if (orphanLabel) {
+    const known = new Set(categories.map(c => c.id));
+    return i => i.category === orphanLabel && (i.categoryId == null || !known.has(i.categoryId));
+  }
+  if (id == null) return () => true;
+  const ids = new Set(scopeIds(categories, id));
+  const names = new Set(categories.filter(c => ids.has(c.id)).map(c => c.name));
+  return i => (i.categoryId != null ? ids.has(i.categoryId) : names.has(i.category));
 }
 
 /** True when the category or anything nested under it tracks open packages. */

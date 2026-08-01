@@ -10,13 +10,14 @@ import {
   type CategoryPackaging, normalizeCategoryPackaging, resolveSteps, formatStock,
   fmtAmount, openPct, effectivePackages, stockStatus,
 } from '@/lib/packaging';
-import { categoryScope, packagingSourceOf, branchTracksOpen, childrenOf } from '@/lib/categoryTree';
+import { packagingSourceOf, branchTracksOpen, childrenOfId, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 
 interface Item {
   id: number;
   name: string;
   category: string;
+  categoryId?: number | null;
   quantity: number;
   minQuantity: number;
   criticalQuantity: number;
@@ -35,7 +36,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
   /** True while a category is open, so the tab can hide everything else. */
   onFocusChange?: (focused: boolean) => void;
 }) {
-  const [openCat, setOpenCat] = useState<string | null>(null);
+  const [openCat, setOpenCat] = useState<number | null>(null);
   const [sweeping, setSweeping] = useState(false);
 
   useEffect(() => { onFocusChange?.(openCat !== null); }, [openCat, onFocusChange]);
@@ -48,37 +49,39 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
     [categories],
   );
 
-  const packagingOf = (name: string): CategoryPackaging | null => {
-    const src = packagingSourceOf(categories as any, name);
+  const packagingOf = (id: number): CategoryPackaging | null => {
+    const cat = findById(categories as any, id);
+    const src = cat ? packagingSourceOf(categories as any, cat) : null;
     return src ? normalizeCategoryPackaging(src) : null;
   };
 
-  const itemsIn = (name: string) => {
-    const scope = new Set(categoryScope(categories, name));
+  const itemsIn = (id: number) => {
+    const inCat = matcher(categories as any, id);
     // Parked items are not on the shelf, so they must not appear in the sweep.
     return items
-      .filter(i => scope.has(i.category) && i.archived !== true)
+      .filter(i => inCat(i) && i.archived !== true)
       .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   };
 
-  const countIn = (name: string) => itemsIn(name).length;
-  const alertsIn = (name: string) => {
-    const packaging = packagingOf(name);
+  const countIn = (id: number) => itemsIn(id).length;
+  const alertsIn = (id: number) => {
+    const packaging = packagingOf(id);
     if (!packaging) return 0;
-    return itemsIn(name).filter(i => stockStatus(withSize(i, packaging), packaging) !== 'ok').length;
+    return itemsIn(id).filter(i => stockStatus(withSize(i, packaging), packaging) !== 'ok').length;
   };
 
   if (navCats.length === 0) return null;
 
-  if (openCat) {
+  if (openCat != null) {
     const packaging = packagingOf(openCat);
     const list = itemsIn(openCat);
     if (!packaging) { setOpenCat(null); return null; }
+    const openName = findById(categories as any, openCat)?.name ?? '';
 
     if (sweeping) {
       return (
         <SweepMode
-          category={openCat} packaging={packaging} items={list}
+          category={openName} packaging={packaging} items={list}
           onChanged={onChanged}
           onDone={() => setSweeping(false)}
         />
@@ -87,8 +90,8 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
     // Items shown here are the ones filed directly in this category; anything
     // in a subcategory is reached through its own button.
-    const direct = list.filter(i => i.category === openCat);
-    const subs = childrenOf(navCats as any, openCat);
+    const direct = list.filter(i => (i.categoryId != null ? i.categoryId === openCat : i.category === openName));
+    const subs = childrenOfId(navCats as any, openCat);
 
     return (
       <section className="space-y-3">

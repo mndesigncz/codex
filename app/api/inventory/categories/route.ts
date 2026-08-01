@@ -71,11 +71,6 @@ export async function POST(request: Request) {
   const name = (body.name ?? '').trim();
   if (!name) return NextResponse.json({ error: 'Název kategorie je povinný' }, { status: 400 });
 
-  const [existing] = await sql`
-    SELECT id FROM inventory_categories
-    WHERE team_id = ${me.teamId} AND lower(name) = lower(${name})`;
-  if (existing) return NextResponse.json({ ok: true, id: existing.id });
-
   // A new category may hang off any category of the same team — nesting has no
   // fixed depth. A brand-new row can't have descendants, so there is no cycle
   // to guard against here.
@@ -92,6 +87,25 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Podkategorie nejsou dostupné — spusť /api/init.' }, { status: 400 });
       }
     }
+  }
+
+  // Names only have to be unique among siblings, so "Sladké" can sit under both
+  // "Virginia" and "Latakia". Asking for one that already exists there returns
+  // the existing category instead of creating a duplicate.
+  try {
+    const [twin] = parentId == null
+      ? await sql`
+          SELECT id FROM inventory_categories
+          WHERE team_id = ${me.teamId} AND parent_id IS NULL AND lower(name) = lower(${name})`
+      : await sql`
+          SELECT id FROM inventory_categories
+          WHERE team_id = ${me.teamId} AND parent_id = ${parentId} AND lower(name) = lower(${name})`;
+    if (twin) return NextResponse.json({ ok: true, id: twin.id });
+  } catch {
+    const [twin] = await sql`
+      SELECT id FROM inventory_categories
+      WHERE team_id = ${me.teamId} AND lower(name) = lower(${name})`;
+    if (twin) return NextResponse.json({ ok: true, id: twin.id });
   }
 
   // Position is counted within the parent so each level orders independently.
