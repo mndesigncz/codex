@@ -102,6 +102,10 @@ function suggestedAmount(i: Item): number {
   return Math.max(1, Math.max(0, base));
 }
 
+function plural(n: number) {
+  return n === 1 ? 'položka' : n >= 2 && n <= 4 ? 'položky' : 'položek';
+}
+
 function relTime(iso?: string) {
   if (!iso) return '';
   const d = new Date(iso).getTime();
@@ -153,6 +157,22 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [showShopping, setShowShopping] = useState(false);
   // Parked items live behind a toggle so they can't clutter the active stock.
   const [showArchived, setShowArchived] = useState(false);
+  // Bulk editing: a selection mode with a bar of actions for what is ticked.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [showBulk, setShowBulk] = useState(false);
+  // The toolbar sticks to the top while scrolling; once it does it collapses to
+  // a single row so it stops eating the screen. A sentinel just above it tells
+  // us when that happened without listening to every scroll event.
+  const [stuck, setStuck] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { threshold: 1 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [notice, setNotice] = useState('');
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -414,6 +434,55 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     } catch { setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x)); }
   };
 
+  const toggleSelected = (id: number) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  const exitSelection = () => { setSelecting(false); setSelected(new Set()); };
+
+  const bulkPatch = async (patch: Record<string, any>) => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return false;
+    try {
+      const res = await fetch('/api/inventory/bulk', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, patch }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        showNotice(d.error || 'Hromadnou úpravu se nepodařilo uložit.');
+        return false;
+      }
+      const d = await res.json().catch(() => ({}));
+      await load();
+      showNotice(`Upraveno ${d.count ?? ids.length} ${plural(d.count ?? ids.length)} ✓`);
+      return true;
+    } catch {
+      showNotice('Nepodařilo se spojit se serverem.');
+      return false;
+    }
+  };
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`Smazat ${ids.length} ${plural(ids.length)}? Tohle nejde vrátit.`)) return;
+    try {
+      const res = await fetch('/api/inventory/bulk', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) {
+        setItems(prev => prev.filter(x => !selected.has(x.id)));
+        exitSelection();
+        showNotice(`Smazáno ${ids.length} ${plural(ids.length)}`);
+      } else showNotice('Smazání se nepodařilo.');
+    } catch { showNotice('Nepodařilo se spojit se serverem.'); }
+  };
+
   const remove = async (i: Item) => {
     if (!confirm(`Smazat položku „${i.name}"?`)) return;
     setItems(prev => prev.filter(x => x.id !== i.id));
@@ -467,13 +536,24 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       )}
 
       {/* Toolbar */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-white/60 dark:bg-transparent backdrop-blur-md space-y-3">
+      <div ref={sentinel} aria-hidden className="h-px -mb-px" />
+      <div className={`sticky top-0 z-20 -mx-6 px-6 bg-white/60 dark:bg-transparent backdrop-blur-md transition-[padding] ${
+        stuck ? 'py-2 space-y-2 shadow-sm shadow-black/[0.04]' : 'py-3 space-y-3'
+      }`}>
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
           <div className="relative flex-1 min-w-0">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={16} /></span>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku nebo dodavatele..." className={`${inputClass} pl-10`} />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Hledat položku nebo dodavatele..."
+              className={`${inputClass} pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
+            <button onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+              className={`rounded-full px-4 py-2.5 text-sm font-medium whitespace-nowrap transition ${
+                selecting ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-[#16181A] hover:bg-black/[0.05]'
+              }`}>
+              {selecting ? 'Zrušit výběr' : 'Vybrat více'}
+            </button>
             <SortMenu sort={sort} setSort={setSort} />
             <div className="glass rounded-full p-1 flex items-center gap-1 shrink-0">
               <button onClick={() => setView('list')} title="Seznam" className={`w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all ${view === 'list' ? 'bg-[#16181A] text-white' : 'text-black/50 hover:text-black'}`}>
@@ -493,6 +573,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           alertOf={alertsIn}
           extraRoots={orphanNames}
           onNavigateOrphan={name => { setOrphanCat(name); setCatId(null); }}
+          condensed={stuck}
         />
       </div>
 
@@ -532,9 +613,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
         />
       ) : view === 'list' ? (
-        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} />
+        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} />
+        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} />
       )}
 
       {/* Item form modal */}
@@ -745,6 +826,48 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         </div>
       )}
 
+      {selecting && selected.size > 0 && (
+        <div className="sticky bottom-4 z-30 mx-auto w-fit max-w-full">
+          <div className="flex items-center gap-2 flex-wrap justify-center rounded-full bg-[#16181A] text-white px-4 py-2.5 shadow-xl shadow-black/20">
+            <span className="text-sm font-semibold whitespace-nowrap px-1">
+              {selected.size} vybráno
+            </span>
+            <button onClick={() => setSelected(new Set(filtered.map(i => i.id)))}
+              className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
+              Vybrat vše ({filtered.length})
+            </button>
+            <button onClick={() => setShowBulk(true)}
+              className="rounded-full bg-[#C8F542] text-black px-4 py-1.5 text-xs font-bold hover:brightness-110 transition whitespace-nowrap">
+              Upravit
+            </button>
+            <button onClick={async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); }}
+              className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
+              {showArchived ? 'Naskladnit' : 'Odložit'}
+            </button>
+            <button onClick={bulkDelete}
+              className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/25 transition whitespace-nowrap">
+              Smazat
+            </button>
+            <button onClick={exitSelection} title="Zrušit výběr"
+              className="rounded-full w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition">✕</button>
+          </div>
+        </div>
+      )}
+
+      {showBulk && (
+        <BulkEditModal
+          count={selected.size}
+          categories={categories}
+          symbol={symbol}
+          onClose={() => setShowBulk(false)}
+          onApply={async patch => {
+            const ok = await bulkPatch(patch);
+            if (ok) { setShowBulk(false); exitSelection(); }
+            return ok;
+          }}
+        />
+      )}
+
       {showCats && (
         <CategoryManager
           categories={categories}
@@ -771,6 +894,125 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         />
       )}
     </div>
+  );
+}
+
+/* ---------- Bulk edit ---------- */
+// Only the ticked fields are sent, so a bulk edit changes exactly what was asked
+// for and leaves everything else on each item alone.
+const BULK_FIELDS: { key: string; label: string; kind: 'text' | 'number' | 'url' | 'multiline' | 'category' }[] = [
+  { key: 'categoryId', label: 'Kategorie', kind: 'category' },
+  { key: 'brand', label: 'Značka', kind: 'text' },
+  { key: 'description', label: 'Popis', kind: 'multiline' },
+  { key: 'unit', label: 'Jednotka', kind: 'text' },
+  { key: 'packageSize', label: 'Velikost balení', kind: 'number' },
+  { key: 'minQuantity', label: 'Upozornit při', kind: 'number' },
+  { key: 'criticalQuantity', label: 'Kriticky málo při', kind: 'number' },
+  { key: 'maxQuantity', label: 'Max. množství', kind: 'number' },
+  { key: 'unitCost', label: 'Cena za jednotku', kind: 'number' },
+  { key: 'supplier', label: 'Dodavatel', kind: 'text' },
+  { key: 'supplierUrl', label: 'Odkaz na objednání', kind: 'url' },
+];
+
+function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
+  count: number;
+  categories: Category[];
+  symbol: string;
+  onClose: () => void;
+  onApply: (patch: Record<string, any>) => Promise<boolean>;
+}) {
+  const [on, setOn] = useState<Record<string, boolean>>({});
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const flat = useMemo(() => flattenTree(categories), [categories]);
+  const chosen = BULK_FIELDS.filter(f => on[f.key]);
+
+  const apply = async () => {
+    setBusy(true);
+    const patch: Record<string, any> = {};
+    chosen.forEach(f => {
+      const raw = values[f.key] ?? '';
+      if (f.kind === 'category') { if (raw) patch.categoryId = Number(raw); return; }
+      if (f.kind === 'number') { if (raw !== '') patch[f.key] = Number(raw); return; }
+      patch[f.key] = raw;   // empty string clears the field on purpose
+    });
+    await onApply(patch);
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin p-6 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Hromadná úprava</h3>
+            <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
+          </div>
+          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+        </div>
+
+        <div className="space-y-2">
+          {BULK_FIELDS.map(f => (
+            <div key={f.key} className={`rounded-2xl border p-3 transition ${
+              on[f.key] ? 'bg-[#C8F542]/[0.10] border-[#C8F542]/30' : 'bg-black/[0.02] border-black/[0.06]'
+            }`}>
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={!!on[f.key]}
+                  onChange={e => setOn(v => ({ ...v, [f.key]: e.target.checked }))}
+                  className="h-4 w-4 accent-[#C8F542]" />
+                <span className="text-sm font-medium text-[#16181A]">{f.label}</span>
+              </label>
+              {on[f.key] && (
+                <div className="mt-2.5">
+                  {f.kind === 'category' ? (
+                    <select value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                      className={`${inputClass} py-2`}>
+                      <option value="">— vyber kategorii —</option>
+                      {flat.map(({ cat: c, depth }) => (
+                        <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}{c.name}</option>
+                      ))}
+                    </select>
+                  ) : f.kind === 'multiline' ? (
+                    <textarea rows={2} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                      placeholder="Prázdné pole popis smaže"
+                      className={`${inputClass} py-2 resize-none`} />
+                  ) : (
+                    <div className="relative">
+                      <input type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                        value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                        placeholder={f.kind === 'text' || f.kind === 'url' ? 'Prázdné pole hodnotu smaže' : ''}
+                        className={`${inputClass} py-2 ${f.key === 'unitCost' ? 'pr-12' : ''}`} />
+                      {f.key === 'unitCost' && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3 sticky bottom-0 bg-white/70 backdrop-blur-xl -mx-6 px-6 py-3 border-t border-black/[0.06]">
+          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Zrušit</button>
+          <button onClick={apply} disabled={busy || chosen.length === 0}
+            className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
+            {busy ? 'Ukládám…' : `Použít na ${count} ${plural(count)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Selection tick ---------- */
+function Tick({ on, className = '' }: { on: boolean; className?: string }) {
+  return (
+    <span className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition ${
+      on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20'
+    } ${className}`}>
+      {on && <Icon name="check" size={13} />}
+    </span>
   );
 }
 
@@ -829,9 +1071,10 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
 }
 
 /* ---------- List view (dense rows) ---------- */
-function ListView({ items, step, openEdit, remove, pk, setArchived }: {
+function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
   pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
+  selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
 }) {
   return (
     <div className="glass-card overflow-hidden">
@@ -849,8 +1092,16 @@ function ListView({ items, step, openEdit, remove, pk, setArchived }: {
           const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#C8F542]';
           const bar = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-orange-400' : 'bg-[#C8F542]';
           return (
-            <div key={i.id} className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_140px_200px_auto] gap-2 md:gap-3 items-center px-4 py-3 hover:bg-black/[0.02] transition-colors">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
+            <div key={i.id}
+              onClick={selecting ? () => onToggle(i.id) : undefined}
+              className={`grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_140px_200px_auto] gap-2 md:gap-3 items-center px-4 py-3 transition-colors ${
+                selecting ? `cursor-pointer ${selected.has(i.id) ? 'bg-[#C8F542]/[0.14]' : 'hover:bg-black/[0.03]'}` : 'hover:bg-black/[0.02]'
+              }`}>
+              {selecting ? (
+                <Tick on={selected.has(i.id)} />
+              ) : (
+                <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
+              )}
               <div className="min-w-0">
                 <p className="font-medium text-sm text-[#16181A] truncate">
                   {i.name}
@@ -869,7 +1120,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived }: {
                 </div>
                 <span className="text-xs text-black/60 tabular-nums whitespace-nowrap">{i.quantity} {i.unit}</span>
               </div>
-              <div className="flex items-center gap-1 justify-end">
+              <div className={`flex items-center gap-1 justify-end ${selecting ? 'hidden' : ''}`}>
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[10px] text-black/40 ml-0.5">{i.unit}</span></span>
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
@@ -891,9 +1142,10 @@ function ListView({ items, step, openEdit, remove, pk, setArchived }: {
 }
 
 /* ---------- Grid view (glass cards) ---------- */
-function GridView({ items, step, openEdit, remove, money, pk, setArchived }: {
+function GridView({ items, step, openEdit, remove, money, pk, setArchived, selecting, selected, onToggle }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
   money: (n: number) => string; pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
+  selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -903,8 +1155,13 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived }: {
         const barColor = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-orange-400' : 'bg-[#C8F542]';
         const chip = st === 'critical' ? 'bg-red-500/15 text-red-600' : st === 'low' ? 'bg-orange-500/15 text-orange-600' : 'bg-[#C8F542]/15 text-[#5B7A08]';
         return (
-          <div key={i.id} className="glass-card p-5">
+          <div key={i.id}
+            onClick={selecting ? () => onToggle(i.id) : undefined}
+            className={`glass-card p-5 transition ${
+              selecting ? `cursor-pointer ${selected.has(i.id) ? 'ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.02]'}` : ''
+            }`}>
             <div className="flex items-start justify-between gap-2">
+              {selecting && <Tick on={selected.has(i.id)} className="mt-0.5 mr-1" />}
               <div className="min-w-0">
                 <p className="font-semibold text-[#16181A] truncate">
                   {i.name}
@@ -918,7 +1175,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived }: {
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
               <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
             </div>
-            <div className="mt-3 flex items-center justify-between">
+            <div className={`mt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">−</button>
                 <span className="text-lg font-bold text-[#16181A] w-16 text-center tabular-nums">{i.quantity} <span className="text-xs text-black/45">{i.unit}</span></span>
