@@ -21,6 +21,9 @@ export interface CategoryNavProps<T extends CategoryNode> {
   alertOf?: (id: number) => number;
   /** Bigger targets for the tablet. */
   size?: 'normal' | 'touch';
+  /** Collapsed into a single scrollable row — for a toolbar that has gone sticky
+   *  and must not eat the screen. */
+  condensed?: boolean;
   /** Label for the root level. */
   rootLabel?: string;
   /** Labels used by items whose category was deleted; they have no row to open. */
@@ -30,12 +33,58 @@ export interface CategoryNavProps<T extends CategoryNode> {
 
 export default function CategoryNav<T extends CategoryNode>({
   categories, current, onNavigate, countOf, alertOf,
-  size = 'normal', rootLabel = 'Vše', extraRoots = [], onNavigateOrphan,
+  size = 'normal', rootLabel = 'Vše', extraRoots = [], onNavigateOrphan, condensed = false,
 }: CategoryNavProps<T>) {
   const trail = ancestryOfId(categories, current);
   const level = childrenOfId(categories, current);
 
   const touch = size === 'touch';
+
+  // Scrolled state: path and the level below it share one scrollable line, so
+  // the toolbar stays a single row no matter how deep the tree goes.
+  if (condensed) {
+    return (
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1 py-0.5">
+        <button onClick={() => onNavigate(null)}
+          className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+            current === null ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+          }`}>
+          {rootLabel}
+        </button>
+        {trail.map(c => (
+          <span key={c.id} className="flex items-center gap-1 shrink-0">
+            <Icon name="chevron" size={12} className="text-black/20 -rotate-90 shrink-0" />
+            <button onClick={() => onNavigate(c.id)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+                c.id === current ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+              }`}>
+              {c.name}
+            </button>
+          </span>
+        ))}
+        {level.length > 0 && (
+          <span className="shrink-0 w-px h-5 bg-black/[0.08] mx-1" aria-hidden />
+        )}
+        {level.map(c => {
+          const alerts = alertOf ? alertOf(c.id) : 0;
+          return (
+            <button key={c.id} onClick={() => onNavigate(c.id)}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/60 hover:text-black transition">
+              <Icon name="box" size={12} className="text-[#5B7A08]" />
+              {c.name}
+              {alerts > 0 && <span className="text-orange-600 font-bold tabular-nums">{alerts}</span>}
+            </button>
+          );
+        })}
+        {current === null && extraRoots.map(name => (
+          <button key={name} onClick={() => onNavigateOrphan?.(name)}
+            className="shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/50 hover:text-black transition">
+            {name}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2.5">
