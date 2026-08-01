@@ -38,10 +38,19 @@ export const DEFAULT_SCALE: Scale = {
 
 export const CONTENT_UNITS = ['g', 'kg', 'ml', 'l', 'ks'] as const;
 
+/**
+ * What the min/critical thresholds are counted in. 'package' keeps the original
+ * meaning (3 = three tins); 'content' switches the whole category to the content
+ * unit (300 = three hundred grams), which is how people think about a category
+ * where the package size differs from item to item.
+ */
+export type ThresholdUnit = 'package' | 'content';
+
 export interface CategoryPackaging {
   tracksOpen: boolean;
   contentUnit: string | null;
   defaultPackageSize: number | null;
+  thresholdUnit: ThresholdUnit;
   scale: Scale;
 }
 
@@ -72,12 +81,17 @@ export function normalizeScale(raw: any): Scale {
   return { kind, steps };
 }
 
+export function normalizeThresholdUnit(raw: any): ThresholdUnit {
+  return raw === 'content' ? 'content' : 'package';
+}
+
 export function normalizeCategoryPackaging(row: any): CategoryPackaging {
   const size = Number(row?.default_package_size ?? row?.defaultPackageSize);
   return {
     tracksOpen: (row?.tracks_open ?? row?.tracksOpen) === true,
     contentUnit: row?.content_unit ?? row?.contentUnit ?? null,
     defaultPackageSize: Number.isFinite(size) && size > 0 ? size : null,
+    thresholdUnit: normalizeThresholdUnit(row?.threshold_unit ?? row?.thresholdUnit),
     scale: normalizeScale(row?.scale),
   };
 }
@@ -106,6 +120,40 @@ export function effectivePackages(item: PackagedItem): number {
   const size = Number(item.packageSize) || 0;
   if (size <= 0) return item.quantity;
   return round1(item.quantity + (Number(item.openAmount) || 0) / size);
+}
+
+export type StockStatus = 'ok' | 'low' | 'critical';
+
+export interface ThresholdItem extends PackagedItem {
+  minQuantity: number;
+  criticalQuantity: number;
+}
+
+/**
+ * The number the thresholds are compared against. Packages by default (a
+ * half-full tin counts as 0.5), total content when the category is set to
+ * watch grams instead.
+ */
+export function stockMeasure(item: PackagedItem, packaging?: CategoryPackaging | null): number {
+  return packaging?.tracksOpen && packaging.thresholdUnit === 'content'
+    ? totalContent(item)
+    : effectivePackages(item);
+}
+
+/** One place that decides low/critical, so every screen agrees. */
+export function stockStatus(item: ThresholdItem, packaging?: CategoryPackaging | null): StockStatus {
+  const measure = stockMeasure(item, packaging);
+  if (measure <= item.criticalQuantity) return 'critical';
+  if (measure <= item.minQuantity) return 'low';
+  return 'ok';
+}
+
+/** What to print after a threshold value: "3 balení" vs "300 g". */
+export function thresholdUnitLabel(packaging: CategoryPackaging | null | undefined, packageWord = 'balení'): string {
+  if (packaging?.tracksOpen && packaging.thresholdUnit === 'content' && packaging.contentUnit) {
+    return packaging.contentUnit;
+  }
+  return packageWord;
 }
 
 /** "2 krabičky + 50 g" — what the shelf actually looks like. */

@@ -16,6 +16,7 @@ interface InventoryItem {
   maxQuantity: number;
   unit: string;
   supplierUrl?: string;
+  status?: 'ok' | 'low' | 'critical';
   packageSize?: number | null;
   openAmount?: number | null;
 }
@@ -25,7 +26,10 @@ interface Props {
   initialCategory?: string;
 }
 
+// The API already applied the category's threshold unit; the comparison below
+// is only a fallback for payloads from an older deployment.
 function statusOf(i: InventoryItem): 'ok' | 'low' | 'critical' {
+  if (i.status) return i.status;
   if (i.quantity <= i.criticalQuantity) return 'critical';
   if (i.quantity <= i.minQuantity) return 'low';
   return 'ok';

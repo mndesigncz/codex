@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { normalizeCategoryPackaging, stockStatus } from '@/lib/packaging';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,26 @@ function statusOf(quantity: number, min: number, critical: number): 'ok' | 'low'
   return 'ok';
 }
 
+/** The category's packaging settings, inherited from a parent when nested. */
+async function packagingFor(teamId: number | null, categoryName: string) {
+  let cats: any[] = [];
+  try {
+    cats = await sql`
+      SELECT id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
+      FROM inventory_categories WHERE team_id = ${teamId}`;
+  } catch {
+    return null;
+  }
+  const own = cats.find((c: any) => c.name === categoryName);
+  if (!own) return null;
+  const source = own.tracks_open === true
+    ? own
+    : (own.parent_id != null ? cats.find((c: any) => c.id === own.parent_id) : null);
+  return source?.tracks_open === true ? normalizeCategoryPackaging(source) : null;
+}
+
 // Return the item in the same shape the list endpoint uses (camelCase fields).
-async function mappedItem(id: number) {
+async function mappedItem(id: number, teamId: number | null) {
   try {
     const [row] = await sql`
       SELECT
@@ -43,11 +62,18 @@ async function mappedItem(id: number) {
         u.name              AS "updatedByName"
       FROM inventory_items i LEFT JOIN users u ON u.id = i.updated_by
       WHERE i.id = ${id}`;
-    return row && {
+    if (!row) return row;
+    const item: any = {
       ...row,
       packageSize: row.packageSize != null ? Number(row.packageSize) : null,
       openAmount: row.openAmount != null ? Number(row.openAmount) : null,
     };
+    // Ship the status with the item so no screen has to re-derive it.
+    const packaging = await packagingFor(teamId, item.category);
+    const sized = packaging
+      ? { ...item, packageSize: item.packageSize ?? packaging.defaultPackageSize }
+      : item;
+    return { ...item, status: stockStatus(sized as any, packaging) };
   } catch {
     const [row] = await sql`
       SELECT
@@ -118,9 +144,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           VALUES (${id}, ${me.meId}, ${oldQty}, ${newQty}, ${note}, NOW())`;
       }
 
-      // Alert employer(s) when the item drops to low/critical.
+      // Alert employer(s) when the item drops to low/critical. The category
+      // decides whether the thresholds are counted in packages or in content,
+      // so the alert fires on the same number the employer sees on screen.
       const size = item.package_size != null ? Number(item.package_size) : 0;
-      const effective = size > 0 ? newQty + (newOpen ?? 0) / size : newQty;
+      let byContent = false;
+      try {
+        const [c] = await sql`
+          SELECT threshold_unit, tracks_open FROM inventory_categories
+          WHERE team_id = ${me.teamId} AND name = ${item.category}`;
+        byContent = c?.tracks_open === true && c?.threshold_unit === 'content';
+      } catch { /* pre-migration DB: stay on packages */ }
+      const effective = byContent
+        ? newQty * size + (newOpen ?? 0)
+        : (size > 0 ? newQty + (newOpen ?? 0) / size : newQty);
       const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
       if (status !== 'ok') {
         const employers = await sql`
@@ -139,7 +176,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
-    return NextResponse.json(await mappedItem(id));
+    return NextResponse.json(await mappedItem(id, me.teamId));
   }
 
   // Employer: full edit.
@@ -199,7 +236,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       VALUES (${id}, ${me.meId}, ${Number(item.quantity)}, ${quantity}, ${note}, NOW())`;
   }
 
-  return NextResponse.json(await mappedItem(id));
+  return NextResponse.json(await mappedItem(id, me.teamId));
 }
 
 // DELETE (employer): remove item.

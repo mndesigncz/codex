@@ -14,7 +14,7 @@ interface Item {
 }
 
 const statusOf = (i: Item) =>
-  i.quantity <= (i.criticalQuantity ?? 0) ? 'critical' : i.quantity <= i.minQuantity ? 'low' : 'ok';
+  (i as any).status ?? (i.quantity <= (i.criticalQuantity ?? 0) ? 'critical' : i.quantity <= i.minQuantity ? 'low' : 'ok');
 
 export default function KioskInventory() {
   const [items, setItems] = useState<Item[]>([]);
