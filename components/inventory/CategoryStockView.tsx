@@ -20,11 +20,50 @@ export interface StockItem {
   minQuantity: number;
   criticalQuantity: number;
   unit: string;
+  supplierUrl?: string;
   packageSize?: number | null;
   openAmount?: number | null;
 }
 
 type Mode = 'view' | 'edit';
+
+/** The same controls a normal stock card has: count stepper, order link, edit, delete. */
+function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
+  item: StockItem;
+  onStep?: (item: StockItem, delta: number) => void;
+  onEditItem?: (item: StockItem) => void;
+  onRemoveItem?: (item: StockItem) => void;
+}) {
+  return (
+    <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+      {onStep ? (
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => onStep(item, -1)} disabled={item.quantity <= 0} title="Ubrat zavřené balení"
+            className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none disabled:opacity-30">−</button>
+          <span className="text-base font-bold text-[#16181A] tabular-nums min-w-[3.5rem] text-center">
+            {item.quantity} <span className="text-[11px] font-medium text-black/45">{item.unit}</span>
+          </span>
+          <button onClick={() => onStep(item, 1)} title="Přidat zavřené balení"
+            className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+        </div>
+      ) : <span />}
+      <div className="flex items-center gap-1">
+        {item.supplierUrl && (
+          <a href={item.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
+            className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+        )}
+        {onEditItem && (
+          <button onClick={() => onEditItem(item)} title="Upravit položku"
+            className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
+        )}
+        {onRemoveItem && (
+          <button onClick={() => onRemoveItem(item)} title="Smazat položku"
+            className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const statusOf = (i: StockItem): 'ok' | 'low' | 'critical' => {
   const eff = effectivePackages(i);
@@ -40,17 +79,20 @@ const TONE = {
 } as const;
 
 export default function CategoryStockView({
-  category, packaging, items, canEdit, onChanged, onEditItem, onRemoveItem,
+  category, packaging, items, canEdit, onChanged, onEditItem, onRemoveItem, onStep,
 }: {
   category: string;
   packaging: CategoryPackaging;
   items: StockItem[];
   canEdit: boolean;
   onChanged: (item: StockItem) => void;
-  /** Given by the employer view so a packaged item stays as editable as any other. */
+  /** Given by the employer view so a packaged item stays as editable as any
+   *  other — same stepper, order link, edit and delete as the normal stock grid. */
   onEditItem?: (item: StockItem) => void;
   onRemoveItem?: (item: StockItem) => void;
+  onStep?: (item: StockItem, delta: number) => void;
 }) {
+  const hasControls = Boolean(onStep || onEditItem || onRemoveItem);
   const [mode, setMode] = useState<Mode>('view');
   const [search, setSearch] = useState('');
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -165,21 +207,11 @@ export default function CategoryStockView({
                     <div key={i.id} className="glass-card p-4">
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-semibold text-[#16181A] leading-snug min-w-0">{i.name}</p>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {st !== 'ok' && (
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
-                              {st === 'critical' ? 'Dochází' : 'Málo'}
-                            </span>
-                          )}
-                          {onEditItem && (
-                            <button onClick={() => onEditItem(i)} title="Upravit položku"
-                              className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/50 hover:text-black text-xs">✎</button>
-                          )}
-                          {onRemoveItem && (
-                            <button onClick={() => onRemoveItem(i)} title="Smazat položku"
-                              className="rounded-full glass w-7 h-7 flex items-center justify-center text-red-600/70 hover:text-red-600 text-xs">✕</button>
-                          )}
-                        </div>
+                        {st !== 'ok' && (
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
+                            {st === 'critical' ? 'Dochází' : 'Málo'}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-black/55 mt-1 tabular-nums">
                         {formatStock({ ...i, packageSize: size }, unit, i.unit)}
@@ -191,6 +223,9 @@ export default function CategoryStockView({
                           </div>
                           <p className="text-[11px] text-black/40 mt-1">Načaté balení: {pct} %</p>
                         </>
+                      )}
+                      {hasControls && (
+                        <ItemControls item={i} onStep={onStep} onEditItem={onEditItem} onRemoveItem={onRemoveItem} />
                       )}
                     </div>
                   );
@@ -274,9 +309,24 @@ export default function CategoryStockView({
                       >
                         <Icon name="plus" size={14} /> Otevřít další balení
                       </button>
-                      <span className="text-[11px] text-black/40">
-                        Zavřených: <strong className="text-black/60 tabular-nums">{i.quantity}</strong>
-                      </span>
+                      {onStep ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] text-black/40">
+                          Zavřených:
+                          <button onClick={() => onStep(i, -1)} disabled={i.quantity <= 0}
+                            className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/70 hover:text-black text-base leading-none disabled:opacity-30">−</button>
+                          <strong className="text-black/60 tabular-nums w-5 text-center">{i.quantity}</strong>
+                          <button onClick={() => onStep(i, 1)}
+                            className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-black/40">
+                          Zavřených: <strong className="text-black/60 tabular-nums">{i.quantity}</strong>
+                        </span>
+                      )}
+                      {i.supplierUrl && (
+                        <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
+                          className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 py-1.5 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+                      )}
                     </div>
                   </>
                 )}

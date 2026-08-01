@@ -440,6 +440,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onChanged={updated => setItems(list => list.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
           onEditItem={i => openEdit(items.find(x => x.id === i.id) ?? (i as any))}
           onRemoveItem={i => remove(items.find(x => x.id === i.id) ?? (i as any))}
+          onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
         />
       ) : view === 'list' ? (
         <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} />
