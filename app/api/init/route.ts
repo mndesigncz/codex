@@ -562,9 +562,21 @@ export async function GET() {
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`;
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`;
 
-    return NextResponse.json({ ok: true, message: 'Databáze inicializována — všechny tabulky připraveny.' });
+    // Which build actually ran the migrations. `ok: true` alone is ambiguous —
+    // an older deployment still answering during a rollout returns it too, and
+    // then the new columns silently never get created.
+    return NextResponse.json({
+      ok: true,
+      message: 'Databáze inicializována — všechny tabulky připraveny.',
+      commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
+    });
   } catch (error) {
     console.error('Init error:', error);
-    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
+    return NextResponse.json({
+      ok: false,
+      error: String(error),
+      commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    }, { status: 500 });
   }
 }
