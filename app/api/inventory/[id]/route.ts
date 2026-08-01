@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus } from '@/lib/packaging';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { packagingSourceOf } from '@/lib/categoryTree';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,12 +37,13 @@ async function packagingFor(teamId: number | null, categoryName: string) {
   } catch {
     return null;
   }
-  const own = cats.find((c: any) => c.name === categoryName);
-  if (!own) return null;
-  const source = own.tracks_open === true
-    ? own
-    : (own.parent_id != null ? cats.find((c: any) => c.id === own.parent_id) : null);
-  return source?.tracks_open === true ? normalizeCategoryPackaging(source) : null;
+  const nodes = cats.map((c: any) => ({
+    id: Number(c.id), name: String(c.name), position: 0,
+    parentId: c.parent_id != null ? Number(c.parent_id) : null,
+    tracksOpen: c.tracks_open === true,
+  }));
+  const src = packagingSourceOf(nodes, categoryName);
+  return src ? normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id)) : null;
 }
 
 // Return the item in the same shape the list endpoint uses (camelCase fields).

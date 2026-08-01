@@ -1,7 +1,7 @@
-// Inventory categories are one level deep: a category can hold subcategories,
-// a subcategory cannot. Items keep referencing their category by NAME, exactly
-// as before — a subcategory is just a category that happens to have a parent,
-// so nothing about items, packaging or thresholds had to change.
+// Inventory categories nest to any depth: Tabáky → Virginia → Sladké → …
+// Items keep referencing their category by NAME, exactly as before — a
+// subcategory is just a category that has a parent, so nothing about items,
+// packaging or thresholds had to change when nesting arrived.
 
 export interface CategoryNode {
   id: number;
@@ -11,73 +11,161 @@ export interface CategoryNode {
   tracksOpen?: boolean;
   contentUnit?: string | null;
   defaultPackageSize?: number | null;
+  thresholdUnit?: 'package' | 'content';
   scale?: any;
 }
 
-export interface CategoryTreeNode<T extends CategoryNode = CategoryNode> {
+export interface TreeNode<T extends CategoryNode = CategoryNode> {
   cat: T;
-  children: T[];
+  children: TreeNode<T>[];
 }
 
-/** Roots in display order, each with its children in display order. */
-export function buildTree<T extends CategoryNode>(categories: T[]): CategoryTreeNode<T>[] {
+/** Depth guard: a malformed parent chain must never hang the UI. */
+const MAX_DEPTH = 12;
+
+function order<T extends CategoryNode>(a: T, b: T) {
+  return (a.position - b.position) || a.name.localeCompare(b.name, 'cs');
+}
+
+/**
+ * A category whose parent no longer exists — or which sits in a cycle — is
+ * treated as a root, so a broken link can never hide a whole branch.
+ */
+function rootsOf<T extends CategoryNode>(categories: T[]): T[] {
   const byId = new Map<number, T>();
   categories.forEach(c => byId.set(c.id, c));
-  const order = (a: T, b: T) => (a.position - b.position) || a.name.localeCompare(b.name, 'cs');
-
-  // A parent pointing at something that no longer exists is treated as a root,
-  // so a deleted parent can never hide its children.
-  const isRoot = (c: T) => c.parentId == null || !byId.has(c.parentId);
-
-  return categories
-    .filter(isRoot)
-    .sort(order)
-    .map(cat => ({
-      cat,
-      children: categories.filter(c => !isRoot(c) && c.parentId === cat.id).sort(order),
-    }));
+  return categories.filter(c => {
+    if (c.parentId == null || !byId.has(c.parentId)) return true;
+    // Walk up; if we come back to ourselves the chain is a cycle.
+    let cur = byId.get(c.parentId);
+    for (let i = 0; i < MAX_DEPTH && cur; i++) {
+      if (cur.id === c.id) return true;
+      cur = cur.parentId != null ? byId.get(cur.parentId) : undefined;
+    }
+    return false;
+  });
 }
 
-/** Categories flattened for a pick-list: each root followed by its children. */
-export function flattenTree<T extends CategoryNode>(categories: T[]): { cat: T; depth: 0 | 1 }[] {
-  const out: { cat: T; depth: 0 | 1 }[] = [];
-  buildTree(categories).forEach(({ cat, children }) => {
-    out.push({ cat, depth: 0 });
-    children.forEach(c => out.push({ cat: c, depth: 1 }));
-  });
+export function childrenOfId<T extends CategoryNode>(categories: T[], id: number | null): T[] {
+  const roots = new Set(rootsOf(categories).map(c => c.id));
+  return categories
+    .filter(c => (id === null ? roots.has(c.id) : c.parentId === id && !roots.has(c.id)))
+    .sort(order);
+}
+
+/** The whole forest, each level sorted for display. */
+export function buildTree<T extends CategoryNode>(categories: T[]): TreeNode<T>[] {
+  const build = (parentId: number | null, depth: number): TreeNode<T>[] => {
+    if (depth > MAX_DEPTH) return [];
+    return childrenOfId(categories, parentId).map(cat => ({
+      cat,
+      children: build(cat.id, depth + 1),
+    }));
+  };
+  return build(null, 0);
+}
+
+/** Every category flattened for a pick-list, each with its nesting depth. */
+export function flattenTree<T extends CategoryNode>(categories: T[]): { cat: T; depth: number }[] {
+  const out: { cat: T; depth: number }[] = [];
+  const walk = (nodes: TreeNode<T>[], depth: number) => {
+    nodes.forEach(n => {
+      out.push({ cat: n.cat, depth });
+      walk(n.children, depth + 1);
+    });
+  };
+  walk(buildTree(categories), 0);
   return out;
 }
 
+export function findByName<T extends CategoryNode>(categories: T[], name: string): T | undefined {
+  return categories.find(c => c.name === name);
+}
+
+/** Direct children of the named category. */
 export function childrenOf<T extends CategoryNode>(categories: T[], name: string): T[] {
-  const parent = categories.find(c => c.name === name);
-  if (!parent) return [];
-  return buildTree(categories).find(n => n.cat.id === parent.id)?.children ?? [];
+  const cat = findByName(categories, name);
+  return cat ? childrenOfId(categories, cat.id) : [];
+}
+
+/** The category and everything nested under it, at any depth. */
+export function descendantsOf<T extends CategoryNode>(categories: T[], id: number): T[] {
+  const out: T[] = [];
+  const walk = (parentId: number, depth: number) => {
+    if (depth > MAX_DEPTH) return;
+    childrenOfId(categories, parentId).forEach(c => {
+      out.push(c);
+      walk(c.id, depth + 1);
+    });
+  };
+  walk(id, 0);
+  return out;
 }
 
 /**
  * Every category name a filter on `name` should match: the category itself plus
- * its subcategories. Selecting "Tabáky" therefore shows everything filed under
- * "Tabáky → Virginia" as well.
+ * everything nested under it. Selecting "Tabáky" therefore shows what is filed
+ * under "Tabáky → Virginia → Sladké" too.
  */
 export function categoryScope<T extends CategoryNode>(categories: T[], name: string): string[] {
-  return [name, ...childrenOf(categories, name).map(c => c.name)];
+  const cat = findByName(categories, name);
+  if (!cat) return [name];
+  return [name, ...descendantsOf(categories, cat.id).map(c => c.name)];
 }
 
-/** "Tabáky → Virginia" for a subcategory, plain name for a root. */
-export function categoryPath<T extends CategoryNode>(categories: T[], name: string): string {
-  const cat = categories.find(c => c.name === name);
-  if (!cat?.parentId) return name;
-  const parent = categories.find(c => c.id === cat.parentId);
-  return parent ? `${parent.name} → ${cat.name}` : name;
+/** From the root down to the named category: ["Tabáky", "Virginia", "Sladké"]. */
+export function ancestryOf<T extends CategoryNode>(categories: T[], name: string): T[] {
+  const cat = findByName(categories, name);
+  if (!cat) return [];
+  const chain: T[] = [cat];
+  const byId = new Map<number, T>();
+  categories.forEach(c => byId.set(c.id, c));
+  const roots = new Set(rootsOf(categories).map(c => c.id));
+  let cur = cat;
+  for (let i = 0; i < MAX_DEPTH; i++) {
+    if (roots.has(cur.id) || cur.parentId == null) break;
+    const parent = byId.get(cur.parentId);
+    if (!parent) break;
+    chain.unshift(parent);
+    cur = parent;
+  }
+  return chain;
+}
+
+/** "Tabáky → Virginia → Sladké" for display. */
+export function categoryPath<T extends CategoryNode>(categories: T[], name: string, sep = ' → '): string {
+  const chain = ancestryOf(categories, name);
+  return chain.length ? chain.map(c => c.name).join(sep) : name;
 }
 
 /**
- * Which categories may become the parent of `id`. One level deep, so a category
- * that already has subcategories can't be nested, and neither can it become its
- * own parent.
+ * Which categories may become the parent of `id`: anything except itself and
+ * its own descendants, which would create a cycle.
  */
 export function possibleParents<T extends CategoryNode>(categories: T[], id: number): T[] {
-  const hasChildren = categories.some(c => c.parentId === id);
-  if (hasChildren) return [];
-  return categories.filter(c => c.id !== id && c.parentId == null);
+  const blocked = new Set([id, ...descendantsOf(categories, id).map(c => c.id)]);
+  return categories.filter(c => !blocked.has(c.id)).sort(order);
+}
+
+/** True when moving `id` under `parentId` would create a cycle. */
+export function wouldCycle<T extends CategoryNode>(categories: T[], id: number, parentId: number): boolean {
+  return id === parentId || descendantsOf(categories, id).some(c => c.id === parentId);
+}
+
+/**
+ * The nearest ancestor (or the category itself) that carries packaging
+ * settings, so a deeply nested subcategory inherits from wherever it was
+ * configured.
+ */
+export function packagingSourceOf<T extends CategoryNode>(categories: T[], name: string): T | null {
+  const chain = ancestryOf(categories, name);
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (chain[i].tracksOpen) return chain[i];
+  }
+  return null;
+}
+
+/** True when the category or anything nested under it tracks open packages. */
+export function branchTracksOpen<T extends CategoryNode>(categories: T[], cat: T): boolean {
+  return cat.tracksOpen === true || descendantsOf(categories, cat.id).some(c => c.tracksOpen === true);
 }

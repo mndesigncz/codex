@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeCategoryPackaging, stockStatus, type CategoryPackaging } from '@/lib/packaging';
+import { packagingSourceOf } from '@/lib/categoryTree';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,13 +79,17 @@ export async function GET() {
     } catch { cats = []; }
   }
 
-  // Subcategories inherit their parent's packaging settings.
+  // Subcategories inherit packaging from the nearest ancestor that has it, at
+  // any depth, so it is configured once on "Tabáky" and holds all the way down.
+  const nodes = cats.map((c: any) => ({
+    id: Number(c.id), name: String(c.name), position: 0,
+    parentId: c.parent_id != null ? Number(c.parent_id) : null,
+    tracksOpen: c.tracks_open === true,
+  }));
   const packagingByName = new Map<string, CategoryPackaging>();
-  cats.forEach((c: any) => {
-    const source = c.tracks_open === true
-      ? c
-      : (c.parent_id != null ? cats.find((p: any) => p.id === c.parent_id) : null);
-    if (source?.tracks_open === true) packagingByName.set(c.name, normalizeCategoryPackaging(source));
+  nodes.forEach(n => {
+    const src = packagingSourceOf(nodes, n.name);
+    if (src) packagingByName.set(n.name, normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id)));
   });
 
   return NextResponse.json(items.map((i: any) => {
