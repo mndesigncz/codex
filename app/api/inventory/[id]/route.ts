@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus } from '@/lib/packaging';
+import { resolveActingUser } from '@/lib/kioskActing';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,6 +111,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if ((body.quantity === undefined || body.quantity === null) && body.openAmount === undefined) {
       return NextResponse.json({ error: 'Zaměstnanec může upravit pouze množství' }, { status: 403 });
     }
+    // On the shared tablet the write belongs to whoever is clocked in, not to
+    // the tablet account — same attribution as tasks and procedure runs.
+    const authorId = await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
     const oldQty = Number(item.quantity);
     const newQty = body.quantity !== undefined && body.quantity !== null ? Number(body.quantity) : oldQty;
     const oldOpen = item.open_amount != null ? Number(item.open_amount) : null;
@@ -121,7 +125,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       try {
         await sql`
           UPDATE inventory_items
-          SET quantity = ${newQty}, open_amount = ${newOpen}, updated_by = ${me.meId}, updated_at = NOW()
+          SET quantity = ${newQty}, open_amount = ${newOpen}, updated_by = ${authorId}, updated_at = NOW()
           WHERE id = ${id}`;
       } catch {
         return NextResponse.json({ error: 'Sledování balení není dostupné — spusť /api/init.' }, { status: 400 });
@@ -129,7 +133,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     } else {
       await sql`
         UPDATE inventory_items
-        SET quantity = ${newQty}, updated_by = ${me.meId}, updated_at = NOW()
+        SET quantity = ${newQty}, updated_by = ${authorId}, updated_at = NOW()
         WHERE id = ${id}`;
     }
 
@@ -137,11 +141,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       try {
         await sql`
           INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)
-          VALUES (${id}, ${me.meId}, ${oldQty}, ${newQty}, ${oldOpen}, ${newOpen}, ${note}, NOW())`;
+          VALUES (${id}, ${authorId}, ${oldQty}, ${newQty}, ${oldOpen}, ${newOpen}, ${note}, NOW())`;
       } catch {
         await sql`
           INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note, created_at)
-          VALUES (${id}, ${me.meId}, ${oldQty}, ${newQty}, ${note}, NOW())`;
+          VALUES (${id}, ${authorId}, ${oldQty}, ${newQty}, ${note}, NOW())`;
       }
 
       // Alert employer(s) when the item drops to low/critical. The category
