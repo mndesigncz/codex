@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
+import { buildTree, categoryScope, childrenOf } from '@/lib/categoryTree';
 
 interface InventoryItem {
   id: number;
@@ -33,8 +34,9 @@ const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
 export default function InventoryReport({ user, initialCategory }: Props) {
   const [items, setItems] = useState<InventoryItem[]>([]);
-  // Only categories that track open packages — they get the tap-scale view.
-  const [categories, setCategories] = useState<any[]>([]);
+  // All categories — the tap-scale view is offered for the ones that track open
+  // packages, and subcategories inherit that setting from their parent.
+  const [allCats, setAllCats] = useState<any[]>([]);
   const [openCat, setOpenCat] = useState<string | null>(initialCategory ?? null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -57,10 +59,46 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
     ]).then(([data, cats]) => {
       if (Array.isArray(data)) setItems(data);
-      if (Array.isArray(cats)) setCategories(cats.filter((c: any) => c.tracksOpen));
+      if (Array.isArray(cats)) setAllCats(cats);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  // Top-level chips: categories that track open packages, plus any parent whose
+  // subcategories do — otherwise a packaged subcategory would be unreachable.
+  const packagedRoots = useMemo(
+    () => buildTree(allCats)
+      .filter(({ cat, children }) => cat.tracksOpen || children.some((c: any) => c.tracksOpen))
+      .map(t => t.cat),
+    [allCats],
+  );
+
+  const activeRoot = useMemo(() => {
+    if (!openCat) return null;
+    const c = allCats.find((x: any) => x.name === openCat);
+    if (!c) return openCat;
+    if (c.parentId == null) return openCat;
+    return allCats.find((x: any) => x.id === c.parentId)?.name ?? openCat;
+  }, [allCats, openCat]);
+
+  const subCats = useMemo(
+    () => (activeRoot ? childrenOf(allCats as any, activeRoot) : []),
+    [allCats, activeRoot],
+  );
+
+  // Packaging settings for the open category, inherited from the parent when the
+  // subcategory doesn't carry its own.
+  const openPackaging = useMemo(() => {
+    if (!openCat) return null;
+    const c = allCats.find((x: any) => x.name === openCat);
+    if (!c) return null;
+    if (c.tracksOpen) return c;
+    if (c.parentId != null) {
+      const p = allCats.find((x: any) => x.id === c.parentId);
+      if (p?.tracksOpen) return p;
+    }
+    return null;
+  }, [allCats, openCat]);
 
   // Re-target when a quick-access tile points at another category.
   useEffect(() => { if (initialCategory) setOpenCat(initialCategory); }, [initialCategory]);
@@ -179,27 +217,52 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         </div>
       )}
 
-      {!loading && categories.length > 0 && (
+      {!loading && packagedRoots.length > 0 && (
         <div className="space-y-3">
           <div className="flex gap-1.5 flex-wrap">
-            {categories.map((c: any) => (
-              <button key={c.id} onClick={() => setOpenCat(openCat === c.name ? null : c.name)}
+            {packagedRoots.map((c: any) => (
+              <button key={c.id} onClick={() => setOpenCat(activeRoot === c.name ? null : c.name)}
                 className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
-                  openCat === c.name ? 'bg-[#16181A] text-white' : 'glass text-black/60 hover:text-black'
+                  activeRoot === c.name ? 'bg-[#16181A] text-white' : 'glass text-black/60 hover:text-black'
                 }`}>
                 <Icon name="box" size={15} /> {c.name}
               </button>
             ))}
           </div>
-          {openCat && (
-            <CategoryStockView
-              category={openCat}
-              packaging={normalizeCategoryPackaging(categories.find((c: any) => c.name === openCat))}
-              items={items.filter(i => i.category === openCat) as any}
-              canEdit
-              onChanged={u => setItems(list => list.map(x => x.id === u.id ? { ...x, ...u } : x))}
-            />
+
+          {/* Subcategories of the open category. */}
+          {activeRoot && subCats.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap items-center">
+              <Icon name="chevron" size={13} className="text-black/20 -rotate-90" />
+              <button onClick={() => setOpenCat(activeRoot)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                  openCat === activeRoot ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
+                }`}>
+                Vše v {activeRoot}
+              </button>
+              {subCats.map((s: any) => (
+                <button key={s.id} onClick={() => setOpenCat(s.name)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                    openCat === s.name ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
+                  }`}>
+                  {s.name}
+                </button>
+              ))}
+            </div>
           )}
+
+          {openCat && openPackaging && (() => {
+            const scope = new Set(categoryScope(allCats as any, openCat));
+            return (
+              <CategoryStockView
+                category={openCat}
+                packaging={normalizeCategoryPackaging(openPackaging)}
+                items={items.filter(i => scope.has(i.category)) as any}
+                canEdit
+                onChanged={u => setItems(list => list.map(x => x.id === u.id ? { ...x, ...u } : x))}
+              />
+            );
+          })()}
         </div>
       )}
 
