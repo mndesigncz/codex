@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Icon } from '../Icons';
 import AnnouncementBanner from '../AnnouncementBanner';
-import { isWidgetOn, readShortcuts } from '@/lib/dashboardWidgets';
-import ShortcutsWidget from '../ShortcutsWidget';
+import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
+import { LinkTile } from '../DashboardEditor';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -33,9 +33,9 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [reviews, setReviews] = useState<ShiftReview[]>([]);
   const [unseenFlagged, setUnseenFlagged] = useState(0);
-  const [cfg, setCfg] = useState<Record<string, boolean>>({});
+  const [cfg, setCfg] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const show = (id: string) => isWidgetOn(cfg, id);
+  const layout = readLayout(cfg, EMPLOYEE_WIDGETS);
 
   useEffect(() => {
     (async () => {
@@ -125,6 +125,120 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     );
   }
 
+  // Named blocks; the employer-approved layout decides order and presence.
+  const blocks: Record<string, React.ReactNode> = {
+    nextShift: (
+            <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs uppercase tracking-wider text-black/45">Nejbližší směna</p>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
+              </div>
+              {nextShift ? (
+                <div>
+                  <p className="text-3xl font-bold tracking-tight text-[#16181A]">
+                    {new Date((nextShift.date) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                  <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.typeLabel ?? (nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna')}</p>
+                </div>
+              ) : (
+                <p className="text-black/45">Žádná nadcházející směna.</p>
+              )}
+            </button>
+    ),
+    feedback: (latestReview || unseenFlagged > 0) ? (
+              <button onClick={() => onNavigate('rewards')}
+                className={`w-full text-left rounded-3xl border p-5 transition-all ${feedbackAlert ? 'bg-red-500/[0.07] border-red-500/30 hover:bg-red-500/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${feedbackAlert ? 'bg-red-500/15 text-red-600' : 'bg-[#16181A] text-[#C8F542]'}`}>
+                    <Icon name={feedbackAlert ? 'warning' : 'award'} size={18} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#16181A]">
+                      {feedbackAlert ? 'U tvé směny je něco k nápravě' : 'Vedení ohodnotilo tvou směnu'}
+                    </p>
+                    <p className={`text-sm ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`}>
+                      {feedbackAlert
+                        ? 'Podívej se, co je potřeba probrat, a potvrď, že to víš.'
+                        : feedbackDetail ? `${feedbackDetail} — přečti si zpětnou vazbu.` : 'Přečti si zpětnou vazbu k poslední směně.'}
+                    </p>
+                  </div>
+                  <Icon name="chevron" size={16} className={`-rotate-90 shrink-0 ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`} />
+                </div>
+              </button>
+    ) : null,
+    stats: (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+                <p className="text-xs uppercase tracking-wider text-black/45">Moje úkoly</p>
+                <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{activeTasks.length}</p>
+                <p className="text-xs text-black/45 mt-1">aktivních</p>
+              </button>
+              <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+                <p className="text-xs uppercase tracking-wider text-black/45">Nepřečtené zprávy</p>
+                <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{unreadChats}</p>
+                <p className="text-xs text-black/45 mt-1">v chatu</p>
+              </button>
+              <div className="text-left glass-card p-5 col-span-2 sm:col-span-1">
+                <p className="text-xs uppercase tracking-wider text-black/45">Odpracováno</p>
+                <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">
+                  {workedH}<span className="text-lg font-semibold text-black/45"> h </span>{workedM > 0 && <>{workedM}<span className="text-lg font-semibold text-black/45"> min</span></>}
+                </p>
+                <p className="text-xs text-black/45 mt-1">tento měsíc (píchačky)</p>
+              </div>
+            </div>
+    ),
+    announcements: <AnnouncementBanner />,
+    closing: closingsDue.length > 0 ? (
+              <button onClick={() => onNavigate('closing')} className="w-full text-left rounded-3xl bg-[#C8F542]/15 border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/20 transition-all">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#16181A]">
+                      {closingsDue.length === 1 ? 'Vyplň uzávěrku ze své směny' : `Máš ${closingsDue.length} neuzavřené směny`}
+                    </p>
+                    <p className="text-sm text-[#5B7A08]">Spočítej kasu a odešli uzávěrku — vedení ji uvidí hned.</p>
+                  </div>
+                  <Icon name="chevron" size={16} className="text-[#5B7A08] -rotate-90 shrink-0" />
+                </div>
+              </button>
+            ) : (
+              <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#16181A]">Uzávěrka směny</p>
+                    <p className="text-sm text-black/55">Na konci směny spočítej kasu a odešli uzávěrku.</p>
+                  </div>
+                  <Icon name="chevron" size={16} className="text-black/35 -rotate-90 shrink-0" />
+                </div>
+              </button>
+    ),
+    availability: availabilitySubmitted === false ? (
+              <button onClick={() => onNavigate('availability')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="calendar" size={18} /></span>
+                  <div>
+                    <p className="font-semibold text-[#16181A]">Zadejte dostupnost na příští měsíc</p>
+                    <p className="text-sm text-black/55">Dejte vedení vědět, kdy nemůžete — sestaví podle toho rozvrh.</p>
+                  </div>
+                </div>
+              </button>
+    ) : null,
+    lowStock: lowStock.length > 0 ? (
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold tracking-tight text-[#16181A]">Zásoby, které docházejí</h3>
+                  <button onClick={() => onNavigate('inventory')} className="text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {lowStock.slice(0, 8).map(i => (
+                    <span key={i.id} className="rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-600">{i.name} · {i.quantity} {i.unit}</span>
+                  ))}
+                </div>
+              </div>
+    ) : null,
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
@@ -135,129 +249,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         </div>
       </div>
 
-      {show('shortcuts') && <ShortcutsWidget shortcuts={readShortcuts(cfg)} onNavigate={onNavigate} />}
-
-      {/* Next shift — hero card */}
-      {show('nextShift') && (
-      <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs uppercase tracking-wider text-black/45">Nejbližší směna</p>
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
-        </div>
-        {nextShift ? (
-          <div>
-            <p className="text-3xl font-bold tracking-tight text-[#16181A]">
-              {new Date((nextShift.date) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-            <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.typeLabel ?? (nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna')}</p>
-          </div>
-        ) : (
-          <p className="text-black/45">Žádná nadcházející směna.</p>
-        )}
-      </button>
-      )}
-
-      {/* Feedback from the employer — flagged shifts shout, plain ratings nudge */}
-      {show('feedback') && (latestReview || unseenFlagged > 0) && (
-        <button onClick={() => onNavigate('rewards')}
-          className={`w-full text-left rounded-3xl border p-5 transition-all ${feedbackAlert ? 'bg-red-500/[0.07] border-red-500/30 hover:bg-red-500/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${feedbackAlert ? 'bg-red-500/15 text-red-600' : 'bg-[#16181A] text-[#C8F542]'}`}>
-              <Icon name={feedbackAlert ? 'warning' : 'award'} size={18} />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#16181A]">
-                {feedbackAlert ? 'U tvé směny je něco k nápravě' : 'Vedení ohodnotilo tvou směnu'}
-              </p>
-              <p className={`text-sm ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`}>
-                {feedbackAlert
-                  ? 'Podívej se, co je potřeba probrat, a potvrď, že to víš.'
-                  : feedbackDetail ? `${feedbackDetail} — přečti si zpětnou vazbu.` : 'Přečti si zpětnou vazbu k poslední směně.'}
-              </p>
-            </div>
-            <Icon name="chevron" size={16} className={`-rotate-90 shrink-0 ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`} />
-          </div>
-        </button>
-      )}
-
-      {/* Stat row */}
-      {show('stats') && (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-black/45">Moje úkoly</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{activeTasks.length}</p>
-          <p className="text-xs text-black/45 mt-1">aktivních</p>
-        </button>
-        <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-black/45">Nepřečtené zprávy</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{unreadChats}</p>
-          <p className="text-xs text-black/45 mt-1">v chatu</p>
-        </button>
-        <div className="text-left glass-card p-5 col-span-2 sm:col-span-1">
-          <p className="text-xs uppercase tracking-wider text-black/45">Odpracováno</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">
-            {workedH}<span className="text-lg font-semibold text-black/45"> h </span>{workedM > 0 && <>{workedM}<span className="text-lg font-semibold text-black/45"> min</span></>}
-          </p>
-          <p className="text-xs text-black/45 mt-1">tento měsíc (píchačky)</p>
-        </div>
-      </div>
-      )}
-
-      {show('announcements') && <AnnouncementBanner />}
-
-      {/* End-of-shift closing quick action — highlighted when a shift is unclosed */}
-      {show('closing') && (closingsDue.length > 0 ? (
-        <button onClick={() => onNavigate('closing')} className="w-full text-left rounded-3xl bg-[#C8F542]/15 border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/20 transition-all">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#16181A]">
-                {closingsDue.length === 1 ? 'Vyplň uzávěrku ze své směny' : `Máš ${closingsDue.length} neuzavřené směny`}
-              </p>
-              <p className="text-sm text-[#5B7A08]">Spočítej kasu a odešli uzávěrku — vedení ji uvidí hned.</p>
-            </div>
-            <Icon name="chevron" size={16} className="text-[#5B7A08] -rotate-90 shrink-0" />
-          </div>
-        </button>
-      ) : (
-        <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#16181A]">Uzávěrka směny</p>
-              <p className="text-sm text-black/55">Na konci směny spočítej kasu a odešli uzávěrku.</p>
-            </div>
-            <Icon name="chevron" size={16} className="text-black/35 -rotate-90 shrink-0" />
-          </div>
-        </button>
-      ))}
-
-      {/* Availability reminder */}
-      {show('availability') && availabilitySubmitted === false && (
-        <button onClick={() => onNavigate('availability')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="calendar" size={18} /></span>
-            <div>
-              <p className="font-semibold text-[#16181A]">Zadejte dostupnost na příští měsíc</p>
-              <p className="text-sm text-black/55">Dejte vedení vědět, kdy nemůžete — sestaví podle toho rozvrh.</p>
-            </div>
-          </div>
-        </button>
-      )}
-
-      {/* Low stock to watch */}
-      {show('lowStock') && lowStock.length > 0 && (
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold tracking-tight text-[#16181A]">Zásoby, které docházejí</h3>
-            <button onClick={() => onNavigate('inventory')} className="text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {lowStock.slice(0, 8).map(i => (
-              <span key={i.id} className="rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-600">{i.name} · {i.quantity} {i.unit}</span>
-            ))}
-          </div>
-        </div>
+      {layout.map((e, i) =>
+        e.type === 'link'
+          ? <LinkTile key={`l-${e.target}-${i}`} entry={e} onNavigate={onNavigate} />
+          : <Fragment key={`w-${e.id}-${i}`}>{blocks[e.id] ?? null}</Fragment>,
       )}
     </div>
   );
