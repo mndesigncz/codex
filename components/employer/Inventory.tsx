@@ -8,8 +8,8 @@ import {
   CONTENT_UNITS, type ScaleStep, type CategoryPackaging,
 } from '@/lib/packaging';
 import {
-  buildTree, flattenTree, categoryScope, categoryPath, childrenOf, possibleParents,
-  packagingSourceOf, ancestryOf, type TreeNode,
+  buildTree, flattenTree, scopeIds, pathOfId, childrenOfId, possibleParents,
+  packagingSourceOf, ancestryOfId, findById, matcher, type TreeNode,
 } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
@@ -19,6 +19,7 @@ interface Item {
   id: number;
   name: string;
   category: string;
+  categoryId?: number | null;
   quantity: number;
   minQuantity: number;
   criticalQuantity: number;
@@ -73,7 +74,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', category: '', quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false };
+const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -85,10 +86,10 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 // Packaged categories decide what the thresholds are counted in, so the status
 // always comes from the same helper the stock view and the server alert use.
-type PackagingLookup = (categoryName: string) => CategoryPackaging | null;
+type PackagingLookup = (item: { category?: string; categoryId?: number | null }) => CategoryPackaging | null;
 
 function statusOf(i: Item, pk?: PackagingLookup): 'ok' | 'low' | 'critical' {
-  return stockStatus(i as any, pk ? pk(i.category) : null);
+  return stockStatus(i as any, pk ? pk(i) : null);
 }
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
@@ -120,9 +121,21 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cat, setCat] = useState(initialCategory ?? 'Vše');
-  // A quick-access tile can re-target the stock while this view stays mounted.
-  useEffect(() => { if (initialCategory) setCat(initialCategory); }, [initialCategory]);
+  // Which category is open, by id. Names may repeat across branches, ids never do.
+  const [catId, setCatId] = useState<number | null>(null);
+  // A label used by items whose category was deleted; browsed on its own.
+  const [orphanCat, setOrphanCat] = useState<string | null>(null);
+  // A quick-access tile still points at a category by name; resolve it once the
+  // categories are loaded. An ambiguous name resolves to the first match.
+  useEffect(() => {
+    if (!initialCategory || categories.length === 0) return;
+    const hit = categories.find(c => c.name === initialCategory);
+    if (hit) { setCatId(hit.id); setOrphanCat(null); }
+    else { setOrphanCat(initialCategory); setCatId(null); }
+  }, [initialCategory, categories]);
+
+  const current = findById(categories, catId) ?? null;
+  const catLabel = orphanCat ?? (current ? current.name : '');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('name');
   const [view, setView] = useState<View>('grid');
@@ -184,26 +197,38 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   // Category strings used by items but no longer configured — kept at the top
   // level so nothing becomes unreachable.
   const orphanNames = useMemo(() => {
-    const known = new Set(categories.map(c => c.name));
+    const knownIds = new Set(categories.map(c => c.id));
     const set = new Set<string>();
-    items.forEach(i => { if (i.category && !known.has(i.category)) set.add(i.category); });
+    items.forEach(i => {
+      const orphan = i.categoryId != null
+        ? !knownIds.has(i.categoryId)
+        : !categories.some(c => c.name === i.category);
+      if (i.category && orphan) set.add(i.category);
+    });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'cs'));
   }, [categories, items]);
 
   const subCats = useMemo(
-    () => (cat === 'Vše' ? [] : childrenOf(categories, cat)),
-    [categories, cat],
+    () => (catId == null ? [] : childrenOfId(categories, catId)),
+    [categories, catId],
   );
 
   // Packaging settings by category name, inherited from the nearest ancestor
   // that has them. Everything that judges stock levels goes through this.
   const pk = useMemo<PackagingLookup>(() => {
-    const map = new Map<string, CategoryPackaging>();
+    const byId = new Map<number, CategoryPackaging>();
+    const byName = new Map<string, CategoryPackaging>();
     categories.forEach(c => {
-      const source = packagingSourceOf(categories, c.name);
-      if (source) map.set(c.name, normalizeCategoryPackaging(source));
+      const source = packagingSourceOf(categories, c);
+      if (!source) return;
+      const settings = normalizeCategoryPackaging(source);
+      byId.set(c.id, settings);
+      if (!byName.has(c.name)) byName.set(c.name, settings);
     });
-    return (name: string) => map.get(name) ?? null;
+    // Items carry an id after the migration; the label is the fallback until then.
+    return (i: { category?: string; categoryId?: number | null }) =>
+      (i.categoryId != null ? byId.get(i.categoryId) : undefined)
+      ?? (i.category ? byName.get(i.category) : undefined) ?? null;
   }, [categories]);
 
   // Parked items are out of the active stock entirely — they must not show up
@@ -212,37 +237,31 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const archivedCount = items.length - active.length;
 
   // Counts on the navigation buttons include everything nested below.
-  const countIn = useMemo(() => (name: string) => {
-    const scope = new Set(categoryScope(categories, name));
-    return active.filter(i => scope.has(i.category)).length;
+  const countIn = useMemo(() => (id: number) => {
+    const inCat = matcher(categories, id, null);
+    return active.filter(inCat).length;
   }, [categories, active]);
 
-  const alertsIn = useMemo(() => (name: string) => {
-    const scope = new Set(categoryScope(categories, name));
-    return active.filter(i => scope.has(i.category) && statusOf(i, pk) !== 'ok').length;
+  const alertsIn = useMemo(() => (id: number) => {
+    const inCat = matcher(categories, id, null);
+    return active.filter(i => inCat(i) && statusOf(i, pk) !== 'ok').length;
   }, [categories, active, pk]);
 
   // A category that tracks open packages renders its own two-mode view.
   // Subcategories inherit the setting from their parent, so packaging is
   // configured once on "Tabáky" and every subcategory under it behaves the same.
-  const packagedCat = useMemo(() => {
-    const c = categories.find(x => x.name === cat);
-    if (!c) return null;
-    if (c.tracksOpen) return c;
-    if (c.parentId != null) {
-      const parent = categories.find(x => x.id === c.parentId);
-      if (parent?.tracksOpen) return parent;
-    }
-    return null;
-  }, [categories, cat]);
+  const packagedCat = useMemo(
+    () => (current ? packagingSourceOf(categories, current) : null),
+    [categories, current],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     // Picking a parent category includes everything filed under its subcategories.
-    const scope = cat === 'Vše' ? null : new Set(categoryScope(categories, cat));
+    const inCat = matcher(categories, catId, orphanCat);
     const list = items.filter(i =>
       (showArchived ? i.archived === true : i.archived !== true) &&
-      (scope === null || scope.has(i.category)) &&
+      inCat(i) &&
       (q === '' || i.name.toLowerCase().includes(q) || (i.brand ?? '').toLowerCase().includes(q)
         || (i.supplier ?? '').toLowerCase().includes(q)));
     const sorted = [...list];
@@ -263,7 +282,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       }
     });
     return sorted;
-  }, [items, categories, cat, search, sort, pk, showArchived]);
+  }, [items, categories, catId, orphanCat, search, sort, pk, showArchived]);
 
   const critical = active.filter(i => statusOf(i, pk) === 'critical');
   const low = active.filter(i => statusOf(i, pk) === 'low');
@@ -280,22 +299,22 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
   // Defaults for a category = everything its ancestors set, overridden by its
   // own, so a rule high up still holds while a subcategory can tweak one field.
-  const defaultsFor = useMemo(() => (name: string): ItemDefaults =>
-    mergeDefaults(ancestryOf(categories, name).map(c => c.defaults)),
+  const defaultsFor = useMemo(() => (id: number | null): ItemDefaults =>
+    mergeDefaults(ancestryOfId(categories, id).map(c => c.defaults)),
   [categories]);
 
   // Choosing a category while creating re-applies its prefill; while editing an
   // existing item it only re-files it, so nothing typed gets overwritten.
-  const pickCategory = (name: string) => {
-    if (editing) { setForm(f => ({ ...f, category: name })); return; }
-    setForm(f => ({ ...seedForm(name), name: f.name, quantity: f.quantity }));
+  const pickCategory = (id: number | null) => {
+    if (editing) { setForm(f => ({ ...f, categoryId: id })); return; }
+    setForm(f => ({ ...seedForm(id), name: f.name, quantity: f.quantity }));
   };
 
-  const seedForm = (categoryName: string) => {
-    const d = defaultsFor(categoryName);
+  const seedForm = (categoryId: number | null) => {
+    const d = defaultsFor(categoryId);
     return {
       ...emptyForm,
-      category: categoryName,
+      categoryId,
       brand: d.brand ?? '',
       description: d.description ?? '',
       unit: d.unit ?? emptyForm.unit,
@@ -311,13 +330,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
   const openNew = () => {
     setEditing(null);
-    setForm(seedForm(cat !== 'Vše' ? cat : (catNames[0] ?? '')));
+    setForm(seedForm(catId ?? categories[0]?.id ?? null));
     setNewCatInline('');
     setShowForm(true);
   };
   const openEdit = (i: Item) => {
     setEditing(i);
-    setForm({ name: i.name, category: i.category ?? '', quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
     setNewCatInline('');
     setShowForm(true);
   };
@@ -354,7 +373,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     e.preventDefault();
     setSaving(true);
     const payload = {
-      name: form.name, category: form.category, unit: form.unit, supplier: form.supplier, supplierUrl: form.supplierUrl,
+      name: form.name,
+      category: findById(categories, form.categoryId)?.name ?? '',
+      categoryId: form.categoryId,
+      unit: form.unit, supplier: form.supplier, supplierUrl: form.supplierUrl,
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
       unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
@@ -465,11 +487,12 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         </div>
         <CategoryNav
           categories={categories}
-          current={cat === 'Vše' ? null : cat}
-          onNavigate={name => setCat(name ?? 'Vše')}
+          current={catId}
+          onNavigate={id => { setCatId(id); setOrphanCat(null); }}
           countOf={countIn}
           alertOf={alertsIn}
           extraRoots={orphanNames}
+          onNavigateOrphan={name => { setOrphanCat(name); setCatId(null); }}
         />
       </div>
 
@@ -480,8 +503,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       <div className="flex items-center justify-between text-xs text-black/45">
         <span>
           {filtered.length} {filtered.length === 1 ? 'položka' : filtered.length >= 2 && filtered.length <= 4 ? 'položky' : 'položek'}
-          {cat !== 'Vše' ? ` v „${categoryPath(categories, cat)}"` : ''}
-          {cat !== 'Vše' && subCats.length > 0 ? ' včetně podkategorií' : ''}
+          {orphanCat ? ` v „${orphanCat}"` : catId != null ? ` v „${pathOfId(categories, catId)}"` : ''}
+          {catId != null && subCats.length > 0 ? ' včetně podkategorií' : ''}
         </span>
         {(archivedCount > 0 || showArchived) && (
           <button onClick={() => setShowArchived(v => !v)}
@@ -499,7 +522,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         <div className="glass-card p-8 text-center text-black/45">{items.length === 0 ? 'Žádné položky. Přidejte první.' : 'Žádné položky neodpovídají filtru.'}</div>
       ) : packagedCat ? (
         <CategoryStockView
-          category={cat}
+          category={catLabel}
           packaging={normalizeCategoryPackaging(packagedCat)}
           items={filtered as any}
           canEdit
@@ -563,15 +586,14 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                       {flatCats.map(({ cat: c, depth }) => (
                         <div key={c.id} style={{ paddingLeft: depth * 14 }}
                           className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
-                          <CatChip name={c.name} active={form.category === c.name} small={depth > 0}
-                            onPick={() => pickCategory(c.name)} />
+                          <CatChip name={c.name} active={form.categoryId === c.id} small={depth > 0}
+                            onPick={() => pickCategory(c.id)} />
                         </div>
                       ))}
                       {orphanNames.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {orphanNames.map(c => (
-                            <CatChip key={c} name={c} active={form.category === c}
-                              onPick={() => pickCategory(c)} />
+                            <CatChip key={c} name={c} active={false} onPick={() => {}} />
                           ))}
                         </div>
                       )}
@@ -624,13 +646,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
                     <input type="number" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
                   </div>
-                  {pk(form.category) && (
+                  {pk(form) && (
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Velikost balení</label>
                       <div className="relative">
                         <input type="number" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
-                          placeholder={String(pk(form.category)?.defaultPackageSize ?? '')} className={`${inputClass} pr-12`} />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{pk(form.category)?.contentUnit}</span>
+                          placeholder={String(pk(form)?.defaultPackageSize ?? '')} className={`${inputClass} pr-12`} />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{pk(form)?.contentUnit}</span>
                       </div>
                       <p className="text-[11px] text-black/40 mt-1.5">Prázdné = výchozí z kategorie.</p>
                     </div>
@@ -643,7 +665,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
                   <Icon name="warning" size={14} className="text-orange-500" /> Hlídání zásob
                   <span className="normal-case tracking-normal text-black/35 font-normal">
-                    · v {thresholdUnitLabel(pk(form.category), form.unit || 'ks')}
+                    · v {thresholdUnitLabel(pk(form), form.unit || 'ks')}
                   </span>
                 </p>
                 <div className="grid grid-cols-2 gap-3">
@@ -653,7 +675,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     </label>
                     <div className="relative">
                       <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form.category), form.unit || 'ks')}</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
                     </div>
                   </div>
                   <div>
@@ -662,13 +684,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     </label>
                     <div className="relative">
                       <input type="number" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form.category), form.unit || 'ks')}</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
                     </div>
                   </div>
                 </div>
-                {pk(form.category)?.thresholdUnit === 'content' && (
+                {pk(form)?.thresholdUnit === 'content' && (
                   <p className="text-[11px] text-black/45 rounded-xl bg-[#C8F542]/[0.12] border border-[#C8F542]/25 px-3 py-2">
-                    Kategorie „{form.category}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.
+                    Kategorie „{findById(categories, form.categoryId)?.name}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.
                   </p>
                 )}
               </div>
@@ -913,7 +935,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived }: {
                 <button onClick={() => remove(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
               </div>
             </div>
-            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i.category), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
+            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
           </div>
         );
       })}
@@ -1288,11 +1310,12 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           prefillOpen={prefillId === c.id}
           togglePrefill={() => setPrefillId(prefillId === c.id ? null : c.id)}
           hasPrefill={hasDefaults(c.defaults)}
+          pathLabel={target => pathOfId(categories, target)}
         />
         {prefillId === c.id && (
           <DefaultsEditor
             category={c}
-            inherited={mergeDefaults(ancestryOf(categories, c.name).slice(0, -1).map(a => a.defaults))}
+            inherited={mergeDefaults(ancestryOfId(categories, c.id).slice(0, -1).map(a => a.defaults))}
             onSaved={onChanged}
           />
         )}
@@ -1433,7 +1456,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 function CategoryRow({
   c, siblings, idx, busy, nested, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
   move, onDelete, packOpen, togglePack, moveOpen, toggleMove, parentOptions, setParent, childCount,
-  inheritsPackaging, prefillOpen, togglePrefill, hasPrefill,
+  inheritsPackaging, prefillOpen, togglePrefill, hasPrefill, pathLabel,
 }: {
   c: Category; siblings: Category[]; idx: number; busy: boolean; nested?: boolean;
   editing: boolean; editName: string; setEditName: (v: string) => void;
@@ -1445,6 +1468,8 @@ function CategoryRow({
   parentOptions: Category[]; setParent: (parentId: number | null) => void;
   childCount: number; inheritsPackaging?: boolean;
   prefillOpen: boolean; togglePrefill: () => void; hasPrefill: boolean;
+  /** Full path of a category, so two same-named options stay distinguishable. */
+  pathLabel: (id: number) => string;
 }) {
   // Anything can be re-filed except under its own branch, which possibleParents
   // has already excluded.
@@ -1499,8 +1524,9 @@ function CategoryRow({
           </button>
           {parentOptions.map(p => (
             <button key={p.id} onClick={() => setParent(p.id)} disabled={busy || c.parentId === p.id}
+              title={pathLabel(p.id)}
               className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId === p.id ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'}`}>
-              pod {p.name}
+              pod {pathLabel(p.id)}
             </button>
           ))}
           {parentOptions.length === 0 && c.parentId == null && (

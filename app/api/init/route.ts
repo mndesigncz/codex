@@ -565,6 +565,20 @@ export async function GET() {
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS description TEXT`;
     // Parked items: kept in the catalogue but out of the way until restocked.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE`;
+
+    // Items point at their category by id, so two subcategories under different
+    // parents may share a name. `category` stays as the display label and as the
+    // fallback for rows created before this ran.
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS category_id INTEGER`;
+    try {
+      await sql`
+        UPDATE inventory_items i
+        SET category_id = c.id
+        FROM inventory_categories c
+        WHERE i.category_id IS NULL
+          AND c.name = i.category
+          AND c.team_id = i.team_id`;
+    } catch { /* nothing to backfill */ }
     // Per item: how big its package is and how much is left in the open one.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`;

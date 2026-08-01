@@ -42,12 +42,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     SET name = ${name}, position = ${position}
     WHERE id = ${id} AND team_id = ${me.teamId}`;
 
-  // Items reference the category by name, so a rename has to follow through or
-  // they would be orphaned into a category that no longer exists.
+  // Items point at the category by id; `category` is only the display label, so
+  // a rename updates the label of exactly this category's items. Matching by the
+  // old name would also hit a same-named category under a different parent.
   if (name !== oldName) {
     try {
-      await sql`UPDATE inventory_items SET category = ${name} WHERE team_id = ${me.teamId} AND category = ${oldName}`;
-    } catch { /* best-effort */ }
+      await sql`UPDATE inventory_items SET category = ${name} WHERE team_id = ${me.teamId} AND category_id = ${id}`;
+    } catch {
+      // Pre-migration DB has no category_id — fall back to the old behaviour.
+      try {
+        await sql`UPDATE inventory_items SET category = ${name} WHERE team_id = ${me.teamId} AND category = ${oldName}`;
+      } catch { /* best-effort */ }
+    }
   }
 
   // Nesting: null puts the category at the top level, an id files it under that
@@ -156,6 +162,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       await sql`UPDATE inventory_categories SET parent_id = ${grandparent} WHERE parent_id = ${id} AND team_id = ${me.teamId}`;
     }
   } catch { /* pre-migration DB has no parent_id */ }
+  // Items keep their label but lose the pointer, so they surface as uncategorised
+  // instead of pointing at a row that no longer exists.
+  try {
+    await sql`UPDATE inventory_items SET category_id = NULL WHERE team_id = ${me.teamId} AND category_id = ${id}`;
+  } catch { /* column not migrated yet */ }
   await sql`DELETE FROM inventory_categories WHERE id = ${id} AND team_id = ${me.teamId}`;
 
   return NextResponse.json({ ok: true });

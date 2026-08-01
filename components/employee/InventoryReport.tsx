@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
-import { categoryScope, packagingSourceOf, branchTracksOpen } from '@/lib/categoryTree';
+import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 
 interface InventoryItem {
@@ -17,6 +17,7 @@ interface InventoryItem {
   maxQuantity: number;
   unit: string;
   supplierUrl?: string;
+  categoryId?: number | null;
   brand?: string | null;
   description?: string | null;
   archived?: boolean;
@@ -45,7 +46,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   // All categories — the tap-scale view is offered for the ones that track open
   // packages, and subcategories inherit that setting from their parent.
   const [allCats, setAllCats] = useState<any[]>([]);
-  const [openCat, setOpenCat] = useState<string | null>(initialCategory ?? null);
+  const [openCat, setOpenCat] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -83,18 +84,21 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   // Packaging settings for the open category, inherited from the nearest
   // ancestor that carries them.
+  const openCategory = findById(allCats as any, openCat);
   const openPackaging = useMemo(
-    () => (openCat ? packagingSourceOf(allCats as any, openCat) : null),
-    [allCats, openCat],
+    () => (openCategory ? packagingSourceOf(allCats as any, openCategory) : null),
+    [allCats, openCategory],
   );
 
-  const countIn = (name: string) => {
-    const scope = new Set(categoryScope(allCats as any, name));
-    return items.filter(i => scope.has(i.category)).length;
-  };
+  const countIn = (id: number) => items.filter(matcher(allCats as any, id)).length;
 
-  // Re-target when a quick-access tile points at another category.
-  useEffect(() => { if (initialCategory) setOpenCat(initialCategory); }, [initialCategory]);
+  // A quick-access tile still points at a category by name; resolve it to an id
+  // once the categories have loaded.
+  useEffect(() => {
+    if (!initialCategory || allCats.length === 0) return;
+    const hit = allCats.find((c: any) => c.name === initialCategory);
+    if (hit) setOpenCat(hit.id);
+  }, [initialCategory, allCats]);
 
   const qtyOf = (i: InventoryItem) => (draft[i.id] !== undefined ? draft[i.id] : i.quantity);
   const isDirty = (i: InventoryItem) => draft[i.id] !== undefined && draft[i.id] !== i.quantity;
@@ -221,13 +225,13 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             rootLabel="Zbytky"
           />
 
-          {openCat && openPackaging && (() => {
-            const scope = new Set(categoryScope(allCats as any, openCat));
+          {openCat != null && openPackaging && (() => {
+            const inCat = matcher(allCats as any, openCat);
             return (
               <CategoryStockView
-                category={openCat}
+                category={openCategory?.name ?? ''}
                 packaging={normalizeCategoryPackaging(openPackaging)}
-                items={items.filter(i => scope.has(i.category)) as any}
+                items={items.filter(inCat) as any}
                 canEdit
                 onChanged={u => setItems(list => list.map(x => x.id === u.id ? { ...x, ...u } : x))}
               />

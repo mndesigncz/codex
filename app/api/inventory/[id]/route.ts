@@ -28,7 +28,7 @@ function statusOf(quantity: number, min: number, critical: number): 'ok' | 'low'
 }
 
 /** The category's packaging settings, inherited from a parent when nested. */
-async function packagingFor(teamId: number | null, categoryName: string) {
+async function packagingFor(teamId: number | null, categoryName: string, categoryId?: number | null) {
   let cats: any[] = [];
   try {
     cats = await sql`
@@ -42,7 +42,12 @@ async function packagingFor(teamId: number | null, categoryName: string) {
     parentId: c.parent_id != null ? Number(c.parent_id) : null,
     tracksOpen: c.tracks_open === true,
   }));
-  const src = packagingSourceOf(nodes, categoryName);
+  // Resolve by id when the item has one — names may repeat across branches.
+  const own = categoryId != null
+    ? nodes.find(n => n.id === categoryId)
+    : nodes.find(n => n.name === categoryName);
+  if (!own) return null;
+  const src = packagingSourceOf(nodes, own);
   return src ? normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id)) : null;
 }
 
@@ -61,6 +66,7 @@ async function mappedItem(id: number, teamId: number | null) {
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
         i.brand, i.description, i.archived,
+        i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName"
@@ -73,7 +79,7 @@ async function mappedItem(id: number, teamId: number | null) {
       openAmount: row.openAmount != null ? Number(row.openAmount) : null,
     };
     // Ship the status with the item so no screen has to re-derive it.
-    const packaging = await packagingFor(teamId, item.category);
+    const packaging = await packagingFor(teamId, item.category, item.categoryId ?? null);
     const sized = packaging
       ? { ...item, packageSize: item.packageSize ?? packaging.defaultPackageSize }
       : item;
@@ -220,6 +226,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.unitCost !== undefined) {
     const uc = body.unitCost === '' || body.unitCost === null ? null : Math.max(0, Math.round(Number(body.unitCost)));
     try { await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${id}`; } catch { /* column not migrated yet */ }
+  }
+
+  // The category pointer travels with the label so a re-filed item follows the
+  // right branch even when two branches use the same name.
+  if (body.categoryId !== undefined) {
+    const wanted = body.categoryId == null || body.categoryId === '' ? null : Number(body.categoryId);
+    try {
+      if (wanted == null) {
+        await sql`UPDATE inventory_items SET category_id = NULL WHERE id = ${id}`;
+      } else if (Number.isFinite(wanted)) {
+        await sql`
+          UPDATE inventory_items SET category_id = ${wanted}
+          WHERE id = ${id} AND EXISTS (
+            SELECT 1 FROM inventory_categories c WHERE c.id = ${wanted} AND c.team_id = ${me.teamId})`;
+      }
+    } catch { /* column not migrated yet */ }
   }
 
   // Brand, description and the parked flag — separate so an un-migrated DB
