@@ -505,12 +505,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           {toBuy.length > 0 && (
             <button onClick={() => setShowShopping(true)} className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
-              🛒 Nákupní seznam ({toBuy.length})
+              🛒 Nakoupit ({toBuy.length})
             </button>
           )}
-          <button onClick={() => setShowCats(true)} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-medium px-4 py-2.5 text-sm flex items-center gap-2 whitespace-nowrap">
-            <Icon name="settings" size={16} /> Kategorie
-          </button>
           <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
             <Icon name="plus" size={16} /> Přidat položku
           </button>
@@ -548,21 +545,22 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
               className={`${inputClass} pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
-            <button onClick={() => (selecting ? exitSelection() : setSelecting(true))}
-              className={`rounded-full px-4 py-2.5 text-sm font-medium whitespace-nowrap transition ${
-                selecting ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-[#16181A] hover:bg-black/[0.05]'
-              }`}>
-              {selecting ? 'Zrušit výběr' : 'Vybrat více'}
-            </button>
+            {selecting && (
+              <button onClick={exitSelection}
+                className="rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-medium whitespace-nowrap">
+                Zrušit výběr
+              </button>
+            )}
             <SortMenu sort={sort} setSort={setSort} />
-            <div className="glass rounded-full p-1 flex items-center gap-1 shrink-0">
-              <button onClick={() => setView('list')} title="Seznam" className={`w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all ${view === 'list' ? 'bg-[#16181A] text-white' : 'text-black/50 hover:text-black'}`}>
-                <Icon name="box" size={16} />
-              </button>
-              <button onClick={() => setView('grid')} title="Karty" className={`w-9 h-9 flex items-center justify-center rounded-full text-sm transition-all ${view === 'grid' ? 'bg-[#16181A] text-white' : 'text-black/50 hover:text-black'}`}>
-                <Icon name="trend" size={16} />
-              </button>
-            </div>
+            <MoreMenu
+              view={view} setView={setView}
+              onSelect={() => setSelecting(true)} selecting={selecting}
+              onCategories={() => setShowCats(true)}
+              onShopping={toBuy.length > 0 ? () => setShowShopping(true) : undefined}
+              shoppingCount={toBuy.length}
+              archivedCount={archivedCount} showArchived={showArchived}
+              onToggleArchived={() => setShowArchived(v => !v)}
+            />
           </div>
         </div>
         <CategoryNav
@@ -587,12 +585,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           {orphanCat ? ` v „${orphanCat}"` : catId != null ? ` v „${pathOfId(categories, catId)}"` : ''}
           {catId != null && subCats.length > 0 ? ' včetně podkategorií' : ''}
         </span>
-        {(archivedCount > 0 || showArchived) && (
-          <button onClick={() => setShowArchived(v => !v)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-              showArchived ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
-            }`}>
-            {showArchived ? 'Zpět na aktivní sklad' : `Momentálně nevedeme (${archivedCount})`}
+        {showArchived && (
+          <button onClick={() => setShowArchived(false)}
+            className="rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-medium">
+            Zpět na aktivní sklad
           </button>
         )}
       </div>
@@ -1027,6 +1023,79 @@ function CatChip({ name, active, small, onPick }: {
       } ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
       {active && <Icon name="check" size={small ? 11 : 13} />}{name}
     </button>
+  );
+}
+
+/* ---------- Everything else, behind one button ---------- */
+// The stock header used to carry six controls at once. Only adding an item and
+// sorting stay in the open; the rest lives here so the toolbar is two controls.
+function MoreMenu({
+  view, setView, onSelect, selecting, onCategories, onShopping, shoppingCount,
+  archivedCount, showArchived, onToggleArchived,
+}: {
+  view: View; setView: (v: View) => void;
+  onSelect: () => void; selecting: boolean;
+  onCategories: () => void;
+  onShopping?: () => void; shoppingCount: number;
+  archivedCount: number; showArchived: boolean; onToggleArchived: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const row = 'w-full text-left px-3 py-2.5 rounded-xl text-sm flex items-center gap-2.5 transition-colors text-[#16181A] hover:bg-black/[0.04]';
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} title="Další"
+        className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] w-11 h-11 flex items-center justify-center">
+        <Icon name="menu" size={17} className="text-black/50" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
+          <button className={row} onClick={() => { onSelect(); setOpen(false); }} disabled={selecting}>
+            <Icon name="check" size={16} className="text-black/40" /> Vybrat více položek
+          </button>
+          <button className={row} onClick={() => { onCategories(); setOpen(false); }}>
+            <Icon name="settings" size={16} className="text-black/40" /> Kategorie a balení
+          </button>
+          {onShopping && (
+            <button className={row} onClick={() => { onShopping(); setOpen(false); }}>
+              <span className="w-4 text-center" aria-hidden>🛒</span> Nákupní seznam
+              <span className="ml-auto text-xs text-black/35 tabular-nums">{shoppingCount}</span>
+            </button>
+          )}
+          {(archivedCount > 0 || showArchived) && (
+            <button className={row} onClick={() => { onToggleArchived(); setOpen(false); }}>
+              <Icon name="box" size={16} className="text-black/40" />
+              {showArchived ? 'Zpět na aktivní sklad' : 'Momentálně nevedeme'}
+              {!showArchived && <span className="ml-auto text-xs text-black/35 tabular-nums">{archivedCount}</span>}
+            </button>
+          )}
+
+          <div className="border-t border-black/[0.06] pt-1.5 mt-1.5">
+            <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-black/35 font-semibold">Zobrazení</p>
+            <div className="flex gap-1 px-1.5 pb-0.5">
+              {([['grid', 'Karty', 'trend'], ['list', 'Seznam', 'box']] as const).map(([v, label, icon]) => (
+                <button key={v} onClick={() => { setView(v); setOpen(false); }}
+                  className={`flex-1 rounded-xl px-3 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition ${
+                    view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:bg-black/[0.04]'
+                  }`}>
+                  <Icon name={icon} size={14} /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -30,6 +30,114 @@ export interface Closing {
   // Everyone who worked the shift this closing covers — resolved by the API
   // from cash_closings.shift_employees. Empty on older rows.
   shiftEmployees?: ShiftPerson[];
+  // Itemisation behind expenses / cash_removed / self_payout. Empty on older rows.
+  movements?: Movement[];
+  // Why the counted cash didn't match, when it didn't.
+  diff_reason?: string | null;
+  diff_note?: string | null;
+}
+
+/**
+ * One movement of cash during the shift. The aggregate columns keep driving the
+ * arithmetic; movements are the itemisation behind them, so the employer can see
+ * *what* was taken out of the register instead of one lump sum.
+ */
+export type MovementKind = 'expense' | 'removal' | 'payout' | 'deposit';
+
+export interface Movement {
+  kind: MovementKind;
+  amount: number;
+  note?: string;
+}
+
+export const MOVEMENT_KINDS: { kind: MovementKind; label: string; hint: string; sign: 1 | -1 }[] = [
+  { kind: 'expense', label: 'Výdaj z kasy', hint: 'Nákup, poplatek…', sign: -1 },
+  { kind: 'removal', label: 'Odloženo ven', hint: 'Do trezoru, odvod', sign: -1 },
+  { kind: 'payout', label: 'Výplata z kasy', hint: 'Vyplaceno komu', sign: -1 },
+  { kind: 'deposit', label: 'Vklad do kasy', hint: 'Doplnění drobných', sign: 1 },
+];
+
+export function movementLabel(kind: MovementKind): string {
+  return MOVEMENT_KINDS.find(k => k.kind === kind)?.label ?? kind;
+}
+
+export function normalizeMovements(raw: any): Movement[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((m: any) => {
+      const kind = MOVEMENT_KINDS.some(k => k.kind === m?.kind) ? (m.kind as MovementKind) : 'expense';
+      const amount = Math.round(Number(m?.amount));
+      if (!Number.isFinite(amount) || amount === 0) return null;
+      const note = String(m?.note ?? '').trim().slice(0, 160);
+      return { kind, amount: Math.abs(amount), note: note || undefined };
+    })
+    .filter(Boolean)
+    .slice(0, 60) as Movement[];
+}
+
+export function sumMovements(movements: Movement[], kind: MovementKind): number {
+  return movements.filter(m => m.kind === kind).reduce((s, m) => s + m.amount, 0);
+}
+
+// ---- Why the drawer doesn't match ------------------------------------------
+
+export const DIFF_REASONS: { id: string; label: string; hint?: string }[] = [
+  { id: 'miscount', label: 'Přepočítáno špatně', hint: 'Přepočítali jsme a bylo to jinak.' },
+  { id: 'unrecorded_expense', label: 'Zapomenutý výdaj', hint: 'Něco se platilo z kasy a nezapsalo se.' },
+  { id: 'wrong_revenue', label: 'Špatně zadaná tržba', hint: 'Hotovost/karta se někde přehodily.' },
+  { id: 'tips', label: 'Spropitné', hint: 'Zůstalo v kase, nebo se z ní vzalo.' },
+  { id: 'change', label: 'Rozměňování', hint: 'Rozměnili jsme si z kasy.' },
+  { id: 'refund', label: 'Vráceno zákazníkovi', hint: 'Reklamace, storno.' },
+  { id: 'opening_wrong', label: 'Jiný počáteční stav', hint: 'Kasa nezačínala tím, co je zapsané.' },
+  { id: 'unknown', label: 'Nevíme', hint: 'Nepodařilo se dohledat.' },
+];
+
+export function diffReasonLabel(id?: string | null): string | null {
+  if (!id) return null;
+  return DIFF_REASONS.find(r => r.id === id)?.label ?? id;
+}
+
+/**
+ * Cheap arithmetic hints for a mismatch: when the difference lands exactly on a
+ * number already in the closing, that is nearly always what happened. Saves the
+ * person closing from hunting for it.
+ */
+export function explainDifference(
+  diff: number,
+  c: ExpectedInput & { card_revenue?: number },
+  movements: Movement[] = [],
+): string[] {
+  const out: string[] = [];
+  const d = Math.round(diff);
+  if (d === 0) return out;
+  const abs = Math.abs(d);
+  const hit = (v: number | undefined) => v != null && v !== 0 && Math.round(v) === abs;
+
+  if (hit(c.tips)) {
+    out.push(d > 0
+      ? 'Přebytek přesně odpovídá spropitnému — nezůstalo omylem v kase? Pak zapni „Spropitné zůstává v kase".'
+      : 'Manko přesně odpovídá spropitnému — nevzalo se z kasy, aniž by to bylo zapsané?');
+  }
+  if (hit(c.self_payout)) {
+    out.push(d > 0
+      ? 'Přebytek přesně odpovídá výplatě — nevyplácelo se nakonec z kasy?'
+      : 'Manko přesně odpovídá výplatě — nevyplatilo se z kasy dvakrát?');
+  }
+  if (hit(c.opening_cash)) {
+    out.push('Rozdíl přesně odpovídá počátečnímu stavu — nezačínala kasa jinou částkou?');
+  }
+  if (hit(c.card_revenue)) {
+    out.push('Rozdíl přesně odpovídá tržbě kartou — nespletla se hotovost s kartou?');
+  }
+  movements.forEach(m => {
+    if (hit(m.amount)) {
+      out.push(`Rozdíl přesně odpovídá pohybu „${movementLabel(m.kind)}${m.note ? ` – ${m.note}` : ''}" — není započítaný dvakrát?`);
+    }
+  });
+  if (out.length === 0 && abs % 100 === 0) {
+    out.push('Rozdíl je celá stovka — často jde o rozměňování nebo přehlédnutou bankovku.');
+  }
+  return out.slice(0, 3);
 }
 
 export type ExpectedInput = {
