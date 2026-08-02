@@ -520,6 +520,11 @@ export async function GET() {
     // Team default + per-closing override (mirrors payout_from_register).
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN DEFAULT FALSE`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN`;
+    // Itemised cash movements behind the aggregate columns, plus why the drawer
+    // didn't match when it didn't.
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS movements JSONB`;
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_reason TEXT`;
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_note TEXT`;
     // A closing belongs to the whole shift, not just its author.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
 

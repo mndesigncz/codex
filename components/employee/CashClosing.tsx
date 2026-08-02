@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
-import { Closing, expectedCash, cashDifference, expectedCashLines } from '@/lib/closing';
+import {
+  Closing, expectedCash, cashDifference, expectedCashLines,
+  type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
+  DIFF_REASONS, diffReasonLabel, explainDifference,
+} from '@/lib/closing';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const inputClass =
@@ -25,6 +29,94 @@ const emptyForm = (): FormState => ({
 });
 
 const n = (s: string) => Math.round(Number(s)) || 0;
+
+/**
+ * Itemised cash movements. One line per thing that left (or entered) the till,
+ * so a closing answers "co si z kasy brali" instead of showing one lump sum.
+ */
+function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }: {
+  movements: Movement[];
+  setMovements: (m: Movement[]) => void;
+  payDailyCash: boolean;
+  money: (n: number) => string;
+  symbol: string;
+}) {
+  const [kind, setKind] = useState<MovementKind>('expense');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+
+  const kinds = MOVEMENT_KINDS.filter(k => k.kind !== 'payout' || payDailyCash);
+
+  const add = () => {
+    const v = Math.abs(Math.round(Number(amount)));
+    if (!Number.isFinite(v) || v === 0) return;
+    setMovements([...movements, { kind, amount: v, note: note.trim() || undefined }]);
+    setAmount(''); setNote('');
+  };
+
+  return (
+    <div className="rounded-2xl bg-white/60 border border-black/[0.07] p-4 space-y-3">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <p className="text-sm font-semibold text-[#16181A]">Pohyby v kase</p>
+        <p className="text-[11px] text-black/40">Rozepiš, co se z kasy bralo — vedení pak vidí za co.</p>
+      </div>
+
+      {movements.length > 0 && (
+        <div className="divide-y divide-black/[0.06]">
+          {movements.map((m, i) => {
+            const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
+            return (
+              <div key={i} className="flex items-center gap-2.5 py-2">
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                  spec?.sign === 1 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-black/[0.06] text-black/50'
+                }`}>
+                  {movementLabel(m.kind)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-black/60">{m.note || '—'}</span>
+                <span className="shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
+                  {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
+                </span>
+                <button type="button" onClick={() => setMovements(movements.filter((_, idx) => idx !== i))}
+                  title="Odebrat"
+                  className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600">✕</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-1.5">
+        {kinds.map(k => (
+          <button key={k.kind} type="button" onClick={() => setKind(k.kind)}
+            title={k.hint}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+              kind === k.kind ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+            }`}>
+            {k.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative w-32 shrink-0">
+          <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+            placeholder="0"
+            className={`${inputClass} py-2 pr-10 tabular-nums`} />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
+        </div>
+        <input value={note} onChange={e => setNote(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          placeholder={MOVEMENT_KINDS.find(k => k.kind === kind)?.hint ?? 'Za co'}
+          className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
+        <button type="button" onClick={add} disabled={!amount}
+          className="shrink-0 rounded-2xl bg-[#C8F542] text-black px-4 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
+          Přidat
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // A numbered, iconed section panel — one guided step of the closing flow.
 function Step({
@@ -128,6 +220,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [err, setErr] = useState('');
   const [coworkers, setCoworkers] = useState<Coworker[]>([]);
   const [coworkerSel, setCoworkerSel] = useState<Record<number, { on: boolean; payout: string }>>({});
+  // Itemised cash movements — what was actually taken out of / put into the till.
+  const [movements, setMovements] = useState<Movement[]>([]);
+  // Why the counted cash didn't match, filled in only when it doesn't.
+  const [diffReason, setDiffReason] = useState('');
+  const [diffNote, setDiffNote] = useState('');
+  // The previous closing's counted cash — offered as this shift's opening cash.
+  const [carry, setCarry] = useState<{ amount: number; date: string; label: string | null } | null>(null);
   const money = useMoney();
   const symbol = useSymbol();
 
@@ -142,7 +241,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     } catch { /* keep the safe default: tips are kept aside */ }
     try {
       const d = await fetch('/api/closings').then(r => r.json());
-      setClosings(Array.isArray(d.closings) ? d.closings : []);
+      const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
+      setClosings(list);
+      // What the previous shift counted is what this one starts with.
+      const prev = list[0];
+      if (prev) {
+        setCarry({ amount: Number(prev.closing_cash) || 0, date: prev.date, label: prev.shift_label ?? null });
+        setForm(f => (f.openingCash === '' ? { ...f, openingCash: String(Math.round(Number(prev.closing_cash) || 0)) } : f));
+      }
       setPayDailyCash(!!d.payDailyCash);
       const payoutDefault = d.payoutFromRegister !== false;
       setTeamPayoutFromRegister(payoutDefault);
@@ -204,15 +310,30 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
+  // Itemised movements, when present, are the source of truth for the totals —
+  // the person writing them shouldn't have to keep a separate sum in their head.
+  // A deposit puts money back, so it lands as a negative expense.
+  const movedExpenses = sumMovements(movements, 'expense') - sumMovements(movements, 'deposit');
+  const movedRemoval = sumMovements(movements, 'removal');
+  const movedPayout = sumMovements(movements, 'payout');
+  const hasMoved = (kind: MovementKind) => movements.some(m => m.kind === kind);
+  const effExpenses = hasMoved('expense') || hasMoved('deposit') ? movedExpenses : n(form.expenses);
+  const effRemoved = hasMoved('removal') ? movedRemoval : n(form.cashRemoved);
+  const effPayout = payDailyCash ? (hasMoved('payout') ? movedPayout : n(form.selfPayout)) : 0;
+
   // Live preview of expected drawer cash and difference.
   const preview = {
     opening_cash: n(form.openingCash), cash_revenue: n(form.cashRevenue), tips: n(form.tips),
-    expenses: n(form.expenses), cash_removed: n(form.cashRemoved), self_payout: payDailyCash ? n(form.selfPayout) : 0,
+    card_revenue: n(form.cardRevenue),
+    expenses: effExpenses, cash_removed: effRemoved, self_payout: effPayout,
     closing_cash: n(form.closingCash), payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer,
   };
   const expected = expectedCash(preview);
   const expectedLines = expectedCashLines(preview);
   const diff = form.closingCash === '' ? null : cashDifference(preview);
+  // Arithmetic nudges: a difference landing exactly on a number already in the
+  // closing is nearly always that number.
+  const hints = diff == null || diff === 0 ? [] : explainDifference(diff, preview, movements);
 
   const totalSteps = 4;
 
@@ -236,10 +357,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         body: JSON.stringify({
           date: form.date, shiftLabel: form.shiftLabel,
           openingCash: n(form.openingCash), cashRevenue: n(form.cashRevenue), cardRevenue: n(form.cardRevenue),
-          tips: n(form.tips), expenses: n(form.expenses), cashRemoved: n(form.cashRemoved),
-          selfPayout: payDailyCash ? n(form.selfPayout) : 0, closingCash: n(form.closingCash),
+          tips: n(form.tips), expenses: effExpenses, cashRemoved: effRemoved,
+          selfPayout: effPayout, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
           payoutFromRegister, tipsInDrawer,
+          movements, diffReason: diffReason || null, diffNote: diffNote || null,
           employeeId: isSelf ? undefined : selEmployee,
           coworkers: includedCoworkers,
         }),
@@ -353,11 +475,28 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         <Step num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
           subtitle="Kolik bylo v kase, když směna začala.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Kasa na začátku', 'openingCash', {
-              hint: closings[0]
-                ? `Minulá uzávěrka (${new Date(closings[0].date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}) skončila s ${money(closings[0].closing_cash)} v kase.`
-                : 'Počáteční stav hotovosti v kase.',
-            })}
+            <div className="min-w-0 space-y-2">
+              {field('Kasa na začátku', 'openingCash', {
+                hint: carry
+                  ? `Předchozí směna (${new Date(carry.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}${carry.label ? `, ${carry.label}` : ''}) skončila s ${money(carry.amount)}.`
+                  : 'Počáteční stav hotovosti v kase.',
+              })}
+              {carry && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {n(form.openingCash) === Math.round(carry.amount) ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-[11px] font-semibold">
+                      <Icon name="check" size={12} /> Převzato z předchozí směny
+                    </span>
+                  ) : (
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, openingCash: String(Math.round(carry.amount)) }))}
+                      className="rounded-full glass border border-black/10 px-3 py-1 text-[11px] font-medium text-[#16181A] hover:bg-black/[0.05]">
+                      Převzít {money(carry.amount)} z předchozí směny
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             {isKiosk ? (
               <div className="min-w-0">
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kterou směnu uzavíráš?</label>
@@ -470,10 +609,16 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         {/* Step 3 — expenses & payouts */}
         <Step num={3} total={totalSteps} icon="box" title="Výdaje a odvody"
           subtitle="Co z kasy odešlo během směny.">
+          <MovementEditor
+            movements={movements} setMovements={setMovements}
+            payDailyCash={payDailyCash} money={money} symbol={symbol}
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Výdaje z kasy', 'expenses', { hint: 'Nákupy apod. placené z kasy.' })}
-            {field('Odloženo ven', 'cashRemoved', { hint: 'Do trezoru / odvod.' })}
-            {payDailyCash && field('Moje výplata dnes', 'selfPayout', {
+            {!hasMoved('expense') && !hasMoved('deposit')
+              && field('Výdaje z kasy', 'expenses', { hint: 'Nákupy apod. placené z kasy.' })}
+            {!hasMoved('removal') && field('Odloženo ven', 'cashRemoved', { hint: 'Do trezoru / odvod.' })}
+            {payDailyCash && !hasMoved('payout') && field('Moje výplata dnes', 'selfPayout', {
               hint: payoutFromRegister
                 ? 'Vyplaceno z kasy — odečte se z očekávaného stavu.'
                 : 'Vyplaceno bokem (ne z kasy) — očekávaný stav kasy neovlivní.',
@@ -591,6 +736,39 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <span className="text-lg font-bold tabular-nums whitespace-nowrap">{diff > 0 ? '+' : ''}{money(diff)}</span>
             </div>
           )}
+
+          {/* When it doesn't match: say why, so the employer isn't left guessing. */}
+          {diff !== null && diff !== 0 && (
+            <div className="rounded-2xl bg-white/60 border border-black/[0.07] p-4 space-y-3">
+              <p className="text-sm font-semibold text-[#16181A]">Čím to nejspíš je?</p>
+
+              {hints.length > 0 && (
+                <div className="space-y-1.5">
+                  {hints.map((h, i) => (
+                    <p key={i} className="text-[12px] text-[#5B7A08] bg-[#C8F542]/[0.14] border border-[#C8F542]/25 rounded-xl px-3 py-2">
+                      {h}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-1.5">
+                {DIFF_REASONS.map(r => (
+                  <button key={r.id} type="button" title={r.hint}
+                    onClick={() => setDiffReason(diffReason === r.id ? '' : r.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                      diffReason === r.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                    }`}>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              <textarea value={diffNote} onChange={e => setDiffNote(e.target.value)} rows={2}
+                placeholder="Co se stalo — vlastními slovy (nepovinné)"
+                className={`${inputClass} resize-none py-2`} />
+            </div>
+          )}
         </Step>
 
         <div>
@@ -643,6 +821,32 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   <div className="min-w-0"><span className="block text-black/40 truncate">Odloženo</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_removed)}</p></div>
                   {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.self_payout)}</p></div>}
                 </div>
+                {(c.movements?.length ?? 0) > 0 && (
+                  <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Pohyby v kase</p>
+                    <div className="divide-y divide-black/[0.06]">
+                      {c.movements!.map((m, i) => {
+                        const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
+                        return (
+                          <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
+                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
+                            <span className="min-w-0 flex-1 truncate text-black/55">{m.note || '—'}</span>
+                            <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">
+                              {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {(c.diff_reason || c.diff_note) && (
+                  <div className="mt-3 rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 p-3">
+                    <p className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold mb-1">Proč kasa nesedí</p>
+                    {c.diff_reason && <p className="text-sm font-medium text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
+                    {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
+                  </div>
+                )}
                 {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3 mt-3">{c.notes}</p>}
               </div>
             );
