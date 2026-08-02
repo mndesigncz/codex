@@ -115,9 +115,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const note = body.note ?? null;
 
   if (me.role !== 'employer') {
-    // Employees and the shared kiosk may change the stock count and, for
-    // packaged goods, how much is left in the open package.
-    if ((body.quantity === undefined || body.quantity === null) && body.openAmount === undefined) {
+    // Employees and the shared kiosk may change the stock count, how much is
+    // left in the open package, and whether we currently carry the item at all —
+    // the person at the counter is the one who knows it ran out.
+    if ((body.quantity === undefined || body.quantity === null)
+        && body.openAmount === undefined && body.archived === undefined) {
       return NextResponse.json({ error: 'Zaměstnanec může upravit pouze množství' }, { status: 403 });
     }
     // On the shared tablet the write belongs to whoever is clocked in, not to
@@ -144,6 +146,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         UPDATE inventory_items
         SET quantity = ${newQty}, updated_by = ${authorId}, updated_at = NOW()
         WHERE id = ${id}`;
+    }
+
+    // Parking an item is its own change and must land even when no number moved.
+    if (body.archived !== undefined) {
+      try {
+        await sql`
+          UPDATE inventory_items SET archived = ${body.archived === true}, updated_by = ${authorId}, updated_at = NOW()
+          WHERE id = ${id}`;
+      } catch {
+        return NextResponse.json({ error: 'Označení „nevedeme" není dostupné — spusť /api/init.' }, { status: 400 });
+      }
     }
 
     if (newQty !== oldQty || newOpen !== oldOpen) {

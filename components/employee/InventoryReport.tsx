@@ -49,6 +49,8 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   const [openCat, setOpenCat] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  // Parked items step aside from the working list but stay one tap away.
+  const [showParked, setShowParked] = useState(false);
 
   // Per-item edited (unsaved) quantity draft.
   const [draft, setDraft] = useState<Record<number, number>>({});
@@ -137,10 +139,27 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       .sort((a, b) => statusRank[statusOf(a)] - statusRank[statusOf(b)] || a.name.localeCompare(b.name, 'cs')),
     [items],
   );
+  const parkedCount = items.filter(i => i.archived === true).length;
   const filtered = useMemo(
-    () => items.filter(i => i.archived !== true && i.name.toLowerCase().includes(search.toLowerCase())),
-    [items, search],
+    () => items.filter(i =>
+      (showParked ? i.archived === true : i.archived !== true)
+      && i.name.toLowerCase().includes(search.toLowerCase())),
+    [items, search, showParked],
   );
+
+  // The person at the counter is the one who knows something ran out.
+  const setParked = async (item: InventoryItem, archived: boolean) => {
+    setItems(prev => prev.map(x => x.id === item.id ? { ...x, archived } : x));
+    try {
+      const res = await fetch(`/api/inventory/${item.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
+      });
+      if (!res.ok) setItems(prev => prev.map(x => x.id === item.id ? { ...x, archived: !archived } : x));
+    } catch {
+      setItems(prev => prev.map(x => x.id === item.id ? { ...x, archived: !archived } : x));
+    }
+  };
 
   const toggle = (id: number) => {
     setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -194,6 +213,15 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           <a href={item.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
             className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
         )}
+        <button type="button" onClick={() => setParked(item, item.archived !== true)}
+          title={item.archived ? 'Vrátit mezi to, co máme' : 'Momentálně nevedeme'}
+          className={`rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${
+            item.archived
+              ? 'bg-[#C8F542] text-black hover:brightness-110'
+              : 'glass border border-black/10 text-black/50 hover:text-black'
+          }`}>
+          {item.archived ? 'Máme zpátky' : 'Nevedeme'}
+        </button>
         <button type="button" onClick={() => save(item)} disabled={!dirty || savingId === item.id}
           className={`rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
           {savingId === item.id ? 'Ukládám…' : savedId === item.id && !dirty ? 'Uloženo ✓' : 'Uložit'}
@@ -281,8 +309,18 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           </div>
 
           <div className="glass-card overflow-hidden">
-            <div className="p-4 border-b border-black/[0.06]">
-              <p className="text-xs font-semibold text-black/45 uppercase tracking-wider">Všechny položky ({filtered.length})</p>
+            <div className="p-4 border-b border-black/[0.06] flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs font-semibold text-black/45 uppercase tracking-wider">
+                {showParked ? `Momentálně nevedeme (${filtered.length})` : `Všechny položky (${filtered.length})`}
+              </p>
+              {(parkedCount > 0 || showParked) && (
+                <button onClick={() => setShowParked(v => !v)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                    showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                  }`}>
+                  {showParked ? 'Zpět na to, co máme' : `Nevedeme (${parkedCount})`}
+                </button>
+              )}
             </div>
             <div className="divide-y divide-black/[0.06]">
               {filtered.map(item => {

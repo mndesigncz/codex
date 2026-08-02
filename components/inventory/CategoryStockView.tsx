@@ -23,6 +23,7 @@ export interface StockItem {
   supplierUrl?: string;
   brand?: string | null;
   description?: string | null;
+  archived?: boolean;
   packageSize?: number | null;
   openAmount?: number | null;
 }
@@ -68,6 +69,30 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
 }
 
 
+/** One tap says "tohle teď nevedeme" — and one more says we do again. */
+function ParkButton({ item, busy, onToggle, className = '' }: {
+  item: StockItem;
+  busy: boolean;
+  onToggle: (item: StockItem, archived: boolean) => void;
+  className?: string;
+}) {
+  const parked = item.archived === true;
+  return (
+    <button
+      onClick={() => onToggle(item, !parked)}
+      disabled={busy}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold min-h-[40px] transition active:scale-[0.97] disabled:opacity-50 ${
+        parked
+          ? 'bg-[#C8F542] text-black hover:brightness-110'
+          : 'glass border border-black/10 text-black/55 hover:text-black'
+      } ${className}`}
+    >
+      <Icon name={parked ? 'check' : 'warning'} size={14} />
+      {parked ? 'Máme zpátky' : 'Nevedeme'}
+    </button>
+  );
+}
+
 const TONE = {
   critical: { bar: 'bg-red-500', text: 'text-red-600', chip: 'bg-red-500/12 text-red-600' },
   low: { bar: 'bg-orange-400', text: 'text-orange-600', chip: 'bg-orange-500/12 text-orange-600' },
@@ -89,22 +114,26 @@ export default function CategoryStockView({
   onStep?: (item: StockItem, delta: number) => void;
 }) {
   const hasControls = Boolean(onStep || onEditItem || onRemoveItem);
+  // Parked items are hidden until asked for — they aren't on the shelf.
+  const [showParked, setShowParked] = useState(false);
   const [mode, setMode] = useState<Mode>('view');
   const [search, setSearch] = useState('');
   const [savingId, setSavingId] = useState<number | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
 
   const unit = packaging.contentUnit;
+  const parkedCount = items.filter(i => i.archived === true).length;
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items
+      .filter(i => (showParked ? i.archived === true : i.archived !== true))
       .filter(i => !q || i.name.toLowerCase().includes(q))
       .sort((a, b) => {
         // Emptiest first while writing, alphabetical while browsing.
         if (mode === 'edit') return effectivePackages(a) - effectivePackages(b);
         return a.name.localeCompare(b.name, 'cs');
       });
-  }, [items, search, mode]);
+  }, [items, search, mode, showParked]);
 
   // When a parent category is open, its subcategories keep their own heading so
   // the list stays readable instead of merging into one long block.
@@ -141,6 +170,24 @@ export default function CategoryStockView({
     setSavingId(null);
   };
 
+  // "Nevedeme" is as quick as tapping a level — the person at the counter is
+  // the one who knows an item ran out, so they must not have to ask anyone.
+  const setParked = async (item: StockItem, archived: boolean) => {
+    setSavingId(item.id);
+    try {
+      const res = await fetch(`/api/inventory/${item.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
+      });
+      if (res.ok) {
+        onChanged({ ...item, archived } as StockItem);
+        setSavedId(item.id);
+        setTimeout(() => setSavedId(s => (s === item.id ? null : s)), 1500);
+      }
+    } catch { /* keep the old value on screen */ }
+    setSavingId(null);
+  };
+
   // Opening the next package: one sealed unit becomes the new open one.
   const openNext = (item: StockItem) => {
     const size = sizeOf(item);
@@ -165,11 +212,21 @@ export default function CategoryStockView({
             </button>
           ))}
         </div>
-        {unit && (
-          <span className="text-sm text-black/50">
-            Celkem v kategorii <strong className="text-[#16181A] tabular-nums">{fmtAmount(totalOfCategory)} {unit}</strong>
-          </span>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {unit && !showParked && (
+            <span className="text-sm text-black/50">
+              Celkem v kategorii <strong className="text-[#16181A] tabular-nums">{fmtAmount(totalOfCategory)} {unit}</strong>
+            </span>
+          )}
+          {(parkedCount > 0 || showParked) && (
+            <button onClick={() => setShowParked(v => !v)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+                showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+              }`}>
+              {showParked ? 'Zpět na skladem' : `Nevedeme (${parkedCount})`}
+            </button>
+          )}
+        </div>
       </div>
 
       {items.length > 6 && (
@@ -200,7 +257,7 @@ export default function CategoryStockView({
                   const st = stockStatus(i, packaging);
                   const pct = openPct({ ...i, packageSize: size });
                   return (
-                    <div key={i.id} className="glass-card p-4">
+                    <div key={i.id} className={`glass-card p-4 ${i.archived ? 'opacity-60' : ''}`}>
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-semibold text-[#16181A] leading-snug min-w-0">
                           {i.name}
@@ -227,6 +284,9 @@ export default function CategoryStockView({
                       <p className="text-[11px] text-black/30 mt-1.5">
                         Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(packaging, i.unit)}
                       </p>
+                      {canEdit && (
+                        <ParkButton item={i} busy={savingId === i.id} onToggle={setParked} className="mt-2.5" />
+                      )}
                       {hasControls && (
                         <ItemControls item={i} onStep={onStep} onEditItem={onEditItem} onRemoveItem={onRemoveItem} />
                       )}
@@ -245,7 +305,7 @@ export default function CategoryStockView({
             const current = Number(i.openAmount) || 0;
             const st = stockStatus(i, packaging);
             return (
-              <div key={i.id} className="glass-card p-4">
+              <div key={i.id} className={`glass-card p-4 ${i.archived ? 'opacity-60' : ''}`}>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
                     <p className="font-semibold text-[#16181A] leading-snug">
@@ -278,10 +338,17 @@ export default function CategoryStockView({
                   </div>
                 </div>
 
-                {size <= 0 ? (
-                  <p className="text-xs text-amber-600 mt-2">
-                    Chybí velikost balení — doplň ji u položky ve skladu.
-                  </p>
+                {i.archived ? (
+                  <div className="mt-3">
+                    <ParkButton item={i} busy={savingId === i.id} onToggle={setParked} />
+                  </div>
+                ) : size <= 0 ? (
+                  <>
+                    <p className="text-xs text-amber-600 mt-2">
+                      Chybí velikost balení — doplň ji u položky ve skladu.
+                    </p>
+                    <ParkButton item={i} busy={savingId === i.id} onToggle={setParked} className="mt-2.5" />
+                  </>
                 ) : (
                   <>
                     <div className="flex flex-wrap gap-1.5 mt-3">

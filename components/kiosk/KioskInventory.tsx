@@ -32,6 +32,7 @@ export default function KioskInventory() {
   // While a packaged category is open it owns the screen — the search and the
   // full list would only be in the way on a tablet.
   const [stockFocused, setStockFocused] = useState(false);
+  const [showParked, setShowParked] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -45,10 +46,19 @@ export default function KioskInventory() {
   }, []);
 
   const cats = useMemo(() => ['Vše', ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
+  const parkedCount = items.filter(i => i.archived === true).length;
   const filtered = items.filter(i =>
-    i.archived !== true &&
+    (showParked ? i.archived === true : i.archived !== true) &&
     (cat === 'Vše' || i.category === cat) &&
     (!search.trim() || i.name.toLowerCase().includes(search.trim().toLowerCase())));
+
+  const setParked = (item: Item, archived: boolean) => {
+    setItems(list => list.map(x => x.id === item.id ? { ...x, archived } : x));
+    fetch(`/api/inventory/${item.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
+    }).catch(() => setItems(list => list.map(x => x.id === item.id ? { ...x, archived: !archived } : x)));
+  };
 
   const step = (item: Item, delta: number) => {
     const next = Math.max(0, item.quantity + delta);
@@ -83,6 +93,14 @@ export default function KioskInventory() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku…"
               className="w-full rounded-2xl bg-white/70 border border-black/[0.08] pl-11 pr-4 py-3.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-base" />
           </div>
+          {(parkedCount > 0 || showParked) && (
+            <button onClick={() => setShowParked(v => !v)}
+              className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
+                showParked ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/55'
+              }`}>
+              {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
+            </button>
+          )}
           <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
             {cats.map(c => (
               <button key={c} onClick={() => setCat(c)}
@@ -112,6 +130,17 @@ export default function KioskInventory() {
                       <p className="text-xs text-black/40 truncate">{i.category}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {i.archived ? (
+                        <button onClick={() => setParked(i, false)}
+                          className="rounded-2xl bg-[#C8F542] text-black px-4 h-12 text-sm font-bold active:scale-95 transition">
+                          Máme zpátky
+                        </button>
+                      ) : (
+                      <>
+                      <button onClick={() => setParked(i, true)} title="Momentálně nevedeme"
+                        className="rounded-2xl glass border border-black/10 w-12 h-12 flex items-center justify-center text-black/40 active:scale-95 transition">
+                        <Icon name="warning" size={18} />
+                      </button>
                       <button onClick={() => step(i, -1)}
                         className="rounded-2xl glass border border-black/10 w-12 h-12 flex items-center justify-center text-2xl leading-none text-black/70 active:scale-95 transition">−</button>
                       <span className="w-16 text-center font-bold text-[#16181A] tabular-nums text-lg">
@@ -119,6 +148,8 @@ export default function KioskInventory() {
                       </span>
                       <button onClick={() => step(i, 1)}
                         className="rounded-2xl bg-[#C8F542] w-12 h-12 flex items-center justify-center text-2xl leading-none text-black active:scale-95 transition">+</button>
+                      </>
+                      )}
                     </div>
                   </div>
                 );

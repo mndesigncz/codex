@@ -38,6 +38,9 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 }) {
   const [openCat, setOpenCat] = useState<number | null>(null);
   const [sweeping, setSweeping] = useState(false);
+  // Parked items step aside but must stay reachable — the same person who said
+  // "nevedeme" is the one who puts it back.
+  const [showParked, setShowParked] = useState(false);
 
   useEffect(() => { onFocusChange?.(openCat !== null); }, [openCat, onFocusChange]);
 
@@ -55,11 +58,11 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
     return src ? normalizeCategoryPackaging(src) : null;
   };
 
-  const itemsIn = (id: number) => {
+  const itemsIn = (id: number, parked = false) => {
     const inCat = matcher(categories as any, id);
-    // Parked items are not on the shelf, so they must not appear in the sweep.
+    // Parked items are not on the shelf, so they stay out of the sweep.
     return items
-      .filter(i => inCat(i) && i.archived !== true)
+      .filter(i => inCat(i) && (parked ? i.archived === true : i.archived !== true))
       .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   };
 
@@ -74,7 +77,8 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
   if (openCat != null) {
     const packaging = packagingOf(openCat);
-    const list = itemsIn(openCat);
+    const list = itemsIn(openCat, showParked);
+    const parkedCount = itemsIn(openCat, true).length;
     if (!packaging) { setOpenCat(null); return null; }
     const openName = findById(categories as any, openCat)?.name ?? '';
 
@@ -98,14 +102,23 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
         <CategoryNav
           categories={navCats}
           current={openCat}
-          onNavigate={name => { setOpenCat(name); setSweeping(false); }}
+          onNavigate={name => { setOpenCat(name); setSweeping(false); setShowParked(false); }}
           countOf={countIn}
           alertOf={alertsIn}
           size="touch"
           rootLabel="Zbytky"
         />
 
-        {list.length > 1 && (
+        {(parkedCount > 0 || showParked) && (
+          <button onClick={() => setShowParked(v => !v)}
+            className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
+              showParked ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/55'
+            }`}>
+            {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
+          </button>
+        )}
+
+        {!showParked && list.length > 1 && (
           <button onClick={() => setSweeping(true)}
             className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C8F542] text-black px-5 py-4 text-base font-bold min-h-[56px] active:scale-[0.99] transition">
             <Icon name="play" size={18} /> Projít vše ({list.length})
@@ -114,7 +127,9 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
         {direct.length === 0 ? (
           subs.length === 0 && (
-            <div className="glass-card p-8 text-center text-black/45">V této kategorii zatím nic není.</div>
+            <div className="glass-card p-8 text-center text-black/45">
+              {showParked ? 'Tady nic odloženého není.' : 'V této kategorii zatím nic není.'}
+            </div>
           )
         ) : (
           <div className="space-y-3">
@@ -148,7 +163,7 @@ function withSize(i: Item, packaging: CategoryPackaging) {
   return { ...i, packageSize: Number(i.packageSize) || packaging.defaultPackageSize || 0 };
 }
 
-async function save(item: Item, patch: { quantity?: number; openAmount?: number | null }) {
+async function save(item: Item, patch: { quantity?: number; openAmount?: number | null; archived?: boolean }) {
   try {
     const res = await fetch(`/api/inventory/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -168,7 +183,7 @@ function ItemRow({ item, packaging, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const apply = async (patch: { quantity?: number; openAmount?: number | null }) => {
+  const apply = async (patch: { quantity?: number; openAmount?: number | null; archived?: boolean }) => {
     setBusy(true);
     const next = { ...item, ...patch } as Item;
     onChanged(next);              // optimistic — the tablet must feel instant
@@ -178,11 +193,32 @@ function ItemRow({ item, packaging, onChanged }: {
     setBusy(false);
   };
 
+  if (item.archived) {
+    return (
+      <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap opacity-80">
+        <p className="font-bold text-[#16181A] min-w-0 truncate">
+          {item.name}
+          {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
+        </p>
+        <button onClick={() => apply({ archived: false })} disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542] text-black px-5 py-3 text-sm font-bold min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
+          <Icon name="check" size={15} /> Máme zpátky
+        </button>
+      </div>
+    );
+  }
+
   if (size <= 0) {
     return (
-      <div className="glass-card p-4">
-        <p className="font-bold text-[#16181A]">{item.name}</p>
-        <p className="text-sm text-amber-600 mt-1">Chybí velikost balení — doplní ji vedení ve skladu.</p>
+      <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="font-bold text-[#16181A] truncate">{item.name}</p>
+          <p className="text-sm text-amber-600 mt-1">Chybí velikost balení — doplní ji vedení ve skladu.</p>
+        </div>
+        <button onClick={() => apply({ archived: true })} disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40">
+          <Icon name="warning" size={15} /> Nevedeme
+        </button>
       </div>
     );
   }
@@ -224,6 +260,10 @@ function ItemRow({ item, packaging, onChanged }: {
         <span className="text-sm text-black/40">
           Zavřených: <strong className="text-black/60 tabular-nums">{item.quantity}</strong>
         </span>
+        <button onClick={() => apply({ archived: true })} disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
+          <Icon name="warning" size={15} /> Nevedeme
+        </button>
       </div>
     </div>
   );
@@ -312,6 +352,17 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
     setIdx(i => i + 1);
   };
 
+  // Ran out for good — park it and move on, no different from tapping a level.
+  const park = async () => {
+    setBusy(true);
+    onChanged({ ...item, archived: true });
+    const ok = await save(item, { archived: true });
+    if (!ok) onChanged(item);
+    else setDone(d => d + 1);
+    setBusy(false);
+    setIdx(i => i + 1);
+  };
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -347,6 +398,10 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
         )}
 
         <div className="flex items-center justify-center gap-2 flex-wrap">
+          <button onClick={park} disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-5 py-3 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
+            <Icon name="warning" size={15} /> Nevedeme
+          </button>
           <button onClick={() => setIdx(i => i + 1)} disabled={busy}
             className="rounded-full glass border border-black/10 px-5 py-3 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
             Přeskočit
