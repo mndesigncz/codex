@@ -525,6 +525,24 @@ export async function GET() {
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS movements JSONB`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_reason TEXT`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_note TEXT`;
+
+    // ---- Public share links (customer-facing menu) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS share_links (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL DEFAULT 'inventory',
+        category_id INTEGER,
+        excluded JSONB DEFAULT '[]',
+        title TEXT,
+        note TEXT,
+        enabled BOOLEAN DEFAULT TRUE,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    // Colours and logo for every share page of the team.
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS share_theme JSONB`;
     // A closing belongs to the whole shift, not just its author.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
 

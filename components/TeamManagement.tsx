@@ -8,6 +8,7 @@ import EmployeeProfile from './employer/EmployeeProfile';
 import { CURRENCIES, LOCALES } from '@/lib/money';
 import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn, readShortcuts, type Shortcut } from '@/lib/dashboardWidgets';
 import { useSymbol } from './CurrencyProvider';
+import ShareSettings from './employer/ShareSettings';
 
 interface Member {
   id: number;
@@ -766,6 +767,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           </div>
         ))}
       </div>
+
+      {/* Public share links + their look */}
+      <ShareSettings />
 
       {/* Payout / cash settings */}
       <div className="glass-card p-6 space-y-4">
