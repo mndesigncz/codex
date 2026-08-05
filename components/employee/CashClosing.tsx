@@ -405,7 +405,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {msg && (
         <div className="p-3.5 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={17} /> {msg}
@@ -859,7 +859,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           goes to management for approval. */}
       {showConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowConfirm(false)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/15 text-2xl">⚠️</div>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-3">Nejsi na směně v tento den</h3>
             <p className="text-sm text-black/55 mt-1.5">

@@ -287,7 +287,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header + period selector */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -495,7 +495,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       {/* Edit time modal */}
       {editEntry && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditEntry(null)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Upravit čas na směně</h3>

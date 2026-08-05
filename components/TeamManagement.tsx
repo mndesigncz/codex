@@ -434,7 +434,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const pending = invitations.filter(i => i.status === 'pending');
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto w-full">
+    <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto w-full">
       {notice && (
         <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={16} /> {notice}
@@ -824,7 +824,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4"
           onClick={() => !removing && setRemoveTarget(null)}>
-          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4"
+          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">

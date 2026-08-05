@@ -184,7 +184,7 @@ export default function AvailabilitySubmit({ user }: Props) {
   }, [grid, dayStates]);
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje dostupnost</h1>
         <p className="text-black/45 mt-1">

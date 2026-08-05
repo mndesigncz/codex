@@ -162,7 +162,7 @@ export default function Tasks({ user }: Props) {
     );
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl mx-auto w-full">
+    <div className="p-4 sm:p-6 space-y-6 max-w-2xl mx-auto w-full">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Úkoly</h1>
         <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">

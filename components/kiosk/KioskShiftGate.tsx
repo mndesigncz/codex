@@ -423,7 +423,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
+      <div className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <span className="text-5xl">{member.avatar || '👤'}</span>
         <h2 className="text-xl font-bold tracking-tight text-[#16181A] mt-2">{member.name}</h2>
         <p className="text-sm text-black/50 mt-1">

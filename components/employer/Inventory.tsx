@@ -148,6 +148,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [formErr, setFormErr] = useState('');
   const money = useMoney();
   const symbol = useSymbol();
   const [newCatInline, setNewCatInline] = useState('');
@@ -349,12 +350,14 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   };
 
   const openNew = () => {
+    setFormErr('');
     setEditing(null);
     setForm(seedForm(catId ?? categories[0]?.id ?? null));
     setNewCatInline('');
     setShowForm(true);
   };
   const openEdit = (i: Item) => {
+    setFormErr('');
     setEditing(i);
     setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
     setNewCatInline('');
@@ -403,15 +406,23 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       brand: form.brand, description: form.description, archived: form.archived,
       packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
     };
+    setFormErr('');
     try {
-      if (editing) {
-        await fetch(`/api/inventory/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = editing
+        ? await fetch(`/api/inventory/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch('/api/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.ok) {
+        setShowForm(false);
+        await load();
       } else {
-        await fetch('/api/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        // Keep the form open with what was typed — closing it would look like
+        // a successful save and quietly lose the work.
+        const d = await res.json().catch(() => ({}));
+        setFormErr(d.error || 'Položku se nepodařilo uložit.');
       }
-      setShowForm(false);
-      await load();
-    } catch {}
+    } catch {
+      setFormErr('Nepodařilo se spojit se serverem.');
+    }
     setSaving(false);
   };
 
@@ -419,8 +430,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     const q = Math.max(0, i.quantity + delta);
     setItems(prev => prev.map(x => x.id === i.id ? { ...x, quantity: q } : x));
     try {
-      await fetch(`/api/inventory/${i.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quantity: q }) });
-    } catch {}
+      const res = await fetch(`/api/inventory/${i.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quantity: q }) });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Put the old number back — a stepper that lies is worse than one that fails.
+      setItems(prev => prev.map(x => x.id === i.id ? { ...x, quantity: i.quantity } : x));
+      showNotice('Množství se nepodařilo uložit.');
+    }
   };
 
   // Parking and un-parking an item is one click — no dialog, no form.
@@ -486,11 +502,17 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const remove = async (i: Item) => {
     if (!confirm(`Smazat položku „${i.name}"?`)) return;
     setItems(prev => prev.filter(x => x.id !== i.id));
-    try { await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' }); } catch {}
+    try {
+      const res = await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+    } catch {
+      setItems(prev => [...prev, i].sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+      showNotice('Položku se nepodařilo smazat.');
+    }
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
@@ -534,7 +556,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
       {/* Toolbar */}
       <div ref={sentinel} aria-hidden className="h-px -mb-px" />
-      <div className={`sticky top-0 z-20 -mx-6 px-6 bg-white/60 dark:bg-transparent backdrop-blur-md transition-[padding] ${
+      <div className={`sticky top-0 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 bg-white/60 dark:bg-transparent backdrop-blur-md transition-[padding] ${
         stuck ? 'py-2 space-y-2 shadow-sm shadow-black/[0.04]' : 'py-3 space-y-3'
       }`}>
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
@@ -812,11 +834,18 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
             </div>
 
             {/* Sticky footer */}
-            <div className="sticky bottom-0 z-10 flex gap-3 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06]">
+            <div className="sticky bottom-0 z-10 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06] space-y-2.5">
+              {formErr && (
+                <p className="text-sm font-medium text-red-600 flex items-center gap-1.5">
+                  <Icon name="warning" size={15} /> {formErr}
+                </p>
+              )}
+              <div className="flex gap-3">
               <button type="button" onClick={() => setShowForm(false)} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">Zrušit</button>
               <button type="submit" disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap">
                 <Icon name="check" size={16} />{saving ? 'Ukládám…' : 'Uložit položku'}
               </button>
+              </div>
             </div>
           </form>
         </div>
@@ -1696,10 +1725,14 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   const saveRename = async (id: number) => {
     const name = editName.trim();
     if (!name) { setEditId(null); return; }
-    setBusy(true);
+    setBusy(true); setErr('');
     try {
-      await fetch(`/api/inventory/categories/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
-    } catch {}
+      const res = await fetch(`/api/inventory/categories/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || 'Přejmenování se nepodařilo.');
+      }
+    } catch { setErr('Nepodařilo se spojit se serverem.'); }
     setBusy(false);
     setEditId(null);
     await onChanged();
@@ -1711,13 +1744,14 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
     const target = idx + dir;
     if (target < 0 || target >= siblings.length) return;
     const a = siblings[idx], b = siblings[target];
-    setBusy(true);
+    setBusy(true); setErr('');
     try {
-      await Promise.all([
+      const res = await Promise.all([
         fetch(`/api/inventory/categories/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: b.position }) }),
         fetch(`/api/inventory/categories/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: a.position }) }),
       ]);
-    } catch {}
+      if (res.some(r => !r.ok)) setErr('Pořadí se nepodařilo uložit.');
+    } catch { setErr('Nepodařilo se spojit se serverem.'); }
     setBusy(false);
     await onChanged();
   };
@@ -1726,8 +1760,11 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
     const kids = categories.filter(x => x.parentId === c.id).length;
     const extra = kids > 0 ? ` ${kids} ${kids === 1 ? 'podkategorie se přesune' : 'podkategorií se přesune'} na hlavní úroveň.` : '';
     if (!confirm(`Smazat kategorii „${c.name}"? Položky si svůj štítek ponechají.${extra}`)) return;
-    setBusy(true);
-    try { await fetch(`/api/inventory/categories/${c.id}`, { method: 'DELETE' }); } catch {}
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch(`/api/inventory/categories/${c.id}`, { method: 'DELETE' });
+      if (!res.ok) setErr('Kategorii se nepodařilo smazat.');
+    } catch { setErr('Nepodařilo se spojit se serverem.'); }
     setBusy(false);
     await onChanged();
   };
