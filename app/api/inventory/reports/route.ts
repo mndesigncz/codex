@@ -1,23 +1,33 @@
+// "Nahlásit chybějící položky" — the list an employee sends to the employer.
+//
+// The author comes from the session; taking it from the request body would let
+// a report be filed under a colleague's name.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
-import { inventoryReports } from '@/lib/db/schema';
+import { neon } from '@neondatabase/serverless';
+
+export const dynamic = 'force-dynamic';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(req: NextRequest) {
-  try {
-  const __s = await getServerSession(authOptions);
-  if (!__s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-    const body = await req.json();
-    const [report] = await db.insert(inventoryReports).values({
-      reportedBy: body.reportedBy,
-      items: body.items,
-      note: body.note,
-      status: 'new',
-    }).returning();
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const meId = parseInt((session.user as any).id);
 
-    return NextResponse.json(report);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to create inventory report' }, { status: 500 });
+  try {
+    const body = await req.json();
+    const items = typeof body.items === 'string' ? body.items : JSON.stringify(body.items ?? []);
+    const note = body.note ? String(body.note).trim().slice(0, 1000) || null : null;
+
+    const [row] = await sql`
+      INSERT INTO inventory_reports (reported_by, items, note, status)
+      VALUES (${meId}, ${items}, ${note}, 'new')
+      RETURNING *`;
+    return NextResponse.json(row);
+  } catch {
+    return NextResponse.json({ error: 'Hlášení se nepodařilo vytvořit' }, { status: 500 });
   }
 }
