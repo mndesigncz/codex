@@ -155,6 +155,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
   const [pts, setPts] = useState<PointsConfig>(initPoints ?? DEFAULT_POINTS);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
 
   const setLevel = (i: number, patch: Partial<RewardLevel>) =>
     setLevels(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
@@ -162,7 +163,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
   const removeLevel = (i: number) => setLevels(ls => ls.filter((_, idx) => idx !== i));
 
   const save = async () => {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setErr('');
     try {
       const res = await fetch('/api/teams', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -172,7 +173,12 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
         }),
       });
       if (res.ok) { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); }
-    } finally { setSaving(false); }
+      else {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || 'Nastavení se nepodařilo uložit.');
+      }
+    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+    finally { setSaving(false); }
   };
 
   // Reward fields stay non-negative; penalty fields must accept minus values.
@@ -256,6 +262,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
           {saving ? 'Ukládám…' : 'Uložit nastavení'}
         </button>
         {saved && <span className="text-sm text-[#5B7A08] font-medium">Uloženo ✓</span>}
+        {err && <span className="text-sm text-red-600 font-medium">{err}</span>}
       </div>
     </div>
   );

@@ -80,6 +80,7 @@ export default function AvailabilitySubmit({ user }: Props) {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
   const [existing, setExisting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -138,7 +139,7 @@ export default function AvailabilitySubmit({ user }: Props) {
   };
 
   const submit = async () => {
-    setSaving(true);
+    setSaving(true); setErr('');
     try {
       // day_preferences: full map of non-default states
       const dayPreferences: Record<string, string> = { ...dayStates };
@@ -161,7 +162,12 @@ export default function AvailabilitySubmit({ user }: Props) {
       if (res.ok) {
         setExisting(true);
         setConfirmed(true);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || 'Dostupnost se nepodařilo odeslat.');
       }
+    } catch {
+      setErr('Nepodařilo se spojit se serverem.');
     } finally {
       setSaving(false);
     }
@@ -339,6 +345,11 @@ export default function AvailabilitySubmit({ user }: Props) {
 
           {/* Submit */}
           <div className="flex flex-wrap items-center gap-3">
+            {err && (
+              <p className="w-full text-sm font-medium text-red-600 flex items-center gap-1.5 mb-2">
+                <Icon name="warning" size={15} /> {err}
+              </p>
+            )}
             <button
               onClick={submit}
               disabled={saving}
