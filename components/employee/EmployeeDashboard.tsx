@@ -113,7 +113,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         <div className="h-7 w-56 rounded-full bg-black/[0.05] animate-pulse" />
         <div className="glass-card h-32 animate-pulse" />
         <div className="grid grid-cols-2 gap-4">
@@ -240,7 +240,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-4">
         <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-black/[0.05]">{user.avatar ?? '👤'}</span>
         <div>

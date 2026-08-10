@@ -71,7 +71,7 @@ export default function ShiftRequests({ user }: Props) {
   const typeLabel = (type: string) => REQUEST_TYPES.find(t => t.value === type)?.label ?? type;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje žádosti</h3>
         <button onClick={() => setShowForm(!showForm)} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all duration-300">

@@ -231,7 +231,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="glass-card p-5">
         <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
         <p className="text-black/50 text-sm mt-1">Uprav stav, když něco dochází — vedení dostane upozornění.</p>

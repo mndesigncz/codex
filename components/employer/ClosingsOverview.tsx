@@ -142,7 +142,7 @@ export default function ClosingsOverview() {
   // Employer fills a closing themselves (e.g. nobody on the crew did it today).
   if (creating) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <button onClick={() => { setCreating(false); setCreatingDate(undefined); }}
           className="inline-flex items-center gap-2 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="rotate-90" /> Zpět na přehled
@@ -158,7 +158,7 @@ export default function ClosingsOverview() {
   const fmtMissing = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
       {missing.length > 0 && (
         <div className="rounded-3xl bg-red-500/[0.06] border border-red-500/25 p-5 space-y-3">
