@@ -28,6 +28,7 @@ export default function ShiftRequests({ user }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ requestType: 'day_off', date: '', note: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const userId = parseInt(user.id ?? '0');
 
@@ -43,6 +44,7 @@ export default function ShiftRequests({ user }: Props) {
     e.preventDefault();
     if (!form.date) return;
     setSubmitting(true);
+    setError('');
     try {
       const res = await fetch('/api/shifts/requests', {
         method: 'POST',
@@ -54,9 +56,13 @@ export default function ShiftRequests({ user }: Props) {
         setRequests(prev => [req, ...prev]);
         setShowForm(false);
         setForm({ requestType: 'day_off', date: '', note: '' });
+      } else {
+        // Keep the form open — closing it would read as "odesláno".
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || 'Žádost se nepodařilo odeslat.');
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setError('Nepodařilo se spojit se serverem.');
     } finally {
       setSubmitting(false);
     }
@@ -104,6 +110,11 @@ export default function ShiftRequests({ user }: Props) {
               className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none resize-none" />
           </div>
           <div className="flex gap-3">
+            {error && (
+              <p className="w-full text-sm font-medium text-red-600 flex items-center gap-1.5 mb-1">
+                ⚠️ {error}
+              </p>
+            )}
             <button type="submit" disabled={submitting} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all duration-300 disabled:opacity-60">
               {submitting ? '⏳ Odesílám...' : '📨 Odeslat žádost'}
             </button>
