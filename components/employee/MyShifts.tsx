@@ -35,7 +35,22 @@ export default function MyShifts({ user }: Props) {
   const upcoming = shifts.filter(s => s.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   const past = shifts.filter(s => s.date < today).sort((a, b) => b.date.localeCompare(a.date));
 
-  const totalHours = shifts.length * 8; // 8h per shift estimate
+  // The shift already carries its own times, so there is no reason to guess 8h.
+  // An overnight shift (22:00–06:00) wraps past midnight and must not come out
+  // negative.
+  const hoursOf = (s: Shift) => {
+    const [sh, sm] = (s.startTime ?? '').split(':').map(Number);
+    const [eh, em] = (s.endTime ?? '').split(':').map(Number);
+    if ([sh, sm, eh, em].some(n => !Number.isFinite(n))) return 0;
+    const mins = (eh * 60 + em) - (sh * 60 + sm);
+    return (mins <= 0 ? mins + 24 * 60 : mins) / 60;
+  };
+  const sumHours = (list: Shift[]) => list.reduce((n, s) => n + hoursOf(s), 0);
+
+  const workedHours = sumHours(past);
+  const totalHours = sumHours(shifts);
+  const fmtHours = (h: number) =>
+    Number.isInteger(h) ? `${h}` : h.toFixed(1).replace('.', ',');
 
   const formatDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -83,10 +98,10 @@ export default function MyShifts({ user }: Props) {
           </div>
         </div>
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-black/45">Odpracované (odhad)</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{past.length * 8}h</p>
+          <p className="text-xs uppercase tracking-wider text-black/45">Odpracované</p>
+          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">{fmtHours(workedHours)} h</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
-            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, ((past.length * 8) / totalHours) * 100) : 0}%` }} />
+            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, (workedHours / totalHours) * 100) : 0}%` }} />
           </div>
         </div>
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
