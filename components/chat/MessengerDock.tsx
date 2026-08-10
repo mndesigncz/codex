@@ -187,6 +187,7 @@ function ChatWindow({
   const { messages, setMessages } = useThreadMessages(conv.id);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -204,8 +205,11 @@ function ChatWindow({
     const msg = await sendMessage(conv.id, payload);
     if (msg) {
       setMessages((prev) => [...prev, msg]);
+      setSendError('');
       onSent();
+      return true;
     }
+    return false;
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -214,7 +218,13 @@ function ChatWindow({
     if (!t || sending) return;
     setSending(true);
     setText('');
-    await doSend({ content: t });
+    const ok = await doSend({ content: t });
+    // The input was cleared optimistically; a failed send must give the text
+    // back rather than swallow what the person wrote.
+    if (!ok) {
+      setText(t);
+      setSendError('Zprávu se nepodařilo odeslat.');
+    }
     setSending(false);
   };
 
@@ -227,7 +237,7 @@ function ChatWindow({
     if (up) {
       await doSend({ attachmentUrl: up.url, attachmentType: up.type, attachmentName: up.name });
     } else {
-      alert('Nahrání souboru se nezdařilo');
+      setSendError('Nahrání souboru se nezdařilo.');
     }
     setUploading(false);
   };
@@ -268,6 +278,12 @@ function ChatWindow({
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {sendError && (
+        <p className="px-2.5 pt-1.5 text-[11px] font-medium text-red-600 flex items-center gap-1">
+          <span aria-hidden>⚠️</span> {sendError}
+        </p>
+      )}
 
       <form
         onSubmit={handleSend}

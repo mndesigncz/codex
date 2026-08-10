@@ -163,6 +163,7 @@ function Thread({
   const { messages, setMessages, loading } = useThreadMessages(conv.id);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -180,8 +181,11 @@ function Thread({
     const msg = await sendMessage(conv.id, payload);
     if (msg) {
       setMessages((prev) => [...prev, msg]);
+      setSendError('');
       onSent();
+      return true;
     }
+    return false;
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -190,7 +194,13 @@ function Thread({
     if (!t || sending) return;
     setSending(true);
     setText('');
-    await doSend({ content: t });
+    const ok = await doSend({ content: t });
+    // The input was cleared optimistically; a failed send must give the text
+    // back rather than swallow what the person wrote.
+    if (!ok) {
+      setText(t);
+      setSendError('Zprávu se nepodařilo odeslat.');
+    }
     setSending(false);
   };
 
@@ -207,7 +217,7 @@ function Thread({
         attachmentName: up.name,
       });
     } else {
-      alert('Nahrání souboru se nezdařilo');
+      setSendError('Nahrání souboru se nezdařilo.');
     }
     setUploading(false);
   };
@@ -252,6 +262,12 @@ function Thread({
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {sendError && (
+        <p className="px-3 pt-2 text-xs font-medium text-red-600 flex items-center gap-1.5">
+          <span aria-hidden>⚠️</span> {sendError}
+        </p>
+      )}
 
       <form
         onSubmit={handleSend}
