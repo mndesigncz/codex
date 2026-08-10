@@ -182,6 +182,7 @@ function ItemRow({ item, packaging, onChanged }: {
   const unit = packaging.contentUnit;
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const apply = async (patch: { quantity?: number; openAmount?: number | null; archived?: boolean }) => {
     setBusy(true);
@@ -189,7 +190,12 @@ function ItemRow({ item, packaging, onChanged }: {
     onChanged(next);              // optimistic — the tablet must feel instant
     const ok = await save(item, patch);
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 1200); }
-    else onChanged(item);         // put the old value back if it didn't land
+    else {
+      // Put the old value back AND say so — a silent revert reads as a missed tap.
+      onChanged(item);
+      setFailed(true);
+      setTimeout(() => setFailed(false), 3000);
+    }
     setBusy(false);
   };
 
@@ -242,6 +248,11 @@ function ItemRow({ item, packaging, onChanged }: {
           </p>
         </div>
         {saved && <span className="text-sm font-bold text-[#5B7A08] shrink-0">Uloženo ✓</span>}
+        {failed && (
+          <span className="text-sm font-bold text-red-600 shrink-0 flex items-center gap-1">
+            <Icon name="warning" size={15} /> Neuloženo
+          </span>
+        )}
       </div>
 
       <div className="h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
@@ -312,6 +323,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
   const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
+  const [err, setErr] = useState('');
 
   // Guard against the list shrinking underneath (an item removed elsewhere).
   useEffect(() => { if (idx > items.length) setIdx(items.length); }, [items.length, idx]);
@@ -346,9 +358,15 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
     setBusy(true);
     onChanged({ ...item, openAmount: amount });
     const ok = await save(item, { openAmount: amount });
-    if (!ok) onChanged(item);
-    else setDone(d => d + 1);
     setBusy(false);
+    if (!ok) {
+      // Stay on this item — advancing would hide that nothing was written.
+      onChanged(item);
+      setErr('Nepodařilo se uložit — zkus to prosím znovu.');
+      return;
+    }
+    setErr('');
+    setDone(d => d + 1);
     setIdx(i => i + 1);
   };
 
@@ -357,9 +375,14 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
     setBusy(true);
     onChanged({ ...item, archived: true });
     const ok = await save(item, { archived: true });
-    if (!ok) onChanged(item);
-    else setDone(d => d + 1);
     setBusy(false);
+    if (!ok) {
+      onChanged(item);
+      setErr('Nepodařilo se uložit — zkus to prosím znovu.');
+      return;
+    }
+    setErr('');
+    setDone(d => d + 1);
     setIdx(i => i + 1);
   };
 
@@ -387,6 +410,12 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
             Teď: {formatStock(sized, packaging.contentUnit, item.unit)}
           </p>
         </div>
+
+        {err && (
+          <p className="text-center text-red-600 text-sm font-semibold flex items-center justify-center gap-1.5">
+            <Icon name="warning" size={16} /> {err}
+          </p>
+        )}
 
         {size <= 0 ? (
           <p className="text-center text-amber-600 text-sm">

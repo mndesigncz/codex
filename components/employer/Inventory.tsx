@@ -731,7 +731,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     <div className="flex items-center rounded-2xl bg-black/[0.04] border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
                       <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
                         className="rounded-xl bg-black/[0.04] hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
-                      <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                      <input type="number" inputMode="numeric" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                         className="flex-1 min-w-0 bg-transparent text-center text-sm font-semibold text-[#16181A] focus:outline-none tabular-nums" />
                       <button type="button" aria-label="Přidat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))}
                         className="rounded-xl bg-[#C8F542] hover:brightness-110 w-9 h-9 flex items-center justify-center text-lg leading-none text-black shrink-0">+</button>
@@ -743,13 +743,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                   </div>
                   <div className="col-span-1">
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
-                    <input type="number" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
+                    <input type="number" inputMode="numeric" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
                   </div>
                   {pk(form) && (
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Velikost balení</label>
                       <div className="relative">
-                        <input type="number" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
+                        <input type="number" inputMode="numeric" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
                           placeholder={String(pk(form)?.defaultPackageSize ?? '')} className={`${inputClass} pr-12`} />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{pk(form)?.contentUnit}</span>
                       </div>
@@ -773,7 +773,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                       <span className="w-2 h-2 rounded-full bg-orange-400" /> Upozornit při
                     </label>
                     <div className="relative">
-                      <input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                      <input type="number" inputMode="numeric" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
                     </div>
                   </div>
@@ -782,7 +782,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                       <span className="w-2 h-2 rounded-full bg-red-500" /> Kriticky málo při
                     </label>
                     <div className="relative">
-                      <input type="number" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                      <input type="number" inputMode="numeric" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
                     </div>
                   </div>
@@ -2050,7 +2050,7 @@ function PackagingEditor({ category, onSaved }: {
             </div>
             <div>
               <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
-              <input type="number" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
+              <input type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
                 className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
             </div>
           </div>
@@ -2087,7 +2087,7 @@ function PackagingEditor({ category, onSaved }: {
                   <input value={s.label} onChange={e => setStep(i, { label: e.target.value })}
                     className="flex-1 min-w-0 rounded-xl bg-white border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
                   <div className="flex items-center gap-1 shrink-0">
-                    <input type="number" min={0} max={100} value={s.pct ?? 0}
+                    <input type="number" inputMode="numeric" min={0} max={100} value={s.pct ?? 0}
                       onChange={e => setStep(i, { pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
                       className="w-16 rounded-xl bg-white border border-black/[0.08] px-2 py-1.5 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
                     <span className="text-xs text-black/40">%</span>

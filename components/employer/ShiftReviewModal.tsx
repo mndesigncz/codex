@@ -466,7 +466,7 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
             <div>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Body za směnu</label>
               <div className="flex items-center gap-2 flex-wrap">
-                <input type="number" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
+                <input type="number" inputMode="numeric" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
                 <span className="text-xs text-black/45">bodů {!ptsTouched && rating > 0 && '(návrh z hvězd)'}</span>
                 {summary && summary.autoPoints.total !== 0 && (
                   <span className="text-xs text-black/45 tabular-nums">· celkem s automatickými: <strong className="text-[#16181A]">{signed(pts + summary.autoPoints.total)}</strong></span>

@@ -200,7 +200,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) - 1)}
             className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
           <input
-            type="number"
+            type="number" inputMode="numeric"
             value={qtyOf(item)}
             onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
             className="w-16 text-center rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2 text-sm font-semibold text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"

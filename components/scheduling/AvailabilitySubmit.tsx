@@ -314,7 +314,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                 Maximální počet směn <span className="text-black/35">(nepovinné)</span>
               </label>
               <input
-                type="number"
+                type="number" inputMode="numeric"
                 min={0}
                 value={maxShifts}
                 onChange={(e) => setMaxShifts(e.target.value)}
