@@ -236,7 +236,7 @@ export default function AvailabilitySubmit({ user }: Props) {
       ) : (
         <>
           {/* Calendar */}
-          <div className="glass-card p-5">
+          <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h2 className="font-bold text-[#16181A] capitalize flex items-center gap-2">
                 <Icon name="calendar" size={20} />
@@ -250,14 +250,14 @@ export default function AvailabilitySubmit({ user }: Props) {
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
               {CZ_DAYS.map((d) => (
                 <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
                   {d}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {grid.map((cell, i) => {
                 if (!cell) return <div key={i} />;
                 const day = parseInt(cell.split('-')[2]);
