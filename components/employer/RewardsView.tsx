@@ -180,7 +180,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
     <div>
       <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
       <input
-        type="number" min={allowNegative ? -100 : 0} max={100} value={pts[key]}
+        type="number" inputMode="numeric" min={allowNegative ? -100 : 0} max={100} value={pts[key]}
         onChange={e => {
           const raw = parseInt(e.target.value);
           const n = Number.isFinite(raw) ? raw : 0;
@@ -241,7 +241,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-xs text-black/45 shrink-0">Od bodů</label>
-                <input type="number" min={0} value={l.minPoints} onChange={e => setLevel(i, { minPoints: Math.max(0, parseInt(e.target.value) || 0) })}
+                <input type="number" inputMode="numeric" min={0} value={l.minPoints} onChange={e => setLevel(i, { minPoints: Math.max(0, parseInt(e.target.value) || 0) })}
                   className={`${inputCls} !py-2 max-w-[120px] tabular-nums`} disabled={i === 0} />
                 {i === 0 && <span className="text-[11px] text-black/35">základní úroveň (vždy od 0)</span>}
               </div>

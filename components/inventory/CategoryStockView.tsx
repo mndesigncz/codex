@@ -120,6 +120,13 @@ export default function CategoryStockView({
   const [search, setSearch] = useState('');
   const [savingId, setSavingId] = useState<number | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
+  // A tap that didn't land must say so — otherwise the shift walks away
+  // believing the stock was written down.
+  const [failedId, setFailedId] = useState<number | null>(null);
+  const flashFail = (id: number) => {
+    setFailedId(id);
+    setTimeout(() => setFailedId(f => (f === id ? null : f)), 3000);
+  };
 
   const unit = packaging.contentUnit;
   const parkedCount = items.filter(i => i.archived === true).length;
@@ -165,8 +172,8 @@ export default function CategoryStockView({
         onChanged({ ...item, ...patch } as StockItem);
         setSavedId(item.id);
         setTimeout(() => setSavedId(s => (s === item.id ? null : s)), 1500);
-      }
-    } catch { /* keep the old value on screen */ }
+      } else flashFail(item.id);
+    } catch { flashFail(item.id); }
     setSavingId(null);
   };
 
@@ -183,8 +190,8 @@ export default function CategoryStockView({
         onChanged({ ...item, archived } as StockItem);
         setSavedId(item.id);
         setTimeout(() => setSavedId(s => (s === item.id ? null : s)), 1500);
-      }
-    } catch { /* keep the old value on screen */ }
+      } else flashFail(item.id);
+    } catch { flashFail(item.id); }
     setSavingId(null);
   };
 
@@ -322,6 +329,11 @@ export default function CategoryStockView({
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {savedId === i.id && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
+                    {failedId === i.id && (
+                      <span className="text-xs font-semibold text-red-600 flex items-center gap-1">
+                        <Icon name="warning" size={13} /> Neuloženo
+                      </span>
+                    )}
                     {st !== 'ok' && (
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
                         {st === 'critical' ? 'Dochází' : 'Málo'}
@@ -376,18 +388,18 @@ export default function CategoryStockView({
                         onClick={() => openNext(i)}
                         disabled={i.quantity <= 0 || savingId === i.id}
                         title={i.quantity <= 0 ? 'Není žádné zavřené balení' : undefined}
-                        className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 text-[#16181A] px-3.5 py-1.5 text-xs font-medium hover:bg-black/[0.05] transition disabled:opacity-40"
+                        className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 min-h-[40px] text-xs font-medium hover:bg-black/[0.05] transition disabled:opacity-40 active:scale-[0.97]"
                       >
                         <Icon name="plus" size={14} /> Otevřít další balení
                       </button>
                       {onStep ? (
                         <span className="inline-flex items-center gap-1.5 text-[11px] text-black/40">
                           Zavřených:
-                          <button onClick={() => onStep(i, -1)} disabled={i.quantity <= 0}
-                            className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/70 hover:text-black text-base leading-none disabled:opacity-30">−</button>
-                          <strong className="text-black/60 tabular-nums w-5 text-center">{i.quantity}</strong>
-                          <button onClick={() => onStep(i, 1)}
-                            className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+                          <button onClick={() => onStep(i, -1)} disabled={i.quantity <= 0} aria-label="Ubrat zavřené balení"
+                            className="rounded-full glass w-10 h-10 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none disabled:opacity-30 active:scale-95 transition">−</button>
+                          <strong className="text-black/60 tabular-nums w-6 text-center text-sm">{i.quantity}</strong>
+                          <button onClick={() => onStep(i, 1)} aria-label="Přidat zavřené balení"
+                            className="rounded-full glass w-10 h-10 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none active:scale-95 transition">+</button>
                         </span>
                       ) : (
                         <span className="text-[11px] text-black/40">
