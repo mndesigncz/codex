@@ -39,6 +39,9 @@ export interface Celebration {
 
 interface ProcedureCtx {
   active: ActiveRun | null;
+  /** True when a tick didn't reach the server. The run is still safe locally,
+   *  but the employer wouldn't see it — so the runner has to say so. */
+  syncFailed: boolean;
   justCompleted: Celebration | null;
   starting: boolean;
   startRun: (procedure: ProcedureLite) => Promise<void>;
@@ -57,6 +60,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<ActiveRun | null>(null);
   const [justCompleted, setJustCompleted] = useState<Celebration | null>(null);
   const [starting, setStarting] = useState(false);
+  const [syncFailed, setSyncFailed] = useState(false);
 
   // Debounce PATCH progress writes so rapid taps don't spam the server.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,28 +91,41 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
 
   const persist = useCallback((runId: number, checkedItems: number[], skippedItems: number[]) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      fetch('/api/procedures/runs', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId, checkedItems, skippedItems }),
-      }).catch(() => { /* best-effort */ });
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/procedures/runs', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ runId, checkedItems, skippedItems }),
+        });
+        // A whole opening procedure can be ticked off without a single write
+        // landing; the person doing it has to find out before they walk away.
+        setSyncFailed(!res.ok);
+      } catch {
+        setSyncFailed(true);
+      }
     }, 350);
   }, []);
 
   const startRun = useCallback(async (procedure: ProcedureLite) => {
     setStarting(true);
+    setSyncFailed(false);
     try {
       const res = await fetch('/api/procedures/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ procedureId: procedure.id }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.active) {
         setJustCompleted(null);
         setActive(data.active as ActiveRun);
+      } else {
+        // Nothing opened — without this the button looks simply dead.
+        setSyncFailed(true);
       }
+    } catch {
+      setSyncFailed(true);
     } finally {
       setStarting(false);
     }
@@ -189,7 +206,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   const dismissCelebration = useCallback(() => setJustCompleted(null), []);
 
   return (
-    <Ctx.Provider value={{ active, justCompleted, starting, startRun, toggleItem, toggleSkip, complete, cancel, dismissCelebration }}>
+    <Ctx.Provider value={{ active, justCompleted, starting, syncFailed, startRun, toggleItem, toggleSkip, complete, cancel, dismissCelebration }}>
       {children}
       <ReminderWatcher />
     </Ctx.Provider>

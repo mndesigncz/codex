@@ -59,7 +59,7 @@ function Confetti() {
 }
 
 export default function FloatingRunner() {
-  const { active, justCompleted, toggleItem, toggleSkip, complete, cancel, dismissCelebration } = useProcedures();
+  const { active, justCompleted, syncFailed, toggleItem, toggleSkip, complete, cancel, dismissCelebration } = useProcedures();
   const [minimized, setMinimized] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
@@ -160,6 +160,15 @@ export default function FloatingRunner() {
               style={{ width: `${pct}%` }}
             />
           </div>
+
+          {/* The ticks live on this device but never reached the server, so the
+              employer wouldn't see the run at all. */}
+          {syncFailed && (
+            <p className="flex items-start gap-1.5 bg-amber-500/[0.12] px-4 py-2 text-[11px] font-medium leading-snug text-amber-800">
+              <span aria-hidden className="mt-px shrink-0">⚠️</span>
+              Odškrtnuté kroky se neukládají na server — zkontroluj připojení, ať se postup nezapíše jako neudělaný.
+            </p>
+          )}
 
           {/* Header */}
           <div className="flex items-center gap-2 px-4 pt-3 pb-2">
