@@ -168,6 +168,8 @@ export default function ScheduleBuilder({ user }: Props) {
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [publishNote, setPublishNote] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  // Surfaced when an action on the board didn't reach the server.
+  const [boardError, setBoardError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const seededRef = useRef(false);
 
@@ -291,8 +293,9 @@ export default function ScheduleBuilder({ user }: Props) {
   };
 
   const removeShift = async (id: number) => {
-    const res = await fetch(`/api/schedule?id=${id}`, { method: 'DELETE' });
-    if (res.ok) setShifts((prev) => prev.filter((s) => s.id !== id));
+    const res = await fetch(`/api/schedule?id=${id}`, { method: 'DELETE' }).catch(() => null);
+    if (res?.ok) setShifts((prev) => prev.filter((s) => s.id !== id));
+    else setBoardError('Směnu se nepodařilo smazat.');
   };
 
   const clearMonth = async () => {
@@ -452,6 +455,13 @@ export default function ScheduleBuilder({ user }: Props) {
         {/* Month selector — arrows for any month, chips for the usual ones.
             Only the schedule grid is month-scoped; the calendar and the
             settings tabs bring their own navigation. */}
+        {boardError && (
+          <div className="w-full rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm font-medium text-red-600 flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
+            <button onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600">✕</button>
+          </div>
+        )}
+
         {tab === 'rozvrh' && (
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1 glass rounded-full p-1">
@@ -938,6 +948,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
   const [startsAtOpen, setStartsAtOpen] = useState(false);
   const [endsAtClose, setEndsAtClose] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
 
   const beginNew = () => {
     setEditing('new');
@@ -984,9 +995,13 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
   };
 
   const remove = async (id: number) => {
+    setErr('');
+    const t = shiftTypes.find(x => x.id === id);
+    if (!confirm(`Smazat typ směny „${t?.name ?? ''}"? Naplánované směny tohoto typu zůstanou, ale ztratí barvu i název.`)) return;
     setBusy(true);
     try {
-      await fetch(`/api/shift-types/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/shift-types/${id}`, { method: 'DELETE' });
+      if (!res.ok) setErr('Typ směny se nepodařilo smazat.');
       await onReload();
     } finally {
       setBusy(false);
@@ -995,6 +1010,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
 
   return (
     <div className="glass-card p-5 space-y-4">
+      {err && <p className="text-sm font-medium text-red-600">{err}</p>}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="clock" size={20} className="text-black/70 flex-shrink-0" />
@@ -1310,6 +1326,7 @@ function FixedAssignmentsManager({
   const [weekday, setWeekday] = useState<number>(0);
   const [shiftTypeId, setShiftTypeId] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
 
   const add = async () => {
     if (!employeeId) return;
@@ -1329,9 +1346,12 @@ function FixedAssignmentsManager({
   };
 
   const remove = async (id: number) => {
+    setErr('');
+    if (!confirm('Smazat pevné přiřazení? Z příštího generování rozpisu vypadne.')) return;
     setBusy(true);
     try {
-      await fetch(`/api/fixed-assignments?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/fixed-assignments?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) setErr('Přiřazení se nepodařilo smazat.');
       await onReload();
     } finally {
       setBusy(false);
@@ -1348,6 +1368,7 @@ function FixedAssignmentsManager({
 
   return (
     <div className="space-y-6">
+      {err && <p className="text-sm font-medium text-red-600">{err}</p>}
       <div className="glass-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Icon name="swap" size={20} className="text-black/70" />
