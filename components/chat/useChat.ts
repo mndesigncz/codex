@@ -75,6 +75,8 @@ export async function markRead(conversationId: number): Promise<void> {
   }
 }
 
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 export async function uploadFile(file: File): Promise<UploadResult | null> {
   const form = new FormData();
   form.append('file', file);

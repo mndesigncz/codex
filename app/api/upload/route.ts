@@ -5,6 +5,10 @@ import { put } from '@vercel/blob';
 
 export const dynamic = 'force-dynamic';
 
+/** Chat attachments are photos and documents, not archives — 10 MB is plenty
+ *  and keeps a mis-picked video from stalling the shift's phone. */
+const MAX_BYTES = 10 * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -26,6 +30,12 @@ export async function POST(request: NextRequest) {
     }
 
     const f = file as File;
+    if (f.size > MAX_BYTES) {
+      return NextResponse.json(
+        { error: `Soubor je příliš velký (max ${Math.round(MAX_BYTES / 1024 / 1024)} MB).` },
+        { status: 413 },
+      );
+    }
     const filename = f.name || 'soubor';
     const blob = await put(filename, f, { access: 'public', addRandomSuffix: true });
     const type = f.type && f.type.startsWith('image/') ? 'image' : 'file';

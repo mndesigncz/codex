@@ -9,6 +9,7 @@ import {
   useThreadMessages,
   sendMessage,
   uploadFile,
+  MAX_UPLOAD_BYTES,
   markRead,
   formatTime,
 } from './useChat';
@@ -208,6 +209,12 @@ function Thread({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    // Say it right away instead of uploading for a minute and then failing.
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setSendError(`Soubor je příliš velký (max ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB).`);
+      return;
+    }
+    setSendError('');
     setUploading(true);
     const up = await uploadFile(file);
     if (up) {
