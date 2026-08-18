@@ -162,6 +162,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   // Movement history of the item being edited — who changed the stock and when.
   const [itemLog, setItemLog] = useState<any[]>([]);
   const [logOpen, setLogOpen] = useState(false);
+  // Items carried from an employee report straight into the shopping list.
+  const [shoppingExtra, setShoppingExtra] = useState<Item[]>([]);
   // Parked items live behind a toggle so they can't clutter the active stock.
   const [showArchived, setShowArchived] = useState(false);
   // Bulk editing: a selection mode with a bar of actions for what is ticked.
@@ -973,6 +975,23 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                           <span className="font-normal text-black/40"> · {new Date(r.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </p>
                         <button
+                          onClick={() => {
+                            const wanted: Item[] = [];
+                            list.forEach((it: any) => {
+                              const id = typeof it === 'number' ? it : it?.id;
+                              const found = items.find(x => x.id === id)
+                                ?? items.find(x => x.name === (typeof it === 'string' ? it : it?.name));
+                              if (found && !wanted.some(w => w.id === found.id)) wanted.push(found);
+                            });
+                            setShoppingExtra(wanted);
+                            setShowReports(false);
+                            setShowShopping(true);
+                          }}
+                          className="rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition glass text-[#5B7A08] hover:brightness-105"
+                        >
+                          🛒 Do nákupu
+                        </button>
+                        <button
                           onClick={async () => {
                             const res = await fetch('/api/inventory/reports', {
                               method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1012,11 +1031,12 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
       {showShopping && (
         <ShoppingListModal
-          items={toBuy}
+          items={[...toBuy, ...shoppingExtra.filter(e => !toBuy.some(t => t.id === e.id))]}
           pk={pk}
-          onClose={() => setShowShopping(false)}
+          onClose={() => { setShowShopping(false); setShoppingExtra([]); }}
           onOrdered={async (count) => {
             setShowShopping(false);
+            setShoppingExtra([]);
             if (count > 0) {
               showNotice(count === 1 ? 'Objednávka vytvořena ✓' : count <= 4 ? `Vytvořeny ${count} objednávky ✓` : `Vytvořeno ${count} objednávek ✓`);
               await loadOrders();

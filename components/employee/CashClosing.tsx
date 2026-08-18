@@ -294,6 +294,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [diffNote, setDiffNote] = useState('');
   // The previous closing's counted cash — offered as this shift's opening cash.
   const [carry, setCarry] = useState<{ amount: number; date: string; label: string | null } | null>(null);
+  // Today's procedure runs — the closing is the natural moment to notice an
+  // unfinished closing checklist.
+  const [todayRuns, setTodayRuns] = useState<any[]>([]);
   // Counting the drawer by denomination instead of typing one total. When the
   // counter is on, the counted total drives form.closingCash.
   const [countMode, setCountMode] = useState(false);
@@ -315,6 +318,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       setTeamTipsInDrawer(drawer);
       setTipsInDrawer(drawer);
     } catch { /* keep the safe default: tips are kept aside */ }
+    try {
+      const rd = await fetch('/api/procedures/runs').then(r => r.json());
+      const today = new Date().toISOString().slice(0, 10);
+      setTodayRuns((Array.isArray(rd?.runs) ? rd.runs : []).filter((r: any) =>
+        String(r.completed_at ?? r.started_at ?? '').slice(0, 10) === today));
+    } catch { /* runs are a nice-to-have here */ }
     try {
       const d = await fetch('/api/closings').then(r => r.json());
       const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
@@ -982,6 +991,33 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         <div>
+          {todayRuns.length > 0 && (
+            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní postupy</p>
+              <div className="flex flex-wrap gap-1.5">
+                {todayRuns.map((r: any) => {
+                  const missing = Math.max(0, (Number(r.total_items) || 0)
+                    - (Array.isArray(r.checked_items) ? r.checked_items.length : 0)
+                    - (Array.isArray(r.skipped_items) ? r.skipped_items.length : 0));
+                  const running = r.status === 'running';
+                  return (
+                    <span key={r.id} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
+                      running ? 'bg-orange-500/12 text-orange-600'
+                      : missing > 0 ? 'bg-amber-500/12 text-amber-700'
+                      : 'bg-[#C8F542]/15 text-[#5B7A08]'
+                    }`}>
+                      {r.procedure_icon ?? '📋'} {r.procedure_name}
+                      {running ? ' · běží' : missing > 0 ? ` · ${missing} nedokončeno` : ' ✓'}
+                    </span>
+                  );
+                })}
+              </div>
+              {todayRuns.some((r: any) => r.status === 'running') && (
+                <p className="text-[12px] text-orange-600 mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
+              )}
+            </div>
+          )}
+
           <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Poznámka</label>
           <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
         </div>

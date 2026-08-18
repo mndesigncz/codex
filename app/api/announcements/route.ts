@@ -63,6 +63,19 @@ export async function POST(req: NextRequest) {
     const ees = (members as any[]).filter(m => m.role !== 'employer').map(m => m.id);
     if (ees.length) await notifyUsers(ees, { title: '📌 Nové oznámení', body, type: 'info', link: '/employee/shifts' });
     if (emp.length) await notifyUsers(emp, { title: '📌 Nové oznámení', body, type: 'info', link: '/employer/overview' });
+
+    // Optionally mirror the announcement into the team chat, so it also lives
+    // where the conversation happens.
+    if (b.postToChat === true) {
+      try {
+        const [conv] = await sql`SELECT id FROM conversations WHERE team_id = ${c.teamId} AND type = 'team' LIMIT 1`;
+        if (conv) {
+          await sql`
+            INSERT INTO chat_messages (conversation_id, sender_id, content)
+            VALUES (${conv.id}, ${c.meId}, ${'📌 ' + content})`;
+        }
+      } catch { /* chat mirror is best-effort */ }
+    }
   } catch { /* best-effort */ }
 
   return NextResponse.json({ ok: true, announcement: row });

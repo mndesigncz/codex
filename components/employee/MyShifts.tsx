@@ -22,6 +22,8 @@ export default function MyShifts({ user }: Props) {
   const [loading, setLoading] = useState(true);
   // Ratings from shift reviews, keyed by date — shown instead of a made-up „Splněno" badge.
   const [ratingByDate, setRatingByDate] = useState<Record<string, number>>({});
+  // Approved holidays — they belong right next to the shifts they carve out.
+  const [timeOff, setTimeOff] = useState<{ fromDate: string; toDate: string; type?: string }[]>([]);
 
   const userId = parseInt(user.id ?? '0');
 
@@ -34,6 +36,12 @@ export default function MyShifts({ user }: Props) {
   }, [userId]);
 
   useEffect(() => {
+    fetch('/api/timeoff').then(r => r.json()).then(d => {
+      const today = new Date().toISOString().split('T')[0];
+      setTimeOff((Array.isArray(d?.requests) ? d.requests : [])
+        .filter((r: any) => r.status === 'approved' && r.toDate >= today)
+        .sort((a: any, b: any) => a.fromDate.localeCompare(b.fromDate)));
+    }).catch(() => {});
     fetch('/api/rewards').then(r => r.json()).then(d => {
       const map: Record<string, number> = {};
       (Array.isArray(d?.reviews) ? d.reviews : []).forEach((r: any) => {
@@ -125,6 +133,23 @@ export default function MyShifts({ user }: Props) {
           </div>
         </div>
       </div>
+
+      {timeOff.length > 0 && (
+        <div className="glass-card p-5">
+          <p className="text-xs uppercase tracking-wider text-black/45 mb-2.5">🏖️ Schválené volno</p>
+          <div className="flex flex-wrap gap-2">
+            {timeOff.map((t, i) => {
+              const one = t.fromDate === t.toDate;
+              const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+              return (
+                <span key={i} className="rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] px-3.5 py-1.5 text-sm font-medium whitespace-nowrap">
+                  {one ? fmt(t.fromDate) : `${fmt(t.fromDate)} – ${fmt(t.toDate)}`}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>

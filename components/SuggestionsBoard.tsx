@@ -254,6 +254,21 @@ export default function SuggestionsBoard() {
 
                 {(isEmployer || mine) && (
                   <div className="flex justify-end gap-1 mt-1">
+                    {isEmployer && s.status !== 'planned' && s.status !== 'done' && (
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`/api/suggestions/${s.id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ toPlanning: true }),
+                          }).catch(() => null);
+                          if (res?.ok) await load();
+                          else setErr('Do plánování se to nepodařilo přesunout.');
+                        }}
+                        className="text-xs text-[#5B7A08] hover:underline rounded-full px-2 py-1 transition"
+                        title="Vytvoří kartu na plánovací tabuli a označí podnět jako naplánovaný">
+                        → Do plánování
+                      </button>
+                    )}
                     {mine && (
                       <button onClick={() => { setEditing(s); setEditTitle(s.title); setEditContent(s.content ?? ''); }}
                         className="text-xs text-black/35 hover:text-black rounded-full px-2 py-1 transition">

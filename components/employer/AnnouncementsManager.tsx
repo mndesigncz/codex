@@ -26,6 +26,7 @@ export default function AnnouncementsManager() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
+  const [alsoChat, setAlsoChat] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -54,7 +55,7 @@ export default function AnnouncementsManager() {
       const r = await fetch('/api/announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({ content: text, postToChat: alsoChat }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d?.ok) {
@@ -117,6 +118,11 @@ export default function AnnouncementsManager() {
           placeholder="Např. V pátek zavíráme dřív…"
           className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none"
         />
+        <label className="flex items-center gap-2 cursor-pointer text-sm text-black/60">
+          <input type="checkbox" checked={alsoChat} onChange={e => setAlsoChat(e.target.checked)}
+            className="h-4 w-4 rounded accent-[#5B9E00]" />
+          Poslat i do týmového chatu
+        </label>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="text-[11px] text-black/35">{content.length}/1000</span>
           <button
