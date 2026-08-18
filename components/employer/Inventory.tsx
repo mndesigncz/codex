@@ -33,6 +33,9 @@ interface Item {
   brand?: string | null;
   description?: string | null;
   archived?: boolean;
+  hideFromOverview?: boolean;
+  approved?: boolean;
+  submittedBy?: number | null;
   updatedAt?: string;
   updatedByName?: string;
 }
@@ -48,6 +51,7 @@ interface Category {
   contentUnit?: string | null;
   defaultPackageSize?: number | null;
   scale?: any;
+  hideFromOverview?: boolean;
 }
 
 interface OrderItem {
@@ -74,7 +78,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false };
+const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false, hideFromOverview: false };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -265,7 +269,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
   // Parked items are out of the active stock entirely — they must not show up
   // in counts, alerts or the shopping list.
-  const active = useMemo(() => items.filter(i => i.archived !== true), [items]);
+  const active = useMemo(() => items.filter(i => i.archived !== true && i.approved !== false), [items]);
   const archivedCount = items.length - active.length;
 
   // Counts on the navigation buttons include everything nested below.
@@ -291,9 +295,19 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     const q = search.trim().toLowerCase();
     // Picking a parent category includes everything filed under its subcategories.
     const inCat = matcher(categories, catId, orphanCat);
+    // On the "Vše" overview, items flagged "jen ve své kategorii" (or living in
+    // a hidden category) stay out of sight — unless the person is searching.
+    const hiddenCatIds = new Set(
+      categories.filter(c => c.hideFromOverview).flatMap(c => Array.from(scopeIds(categories, c.id))),
+    );
+    const hiddenOnOverview = (i: Item) =>
+      catId === null && q === '' &&
+      (i.hideFromOverview === true || (i.categoryId != null && hiddenCatIds.has(i.categoryId)));
     const list = items.filter(i =>
+      i.approved !== false &&
       (showArchived ? i.archived === true : i.archived !== true) &&
       inCat(i) &&
+      !hiddenOnOverview(i) &&
       (q === '' || i.name.toLowerCase().includes(q) || (i.brand ?? '').toLowerCase().includes(q)
         || (i.supplier ?? '').toLowerCase().includes(q)));
     const sorted = [...list];
@@ -371,7 +385,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const openEdit = (i: Item) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true, hideFromOverview: i.hideFromOverview === true });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
@@ -419,7 +433,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
       unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
-      brand: form.brand, description: form.description, archived: form.archived,
+      brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview,
       packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
     };
     setFormErr('');
@@ -560,6 +574,43 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       {notice && (
         <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm font-semibold px-4 py-3">
           {notice}
+        </div>
+      )}
+
+      {items.some(i => i.approved === false) && (
+        <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
+          <p className="font-semibold text-sm text-[#16181A]">📥 Návrhy položek od týmu ({items.filter(i => i.approved === false).length})</p>
+          <div className="space-y-2">
+            {items.filter(i => i.approved === false).map(i => (
+              <div key={i.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-2.5">
+                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">
+                  {i.name}
+                  <span className="text-black/40 font-normal"> · {i.category || 'bez kategorie'} · {i.quantity} {i.unit}</span>
+                </span>
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`/api/inventory/${i.id}`, {
+                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ approve: true }),
+                    }).catch(() => null);
+                    if (res?.ok) await load();
+                    else showNotice('Schválení se nepodařilo.');
+                  }}
+                  className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">
+                  Schválit ✓
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Zamítnout a smazat návrh „${i.name}"?`)) return;
+                    const res = await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' }).catch(() => null);
+                    if (res?.ok) await load();
+                  }}
+                  className="shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">
+                  Zamítnout
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -849,6 +900,16 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                   <span className="block text-sm font-medium text-[#16181A]">Momentálně nevedeme</span>
                   <span className="block text-[11px] text-black/45 mt-0.5">
                     Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klikem ji vrátíš zpět.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 cursor-pointer">
+                <input type="checkbox" checked={form.hideFromOverview} onChange={e => setForm(f => ({ ...f, hideFromOverview: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 accent-[#C8F542]" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-[#16181A]">Jen ve své kategorii</span>
+                  <span className="block text-[11px] text-black/45 mt-0.5">
+                    V přehledu „Vše" se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál.
                   </span>
                 </span>
               </label>
@@ -1794,6 +1855,14 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           togglePrefill={() => setPrefillId(prefillId === c.id ? null : c.id)}
           hasPrefill={hasDefaults(c.defaults)}
           pathLabel={target => pathOfId(categories, target)}
+          onToggleHide={async () => {
+            const res = await fetch(`/api/inventory/categories/${c.id}`, {
+              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ hideFromOverview: !(c.hideFromOverview === true) }),
+            }).catch(() => null);
+            if (res?.ok) await onChanged();
+            else setErr('Skrytí kategorie se nepodařilo uložit.');
+          }}
         />
         {prefillId === c.id && (
           <DefaultsEditor
@@ -1947,9 +2016,10 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 function CategoryRow({
   c, siblings, idx, busy, nested, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
   move, onDelete, packOpen, togglePack, moveOpen, toggleMove, parentOptions, setParent, childCount,
-  inheritsPackaging, prefillOpen, togglePrefill, hasPrefill, pathLabel,
+  inheritsPackaging, prefillOpen, togglePrefill, hasPrefill, pathLabel, onToggleHide,
 }: {
   c: Category; siblings: Category[]; idx: number; busy: boolean; nested?: boolean;
+  onToggleHide: () => void;
   editing: boolean; editName: string; setEditName: (v: string) => void;
   startEdit: () => void; cancelEdit: () => void; saveRename: () => void;
   move: (siblings: Category[], idx: number, dir: -1 | 1) => void;
@@ -1992,6 +2062,12 @@ function CategoryRow({
             <Icon name="swap" size={14} />
           </button>
         )}
+        <button onClick={onToggleHide} title={c.hideFromOverview ? 'Kategorie je skrytá z přehledu „Vše" — kliknutím zobrazíš' : 'Skrýt obsah kategorie z přehledu „Vše"'}
+          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
+            c.hideFromOverview ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+          }`}>
+          {c.hideFromOverview ? '🙈' : '👁'}
+        </button>
         <button onClick={togglePrefill} title="Předvyplnění nových položek"
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
             prefillOpen ? 'bg-[#16181A] text-white' : hasPrefill ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'

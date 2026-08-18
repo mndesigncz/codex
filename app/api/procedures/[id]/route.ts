@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { notifyUser } from '@/lib/push';
 import { sanitizeSteps } from '@/lib/steps';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const body = await request.json().catch(() => ({}));
+
+  // Approving an employee proposal is its own lightweight action.
+  if (body.approve === true) {
+    try {
+      const [row] = await sql`
+        UPDATE procedures SET approved = TRUE
+        WHERE id = ${id} AND team_id = ${me.teamId}
+        RETURNING id, submitted_by`;
+      if (!row) return NextResponse.json({ error: 'Postup nenalezen' }, { status: 404 });
+      if (row.submitted_by) {
+        try {
+          await notifyUser(row.submitted_by, {
+            title: 'Tvůj postup byl schválen ✓',
+            body: 'Návrh postupu je schválený a platí pro celý tým.',
+            type: 'info',
+            link: '/employee/shifts?view=procedures',
+          });
+        } catch { /* best-effort */ }
+      }
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: 'Schválení není dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
   const name = String(body.name ?? '').trim();
   const description = body.description ? String(body.description).trim() : null;
   const icon = body.icon ? String(body.icon) : 'check';

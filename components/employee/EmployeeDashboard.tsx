@@ -33,6 +33,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [closingsDue, setClosingsDue] = useState<any[]>([]);
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [reviews, setReviews] = useState<ShiftReview[]>([]);
+  const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [unseenFlagged, setUnseenFlagged] = useState(0);
   const [cfg, setCfg] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           fetch('/api/rewards').then(r => r.json()).catch(() => ({})),
         ]);
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
+        setPinnedShare(tm?.pinnedShare ?? null);
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));
         setTasks(Array.isArray(tk) ? tk : []);
@@ -128,6 +130,18 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
 
   // Named blocks; the employer-approved layout decides order and presence.
   const blocks: Record<string, React.ReactNode> = {
+    sharedLink: pinnedShare ? (
+      <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
+        className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-bold text-[#16181A] truncate">📌 {pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</p>
+            <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
+        </div>
+      </a>
+    ) : null,
     clock: user.id ? <ClockWidget userId={parseInt(String(user.id))} /> : null,
     nextShift: (
             <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">

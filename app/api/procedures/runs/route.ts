@@ -169,6 +169,12 @@ export async function POST(request: Request) {
   if (!proc || proc.team_id !== me.teamId) {
     return NextResponse.json({ error: 'Postup nenalezen' }, { status: 404 });
   }
+  try {
+    const [ap] = await sql`SELECT approved FROM procedures WHERE id = ${procedureId}`;
+    if (ap && ap.approved === false) {
+      return NextResponse.json({ error: 'Postup čeká na schválení vedením.' }, { status: 403 });
+    }
+  } catch { /* column not migrated yet */ }
 
   // On the shared tablet the run belongs to the person currently selected on it.
   const effectiveId = await resolveActingUser(me.id, me.role, me.teamId, body.actingAs, request);

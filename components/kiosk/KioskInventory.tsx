@@ -39,7 +39,7 @@ export default function KioskInventory() {
       fetch('/api/inventory').then(r => r.json()).catch(() => []),
       fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
     ]).then(([d, c]) => {
-      if (Array.isArray(d)) setItems(d);
+      if (Array.isArray(d)) setItems(Array.isArray(d) ? d.filter((i: any) => i.approved !== false) : d);
       if (Array.isArray(c)) setCategories(c);
       setLoading(false);
     }).catch(() => setLoading(false));

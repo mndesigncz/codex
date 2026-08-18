@@ -13,6 +13,8 @@ interface Props {
 }
 
 interface Procedure extends ProcedureLite {
+  approved?: boolean;
+  submittedBy?: number | null;
   description?: string | null;
   icon: string;
   color: string;
@@ -227,6 +229,25 @@ export default function Procedures({ user }: Props) {
                   )}
                 </div>
                 <h3 className="mt-4 text-lg font-bold tracking-tight text-[#16181A]">{p.name}</h3>
+                {p.approved === false && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
+                    {isEmployer && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const res = await fetch(`/api/procedures/${p.id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ approve: true }),
+                          }).catch(() => null);
+                          if (res?.ok) await load();
+                        }}
+                        className="rounded-full bg-[#16181A] text-white px-3 py-1 text-xs font-semibold hover:bg-black transition">
+                        Schválit ✓
+                      </button>
+                    )}
+                  </div>
+                )}
                 {p.description && <p className="mt-1 text-sm text-black/50 line-clamp-2">{p.description}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-black/45">
                   <span className="inline-flex items-center gap-1.5">
@@ -252,8 +273,8 @@ export default function Procedures({ user }: Props) {
                 )}
                 <div className="mt-4 pt-1 flex-1 flex items-end">
                   <button
-                    onClick={(e) => { e.stopPropagation(); running ? setDetail(p) : startRun(p); }}
-                    disabled={starting}
+                    onClick={(e) => { e.stopPropagation(); if (p.approved === false) { setDetail(p); return; } running ? setDetail(p) : startRun(p); }}
+                    disabled={starting || p.approved === false}
                     className={`w-full rounded-full px-5 py-2.5 font-semibold transition inline-flex items-center justify-center gap-2 ${
                       running
                         ? 'bg-[#C8F542]/25 text-[#5B7A08]'
@@ -267,7 +288,7 @@ export default function Procedures({ user }: Props) {
             );
           })}
 
-          {isEmployer && (
+          {user.role !== 'kiosk' && (
             <button
               onClick={openNew}
               className="glass rounded-3xl p-5 min-h-[176px] flex flex-col items-center justify-center gap-2 border border-dashed border-black/15 text-black/45 hover:text-black hover:border-black/30 transition"
@@ -275,7 +296,8 @@ export default function Procedures({ user }: Props) {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/[0.04]">
                 <Icon name="plus" size={24} />
               </div>
-              <span className="text-sm font-medium">Nový postup</span>
+              <span className="text-sm font-medium">{isEmployer ? 'Nový postup' : 'Navrhnout postup'}</span>
+              {!isEmployer && <span className="text-[11px] text-black/35">schválí vedení</span>}
             </button>
           )}
         </div>

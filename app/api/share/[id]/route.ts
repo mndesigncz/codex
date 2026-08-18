@@ -41,6 +41,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (b.enabled !== undefined) {
     await sql`UPDATE share_links SET enabled = ${b.enabled === true} WHERE id = ${id} AND team_id = ${me.teamId}`;
   }
+  if (b.pinned !== undefined) {
+    try {
+      if (b.pinned === true) {
+        // One pinned link per team — pinning a new one unpins the old.
+        await sql`UPDATE share_links SET pinned = FALSE WHERE team_id = ${me.teamId}`;
+        await sql`UPDATE share_links SET pinned = TRUE, enabled = TRUE WHERE id = ${id} AND team_id = ${me.teamId}`;
+      } else {
+        await sql`UPDATE share_links SET pinned = FALSE WHERE id = ${id} AND team_id = ${me.teamId}`;
+      }
+    } catch { /* not migrated yet */ }
+  }
 
   const [row] = await sql`SELECT * FROM share_links WHERE id = ${id} AND team_id = ${me.teamId}`;
   if (!row) return NextResponse.json({ error: 'Odkaz nenalezen' }, { status: 404 });

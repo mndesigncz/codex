@@ -61,6 +61,37 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   const [showReport, setShowReport] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [note, setNote] = useState('');
+  // Proposing a brand-new item — lands in the employer's approval queue.
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [propName, setPropName] = useState('');
+  const [propUnit, setPropUnit] = useState('ks');
+  const [propCatId, setPropCatId] = useState<number | ''>('');
+  const [propMsg, setPropMsg] = useState('');
+  const [proposing, setProposing] = useState(false);
+  const reloadItems = () =>
+    fetch('/api/inventory').then(r => r.json()).then(d => { if (Array.isArray(d)) setItems(d); }).catch(() => {});
+  const submitProposal = async () => {
+    if (!propName.trim()) return;
+    setProposing(true); setPropMsg('');
+    const cat = (allCats as any[]).find((c: any) => c.id === propCatId);
+    const res = await fetch('/api/inventory', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: propName.trim(), unit: propUnit.trim() || 'ks', quantity: 0,
+        category: cat?.name ?? null, categoryId: propCatId === '' ? undefined : propCatId,
+      }),
+    }).catch(() => null);
+    setProposing(false);
+    if (res?.ok) {
+      setPropName(''); setPropCatId(''); setProposeOpen(false);
+      setPropMsg('Návrh odeslán — vedení ho schválí. ✓');
+      setTimeout(() => setPropMsg(''), 4000);
+      reloadItems();
+    } else {
+      const d = res ? await res.json().catch(() => ({})) : {};
+      setPropMsg(d.error || 'Návrh se nepodařilo odeslat.');
+    }
+  };
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -92,7 +123,9 @@ export default function InventoryReport({ user, initialCategory }: Props) {
     [allCats, openCategory],
   );
 
-  const countIn = (id: number) => items.filter(matcher(allCats as any, id)).length;
+  const usable = useMemo(() => items.filter((i: any) => i.approved !== false), [items]);
+  const myPending = useMemo(() => items.filter((i: any) => i.approved === false), [items]);
+  const countIn = (id: number) => usable.filter(matcher(allCats as any, id)).length;
 
   // A quick-access tile still points at a category by name; resolve it to an id
   // once the categories have loaded.
@@ -135,16 +168,16 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   // Parked items are not on the shelf — they must not raise alerts either.
   const lowItems = useMemo(
-    () => items.filter(i => i.archived !== true && statusOf(i) !== 'ok')
+    () => usable.filter(i => i.archived !== true && statusOf(i) !== 'ok')
       .sort((a, b) => statusRank[statusOf(a)] - statusRank[statusOf(b)] || a.name.localeCompare(b.name, 'cs')),
-    [items],
+    [usable],
   );
-  const parkedCount = items.filter(i => i.archived === true).length;
+  const parkedCount = usable.filter(i => i.archived === true).length;
   const filtered = useMemo(
-    () => items.filter(i =>
+    () => usable.filter(i =>
       (showParked ? i.archived === true : i.archived !== true)
       && i.name.toLowerCase().includes(search.toLowerCase())),
-    [items, search, showParked],
+    [usable, search, showParked],
   );
 
   // The person at the counter is the one who knows something ran out.
@@ -244,6 +277,49 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           ✅ Hlášení bylo odesláno zaměstnavateli.
         </div>
       )}
+
+      {propMsg && (
+        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">{propMsg}</div>
+      )}
+
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="font-semibold text-[#16181A]">Chybí něco v katalogu?</p>
+            <p className="text-sm text-black/45 mt-0.5">Navrhni novou položku — po schválení vedením se objeví ve skladu.</p>
+          </div>
+          <button onClick={() => setProposeOpen(o => !o)}
+            className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition">
+            {proposeOpen ? 'Zavřít' : '+ Navrhnout položku'}
+          </button>
+        </div>
+        {proposeOpen && (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_110px_1fr_auto] gap-2">
+            <input value={propName} onChange={e => setPropName(e.target.value)} placeholder="Název položky" maxLength={120}
+              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            <input value={propUnit} onChange={e => setPropUnit(e.target.value)} placeholder="ks" maxLength={20}
+              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            <select value={propCatId} onChange={e => setPropCatId(e.target.value === '' ? '' : parseInt(e.target.value))}
+              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+              <option value="">Bez kategorie</option>
+              {(allCats as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button onClick={submitProposal} disabled={proposing || !propName.trim()}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
+              {proposing ? 'Odesílám…' : 'Odeslat návrh'}
+            </button>
+          </div>
+        )}
+        {myPending.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {myPending.map((i: any) => (
+              <span key={i.id} className="rounded-full bg-amber-500/12 text-amber-700 px-3 py-1.5 text-xs font-medium">
+                {i.name} · čeká na schválení
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       {!loading && packagedCats.length > 0 && (
         <div className="space-y-3">

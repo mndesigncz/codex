@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { notifyUsers, notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,23 +53,42 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const categoryId = searchParams.get('categoryId');
 
-  const rows = categoryId
-    ? await sql`
-        SELECT id, title, category_id, content, checklist, updated_at
-        FROM guides
-        WHERE team_id = ${c.teamId} AND category_id = ${parseInt(categoryId)}
-        ORDER BY updated_at DESC`
-    : await sql`
-        SELECT id, title, category_id, content, checklist, updated_at
-        FROM guides
-        WHERE team_id = ${c.teamId}
-        ORDER BY updated_at DESC`;
+  let rows: any[];
+  try {
+    rows = categoryId
+      ? await sql`
+          SELECT id, title, category_id, content, checklist, updated_at, approved, submitted_by
+          FROM guides
+          WHERE team_id = ${c.teamId} AND category_id = ${parseInt(categoryId)}
+          ORDER BY updated_at DESC`
+      : await sql`
+          SELECT id, title, category_id, content, checklist, updated_at, approved, submitted_by
+          FROM guides
+          WHERE team_id = ${c.teamId}
+          ORDER BY updated_at DESC`;
+  } catch {
+    rows = categoryId
+      ? await sql`
+          SELECT id, title, category_id, content, checklist, updated_at
+          FROM guides
+          WHERE team_id = ${c.teamId} AND category_id = ${parseInt(categoryId)}
+          ORDER BY updated_at DESC`
+      : await sql`
+          SELECT id, title, category_id, content, checklist, updated_at
+          FROM guides
+          WHERE team_id = ${c.teamId}
+          ORDER BY updated_at DESC`;
+  }
+  // Pending proposals: employer sees them (to approve), the author sees their own.
+  rows = rows.filter((g: any) => g.approved !== false || c.role === 'employer' || g.submitted_by === c.meId);
 
   const guides = rows.map((g: any) => ({
     id: g.id,
     title: g.title,
     categoryId: g.category_id,
     updatedAt: g.updated_at,
+    approved: g.approved !== false,
+    submittedBy: g.submitted_by ?? null,
     excerpt: excerpt(g.content),
     hasChecklist: checklistLength(g.checklist) > 0,
   }));
@@ -80,7 +100,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (c.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  // Employees may PROPOSE a guide — it waits for the employer's approval.
+  const isProposal = c.role !== 'employer';
   if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
   const { title, content, categoryId, checklist } = await request.json();
@@ -88,7 +110,25 @@ export async function POST(request: Request) {
 
   const steps = normalizeChecklist(checklist);
 
-  const [guide] = await sql`
+  let guide: any;
+  try {
+    [guide] = await sql`
+    INSERT INTO guides (team_id, category_id, title, content, checklist, created_by, updated_at, approved, submitted_by)
+    VALUES (
+      ${c.teamId},
+      ${categoryId ? parseInt(categoryId) : null},
+      ${String(title).trim()},
+      ${content || ''},
+      ${JSON.stringify(steps)},
+      ${c.meId},
+      NOW(),
+      ${!isProposal},
+      ${isProposal ? c.meId : null}
+    )
+    RETURNING id, title, category_id, content, checklist, updated_at`;
+  } catch {
+    // approval columns not migrated yet — insert the old shape (auto-approved)
+    [guide] = await sql`
     INSERT INTO guides (team_id, category_id, title, content, checklist, created_by, updated_at)
     VALUES (
       ${c.teamId},
@@ -99,7 +139,22 @@ export async function POST(request: Request) {
       ${c.meId},
       NOW()
     )
-    RETURNING id, title, category_id, content, checklist, updated_at`;
+    RETURNING *`;
+  }
+
+
+  if (isProposal) {
+    try {
+      const employers = await sql`SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer'`;
+      const [author] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
+      await notifyUsers((employers as any[]).map(e => e.id), {
+        title: '📖 Návrh návodu ke schválení',
+        body: `${author?.name ?? 'Zaměstnanec'} navrhuje návod „${String(title).trim()}".`,
+        type: 'info',
+        link: '/employer/overview?view=guides',
+      });
+    } catch { /* best-effort */ }
+  }
 
   return NextResponse.json({
     guide: {

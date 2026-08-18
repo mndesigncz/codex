@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { sanitizeSteps } from '@/lib/steps';
+import { notifyUsers } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,8 @@ export async function GET() {
     procedures = await sql`
       SELECT id, name, description, icon, color, items,
              remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor",
-             require_before_closing AS "requireBeforeClosing"
+             require_before_closing AS "requireBeforeClosing",
+             approved, submitted_by AS "submittedBy"
       FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
   } catch {
    try {
@@ -56,6 +58,11 @@ export async function GET() {
       FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
    }
   }
+
+  // Pending proposals are visible to the employer (to approve) and to their
+  // author (to see the state) — nobody else runs an unapproved procedure.
+  procedures = (procedures as any[]).filter((p: any) =>
+    p.approved !== false || me.role === 'employer' || p.submitted_by === me.id);
 
   // Does the current user work today? (kiosk = shared device, always yes.)
   const today = new Date().toISOString().split('T')[0];
@@ -83,8 +90,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (me.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   if (!me.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
+  // Employees may PROPOSE a procedure — it waits for the employer's approval.
+  const isProposal = me.role !== 'employer';
 
   const body = await request.json().catch(() => ({}));
   const name = String(body.name ?? '').trim();
@@ -104,14 +113,27 @@ export async function POST(request: Request) {
   let created: any;
   try {
     [created] = await sql`
-      INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, remind_anchor, require_before_closing, created_by)
-      VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${remindAnchor}, ${body.requireBeforeClosing === true}, ${me.id})
-      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor", require_before_closing AS "requireBeforeClosing"`;
+      INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, remind_anchor, require_before_closing, created_by, approved, submitted_by)
+      VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${remindAnchor}, ${body.requireBeforeClosing === true && !isProposal}, ${me.id}, ${!isProposal}, ${isProposal ? me.id : null})
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor", require_before_closing AS "requireBeforeClosing", approved, submitted_by AS "submittedBy"`;
   } catch {
     [created] = await sql`
       INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, created_by)
       VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${me.id})
       RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+  }
+
+  if (isProposal) {
+    try {
+      const employers = await sql`SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+      const [author] = await sql`SELECT name FROM users WHERE id = ${me.id}`;
+      await notifyUsers((employers as any[]).map(e => e.id), {
+        title: '📋 Návrh postupu ke schválení',
+        body: `${author?.name ?? 'Zaměstnanec'} navrhuje postup „${name}".`,
+        type: 'info',
+        link: '/employer/overview?view=procedures',
+      });
+    } catch { /* best-effort */ }
   }
 
   return NextResponse.json({ procedure: created });

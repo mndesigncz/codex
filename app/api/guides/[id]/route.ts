@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!existing) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
 
   const body = await request.json();
+
+  // Approving an employee proposal.
+  if (body.approve === true) {
+    try {
+      const [row] = await sql`
+        UPDATE guides SET approved = TRUE
+        WHERE id = ${id} AND team_id = ${c.teamId}
+        RETURNING id, submitted_by, title`;
+      if (!row) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
+      if (row.submitted_by) {
+        try {
+          await notifyUser(row.submitted_by, {
+            title: 'Tvůj návod byl schválen ✓',
+            body: `„${row.title}" je teď vidět pro celý tým.`,
+            type: 'info',
+            link: '/employee/shifts?view=guides',
+          });
+        } catch { /* best-effort */ }
+      }
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: 'Schválení není dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
   const { title, content, categoryId, checklist } = body;
 
   const nextTitle = title !== undefined && String(title).trim() ? String(title).trim() : null;

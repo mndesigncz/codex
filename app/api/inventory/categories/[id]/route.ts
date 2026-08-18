@@ -106,6 +106,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   // Packaging settings — each guarded so a pending migration degrades quietly.
+  if (body.hideFromOverview !== undefined) {
+    try {
+      await sql`UPDATE inventory_categories SET hide_from_overview = ${body.hideFromOverview === true} WHERE id = ${id} AND team_id = ${me.teamId}`;
+    } catch { /* not migrated yet */ }
+  }
+
   if (body.tracksOpen !== undefined || body.contentUnit !== undefined
       || body.defaultPackageSize !== undefined || body.scale !== undefined
       || body.thresholdUnit !== undefined) {

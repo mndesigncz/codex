@@ -93,6 +93,15 @@ export async function GET() {
     } catch { /* columns not migrated yet ⇒ grandfathered pro */ }
     const planInfo = planInfoOf(planRow);
 
+    // The link pinned to every dashboard (employer, employees, kiosk).
+    let pinnedShare: { token: string; title: string | null; kind: string } | null = null;
+    try {
+      const [ps] = await sql`
+        SELECT token, title, kind FROM share_links
+        WHERE team_id = ${teamId} AND pinned = TRUE AND enabled = TRUE LIMIT 1`;
+      if (ps) pinnedShare = { token: ps.token, title: ps.title ?? null, kind: ps.kind };
+    } catch { /* not migrated yet */ }
+
     let members: any[];
     try {
       members = await sql`
@@ -107,6 +116,7 @@ export async function GET() {
 
     return NextResponse.json({
       planInfo,
+      pinnedShare,
       team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
       members,
       isOwner: team?.owner_id === me.id,

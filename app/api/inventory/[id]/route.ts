@@ -259,6 +259,39 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   // Brand, description and the parked flag — separate so an un-migrated DB
   // still saves the rest of the edit.
+  // Approving an employee's proposed item.
+  if (body.approve === true) {
+    try {
+      const [row] = await sql`
+        UPDATE inventory_items SET approved = TRUE
+        WHERE id = ${id} AND team_id = ${me.teamId}
+        RETURNING id, name, submitted_by`;
+      if (row?.submitted_by) {
+        try {
+          await notifyUser(row.submitted_by, {
+            title: 'Položka schválena ✓',
+            body: `„${row.name}" je teď ve skladu.`,
+            type: 'info',
+            category: 'stock',
+            link: '/employee/shifts?view=inventory',
+          });
+        } catch { /* best-effort */ }
+      }
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: 'Schválení není dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
+
+  // Visibility on the "Vše" overview is employer configuration.
+  if (body.hideFromOverview !== undefined) {
+    try {
+      await sql`
+        UPDATE inventory_items SET hide_from_overview = ${body.hideFromOverview === true}, updated_by = ${me.meId}, updated_at = NOW()
+        WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+    } catch { /* not migrated yet */ }
+  }
+
   if (body.brand !== undefined || body.description !== undefined || body.archived !== undefined) {
     const brand = body.brand !== undefined
       ? (body.brand ? String(body.brand).trim().slice(0, 120) || null : null)
