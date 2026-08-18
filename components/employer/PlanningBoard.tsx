@@ -22,6 +22,22 @@ export default function PlanningBoard() {
   const [cards, setCards] = useState<PlanningCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
+  // Inline edit of an existing card — a typo shouldn't mean delete + retype.
+  const [editCard, setEditCard] = useState<{ id: number; title: string; description: string } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const saveEdit = async () => {
+    if (!editCard || !editCard.title.trim()) return;
+    setSavingEdit(true);
+    const res = await fetch(`/api/planning/${editCard.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editCard.title.trim(), description: editCard.description.trim() }),
+    }).catch(() => null);
+    setSavingEdit(false);
+    if (res?.ok) {
+      setCards(prev => prev.map(c => c.id === editCard.id ? { ...c, title: editCard.title.trim(), description: editCard.description.trim() } : c));
+      setEditCard(null);
+    } else setFlash('Kartu se nepodařilo uložit.');
+  };
   const [adding, setAdding] = useState(false);
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
@@ -196,6 +212,12 @@ export default function PlanningBoard() {
                               </button>
                             </>
                           )}
+                          <button
+                            onClick={() => { setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }); setMenuId(null); }}
+                            className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] flex items-center gap-2 transition-colors"
+                          >
+                            ✎ Upravit kartu
+                          </button>
                           <div className="h-px bg-black/[0.08] my-1" />
                           <button
                             onClick={() => deleteCard(card)}
@@ -247,6 +269,28 @@ export default function PlanningBoard() {
           ))}
         </div>
       )}
+      {editCard && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditCard(null)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Upravit kartu</h3>
+            <div className="space-y-3">
+              <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
+                placeholder="Název" maxLength={200}
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+              <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
+                placeholder="Popis (nepovinný)" rows={3}
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setEditCard(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+              <button onClick={saveEdit} disabled={savingEdit || !editCard.title.trim()} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                {savingEdit ? 'Ukládám…' : 'Uložit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

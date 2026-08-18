@@ -20,6 +20,8 @@ interface Props {
 export default function MyShifts({ user }: Props) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  // Ratings from shift reviews, keyed by date — shown instead of a made-up „Splněno" badge.
+  const [ratingByDate, setRatingByDate] = useState<Record<string, number>>({});
 
   const userId = parseInt(user.id ?? '0');
 
@@ -30,6 +32,17 @@ export default function MyShifts({ user }: Props) {
       .then(data => { if (Array.isArray(data)) setShifts(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [userId]);
+
+  useEffect(() => {
+    fetch('/api/rewards').then(r => r.json()).then(d => {
+      const map: Record<string, number> = {};
+      (Array.isArray(d?.reviews) ? d.reviews : []).forEach((r: any) => {
+        const day = String(r.work_date ?? '').slice(0, 10);
+        if (day && Number(r.rating) > 0) map[day] = Number(r.rating);
+      });
+      setRatingByDate(map);
+    }).catch(() => {});
+  }, []);
 
   const today = new Date().toISOString().split('T')[0];
   const upcoming = shifts.filter(s => s.date >= today).sort((a, b) => a.date.localeCompare(b.date));
@@ -163,7 +176,11 @@ export default function MyShifts({ user }: Props) {
                       <p className="text-sm text-[#16181A] font-medium truncate">{formatDate(s.date)}</p>
                       <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                     </div>
-                    <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">✓ Splněno</span>
+                    {ratingByDate[s.date] ? (
+                      <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">★ {ratingByDate[s.date]}/5</span>
+                    ) : (
+                      <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/40">Bez hodnocení</span>
+                    )}
                   </div>
                 ))}
               </div>

@@ -488,7 +488,7 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
         </div>
 
         <div className="sticky bottom-0 flex gap-2 px-5 py-4 bg-white/85 backdrop-blur border-t border-black/[0.06]">
-          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition">Zavřít</button>
+          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition" title="Body a poznámky u položek se ukládají průběžně">Hotovo</button>
           {saveErr && (
             <p className="w-full text-sm font-medium text-red-600">⚠️ {saveErr}</p>
           )}

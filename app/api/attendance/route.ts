@@ -114,7 +114,16 @@ export async function GET(req: NextRequest) {
     FROM time_entries
     WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '60 days'
     ORDER BY clock_in DESC`;
-  return NextResponse.json({ roster: [], entries });
+  // Their own open entry rides along so the clock widget works for them too.
+  let openSince: string | null = null;
+  try {
+    const [openRow] = await sql`
+      SELECT clock_in FROM time_entries
+      WHERE employee_id = ${c.meId} AND clock_out IS NULL
+      ORDER BY clock_in DESC LIMIT 1`;
+    openSince = openRow?.clock_in ?? null;
+  } catch { /* ignore */ }
+  return NextResponse.json({ roster: [{ id: c.meId, openSince }], entries });
 }
 
 // POST — clock in / out. Caller must be the kiosk or the employee themselves.
@@ -127,6 +136,27 @@ export async function POST(req: NextRequest) {
   const employeeId = parseInt(b.employeeId);
   const action = b.action === 'out' ? 'out' : 'in';
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Chybí zaměstnanec' }, { status: 400 });
+
+  // Manual complete entry: the employer backfills a forgotten punch for a
+  // member of their own team ({ employeeId, clockIn, clockOut } as ISO).
+  if (c.role === 'employer' && b.clockIn && b.clockOut) {
+    const [emp0] = await sql`SELECT id, team_id FROM users WHERE id = ${employeeId}`;
+    if (!emp0 || emp0.team_id !== c.teamId) {
+      return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
+    }
+    const ci = new Date(b.clockIn), co = new Date(b.clockOut);
+    if (isNaN(+ci) || isNaN(+co) || co <= ci) {
+      return NextResponse.json({ error: 'Odchod musí být po příchodu.' }, { status: 400 });
+    }
+    if (+co - +ci > 24 * 3600 * 1000) {
+      return NextResponse.json({ error: 'Záznam je delší než 24 hodin — zkontroluj časy.' }, { status: 400 });
+    }
+    const [entry] = await sql`
+      INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source)
+      VALUES (${c.teamId}, ${employeeId}, ${ci.toISOString()}, ${co.toISOString()}, 'manual')
+      RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut"`;
+    return NextResponse.json({ ok: true, entry });
+  }
 
   // Authorization: kiosk (same team) or the employee acting on themselves.
   const isKiosk = c.role === 'kiosk';

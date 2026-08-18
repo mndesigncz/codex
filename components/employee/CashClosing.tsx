@@ -1020,6 +1020,17 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   {pending && (
                     <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
+                  <button
+                    type="button"
+                    title="Smazat uzávěrku"
+                    onClick={async () => {
+                      if (!confirm('Smazat tuhle uzávěrku? Po smazání ji můžeš vyplnit znovu správně.')) return;
+                      const res = await fetch(`/api/closings/${c.id}`, { method: 'DELETE' });
+                      if (res.ok) setClosings(prev => prev.filter(x => x.id !== c.id));
+                      else { const d = await res.json().catch(() => ({})); setErr(d.error || 'Smazání se nepodařilo.'); }
+                    }}
+                    className="rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
+                  >✕</button>
                   <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>

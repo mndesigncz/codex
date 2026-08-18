@@ -28,7 +28,7 @@ export async function GET() {
              u.name AS "authorName", u.avatar AS "authorAvatar"
       FROM announcements a
       LEFT JOIN users u ON u.id = a.author_id
-      WHERE a.team_id = ${c.teamId} AND a.pinned = TRUE
+      WHERE a.team_id = ${c.teamId} AND (a.pinned = TRUE OR ${c.role === 'employer'})
       ORDER BY a.created_at DESC
       LIMIT 10`;
     return NextResponse.json({ announcements: rows });
@@ -69,6 +69,29 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE ?id= (employer) — unpin/remove an announcement.
+// PATCH — edit the text or unpin/pin: { id, content?, pinned? }. Employer only.
+export async function PATCH(req: NextRequest) {
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const b = await req.json().catch(() => ({}));
+  const id = parseInt(b.id);
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
+  try {
+    if (typeof b.content === 'string' && b.content.trim()) {
+      await sql`UPDATE announcements SET content = ${b.content.trim().slice(0, 2000)} WHERE id = ${id} AND team_id = ${c.teamId}`;
+    }
+    if (typeof b.pinned === 'boolean') {
+      await sql`UPDATE announcements SET pinned = ${b.pinned} WHERE id = ${id} AND team_id = ${c.teamId}`;
+    }
+    const [row] = await sql`SELECT id, content, pinned, created_at AS "createdAt" FROM announcements WHERE id = ${id} AND team_id = ${c.teamId}`;
+    if (!row) return NextResponse.json({ error: 'Oznámení nenalezeno' }, { status: 404 });
+    return NextResponse.json(row);
+  } catch {
+    return NextResponse.json({ error: 'Uložení se nepodařilo' }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });

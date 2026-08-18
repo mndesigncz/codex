@@ -14,7 +14,7 @@ interface Standing {
     tasks: number; procedures: number; closings: number; reviewPoints: number; ratedShifts: number;
     autoPoints?: number; itemPoints?: number; flagged?: number;
   };
-  flagged?: number; pending?: number;
+  flagged?: number; pending?: number; oldestPending?: string | null;
   levelName: string; levelIndex: number;
   next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number;
 }
@@ -75,6 +75,7 @@ export default function RewardsView({ user }: { user: { id?: string } }) {
       {rating && (
         <ShiftReviewModal
           employee={{ id: rating.id, name: rating.name, avatar: rating.avatar }}
+          initialDate={rating.oldestPending ?? undefined}
           onClose={() => setRating(null)}
           onSaved={() => { setRating(null); load(); }}
         />

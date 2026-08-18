@@ -71,3 +71,27 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true, token, path: `/join?token=${token}`, emailSent });
 }
+
+// DELETE ?id= — revoke a pending invitation (typo in the e-mail, wrong person…).
+// The token stops working immediately; the row stays for the audit trail.
+export async function DELETE(request: Request) {
+  const me = await currentEmployer();
+  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const sql = neon(process.env.DATABASE_URL!);
+  const url = new URL(request.url);
+  const id = parseInt(url.searchParams.get('id') ?? '');
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
+
+  const [meRow] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
+  const [team] = meRow?.team_id
+    ? await sql`SELECT id FROM teams WHERE id = ${meRow.team_id}`
+    : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
+  if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+
+  const [row] = await sql`
+    UPDATE invitations SET status = 'revoked'
+    WHERE id = ${id} AND team_id = ${team.id} AND status = 'pending'
+    RETURNING id`;
+  if (!row) return NextResponse.json({ error: 'Pozvánka nenalezena nebo už není aktivní' }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}

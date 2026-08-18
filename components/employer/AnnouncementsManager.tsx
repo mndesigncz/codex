@@ -70,6 +70,19 @@ export default function AnnouncementsManager() {
     }
   };
 
+  // Edit in place + unpin instead of delete — unpinned stays here, hidden from the team.
+  const [editing, setEditing] = useState<Announcement | null>(null);
+  const [editText, setEditText] = useState('');
+  const patch = async (id: number, body: any) => {
+    const r = await fetch('/api/announcements', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...body }),
+    }).catch(() => null);
+    if (r?.ok) { await load(); return true; }
+    setError('Uložení se nepodařilo.');
+    return false;
+  };
+
   const remove = async (id: number) => {
     if (!confirm('Odstranit toto oznámení?')) return;
     const prev = announcements;
@@ -125,10 +138,10 @@ export default function AnnouncementsManager() {
           {announcements.map((a) => (
             <div
               key={a.id}
-              className="rounded-3xl bg-[#FFD60A]/[0.12] border border-[#FFD60A]/30 px-4 py-3 flex items-start gap-3 min-w-0"
+              className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-[#FFD60A]/[0.12] border-[#FFD60A]/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
             >
               <span className="shrink-0 text-lg leading-6" aria-hidden>
-                📌
+                {a.pinned ? '📌' : '📄'}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-[#16181A] whitespace-pre-wrap break-words">
@@ -141,16 +154,35 @@ export default function AnnouncementsManager() {
                   {formatDate(a.createdAt)}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => remove(a.id)}
-                aria-label="Odstranit oznámení"
-                className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm"
-              >
-                ✕
-              </button>
+              <div className="shrink-0 flex items-center gap-1">
+                <button type="button" onClick={() => { setEditing(a); setEditText(a.content); }}
+                  aria-label="Upravit" title="Upravit"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm">✎</button>
+                <button type="button" onClick={() => patch(a.id, { pinned: !a.pinned })}
+                  aria-label={a.pinned ? 'Odepnout' : 'Připnout'} title={a.pinned ? 'Odepnout (tým ho přestane vidět)' : 'Znovu připnout'}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-xs">{a.pinned ? '⤓' : '📌'}</button>
+                <button type="button" onClick={() => remove(a.id)}
+                  aria-label="Odstranit oznámení"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm">✕</button>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditing(null)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit oznámení</h3>
+            <textarea rows={4} value={editText} maxLength={1000} onChange={(e) => setEditText(e.target.value)}
+              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+              <button onClick={async () => { if (await patch(editing.id, { content: editText.trim() })) setEditing(null); }}
+                disabled={!editText.trim()}
+                className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">Uložit</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -21,6 +21,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
+  const [offerNote, setOfferNote] = useState<Record<number, string>>({});
   const [msg, setMsg] = useState('');
 
   const load = useCallback(async () => {
@@ -83,15 +84,20 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
         ) : (
           <div className="space-y-2">
             {offerable.map(s => (
-              <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl bg-black/[0.02] border border-black/[0.06] px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(s.date)}</p>
-                  <p className="text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</p>
+              <div key={s.id} className="rounded-2xl bg-black/[0.02] border border-black/[0.06] px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(s.date)}</p>
+                    <p className="text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</p>
+                  </div>
+                  <button onClick={() => act({ shiftId: s.id, note: offerNote[s.id]?.trim() || undefined }, s.id, 'Směna je v burze. ✓')} disabled={busy === s.id}
+                    className="shrink-0 rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
+                    Nabídnout
+                  </button>
                 </div>
-                <button onClick={() => act({ shiftId: s.id }, s.id, 'Směna je v burze. ✓')} disabled={busy === s.id}
-                  className="shrink-0 rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
-                  Nabídnout
-                </button>
+                <input value={offerNote[s.id] ?? ''} onChange={e => setOfferNote(n => ({ ...n, [s.id]: e.target.value }))}
+                  placeholder="Proč nabízíš? (nepovinné — kolegové to uvidí)" maxLength={160}
+                  className="w-full rounded-xl bg-white/60 border border-black/[0.07] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             ))}
           </div>
