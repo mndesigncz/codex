@@ -31,6 +31,7 @@ const mapRow = (r: any) => ({
   title: r.title ?? null,
   note: r.note ?? null,
   enabled: r.enabled !== false,
+  pinned: r.pinned === true,
   createdAt: r.created_at,
 });
 

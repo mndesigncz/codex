@@ -333,6 +333,13 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove }: {
           <p className="text-sm font-semibold text-[#16181A] truncate">{link.title || scope}</p>
           <p className="text-[11px] text-black/40 truncate">{scope}{link.excluded.length > 0 ? ` · ${link.excluded.length} skryto` : ''}</p>
         </div>
+        <button onClick={() => onPatch({ pinned: !(link.pinned === true) })}
+          title={link.pinned ? 'Odepnout z nástěnek' : 'Připnout na nástěnku všech (i tabletu)'}
+          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
+            link.pinned ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+          }`}>
+          📌
+        </button>
         <button onClick={onCopy} title="Zkopírovat odkaz"
           className="shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-1.5 text-xs font-bold hover:brightness-110">
           Kopírovat

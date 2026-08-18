@@ -590,6 +590,18 @@ export async function GET() {
     // per-step skip reasons on a run + which procedures are mandatory before the closing
     await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`;
     await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`;
+    // items/categories that only show inside their category, not on the "Vše" overview
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`;
+    // employee submissions await employer approval; NULL/TRUE = approved (legacy rows)
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
+    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
+    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
+    // one share link can be pinned to every dashboard (including the kiosk)
+    await sql`ALTER TABLE share_links ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

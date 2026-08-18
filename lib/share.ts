@@ -15,6 +15,8 @@ export interface ShareLink {
   title: string | null;
   note: string | null;
   enabled: boolean;
+  /** Shown as a card on every dashboard incl. the kiosk. One per team. */
+  pinned?: boolean;
   createdAt?: string;
 }
 

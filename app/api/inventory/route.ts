@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { notifyUsers } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus, type CategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf } from '@/lib/categoryTree';
 
@@ -39,6 +40,8 @@ export async function GET() {
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
         i.brand, i.description, i.archived,
+        i.hide_from_overview AS "hideFromOverview",
+        i.approved, i.submitted_by AS "submittedBy",
         i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
@@ -144,11 +147,12 @@ export async function GET() {
   }));
 }
 
-// POST (employer): create a new item
+// POST: employer creates an item; an employee PROPOSES one (needs approval).
 export async function POST(request: Request) {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (me.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const isProposal = me.role !== 'employer';
 
   const body = await request.json();
   const name = (body.name ?? '').trim();
@@ -171,6 +175,22 @@ export async function POST(request: Request) {
     VALUES
       (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${me.meId}, ${me.meId}, NOW())
     RETURNING id`;
+
+  // Employee proposals wait for the employer; the columns are newer, so the
+  // flag lands defensively (missing column ⇒ item is simply live right away).
+  if (isProposal) {
+    try {
+      await sql`UPDATE inventory_items SET approved = FALSE, submitted_by = ${me.meId} WHERE id = ${item.id}`;
+      const employers = await sql`SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+      const [author] = await sql`SELECT name FROM users WHERE id = ${me.meId}`;
+      await notifyUsers((employers as any[]).map(e => e.id), {
+        title: '📦 Návrh položky ke schválení',
+        body: `${author?.name ?? 'Zaměstnanec'} navrhuje do skladu „${name}".`,
+        type: 'info',
+        link: '/employer/overview?view=inventory',
+      });
+    } catch { /* best-effort */ }
+  }
 
   // unit_cost applied separately so a not-yet-migrated column can't fail the insert.
   if (unitCost !== null && Number.isFinite(unitCost)) {

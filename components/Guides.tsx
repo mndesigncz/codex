@@ -25,6 +25,8 @@ interface GuideSummary {
   updatedAt: string;
   excerpt: string;
   hasChecklist: boolean;
+  approved?: boolean;
+  submittedBy?: number | null;
 }
 
 interface GuideFull {
@@ -232,13 +234,14 @@ export default function Guides({ user }: { user: User }) {
           </h1>
           <p className="text-black/45 mt-1 text-sm">Znalostní báze vašeho týmu</p>
         </div>
-        {isEmployer && (
+        {user.role !== 'kiosk' && (
           <button
             onClick={() => openEditor()}
             className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 flex items-center gap-2 hover:brightness-110 transition-all flex-shrink-0"
+            title={isEmployer ? undefined : 'Návrh schválí vedení'}
           >
             <Icon name="plus" size={18} strokeWidth={2.2} />
-            <span className="hidden sm:inline">Nový návod</span>
+            <span className="hidden sm:inline">{isEmployer ? 'Nový návod' : 'Navrhnout návod'}</span>
           </button>
         )}
       </div>
@@ -360,7 +363,28 @@ export default function Guides({ user }: { user: User }) {
                     className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition-all duration-300 flex flex-col group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0 flex-1 break-words">{g.title}</h3>
+                      <h3 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0 flex-1 break-words">
+                        {g.title}
+                        {g.approved === false && (
+                          <span className="ml-2 align-middle inline-flex items-center gap-1.5">
+                            <span className="rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">Čeká na schválení</span>
+                            {isEmployer && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const res = await fetch(`/api/guides/${g.id}`, {
+                                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ approve: true }),
+                                  }).catch(() => null);
+                                  if (res?.ok) await loadGuides();
+                                }}
+                                className="rounded-full bg-[#16181A] text-white px-2.5 py-0.5 text-[11px] font-semibold hover:bg-black transition whitespace-nowrap">
+                                Schválit ✓
+                              </button>
+                            )}
+                          </span>
+                        )}
+                      </h3>
                       {isEmployer && (
                         <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                           <button

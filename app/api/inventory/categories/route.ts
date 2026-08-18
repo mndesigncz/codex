@@ -28,6 +28,9 @@ export async function GET() {
   // Columns the query didn't select simply come back undefined below.
   const attempts = [
     () => sql`
+      SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, defaults, scale, hide_from_overview
+      FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
+    () => sql`
       SELECT id, name, position, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, defaults, scale
       FROM inventory_categories WHERE team_id = ${me.teamId} ORDER BY position ASC, name ASC`,
     () => sql`
@@ -58,6 +61,7 @@ export async function GET() {
     thresholdUnit: r.threshold_unit === 'content' ? 'content' : 'package',
     defaults: normalizeDefaults(r.defaults),
     scale: r.scale ?? null,
+    hideFromOverview: r.hide_from_overview === true,
   })));
 }
 

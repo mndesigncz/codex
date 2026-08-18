@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import KioskInventory from './KioskInventory';
@@ -104,6 +104,7 @@ function KioskShell({ user }: { user: KioskUser }) {
         <main className="flex-1 mt-6 space-y-5">
           <AnnouncementBanner />
           <WhoIsWorkingOrLock />
+          <KioskHomeExtras />
         </main>
       )}
 
@@ -130,4 +131,86 @@ function WhoIsWorkingOrLock() {
   const { onShift } = useKioskShift();
   if (onShift.length === 0) return <KioskShiftGate>{null}</KioskShiftGate>;
   return <WhoIsWorking />;
+}
+
+// Extra context on the tablet's home tab: today's roster, the state of
+// mandatory procedures, and the customer-facing pinned page — the things a
+// shift actually needs at a glance.
+function KioskHomeExtras() {
+  const [roster, setRoster] = useState<any[]>([]);
+  const [required, setRequired] = useState<{ id: number; name: string; icon?: string; done: boolean }[]>([]);
+  const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/attendance').then(r => r.json())
+      .then(d => setRoster((d?.roster ?? []).filter((r: any) => r.shiftStart)))
+      .catch(() => {});
+    fetch('/api/teams').then(r => r.json())
+      .then(d => setPinnedShare(d?.pinnedShare ?? null))
+      .catch(() => {});
+    Promise.all([
+      fetch('/api/procedures').then(r => r.json()).catch(() => ({})),
+      fetch('/api/procedures/runs?today=team').then(r => r.json()).catch(() => ({})),
+    ]).then(([pd, rd]) => {
+      const runs = Array.isArray(rd?.runs) ? rd.runs : [];
+      const req = (Array.isArray(pd?.procedures) ? pd.procedures : [])
+        .filter((p: any) => p.requireBeforeClosing === true)
+        .map((p: any) => ({
+          id: p.id, name: p.name, icon: p.icon,
+          done: runs.some((r: any) => r.procedure_id === p.id && r.status === 'completed'),
+        }));
+      setRequired(req);
+    }).catch(() => {});
+  }, []);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {roster.length > 0 && (
+        <div className="glass-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📅 Dnešní směny</p>
+          <div className="space-y-2">
+            {roster.map((r: any) => (
+              <div key={r.id} className="flex items-center gap-3 min-w-0">
+                <span className="text-xl shrink-0">{r.avatar ?? '👤'}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#16181A]">{r.name}</span>
+                <span className="shrink-0 text-sm text-black/50 tabular-nums">{String(r.shiftStart).slice(0, 5)}–{String(r.shiftEnd ?? '').slice(0, 5)}</span>
+                {r.openSince && <span className="shrink-0 h-2 w-2 rounded-full bg-[#5B9E00]" title="Na směně" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {required.length > 0 && (
+        <div className="glass-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📋 Povinné postupy dnes</p>
+          <div className="flex flex-wrap gap-2">
+            {required.map(p => (
+              <span key={p.id} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium ${
+                p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-amber-500/12 text-amber-700'
+              }`}>
+                {p.icon ?? '📋'} {p.name} {p.done ? '✓' : '· čeká'}
+              </span>
+            ))}
+          </div>
+          {required.some(p => !p.done) && (
+            <p className="text-[12px] text-black/45 mt-2.5">Bez dokončení nepůjde odeslat uzávěrka — najdeš je v záložce Postupy.</p>
+          )}
+        </div>
+      )}
+
+      {pinnedShare && (
+        <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
+          className="md:col-span-2 block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-bold text-[#16181A] truncate">📌 {pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</p>
+              <p className="text-sm text-black/50 mt-0.5 truncate">Stránka pro zákazníky — otoč tablet a ukaž, co máme.</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
+          </div>
+        </a>
+      )}
+    </div>
+  );
 }
