@@ -5,6 +5,7 @@
 // the app.
 
 import { useEffect, useMemo, useState } from 'react';
+import QRCode from 'qrcode';
 import { Icon } from '../Icons';
 import { usePlan, ProBadge, UpgradeModal } from '../Pro';
 import {
@@ -22,6 +23,13 @@ export default function ShareSettings() {
   const [theme, setTheme] = useState<ShareTheme>(DEFAULT_THEME);
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
+  // QR of a link, rendered on demand — print it and put it on the counter.
+  const [qrFor, setQrFor] = useState<{ url: string; title: string } | null>(null);
+  const [qrData, setQrData] = useState('');
+  useEffect(() => {
+    if (!qrFor) { setQrData(''); return; }
+    QRCode.toDataURL(qrFor.url, { width: 480, margin: 1 }).then(setQrData).catch(() => setQrData(''));
+  }, [qrFor]);
   const [cats, setCats] = useState<CategoryNode[]>([]);
   const [guideCats, setGuideCats] = useState<GuideCat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,7 +200,8 @@ export default function ShareSettings() {
           <div className="divide-y divide-black/[0.06]">
             {links.map(l => (
               <LinkRow key={l.id} link={l} cats={cats} guideCats={guideCats}
-                url={urlOf(l)} onCopy={() => copy(l)} onPatch={b => patch(l.id, b)} onRemove={() => remove(l)} />
+                url={urlOf(l)} onCopy={() => copy(l)} onPatch={b => patch(l.id, b)} onRemove={() => remove(l)}
+                onQr={() => setQrFor({ url: urlOf(l), title: l.title || 'Sdílený odkaz' })} />
             ))}
           </div>
         </div>
@@ -290,18 +299,42 @@ export default function ShareSettings() {
         </div>
       </div>
       )}
+      {qrFor && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setQrFor(null)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">{qrFor.title}</h3>
+            <p className="text-sm text-black/45 mb-4">Vytiskni a polož na pult — zákazník načte mobilem.</p>
+            {qrData ? (
+              <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
+            ) : (
+              <div className="mx-auto w-64 h-64 rounded-2xl bg-black/[0.04] animate-pulse" />
+            )}
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setQrFor(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
+              {qrData && (
+                <a href={qrData} download="qr-nabidka.png"
+                  className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black transition">
+                  Stáhnout PNG
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
     </div>
   );
 }
 
-function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove }: {
+function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }: {
   link: ShareLink;
   cats: CategoryNode[];
   guideCats: GuideCat[];
   url: string;
   onCopy: () => void;
   onPatch: (body: Record<string, any>) => void;
+  onQr: () => void;
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -339,6 +372,10 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove }: {
             link.pinned ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
           }`}>
           📌
+        </button>
+        <button onClick={onQr} title="Zobrazit QR kód"
+          className="shrink-0 rounded-full w-8 h-8 flex items-center justify-center glass text-black/50 hover:text-black text-xs transition">
+          ⬚
         </button>
         <button onClick={onCopy} title="Zkopírovat odkaz"
           className="shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-1.5 text-xs font-bold hover:brightness-110">

@@ -34,6 +34,7 @@ interface Item {
   description?: string | null;
   archived?: boolean;
   hideFromOverview?: boolean;
+  highlight?: string | null;
   approved?: boolean;
   submittedBy?: number | null;
   updatedAt?: string;
@@ -78,7 +79,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false, hideFromOverview: false };
+const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false, hideFromOverview: false, highlight: '' };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -385,7 +386,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const openEdit = (i: Item) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true, hideFromOverview: i.hideFromOverview === true });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
@@ -433,7 +434,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
       unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
-      brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview,
+      brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview, highlight: form.highlight || null,
       packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
     };
     setFormErr('');
@@ -903,6 +904,20 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                   </span>
                 </span>
               </label>
+              <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5">
+                <span className="block text-sm font-medium text-[#16181A]">Zvýraznit zákazníkům</span>
+                <span className="block text-[11px] text-black/45 mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</span>
+                <div className="flex gap-1.5">
+                  {([['', 'Nic'], ['new', '✨ Novinka'], ['tip', '👍 Tip']] as const).map(([v, lbl]) => (
+                    <button key={v} type="button" onClick={() => setForm(f => ({ ...f, highlight: v }))}
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                        form.highlight === v ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                      }`}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 cursor-pointer">
                 <input type="checkbox" checked={form.hideFromOverview} onChange={e => setForm(f => ({ ...f, hideFromOverview: e.target.checked }))}
                   className="mt-0.5 h-4 w-4 accent-[#C8F542]" />

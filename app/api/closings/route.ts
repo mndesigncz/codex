@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { cashDifference, czk, normalizeMovements, normalizeDenominations, ShiftPerson } from '@/lib/closing';
+import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
 
 export const dynamic = 'force-dynamic';
 
@@ -425,6 +425,13 @@ export async function POST(request: Request) {
     }
    }
   }
+
+  // The handover rides on the closing; separate UPDATE so a not-yet-migrated
+  // column can't fail the insert.
+  try {
+    const handover = normalizeHandover(b.handover);
+    if (handover) await sql`UPDATE cash_closings SET handover = ${JSON.stringify(handover)}::jsonb WHERE id = ${row.id}`;
+  } catch { /* column not migrated yet */ }
 
   // Notify team employers (except the author).
   try {

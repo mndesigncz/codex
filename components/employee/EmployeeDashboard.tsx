@@ -35,6 +35,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [reviews, setReviews] = useState<ShiftReview[]>([]);
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [myEntries, setMyEntries] = useState<any[]>([]);
+  const [handover, setHandover] = useState<any | null>(null);
   const [unseenFlagged, setUnseenFlagged] = useState(0);
   const [cfg, setCfg] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
         setPinnedShare(tm?.pinnedShare ?? null);
         setMyEntries(Array.isArray(att?.entries) ? att.entries : []);
+        fetch('/api/closings/handover').then(r => r.json())
+          .then(d => setHandover(d?.handover ? d : null)).catch(() => {});
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));
         setTasks(Array.isArray(tk) ? tk : []);
@@ -148,6 +151,19 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   };
 
   const blocks: Record<string, React.ReactNode> = {
+    handover: handover ? (
+      <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
+          🤝 Předávka od {handover.authorName ?? 'předchozí směny'}
+          <span className="normal-case font-normal text-black/35"> · {new Date(handover.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}</span>
+        </p>
+        <div className="space-y-1.5 text-sm text-[#16181A]">
+          {handover.handover.todo && <p>🔧 <span className="text-black/70">{handover.handover.todo}</span></p>}
+          {handover.handover.runningOut && <p>📦 <span className="text-black/70">{handover.handover.runningOut}</span></p>}
+          {handover.handover.message && <p>💬 <span className="text-black/70">{handover.handover.message}</span></p>}
+        </div>
+      </div>
+    ) : null,
     monthly: (monthHours > 0 || monthRatings.length > 0) ? (
       <div className="glass-card p-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📆 Tenhle měsíc</p>

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-type Entry = { id: number; name: string; brand: string | null; description: string | null };
+type Entry = { id: number; name: string; brand: string | null; description: string | null; highlight?: string | null };
 
 async function loadLink(token: string) {
   try {
@@ -105,6 +105,15 @@ export default async function SharePage({ params }: { params: { token: string } 
                   <li key={e.id} style={{ background: card, border: `1px solid ${line}`, borderRadius: 14, padding: '12px 16px' }}>
                     <p style={{ margin: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.35 }}>
                       {e.name}
+                      {e.highlight && (
+                        <span style={{
+                          marginLeft: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                          padding: '2px 8px', borderRadius: 999, verticalAlign: 'middle',
+                          background: theme.accent, color: theme.background,
+                        }}>
+                          {e.highlight === 'new' ? 'NOVINKA' : 'TIP'}
+                        </span>
+                      )}
                       {e.brand && <span style={{ fontWeight: 400, color: muted }}> · {e.brand}</span>}
                     </p>
                     {e.description && (
@@ -149,9 +158,9 @@ async function inventorySections(teamId: number, rootId: number | null, excluded
   let items: any[] = [];
   try {
     items = await sql`
-      SELECT id, name, category, category_id, brand, description
+      SELECT id, name, category, category_id, brand, description, highlight
       FROM inventory_items
-      WHERE team_id = ${teamId} AND archived IS NOT TRUE
+      WHERE team_id = ${teamId} AND archived IS NOT TRUE AND (approved IS DISTINCT FROM FALSE)
       ORDER BY name ASC`;
   } catch {
     try {
@@ -167,7 +176,10 @@ async function inventorySections(teamId: number, rootId: number | null, excluded
       .map(i => ({
         id: Number(i.id), name: String(i.name),
         brand: i.brand ?? null, description: i.description ?? null,
-      }));
+        highlight: i.highlight === 'new' || i.highlight === 'tip' ? i.highlight : null,
+      }))
+      // Novinky a tipy nahoru — to je to, co má zákazník vidět první.
+      .sort((a, b) => Number(!!b.highlight) - Number(!!a.highlight) || a.name.localeCompare(b.name, 'cs'));
 
   // Only the branch under `rootId`, or the whole forest when nothing was picked.
   const forest: TreeNode<CategoryNode>[] = (() => {
@@ -212,6 +224,7 @@ async function inventorySections(teamId: number, rootId: number | null, excluded
         entries: orphans.map(i => ({
           id: Number(i.id), name: String(i.name),
           brand: i.brand ?? null, description: i.description ?? null,
+          highlight: i.highlight === 'new' || i.highlight === 'tip' ? i.highlight : null,
         })),
       });
     }
