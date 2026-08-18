@@ -76,6 +76,7 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
   const [wholeShift, setWholeShift] = useState(false);
   const [ratingStar, setRatingStar] = useState(4);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (k: string) => setExpanded(e => ({ ...e, [k]: !e[k] }));
 
@@ -168,7 +169,7 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
   };
 
   const saveRating = async () => {
-    setSaving(true);
+    setSaving(true); setSaveErr('');
     try {
       const ids = wholeShift ? [employee.id, ...(summary?.coworkers ?? []).map(c => c.id)] : undefined;
       const res = await fetch('/api/shift-reviews', {
@@ -179,6 +180,12 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
         }),
       });
       if (res.ok) onSaved();
+      else {
+        const d = await res.json().catch(() => ({}));
+        setSaveErr(d.error || 'Hodnocení se nepodařilo uložit.');
+      }
+    } catch {
+      setSaveErr('Nepodařilo se spojit se serverem.');
     } finally { setSaving(false); }
   };
 
@@ -482,6 +489,9 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
 
         <div className="sticky bottom-0 flex gap-2 px-5 py-4 bg-white/85 backdrop-blur border-t border-black/[0.06]">
           <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition">Zavřít</button>
+          {saveErr && (
+            <p className="w-full text-sm font-medium text-red-600">⚠️ {saveErr}</p>
+          )}
           <button onClick={saveRating} disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition">
             {saving ? 'Ukládám…' : wholeShift ? `Uložit pro ${targetNames.length} ${plural(targetNames.length, 'člověka', 'lidi', 'lidí')}` : 'Uložit hodnocení'}
           </button>

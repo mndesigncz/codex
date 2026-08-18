@@ -416,7 +416,14 @@ export default function ClosingsOverview() {
                     )}
                     <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
-                    }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
+                    }`}>
+                      {d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}
+                      {/* When the closer explained the difference, say so right in
+                          the row — an explained manko reads very differently. */}
+                      {d !== 0 && c.diff_reason && (
+                        <span className="hidden sm:inline font-normal opacity-75"> · {diffReasonLabel(c.diff_reason)}</span>
+                      )}
+                    </span>
                     <Icon name="chevron" size={16} className={`text-black/35 transition-transform ${open ? 'rotate-180' : ''}`} />
                   </div>
                 </button>

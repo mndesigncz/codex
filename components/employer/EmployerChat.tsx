@@ -26,6 +26,7 @@ export default function EmployerChat({ user }: Props) {
   const [users, setUsers] = useState<User[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendErr, setSendErr] = useState('');
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -70,13 +71,17 @@ export default function EmployerChat({ user }: Props) {
           content: newMessage.trim(),
         }),
       });
-      if (res.ok) {
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setSendErr(d.error || 'Zprávu se nepodařilo odeslat.');
+      } else {
+        setSendErr('');
         const msg = await res.json();
         setMessages(prev => [...prev, { ...msg, senderName: user.name ?? 'Eva', senderAvatar: user.avatar ?? '👩‍💼' }]);
         setNewMessage('');
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setSendErr('Nepodařilo se spojit se serverem.');
     } finally {
       setSending(false);
     }
@@ -123,6 +128,9 @@ export default function EmployerChat({ user }: Props) {
         <div ref={bottomRef} />
       </div>
 
+      {sendErr && (
+        <p className="flex-shrink-0 px-4 pt-2 text-xs font-medium text-red-600">⚠️ {sendErr}</p>
+      )}
       <form onSubmit={sendMessage} className="flex-shrink-0 p-4 border-t border-black/[0.06] backdrop-blur-xl bg-white/[0.03] flex gap-3">
         <input
           value={newMessage}
