@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { cashDifference, czk, normalizeMovements, ShiftPerson } from '@/lib/closing';
+import { cashDifference, czk, normalizeMovements, normalizeDenominations, ShiftPerson } from '@/lib/closing';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +97,7 @@ export async function GET() {
   const closings = (rows as any[]).map(r => ({
     ...r,
     movements: normalizeMovements(r.movements),
+    denominations: normalizeDenominations(r.denominations),
     shiftEmployees: idsOf(r.shift_employees)
       .map(id => peopleById.get(id) ?? { id, name: 'Neznámý', avatar: null }),
   }));
@@ -335,19 +336,21 @@ export async function POST(request: Request) {
   const movements = normalizeMovements(b.movements);
   const diffReason = b.diffReason ? String(b.diffReason).slice(0, 40) : null;
   const diffNote = b.diffNote ? String(b.diffNote).trim().slice(0, 500) || null : null;
+  const denominations = normalizeDenominations(b.denominations);
 
   let row: any;
   try {
     [row] = await sql`
       INSERT INTO cash_closings (
         team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
-        tips_in_drawer, shift_employees, movements, diff_reason, diff_note,
+        tips_in_drawer, shift_employees, movements, diff_reason, diff_note, denominations,
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
         ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
+        ${JSON.stringify(denominations)}::jsonb,
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;

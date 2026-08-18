@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
-import { Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference } from '@/lib/closing';
+import {
+  Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference,
+  MOVEMENT_KINDS, movementLabel, diffReasonLabel, hasDenominations,
+} from '@/lib/closing';
 import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
 import ClosingsCalendar from './ClosingsCalendar';
@@ -454,6 +457,50 @@ export default function ClosingsOverview() {
                         <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{money(d)}</span>
                       </div>
                     </div>
+
+                    {/* Itemised movements — what exactly left the drawer and why. */}
+                    {(c.movements?.length ?? 0) > 0 && (
+                      <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-1.5">Pohyby v kase</p>
+                        <div className="divide-y divide-black/[0.06]">
+                          {c.movements!.map((m, i) => {
+                            const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
+                            return (
+                              <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
+                                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
+                                <span className="min-w-0 flex-1 truncate text-black/55">{m.note || '—'}</span>
+                                <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* How the drawer was actually counted — banknote by banknote. */}
+                    {hasDenominations(c.denominations) && (
+                      <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Kasa napočítaná po bankovkách</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(c.denominations!)
+                            .sort((a, b) => Number(b[0]) - Number(a[0]))
+                            .map(([denom, count]) => (
+                              <span key={denom} className="rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
+                                <strong>{count}×</strong> {Number(denom).toLocaleString('cs-CZ')}
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Why it didn't match, in the closer's words. */}
+                    {(c.diff_reason || c.diff_note) && (
+                      <div className="rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-1">Proč kasa nesedí</p>
+                        {c.diff_reason && <p className="text-sm font-medium text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
+                        {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
+                      </div>
+                    )}
                     {covered.length > 0 && (
                       <div className="rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/30 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wider text-[#5B7A08] mb-2 flex items-center gap-1.5">
