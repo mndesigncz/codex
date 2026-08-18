@@ -7,6 +7,7 @@ import {
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
   DIFF_REASONS, diffReasonLabel, explainDifference,
   type DenominationCounts, denominationsFor, sumDenominations, hasDenominations,
+  cashLeft,
 } from '@/lib/closing';
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 
@@ -297,6 +298,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // counter is on, the counted total drives form.closingCash.
   const [countMode, setCountMode] = useState(false);
   const [denoms, setDenoms] = useState<DenominationCounts>({});
+  // End-of-shift removal: how much stays in the drawer for the next shift.
+  // Empty = everything stays (no removal). The removal itself is derived.
+  const [leaveCash, setLeaveCash] = useState('');
   const money = useMoney();
   const symbol = useSymbol();
   const { currency } = useCurrency();
@@ -318,8 +322,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       // What the previous shift counted is what this one starts with.
       const prev = list[0];
       if (prev) {
-        setCarry({ amount: Number(prev.closing_cash) || 0, date: prev.date, label: prev.shift_label ?? null });
-        setForm(f => (f.openingCash === '' ? { ...f, openingCash: String(Math.round(Number(prev.closing_cash) || 0)) } : f));
+        // The next shift starts with what physically STAYED in the drawer —
+        // the counted cash minus what was carried out at the end.
+        const left = cashLeft(prev);
+        setCarry({ amount: left, date: prev.date, label: prev.shift_label ?? null });
+        setForm(f => (f.openingCash === '' ? { ...f, openingCash: String(left) } : f));
+        // A team that removes the surplus every day leaves the same float each
+        // time — offer it prefilled, still editable.
+        if ((Number(prev.final_removal) || 0) > 0) setLeaveCash(l => (l === '' ? String(left) : l));
       }
       setPayDailyCash(!!d.payDailyCash);
       const payoutDefault = d.payoutFromRegister !== false;
@@ -405,7 +415,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const diff = form.closingCash === '' ? null : cashDifference(preview);
   // Arithmetic nudges: a difference landing exactly on a number already in the
   // closing is nearly always that number.
-  const hints = diff == null || diff === 0 ? [] : explainDifference(diff, preview, movements);
+  // End-of-shift removal, derived from "what stays in": counted − left.
+  // It happens AFTER the count, so it never touches expected/diff.
+  const finalRemoval = leaveCash === '' || form.closingCash === ''
+    ? 0
+    : Math.max(0, n(form.closingCash) - n(leaveCash));
+  const leaveTooHigh = leaveCash !== '' && form.closingCash !== '' && n(leaveCash) > n(form.closingCash);
+  const hints = diff == null || diff === 0 ? [] : explainDifference(diff, { ...preview, final_removal: finalRemoval }, movements);
 
   const totalSteps = 4;
 
@@ -425,6 +441,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const submit = (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setMsg('');
     if (form.closingCash === '') { setErr('Zadej skutečný stav kasy na konci směny.'); return; }
+    if (leaveTooHigh) { setErr('V kase nemůže zůstat víc, než kolik jsi napočítal/a. Uprav odvod na konci směny.'); return; }
     // Employee closing a day they weren't on shift ⇒ confirm the approval path.
     if (isSelf && !onShift) { setShowConfirm(true); return; }
     doSubmit();
@@ -448,6 +465,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           payoutFromRegister, tipsInDrawer,
           movements, diffReason: diffReason || null, diffNote: diffNote || null,
           denominations: countMode ? denoms : null,
+          finalRemoval,
           employeeId: isSelf ? undefined : selEmployee,
           coworkers: includedCoworkers,
         }),
@@ -459,6 +477,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         setForm(emptyForm());
         setCoworkerSel({});
         setDenoms({});
+        setLeaveCash('');
         setMovements([]);
         setDiffReason(''); setDiffNote('');
         setPayoutFromRegister(teamPayoutFromRegister);
@@ -920,6 +939,46 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 className={`${inputClass} resize-none py-2`} />
             </div>
           )}
+
+          {/* End-of-shift removal — the drawer gets counted FIRST (that is what
+              the diff above judges), and only then does the surplus go to the
+              safe. What stays here is what the next shift takes over. */}
+          {form.closingCash !== '' && (
+            <div className="rounded-2xl bg-white/60 border border-black/[0.07] p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-[#16181A]">Odvod na konci směny</p>
+                <p className="text-[12px] text-black/45 mt-0.5">
+                  Odkládáte přebytečné bankovky ven? Napiš, kolik v kase necháváš pro další směnu — kolik odložit spočítám.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">V kase necháváš</label>
+                <div className="relative">
+                  <input type="number" inputMode="numeric" value={leaveCash}
+                    onChange={e => setLeaveCash(e.target.value)}
+                    placeholder={`${n(form.closingCash)}`}
+                    className={`${inputClass} pr-12`} />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
+                </div>
+              </div>
+              {leaveTooHigh ? (
+                <p className="text-[13px] text-red-600 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                  V kase je napočítáno jen {money(n(form.closingCash))} — nemůže v ní zůstat víc.
+                </p>
+              ) : leaveCash !== '' && finalRemoval > 0 ? (
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] text-white px-4 py-3">
+                  <span className="text-sm font-medium flex items-center gap-2 min-w-0">
+                    <Icon name="swap" size={16} /> Odlož ven (trezor / odvod)
+                  </span>
+                  <span className="text-lg font-bold tabular-nums shrink-0 whitespace-nowrap">{money(finalRemoval)}</span>
+                </div>
+              ) : leaveCash !== '' ? (
+                <p className="text-[13px] text-black/45">V kase zůstává všechno — žádný odvod.</p>
+              ) : (
+                <p className="text-[12px] text-black/35">Nech prázdné, pokud v kase zůstává všechno.</p>
+              )}
+            </div>
+          )}
         </Step>
 
         <div>
@@ -1003,6 +1062,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                           </span>
                         ))}
                     </div>
+                  </div>
+                )}
+                {(Number(c.final_removal) || 0) > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 py-2.5 text-sm">
+                    <span className="text-black/55 whitespace-nowrap">Odvod na konci: <strong className="text-[#16181A] tabular-nums">−{money(Number(c.final_removal))}</strong></span>
+                    <span className="text-black/55 whitespace-nowrap">V kase zůstalo: <strong className="text-[#16181A] tabular-nums">{money(cashLeft(c))}</strong></span>
                   </div>
                 )}
                 {(c.diff_reason || c.diff_note) && (
