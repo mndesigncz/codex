@@ -17,6 +17,7 @@ export const EMPLOYER_WIDGETS: Widget[] = [
 ];
 
 export const EMPLOYEE_WIDGETS: Widget[] = [
+  { id: 'monthly', label: 'Tenhle měsíc', hint: 'Odpracované hodiny a hodnocení.' },
   { id: 'sharedLink', label: 'Připnutá nabídka', hint: 'Sdílený odkaz pro zákazníky na jeden klik.' },
   { id: 'clock', label: 'Píchačky', hint: 'Příchod/odchod přímo z telefonu.' },
   { id: 'nextShift', label: 'Nejbližší směna' },

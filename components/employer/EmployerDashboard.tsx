@@ -78,6 +78,12 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   // can't sit unseen for weeks.
   const [pendingApprovals, setPendingApprovals] = useState({ timeoff: 0, swaps: 0, closings: 0 });
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
+  // First-steps checklist for a fresh team; goes away once done or dismissed.
+  const [onboardingDismissed, setOnboardingDismissed] = useState(true);
+  useEffect(() => {
+    try { setOnboardingDismissed(localStorage.getItem('pangea-onboarding-dismissed') === '1'); } catch { /* ignore */ }
+  }, []);
+  const [closingsCount, setClosingsCount] = useState(0);
   const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({});
   const [reviewDate, setReviewDate] = useState('');
   const [rating, setRating] = useState<RosterEntry | null>(null);
@@ -135,6 +141,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
         setOnShift((att?.roster ?? []).filter((r: any) => r.openSince));
+        setClosingsCount(Array.isArray(clo?.closings) ? clo.closings.length : 0);
         setPendingApprovals({
           timeoff: (toff?.requests ?? []).filter((r: any) => r.status === 'pending').length,
           swaps: (offers?.offers ?? []).filter((o: any) => o.status === 'claimed').length,
@@ -388,6 +395,38 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {(() => {
+        const steps = [
+          { done: members.length > 0, label: 'Přidat prvního zaměstnance (kód týmu / pozvánka)', view: 'team-settings' },
+          { done: shifts.length > 0, label: 'Naplánovat první směny', view: 'shifts' },
+          { done: inventory.length > 0, label: 'Založit sklad (kategorie a položky)', view: 'inventory' },
+          { done: closingsCount > 0, label: 'Vyplnit první uzávěrku', view: 'reports' },
+        ];
+        const remaining = steps.filter(st => !st.done);
+        if (onboardingDismissed || remaining.length === 0) return null;
+        return (
+          <div className="glass-card p-5 border border-[#C8F542]/30">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="font-bold text-[#16181A]">🚀 První kroky ({steps.length - remaining.length}/{steps.length})</p>
+              <button onClick={() => { setOnboardingDismissed(true); try { localStorage.setItem('pangea-onboarding-dismissed', '1'); } catch {} }}
+                className="text-xs text-black/40 hover:text-black">Skrýt</button>
+            </div>
+            <div className="space-y-1.5">
+              {steps.map((st, i) => (
+                <button key={i} onClick={() => !st.done && onNavigate(st.view)} disabled={st.done}
+                  className={`w-full flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-sm text-left transition ${
+                    st.done ? 'bg-[#C8F542]/10 text-black/40 line-through' : 'bg-black/[0.03] text-[#16181A] hover:bg-black/[0.06]'
+                  }`}>
+                  <span className="shrink-0">{st.done ? '✅' : '⭕'}</span>
+                  <span className="min-w-0 flex-1 truncate">{st.label}</span>
+                  {!st.done && <span className="shrink-0 text-black/35">→</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {(pendingApprovals.timeoff > 0 || pendingApprovals.swaps > 0 || pendingApprovals.closings > 0) && (
         <div className="rounded-3xl border border-orange-500/25 bg-orange-500/[0.07] p-4 sm:p-5">
           <p className="font-bold text-[#16181A] flex items-center gap-2 mb-2">

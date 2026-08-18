@@ -1802,6 +1802,12 @@ function ShoppingListModal({ items, onClose, onOrdered, pk }: {
           <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 px-4 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
             {copied ? 'Zkopírováno ✓' : 'Zkopírovat seznam'}
           </button>
+          <a
+            href={`mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`}
+            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap inline-flex items-center gap-1.5"
+            title="Otevře e-mail s předvyplněným seznamem — doplň adresu dodavatele">
+            ✉️ Poslat e-mailem
+          </a>
           {canShare && (
             <button onClick={share} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 px-4 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">
               Sdílet

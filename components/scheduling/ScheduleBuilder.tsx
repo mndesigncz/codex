@@ -172,6 +172,65 @@ export default function ScheduleBuilder({ user }: Props) {
   const [publishNote, setPublishNote] = useState('');
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
+  // Copy a whole week of shifts onto another week — the "typical week" workflow.
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySrc, setCopySrc] = useState('');
+  const [copyDst, setCopyDst] = useState('');
+  const [copying, setCopying] = useState(false);
+  const [copyMsg, setCopyMsg] = useState('');
+  const mondayOf = (d: Date) => {
+    const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(12, 0, 0, 0);
+    return x;
+  };
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const weekLabel = (mon: Date) => {
+    const end = new Date(mon); end.setDate(end.getDate() + 6);
+    return `${mon.getDate()}.${mon.getMonth() + 1}. – ${end.getDate()}.${end.getMonth() + 1}.`;
+  };
+  const weekOptions = (back: number, fwd: number) => {
+    const base = mondayOf(new Date());
+    const out: { value: string; label: string }[] = [];
+    for (let i = -back; i <= fwd; i++) {
+      const m = new Date(base); m.setDate(m.getDate() + i * 7);
+      out.push({ value: iso(m), label: `${weekLabel(m)}${i === 0 ? ' (tento týden)' : ''}` });
+    }
+    return out;
+  };
+  const copyWeek = async () => {
+    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg('Vyber dva různé týdny.'); return; }
+    setCopying(true); setCopyMsg('');
+    try {
+      // Source shifts may live outside the loaded month — fetch both weeks' months.
+      const months = new Set([copySrc.slice(0, 7), iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000)).slice(0, 7)]);
+      let source: Shift[] = [];
+      for (const m of Array.from(months)) {
+        const d = await fetch(`/api/schedule?month=${m}`).then(r => r.json()).catch(() => ({}));
+        source = source.concat(Array.isArray(d?.shifts) ? d.shifts : []);
+      }
+      const srcStart = copySrc;
+      const srcEnd = iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000));
+      const offsetDays = Math.round((new Date(copyDst + 'T12:00:00').getTime() - new Date(copySrc + 'T12:00:00').getTime()) / 86400000);
+      const toCreate = source
+        .filter(sh => sh.date >= srcStart && sh.date <= srcEnd)
+        .map(sh => {
+          const nd = new Date(sh.date + 'T12:00:00'); nd.setDate(nd.getDate() + offsetDays);
+          return { employeeId: sh.employeeId, date: iso(nd), startTime: sh.startTime, endTime: sh.endTime, type: sh.type };
+        });
+      if (toCreate.length === 0) { setCopyMsg('Ve zdrojovém týdnu nejsou žádné směny.'); setCopying(false); return; }
+      const res = await fetch('/api/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shifts: toCreate }),
+      });
+      if (res.ok) {
+        setCopyMsg(`Hotovo — zkopírováno ${toCreate.length} směn. ✓`);
+        await load();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setCopyMsg(d.error || 'Kopírování se nepodařilo.');
+      }
+    } catch { setCopyMsg('Kopírování se nepodařilo.'); }
+    setCopying(false);
+  };
   const [publishing, setPublishing] = useState(false);
   const publish = async () => {
     setPublishing(true);
@@ -704,6 +763,12 @@ export default function ScheduleBuilder({ user }: Props) {
               <Icon name="trend" size={18} /> Export CSV
             </button>
             <button
+              onClick={() => { setCopyOpen(true); setCopyMsg(''); setCopySrc(''); setCopyDst(''); }}
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2"
+            >
+              <Icon name="swap" size={18} /> Kopírovat týden
+            </button>
+            <button
               onClick={() => fileRef.current?.click()}
               className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2"
             >
@@ -738,6 +803,40 @@ export default function ScheduleBuilder({ user }: Props) {
           </div>
 
           {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
+          {copyOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setCopyOpen(false)}>
+              <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">Kopírovat týden</h3>
+                <p className="text-sm text-black/50 mb-4">Vezme všechny směny zdrojového týdne a naplánuje je do cílového (stejné dny, časy i lidi).</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zkopírovat týden</label>
+                    <select value={copySrc} onChange={(e) => setCopySrc(e.target.value)}
+                      className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                      <option value="">— vyber —</option>
+                      {weekOptions(4, 0).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Do týdne</label>
+                    <select value={copyDst} onChange={(e) => setCopyDst(e.target.value)}
+                      className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                      <option value="">— vyber —</option>
+                      {weekOptions(0, 5).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+                    </select>
+                  </div>
+                  {copyMsg && <p className={`text-sm ${copyMsg.includes('✓') ? 'text-[#5B7A08]' : 'text-red-600'}`}>{copyMsg}</p>}
+                </div>
+                <div className="flex gap-2 mt-5">
+                  <button onClick={() => setCopyOpen(false)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
+                  <button onClick={copyWeek} disabled={copying || !copySrc || !copyDst}
+                    className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                    {copying ? 'Kopíruji…' : 'Zkopírovat'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {publishNote && (
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
               <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />
