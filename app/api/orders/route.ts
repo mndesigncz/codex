@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sendOrderEmail } from '@/lib/email';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -71,7 +72,27 @@ export async function POST(req: NextRequest) {
     VALUES (${c.teamId}, ${c.meId}, ${b.supplier ? String(b.supplier).slice(0, 120) : null},
             ${JSON.stringify(items)}, ${b.note ? String(b.note).slice(0, 500) : null})
     RETURNING *`;
-  return NextResponse.json({ ok: true, order: shape(row) });
+
+  // Link the supplier entity and — when asked and it has an e-mail — send the
+  // order straight out. Both steps are additive; the order exists regardless.
+  const supplierId = parseInt(b.supplierId);
+  let emailed = false;
+  if (Number.isFinite(supplierId)) {
+    try { await sql`UPDATE orders SET supplier_id = ${supplierId} WHERE id = ${row.id}`; } catch { /* not migrated */ }
+    if (b.sendEmail === true) {
+      try {
+        const [sup] = await sql`SELECT name, email FROM suppliers WHERE id = ${supplierId} AND team_id = ${c.teamId}`;
+        if (sup?.email) {
+          const [team] = await sql`SELECT name FROM teams WHERE id = ${c.teamId}`;
+          const text = items.map((i: any) => `• ${i.name} — ${i.qty} ${i.unit ?? ''}`.trim()).join('\n');
+          await sendOrderEmail(sup.email, team?.name ?? 'Pangea', text, b.note ?? null);
+          await sql`UPDATE orders SET email_sent_at = NOW() WHERE id = ${row.id}`;
+          emailed = true;
+        }
+      } catch { /* e-mail is best-effort; the order stays created */ }
+    }
+  }
+  return NextResponse.json({ ok: true, order: shape(row), emailed });
 }
 
 // PATCH (employer) — receive or cancel: { id, action: 'received'|'cancelled', totalCost?, restock? }.

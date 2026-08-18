@@ -4,6 +4,7 @@
   "installCommand": "npm install",
   "crons": [
     { "path": "/api/backup", "schedule": "0 2 * * *" },
-    { "path": "/api/closings/remind", "schedule": "0 21 * * *" }
+    { "path": "/api/closings/remind", "schedule": "0 21 * * *" },
+    { "path": "/api/digest", "schedule": "30 21 * * *" }
   ]
 }

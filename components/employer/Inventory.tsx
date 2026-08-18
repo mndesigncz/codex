@@ -166,6 +166,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [reports, setReports] = useState<any[]>([]);
   const [showReports, setShowReports] = useState(false);
   const [showStocktake, setShowStocktake] = useState(false);
+  // Supplier entities — the address an order can actually be sent to.
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [showSuppliers, setShowSuppliers] = useState(false);
   // Movement history of the item being edited — who changed the stock and when.
   const [itemLog, setItemLog] = useState<any[]>([]);
   const [logOpen, setLogOpen] = useState(false);
@@ -208,6 +211,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   };
 
   const load = async () => {
+    fetch('/api/suppliers').then(r => r.json())
+      .then(d => setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []))
+      .catch(() => {});
     fetch('/api/inventory/reports').then(r => r.json())
       .then(d => setReports(Array.isArray(d.reports) ? d.reports : []))
       .catch(() => {});
@@ -563,6 +569,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
               🛒 Nakoupit ({toBuy.length})
             </button>
           )}
+          <button onClick={() => setShowSuppliers(true)}
+            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
+            🚚 Dodavatelé
+          </button>
           <button onClick={() => setShowStocktake(true)}
             className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
             📋 Inventura
@@ -888,7 +898,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název dodavatele</label>
-                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} />
+                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} list="pangea-suppliers" />
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
@@ -1034,6 +1044,18 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         />
       )}
 
+      <datalist id="pangea-suppliers">
+        {suppliers.map(sp => <option key={sp.id} value={sp.name} />)}
+      </datalist>
+
+      {showSuppliers && (
+        <SuppliersModal suppliers={suppliers} onClose={() => setShowSuppliers(false)}
+          onChanged={async () => {
+            const d = await fetch('/api/suppliers').then(r => r.json()).catch(() => ({}));
+            setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []);
+          }} />
+      )}
+
       {showStocktake && (
         <StocktakeModal isEmployer onClose={() => setShowStocktake(false)} onApplied={load} />
       )}
@@ -1117,6 +1139,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
       {showShopping && (
         <ShoppingListModal
+          suppliers={suppliers}
           items={[...toBuy, ...shoppingExtra.filter(e => !toBuy.some(t => t.id === e.id))]}
           pk={pk}
           onClose={() => { setShowShopping(false); setShoppingExtra([]); }}
@@ -1713,12 +1736,35 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
 }
 
 /* ---------- Shopping list modal ---------- */
-function ShoppingListModal({ items, onClose, onOrdered, pk }: {
+function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
   items: Item[];
   onClose: () => void;
   onOrdered: (createdCount: number) => void;
   pk: PackagingLookup;
+  suppliers?: any[];
 }) {
+  const supplierByName = (name: string) => suppliers.find(sp => sp.name === name) ?? null;
+  const [emailing, setEmailing] = useState<string | null>(null);
+  const [emailMsg, setEmailMsg] = useState('');
+  const emailGroup = async (supplier: string, list: Item[]) => {
+    const sp = supplierByName(supplier);
+    if (!sp?.email) return;
+    setEmailing(supplier); setEmailMsg('');
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier, supplierId: sp.id, sendEmail: true,
+          items: list.map(i => ({ name: i.name, qty: suggestedAmount(i), unit: i.unit, itemId: i.id })),
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.emailed) setEmailMsg(`Objednávka odeslána na ${sp.email} ✓`);
+      else if (res.ok) setEmailMsg('Objednávka vytvořena, ale e-mail se nepodařilo odeslat — pošli ji ručně.');
+      else setEmailMsg(d.error || 'Odeslání se nepodařilo.');
+    } catch { setEmailMsg('Odeslání se nepodařilo.'); }
+    setEmailing(null);
+  };
   const [copied, setCopied] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1793,12 +1839,21 @@ function ShoppingListModal({ items, onClose, onOrdered, pk }: {
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
           <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
         </div>
+        {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
 
         <div className="space-y-4">
           {groups.map(([supplier, list]) => (
             <div key={supplier} className="space-y-1">
               {hasSuppliers && (
-                <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">{supplier}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">{supplier}</p>
+                  {supplierByName(supplier)?.email && (
+                    <button onClick={() => emailGroup(supplier, list)} disabled={emailing === supplier}
+                      className="rounded-full bg-[#16181A] text-white px-3 py-1 text-[11px] font-semibold hover:bg-black disabled:opacity-50 transition whitespace-nowrap">
+                      {emailing === supplier ? 'Odesílám…' : '✉️ Objednat e-mailem'}
+                    </button>
+                  )}
+                </div>
               )}
               <div className="divide-y divide-black/[0.06]">
                 {list.map(i => {
@@ -2350,6 +2405,93 @@ function PackagingEditor({ category, onSaved }: {
         </button>
         {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
         {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Suppliers manager: name + e-mail is all an order needs to leave the app.
+function SuppliersModal({ suppliers, onClose, onChanged }: {
+  suppliers: any[];
+  onClose: () => void;
+  onChanged: () => Promise<void> | void;
+}) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editEmail, setEditEmail] = useState('');
+
+  const add = async () => {
+    if (!name.trim()) return;
+    setBusy(true); setErr('');
+    const res = await fetch('/api/suppliers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null }),
+    }).catch(() => null);
+    setBusy(false);
+    if (res?.ok) { setName(''); setEmail(''); setPhone(''); await onChanged(); }
+    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || 'Uložení se nepodařilo.'); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
+      <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">🚚 Dodavatelé</h3>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+        </div>
+        <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
+        {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Název dodavatele" maxLength={120}
+            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200}
+            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+          <button onClick={add} disabled={busy || !name.trim()}
+            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
+            Přidat
+          </button>
+        </div>
+
+        {suppliers.length === 0 ? (
+          <p className="text-sm text-black/40 text-center py-6">Zatím žádní dodavatelé.</p>
+        ) : (
+          <div className="divide-y divide-black/[0.06] rounded-2xl border border-black/[0.06] overflow-hidden">
+            {suppliers.map(sp => (
+              <div key={sp.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
+                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">{sp.name}</span>
+                {editId === sp.id ? (
+                  <span className="flex items-center gap-1.5">
+                    <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="e-mail"
+                      className="w-52 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                    <button onClick={async () => {
+                      const res = await fetch('/api/suppliers', {
+                        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
+                      }).catch(() => null);
+                      if (res?.ok) { setEditId(null); await onChanged(); }
+                    }} className="rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-semibold">Uložit</button>
+                  </span>
+                ) : (
+                  <>
+                    <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-amber-700'}`}>{sp.email ?? 'bez e-mailu'}</span>
+                    <button onClick={() => { setEditId(sp.id); setEditEmail(sp.email ?? ''); }}
+                      className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-black text-xs">✎</button>
+                    <button onClick={async () => {
+                      if (!confirm(`Smazat dodavatele „${sp.name}"?`)) return;
+                      const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
+                      if (res?.ok) await onChanged();
+                    }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
