@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
+import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { linkNewMember } from '@/lib/chat';
 import { notifyUser } from '@/lib/push';
 
@@ -36,6 +37,10 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const newRole = inv.role === 'employer' ? 'employer' : 'employee';
+
+    if (await memberLimitHit(sql, inv.team_id)) {
+      return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
+    }
     const [user] = await sql`
       INSERT INTO users (name, email, password_hash, role, avatar, job_title, team_id, employer_id)
       VALUES (${name}, ${inv.email}, ${passwordHash}, ${newRole}, '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
@@ -56,4 +61,18 @@ export async function POST(request: Request) {
     console.error('accept invite error', error);
     return NextResponse.json({ error: 'Chyba serveru' }, { status: 500 });
   }
+}
+
+async function memberLimitHit(sql: any, teamId: number): Promise<boolean> {
+  if (!PLAN_ENFORCED) return false;
+  let plan;
+  try {
+    const [row] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
+    plan = planInfoOf(row);
+  } catch { return false; }
+  if (plan.effective === 'pro') return false;
+  try {
+    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${teamId} AND role <> 'kiosk'`;
+    return !canAddMember(plan, Number(n) || 0);
+  } catch { return false; }
 }

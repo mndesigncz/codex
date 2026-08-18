@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import KioskApp from '@/components/kiosk/KioskApp';
 import { CurrencyProvider } from '@/components/CurrencyProvider';
+import { PlanProvider } from '@/components/Pro';
 
 export default async function KioskPage() {
   const session = await getServerSession(authOptions);
@@ -14,7 +15,9 @@ export default async function KioskPage() {
   const u = session.user as any;
   return (
     <CurrencyProvider>
+      <PlanProvider>
       <KioskApp user={{ id: u?.id, name: u?.name ?? 'Tablet', role: 'kiosk', avatar: u?.avatar ?? '📟' }} />
+      </PlanProvider>
     </CurrencyProvider>
   );
 }

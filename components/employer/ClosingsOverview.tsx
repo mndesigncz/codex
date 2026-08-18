@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
+import { usePlan, UpgradeModal, ProBadge } from '../Pro';
 import {
   Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference,
   cashLeft,
@@ -28,6 +29,8 @@ const crewOf = (c: ClosingRow): ShiftPerson[] =>
 
 export default function ClosingsOverview() {
   const money = useMoney();
+  const { pro } = usePlan();
+  const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
   // For the month-in-numbers card: who worked (labor cost) and what was bought.
   const [attRoster, setAttRoster] = useState<any[]>([]);
@@ -117,6 +120,7 @@ export default function ClosingsOverview() {
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   const exportCsv = () => {
+    if (!pro) { setUpgradeFor('Export CSV'); return; }
     const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka'];
     const rows = closings.map(c => [
       c.date, c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
@@ -301,7 +305,7 @@ export default function ClosingsOverview() {
       </div>
 
       {/* Month in numbers — the connected view: revenue × labor × purchases */}
-      {(laborCost > 0 || purchases > 0) && (
+      {(laborCost > 0 || purchases > 0) && pro && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
             <h3 className="font-bold tracking-tight text-[#16181A]">📈 {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
@@ -335,6 +339,19 @@ export default function ClosingsOverview() {
           </div>
         </div>
       )}
+
+      {(laborCost > 0 || purchases > 0) && !pro && (
+        <button onClick={() => setUpgradeFor('Měsíční přehled podniku')}
+          className="w-full glass-card p-5 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
+          <div className="min-w-0">
+            <p className="font-bold text-[#16181A] flex items-center gap-2">📈 Měsíc v číslech <ProBadge /></p>
+            <p className="text-sm text-black/50 mt-0.5">Tržby × mzdové náklady × nákupy a provozní výsledek na jeden pohled.</p>
+          </div>
+          <span className="shrink-0 text-2xl">🔒</span>
+        </button>
+      )}
+
+      {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
 
       {/* Revenue trend chart */}
       {daily.length >= 2 && (() => {

@@ -27,6 +27,8 @@ import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
+import { usePlan } from '../Pro';
+import { czDays } from '@/lib/plan';
 
 const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
@@ -62,6 +64,7 @@ interface Props {
 }
 
 export default function EmployerLayout({ user }: Props) {
+  const { plan } = usePlan();
   const [currentView, setCurrentView] = useState('overview');
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
@@ -216,6 +219,12 @@ export default function EmployerLayout({ user }: Props) {
           <NotificationBell />
         </header>
 
+        {plan?.trialing && (
+          <button onClick={() => setCurrentView('settings')}
+            className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
+            ✨ Zkoušíte Pro — zbývá {czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.
+          </button>
+        )}
         <main className={`flex-1 pb-28 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? renderView() : (
             <div className="mx-auto w-full max-w-7xl">{renderView()}</div>

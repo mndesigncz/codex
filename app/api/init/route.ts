@@ -532,6 +532,14 @@ export async function GET() {
     // idempotent and never downgrades anyone).
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS plan TEXT`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP`;
+    // who clicked "Mám zájem o Pro" — demand signal until real billing exists
+    await sql`
+      CREATE TABLE IF NOT EXISTS billing_interest (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
     await sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`;
     // end-of-shift removal: cash carried out AFTER the drawer was counted
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`;

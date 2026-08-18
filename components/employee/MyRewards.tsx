@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import type { RewardLevel } from '@/lib/rewardLevels';
+import { ProGate } from '../Pro';
 
 interface Review {
   work_date: string; rating: number; note: string | null; points: number;
@@ -95,6 +96,14 @@ function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
 }
 
 export default function MyRewards() {
+  return (
+    <ProGate feature="Moje odměny" employer={false} benefit="Body, úrovně a odměny za dobře odvedené směny.">
+      <MyRewardsInner  />
+    </ProGate>
+  );
+}
+
+function MyRewardsInner() {
   const [levels, setLevels] = useState<RewardLevel[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);

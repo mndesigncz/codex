@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import ShiftCalendar from './ShiftCalendar';
+import { usePlan, UpgradeModal } from '../Pro';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -169,6 +170,8 @@ export default function ScheduleBuilder({ user }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [publishNote, setPublishNote] = useState('');
+  const { pro } = usePlan();
+  const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const publish = async () => {
     setPublishing(true);
@@ -385,6 +388,7 @@ export default function ScheduleBuilder({ user }: Props) {
 
   // ---- CSV export ----
   const exportCsv = () => {
+    if (!pro) { setUpgradeFor('Export CSV'); return; }
     const header = 'datum,zaměstnanec,od,do,typ';
     const lines = shifts
       .slice()
@@ -717,6 +721,7 @@ export default function ScheduleBuilder({ user }: Props) {
             )}
           </div>
 
+          {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
           {publishNote && (
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
               <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />

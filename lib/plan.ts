@@ -23,8 +23,12 @@ export const LIMITS: Record<PlanId, { members: number | null; shareLinks: number
   pro: { members: null, shareLinks: null },
 };
 
-/** Flip once payments are live. While false, every feature stays unlocked. */
-export const PLAN_ENFORCED = false;
+/**
+ * Freemium is ON: the Free plan is fully usable forever (shifts, closings,
+ * tasks, chat, basic stock), Pro features lock after the trial with an
+ * upgrade prompt. Existing teams were grandfathered to Pro by the migration.
+ */
+export const PLAN_ENFORCED = true;
 
 export const PRO_PRICE = { monthly: 249, currency: 'Kč', per: 'měsíčně za podnik' };
 
@@ -38,7 +42,8 @@ export const PLAN_FEATURES: { label: string; free: string | boolean; pro: string
   { label: 'Sdílené menu pro zákazníky', free: '1 odkaz', pro: 'Neomezeně + vlastní vzhled' },
   { label: 'Kiosk režim pro tablet na prodejně', free: false, pro: true },
   { label: 'Hodnocení směn, odměny a úrovně', free: false, pro: true },
-  { label: 'CSV exporty a přehledy', free: false, pro: true },
+  { label: 'CSV exporty', free: false, pro: true },
+  { label: 'Měsíční přehled podniku (tržby × mzdy × nákupy)', free: false, pro: true },
 ];
 
 /**
@@ -72,3 +77,19 @@ export function planLabel(p: PlanInfo): string {
   if (p.trialing) return `Pro — zkušební, zbývá ${czDays(p.trialDaysLeft)}`;
   return p.effective === 'pro' ? 'Pro' : 'Zdarma';
 }
+
+export function isPro(p: PlanInfo | null | undefined): boolean {
+  return !p || p.effective === 'pro';
+}
+
+/** Server-side: may the team add another (non-kiosk) member? */
+export function canAddMember(p: PlanInfo, currentCount: number): boolean {
+  if (!PLAN_ENFORCED || p.effective === 'pro') return true;
+  const limit = LIMITS.free.members;
+  return limit == null || currentCount < limit;
+}
+
+export const MEMBER_LIMIT_MSG =
+  `Plán Zdarma má až ${LIMITS.free.members} členy týmu. Pro neomezený tým přejděte na Pro v Nastavení → Předplatné.`;
+export const SHARE_LIMIT_MSG =
+  'Plán Zdarma má 1 aktivní sdílený odkaz. Více odkazů a vlastní vzhled odemyká Pro.';

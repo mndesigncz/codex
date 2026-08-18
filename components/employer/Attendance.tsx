@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
+import { usePlan, UpgradeModal } from '../Pro';
 
 type RosterMember = {
   id: number | string;
@@ -89,6 +90,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [deleting, setDeleting] = useState<Entry['id'] | null>(null);
   const [closings, setClosings] = useState<Closing[]>([]);
   const money = useMoney();
+  const { pro } = usePlan();
+  const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   const symbol = useSymbol();
   const { laborTargetPct } = useCurrency();
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
@@ -281,6 +284,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   };
 
   const exportCsv = () => {
+    if (!pro) { setUpgradeFor('Export CSV'); return; }
     const head = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', `Mzda (${symbol})`];
     const rows = entries.map(e => {
       const start = new Date(e.clockIn).getTime();
@@ -560,6 +564,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           </div>
         </div>
       )}
+
+      {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
 
       {editEntry && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditEntry(null)}>

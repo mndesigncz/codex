@@ -10,6 +10,7 @@ import Guides from '../Guides';
 import CashClosing from '../employee/CashClosing';
 import MessengerDock from '../chat/MessengerDock';
 import AnnouncementBanner from '../AnnouncementBanner';
+import { usePlan, ProBadge } from '../Pro';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
@@ -27,6 +28,23 @@ const TABS = [
 interface KioskUser { id?: string | number; name: string; role: string; avatar?: string }
 
 export default function KioskApp({ user }: { user: KioskUser }) {
+  // The shared tablet is a Pro feature. The gate explains instead of erroring.
+  const { pro, loaded } = usePlan();
+  if (loaded && !pro) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="glass-card p-10 max-w-md text-center space-y-3">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-3xl">📟</div>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Kiosk režim</h1>
+            <ProBadge />
+          </div>
+          <p className="text-sm text-black/55">Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <KioskShiftProvider>
       <KioskShell user={user} />
