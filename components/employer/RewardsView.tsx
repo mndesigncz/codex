@@ -39,6 +39,25 @@ function RewardsViewInner() {
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState<Standing | null>(null); // employee being rated
   const [profileId, setProfileId] = useState<number | null>(null); // opened employee profile
+  // Rewards shop management + redemption queue.
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [newTitle, setNewTitle] = useState('');
+  const [newCost, setNewCost] = useState('');
+  const [newIcon, setNewIcon] = useState('🎁');
+  const loadShop = useCallback(() =>
+    fetch('/api/rewards/catalog').then(r => r.json()).then(d => {
+      setCatalog(Array.isArray(d.catalog) ? d.catalog : []);
+      setRedemptions(Array.isArray(d.redemptions) ? d.redemptions : []);
+    }).catch(() => {}), []);
+  useEffect(() => { loadShop(); }, [loadShop]);
+  const decide = async (id: number, action: 'approve' | 'decline') => {
+    const res = await fetch('/api/rewards/catalog', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action }),
+    }).catch(() => null);
+    if (res?.ok) { await loadShop(); load(); }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -77,7 +96,80 @@ function RewardsViewInner() {
       ) : loading ? (
         <div className="space-y-3">{[0, 1, 2].map(i => <div key={i} className="glass-card h-24 animate-pulse" />)}</div>
       ) : tab === 'board' ? (
+        <>
+        {redemptions.some(r => r.status === 'pending') && (
+          <div className="glass-card p-5 border border-[#C8F542]/30">
+            <p className="font-bold text-[#16181A] mb-2.5">🎁 Žádosti o odměny</p>
+            <div className="space-y-2">
+              {redemptions.filter(r => r.status === 'pending').map(r => (
+                <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5">
+                  <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">
+                    {r.employee_avatar ?? '👤'} <strong>{r.employee_name}</strong> · {r.title}
+                    <span className="text-black/40"> · {r.cost} b.</span>
+                  </span>
+                  <button onClick={() => decide(r.id, 'approve')}
+                    className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">Schválit ✓</button>
+                  <button onClick={() => decide(r.id, 'decline')}
+                    className="shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">Zamítnout</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <StandingsBoard standings={standings} onRate={setRating} onOpen={s => setProfileId(s.id)} />
+        <div className="glass-card p-5">
+          <p className="font-bold text-[#16181A] mb-1">🎁 Katalog odměn</p>
+          <p className="text-sm text-black/45 mb-3">Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.</p>
+          <div className="grid grid-cols-[56px_1fr_90px_auto] gap-2 mb-3">
+            <input value={newIcon} onChange={e => setNewIcon(e.target.value)} maxLength={4}
+              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2.5 text-center text-lg focus:outline-none focus:border-[#C8F542]/50" />
+            <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Např. Směna končí o hodinu dřív" maxLength={120}
+              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+            <input value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="body" type="number" inputMode="numeric" min={1}
+              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+            <button
+              onClick={async () => {
+                if (!newTitle.trim() || !Number(newCost)) return;
+                const res = await fetch('/api/rewards/catalog', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ manage: true, title: newTitle.trim(), cost: Number(newCost), icon: newIcon.trim() || null }),
+                }).catch(() => null);
+                if (res?.ok) { setNewTitle(''); setNewCost(''); await loadShop(); }
+              }}
+              disabled={!newTitle.trim() || !Number(newCost)}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
+              Přidat
+            </button>
+          </div>
+          {catalog.length === 0 ? (
+            <p className="text-sm text-black/40">Zatím žádné odměny — přidej první, ať mají body smysl.</p>
+          ) : (
+            <div className="divide-y divide-black/[0.05] rounded-2xl border border-black/[0.06] overflow-hidden">
+              {catalog.map(rw => (
+                <div key={rw.id} className={`flex items-center gap-3 px-4 py-2.5 ${rw.active === false ? 'opacity-50' : ''}`}>
+                  <span className="text-xl shrink-0">{rw.icon ?? '🎁'}</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">{rw.title}</span>
+                  <span className="shrink-0 text-xs text-black/45 tabular-nums">{rw.cost} b.</span>
+                  <button onClick={async () => {
+                    await fetch('/api/rewards/catalog', {
+                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ manage: true, id: rw.id, active: rw.active === false }),
+                    }).catch(() => null);
+                    await loadShop();
+                  }} className="shrink-0 rounded-full glass px-3 py-1 text-[11px] font-semibold text-black/50 hover:text-black transition">
+                    {rw.active === false ? 'Zapnout' : 'Vypnout'}
+                  </button>
+                  <button onClick={async () => {
+                    if (!confirm(`Smazat odměnu „${rw.title}"?`)) return;
+                    await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
+                    await loadShop();
+                  }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        </>
       ) : (
         <SettingsPanel levels={levels} points={points} onSaved={load} />
       )}

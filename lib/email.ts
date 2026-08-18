@@ -106,3 +106,19 @@ export async function sendOrderEmail(to: string, businessName: string, orderText
     `,
   });
 }
+
+export async function sendDigestEmail(to: string, businessName: string, dateLabel: string, html: string) {
+  await getResend().emails.send({
+    from: 'Pangea <onboarding@resend.dev>',
+    to,
+    subject: `Souhrn dne — ${businessName} · ${dateLabel}`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px;">
+        <h2 style="margin: 0 0 2px;">Souhrn dne · ${dateLabel}</h2>
+        <p style="color: #666; margin: 0 0 20px;">${businessName} — automaticky z aplikace Pangea.</p>
+        ${html}
+        <p style="color: #999; font-size: 12px; margin-top: 24px;">Denní souhrn chodí každý večer. Detaily najdete v aplikaci.</p>
+      </div>
+    `,
+  });
+}
