@@ -37,6 +37,10 @@ export interface Closing {
   diff_note?: string | null;
   // How the drawer was counted, when it was counted by denomination.
   denominations?: DenominationCounts | null;
+  // Cash carried out AFTER the drawer was counted — the end-of-shift
+  // "odlož přebytek do trezoru". Doesn't enter the expected/diff arithmetic
+  // (the count happens first); it only changes what the next shift takes over.
+  final_removal?: number | null;
 }
 
 /**
@@ -106,7 +110,7 @@ export function diffReasonLabel(id?: string | null): string | null {
  */
 export function explainDifference(
   diff: number,
-  c: ExpectedInput & { card_revenue?: number },
+  c: ExpectedInput & { card_revenue?: number; final_removal?: number | null },
   movements: Movement[] = [],
 ): string[] {
   const out: string[] = [];
@@ -130,6 +134,9 @@ export function explainDifference(
   }
   if (hit(c.card_revenue)) {
     out.push('Rozdíl přesně odpovídá tržbě kartou — nespletla se hotovost s kartou?');
+  }
+  if (d < 0 && hit(Number(c.final_removal) || 0)) {
+    out.push('Manko přesně odpovídá odvodu na konci — nezadal se stav kasy až po odložení ven? Kasa se počítá před odvodem.');
   }
   movements.forEach(m => {
     if (hit(m.amount)) {
@@ -183,6 +190,16 @@ export function expectedCash(c: ExpectedInput): number {
 //   > 0 přebytek (surplus), < 0 manko (shortage), 0 sedí (balanced).
 export function cashDifference(c: ExpectedInput & { closing_cash: number }): number {
   return c.closing_cash - expectedCash(c);
+}
+
+/**
+ * What physically stays in the drawer for the next shift: the counted cash
+ * minus the end-of-shift removal. This — not closing_cash — is the number the
+ * next closing should start from.
+ */
+export function cashLeft(c: { closing_cash: number; final_removal?: number | null }): number {
+  const removed = Number(c.final_removal) || 0;
+  return Math.max(0, Math.round((Number(c.closing_cash) || 0) - removed));
 }
 
 export type ExpectedLine = { label: string; amount: number; sign: 1 | -1 };

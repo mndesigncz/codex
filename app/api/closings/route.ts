@@ -337,9 +337,32 @@ export async function POST(request: Request) {
   const diffReason = b.diffReason ? String(b.diffReason).slice(0, 40) : null;
   const diffNote = b.diffNote ? String(b.diffNote).trim().slice(0, 500) || null : null;
   const denominations = normalizeDenominations(b.denominations);
+  // End-of-shift removal happens AFTER the count, so it can never exceed what
+  // was counted — clamp instead of trusting the client.
+  const finalRemoval = Math.min(
+    Math.max(0, Math.round(Number(b.finalRemoval) || 0)),
+    Math.max(0, num(b.closingCash)),
+  );
 
   let row: any;
   try {
+    [row] = await sql`
+      INSERT INTO cash_closings (
+        team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
+        tips_in_drawer, shift_employees, movements, diff_reason, diff_note, denominations, final_removal,
+        opening_cash, cash_revenue, card_revenue, tips, expenses,
+        cash_removed, self_payout, closing_cash, customers, notes
+      ) VALUES (
+        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+        ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
+        ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
+        ${JSON.stringify(denominations)}::jsonb, ${finalRemoval},
+        ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
+        ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+      ) RETURNING *`;
+  } catch {
+   try {
+    // final_removal not migrated yet.
     [row] = await sql`
       INSERT INTO cash_closings (
         team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
@@ -354,7 +377,7 @@ export async function POST(request: Request) {
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
-  } catch {
+   } catch {
     try {
       // tips_in_drawer / shift_employees not migrated yet.
       [row] = await sql`
@@ -380,6 +403,7 @@ export async function POST(request: Request) {
           ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
         ) RETURNING *`;
     }
+   }
   }
 
   // Notify team employers (except the author).

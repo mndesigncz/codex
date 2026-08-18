@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
 import {
   Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference,
+  cashLeft,
   MOVEMENT_KINDS, movementLabel, diffReasonLabel, hasDenominations,
 } from '@/lib/closing';
 import { useMoney } from '../CurrencyProvider';
@@ -103,11 +104,12 @@ export default function ClosingsOverview() {
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   const exportCsv = () => {
-    const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Zákazníků', 'Poznámka'];
+    const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka'];
     const rows = closings.map(c => [
       c.date, c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
       c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.tips_in_drawer ? 'ano' : 'ne', c.expenses,
       c.cash_removed, c.self_payout, c.closing_cash, expectedCash(c), cashDifference(c),
+      Number(c.final_removal) || 0, cashLeft(c),
       c.customers, (c.notes ?? '').replace(/\n/g, ' '),
     ]);
     const csv = [head, ...rows]
@@ -127,7 +129,7 @@ export default function ClosingsOverview() {
     card: a.card + c.card_revenue,
     tips: a.tips + c.tips,
     payout: a.payout + c.self_payout,
-    removed: a.removed + c.cash_removed,
+    removed: a.removed + c.cash_removed + (Number(c.final_removal) || 0),
     diff: a.diff + cashDifference(c),
   }), { cash: 0, card: 0, tips: 0, payout: 0, removed: 0, diff: 0 });
   const totalRevenue = totals.cash + totals.card;
@@ -459,6 +461,12 @@ export default function ClosingsOverview() {
                       </div>
                       <div className="flex justify-between gap-3 border-t border-black/[0.07] pt-2"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
                       <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(c.closing_cash)}</span></div>
+                      {(Number(c.final_removal) || 0) > 0 && (
+                        <>
+                          <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Odvod na konci směny</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">− {money(Number(c.final_removal))}</span></div>
+                          <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">V kase zůstalo na další směnu</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(cashLeft(c))}</span></div>
+                        </>
+                      )}
                       <div className={`flex justify-between gap-3 rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
                         <span className="font-medium min-w-0">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
                         <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{money(d)}</span>
