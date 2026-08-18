@@ -62,6 +62,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: true });
   }
 
+  // Send to the planning board — employer only. Creates a card and marks the
+  // suggestion as planned, so an accepted idea doesn't die in the list.
+  if (b.toPlanning) {
+    if (c.role !== 'employer') return NextResponse.json({ error: 'Jen vedení může plánovat.' }, { status: 403 });
+    const [full] = await sql`SELECT title, content FROM suggestions WHERE id = ${id}`;
+    if (!full) return NextResponse.json({ error: 'Podnět nenalezen' }, { status: 404 });
+    await sql`
+      INSERT INTO planning_cards (title, description, "column", position, created_by)
+      VALUES (${full.title}, ${full.content ?? null}, 'ideas', 0, ${c.meId})`;
+    await sql`UPDATE suggestions SET status = 'planned' WHERE id = ${id} AND team_id = ${c.teamId}`;
+    return NextResponse.json({ ok: true });
+  }
+
   // Change status — employer only.
   const status = String(b.status ?? '');
   if (STATUSES.includes(status as any)) {

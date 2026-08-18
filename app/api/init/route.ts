@@ -532,6 +532,14 @@ export async function GET() {
     // idempotent and never downgrades anyone).
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS plan TEXT`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP`;
+    // who clicked "Mám zájem o Pro" — demand signal until real billing exists
+    await sql`
+      CREATE TABLE IF NOT EXISTS billing_interest (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
     await sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`;
     // end-of-shift removal: cash carried out AFTER the drawer was counted
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`;
@@ -579,6 +587,9 @@ export async function GET() {
         UNIQUE (employee_id, work_date, kind, ref_id)
       )`;
     await sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`;
+    // per-step skip reasons on a run + which procedures are mandatory before the closing
+    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`;
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

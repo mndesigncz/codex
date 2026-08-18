@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import ShiftCalendar from './ShiftCalendar';
+import { usePlan, UpgradeModal } from '../Pro';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -169,6 +170,8 @@ export default function ScheduleBuilder({ user }: Props) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [publishNote, setPublishNote] = useState('');
+  const { pro } = usePlan();
+  const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const publish = async () => {
     setPublishing(true);
@@ -385,6 +388,7 @@ export default function ScheduleBuilder({ user }: Props) {
 
   // ---- CSV export ----
   const exportCsv = () => {
+    if (!pro) { setUpgradeFor('Export CSV'); return; }
     const header = 'datum,zaměstnanec,od,do,typ';
     const lines = shifts
       .slice()
@@ -575,10 +579,15 @@ export default function ScheduleBuilder({ user }: Props) {
         <>
           {/* Availability summary */}
           <div className="glass-card p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Icon name="users" size={20} className="text-black/70" />
-              <h2 className="font-bold text-[#16181A]">Dostupnost týmu</h2>
-              <span className="text-xs text-black/45">
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <Icon name="users" size={20} className="text-black/70 shrink-0" />
+                <h2 className="font-bold text-[#16181A] truncate">Dostupnost týmu</h2>
+              </div>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
+                submissions.length >= employees.length && employees.length > 0
+                  ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-black/[0.05] text-black/50'
+              }`}>
                 {submissions.length}/{employees.length} odesláno
               </span>
             </div>
@@ -586,30 +595,41 @@ export default function ScheduleBuilder({ user }: Props) {
               <p className="text-black/45 text-sm">Zatím nemáš v týmu žádné zaměstnance.</p>
             ) : (
               <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {submissions.map((s) => (
-                    <button
-                      key={s.employeeId}
-                      onClick={() => setExpanded(expanded === s.employeeId ? null : s.employeeId)}
-                      className={`flex items-center gap-2 max-w-full rounded-full pl-1.5 pr-3 py-1.5 text-sm border transition-all ${
-                        expanded === s.employeeId
-                          ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#16181A]'
-                          : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-black/80 hover:bg-[#C8F542]/15'
-                      }`}
-                    >
-                      <span className="text-base flex-shrink-0">{s.employeeAvatar}</span>
-                      <span className="min-w-0 truncate">{s.employeeName}</span>
-                      <Icon name="check" size={15} className="text-[#5B7A08] flex-shrink-0" />
-                    </button>
-                  ))}
+                {/* One row per person, responsive columns — readable at every width. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {submissions.map((s) => {
+                    const blocked = (s.unavailableDates ?? []).length;
+                    return (
+                      <button
+                        key={s.employeeId}
+                        onClick={() => setExpanded(expanded === s.employeeId ? null : s.employeeId)}
+                        className={`flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm border text-left transition-all ${
+                          expanded === s.employeeId
+                            ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#16181A]'
+                            : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-black/80 hover:bg-[#C8F542]/15'
+                        }`}
+                      >
+                        <span className="text-lg flex-shrink-0">{s.employeeAvatar}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{s.employeeName}</span>
+                          <span className="block text-[11px] text-black/45 truncate">
+                            {blocked === 0 ? 'bez omezení' : `nemůže ${blocked} ${blocked === 1 ? 'den' : blocked <= 4 ? 'dny' : 'dní'}`}
+                          </span>
+                        </span>
+                        <Icon name="check" size={15} className="text-[#5B7A08] flex-shrink-0" />
+                      </button>
+                    );
+                  })}
                   {notSubmitted.map((e) => (
                     <span
                       key={e.id}
-                      className="flex items-center gap-2 max-w-full rounded-full pl-1.5 pr-3 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45"
+                      className="flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45"
                     >
-                      <span className="text-base opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
-                      <span className="min-w-0 truncate">{e.name}</span>
-                      <span className="text-[11px] uppercase tracking-wide text-black/30 flex-shrink-0">čeká</span>
+                      <span className="text-lg opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{e.name}</span>
+                        <span className="block text-[11px] uppercase tracking-wide text-black/30">čeká na vyplnění</span>
+                      </span>
                     </span>
                   ))}
                 </div>
@@ -717,6 +737,7 @@ export default function ScheduleBuilder({ user }: Props) {
             )}
           </div>
 
+          {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
           {publishNote && (
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
               <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />

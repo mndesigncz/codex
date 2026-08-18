@@ -6,6 +6,7 @@ import { DEFAULT_POINTS, type RewardLevel, type PointsConfig } from '@/lib/rewar
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
 import EmployeeProfile from './EmployeeProfile';
+import { ProGate } from '../Pro';
 
 interface Standing {
   id: number; name: string; avatar?: string;
@@ -22,6 +23,15 @@ interface Standing {
 const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 export default function RewardsView({ user }: { user: { id?: string } }) {
+  // Rewards & levels are a Pro feature — the gate sells it instead of hiding it.
+  return (
+    <ProGate feature="Odměny a hodnocení" benefit="Body za směny, úrovně a žebříček motivace týmu — automaticky z hodnocení.">
+      <RewardsViewInner />
+    </ProGate>
+  );
+}
+
+function RewardsViewInner() {
   const [tab, setTab] = useState<'board' | 'calendar' | 'settings'>('board');
   const [standings, setStandings] = useState<Standing[]>([]);
   const [levels, setLevels] = useState<RewardLevel[]>([]);

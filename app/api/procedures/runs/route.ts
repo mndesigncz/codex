@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { normalizeSkipReasons, scoreRun } from '@/lib/procedureScoring';
+import { normalizePoints } from '@/lib/rewardLevels';
 import { resolveActingUser } from '@/lib/kioskActing';
 
 export const dynamic = 'force-dynamic';
@@ -34,6 +36,7 @@ function shapeActive(row: any) {
     totalItems: row.total_items ?? 0,
     startedAt: row.started_at,
     status: row.status,
+    skipReasons: row.skip_reasons && typeof row.skip_reasons === 'object' ? row.skip_reasons : {},
   };
 }
 
@@ -51,7 +54,7 @@ export async function GET(request: Request) {
     let row;
     try {
       [row] = await sql`
-        SELECT r.id, r.procedure_id, r.checked_items, r.skipped_items, r.total_items, r.status, r.started_at,
+        SELECT r.id, r.procedure_id, r.checked_items, r.skipped_items, r.skip_reasons, r.total_items, r.status, r.started_at,
                p.name, p.icon, p.color, p.items
         FROM procedure_runs r
         JOIN procedures p ON p.id = r.procedure_id
@@ -71,11 +74,31 @@ export async function GET(request: Request) {
     return NextResponse.json({ active: shapeActive(row) });
   }
 
+  // Today's completed runs for the WHOLE team — the closing form needs to know
+  // whether a required procedure was done by anyone on the shift, not just me.
+  if (searchParams.get('today') === 'team') {
+    const today = new Date().toISOString().slice(0, 10);
+    let rows: any[] = [];
+    try {
+      rows = await sql`
+        SELECT r.id, r.procedure_id, r.user_id, r.status, r.checked_items, r.skipped_items, r.total_items,
+               r.started_at, r.completed_at, p.name AS procedure_name, p.icon AS procedure_icon,
+               u.name AS user_name
+        FROM procedure_runs r
+        JOIN procedures p ON p.id = r.procedure_id
+        JOIN users u ON u.id = r.user_id
+        WHERE r.team_id = ${me.teamId}
+          AND to_char(COALESCE(r.completed_at, r.started_at), 'YYYY-MM-DD') = ${today}
+        ORDER BY COALESCE(r.completed_at, r.started_at) DESC`;
+    } catch { rows = []; }
+    return NextResponse.json({ runs: rows });
+  }
+
   if (me.role === 'employer') {
     let runs;
     try {
       runs = await sql`
-        SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.skipped_items, r.total_items, r.status,
+        SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.skipped_items, r.skip_reasons, r.total_items, r.status,
                r.started_at, r.completed_at, r.duration_seconds,
                p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
                u.name AS user_name, u.avatar AS user_avatar
@@ -104,7 +127,7 @@ export async function GET(request: Request) {
   let runs;
   try {
     runs = await sql`
-      SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.skipped_items, r.total_items, r.status,
+      SELECT r.id, r.procedure_id, r.user_id, r.checked_items, r.skipped_items, r.skip_reasons, r.total_items, r.status,
              r.started_at, r.completed_at, r.duration_seconds,
              p.name AS procedure_name, p.icon AS procedure_icon, p.color AS procedure_color,
              u.name AS user_name, u.avatar AS user_avatar
@@ -214,6 +237,7 @@ export async function PATCH(request: Request) {
   const checked = cleanIndices(body.checkedItems);
   // A step can't be both done and skipped — done wins.
   const skipped = cleanIndices(body.skippedItems).filter(i => !checked.includes(i));
+  const skipReasons = normalizeSkipReasons(body.skipReasons);
 
   if (body.complete) {
     let updated;
@@ -221,17 +245,28 @@ export async function PATCH(request: Request) {
       [updated] = await sql`
         UPDATE procedure_runs
         SET checked_items = ${JSON.stringify(checked)}, skipped_items = ${JSON.stringify(skipped)},
+            skip_reasons = ${JSON.stringify(skipReasons)}::jsonb,
             status = 'completed', completed_at = NOW(),
             duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
         WHERE id = ${runId}
         RETURNING id, procedure_id, checked_items, skipped_items, total_items, status, started_at, completed_at, duration_seconds`;
     } catch {
+     try {
+      [updated] = await sql`
+        UPDATE procedure_runs
+        SET checked_items = ${JSON.stringify(checked)}, skipped_items = ${JSON.stringify(skipped)},
+            status = 'completed', completed_at = NOW(),
+            duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
+        WHERE id = ${runId}
+        RETURNING id, procedure_id, checked_items, skipped_items, total_items, status, started_at, completed_at, duration_seconds`;
+     } catch {
       [updated] = await sql`
         UPDATE procedure_runs
         SET checked_items = ${JSON.stringify(checked)}, status = 'completed', completed_at = NOW(),
             duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int
         WHERE id = ${runId}
         RETURNING id, procedure_id, checked_items, total_items, status, started_at, completed_at, duration_seconds`;
+     }
     }
 
     // Notify the team owner (employer) — flag any steps that weren't completed.
@@ -257,6 +292,22 @@ export async function PATCH(request: Request) {
         link: '/employer/overview?view=procedures',
       });
     }
+
+    // ---- Automatic points: score the run from step weights and skip reasons,
+    // and write it into the same per-item ledger the review modal edits. A row
+    // the employer already touched wins (ON CONFLICT DO NOTHING).
+    try {
+      const [proc] = await sql`SELECT items FROM procedures WHERE id = ${run.procedure_id}`;
+      const [teamCfg] = await sql`SELECT points_config FROM teams WHERE id = ${run.team_id}`;
+      const cfg = normalizePoints(teamCfg?.points_config);
+      const score = scoreRun(proc?.items, checked, skipped, skipReasons, cfg.procedure);
+      const workDate = new Date().toISOString().slice(0, 10);
+      await sql`
+        INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by)
+        VALUES (${run.team_id}, ${run.user_id}, ${workDate}, 'procedure', ${runId},
+                ${score.points}, ${score.summary}, ${score.flagged}, NULL)
+        ON CONFLICT (employee_id, work_date, kind, ref_id) DO NOTHING`;
+    } catch { /* auto-scoring is additive — never block completing a run */ }
 
     return NextResponse.json({ run: updated });
   }

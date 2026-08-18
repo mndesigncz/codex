@@ -93,6 +93,7 @@ export default function Settings({ user, initialTab }: Props) {
   const { update } = useSession();
   const { theme, setTheme } = useTheme();
   const [section, setSection] = useState<SectionId>(initialTab ?? 'account');
+  const [interestSent, setInterestSent] = useState(false);
 
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
@@ -595,9 +596,23 @@ export default function Settings({ user, initialTab }: Props) {
                   </p>
                 )}
                 <p className="mt-4 text-sm text-black/55 rounded-2xl bg-black/[0.03] border border-black/[0.07] px-4 py-3">
-                  Platby teprve připravujeme — <strong className="text-[#16181A]">během beta období nic neomezujeme</strong> a
-                  všechny funkce jsou odemčené pro všechny. Až se to změní, dáme vědět s předstihem.
+                  Plán <strong className="text-[#16181A]">Zdarma platí napořád</strong> — směny, uzávěrky, úkoly, chat i sklad
+                  v něm fungují bez omezení času. Pro odemyká větší tým, kiosk, odměny, exporty, měsíční přehled a vlastní
+                  vzhled sdílených stránek. Online platby teprve připravujeme.
                 </p>
+                {plan?.effective !== 'pro' || plan?.trialing ? (
+                  <button
+                    onClick={async () => {
+                      if (interestSent) return;
+                      const res = await fetch('/api/billing/interest', { method: 'POST' }).catch(() => null);
+                      if (res?.ok) setInterestSent(true);
+                    }}
+                    className={`mt-3 w-full sm:w-auto rounded-full px-6 py-3 text-sm font-semibold transition ${
+                      interestSent ? 'bg-[#C8F542]/20 text-[#5B7A08] cursor-default' : 'bg-[#16181A] text-white hover:bg-black'
+                    }`}>
+                    {interestSent ? 'Díky! Ozveme se, až půjde Pro zaplatit ✓' : 'Mám zájem o Pro — dejte mi vědět'}
+                  </button>
+                ) : null}
               </div>
 
               {/* Plan comparison */}

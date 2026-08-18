@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
+import { usePlan, ProBadge, UpgradeModal } from '../Pro';
 import {
   type ShareLink, type ShareTheme, DEFAULT_THEME, THEME_PRESETS, normalizeTheme,
 } from '@/lib/share';
@@ -19,6 +20,8 @@ type GuideCat = { id: number; name: string };
 export default function ShareSettings() {
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [theme, setTheme] = useState<ShareTheme>(DEFAULT_THEME);
+  const { pro } = usePlan();
+  const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   const [cats, setCats] = useState<CategoryNode[]>([]);
   const [guideCats, setGuideCats] = useState<GuideCat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +199,16 @@ export default function ShareSettings() {
       )}
 
       {/* ---- Look of the pages ---- */}
+      {!pro ? (
+        <button onClick={() => setUpgradeFor('Vlastní vzhled sdílených stránek')}
+          className="w-full glass-card p-6 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
+          <div className="min-w-0">
+            <p className="font-bold text-[#16181A] flex items-center gap-2"><Icon name="sun" size={17} className="text-[#5B7A08]" /> Vzhled sdílených stránek <ProBadge /></p>
+            <p className="text-sm text-black/45 mt-0.5">Barvy, logo a patička podle vašeho podniku.</p>
+          </div>
+          <span className="shrink-0 text-2xl">🔒</span>
+        </button>
+      ) : (
       <div className="glass-card p-6 space-y-4">
         <div>
           <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
@@ -276,6 +289,8 @@ export default function ShareSettings() {
           </div>
         </div>
       </div>
+      )}
+      {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
     </div>
   );
 }
@@ -371,6 +386,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove }: {
           </button>
         </div>
       )}
+
     </div>
   );
 }

@@ -61,16 +61,26 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     [updated] = await sql`
       UPDATE procedures
       SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
+          remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}, remind_anchor = ${remindAnchor},
+          require_before_closing = ${body.requireBeforeClosing === true}
+      WHERE id = ${id}
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor", require_before_closing AS "requireBeforeClosing"`;
+  } catch {
+   try {
+    [updated] = await sql`
+      UPDATE procedures
+      SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
           remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}, remind_anchor = ${remindAnchor}
       WHERE id = ${id}
       RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"`;
-  } catch {
+   } catch {
     [updated] = await sql`
       UPDATE procedures
       SET name = ${name}, description = ${description}, icon = ${icon}, color = ${color}, items = ${JSON.stringify(items)},
           remind_at = ${remindAt}, remind_days = ${JSON.stringify(remindDays)}
       WHERE id = ${id}
       RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays"`;
+   }
   }
 
   return NextResponse.json({ procedure: updated });

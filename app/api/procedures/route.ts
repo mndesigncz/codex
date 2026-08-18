@@ -40,13 +40,21 @@ export async function GET() {
   try {
     procedures = await sql`
       SELECT id, name, description, icon, color, items,
-             remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"
+             remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor",
+             require_before_closing AS "requireBeforeClosing"
       FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
   } catch {
+   try {
+    procedures = await sql`
+      SELECT id, name, description, icon, color, items,
+             remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"
+      FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
+   } catch {
     procedures = await sql`
       SELECT id, name, description, icon, color, items,
              remind_at AS "remindAt", remind_days AS "remindDays"
       FROM procedures WHERE team_id = ${me.teamId} ORDER BY created_at ASC`;
+   }
   }
 
   // Does the current user work today? (kiosk = shared device, always yes.)
@@ -96,9 +104,9 @@ export async function POST(request: Request) {
   let created: any;
   try {
     [created] = await sql`
-      INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, remind_anchor, created_by)
-      VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${remindAnchor}, ${me.id})
-      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor"`;
+      INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, remind_anchor, require_before_closing, created_by)
+      VALUES (${me.teamId}, ${name}, ${description}, ${icon}, ${color}, ${JSON.stringify(items)}, ${remindAt}, ${JSON.stringify(remindDays)}, ${remindAnchor}, ${body.requireBeforeClosing === true}, ${me.id})
+      RETURNING id, name, description, icon, color, items, remind_at AS "remindAt", remind_days AS "remindDays", remind_anchor AS "remindAnchor", require_before_closing AS "requireBeforeClosing"`;
   } catch {
     [created] = await sql`
       INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, created_by)

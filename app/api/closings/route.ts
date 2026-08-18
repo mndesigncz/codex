@@ -332,6 +332,26 @@ export async function POST(request: Request) {
     }
   } catch { /* shifts table issue — the author alone owns the closing */ }
 
+  // Required procedures gate the closing server-side too — the client check
+  // alone would be decorative. Employers may override (they confirmed in UI).
+  if (!isEmployer) {
+    try {
+      const req = await sql`
+        SELECT p.id, p.name FROM procedures p
+        WHERE p.team_id = ${c.teamId} AND p.require_before_closing = TRUE
+          AND NOT EXISTS (
+            SELECT 1 FROM procedure_runs r
+            WHERE r.procedure_id = p.id AND r.team_id = ${c.teamId} AND r.status = 'completed'
+              AND to_char(r.completed_at, 'YYYY-MM-DD') = ${date}
+          )`;
+      if ((req as any[]).length > 0) {
+        return NextResponse.json({
+          error: `Nejdřív dokonči povinné postupy: ${(req as any[]).map((r: any) => r.name).join(', ')}.`,
+        }, { status: 400 });
+      }
+    } catch { /* column not migrated yet — don't block */ }
+  }
+
   // Itemised movements and the reason for a mismatch travel with the closing.
   const movements = normalizeMovements(b.movements);
   const diffReason = b.diffReason ? String(b.diffReason).slice(0, 40) : null;

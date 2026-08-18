@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { planInfoOf, PLAN_ENFORCED, LIMITS, SHARE_LIMIT_MSG } from '@/lib/plan';
 import { makeToken, normalizeExcluded, normalizeTheme } from '@/lib/share';
 
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,19 @@ export async function POST(request: Request) {
   const note = b.note ? String(b.note).trim().slice(0, 500) || null : null;
 
   try {
+
+  // Free plan: one active link is included; more (and theming) is Pro.
+  if (PLAN_ENFORCED && LIMITS.free.shareLinks != null) {
+    const plan = await teamPlan(sql, me.teamId);
+    if (plan.effective === 'free') {
+      try {
+        const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM share_links WHERE team_id = ${me.teamId} AND enabled = TRUE`;
+        if ((n ?? 0) >= LIMITS.free.shareLinks) {
+          return NextResponse.json({ error: SHARE_LIMIT_MSG }, { status: 403 });
+        }
+      } catch { /* table missing — nothing to limit */ }
+    }
+  }
     const [row] = await sql`
       INSERT INTO share_links (team_id, token, kind, category_id, excluded, title, note, created_by)
       VALUES (${me.teamId}, ${makeToken()}, ${kind}, ${categoryId},
@@ -87,9 +101,23 @@ export async function PATCH(request: Request) {
   const b = await request.json();
   const theme = normalizeTheme(b.theme);
   try {
+
+  {
+    const plan = await teamPlan(sql, me.teamId);
+    if (PLAN_ENFORCED && plan.effective === 'free') {
+      return NextResponse.json({ error: 'Vlastní vzhled sdílených stránek je součástí plánu Pro.' }, { status: 403 });
+    }
+  }
     await sql`UPDATE teams SET share_theme = ${JSON.stringify(theme)}::jsonb WHERE id = ${me.teamId}`;
     return NextResponse.json({ ok: true, theme });
   } catch {
     return NextResponse.json({ error: 'Vzhled sdílení není dostupný — spusť /api/init.' }, { status: 400 });
   }
+}
+
+async function teamPlan(sql: any, teamId: number) {
+  try {
+    const [row] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
+    return planInfoOf(row);
+  } catch { return planInfoOf(null); }
 }

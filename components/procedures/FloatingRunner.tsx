@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProcedures } from './ProcedureProvider';
 import { parseSteps } from '@/lib/steps';
+import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
 
 function fmt(sec: number) {
@@ -59,11 +60,14 @@ function Confetti() {
 }
 
 export default function FloatingRunner() {
-  const { active, justCompleted, syncFailed, toggleItem, toggleSkip, complete, cancel, dismissCelebration } = useProcedures();
+  const { active, justCompleted, syncFailed, toggleItem, toggleSkip, setSkipReason, complete, cancel, dismissCelebration } = useProcedures();
   const [minimized, setMinimized] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [completing, setCompleting] = useState(false);
+  // Skipping asks WHY — the reason decides whether it costs points.
+  const [skipFor, setSkipFor] = useState<number | null>(null);
+  const [skipNote, setSkipNote] = useState('');
   const elapsed = useElapsed(active?.startedAt);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -262,11 +266,42 @@ export default function FloatingRunner() {
                     ...Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const])),
                   }}
                   onToggle={toggleItem}
-                  onSkip={toggleSkip}
+                  onSkip={(i) => {
+                    if (active.skippedItems.includes(i)) toggleSkip(i);
+                    else { setSkipFor(i); setSkipNote(''); }
+                  }}
                   interactive
                   compact
                 />
               </div>
+
+              {skipFor != null && (
+                <div className="px-3.5 pb-2">
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-3 space-y-2">
+                    <p className="text-xs font-semibold text-amber-700">Proč krok přeskakuješ?</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SKIP_REASONS.map(r => (
+                        <button key={r.id} type="button"
+                          onClick={() => {
+                            if (r.id === 'other' && !skipNote.trim()) return;
+                            toggleSkip(skipFor);
+                            setSkipReason(skipFor, r.id, r.id === 'other' ? skipNote.trim() : undefined);
+                            setSkipFor(null);
+                          }}
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                            r.excused ? 'bg-white/70 text-[#5B7A08] border border-[#C8F542]/40' : 'bg-white/70 text-black/60 border border-black/10'
+                          } hover:brightness-105 ${r.id === 'other' && !skipNote.trim() ? 'opacity-50' : ''}`}>
+                          {r.label}{r.excused ? '' : ' (−body)'}
+                        </button>
+                      ))}
+                    </div>
+                    <input value={skipNote} onChange={e => setSkipNote(e.target.value)} maxLength={200}
+                      placeholder={'U „Jiný důvod" napiš proč…'}
+                      className="w-full rounded-xl bg-white/70 border border-black/10 px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+                    <button type="button" onClick={() => setSkipFor(null)} className="text-[11px] text-black/40 hover:text-black">Zrušit</button>
+                  </div>
+                </div>
+              )}
 
               {/* Footer / complete */}
               <div className="px-3 pb-3 pt-1 space-y-2">

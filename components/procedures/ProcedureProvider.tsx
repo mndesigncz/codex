@@ -12,6 +12,8 @@ export interface ActiveRun {
   items: any[];
   checkedItems: number[];
   skippedItems: number[];
+  /** index → why it was skipped (drives automatic points). */
+  skipReasons: Record<string, { reason: string; note?: string }>;
   totalItems: number;
   startedAt: string;
   status: string;
@@ -38,6 +40,8 @@ export interface Celebration {
 }
 
 interface ProcedureCtx {
+  /** Record why a step was skipped; empty reason removes the record. */
+  setSkipReason: (index: number, reason: string, note?: string) => void;
   active: ActiveRun | null;
   /** True when a tick didn't reach the server. The run is still safe locally,
    *  but the employer wouldn't see it — so the runner has to say so. */
@@ -73,7 +77,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch('/api/procedures/runs?active=1');
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.active) setActive(data.active as ActiveRun);
+        if (!cancelled && data.active) setActive({ skipReasons: {}, ...(data.active as any) } as ActiveRun);
       } catch {
         /* offline — ignore */
       }
@@ -89,14 +93,14 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
     } catch { /* ignore */ }
   }, [active]);
 
-  const persist = useCallback((runId: number, checkedItems: number[], skippedItems: number[]) => {
+  const persist = useCallback((runId: number, checkedItems: number[], skippedItems: number[], skipReasons?: Record<string, { reason: string; note?: string }>) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
         const res = await fetch('/api/procedures/runs', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ runId, checkedItems, skippedItems }),
+          body: JSON.stringify({ runId, checkedItems, skippedItems, skipReasons }),
         });
         // A whole opening procedure can be ticked off without a single write
         // landing; the person doing it has to find out before they walk away.
@@ -119,7 +123,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.active) {
         setJustCompleted(null);
-        setActive(data.active as ActiveRun);
+        setActive({ skipReasons: {}, ...(data.active as any) } as ActiveRun);
       } else {
         // Nothing opened — without this the button looks simply dead.
         setSyncFailed(true);
@@ -140,8 +144,10 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
         : [...prev.checkedItems, index].sort((a, b) => a - b);
       // Marking a step done clears any "skipped" flag on it.
       const skippedItems = has ? prev.skippedItems : prev.skippedItems.filter(i => i !== index);
-      persist(prev.id, checkedItems, skippedItems);
-      return { ...prev, checkedItems, skippedItems };
+      const skipReasons = { ...prev.skipReasons };
+      if (!has) delete skipReasons[String(index)];
+      persist(prev.id, checkedItems, skippedItems, skipReasons);
+      return { ...prev, checkedItems, skippedItems, skipReasons };
     });
   }, [persist]);
 
@@ -155,8 +161,21 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
         : [...prev.skippedItems, index].sort((a, b) => a - b);
       // Skipping a step clears any "done" flag on it.
       const checkedItems = has ? prev.checkedItems : prev.checkedItems.filter(i => i !== index);
-      persist(prev.id, checkedItems, skippedItems);
-      return { ...prev, checkedItems, skippedItems };
+      const skipReasons = { ...prev.skipReasons };
+      if (has) delete skipReasons[String(index)];
+      persist(prev.id, checkedItems, skippedItems, skipReasons);
+      return { ...prev, checkedItems, skippedItems, skipReasons };
+    });
+  }, [persist]);
+
+  const setSkipReason = useCallback((index: number, reason: string, note?: string) => {
+    setActive(prev => {
+      if (!prev) return prev;
+      const skipReasons = { ...prev.skipReasons };
+      if (reason) skipReasons[String(index)] = note ? { reason, note } : { reason };
+      else delete skipReasons[String(index)];
+      persist(prev.id, prev.checkedItems, prev.skippedItems, skipReasons);
+      return { ...prev, skipReasons };
     });
   }, [persist]);
 
@@ -175,7 +194,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch('/api/procedures/runs', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId: snapshot.id, checkedItems: snapshot.checkedItems, skippedItems: snapshot.skippedItems, complete: true }),
+        body: JSON.stringify({ runId: snapshot.id, checkedItems: snapshot.checkedItems, skippedItems: snapshot.skippedItems, skipReasons: snapshot.skipReasons, complete: true }),
       });
       const data = await res.json();
       const duration = res.ok && data.run?.duration_seconds != null
@@ -206,7 +225,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   const dismissCelebration = useCallback(() => setJustCompleted(null), []);
 
   return (
-    <Ctx.Provider value={{ active, justCompleted, starting, syncFailed, startRun, toggleItem, toggleSkip, complete, cancel, dismissCelebration }}>
+    <Ctx.Provider value={{ active, justCompleted, starting, syncFailed, startRun, toggleItem, toggleSkip, complete, cancel, dismissCelebration , setSkipReason }}>
       {children}
       <ReminderWatcher />
     </Ctx.Provider>
