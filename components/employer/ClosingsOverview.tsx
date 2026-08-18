@@ -119,6 +119,37 @@ export default function ClosingsOverview() {
   const topLevel = listed.filter(c => !c.covered_by);
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
+  // One file the accountant can work with: per-day rows + the month's summary.
+  const exportAccountant = () => {
+    if (!pro) { setUpgradeFor('Export pro účetní'); return; }
+    const head = ['Datum', 'Tržba hotově', 'Tržba kartou', 'Tržba celkem', 'Spropitné', 'Výdaje z kasy', 'Odvedeno', 'Vyplaceno hotově'];
+    const byDay = new Map<string, { cash: number; card: number; tips: number; exp: number; rem: number; pay: number }>();
+    closings.forEach(c => {
+      const d = byDay.get(c.date) ?? { cash: 0, card: 0, tips: 0, exp: 0, rem: 0, pay: 0 };
+      d.cash += c.cash_revenue; d.card += c.card_revenue; d.tips += c.tips;
+      d.exp += c.expenses; d.rem += c.cash_removed + (Number(c.final_removal) || 0); d.pay += c.self_payout;
+      byDay.set(c.date, d);
+    });
+    const rows = Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, d]) => [date, d.cash, d.card, d.cash + d.card, d.tips, d.exp, d.rem, d.pay]);
+    const summary = [
+      [], ['SOUHRN OBDOBÍ', month === 'all' ? 'vše' : month],
+      ['Tržby celkem', totalRevenue],
+      ['Mzdové náklady (z docházky)', laborCost],
+      ['Nákupy zboží (přijaté objednávky)', purchases],
+      ['Provozní výsledek (orientační)', operating],
+    ];
+    const csv = [head, ...rows, ...summary]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+      .join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `ucetni-podklad${month === 'all' ? '' : '-' + month}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
     const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka'];
@@ -411,10 +442,16 @@ export default function ClosingsOverview() {
             <Icon name="plus" size={16} /> Nová uzávěrka
           </button>
           {topLevel.length > 0 && (
-            <button onClick={exportCsv}
-              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
-              Export CSV ↓
-            </button>
+            <>
+              <button onClick={exportCsv}
+                className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
+                Export CSV ↓
+              </button>
+              <button onClick={exportAccountant}
+                className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
+                🧾 Pro účetní ↓
+              </button>
+            </>
           )}
         </div>
       </div>

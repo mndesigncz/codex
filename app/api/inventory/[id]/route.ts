@@ -283,6 +283,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  // Customer-facing badge on the share page.
+  if (body.highlight !== undefined) {
+    const h = body.highlight === 'new' || body.highlight === 'tip' ? body.highlight : null;
+    try {
+      await sql`UPDATE inventory_items SET highlight = ${h} WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+    } catch { /* not migrated yet */ }
+  }
+
   // Visibility on the "Vše" overview is employer configuration.
   if (body.hideFromOverview !== undefined) {
     try {

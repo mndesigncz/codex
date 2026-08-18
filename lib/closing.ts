@@ -37,6 +37,9 @@ export interface Closing {
   diff_note?: string | null;
   // How the drawer was counted, when it was counted by denomination.
   denominations?: DenominationCounts | null;
+  // Structured note for whoever opens tomorrow. Lives on the closing because
+  // the closing IS the end of the shift.
+  handover?: Handover | null;
   // Cash carried out AFTER the drawer was counted — the end-of-shift
   // "odlož přebytek do trezoru". Doesn't enter the expected/diff arithmetic
   // (the count happens first); it only changes what the next shift takes over.
@@ -263,4 +266,25 @@ export function sumDenominations(counts: DenominationCounts): number {
 
 export function hasDenominations(counts: DenominationCounts | null | undefined): boolean {
   return !!counts && Object.keys(counts).length > 0;
+}
+
+// ---- Shift handover ---------------------------------------------------------
+
+export interface Handover {
+  /** What didn't get finished and needs doing. */
+  todo?: string;
+  /** What is running out / needs ordering. */
+  runningOut?: string;
+  /** Anything else the next shift should know. */
+  message?: string;
+}
+
+export function normalizeHandover(raw: any): Handover | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const pick = (k: string) => String(raw[k] ?? '').trim().slice(0, 500);
+  const h: Handover = {};
+  if (pick('todo')) h.todo = pick('todo');
+  if (pick('runningOut')) h.runningOut = pick('runningOut');
+  if (pick('message')) h.message = pick('message');
+  return Object.keys(h).length ? h : null;
 }

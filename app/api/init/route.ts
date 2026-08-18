@@ -602,6 +602,21 @@ export async function GET() {
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
     // one share link can be pinned to every dashboard (including the kiosk)
     await sql`ALTER TABLE share_links ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`;
+    // customer-facing "novinka / tip" badge on share pages
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS highlight TEXT`;
+    // structured shift handover, stored with the closing that ends the shift
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS handover JSONB`;
+    // stocktakes: one row per counted inventory session
+    await sql`
+      CREATE TABLE IF NOT EXISTS stocktakes (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        data JSONB NOT NULL DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT NOW(),
+        completed_at TIMESTAMP
+      )`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

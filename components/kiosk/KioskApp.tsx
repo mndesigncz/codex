@@ -140,6 +140,7 @@ function KioskHomeExtras() {
   const [roster, setRoster] = useState<any[]>([]);
   const [required, setRequired] = useState<{ id: number; name: string; icon?: string; done: boolean }[]>([]);
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
+  const [handover, setHandover] = useState<any | null>(null);
 
   useEffect(() => {
     fetch('/api/attendance').then(r => r.json())
@@ -147,6 +148,9 @@ function KioskHomeExtras() {
       .catch(() => {});
     fetch('/api/teams').then(r => r.json())
       .then(d => setPinnedShare(d?.pinnedShare ?? null))
+      .catch(() => {});
+    fetch('/api/closings/handover').then(r => r.json())
+      .then(d => setHandover(d?.handover ? d : null))
       .catch(() => {});
     Promise.all([
       fetch('/api/procedures').then(r => r.json()).catch(() => ({})),
@@ -165,6 +169,18 @@ function KioskHomeExtras() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {handover && (
+        <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
+            🤝 Předávka od {handover.authorName ?? 'předchozí směny'}
+          </p>
+          <div className="space-y-1.5 text-sm text-[#16181A]">
+            {handover.handover.todo && <p>🔧 <span className="text-black/70">{handover.handover.todo}</span></p>}
+            {handover.handover.runningOut && <p>📦 <span className="text-black/70">{handover.handover.runningOut}</span></p>}
+            {handover.handover.message && <p>💬 <span className="text-black/70">{handover.handover.message}</span></p>}
+          </div>
+        </div>
+      )}
       {roster.length > 0 && (
         <div className="glass-card p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📅 Dnešní směny</p>

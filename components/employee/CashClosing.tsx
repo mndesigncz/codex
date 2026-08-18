@@ -306,6 +306,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // End-of-shift removal: how much stays in the drawer for the next shift.
   // Empty = everything stays (no removal). The removal itself is derived.
   const [leaveCash, setLeaveCash] = useState('');
+  // Structured handover for the next shift.
+  const [hoTodo, setHoTodo] = useState('');
+  const [hoRunningOut, setHoRunningOut] = useState('');
+  const [hoMessage, setHoMessage] = useState('');
   const money = useMoney();
   const symbol = useSymbol();
   const { currency } = useCurrency();
@@ -490,6 +494,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           movements, diffReason: diffReason || null, diffNote: diffNote || null,
           denominations: countMode ? denoms : null,
           finalRemoval,
+          handover: (hoTodo.trim() || hoRunningOut.trim() || hoMessage.trim())
+            ? { todo: hoTodo.trim(), runningOut: hoRunningOut.trim(), message: hoMessage.trim() }
+            : null,
           employeeId: isSelf ? undefined : selEmployee,
           coworkers: includedCoworkers,
         }),
@@ -502,6 +509,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         setCoworkerSel({});
         setDenoms({});
         setLeaveCash('');
+        setHoTodo(''); setHoRunningOut(''); setHoMessage('');
         setMovements([]);
         setDiffReason(''); setDiffNote('');
         setPayoutFromRegister(teamPayoutFromRegister);
@@ -1048,6 +1056,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               )}
             </div>
           )}
+
+          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-black/45">🤝 Předávka pro další směnu <span className="normal-case font-normal text-black/35">(nepovinné — uvidí ji tým na přehledu a tabletu)</span></p>
+            <input value={hoTodo} onChange={e => setHoTodo(e.target.value)} maxLength={500}
+              placeholder="Co zbývá dodělat…"
+              className={inputClass} />
+            <input value={hoRunningOut} onChange={e => setHoRunningOut(e.target.value)} maxLength={500}
+              placeholder="Co dochází / objednat…"
+              className={inputClass} />
+            <input value={hoMessage} onChange={e => setHoMessage(e.target.value)} maxLength={500}
+              placeholder="Vzkaz pro další směnu…"
+              className={inputClass} />
+          </div>
 
           <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Poznámka</label>
           <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />

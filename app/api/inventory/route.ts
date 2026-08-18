@@ -41,6 +41,7 @@ export async function GET() {
         i.open_amount       AS "openAmount",
         i.brand, i.description, i.archived,
         i.hide_from_overview AS "hideFromOverview",
+        i.highlight,
         i.approved, i.submitted_by AS "submittedBy",
         i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",

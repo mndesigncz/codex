@@ -34,6 +34,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [reviews, setReviews] = useState<ShiftReview[]>([]);
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
+  const [myEntries, setMyEntries] = useState<any[]>([]);
+  const [handover, setHandover] = useState<any | null>(null);
   const [unseenFlagged, setUnseenFlagged] = useState(0);
   const [cfg, setCfg] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,9 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         ]);
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
         setPinnedShare(tm?.pinnedShare ?? null);
+        setMyEntries(Array.isArray(att?.entries) ? att.entries : []);
+        fetch('/api/closings/handover').then(r => r.json())
+          .then(d => setHandover(d?.handover ? d : null)).catch(() => {});
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));
         setTasks(Array.isArray(tk) ? tk : []);
@@ -129,7 +134,55 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   }
 
   // Named blocks; the employer-approved layout decides order and presence.
+  // This month in numbers, for the person themselves.
+  const monthPrefix = new Date().toISOString().slice(0, 7);
+  const monthHours = myEntries.reduce((sum: number, e: any) => {
+    if (!e.clockOut || String(e.clockIn).slice(0, 7) !== monthPrefix) return sum;
+    const h = (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
+    return h > 0 && h < 24 ? sum + h : sum;
+  }, 0);
+  const monthRatings = reviews.filter(r => String(r.work_date ?? '').slice(0, 7) === monthPrefix && Number(r.rating) > 0);
+  const monthAvg = monthRatings.length
+    ? monthRatings.reduce((s2, r) => s2 + Number(r.rating), 0) / monthRatings.length
+    : null;
+  const fmtH = (h: number) => {
+    const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+    return mm ? `${hh} h ${mm} m` : `${hh} h`;
+  };
+
   const blocks: Record<string, React.ReactNode> = {
+    handover: handover ? (
+      <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
+          🤝 Předávka od {handover.authorName ?? 'předchozí směny'}
+          <span className="normal-case font-normal text-black/35"> · {new Date(handover.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}</span>
+        </p>
+        <div className="space-y-1.5 text-sm text-[#16181A]">
+          {handover.handover.todo && <p>🔧 <span className="text-black/70">{handover.handover.todo}</span></p>}
+          {handover.handover.runningOut && <p>📦 <span className="text-black/70">{handover.handover.runningOut}</span></p>}
+          {handover.handover.message && <p>💬 <span className="text-black/70">{handover.handover.message}</span></p>}
+        </div>
+      </div>
+    ) : null,
+    monthly: (monthHours > 0 || monthRatings.length > 0) ? (
+      <div className="glass-card p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📆 Tenhle měsíc</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Odpracováno</p>
+            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{fmtH(monthHours)}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Hodnocených směn</p>
+            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5">{monthRatings.length}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Průměr hodnocení</p>
+            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? `★ ${monthAvg.toFixed(1)}` : '—'}</p>
+          </div>
+        </div>
+      </div>
+    ) : null,
     sharedLink: pinnedShare ? (
       <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
         className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
