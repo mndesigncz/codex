@@ -271,7 +271,7 @@ export default function CategoryStockView({
                           {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                         </p>
                         {st !== 'ok' && (
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
                             {st === 'critical' ? 'Dochází' : 'Málo'}
                           </span>
                         )}
@@ -319,7 +319,7 @@ export default function CategoryStockView({
                       {i.name}
                       {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                       {showHeadings && i.category && i.category !== category && (
-                        <span className="ml-2 rounded-full bg-black/[0.05] px-2 py-0.5 text-[10px] font-medium text-black/45 align-middle">{i.category}</span>
+                        <span className="ml-2 rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] font-medium text-black/45 align-middle">{i.category}</span>
                       )}
                     </p>
                     <p className="text-xs text-black/45 tabular-nums mt-0.5">
@@ -335,7 +335,7 @@ export default function CategoryStockView({
                       </span>
                     )}
                     {st !== 'ok' && (
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
                         {st === 'critical' ? 'Dochází' : 'Málo'}
                       </span>
                     )}

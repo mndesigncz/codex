@@ -60,12 +60,19 @@ export default function NotificationBell() {
     return () => clearInterval(t);
   }, [role, loadFeedback]);
 
+  // Latest open/unread for the outside-click closer (registered once).
+  const stateRef = useRef({ open: false, unread: 0 });
+  stateRef.current = { open, unread };
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        if (stateRef.current.open && stateRef.current.unread) markAllRead();
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const markAllRead = async () => {
@@ -88,13 +95,17 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { if (!open) { loadFeedback(); if (unread) markAllRead(); } setOpen(o => !o); }}
+        onClick={() => {
+          if (!open) loadFeedback();
+          else if (unread) markAllRead();
+          setOpen(o => !o);
+        }}
         className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
         title="Notifikace"
       >
         <Icon name="bell" size={19} />
         {badge > 0 && (
-          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
+          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
             {badge > 9 ? '9+' : badge}
           </span>
         )}

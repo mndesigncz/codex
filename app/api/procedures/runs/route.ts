@@ -254,6 +254,7 @@ export async function PATCH(request: Request) {
           ? `${doneBy} dokončil/a ${run.procedure_name} za ${dur} — ${missing} ${missing === 1 ? 'krok nedokončen' : missing <= 4 ? 'kroky nedokončeny' : 'kroků nedokončeno'}`
           : `${doneBy} dokončil/a ${run.procedure_name} za ${dur}`,
         type: 'shift',
+        link: '/employer/overview?view=procedures',
       });
     }
 

@@ -74,6 +74,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [availability, setAvailability] = useState<any[]>([]);
   const [unreadChats, setUnreadChats] = useState(0);
   const [onShift, setOnShift] = useState<any[]>([]);
+  // Things waiting for the employer's decision — surfaced up top so a request
+  // can't sit unseen for weeks.
+  const [pendingApprovals, setPendingApprovals] = useState({ timeoff: 0, swaps: 0, closings: 0 });
   const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({});
   const [reviewDate, setReviewDate] = useState('');
   const [rating, setRating] = useState<RosterEntry | null>(null);
@@ -107,7 +110,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const [team, sh, tk, inv, av, conv, att] = await Promise.all([
+        const [team, sh, tk, inv, av, conv, att, toff, offers, clo] = await Promise.all([
           fetch('/api/teams').then(r => r.json()).catch(() => ({})),
           fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
           fetch('/api/tasks').then(r => r.json()).catch(() => []),
@@ -115,6 +118,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           fetch(`/api/availability?month=${month}`).then(r => r.json()).catch(() => []),
           fetch('/api/conversations').then(r => r.json()).catch(() => []),
           fetch('/api/attendance?days=1').then(r => r.json()).catch(() => ({})),
+          fetch('/api/timeoff').then(r => r.json()).catch(() => ({})),
+          fetch('/api/shifts/offers').then(r => r.json()).catch(() => ({})),
+          fetch('/api/closings').then(r => r.json()).catch(() => ({})),
         ]);
         setCfg(team?.team?.dashboard_config?.employer ?? {});
         setEmployeeCfg(team?.team?.dashboard_config?.employee ?? {});
@@ -127,6 +133,11 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         const convs = Array.isArray(conv) ? conv : conv?.conversations ?? [];
         setUnreadChats(convs.reduce((s: number, c: any) => s + (c.unreadCount || 0), 0));
         setOnShift((att?.roster ?? []).filter((r: any) => r.openSince));
+        setPendingApprovals({
+          timeoff: (toff?.requests ?? []).filter((r: any) => r.status === 'pending').length,
+          swaps: (offers?.offers ?? []).filter((o: any) => o.status === 'claimed').length,
+          closings: (clo?.closings ?? []).filter((c: any) => c.approved === false).length,
+        });
         loadRoster(true);
       } catch {}
       setLoading(false);
@@ -243,7 +254,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
                         {label}
                         {pending > 0 && (
-                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
+                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
                         )}
                       </button>
                     );
@@ -363,6 +374,30 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {(pendingApprovals.timeoff > 0 || pendingApprovals.swaps > 0 || pendingApprovals.closings > 0) && (
+        <div className="rounded-3xl border border-orange-500/25 bg-orange-500/[0.07] p-4 sm:p-5">
+          <p className="font-bold text-[#16181A] flex items-center gap-2 mb-2">
+            <Icon name="warning" size={17} className="text-orange-600" /> Čeká na tvoje rozhodnutí
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {pendingApprovals.timeoff > 0 && (
+              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition">
+                🏖️ {pendingApprovals.timeoff}× žádost o volno
+              </button>
+            )}
+            {pendingApprovals.swaps > 0 && (
+              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition">
+                🔄 {pendingApprovals.swaps}× výměna směny
+              </button>
+            )}
+            {pendingApprovals.closings > 0 && (
+              <button onClick={() => onNavigate('reports')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition">
+                📊 {pendingApprovals.closings}× uzávěrka ke schválení
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-black/45 text-sm">Přehled podniku</p>

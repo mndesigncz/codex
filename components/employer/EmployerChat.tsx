@@ -91,7 +91,7 @@ export default function EmployerChat({ user }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-black/[0.06] backdrop-blur-xl bg-white/[0.03] flex-shrink-0">
+      <div className="px-6 py-4 border-b border-black/[0.06] backdrop-blur-xl glass flex-shrink-0">
         <h3 className="font-bold tracking-tight text-[#16181A]">💬 Obecný chat</h3>
         <p className="text-xs text-black/45">Komunikace s týmem</p>
       </div>
@@ -131,7 +131,7 @@ export default function EmployerChat({ user }: Props) {
       {sendErr && (
         <p className="flex-shrink-0 px-4 pt-2 text-xs font-medium text-red-600">⚠️ {sendErr}</p>
       )}
-      <form onSubmit={sendMessage} className="flex-shrink-0 p-4 border-t border-black/[0.06] backdrop-blur-xl bg-white/[0.03] flex gap-3">
+      <form onSubmit={sendMessage} className="flex-shrink-0 p-4 border-t border-black/[0.06] backdrop-blur-xl glass flex gap-3">
         <input
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}

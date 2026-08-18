@@ -128,6 +128,7 @@ export async function POST(req: Request) {
           body: `${ctx.name ?? 'Zaměstnanec'} zadal/a dostupnost na ${monthLabel}`,
           type: 'shift',
           category: 'shift',
+          link: '/employer/overview?view=shifts',
         }),
       ),
     );

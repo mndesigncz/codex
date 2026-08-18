@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       title: 'Nový člen týmu',
       body: `${name} se právě připojil/a do týmu.`,
       type: 'invite',
-      link: '/',
+      link: '/employer/overview?view=team-settings',
     }).catch(() => {});
 
     return NextResponse.json({ ok: true, user });

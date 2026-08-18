@@ -84,7 +84,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
                 <span className="inline-flex items-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-1.5 py-0.5 text-[9px] font-semibold">↻</span>
               )}
             </div>
-            {done && t.completedByName && <p className="text-[10px] text-black/35 mt-1">splnil {t.completedByName}</p>}
+            {done && t.completedByName && <p className="text-[11px] text-black/35 mt-1">splnil {t.completedByName}</p>}
           </button>
         </div>
       </div>

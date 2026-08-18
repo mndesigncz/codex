@@ -224,7 +224,7 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
   const itemBadge = (mark: ItemMark | null) => (
     <>
       {mark?.flagged && <Icon name="warning" size={13} className="text-amber-600 shrink-0" />}
-      {!!mark?.points && <span className={`text-[10px] font-bold tabular-nums shrink-0 ${mark.points > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>{signed(mark.points)}</span>}
+      {!!mark?.points && <span className={`text-[11px] font-bold tabular-nums shrink-0 ${mark.points > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>{signed(mark.points)}</span>}
     </>
   );
 
@@ -236,7 +236,7 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 bg-white/85 backdrop-blur border-b border-black/[0.06]">
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 glass-strong border-b border-black/[0.06]">
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{employee.avatar || '👤'}</span>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">Hodnotit směnu — {employee.name}</h3>
@@ -330,10 +330,10 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
                           <button onClick={() => toggleExpand(key)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left">
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${prioDot(t.priority)}`} />
                             <span className={`flex-1 min-w-0 text-[13px] truncate ${missed ? 'text-red-700' : 'text-[#16181A]'}`}>{t.title}</span>
-                            {missed && <span className="rounded-full bg-red-500/12 text-red-600 px-2 py-0.5 text-[10px] font-semibold shrink-0">neuděláno</span>}
+                            {missed && <span className="rounded-full bg-red-500/12 text-red-600 px-2 py-0.5 text-[11px] font-semibold shrink-0">neuděláno</span>}
                             {itemBadge(t.item)}
                             {(t.item?.note || t.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
-                            {t.checklist.length > 0 && <span className="text-[10px] text-black/40 tabular-nums shrink-0">{t.checklist.filter(i => i.done).length}/{t.checklist.length}</span>}
+                            {t.checklist.length > 0 && <span className="text-[11px] text-black/40 tabular-nums shrink-0">{t.checklist.filter(i => i.done).length}/{t.checklist.length}</span>}
                             {chev(!!expanded[key])}
                           </button>
                           {expanded[key] && (
@@ -378,9 +378,9 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
                             <span className="flex-1 min-w-0 text-[13px] text-[#16181A] truncate">{p.name}</span>
                             {itemBadge(p.item)}
                             {(p.item?.note || p.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
-                            <span className="text-[10px] tabular-nums shrink-0 text-[#5B7A08]">{p.done}/{count}</span>
-                            {p.skippedCount > 0 && <span className="text-[10px] text-amber-600 shrink-0">{p.skippedCount}⤳</span>}
-                            {p.missing.length > 0 && <span className="text-[10px] text-red-600 shrink-0">{p.missing.length}✕</span>}
+                            <span className="text-[11px] tabular-nums shrink-0 text-[#5B7A08]">{p.done}/{count}</span>
+                            {p.skippedCount > 0 && <span className="text-[11px] text-amber-600 shrink-0">{p.skippedCount}⤳</span>}
+                            {p.missing.length > 0 && <span className="text-[11px] text-red-600 shrink-0">{p.missing.length}✕</span>}
                             {chev(!!expanded[key])}
                           </button>
                           {expanded[key] && (
@@ -394,10 +394,10 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
                                   return (
                                     <button key={i} onClick={() => toggleProcStep(p.id, i)} className="w-full flex items-center gap-2.5 text-left group">
                                       <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : skipped ? 'bg-amber-400/80 border-amber-400 text-white' : 'border-red-500/40 group-hover:border-[#C8F542]/60'}`}>
-                                        {checked ? <span className="text-[11px] font-bold">✓</span> : skipped ? <span className="text-[10px] font-bold">⤳</span> : null}
+                                        {checked ? <span className="text-[11px] font-bold">✓</span> : skipped ? <span className="text-[11px] font-bold">⤳</span> : null}
                                       </span>
                                       <span className={`text-[13px] ${checked ? 'text-black/45 line-through' : skipped ? 'text-amber-700' : 'text-red-700'}`}>{p.steps[i] ?? `Krok ${i + 1}`}</span>
-                                      {!checked && !skipped && <span className="text-[10px] text-red-600 shrink-0">neuděláno</span>}
+                                      {!checked && !skipped && <span className="text-[11px] text-red-600 shrink-0">neuděláno</span>}
                                     </button>
                                   );
                                 })}
@@ -487,8 +487,8 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
           </div>
         </div>
 
-        <div className="sticky bottom-0 flex gap-2 px-5 py-4 bg-white/85 backdrop-blur border-t border-black/[0.06]">
-          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition">Zavřít</button>
+        <div className="sticky bottom-0 flex gap-2 px-5 py-4 glass-strong border-t border-black/[0.06]">
+          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition" title="Body a poznámky u položek se ukládají průběžně">Hotovo</button>
           {saveErr && (
             <p className="w-full text-sm font-medium text-red-600">⚠️ {saveErr}</p>
           )}

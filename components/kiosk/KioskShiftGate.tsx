@@ -357,7 +357,7 @@ export function ActivePersonChip() {
       >
         <span className="text-2xl leading-none">{active.avatar}</span>
         <span className="text-left leading-tight">
-          <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-black/40">Zapisuje se jako</span>
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40">Zapisuje se jako</span>
           <span className="block font-bold text-[#16181A] text-sm truncate max-w-[9rem]">{active.name}</span>
         </span>
         {canSwitch && <Icon name="chevron" size={15} className="text-black/35" />}
@@ -441,7 +441,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
           <div className="mt-5">
             <div className="flex justify-center gap-2 mb-3">
               {[0, 1, 2, 3].map(i => (
-                <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-[#16181A]' : 'bg-black/15'}`} />
+                <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-[#C8F542] ring-1 ring-black/15' : 'bg-black/15'}`} />
               ))}
             </div>
             <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">

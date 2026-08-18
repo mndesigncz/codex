@@ -269,7 +269,7 @@ export default function ShareSettings() {
               <img src={theme.logoUrl} alt="" style={{ maxHeight: 36, margin: '0 auto 10px', objectFit: 'contain' }} />
             )}
             {theme.businessName && (
-              <p className="text-[10px] uppercase tracking-[0.16em] opacity-60">{theme.businessName}</p>
+              <p className="text-[11px] uppercase tracking-[0.16em] opacity-60">{theme.businessName}</p>
             )}
             <p style={{ color: theme.accent }} className="text-xl font-bold tracking-tight mt-1">Naše nabídka</p>
             <p className="text-xs opacity-60 mt-2">Ukázka toho, jak stránka vypadá.</p>
@@ -309,7 +309,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove }: {
   return (
     <div className="py-3 space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
           link.enabled ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-black/[0.06] text-black/40'
         }`}>
           {link.kind === 'guides' ? 'Návody' : 'Sklad'}
@@ -346,7 +346,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove }: {
           </label>
 
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Nesdílet tyhle kategorie</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Nesdílet tyhle kategorie</p>
             <div className="flex flex-wrap gap-1.5">
               {excludable.map(e => {
                 const off = link.excluded.includes(e.id);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import { Icon } from '../Icons';
+import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
@@ -127,6 +128,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
 
   // Named blocks; the employer-approved layout decides order and presence.
   const blocks: Record<string, React.ReactNode> = {
+    clock: user.id ? <ClockWidget userId={parseInt(String(user.id))} /> : null,
     nextShift: (
             <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
               <div className="flex items-center justify-between mb-3">

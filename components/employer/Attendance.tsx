@@ -95,6 +95,31 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [editIn, setEditIn] = useState('');
   const [editOut, setEditOut] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  // Manual entry — someone forgot to punch entirely.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addEmp, setAddEmp] = useState<number | ''>('');
+  const [addIn, setAddIn] = useState('');
+  const [addOut, setAddOut] = useState('');
+  const [addErr, setAddErr] = useState('');
+  const [savingAdd, setSavingAdd] = useState(false);
+  const saveAdd = async () => {
+    if (addEmp === '' || !addIn || !addOut) { setAddErr('Vyplň zaměstnance i oba časy.'); return; }
+    setSavingAdd(true); setAddErr('');
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: addEmp,
+          clockIn: new Date(addIn).toISOString(),
+          clockOut: new Date(addOut).toISOString(),
+        }),
+      });
+      const d = await res.json();
+      if (res.ok) { setAddOpen(false); setAddEmp(''); setAddIn(''); setAddOut(''); await load(days); }
+      else setAddErr(d.error || 'Nepodařilo se uložit.');
+    } catch { setAddErr('Chyba serveru.'); }
+    setSavingAdd(false);
+  };
   const [editErr, setEditErr] = useState('');
 
   const openEdit = (e: Entry) => {
@@ -292,7 +317,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 min-w-0">
           <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
-          <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
@@ -303,6 +328,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               </button>
             ))}
           </div>
+          <button onClick={() => { setAddOpen(true); setAddErr(''); }}
+            className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
+            + Přidat záznam
+          </button>
           {entries.length > 0 && (
             <button onClick={exportCsv}
               className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
@@ -493,6 +522,45 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       )}
 
       {/* Edit time modal */}
+      {addOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setAddOpen(false)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2.5 mb-1">
+              <Icon name="clock" size={20} className="text-[#16181A]" />
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Přidat záznam docházky</h3>
+            </div>
+            <p className="text-sm text-black/50 mb-4">Když se někdo zapomněl odpíchnout úplně.</p>
+            {addErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{addErr}</div>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zaměstnanec</label>
+                <select value={addEmp} onChange={e => setAddEmp(e.target.value === '' ? '' : parseInt(e.target.value))}
+                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                  <option value="">— vyber —</option>
+                  {roster.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>
+                <input type="datetime-local" value={addIn} onChange={e => setAddIn(e.target.value)}
+                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odchod</label>
+                <input type="datetime-local" value={addOut} onChange={e => setAddOut(e.target.value)}
+                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setAddOpen(false)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+              <button onClick={saveAdd} disabled={savingAdd} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                {savingAdd ? 'Ukládám…' : 'Uložit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editEntry && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditEntry(null)}>
           <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>

@@ -174,8 +174,10 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reportedBy: parseInt(user.id ?? '0'),
-          items: JSON.stringify(selected),
+          items: JSON.stringify(selected.map(id => {
+            const it = items.find(i => i.id === id);
+            return { id, name: it?.name ?? `#${id}` };
+          })),
           note,
         }),
       });
@@ -233,7 +235,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="glass-card p-5">
-        <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
         <p className="text-black/50 text-sm mt-1">Uprav stav, když něco dochází — vedení dostane upozornění.</p>
       </div>
 

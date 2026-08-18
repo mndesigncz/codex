@@ -99,7 +99,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
                 className={e.type === 'link' ? 'text-[#5B7A08] shrink-0' : 'text-black/35 shrink-0'} />
               <span className="text-sm text-[#16181A] min-w-0 flex-1 truncate">{labelOf(e)}</span>
               {e.type === 'link' && (
-                <span className="text-[10px] uppercase tracking-wider text-black/30 shrink-0">odkaz</span>
+                <span className="text-[11px] uppercase tracking-wider text-black/30 shrink-0">odkaz</span>
               )}
               <button onClick={() => onChange(layout.filter((_, idx) => idx !== i))} title="Odebrat z přehledu"
                 className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600">✕</button>
@@ -155,7 +155,7 @@ function AddPanel({ spare, onAdd, onClose }: {
     <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
       {spare.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Widgety</p>
+          <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Widgety</p>
           <div className="flex flex-wrap gap-1.5">
             {spare.map(w => (
               <button key={w.id} onClick={() => onAdd({ type: 'widget', id: w.id })} title={w.hint}
@@ -168,7 +168,7 @@ function AddPanel({ spare, onAdd, onClose }: {
       )}
 
       <div>
-        <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Odkaz na…</p>
+        <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Odkaz na…</p>
         <div className="flex flex-wrap gap-1.5">
           {LINK_SOURCES.map(s => (
             <button key={s.kind} onClick={() => setSource(source === s.kind ? null : s.kind)}

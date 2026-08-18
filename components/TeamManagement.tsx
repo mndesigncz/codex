@@ -6,7 +6,7 @@ import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
 import { CURRENCIES, LOCALES } from '@/lib/money';
-import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn, readShortcuts, type Shortcut } from '@/lib/dashboardWidgets';
+import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn } from '@/lib/dashboardWidgets';
 import { useSymbol } from './CurrencyProvider';
 import ShareSettings from './employer/ShareSettings';
 
@@ -61,13 +61,14 @@ function roleLabel(role: string) {
 
 function statusChip(status: string) {
   if (status === 'accepted') return 'bg-[#C8F542]/15 text-[#5B7A08]';
-  if (status === 'expired' || status === 'declined') return 'bg-red-500/15 text-red-600';
+  if (status === 'expired' || status === 'declined' || status === 'revoked') return 'bg-red-500/15 text-red-600';
   return 'bg-blue-500/15 text-blue-600';
 }
 function statusLabel(status: string) {
   if (status === 'accepted') return 'Přijato';
   if (status === 'expired') return 'Vypršelo';
   if (status === 'declined') return 'Odmítnuto';
+  if (status === 'revoked') return 'Zrušeno';
   return 'Čeká';
 }
 
@@ -200,23 +201,6 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       setError('Nastavení se nepodařilo uložit.');
     } finally {
       setSavingRequiresShift(false);
-    }
-  };
-
-  // Dashboard widget visibility per role.
-  const saveShortcuts = async (role: 'employer' | 'employee', list: Shortcut[]) => {
-    const current = team?.dashboard_config ?? {};
-    const next = { ...current, [role]: { ...(current[role] ?? {}), shortcuts: list } };
-    setTeam(t => (t ? { ...t, dashboard_config: next } : t));
-    try {
-      const res = await fetch('/api/teams', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dashboardConfig: next }),
-      });
-      if (!res.ok) { setTeam(t => (t ? { ...t, dashboard_config: current } : t)); setError('Zkratky se nepodařilo uložit.'); }
-    } catch {
-      setTeam(t => (t ? { ...t, dashboard_config: current } : t));
-      setError('Zkratky se nepodařilo uložit.');
     }
   };
 
@@ -405,7 +389,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   if (loadError) {
     return (
-      <div className="p-6 max-w-2xl mx-auto w-full">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
       <div className="glass-card p-8 text-center space-y-3">
         <p className="text-[#16181A] font-medium">Tým se nepodařilo načíst.</p>
         <p className="text-black/45 text-sm">Vaše data jsou v pořádku — jen se je nepodařilo teď načíst.</p>
@@ -422,7 +406,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   if (!team) {
     return (
-      <div className="p-6 max-w-2xl mx-auto w-full">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
         <div className="glass-card p-8 text-center">
           <p className="text-black/45">Zatím nemáte žádný tým.</p>
         </div>
@@ -570,6 +554,18 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       <button type="button" onClick={() => copyInviteLink(inv.token)}
                         className="text-xs font-medium text-[#5B7A08] hover:underline whitespace-nowrap">
                         {copiedToken === inv.token ? 'Zkopírováno ✓' : 'Kopírovat odkaz'}
+                      </button>
+                    )}
+                    {inv.status === 'pending' && (
+                      <button type="button"
+                        onClick={async () => {
+                          if (!confirm(`Zrušit pozvánku pro ${inv.email}? Odkaz přestane platit.`)) return;
+                          const res = await fetch(`/api/invitations?id=${inv.id}`, { method: 'DELETE' });
+                          if (res.ok) setInvitations(prev => prev.map(x => x.id === inv.id ? { ...x, status: 'revoked' } : x));
+                          else setError('Pozvánku se nepodařilo zrušit.');
+                        }}
+                        className="text-xs font-medium text-red-600/80 hover:text-red-600 hover:underline whitespace-nowrap">
+                        Zrušit
                       </button>
                     )}
                     <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
@@ -757,7 +753,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       className={`relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
                       style={{ width: '2.75rem', height: '1.6rem' }}
                     >
-                      <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
+                      <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
                     </button>
                   </label>
                 );
@@ -792,7 +788,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             onClick={() => togglePayDailyCash(!team?.pay_daily_cash)}
             className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
-            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
           </button>
         </label>
 
@@ -811,7 +807,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             onClick={() => toggleRequiresShift(!(team?.closing_requires_shift !== false))}
             className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
-            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
           </button>
         </label>
       </div>
@@ -871,87 +867,3 @@ const SHORTCUT_VIEWS: { id: string; label: string; icon: string }[] = [
   { id: 'chat', label: 'Chat', icon: 'chat' },
 ];
 
-function ShortcutEditor({ shortcuts, categories, onChange }: {
-  shortcuts: Shortcut[];
-  categories: { id: number; name: string }[];
-  onChange: (list: Shortcut[]) => void;
-}) {
-  const [adding, setAdding] = useState(false);
-
-  const add = (s: Shortcut) => { onChange([...shortcuts, s]); setAdding(false); };
-  const remove = (i: number) => onChange(shortcuts.filter((_, idx) => idx !== i));
-  const move = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= shortcuts.length) return;
-    const next = [...shortcuts];
-    [next[i], next[j]] = [next[j], next[i]];
-    onChange(next);
-  };
-
-  return (
-    <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5">
-      <p className="text-[10px] uppercase tracking-wider text-black/45 mb-2">Dlaždice rychlého přístupu</p>
-
-      {shortcuts.length === 0 ? (
-        <p className="text-xs text-black/40 mb-2">Zatím žádné. Přidej, na co se kliká každou směnu.</p>
-      ) : (
-        <div className="space-y-1.5 mb-2">
-          {shortcuts.map((s, i) => (
-            <div key={`${s.target}-${i}`} className="flex items-center gap-2 rounded-xl bg-white border border-black/[0.06] px-3 py-2">
-              <Icon name={s.icon || 'chevron'} size={14} className="text-[#5B7A08] shrink-0" />
-              <span className="text-sm text-[#16181A] min-w-0 flex-1 truncate">{s.label}</span>
-              <div className="flex flex-col shrink-0">
-                <button onClick={() => move(i, -1)} disabled={i === 0}
-                  className="text-black/35 hover:text-black disabled:opacity-20 leading-none text-[10px]">▲</button>
-                <button onClick={() => move(i, 1)} disabled={i === shortcuts.length - 1}
-                  className="text-black/35 hover:text-black disabled:opacity-20 leading-none text-[10px]">▼</button>
-              </div>
-              <button onClick={() => remove(i)}
-                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600">✕</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {adding ? (
-        <div className="space-y-2.5">
-          {categories.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Kategorie ve skladu</p>
-              <div className="flex flex-wrap gap-1.5">
-                {categories.map(c => (
-                  <button key={c.id}
-                    onClick={() => add({ label: c.name, target: `inventory:${c.name}`, icon: 'box' })}
-                    className="rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs font-medium text-[#16181A] hover:border-[#C8F542] transition">
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Záložky</p>
-            <div className="flex flex-wrap gap-1.5">
-              {SHORTCUT_VIEWS.map(v => (
-                <button key={v.id}
-                  onClick={() => add({ label: v.label, target: `view:${v.id}`, icon: v.icon })}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs font-medium text-[#16181A] hover:border-[#C8F542] transition">
-                  <Icon name={v.icon} size={13} /> {v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button onClick={() => setAdding(false)}
-            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-1.5 text-xs font-medium hover:bg-black/[0.05] transition">
-            Zavřít
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => setAdding(true)} disabled={shortcuts.length >= 8}
-          className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] text-black/60 px-3.5 py-2 text-xs font-medium hover:bg-black/[0.09] transition disabled:opacity-40">
-          <Icon name="plus" size={14} /> Přidat dlaždici
-        </button>
-      )}
-    </div>
-  );
-}

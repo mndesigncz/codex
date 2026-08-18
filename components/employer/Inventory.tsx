@@ -156,6 +156,12 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [inlineParent, setInlineParent] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
+  // Reports employees filed via "Nahlásit chybějící" on the tablet/phone.
+  const [reports, setReports] = useState<any[]>([]);
+  const [showReports, setShowReports] = useState(false);
+  // Movement history of the item being edited — who changed the stock and when.
+  const [itemLog, setItemLog] = useState<any[]>([]);
+  const [logOpen, setLogOpen] = useState(false);
   // Parked items live behind a toggle so they can't clutter the active stock.
   const [showArchived, setShowArchived] = useState(false);
   // Bulk editing: a selection mode with a bar of actions for what is ticked.
@@ -193,6 +199,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   };
 
   const load = async () => {
+    fetch('/api/inventory/reports').then(r => r.json())
+      .then(d => setReports(Array.isArray(d.reports) ? d.reports : []))
+      .catch(() => {});
     try {
       const [data, cats] = await Promise.all([
         fetch('/api/inventory').then(r => r.json()),
@@ -354,6 +363,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     setEditing(null);
     setForm(seedForm(catId ?? categories[0]?.id ?? null));
     setNewCatInline('');
+    setItemLog([]); setLogOpen(false);
     setShowForm(true);
   };
   const openEdit = (i: Item) => {
@@ -361,6 +371,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     setEditing(i);
     setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
     setNewCatInline('');
+    setItemLog([]); setLogOpen(false);
+    fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
+      .then(d => setItemLog(Array.isArray(d.log) ? d.log : Array.isArray(d) ? d : []))
+      .catch(() => {});
     setShowForm(true);
   };
 
@@ -528,6 +542,11 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           {toBuy.length > 0 && (
             <button onClick={() => setShowShopping(true)} className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
               🛒 Nakoupit ({toBuy.length})
+            </button>
+          )}
+          {reports.some(r => r.status !== 'done') && (
+            <button onClick={() => setShowReports(true)} className="rounded-full glass border border-orange-500/25 text-orange-600 px-4 py-2.5 text-sm font-semibold hover:bg-orange-500/[0.06] whitespace-nowrap">
+              📦 Hlášení ({reports.filter(r => r.status !== 'done').length})
             </button>
           )}
           <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
@@ -834,6 +853,35 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
             </div>
 
             {/* Sticky footer */}
+            {editing && itemLog.length > 0 && (
+              <div className="px-6 pb-4">
+                <button type="button" onClick={() => setLogOpen(o => !o)}
+                  className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
+                  <span>🕓 Historie změn ({itemLog.length})</span>
+                  <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${logOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {logOpen && (
+                  <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] max-h-56 overflow-y-auto scrollbar-thin">
+                    {itemLog.map((l: any) => {
+                      const delta = Number(l.newQuantity) - Number(l.oldQuantity);
+                      return (
+                        <div key={l.id} className="flex items-center gap-2.5 px-4 py-2.5 text-sm">
+                          <span className={`shrink-0 font-bold tabular-nums ${delta > 0 ? 'text-[#5B7A08]' : delta < 0 ? 'text-red-600' : 'text-black/40'}`}>
+                            {delta > 0 ? `+${delta}` : delta}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-black/55">
+                            {l.userName ?? 'Někdo'}{l.note ? ` · ${l.note}` : ''}
+                          </span>
+                          <span className="shrink-0 text-xs text-black/35 tabular-nums">
+                            {new Date(l.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="sticky bottom-0 z-10 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06] space-y-2.5">
               {formErr && (
                 <p className="text-sm font-medium text-red-600 flex items-center gap-1.5">
@@ -852,7 +900,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       )}
 
       {selecting && selected.size > 0 && (
-        <div className="sticky bottom-4 z-30 mx-auto w-fit max-w-full">
+        <div className="sticky bottom-[calc(104px+env(safe-area-inset-bottom))] md:bottom-4 z-30 mx-auto w-fit max-w-full">
           <div className="flex items-center gap-2 flex-wrap justify-center rounded-full bg-[#16181A] text-white px-4 py-2.5 shadow-xl shadow-black/20">
             <span className="text-sm font-semibold whitespace-nowrap px-1">
               {selected.size} vybráno
@@ -900,6 +948,66 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onChanged={load}
           createCategory={createCategory}
         />
+      )}
+
+      {showReports && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">📦 Hlášení ze skladu</h3>
+              <button onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+            </div>
+            {reports.length === 0 ? (
+              <p className="text-black/45 text-sm text-center py-8">Žádná hlášení od zaměstnanců.</p>
+            ) : (
+              <div className="space-y-3">
+                {reports.map(r => {
+                  let list: any[] = [];
+                  try { list = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items ?? []); } catch {}
+                  const done = r.status === 'done';
+                  return (
+                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-orange-500/25 bg-orange-500/[0.04]'}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <p className="text-sm font-semibold text-[#16181A] min-w-0">
+                          {r.author_avatar ?? '👤'} {r.author_name ?? 'Zaměstnanec'}
+                          <span className="font-normal text-black/40"> · {new Date(r.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </p>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch('/api/inventory/reports', {
+                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: r.id, status: done ? 'new' : 'done' }),
+                            });
+                            if (res.ok) setReports(prev => prev.map(x => x.id === r.id ? { ...x, status: done ? 'new' : 'done' } : x));
+                          }}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+                            done ? 'glass text-black/50 hover:text-black' : 'bg-[#16181A] text-white hover:bg-black'
+                          }`}>
+                          {done ? 'Vyřízeno ✓' : 'Označit vyřízené'}
+                        </button>
+                      </div>
+                      {list.length > 0 && (
+                        <ul className="text-sm text-black/70 space-y-0.5">
+                          {list.map((it: any, i: number) => (
+                            <li key={i} className="flex items-baseline gap-2">
+                              <span className="text-black/30">•</span>
+                              <span className="min-w-0">{
+                                typeof it === 'string' ? it
+                                : typeof it === 'number' ? (items.find(x => x.id === it)?.name ?? `Položka #${it}`)
+                                : `${it.name ?? it.title ?? '?'}${it.quantity ? ` — ${it.quantity}` : ''}${it.note ? ` (${it.note})` : ''}`
+                              }</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {r.note && <p className="text-sm text-black/50 mt-1.5 italic">„{r.note}"</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {showShopping && (
@@ -1088,7 +1196,7 @@ function MoreMenu({
         <Icon name="menu" size={17} className="text-black/50" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
+        <div role="menu" className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
           <button className={row} onClick={() => { onSelect(); setOpen(false); }} disabled={selecting}>
             <Icon name="check" size={16} className="text-black/40" /> Vybrat více položek
           </button>
@@ -1110,7 +1218,7 @@ function MoreMenu({
           )}
 
           <div className="border-t border-black/[0.06] pt-1.5 mt-1.5">
-            <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-black/35 font-semibold">Zobrazení</p>
+            <p className="px-3 pb-1 text-[11px] uppercase tracking-wider text-black/35 font-semibold">Zobrazení</p>
             <div className="flex gap-1 px-1.5 pb-0.5">
               {([['grid', 'Karty', 'trend'], ['list', 'Seznam', 'box']] as const).map(([v, label, icon]) => (
                 <button key={v} onClick={() => { setView(v); setOpen(false); }}
@@ -1150,7 +1258,7 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
         <Icon name="chevron" size={14} className={`text-black/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div role="listbox" className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
+        <div role="listbox" className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
           {SORTS.map(s => {
             const active = s.key === sort;
             return (
@@ -1220,7 +1328,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
               </div>
               <div className={`flex items-center gap-1 justify-end ${selecting ? 'hidden' : ''}`}>
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
-                <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[10px] text-black/40 ml-0.5">{i.unit}</span></span>
+                <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
@@ -1950,7 +2058,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
           const fromParent = (inherited as any)[f.key];
           return (
             <div key={f.key} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}>
-              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">{f.label}</label>
+              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">{f.label}</label>
               {f.kind === 'multiline' ? (
                 <textarea rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
@@ -1962,7 +2070,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
                   className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
               )}
               {fromParent != null && !values[f.key] && (
-                <p className="text-[10px] text-black/35 mt-0.5">Zdědí se z nadřazené kategorie.</p>
+                <p className="text-[11px] text-black/35 mt-0.5">Zdědí se z nadřazené kategorie.</p>
               )}
             </div>
           );
@@ -2042,21 +2150,21 @@ function PackagingEditor({ category, onSaved }: {
         <>
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Jednotka obsahu</label>
+              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">Jednotka obsahu</label>
               <select value={unit} onChange={e => setUnit(e.target.value)}
                 className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
                 {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
+              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
               <input type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
                 className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
             </div>
           </div>
 
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Hlídat zásoby podle</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Hlídat zásoby podle</p>
             <div className="flex gap-1 rounded-full bg-white border border-black/[0.08] p-1 w-fit">
               {([['package', 'Balení'], ['content', unit ? `Obsahu (${unit})` : 'Obsahu']] as const).map(([v, lbl]) => (
                 <button key={v} type="button" onClick={() => setThresholdUnit(v)}
@@ -2080,7 +2188,7 @@ function PackagingEditor({ category, onSaved }: {
           </div>
 
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Stupně měřítka</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Stupně měřítka</p>
             <div className="space-y-1.5">
               {steps.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">

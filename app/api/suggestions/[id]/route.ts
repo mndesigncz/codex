@@ -52,6 +52,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: true, votes, hasVoted: !existing });
   }
 
+  // Edit the text — author only (typo in your own idea shouldn't be forever).
+  if (typeof b.title === 'string' || typeof b.content === 'string') {
+    if (s.author_id !== c.meId) return NextResponse.json({ error: 'Upravit může jen autor.' }, { status: 403 });
+    const title = typeof b.title === 'string' ? b.title.trim().slice(0, 200) : null;
+    const content = typeof b.content === 'string' ? b.content.trim().slice(0, 2000) : null;
+    if (title !== null && title) await sql`UPDATE suggestions SET title = ${title} WHERE id = ${id}`;
+    if (content !== null) await sql`UPDATE suggestions SET content = ${content || null} WHERE id = ${id}`;
+    return NextResponse.json({ ok: true });
+  }
+
   // Change status — employer only.
   const status = String(b.status ?? '');
   if (STATUSES.includes(status as any)) {
@@ -60,10 +70,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Let the author know their idea moved (unless they changed it themselves).
     if (s.author_id && s.author_id !== c.meId && STATUS_LABEL[status]) {
       try {
+        const [author] = await sql`SELECT role FROM users WHERE id = ${s.author_id}`;
         await notifyUser(s.author_id, {
           title: 'Tvůj podnět má nový stav',
           body: STATUS_LABEL[status],
           type: status === 'declined' ? 'warning' : 'info',
+          link: author?.role === 'employer' ? '/employer/overview?view=suggestions' : '/employee/shifts?view=suggestions',
         });
       } catch { /* best-effort */ }
     }

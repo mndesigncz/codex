@@ -81,6 +81,33 @@ export async function POST(req: Request) {
   return NextResponse.json({ id: row.id, ok: true });
 }
 
+// PATCH { id, shiftTypeId } — change the shift type of an existing fixed day
+// in place (no more delete + recreate).
+export async function PATCH(req: Request) {
+  const ctx = await context();
+  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
+  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+
+  const body = await req.json().catch(() => ({}));
+  const id = parseInt(body.id);
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
+  const shiftTypeId =
+    body.shiftTypeId === null || body.shiftTypeId === undefined || body.shiftTypeId === ''
+      ? null
+      : parseInt(body.shiftTypeId);
+  if (shiftTypeId != null) {
+    const [st] = await sql`SELECT id FROM shift_types WHERE id = ${shiftTypeId} AND team_id = ${ctx.teamId}`;
+    if (!st) return NextResponse.json({ error: 'Typ směny nenalezen' }, { status: 400 });
+  }
+  const [row] = await sql`
+    UPDATE fixed_assignments SET shift_type_id = ${shiftTypeId}
+    WHERE id = ${id} AND team_id = ${ctx.teamId}
+    RETURNING id`;
+  if (!row) return NextResponse.json({ error: 'Záznam nenalezen' }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
 // DELETE ?id= (employer)
 export async function DELETE(req: Request) {
   const ctx = await context();

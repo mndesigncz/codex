@@ -76,20 +76,20 @@ function totalPoints(b: Breakdown, pt: PointsConfig): number {
 
 // Worked days in the recent past that still have no review — the employer's
 // "to rate" backlog. Older shifts are ignored so the number stays actionable.
-async function pendingFor(userId: number): Promise<number> {
+async function pendingFor(userId: number): Promise<{ n: number; oldest: string | null }> {
   const today = new Date();
   const from = new Date(today.getTime() - 60 * 86400000).toISOString().split('T')[0];
   const to = today.toISOString().split('T')[0];
   try {
     const [r] = await sql`
-      SELECT COUNT(*)::int AS n FROM (
+      SELECT COUNT(*)::int AS n, MIN(x.date) AS oldest FROM (
         SELECT DISTINCT s.date FROM shifts s
         WHERE s.employee_id = ${userId} AND s.date >= ${from} AND s.date <= ${to}
           AND NOT EXISTS (SELECT 1 FROM shift_reviews r WHERE r.employee_id = ${userId} AND r.work_date = s.date)
       ) x`;
-    return r?.n ?? 0;
+    return { n: r?.n ?? 0, oldest: r?.oldest ?? null };
   } catch {
-    return 0;
+    return { n: 0, oldest: null };
   }
 }
 
@@ -159,7 +159,7 @@ export async function GET() {
       standings.push({
         id: m.id, name: m.name, avatar: m.avatar,
         points: total, breakdown: b,
-        flagged: b.flagged, pending: await pendingFor(m.id),
+        flagged: b.flagged, ...await (async () => { const p = await pendingFor(m.id); return { pending: p.n, oldestPending: p.oldest }; })(),
         levelName: st.level.name, levelIndex: st.levelIndex,
         next: st.next, pctToNext: st.pctToNext, pointsIntoLevel: st.pointsIntoLevel, pointsForNext: st.pointsForNext,
       });

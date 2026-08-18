@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// Hourly cron: remind anyone whose shift today has ended but who hasn't
-// submitted a cash closing yet. Also nudges employers about pending ones.
+// Daily cron (21:00 UTC): remind anyone whose shift today has ended but who
+// hasn't submitted a cash closing yet, and nudge employers about closings
+// still waiting for their approval.
 export async function GET() {
   const now = new Date();
   // Local (Europe/Prague) date + HH:MM for comparing against shift end_time.
@@ -42,6 +43,7 @@ export async function GET() {
           title: '📊 Nezapomeň na uzávěrku',
           body: 'Tvoje směna skončila — vyplň prosím uzávěrku kasy.',
           type: 'warning',
+          link: '/employee/shifts?view=closing',
         });
         reminded++;
       } catch { /* best-effort */ }
@@ -50,5 +52,31 @@ export async function GET() {
     console.error('closing remind failed', e);
   }
 
-  return NextResponse.json({ ok: true, reminded });
+  // Closings waiting for approval — one nudge per team per run.
+  let nudgedEmployers = 0;
+  try {
+    const pending = await sql`
+      SELECT cc.team_id, COUNT(*)::int AS n
+      FROM cash_closings cc
+      WHERE cc.approved = FALSE
+      GROUP BY cc.team_id`;
+    for (const t of pending as any[]) {
+      if (!t.team_id || !t.n) continue;
+      const employers = await sql`
+        SELECT id FROM users WHERE team_id = ${t.team_id} AND role = 'employer'`;
+      for (const e of employers as any[]) {
+        try {
+          await notifyUser(e.id, {
+            title: '⚠️ Uzávěrky ke schválení',
+            body: `${t.n} ${t.n === 1 ? 'uzávěrka čeká' : t.n <= 4 ? 'uzávěrky čekají' : 'uzávěrek čeká'} na tvoje schválení.`,
+            type: 'warning',
+            link: '/employer/overview?view=reports',
+          });
+          nudgedEmployers++;
+        } catch { /* best-effort */ }
+      }
+    }
+  } catch { /* approved column may not exist yet */ }
+
+  return NextResponse.json({ ok: true, reminded, nudgedEmployers });
 }

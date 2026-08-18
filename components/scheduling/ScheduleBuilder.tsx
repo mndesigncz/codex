@@ -163,10 +163,34 @@ export default function ScheduleBuilder({ user }: Props) {
   const [shiftTypes, setShiftTypes] = useState<ShiftType[]>([]);
   const [fixed, setFixed] = useState<FixedAssignment[]>([]);
   const [openingHours, setOpeningHours] = useState<Record<string, OpeningDay>>({});
+  // Approved time off — a shift must never land on someone's holiday silently.
+  const [timeOff, setTimeOff] = useState<{ employeeId: number; fromDate: string; toDate: string; status: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
-  const [publishNote, setPublishNote] = useState(false);
+  const [publishNote, setPublishNote] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  const publish = async () => {
+    setPublishing(true);
+    try {
+      const res = await fetch('/api/schedule/publish', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const n = Number(d.notified) || 0;
+        setPublishNote(n === 0
+          ? 'V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.'
+          : `Hotovo — rozvrh dostal${n === 1 ? '' : 'o'} ${n} ${n === 1 ? 'člověk' : n <= 4 ? 'lidi' : 'lidí'} jako notifikaci. Každá další změna se jim ukáže v „Moje směny".`);
+      } else {
+        setPublishNote(d.error || 'Publikování se nepodařilo — zkus to znovu.');
+      }
+    } catch {
+      setPublishNote('Publikování se nepodařilo — zkus to znovu.');
+    }
+    setPublishing(false);
+  };
   const [confirmClear, setConfirmClear] = useState(false);
   // Surfaced when an action on the board didn't reach the server.
   const [boardError, setBoardError] = useState('');
@@ -191,21 +215,23 @@ export default function ScheduleBuilder({ user }: Props) {
   const load = async () => {
     setLoading(true);
     try {
-      const [tRes, aRes, sRes, stRes, faRes, ohRes] = await Promise.all([
+      const [tRes, aRes, sRes, stRes, faRes, ohRes, toRes] = await Promise.all([
         fetch('/api/teams'),
         fetch(`/api/availability?month=${month}`),
         fetch(`/api/schedule?month=${month}`),
         fetch('/api/shift-types'),
         fetch('/api/fixed-assignments'),
         fetch('/api/opening-hours'),
+        fetch('/api/timeoff'),
       ]);
-      const [tData, aData, sData, stData, faData, ohData] = await Promise.all([
+      const [tData, aData, sData, stData, faData, ohData, toData] = await Promise.all([
         tRes.json(),
         aRes.json(),
         sRes.json(),
         stRes.json(),
         faRes.json(),
         ohRes.json(),
+        toRes.json(),
       ]);
       setMembers(tData.members ?? []);
       setSubmissions(aData.submissions ?? []);
@@ -213,6 +239,7 @@ export default function ScheduleBuilder({ user }: Props) {
       setShiftTypes(stData.shiftTypes ?? []);
       setFixed(faData.assignments ?? []);
       setOpeningHours(ohData.openingHours ?? {});
+      setTimeOff(Array.isArray(toData?.requests) ? toData.requests.filter((r: any) => r.status === 'approved') : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -222,7 +249,7 @@ export default function ScheduleBuilder({ user }: Props) {
 
   useEffect(() => {
     load();
-    setPublishNote(false);
+    setPublishNote('');
     setConfirmClear(false);
     setPreview(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,12 +303,18 @@ export default function ScheduleBuilder({ user }: Props) {
     return map;
   }, [preview]);
 
-  const unavailableOn = (date: string) =>
-    new Set(
+  const unavailableOn = (date: string) => {
+    const set = new Set(
       submissions
         .filter((s) => (s.unavailableDates ?? []).includes(date) || s.dayPreferences?.[date] === 'off')
         .map((s) => s.employeeId),
     );
+    // Approved holiday counts as unavailable — the whole point of approving it.
+    timeOff.forEach(t => {
+      if (t.fromDate <= date && date <= t.toDate) set.add(t.employeeId);
+    });
+    return set;
+  };
 
   const addShift = async (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
     const res = await fetch('/api/schedule', {
@@ -490,7 +523,7 @@ export default function ScheduleBuilder({ user }: Props) {
                 key={m}
                 onClick={() => setMonth(m)}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-medium capitalize whitespace-nowrap transition ${
-                  month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
+                  month === m ? 'bg-[#16181A] text-white font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
                 }`}
               >
                 {m === currentMonth ? 'Tento měsíc' : 'Příští měsíc'}
@@ -576,7 +609,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     >
                       <span className="text-base opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="min-w-0 truncate">{e.name}</span>
-                      <span className="text-[10px] uppercase tracking-wide text-black/30 flex-shrink-0">čeká</span>
+                      <span className="text-[11px] uppercase tracking-wide text-black/30 flex-shrink-0">čeká</span>
                     </span>
                   ))}
                 </div>
@@ -637,10 +670,11 @@ export default function ScheduleBuilder({ user }: Props) {
               <span>✨</span> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
             </button>
             <button
-              onClick={() => setPublishNote(true)}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2"
+              onClick={publish}
+              disabled={publishing}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2 disabled:opacity-50"
             >
-              <Icon name="check" size={18} /> Publikovat rozvrh
+              <Icon name="check" size={18} /> {publishing ? 'Posílám…' : 'Publikovat rozvrh'}
             </button>
             <button
               onClick={exportCsv}
@@ -686,10 +720,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {publishNote && (
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
               <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />
-              <p className="text-sm text-black/70">
-                Rozvrh je průběžně ukládán — každá přidaná směna je hned uložena a viditelná zaměstnancům v jejich sekci
-                „Moje směny". Není potřeba nic dalšího potvrzovat.
-              </p>
+              <p className="text-sm text-black/70">{publishNote}</p>
             </div>
           )}
 
@@ -802,7 +833,7 @@ export default function ScheduleBuilder({ user }: Props) {
                           <span
                             key={s.id}
                             title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
-                            className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden bg-black/[0.05] text-black/70"
+                            className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70"
                           >
                             <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: rt.color }} />
                             <span className="flex-shrink-0">{s.employeeAvatar}</span>
@@ -811,21 +842,21 @@ export default function ScheduleBuilder({ user }: Props) {
                         );
                       })}
                       {dayShifts.length > 3 && (
-                        <span className="text-[10px] text-black/45">+{dayShifts.length - 3} další</span>
+                        <span className="text-[11px] text-black/45">+{dayShifts.length - 3} další</span>
                       )}
                       {/* proposed (preview) */}
                       {dayProposed.slice(0, 3).map((p, idx) => (
                         <span
                           key={`p-${idx}`}
                           title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
                         >
                           <span className="flex-shrink-0">✨{p.employeeAvatar}</span>
                           <span className="truncate min-w-0">{p.startTime}</span>
                         </span>
                       ))}
                       {dayProposed.length > 3 && (
-                        <span className="text-[10px] text-[#5B7A08]/70">+{dayProposed.length - 3} návrh</span>
+                        <span className="text-[11px] text-[#5B7A08]/70">+{dayProposed.length - 3} návrh</span>
                       )}
                     </div>
                   </button>
@@ -1463,9 +1494,25 @@ function FixedAssignmentsManager({
                       >
                         <span className="text-base flex-shrink-0">{a.employeeAvatar}</span>
                         <span className="min-w-0 truncate">{a.employeeName}</span>
-                        <span className="text-xs text-black/45 whitespace-nowrap flex-shrink-0">
-                          {a.shiftTypeName ? `· ${a.shiftTypeName}` : '· libovolná'}
-                        </span>
+                        <select
+                          value={a.shiftTypeId ?? ''}
+                          onChange={async (e) => {
+                            const v = e.target.value === '' ? null : parseInt(e.target.value);
+                            const res = await fetch('/api/fixed-assignments', {
+                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: a.id, shiftTypeId: v }),
+                            }).catch(() => null);
+                            if (res?.ok) await onReload();
+                            else setErr('Změnu se nepodařilo uložit.');
+                          }}
+                          className="text-xs text-black/55 bg-transparent border-0 focus:outline-none cursor-pointer max-w-[140px] truncate"
+                          title="Změnit typ směny"
+                        >
+                          <option value="">libovolná</option>
+                          {shiftTypes.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
                         <button
                           onClick={() => remove(a.id)}
                           className="text-black/30 hover:text-red-600 pl-1 flex-shrink-0"
@@ -1665,7 +1712,7 @@ function DayModal({
                   >
                     <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
                     {t.name}
-                    {(t.startsAtOpen || t.endsAtClose) && <span className={`text-[10px] ${active ? 'text-black/50' : 'text-black/35'}`}>{rt.start}–{rt.end}</span>}
+                    {(t.startsAtOpen || t.endsAtClose) && <span className={`text-[11px] ${active ? 'text-black/50' : 'text-black/35'}`}>{rt.start}–{rt.end}</span>}
                   </button>
                 );
               })}
