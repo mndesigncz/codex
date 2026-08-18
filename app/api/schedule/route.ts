@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -91,6 +92,7 @@ export async function DELETE(req: Request) {
     await sql`
       DELETE FROM shifts
       WHERE team_id = ${ctx.teamId} AND to_char(date::date, 'YYYY-MM') = ${month}`;
+    audit(ctx.teamId, ctx.meId ?? null, 'schedule.clearMonth', 'schedule', null, month);
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: 'Chybí id nebo měsíc' }, { status: 400 });

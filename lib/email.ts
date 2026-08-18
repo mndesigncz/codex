@@ -89,3 +89,36 @@ export async function sendShiftRequestNotification(employerEmail: string, employ
     `,
   });
 }
+
+export async function sendOrderEmail(to: string, businessName: string, orderText: string, note?: string | null) {
+  await getResend().emails.send({
+    from: 'Pangea <onboarding@resend.dev>',
+    to,
+    subject: `Objednávka — ${businessName} (${new Date().toLocaleDateString('cs-CZ')})`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px;">
+        <h2 style="margin: 0 0 4px;">Objednávka — ${businessName}</h2>
+        <p style="color: #666; margin: 0 0 20px;">Odesláno z aplikace Pangea.</p>
+        <pre style="background: #F6F7F2; border-radius: 12px; padding: 18px; font-family: inherit; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${orderText.replace(/</g, '&lt;')}</pre>
+        ${note ? `<p style="color: #444;">${String(note).replace(/</g, '&lt;')}</p>` : ''}
+        <p style="color: #999; font-size: 13px;">Odpovězte prosím na tento e-mail s potvrzením a termínem dodání.</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendDigestEmail(to: string, businessName: string, dateLabel: string, html: string) {
+  await getResend().emails.send({
+    from: 'Pangea <onboarding@resend.dev>',
+    to,
+    subject: `Souhrn dne — ${businessName} · ${dateLabel}`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px;">
+        <h2 style="margin: 0 0 2px;">Souhrn dne · ${dateLabel}</h2>
+        <p style="color: #666; margin: 0 0 20px;">${businessName} — automaticky z aplikace Pangea.</p>
+        ${html}
+        <p style="color: #999; font-size: 12px; margin-top: 24px;">Denní souhrn chodí každý večer. Detaily najdete v aplikaci.</p>
+      </div>
+    `,
+  });
+}

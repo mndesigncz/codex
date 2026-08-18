@@ -7,7 +7,7 @@ import { Icon } from './Icons';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing';
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -94,6 +94,14 @@ export default function Settings({ user, initialTab }: Props) {
   const { theme, setTheme } = useTheme();
   const [section, setSection] = useState<SectionId>(initialTab ?? 'account');
   const [interestSent, setInterestSent] = useState(false);
+  const [auditEntries, setAuditEntries] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (section !== 'audit' || auditEntries) return;
+    fetch('/api/audit').then(r => r.json())
+      .then(d => setAuditEntries(Array.isArray(d.entries) ? d.entries : []))
+      .catch(() => setAuditEntries([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
 
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
@@ -286,6 +294,7 @@ export default function Settings({ user, initialTab }: Props) {
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
     ...(isEmployer ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
+    ...(isEmployer ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
   ];
 
   const unreadCount = notifs.filter(n => !n.is_read).length;
@@ -648,6 +657,35 @@ export default function Settings({ user, initialTab }: Props) {
                   </table>
                 </div>
               </div>
+            </div>
+          ) : section === 'audit' ? (
+            <div className="glass-card p-6">
+              <h3 className={cardTitle}>Historie změn</h3>
+              <p className="text-black/45 text-sm mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
+              {auditEntries === null ? (
+                <div className="flex items-center justify-center h-24">
+                  <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+                </div>
+              ) : auditEntries.length === 0 ? (
+                <p className="text-sm text-black/40">Zatím žádné záznamy.</p>
+              ) : (
+                <div className="divide-y divide-black/[0.05]">
+                  {auditEntries.map(e => (
+                    <div key={e.id} className="flex items-start gap-3 py-2.5">
+                      <span className="shrink-0 text-lg">{e.userAvatar}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-[#16181A]">
+                          <strong>{e.userName}</strong> · {e.label}
+                          {e.detail && <span className="text-black/50"> — {e.detail}</span>}
+                        </p>
+                        <p className="text-[11px] text-black/35 tabular-nums">
+                          {new Date(e.createdAt).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <TeamManagement user={user} />

@@ -174,6 +174,31 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     }, 0);
   } catch { /* ignore */ }
 
+  // Punctuality, last 30 days: first clock-in of a day vs the planned start.
+  // Late = more than 10 minutes after. Days without a plan don't count.
+  let punctuality: { checked: number; late: number } | null = null;
+  try {
+    const rows = await sql`
+      SELECT s.date, s.start_time,
+             (SELECT MIN(te.clock_in) FROM time_entries te
+              WHERE te.employee_id = ${employeeId}
+                AND to_char(te.clock_in, 'YYYY-MM-DD') = s.date) AS first_in
+      FROM shifts s
+      WHERE s.employee_id = ${employeeId} AND s.start_time IS NOT NULL
+        AND s.date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')
+        AND s.date <= to_char(NOW(), 'YYYY-MM-DD')`;
+    let checked = 0, late = 0;
+    for (const r of rows as any[]) {
+      if (!r.first_in) continue;
+      checked++;
+      const [ph, pm] = String(r.start_time).split(':').map(Number);
+      const inD = new Date(r.first_in);
+      const inMin = inD.getHours() * 60 + inD.getMinutes();
+      if (inMin - (ph * 60 + pm) > 10) late++;
+    }
+    if (checked > 0) punctuality = { checked, late };
+  } catch { /* ignore */ }
+
   let closingsMonth = 0;
   try {
     const [r] = await sql`
@@ -198,5 +223,6 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     shifts: { upcoming, recent },
     reviews, items,
     month: { hoursMs: monthMs, shifts: recent.filter(sh => sh.date.startsWith(monthKey)).length + upcoming.filter(sh => sh.date.startsWith(monthKey)).length, closings: closingsMonth },
+    punctuality,
   });
 }

@@ -617,6 +617,88 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW(),
         completed_at TIMESTAMP
       )`;
+    // suppliers as first-class entities; items/orders point at them
+    await sql`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_id INTEGER`;
+    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_id INTEGER`;
+    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`;
+    // rewards catalog: what points can buy, and who asked for what
+    await sql`
+      CREATE TABLE IF NOT EXISTS rewards_catalog (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        icon TEXT,
+        cost INTEGER NOT NULL,
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS reward_redemptions (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        employee_id INTEGER NOT NULL,
+        reward_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        cost INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        decided_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        decided_at TIMESTAMP
+      )`;
+    // guides that every employee must read, with read receipts
+    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS require_read BOOLEAN DEFAULT FALSE`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS guide_reads (
+        id SERIAL PRIMARY KEY,
+        guide_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        read_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (guide_id, user_id)
+      )`;
+    // quick polls inside the team chat
+    await sql`
+      CREATE TABLE IF NOT EXISTS polls (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        conversation_id INTEGER,
+        question TEXT NOT NULL,
+        options JSONB NOT NULL,
+        created_by INTEGER NOT NULL,
+        closed BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS poll_votes (
+        id SERIAL PRIMARY KEY,
+        poll_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        option_idx INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (poll_id, user_id)
+      )`;
+    // audit trail of the important writes, for the employer's eyes
+    await sql`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER,
+        user_id INTEGER,
+        action TEXT NOT NULL,
+        entity TEXT,
+        entity_id INTEGER,
+        detail TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS audit_log_team ON audit_log (team_id, created_at DESC)`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

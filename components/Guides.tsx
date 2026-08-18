@@ -27,6 +27,9 @@ interface GuideSummary {
   hasChecklist: boolean;
   approved?: boolean;
   submittedBy?: number | null;
+  requireRead?: boolean;
+  readCount?: number;
+  myRead?: boolean;
 }
 
 interface GuideFull {
@@ -420,6 +423,14 @@ export default function Guides({ user }: { user: User }) {
                           {cat.name}
                         </span>
                       )}
+                      {g.requireRead && (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'
+                        }`}>
+                          📖 {g.myRead ? 'přečteno ✓' : 'povinné čtení'}
+                          {isEmployer && <span className="font-normal opacity-70">· {g.readCount ?? 0}×</span>}
+                        </span>
+                      )}
                       {g.hasChecklist && (
                         <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
                           <Icon name="check" size={12} strokeWidth={2.2} />
@@ -467,6 +478,45 @@ export default function Guides({ user }: { user: User }) {
                     Aktualizováno {formatDate(reader.updatedAt)}
                   </p>
                 )}
+                {(() => {
+                  const summary = guides.find(g => g.id === reader.id);
+                  if (!summary) return null;
+                  return (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {summary.requireRead && !summary.myRead && user.role !== 'kiosk' && (
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/guides/${reader.id}`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ markRead: true }),
+                            }).catch(() => null);
+                            if (res?.ok) await loadGuides();
+                          }}
+                          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
+                          ✓ Potvrzuji přečtení
+                        </button>
+                      )}
+                      {summary.requireRead && summary.myRead && (
+                        <span className="rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno ✓</span>
+                      )}
+                      {isEmployer && (
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/guides/${reader.id}`, {
+                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ requireRead: !(summary.requireRead === true) }),
+                            }).catch(() => null);
+                            if (res?.ok) await loadGuides();
+                          }}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                            summary.requireRead ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
+                          }`}>
+                          {summary.requireRead ? 'Zrušit povinné čtení' : '📖 Označit jako povinné čtení'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {isEmployer && !readerLoading && (

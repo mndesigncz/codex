@@ -24,6 +24,7 @@ interface Profile {
   reviews: Review[];
   items: FeedbackItem[];
   month: { hoursMs: number; shifts: number; closings: number };
+  punctuality?: { checked: number; late: number } | null;
 }
 
 const KIND_LABEL: Record<string, string> = { task: 'Úkol', procedure: 'Postup', closing: 'Uzávěrka' };
@@ -142,6 +143,16 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                         <p className="text-[11px] text-black/45 mt-0.5">uzávěrek</p>
                       </div>
                     </div>
+                    {p.punctuality && (
+                      <p className={`mt-2 text-[12px] rounded-xl px-3 py-2 ${
+                        p.punctuality.late === 0
+                          ? 'bg-[#C8F542]/10 text-[#5B7A08]'
+                          : 'bg-amber-500/10 text-amber-700'
+                      }`}>
+                        ⏰ Dochvilnost (30 dní): {p.punctuality.checked - p.punctuality.late}/{p.punctuality.checked} včas
+                        {p.punctuality.late > 0 && ` · ${p.punctuality.late}× pozdě (víc než 10 min)`}
+                      </p>
+                    )}
                   </div>
 
                   {/* Points breakdown */}

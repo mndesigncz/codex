@@ -106,6 +106,25 @@ export default function MyRewards() {
 function MyRewardsInner() {
   const [levels, setLevels] = useState<RewardLevel[]>([]);
   const [me, setMe] = useState<Me | null>(null);
+  // Rewards shop: what points can buy + my redemption requests.
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [myRedemptions, setMyRedemptions] = useState<any[]>([]);
+  const [shopMsg, setShopMsg] = useState('');
+  const loadShop = () =>
+    fetch('/api/rewards/catalog').then(r => r.json()).then(d => {
+      setCatalog(Array.isArray(d.catalog) ? d.catalog : []);
+      setMyRedemptions(Array.isArray(d.redemptions) ? d.redemptions : []);
+    }).catch(() => {});
+  useEffect(() => { loadShop(); }, []);
+  const redeem = async (rw: any) => {
+    if (!confirm(`Vyměnit ${rw.cost} bodů za „${rw.title}"? Vedení žádost schválí.`)) return;
+    const res = await fetch('/api/rewards/catalog', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rewardId: rw.id }),
+    }).catch(() => null);
+    if (res?.ok) { setShopMsg('Žádost odeslána — počká na schválení vedením. ✓'); loadShop(); setTimeout(() => setShopMsg(''), 4000); }
+    else setShopMsg('Žádost se nepodařilo odeslat.');
+  };
   const [reviews, setReviews] = useState<Review[]>([]);
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [unseenFlagged, setUnseenFlagged] = useState(0);
@@ -229,6 +248,54 @@ function MyRewardsInner() {
           )}
         </div>
       </div>
+
+      {/* Rewards shop */}
+      {catalog.length > 0 && (
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+            <h3 className="font-bold tracking-tight text-[#16181A]">🎁 Katalog odměn</h3>
+            <span className="text-xs text-black/40">máš {me.points} bodů</span>
+          </div>
+          <p className="text-sm text-black/45 mb-4">Vyměň body za odměnu — žádost schválí vedení a body se odečtou.</p>
+          {shopMsg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-2.5 mb-3">{shopMsg}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {catalog.map(rw => {
+              const afford = me.points >= rw.cost;
+              const pending = myRedemptions.some(r => r.reward_id === rw.id && r.status === 'pending');
+              return (
+                <div key={rw.id} className="flex items-center gap-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+                  <span className="text-2xl shrink-0">{rw.icon ?? '🎁'}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[#16181A] truncate">{rw.title}</p>
+                    <p className="text-xs text-black/45 tabular-nums">{rw.cost} bodů</p>
+                  </div>
+                  <button onClick={() => redeem(rw)} disabled={!afford || pending}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition ${
+                      pending ? 'bg-amber-500/12 text-amber-700 cursor-default'
+                      : afford ? 'bg-[#16181A] text-white hover:bg-black'
+                      : 'bg-black/[0.05] text-black/35 cursor-not-allowed'
+                    }`}>
+                    {pending ? 'Čeká…' : afford ? 'Vyměnit' : 'Málo bodů'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {myRedemptions.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {myRedemptions.slice(0, 6).map(r => (
+                <span key={r.id} className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                  r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#5B7A08]'
+                  : r.status === 'declined' ? 'bg-red-500/10 text-red-600'
+                  : 'bg-amber-500/12 text-amber-700'
+                }`}>
+                  {r.title} · {r.status === 'approved' ? 'schváleno ✓' : r.status === 'declined' ? 'zamítnuto' : 'čeká'}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* How points are earned */}
       <div className="glass-card p-5">

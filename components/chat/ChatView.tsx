@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/Icons';
+import PollsStrip from './Polls';
 import {
   Conversation,
   ChatMessage,
@@ -251,6 +252,7 @@ function Thread({
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4 space-y-2">
+        {conv.type === 'team' && <PollsStrip meId={meId} />}
         {loading && (
           <div className="text-center text-black/45 text-sm py-6">Načítání…</div>
         )}

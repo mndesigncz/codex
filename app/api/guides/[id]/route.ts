@@ -80,6 +80,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const body = await request.json();
 
+  // Mark/unmark as required reading for the whole team.
+  if (body.requireRead !== undefined) {
+    try {
+      await sql`UPDATE guides SET require_read = ${body.requireRead === true} WHERE id = ${id} AND team_id = ${c.teamId}`;
+      if (body.requireRead === true) {
+        const members = await sql`SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employee'`;
+        const [g2] = await sql`SELECT title FROM guides WHERE id = ${id}`;
+        const { notifyUsers } = await import('@/lib/push');
+        await notifyUsers((members as any[]).map(m => m.id), {
+          title: '📖 Povinné čtení',
+          body: `Návod „${g2?.title ?? ''}" je povinný — přečti a potvrď.`,
+          type: 'info',
+          link: '/employee/shifts?view=guides',
+        });
+      }
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: 'Není dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
+
   // Approving an employee proposal.
   if (body.approve === true) {
     try {
@@ -151,4 +172,24 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   await sql`DELETE FROM guides WHERE id = ${id} AND team_id = ${c.teamId}`;
   return NextResponse.json({ ok: true });
+}
+
+// POST — the reader confirms they read a required guide: { markRead: true }.
+export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const c = await ctx();
+  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (c.role === 'kiosk') return NextResponse.json({ error: 'Potvrzení čtení je osobní — přihlas se svým účtem.' }, { status: 403 });
+  const id = parseInt(params.id);
+  const b = await request.json().catch(() => ({}));
+  if (b.markRead !== true) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
+  const [g] = await sql`SELECT id FROM guides WHERE id = ${id} AND team_id = ${c.teamId}`;
+  if (!g) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
+  try {
+    await sql`
+      INSERT INTO guide_reads (guide_id, user_id) VALUES (${id}, ${c.meId})
+      ON CONFLICT (guide_id, user_id) DO NOTHING`;
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: 'Potvrzení není dostupné — spusť /api/init.' }, { status: 400 });
+  }
 }

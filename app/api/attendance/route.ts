@@ -190,6 +190,34 @@ export async function POST(req: NextRequest) {
     // No planned shift for today? Create one from the clock-in so the closing counts it.
     const now = hhmmPrague();
     await ensureShift(c.teamId, employeeId, today, now, now);
+
+    // Late check: a planned start more than 10 minutes ago means the shift
+    // started without them — tell the employer while it still matters.
+    try {
+      const [planned] = await sql`
+        SELECT start_time FROM shifts
+        WHERE employee_id = ${employeeId} AND date = ${today} AND start_time IS NOT NULL
+        ORDER BY start_time ASC LIMIT 1`;
+      if (planned?.start_time) {
+        const [ph, pm] = String(planned.start_time).split(':').map(Number);
+        const [nh, nm] = now.split(':').map(Number);
+        const lateMin = (nh * 60 + nm) - (ph * 60 + pm);
+        if (lateMin > 10 && lateMin < 12 * 60) {
+          const [emp2] = await sql`SELECT name FROM users WHERE id = ${employeeId}`;
+          const employers = await sql`
+            SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${employeeId}`;
+          const { notifyUsers } = await import('@/lib/push');
+          await notifyUsers((employers as any[]).map(e => e.id), {
+            title: '⏰ Pozdní příchod',
+            body: `${emp2?.name ?? 'Zaměstnanec'} se odpíchl/a v ${now} — směna začínala v ${String(planned.start_time).slice(0, 5)} (+${lateMin} min).`,
+            type: 'warning',
+            category: 'shift',
+            link: '/employer/overview?view=attendance',
+          });
+        }
+      }
+    } catch { /* late check is best-effort */ }
+
     return NextResponse.json({ ok: true, action: 'in', entry: row });
   }
 
