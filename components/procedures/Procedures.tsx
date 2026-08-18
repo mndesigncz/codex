@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
+import { isExcused, skipReasonLabel } from '@/lib/procedureScoring';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
-import { parseSteps, totalMinutes, fmtMinutes, timeRange, type Step } from '@/lib/steps';
+import { parseSteps, totalMinutes, fmtMinutes, timeRange, STEP_WEIGHTS, weightSpec, stepPenalty, stepPlus, type Step } from '@/lib/steps';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -16,6 +17,7 @@ interface Procedure extends ProcedureLite {
   icon: string;
   color: string;
   remindAt?: string | null;
+  requireBeforeClosing?: boolean;
   remindDays?: number[] | null;
 }
 
@@ -101,6 +103,8 @@ export default function Procedures({ user }: Props) {
 
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [runs, setRuns] = useState<RunRow[]>([]);
+  // Clicking a finished run opens the exact ✓/✗/skip breakdown.
+  const [runDetail, setRunDetail] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -292,7 +296,9 @@ export default function Procedures({ user }: Props) {
                 const checkedCount = Array.isArray(r.checked_items) ? r.checked_items.length : 0;
                 const missing = Math.max(0, (r.total_items ?? 0) - checkedCount);
                 return (
-                  <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+                  <div key={r.id}
+                    onClick={() => done && setRunDetail(r)}
+                    className={`flex items-center gap-3 px-4 py-3 ${done ? 'cursor-pointer hover:bg-black/[0.03] transition-colors' : ''}`}>
                     <PersonLink id={r.user_id} className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{r.user_avatar || '👤'}</PersonLink>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-[#16181A] truncate">
@@ -378,6 +384,68 @@ export default function Procedures({ user }: Props) {
           }}
         />
       )}
+      {runDetail && (() => {
+        const steps = parseSteps(
+          procedures.find(p => p.id === runDetail.procedure_id)?.items ?? []
+        );
+        const checked: number[] = Array.isArray(runDetail.checked_items) ? runDetail.checked_items : [];
+        const skipped: number[] = Array.isArray(runDetail.skipped_items) ? runDetail.skipped_items : [];
+        const reasons = runDetail.skip_reasons && typeof runDetail.skip_reasons === 'object' ? runDetail.skip_reasons : {};
+        return (
+          <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setRunDetail(null)}>
+            <div className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <h3 className="text-lg font-bold tracking-tight text-[#16181A] min-w-0">{runDetail.procedure_name}</h3>
+                <button onClick={() => setRunDetail(null)} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+              </div>
+              <p className="text-sm text-black/50 mb-4">
+                {runDetail.user_avatar ?? '👤'} {runDetail.user_name} · {fmtWhen(runDetail.completed_at || runDetail.started_at)} · {fmtDuration(runDetail.duration_seconds)}
+              </p>
+              {steps.length === 0 ? (
+                <p className="text-sm text-black/45">Kroky tohoto postupu už nejsou k dispozici (postup byl změněn nebo smazán).</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {steps.map((st, i) => {
+                    const isDone = checked.includes(i);
+                    const isSkip = skipped.includes(i);
+                    const reason = reasons[String(i)];
+                    const excused = reason && isExcused(reason.reason);
+                    return (
+                      <div key={i} className={`rounded-2xl border px-3.5 py-2.5 ${
+                        isDone ? 'border-[#C8F542]/30 bg-[#C8F542]/[0.07]'
+                        : isSkip && excused ? 'border-black/[0.08] bg-black/[0.02]'
+                        : 'border-red-500/25 bg-red-500/[0.05]'
+                      }`}>
+                        <div className="flex items-start gap-2.5">
+                          <span className="shrink-0 mt-0.5 text-sm">{isDone ? '✅' : isSkip ? '⏭️' : '❌'}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-sm ${isDone ? 'text-[#16181A]' : 'text-black/70'}`}>
+                              {st.emoji ? `${st.emoji} ` : ''}{st.text}
+                              {st.weight === 'key' && <span className="ml-1.5 rounded-full bg-[#16181A] text-white px-1.5 py-0.5 text-[10px] font-bold align-middle">KLÍČOVÝ</span>}
+                            </p>
+                            {isSkip && (
+                              <p className={`text-xs mt-0.5 ${excused ? 'text-black/45' : 'text-red-600'}`}>
+                                {skipReasonLabel(reason?.reason)}{reason?.note ? ` — „${reason.note}"` : ''}
+                                {excused ? ' · omluveno, bez bodové ztráty' : ` · −${stepPenalty(st)} b.`}
+                              </p>
+                            )}
+                            {!isDone && !isSkip && (
+                              <p className="text-xs text-red-600 mt-0.5">Nedokončeno · −{stepPenalty(st)} b.</p>
+                            )}
+                          </div>
+                          {isDone && stepPlus(st) > 0 && (
+                            <span className="shrink-0 text-xs font-semibold text-[#5B7A08] tabular-nums">+{stepPlus(st)}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -472,6 +540,7 @@ function EmptyState({ isEmployer, seeding, onSeed, onNew }: { isEmployer: boolea
           </button>
         </div>
       )}
+
     </div>
   );
 }
@@ -492,10 +561,11 @@ function ProcedureEditor({
   const [remindAnchor, setRemindAnchor] = useState<'time' | 'open' | 'close'>(
     (initial?.remindAnchor as 'time' | 'open' | 'close') ?? 'time'
   );
+  const [requireBeforeClosing, setRequireBeforeClosing] = useState<boolean>((initial as any)?.requireBeforeClosing === true);
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
-  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null });
+  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null });
   const [steps, setSteps] = useState<Step[]>(() => {
     const parsed = parseSteps(initial?.items);
     return parsed.length ? parsed : [blankStep()];
@@ -536,6 +606,7 @@ function ProcedureEditor({
         remindAnchor,
         remindAt: remindAnchor === 'time' ? (remindAt || null) : null,
         remindDays: reminderOn ? remindDays : [],
+        requireBeforeClosing,
       };
       const res = await fetch(initial ? `/api/procedures/${initial.id}` : '/api/procedures', {
         method: initial ? 'PATCH' : 'POST',
@@ -607,7 +678,7 @@ function ProcedureEditor({
 
           <div>
             <label className="block text-xs font-medium text-black/50 mb-1.5">Kroky</label>
-            <p className="mb-2 text-xs text-black/40">Emoji a čas jsou nepovinné. Poznámka se zobrazí pod krokem.</p>
+            <p className="mb-2 text-xs text-black/40">Emoji a čas jsou nepovinné. Důležitost kroku řídí automatické body: hotový krok přičítá, vynechaný odečítá (Klíčový +2/−3, Běžný +1/−1, Drobný 0). Vlastní minus body mají přednost.</p>
             <div className="space-y-2.5">
               {steps.map((s, i) => (
                 <div key={i} className="space-y-2.5">
@@ -637,7 +708,27 @@ function ProcedureEditor({
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-black/35">m</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Importance drives automatic points: done = +, missed = − */}
+                    <div className="flex gap-1 rounded-full bg-white/60 border border-black/[0.07] p-0.5">
+                      {STEP_WEIGHTS.map(w => (
+                        <button key={w.id} type="button" title={`${w.hint} (+${w.plus} / −${s.penalty ?? w.minus})`}
+                          onClick={() => patchStep(i, { weight: w.id })}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                            (s.weight ?? 'normal') === w.id ? 'bg-[#16181A] text-white' : 'text-black/45 hover:text-black'
+                          }`}>
+                          {w.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative flex-shrink-0" title="Vlastní minus body, když se krok neudělá">
+                      <input type="number" min={0} inputMode="numeric"
+                        value={s.penalty ?? ''}
+                        onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
+                        placeholder={String(weightSpec(s.weight ?? 'normal').minus)}
+                        className="w-[64px] rounded-xl bg-white/60 border border-black/[0.07] pl-6 pr-2 py-1.5 text-xs tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-red-500/70">−</span>
+                    </div>
                     <input
                       value={s.note ?? ''}
                       onChange={e => patchStep(i, { note: e.target.value })}
@@ -672,6 +763,15 @@ function ProcedureEditor({
               <Icon name="plus" size={16} /> Přidat krok
             </button>
           </div>
+
+          <label className="flex items-start justify-between gap-4 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 cursor-pointer">
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-[#16181A]">Vyžadovat před uzávěrkou</span>
+              <span className="block text-xs text-black/45 mt-0.5">Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne.</span>
+            </span>
+            <input type="checkbox" checked={requireBeforeClosing} onChange={e => setRequireBeforeClosing(e.target.checked)}
+              className="mt-1 h-5 w-5 rounded accent-[#5B9E00] shrink-0" />
+          </label>
 
           <div>
             <label className="block text-xs font-medium text-black/50 mb-1.5">Připomínka (nepovinné)</label>

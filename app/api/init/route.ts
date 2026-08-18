@@ -587,6 +587,9 @@ export async function GET() {
         UNIQUE (employee_id, work_date, kind, ref_id)
       )`;
     await sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`;
+    // per-step skip reasons on a run + which procedures are mandatory before the closing
+    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`;
+    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

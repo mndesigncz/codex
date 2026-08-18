@@ -297,6 +297,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // Today's procedure runs — the closing is the natural moment to notice an
   // unfinished closing checklist.
   const [todayRuns, setTodayRuns] = useState<any[]>([]);
+  // Procedures the employer marked as mandatory before the closing.
+  const [requiredProcs, setRequiredProcs] = useState<{ id: number; name: string; icon?: string }[]>([]);
   // Counting the drawer by denomination instead of typing one total. When the
   // counter is on, the counted total drives form.closingCash.
   const [countMode, setCountMode] = useState(false);
@@ -319,11 +321,15 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       setTipsInDrawer(drawer);
     } catch { /* keep the safe default: tips are kept aside */ }
     try {
-      const rd = await fetch('/api/procedures/runs').then(r => r.json());
-      const today = new Date().toISOString().slice(0, 10);
-      setTodayRuns((Array.isArray(rd?.runs) ? rd.runs : []).filter((r: any) =>
-        String(r.completed_at ?? r.started_at ?? '').slice(0, 10) === today));
+      const rd = await fetch('/api/procedures/runs?today=team').then(r => r.json());
+      setTodayRuns(Array.isArray(rd?.runs) ? rd.runs : []);
     } catch { /* runs are a nice-to-have here */ }
+    try {
+      const pd = await fetch('/api/procedures').then(r => r.json());
+      const list = Array.isArray(pd?.procedures) ? pd.procedures : [];
+      setRequiredProcs(list.filter((p: any) => p.requireBeforeClosing === true)
+        .map((p: any) => ({ id: p.id, name: p.name, icon: p.icon })));
+    } catch { /* enforcement needs the list; without it nothing blocks */ }
     try {
       const d = await fetch('/api/closings').then(r => r.json());
       const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
@@ -447,10 +453,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const scrollToStep = (i: number) =>
     stepRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  // A required procedure counts as done when ANYONE on the team completed it today.
+  const missingRequired = requiredProcs.filter(p =>
+    !todayRuns.some((r: any) => r.procedure_id === p.id && r.status === 'completed'));
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setMsg('');
     if (form.closingCash === '') { setErr('Zadej skutečný stav kasy na konci směny.'); return; }
     if (leaveTooHigh) { setErr('V kase nemůže zůstat víc, než kolik jsi napočítal/a. Uprav odvod na konci směny.'); return; }
+    if (missingRequired.length > 0 && !isEmployer) {
+      setErr(`Nejdřív dokonči ${missingRequired.length === 1 ? 'povinný postup' : 'povinné postupy'}: ${missingRequired.map(p => p.name).join(', ')}. Pak půjde uzávěrka odeslat.`);
+      return;
+    }
+    if (missingRequired.length > 0 && isEmployer && !confirm(`Povinné postupy nejsou dokončené (${missingRequired.map(p => p.name).join(', ')}). Odeslat uzávěrku přesto?`)) return;
     // Employee closing a day they weren't on shift ⇒ confirm the approval path.
     if (isSelf && !onShift) { setShowConfirm(true); return; }
     doSubmit();
@@ -991,6 +1006,22 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         <div>
+          {missingRequired.length > 0 && (
+            <div className="rounded-2xl bg-red-500/[0.07] border border-red-500/25 p-4">
+              <p className="text-sm font-semibold text-red-600 flex items-center gap-2">
+                <Icon name="warning" size={16} /> Před uzávěrkou je potřeba dokončit:
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {missingRequired.map(p => (
+                  <span key={p.id} className="rounded-full bg-white/70 border border-red-500/20 px-3 py-1.5 text-sm text-[#16181A]">
+                    {p.icon ?? '📋'} {p.name}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[12px] text-black/45 mt-2">Najdeš je v sekci Postupy. Jakmile je někdo ze směny dokončí, uzávěrka půjde odeslat.</p>
+            </div>
+          )}
+
           {todayRuns.length > 0 && (
             <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní postupy</p>
