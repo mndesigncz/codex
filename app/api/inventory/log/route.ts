@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       FROM inventory_log l
       LEFT JOIN users u ON u.id = l.user_id
       LEFT JOIN inventory_items i ON i.id = l.item_id
-      WHERE l.item_id = ${parseInt(itemId)}
+      WHERE l.item_id = ${parseInt(itemId)} AND i.team_id = ${me.teamId}
       ORDER BY l.created_at DESC
       LIMIT 30`;
     return NextResponse.json(rows);

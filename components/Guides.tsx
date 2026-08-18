@@ -482,7 +482,7 @@ export default function Guides({ user }: { user: User }) {
             ) : (
               <>
                 <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
-                {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} />}
+                {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} guideId={reader.id} />}
               </>
             )}
           </div>
@@ -514,9 +514,29 @@ export default function Guides({ user }: { user: User }) {
   );
 }
 
-// Interactive tick list for the reader. State is local to the session — resets on reopen.
-function ReaderChecklist({ steps }: { steps: string[] }) {
-  const [done, setDone] = useState<boolean[]>(() => steps.map(() => false));
+// Interactive tick list for the reader. Progress survives closing the reader —
+// it lives in localStorage per guide on this device, and clears itself once
+// the list is completed (next open starts fresh).
+function ReaderChecklist({ steps, guideId }: { steps: string[]; guideId?: number }) {
+  const storageKey = guideId ? `pangea-guide-ticks-${guideId}` : null;
+  const [done, setDone] = useState<boolean[]>(() => {
+    if (storageKey) {
+      try {
+        const raw = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+        if (Array.isArray(raw) && raw.length === steps.length) return raw.map(Boolean);
+      } catch { /* fall through */ }
+    }
+    return steps.map(() => false);
+  });
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const all = done.length > 0 && done.every(Boolean);
+      if (all) localStorage.removeItem(storageKey);
+      else if (done.some(Boolean)) localStorage.setItem(storageKey, JSON.stringify(done));
+      else localStorage.removeItem(storageKey);
+    } catch { /* storage full/blocked — ticks just won't persist */ }
+  }, [done, storageKey]);
 
   const doneCount = done.filter(Boolean).length;
   const total = steps.length;

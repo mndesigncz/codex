@@ -1494,9 +1494,25 @@ function FixedAssignmentsManager({
                       >
                         <span className="text-base flex-shrink-0">{a.employeeAvatar}</span>
                         <span className="min-w-0 truncate">{a.employeeName}</span>
-                        <span className="text-xs text-black/45 whitespace-nowrap flex-shrink-0">
-                          {a.shiftTypeName ? `· ${a.shiftTypeName}` : '· libovolná'}
-                        </span>
+                        <select
+                          value={a.shiftTypeId ?? ''}
+                          onChange={async (e) => {
+                            const v = e.target.value === '' ? null : parseInt(e.target.value);
+                            const res = await fetch('/api/fixed-assignments', {
+                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: a.id, shiftTypeId: v }),
+                            }).catch(() => null);
+                            if (res?.ok) await onReload();
+                            else setErr('Změnu se nepodařilo uložit.');
+                          }}
+                          className="text-xs text-black/55 bg-transparent border-0 focus:outline-none cursor-pointer max-w-[140px] truncate"
+                          title="Změnit typ směny"
+                        >
+                          <option value="">libovolná</option>
+                          {shiftTypes.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
                         <button
                           onClick={() => remove(a.id)}
                           className="text-black/30 hover:text-red-600 pl-1 flex-shrink-0"

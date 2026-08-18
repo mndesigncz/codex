@@ -122,6 +122,23 @@ export default function SuggestionsBoard() {
     } catch { setItems(prev); }
   };
 
+  // Author edits their own idea in place.
+  const [editing, setEditing] = useState<Suggestion | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const saveEdit = async () => {
+    if (!editing || !editTitle.trim()) return;
+    setSavingEdit(true);
+    const res = await fetch(`/api/suggestions/${editing.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editTitle.trim(), content: editContent.trim() }),
+    }).catch(() => null);
+    setSavingEdit(false);
+    if (res?.ok) { setEditing(null); await load(); }
+    else setErr('Úpravu se nepodařilo uložit.');
+  };
+
   const remove = async (s: Suggestion) => {
     if (!confirm('Smazat tento podnět?')) return;
     const prev = items;
@@ -236,7 +253,13 @@ export default function SuggestionsBoard() {
                 </div>
 
                 {(isEmployer || mine) && (
-                  <div className="flex justify-end mt-1">
+                  <div className="flex justify-end gap-1 mt-1">
+                    {mine && (
+                      <button onClick={() => { setEditing(s); setEditTitle(s.title); setEditContent(s.content ?? ''); }}
+                        className="text-xs text-black/35 hover:text-black rounded-full px-2 py-1 transition">
+                        Upravit
+                      </button>
+                    )}
                     <button onClick={() => remove(s)}
                       className="text-xs text-black/35 hover:text-red-600 rounded-full px-2 py-1 transition">
                       Smazat
@@ -287,6 +310,26 @@ export default function SuggestionsBoard() {
           </div>
         </div>
       )}
+      {editing && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditing(null)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit podnět</h3>
+            <div className="space-y-3">
+              <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200}
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+              <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000}
+                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+              <button onClick={saveEdit} disabled={savingEdit || !editTitle.trim()} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                {savingEdit ? 'Ukládám…' : 'Uložit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

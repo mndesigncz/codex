@@ -159,6 +159,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   // Reports employees filed via "Nahlásit chybějící" on the tablet/phone.
   const [reports, setReports] = useState<any[]>([]);
   const [showReports, setShowReports] = useState(false);
+  // Movement history of the item being edited — who changed the stock and when.
+  const [itemLog, setItemLog] = useState<any[]>([]);
+  const [logOpen, setLogOpen] = useState(false);
   // Parked items live behind a toggle so they can't clutter the active stock.
   const [showArchived, setShowArchived] = useState(false);
   // Bulk editing: a selection mode with a bar of actions for what is ticked.
@@ -360,6 +363,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     setEditing(null);
     setForm(seedForm(catId ?? categories[0]?.id ?? null));
     setNewCatInline('');
+    setItemLog([]); setLogOpen(false);
     setShowForm(true);
   };
   const openEdit = (i: Item) => {
@@ -367,6 +371,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     setEditing(i);
     setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true });
     setNewCatInline('');
+    setItemLog([]); setLogOpen(false);
+    fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
+      .then(d => setItemLog(Array.isArray(d.log) ? d.log : Array.isArray(d) ? d : []))
+      .catch(() => {});
     setShowForm(true);
   };
 
@@ -845,6 +853,35 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
             </div>
 
             {/* Sticky footer */}
+            {editing && itemLog.length > 0 && (
+              <div className="px-6 pb-4">
+                <button type="button" onClick={() => setLogOpen(o => !o)}
+                  className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
+                  <span>🕓 Historie změn ({itemLog.length})</span>
+                  <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${logOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {logOpen && (
+                  <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] max-h-56 overflow-y-auto scrollbar-thin">
+                    {itemLog.map((l: any) => {
+                      const delta = Number(l.newQuantity) - Number(l.oldQuantity);
+                      return (
+                        <div key={l.id} className="flex items-center gap-2.5 px-4 py-2.5 text-sm">
+                          <span className={`shrink-0 font-bold tabular-nums ${delta > 0 ? 'text-[#5B7A08]' : delta < 0 ? 'text-red-600' : 'text-black/40'}`}>
+                            {delta > 0 ? `+${delta}` : delta}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-black/55">
+                            {l.userName ?? 'Někdo'}{l.note ? ` · ${l.note}` : ''}
+                          </span>
+                          <span className="shrink-0 text-xs text-black/35 tabular-nums">
+                            {new Date(l.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="sticky bottom-0 z-10 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06] space-y-2.5">
               {formErr && (
                 <p className="text-sm font-medium text-red-600 flex items-center gap-1.5">
