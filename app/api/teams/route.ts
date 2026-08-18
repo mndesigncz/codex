@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
+import { planInfoOf } from '@/lib/plan';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,6 +86,13 @@ export async function GET() {
       };
     } catch { /* columns not migrated yet */ }
 
+    // Plan & trial — resolved server-side so every client agrees on the label.
+    let planRow: any = null;
+    try {
+      [planRow] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
+    } catch { /* columns not migrated yet ⇒ grandfathered pro */ }
+    const planInfo = planInfoOf(planRow);
+
     let members: any[];
     try {
       members = await sql`
@@ -98,6 +106,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      planInfo,
       team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
       members,
       isOwner: team?.owner_id === me.id,

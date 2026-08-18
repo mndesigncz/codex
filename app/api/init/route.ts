@@ -527,6 +527,12 @@ export async function GET() {
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_note TEXT`;
     // How the drawer was counted, by denomination — {"500": 3, "100": 7}.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS denominations JSONB`;
+    // Plans & billing prep: stored plan + trial end. Existing teams are
+    // grandfathered to Pro (the UPDATE touches only NULL rows, so it's
+    // idempotent and never downgrades anyone).
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS plan TEXT`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP`;
+    await sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`;
     // end-of-shift removal: cash carried out AFTER the drawer was counted
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`;
 

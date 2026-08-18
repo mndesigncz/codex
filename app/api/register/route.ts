@@ -40,10 +40,20 @@ export async function POST(request: Request) {
       if (clash.length === 0) break;
       joinCode = generateJoinCode();
     }
-    const [team] = await sql`
-      INSERT INTO teams (name, owner_id, join_code)
-      VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode})
-      RETURNING id, join_code`;
+    // New teams start on the free plan with a full-featured trial.
+    let team: any;
+    try {
+      [team] = await sql`
+        INSERT INTO teams (name, owner_id, join_code, plan, trial_ends_at)
+        VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode}, 'free', NOW() + INTERVAL '30 days')
+        RETURNING id, join_code`;
+    } catch {
+      // plan columns not migrated yet
+      [team] = await sql`
+        INSERT INTO teams (name, owner_id, join_code)
+        VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode})
+        RETURNING id, join_code`;
+    }
 
     // Link owner to team
     await sql`UPDATE users SET team_id = ${team.id} WHERE id = ${user.id}`;

@@ -53,7 +53,8 @@ export default function RegisterPage() {
           <div className="glass-card p-8">
             <div className="text-4xl mb-3">🎉</div>
             <h1 className="text-2xl font-bold tracking-tight text-[#16181A] mb-2">Podnik vytvořen!</h1>
-            <p className="text-black/55 text-sm mb-6">Sdílejte tento kód se zaměstnanci — připojí se do vašeho týmu.</p>
+            <p className="text-black/55 text-sm mb-2">Sdílejte tento kód se zaměstnanci — připojí se do vašeho týmu.</p>
+            <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6">Prvních 30 dní máte všechny funkce Pro zdarma.</p>
             <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-6 mb-6">
               <p className="text-xs uppercase tracking-[0.2em] text-black/45 mb-2">Kód týmu</p>
               <p className="text-4xl font-bold tracking-[0.3em] text-[#5B7A08]">{joinCode}</p>

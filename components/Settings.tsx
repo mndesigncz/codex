@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { PLAN_FEATURES, PRO_PRICE, planInfoOf, planLabel, czDays, type PlanInfo } from '@/lib/plan';
 import { Icon } from './Icons';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team';
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -123,6 +124,15 @@ export default function Settings({ user, initialTab }: Props) {
   const [notifsLoaded, setNotifsLoaded] = useState(false);
 
   const isEmployer = (account?.role ?? user.role) === 'employer';
+
+  // Plan & trial for the billing section (employer only).
+  const [plan, setPlan] = useState<PlanInfo | null>(null);
+  useEffect(() => {
+    if (section !== 'billing' || plan) return;
+    fetch('/api/teams').then(r => r.json())
+      .then(d => setPlan(d.planInfo ?? planInfoOf(null)))
+      .catch(() => setPlan(planInfoOf(null)));
+  }, [section, plan]);
 
   useEffect(() => {
     fetch('/api/account')
@@ -274,6 +284,7 @@ export default function Settings({ user, initialTab }: Props) {
     { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
+    ...(isEmployer ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
   ];
 
   const unreadCount = notifs.filter(n => !n.is_read).length;
@@ -560,6 +571,69 @@ export default function Settings({ user, initialTab }: Props) {
                 </button>
               </div>
             </form>
+          ) : section === 'billing' ? (
+            <div className="space-y-4">
+              {/* Current plan */}
+              <div className="glass-card p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className={cardTitle}>Váš plán</h3>
+                    <p className="text-black/45 text-sm mt-1">Co váš podnik v Pangea aktuálně má.</p>
+                  </div>
+                  {plan && (
+                    <span className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                      plan.effective === 'pro' ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-black/[0.06] text-black/60'
+                    }`}>
+                      {planLabel(plan)}
+                    </span>
+                  )}
+                </div>
+                {plan?.trialing && (
+                  <p className="mt-4 text-sm text-black/55 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3">
+                    Zkušební období končí za <strong className="text-[#16181A]">{czDays(plan.trialDaysLeft)}</strong>.
+                    Potom se podnik přepne na plán Zdarma — o data nepřijdete.
+                  </p>
+                )}
+                <p className="mt-4 text-sm text-black/55 rounded-2xl bg-black/[0.03] border border-black/[0.07] px-4 py-3">
+                  Platby teprve připravujeme — <strong className="text-[#16181A]">během beta období nic neomezujeme</strong> a
+                  všechny funkce jsou odemčené pro všechny. Až se to změní, dáme vědět s předstihem.
+                </p>
+              </div>
+
+              {/* Plan comparison */}
+              <div className="glass-card p-6">
+                <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+                  <h3 className={cardTitle}>Zdarma vs. Pro</h3>
+                  <p className="text-sm text-black/45">
+                    Pro: <strong className="text-[#16181A]">{PRO_PRICE.monthly} {PRO_PRICE.currency}</strong> {PRO_PRICE.per}
+                  </p>
+                </div>
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <table className="w-full text-sm min-w-[420px]">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-wider text-black/40">
+                        <th className="py-2 pr-3 font-semibold">Funkce</th>
+                        <th className="py-2 px-3 font-semibold w-28">Zdarma</th>
+                        <th className="py-2 pl-3 font-semibold w-40 text-[#5B7A08]">Pro</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.06]">
+                      {PLAN_FEATURES.map(f => (
+                        <tr key={f.label}>
+                          <td className="py-2.5 pr-3 text-[#16181A]">{f.label}</td>
+                          <td className="py-2.5 px-3 text-black/55">
+                            {f.free === true ? <Icon name="check" size={16} className="text-[#5B7A08]" /> : f.free === false ? <span className="text-black/25">—</span> : f.free}
+                          </td>
+                          <td className="py-2.5 pl-3 text-black/70">
+                            {f.pro === true ? <Icon name="check" size={16} className="text-[#5B7A08]" /> : f.pro === false ? <span className="text-black/25">—</span> : f.pro}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           ) : (
             <TeamManagement user={user} />
           )}
