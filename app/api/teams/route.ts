@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -144,6 +145,8 @@ export async function PATCH(request: Request) {
     : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
+  audit(team.id, me.id, 'team.settings', 'team', team.id,
+    Object.keys(body).filter(k => body[k] !== undefined).join(', ').slice(0, 200));
   if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
   if (typeof payDailyCash === 'boolean') await sql`UPDATE teams SET pay_daily_cash = ${payDailyCash} WHERE id = ${team.id}`;
   if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;

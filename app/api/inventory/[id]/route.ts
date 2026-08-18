@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -348,6 +349,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   const id = parseInt(params.id);
   await sql`DELETE FROM inventory_log WHERE item_id = ${id}`;
   await sql`DELETE FROM inventory_items WHERE id = ${id}`;
+  audit(me.teamId, me.meId, 'inventory.delete', 'item', id);
 
   return NextResponse.json({ ok: true });
 }

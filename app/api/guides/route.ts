@@ -57,15 +57,21 @@ export async function GET(request: Request) {
   try {
     rows = categoryId
       ? await sql`
-          SELECT id, title, category_id, content, checklist, updated_at, approved, submitted_by
-          FROM guides
-          WHERE team_id = ${c.teamId} AND category_id = ${parseInt(categoryId)}
-          ORDER BY updated_at DESC`
+          SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by,
+                 g.require_read,
+                 (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
+                 EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
+          FROM guides g
+          WHERE g.team_id = ${c.teamId} AND g.category_id = ${parseInt(categoryId)}
+          ORDER BY g.updated_at DESC`
       : await sql`
-          SELECT id, title, category_id, content, checklist, updated_at, approved, submitted_by
-          FROM guides
-          WHERE team_id = ${c.teamId}
-          ORDER BY updated_at DESC`;
+          SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by,
+                 g.require_read,
+                 (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
+                 EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
+          FROM guides g
+          WHERE g.team_id = ${c.teamId}
+          ORDER BY g.updated_at DESC`;
   } catch {
     rows = categoryId
       ? await sql`
@@ -89,6 +95,9 @@ export async function GET(request: Request) {
     updatedAt: g.updated_at,
     approved: g.approved !== false,
     submittedBy: g.submitted_by ?? null,
+    requireRead: g.require_read === true,
+    readCount: Number(g.read_count) || 0,
+    myRead: g.my_read === true,
     excerpt: excerpt(g.content),
     hasChecklist: checklistLength(g.checklist) > 0,
   }));

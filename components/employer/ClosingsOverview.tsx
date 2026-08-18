@@ -120,6 +120,35 @@ export default function ClosingsOverview() {
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   // One file the accountant can work with: per-day rows + the month's summary.
+  // One printable A5-ish sheet per closing — window.print into PDF/paper.
+  const printClosing = (c: ClosingRow) => {
+    const lines = expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' });
+    const d = cashDifference(c);
+    const w = window.open('', '_blank', 'width=640,height=800');
+    if (!w) return;
+    const row = (label: string, val: string, strong = false) =>
+      `<tr><td style="padding:6px 0;color:#555;">${label}</td><td style="text-align:right;${strong ? 'font-weight:700;' : ''}">${val}</td></tr>`;
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Uzávěrka ${c.date}</title></head>
+      <body style="font-family:-apple-system,sans-serif;max-width:420px;margin:24px auto;color:#16181A;">
+        <h2 style="margin:0 0 2px;">Uzávěrka — ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
+        <p style="margin:0 0 16px;color:#777;">${c.shift_label ?? ''} · vyplnil/a ${c.author_name ?? '—'}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:15px;">
+          ${lines.map(l => row(l.label, `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
+          ${row('Očekávaný stav kasy', money(expectedCash(c)), true)}
+          ${row('Skutečný stav kasy', money(c.closing_cash), true)}
+          ${row(d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko', (d > 0 ? '+' : '') + money(d), true)}
+          ${Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('V kase zůstalo', money(cashLeft(c))) : ''}
+          ${row('Tržba kartou', money(c.card_revenue))}
+          ${row('Spropitné', money(c.tips))}
+          ${row('Zákazníků', String(c.customers))}
+        </table>
+        ${c.notes ? `<p style="margin-top:16px;font-size:14px;color:#555;">Poznámka: ${String(c.notes).replace(/</g, '&lt;')}</p>` : ''}
+        <p style="margin-top:24px;font-size:12px;color:#999;">Vytištěno z aplikace Pangea · ${new Date().toLocaleString('cs-CZ')}</p>
+        <script>window.onload = () => window.print();</scr` + `ipt>
+      </body></html>`);
+    w.document.close();
+  };
+
   const exportAccountant = () => {
     if (!pro) { setUpgradeFor('Export pro účetní'); return; }
     const head = ['Datum', 'Tržba hotově', 'Tržba kartou', 'Tržba celkem', 'Spropitné', 'Výdaje z kasy', 'Odvedeno', 'Vyplaceno hotově'];
@@ -200,6 +229,47 @@ export default function ClosingsOverview() {
     o.status === 'received' && inScope(String(o.receivedAt ?? o.createdAt).slice(0, 10))
       ? sum + (Number(o.totalCost) || 0) : sum, 0);
   const operating = totalRevenue - laborCost - purchases;
+
+  // ---- Trends: this week vs last, strongest weekday, record day. Computed
+  // from ALL closings (not just the picked month) so the comparison is honest.
+  const trend = (() => {
+    const byDay = new Map<string, number>();
+    allClosings.forEach(c => {
+      if (c.date) byDay.set(c.date, (byDay.get(c.date) ?? 0) + c.cash_revenue + c.card_revenue);
+    });
+    if (byDay.size < 4) return null;
+    const now = new Date(); now.setHours(12, 0, 0, 0);
+    const dayIdx = (now.getDay() + 6) % 7;
+    const monday = new Date(now); monday.setDate(monday.getDate() - dayIdx);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const sumRange = (from: Date, days: number) => {
+      let s2 = 0;
+      for (let i = 0; i < days; i++) {
+        const d = new Date(from); d.setDate(d.getDate() + i);
+        s2 += byDay.get(iso(d)) ?? 0;
+      }
+      return s2;
+    };
+    const prevMonday = new Date(monday); prevMonday.setDate(prevMonday.getDate() - 7);
+    // Same-length windows: Monday..today vs the same span last week.
+    const thisWeek = sumRange(monday, dayIdx + 1);
+    const lastWeekSame = sumRange(prevMonday, dayIdx + 1);
+    const wow = lastWeekSame > 0 ? ((thisWeek - lastWeekSame) / lastWeekSame) * 100 : null;
+    const weekdaySums = new Array(7).fill(0), weekdayCounts = new Array(7).fill(0);
+    byDay.forEach((v, d) => {
+      const wd = (new Date(d + 'T12:00:00').getDay() + 6) % 7;
+      weekdaySums[wd] += v; weekdayCounts[wd]++;
+    });
+    let bestWd = 0, bestAvg = 0;
+    for (let i = 0; i < 7; i++) {
+      const avg = weekdayCounts[i] ? weekdaySums[i] / weekdayCounts[i] : 0;
+      if (avg > bestAvg) { bestAvg = avg; bestWd = i; }
+    }
+    let recordDay = '', recordVal = 0;
+    byDay.forEach((v, d) => { if (v > recordVal) { recordVal = v; recordDay = d; } });
+    const WDS = ['pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota', 'neděle'];
+    return { thisWeek, lastWeekSame, wow, bestWdLabel: WDS[bestWd], bestAvg, recordDay, recordVal };
+  })();
   const laborPct = totalRevenue > 0 && laborCost > 0 ? (laborCost / totalRevenue) * 100 : null;
 
   // Daily revenue trend: sum of cash + card per day, chronological (oldest first).
@@ -334,6 +404,38 @@ export default function ClosingsOverview() {
           <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
         </div>
       </div>
+
+      {trend && pro && (
+        <div className="glass-card p-5 sm:p-6">
+          <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📊 Trendy</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tento týden</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(trend.thisWeek)}</p>
+              <p className="text-[11px] text-black/40 mt-0.5">od pondělí do dneška</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">vs. minulý týden</p>
+              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${
+                trend.wow == null ? 'text-black/40' : trend.wow >= 0 ? 'text-[#5B7A08]' : 'text-red-600'
+              }`}>
+                {trend.wow == null ? '—' : `${trend.wow >= 0 ? '+' : ''}${trend.wow.toFixed(0)} %`}
+              </p>
+              <p className="text-[11px] text-black/40 mt-0.5 truncate">stejné dny: {money(trend.lastWeekSame)}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Nejsilnější den</p>
+              <p className="text-lg sm:text-xl font-bold text-[#16181A] mt-1 capitalize truncate">{trend.bestWdLabel}</p>
+              <p className="text-[11px] text-black/40 mt-0.5 truncate">průměr {money(Math.round(trend.bestAvg))}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Rekordní den</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(trend.recordVal)}</p>
+              <p className="text-[11px] text-black/40 mt-0.5 truncate">{trend.recordDay && new Date(trend.recordDay + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Month in numbers — the connected view: revenue × labor × purchases */}
       {(laborCost > 0 || purchases > 0) && pro && (
@@ -595,6 +697,11 @@ export default function ClosingsOverview() {
                         <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{money(d)}</span>
                       </div>
                     </div>
+
+                    <button onClick={() => printClosing(c)}
+                      className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-medium hover:bg-black/[0.05] transition">
+                      🖨 Vytisknout uzávěrku
+                    </button>
 
                     {/* Itemised movements — what exactly left the drawer and why. */}
                     {(c.movements?.length ?? 0) > 0 && (

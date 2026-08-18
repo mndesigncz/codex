@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -19,7 +20,7 @@ export async function PATCH(_req: Request, { params }: { params: { id: string } 
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
   const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const [row] = await sql`SELECT created_by, team_id FROM cash_closings WHERE id = ${id}`;
+  const [row] = await sql`SELECT created_by, team_id, date FROM cash_closings WHERE id = ${id}`;
   if (!row || row.team_id !== u?.team_id) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
 
   try {
@@ -44,7 +45,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
 
   const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
   const teamId = u?.team_id;
-  const [row] = await sql`SELECT created_by, team_id FROM cash_closings WHERE id = ${id}`;
+  const [row] = await sql`SELECT created_by, team_id, date FROM cash_closings WHERE id = ${id}`;
   if (!row) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
 
   const isOwnerOfTeam = role === 'employer' && row.team_id === teamId;
@@ -52,5 +53,6 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   if (!isOwnerOfTeam && !isAuthor) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   await sql`DELETE FROM cash_closings WHERE id = ${id}`;
+  audit(row.team_id, meId, 'closing.delete', 'closing', id, `uzávěrka ${row?.date ?? ''}`);
   return NextResponse.json({ ok: true });
 }
