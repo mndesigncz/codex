@@ -174,8 +174,10 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reportedBy: parseInt(user.id ?? '0'),
-          items: JSON.stringify(selected),
+          items: JSON.stringify(selected.map(id => {
+            const it = items.find(i => i.id === id);
+            return { id, name: it?.name ?? `#${id}` };
+          })),
           note,
         }),
       });

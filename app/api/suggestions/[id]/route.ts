@@ -60,10 +60,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Let the author know their idea moved (unless they changed it themselves).
     if (s.author_id && s.author_id !== c.meId && STATUS_LABEL[status]) {
       try {
+        const [author] = await sql`SELECT role FROM users WHERE id = ${s.author_id}`;
         await notifyUser(s.author_id, {
           title: 'Tvůj podnět má nový stav',
           body: STATUS_LABEL[status],
           type: status === 'declined' ? 'warning' : 'info',
+          link: author?.role === 'employer' ? '/employer/overview?view=suggestions' : '/employee/shifts?view=suggestions',
         });
       } catch { /* best-effort */ }
     }

@@ -60,12 +60,19 @@ export default function NotificationBell() {
     return () => clearInterval(t);
   }, [role, loadFeedback]);
 
+  // Latest open/unread for the outside-click closer (registered once).
+  const stateRef = useRef({ open: false, unread: 0 });
+  stateRef.current = { open, unread };
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        if (stateRef.current.open && stateRef.current.unread) markAllRead();
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const markAllRead = async () => {
@@ -88,7 +95,11 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { if (!open) { loadFeedback(); if (unread) markAllRead(); } setOpen(o => !o); }}
+        onClick={() => {
+          if (!open) loadFeedback();
+          else if (unread) markAllRead();
+          setOpen(o => !o);
+        }}
         className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
         title="Notifikace"
       >

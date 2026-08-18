@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import NotificationBell from '../NotificationBell';
@@ -69,6 +69,11 @@ export default function EmployerLayout({ user }: Props) {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setCurrentView(view);
   };
+  // Deep links from notifications and old bookmarks: /employer/overview?view=X
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('view');
+    if (v && (byId[v] || v === 'settings' || v === 'team-settings')) setCurrentView(v);
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);

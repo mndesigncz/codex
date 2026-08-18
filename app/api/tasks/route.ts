@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
   // Notify the assignee (specific person) when it isn't self-assigned.
   if (assignedTo && assignedTo !== c.meId) {
     try {
-      await notifyUser(assignedTo, { title: 'Nový úkol', body: title, type: priority === 'high' ? 'warning' : 'info' });
+      await notifyUser(assignedTo, { title: 'Nový úkol', body: title, type: priority === 'high' ? 'warning' : 'info', link: '/employee/shifts?view=tasks' });
     } catch { /* best-effort */ }
   }
 

@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       title: 'Pozvánka přijata',
       body: `${name} přijal/a pozvánku a připojil/a se do týmu.`,
       type: 'invite',
+      link: '/employer/overview?view=team-settings',
     }).catch(() => {});
 
     return NextResponse.json({ ok: true, user });

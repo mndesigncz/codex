@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
       title: 'Žádost o volno',
       body: `${c.name}: ${from === to ? from : `${from} až ${to}`}`,
       type: 'info',
+      category: 'shift',
+      link: '/employer/overview?view=shifts',
     });
   } catch { /* best-effort */ }
 
@@ -103,6 +105,8 @@ export async function PATCH(req: NextRequest) {
       title: status === 'approved' ? 'Volno schváleno ✓' : 'Volno zamítnuto',
       body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`}`,
       type: status === 'approved' ? 'info' : 'warning',
+      category: 'shift',
+      link: '/employee/shifts?view=availability',
     });
   } catch { /* best-effort */ }
 

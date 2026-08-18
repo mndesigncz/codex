@@ -156,6 +156,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const [inlineParent, setInlineParent] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
+  // Reports employees filed via "Nahlásit chybějící" on the tablet/phone.
+  const [reports, setReports] = useState<any[]>([]);
+  const [showReports, setShowReports] = useState(false);
   // Parked items live behind a toggle so they can't clutter the active stock.
   const [showArchived, setShowArchived] = useState(false);
   // Bulk editing: a selection mode with a bar of actions for what is ticked.
@@ -193,6 +196,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   };
 
   const load = async () => {
+    fetch('/api/inventory/reports').then(r => r.json())
+      .then(d => setReports(Array.isArray(d.reports) ? d.reports : []))
+      .catch(() => {});
     try {
       const [data, cats] = await Promise.all([
         fetch('/api/inventory').then(r => r.json()),
@@ -528,6 +534,11 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           {toBuy.length > 0 && (
             <button onClick={() => setShowShopping(true)} className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
               🛒 Nakoupit ({toBuy.length})
+            </button>
+          )}
+          {reports.some(r => r.status !== 'done') && (
+            <button onClick={() => setShowReports(true)} className="rounded-full glass border border-orange-500/25 text-orange-600 px-4 py-2.5 text-sm font-semibold hover:bg-orange-500/[0.06] whitespace-nowrap">
+              📦 Hlášení ({reports.filter(r => r.status !== 'done').length})
             </button>
           )}
           <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
@@ -900,6 +911,66 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onChanged={load}
           createCategory={createCategory}
         />
+      )}
+
+      {showReports && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
+          <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">📦 Hlášení ze skladu</h3>
+              <button onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+            </div>
+            {reports.length === 0 ? (
+              <p className="text-black/45 text-sm text-center py-8">Žádná hlášení od zaměstnanců.</p>
+            ) : (
+              <div className="space-y-3">
+                {reports.map(r => {
+                  let list: any[] = [];
+                  try { list = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items ?? []); } catch {}
+                  const done = r.status === 'done';
+                  return (
+                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-orange-500/25 bg-orange-500/[0.04]'}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <p className="text-sm font-semibold text-[#16181A] min-w-0">
+                          {r.author_avatar ?? '👤'} {r.author_name ?? 'Zaměstnanec'}
+                          <span className="font-normal text-black/40"> · {new Date(r.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </p>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch('/api/inventory/reports', {
+                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: r.id, status: done ? 'new' : 'done' }),
+                            });
+                            if (res.ok) setReports(prev => prev.map(x => x.id === r.id ? { ...x, status: done ? 'new' : 'done' } : x));
+                          }}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+                            done ? 'glass text-black/50 hover:text-black' : 'bg-[#16181A] text-white hover:bg-black'
+                          }`}>
+                          {done ? 'Vyřízeno ✓' : 'Označit vyřízené'}
+                        </button>
+                      </div>
+                      {list.length > 0 && (
+                        <ul className="text-sm text-black/70 space-y-0.5">
+                          {list.map((it: any, i: number) => (
+                            <li key={i} className="flex items-baseline gap-2">
+                              <span className="text-black/30">•</span>
+                              <span className="min-w-0">{
+                                typeof it === 'string' ? it
+                                : typeof it === 'number' ? (items.find(x => x.id === it)?.name ?? `Položka #${it}`)
+                                : `${it.name ?? it.title ?? '?'}${it.quantity ? ` — ${it.quantity}` : ''}${it.note ? ` (${it.note})` : ''}`
+                              }</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {r.note && <p className="text-sm text-black/50 mt-1.5 italic">„{r.note}"</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {showShopping && (

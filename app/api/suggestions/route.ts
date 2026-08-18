@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
         title: '💡 Nový podnět na vylepšení',
         body: `${c.name ?? 'Někdo'}: ${title.length > 100 ? title.slice(0, 97) + '…' : title}`,
         type: 'info',
+        link: '/employer/overview?view=suggestions',
       });
     }
   } catch { /* best-effort */ }

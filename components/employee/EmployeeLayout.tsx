@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import NotificationBell from '../NotificationBell';
@@ -53,6 +53,11 @@ interface Props {
 
 export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
+  // Deep links from notifications: /employee/shifts?view=X
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('view');
+    if (v && (byId[v] || v === 'settings')) setCurrentView(v);
+  }, []);
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
   const navigate = (view: string, arg?: string) => {

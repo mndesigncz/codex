@@ -57,12 +57,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const members = await sql`
-      SELECT id FROM users WHERE team_id = ${c.teamId} AND id <> ${c.meId} AND role <> 'kiosk'`;
-    await notifyUsers(members.map((m: any) => m.id), {
-      title: '📌 Nové oznámení',
-      body: content.length > 120 ? content.slice(0, 117) + '…' : content,
-      type: 'info',
-    });
+      SELECT id, role FROM users WHERE team_id = ${c.teamId} AND id <> ${c.meId} AND role <> 'kiosk'`;
+    const body = content.length > 120 ? content.slice(0, 117) + '…' : content;
+    const emp = (members as any[]).filter(m => m.role === 'employer').map(m => m.id);
+    const ees = (members as any[]).filter(m => m.role !== 'employer').map(m => m.id);
+    if (ees.length) await notifyUsers(ees, { title: '📌 Nové oznámení', body, type: 'info', link: '/employee/shifts' });
+    if (emp.length) await notifyUsers(emp, { title: '📌 Nové oznámení', body, type: 'info', link: '/employer/overview' });
   } catch { /* best-effort */ }
 
   return NextResponse.json({ ok: true, announcement: row });

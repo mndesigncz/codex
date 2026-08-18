@@ -42,6 +42,7 @@ export async function GET() {
           title: '📊 Nezapomeň na uzávěrku',
           body: 'Tvoje směna skončila — vyplň prosím uzávěrku kasy.',
           type: 'warning',
+          link: '/employee/shifts?view=closing',
         });
         reminded++;
       } catch { /* best-effort */ }

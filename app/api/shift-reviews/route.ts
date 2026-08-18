@@ -468,6 +468,7 @@ export async function POST(req: NextRequest) {
         title: flagged ? 'Hodnocení směny — něco k nápravě' : 'Hodnocení směny',
         body: `Vedení ohodnotilo tvou směnu ${dLabel}${rating ? ` — ${rating}★` : ''}${pointsAwarded ? `, ${pointsAwarded > 0 ? '+' : ''}${pointsAwarded} bodů` : ''}`,
         type: 'info',
+        link: '/employee/shifts?view=rewards',
       });
     } catch { /* best-effort */ }
   }

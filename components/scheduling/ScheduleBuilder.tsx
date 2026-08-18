@@ -163,10 +163,34 @@ export default function ScheduleBuilder({ user }: Props) {
   const [shiftTypes, setShiftTypes] = useState<ShiftType[]>([]);
   const [fixed, setFixed] = useState<FixedAssignment[]>([]);
   const [openingHours, setOpeningHours] = useState<Record<string, OpeningDay>>({});
+  // Approved time off — a shift must never land on someone's holiday silently.
+  const [timeOff, setTimeOff] = useState<{ employeeId: number; fromDate: string; toDate: string; status: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
-  const [publishNote, setPublishNote] = useState(false);
+  const [publishNote, setPublishNote] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  const publish = async () => {
+    setPublishing(true);
+    try {
+      const res = await fetch('/api/schedule/publish', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const n = Number(d.notified) || 0;
+        setPublishNote(n === 0
+          ? 'V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.'
+          : `Hotovo — rozvrh dostal${n === 1 ? '' : 'o'} ${n} ${n === 1 ? 'člověk' : n <= 4 ? 'lidi' : 'lidí'} jako notifikaci. Každá další změna se jim ukáže v „Moje směny".`);
+      } else {
+        setPublishNote(d.error || 'Publikování se nepodařilo — zkus to znovu.');
+      }
+    } catch {
+      setPublishNote('Publikování se nepodařilo — zkus to znovu.');
+    }
+    setPublishing(false);
+  };
   const [confirmClear, setConfirmClear] = useState(false);
   // Surfaced when an action on the board didn't reach the server.
   const [boardError, setBoardError] = useState('');
@@ -191,21 +215,23 @@ export default function ScheduleBuilder({ user }: Props) {
   const load = async () => {
     setLoading(true);
     try {
-      const [tRes, aRes, sRes, stRes, faRes, ohRes] = await Promise.all([
+      const [tRes, aRes, sRes, stRes, faRes, ohRes, toRes] = await Promise.all([
         fetch('/api/teams'),
         fetch(`/api/availability?month=${month}`),
         fetch(`/api/schedule?month=${month}`),
         fetch('/api/shift-types'),
         fetch('/api/fixed-assignments'),
         fetch('/api/opening-hours'),
+        fetch('/api/timeoff'),
       ]);
-      const [tData, aData, sData, stData, faData, ohData] = await Promise.all([
+      const [tData, aData, sData, stData, faData, ohData, toData] = await Promise.all([
         tRes.json(),
         aRes.json(),
         sRes.json(),
         stRes.json(),
         faRes.json(),
         ohRes.json(),
+        toRes.json(),
       ]);
       setMembers(tData.members ?? []);
       setSubmissions(aData.submissions ?? []);
@@ -213,6 +239,7 @@ export default function ScheduleBuilder({ user }: Props) {
       setShiftTypes(stData.shiftTypes ?? []);
       setFixed(faData.assignments ?? []);
       setOpeningHours(ohData.openingHours ?? {});
+      setTimeOff(Array.isArray(toData?.requests) ? toData.requests.filter((r: any) => r.status === 'approved') : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -222,7 +249,7 @@ export default function ScheduleBuilder({ user }: Props) {
 
   useEffect(() => {
     load();
-    setPublishNote(false);
+    setPublishNote('');
     setConfirmClear(false);
     setPreview(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,12 +303,18 @@ export default function ScheduleBuilder({ user }: Props) {
     return map;
   }, [preview]);
 
-  const unavailableOn = (date: string) =>
-    new Set(
+  const unavailableOn = (date: string) => {
+    const set = new Set(
       submissions
         .filter((s) => (s.unavailableDates ?? []).includes(date) || s.dayPreferences?.[date] === 'off')
         .map((s) => s.employeeId),
     );
+    // Approved holiday counts as unavailable — the whole point of approving it.
+    timeOff.forEach(t => {
+      if (t.fromDate <= date && date <= t.toDate) set.add(t.employeeId);
+    });
+    return set;
+  };
 
   const addShift = async (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
     const res = await fetch('/api/schedule', {
@@ -637,10 +670,11 @@ export default function ScheduleBuilder({ user }: Props) {
               <span>✨</span> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
             </button>
             <button
-              onClick={() => setPublishNote(true)}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2"
+              onClick={publish}
+              disabled={publishing}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2 disabled:opacity-50"
             >
-              <Icon name="check" size={18} /> Publikovat rozvrh
+              <Icon name="check" size={18} /> {publishing ? 'Posílám…' : 'Publikovat rozvrh'}
             </button>
             <button
               onClick={exportCsv}
@@ -686,10 +720,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {publishNote && (
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
               <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />
-              <p className="text-sm text-black/70">
-                Rozvrh je průběžně ukládán — každá přidaná směna je hned uložena a viditelná zaměstnancům v jejich sekci
-                „Moje směny". Není potřeba nic dalšího potvrzovat.
-              </p>
+              <p className="text-sm text-black/70">{publishNote}</p>
             </div>
           )}
 
