@@ -8,7 +8,7 @@ import {
   cashLeft,
   MOVEMENT_KINDS, movementLabel, diffReasonLabel, hasDenominations,
 } from '@/lib/closing';
-import { useMoney } from '../CurrencyProvider';
+import { useMoney, useCurrency } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
 import ClosingsCalendar from './ClosingsCalendar';
 
@@ -29,6 +29,10 @@ const crewOf = (c: ClosingRow): ShiftPerson[] =>
 export default function ClosingsOverview() {
   const money = useMoney();
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
+  // For the month-in-numbers card: who worked (labor cost) and what was bought.
+  const [attRoster, setAttRoster] = useState<any[]>([]);
+  const [attEntries, setAttEntries] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [payDailyCash, setPayDailyCash] = useState(false);
   const [missing, setMissing] = useState<MissingDay[]>([]);
   const [scheduledByDate, setScheduledByDate] = useState<Record<string, Person[]>>({});
@@ -52,6 +56,15 @@ export default function ClosingsOverview() {
       setScheduledByDate(d.scheduledByDate && typeof d.scheduledByDate === 'object' ? d.scheduledByDate : {});
       setDataVersion(v => v + 1);
     } catch { /* ignore */ }
+    try {
+      const a = await fetch('/api/attendance?days=180').then(r => r.json());
+      setAttRoster(Array.isArray(a?.roster) ? a.roster : []);
+      setAttEntries(Array.isArray(a?.entries) ? a.entries : []);
+    } catch { /* month card just loses the labor line */ }
+    try {
+      const o = await fetch('/api/orders').then(r => r.json());
+      setOrders(Array.isArray(o?.orders) ? o.orders : Array.isArray(o) ? o : []);
+    } catch { /* and the purchases line */ }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -133,6 +146,26 @@ export default function ClosingsOverview() {
     diff: a.diff + cashDifference(c),
   }), { cash: 0, card: 0, tips: 0, payout: 0, removed: 0, diff: 0 });
   const totalRevenue = totals.cash + totals.card;
+
+  // ---- Month in numbers: revenue (closings) × labor (attendance × rates) ×
+  // purchases (received orders). Approximate by design — no VAT, no fixed
+  // costs — but it answers "vyplatil se tenhle měsíc?" at a glance.
+  const { laborTargetPct } = useCurrency();
+  const inScope = (iso: string | null | undefined) => {
+    const d = String(iso ?? '');
+    return month === 'all' ? d !== '' : d.slice(0, 7) === month;
+  };
+  const rateOf = (id: number) => Number(attRoster.find((r: any) => Number(r.id) === Number(id))?.hourlyRate) || 0;
+  const laborCost = Math.round(attEntries.reduce((sum: number, e: any) => {
+    if (!e.clockOut || !inScope(String(e.clockIn).slice(0, 10))) return sum;
+    const h = (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
+    return h > 0 && h < 24 ? sum + h * rateOf(e.employeeId) : sum;
+  }, 0));
+  const purchases = orders.reduce((sum: number, o: any) =>
+    o.status === 'received' && inScope(String(o.receivedAt ?? o.createdAt).slice(0, 10))
+      ? sum + (Number(o.totalCost) || 0) : sum, 0);
+  const operating = totalRevenue - laborCost - purchases;
+  const laborPct = totalRevenue > 0 && laborCost > 0 ? (laborCost / totalRevenue) * 100 : null;
 
   // Daily revenue trend: sum of cash + card per day, chronological (oldest first).
   const daily = Array.from(
@@ -266,6 +299,42 @@ export default function ClosingsOverview() {
           <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
         </div>
       </div>
+
+      {/* Month in numbers — the connected view: revenue × labor × purchases */}
+      {(laborCost > 0 || purchases > 0) && (
+        <div className="glass-card p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <h3 className="font-bold tracking-tight text-[#16181A]">📈 {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
+            <span className="text-[11px] text-black/35">orientační — bez DPH a fixních nákladů</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržby</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(totalRevenue)}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Mzdové náklady</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">− {money(laborCost)}</p>
+              {laborPct != null && (
+                <p className={`text-[11px] mt-0.5 truncate ${laborTargetPct != null && laborPct > laborTargetPct ? 'text-red-600 font-semibold' : 'text-black/40'}`}>
+                  {laborPct.toFixed(0)} % z tržeb{laborTargetPct != null ? ` (cíl ${laborTargetPct} %)` : ''}
+                </p>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Nákupy zboží</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">− {money(purchases)}</p>
+              <p className="text-[11px] text-black/40 mt-0.5 truncate">přijaté objednávky</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Provozní výsledek</p>
+              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${operating >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+                {operating >= 0 ? '+' : ''}{money(operating)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Revenue trend chart */}
       {daily.length >= 2 && (() => {
