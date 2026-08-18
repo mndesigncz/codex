@@ -35,6 +35,8 @@ export interface Closing {
   // Why the counted cash didn't match, when it didn't.
   diff_reason?: string | null;
   diff_note?: string | null;
+  // How the drawer was counted, when it was counted by denomination.
+  denominations?: DenominationCounts | null;
 }
 
 /**
@@ -203,3 +205,45 @@ export function expectedCashLines(c: ExpectedInput, opts?: { payoutLabel?: strin
 }
 
 export const czk = (n: number) => `${Math.round(n).toLocaleString('cs-CZ')} Kč`;
+
+// ---- Counting the drawer by denomination ------------------------------------
+// Typing one total means doing the arithmetic in your head, and a slip there
+// shows up as a phantom manko. Counting "3× 500, 7× 100…" is how people
+// actually count a drawer — the app does the adding.
+
+export type DenominationCounts = Record<string, number>;
+
+/** Denominations per currency, largest first. Currencies without a set fall
+ *  back to typing the total. */
+export const DENOMINATION_SETS: Record<string, number[]> = {
+  CZK: [2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1],
+  EUR: [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1],
+};
+
+export function denominationsFor(currency: string | null | undefined): number[] {
+  return DENOMINATION_SETS[(currency ?? 'CZK').toUpperCase()] ?? [];
+}
+
+export function normalizeDenominations(raw: any): DenominationCounts {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: DenominationCounts = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const denom = Number(k);
+    const count = Math.round(Number(v));
+    if (Number.isFinite(denom) && denom > 0 && Number.isFinite(count) && count > 0 && count <= 10000) {
+      out[String(denom)] = count;
+    }
+  }
+  return out;
+}
+
+/** Total value of the counted drawer. Cent-safe for decimal denominations. */
+export function sumDenominations(counts: DenominationCounts): number {
+  const cents = Object.entries(counts).reduce(
+    (n, [denom, count]) => n + Math.round(Number(denom) * 100) * count, 0);
+  return cents / 100;
+}
+
+export function hasDenominations(counts: DenominationCounts | null | undefined): boolean {
+  return !!counts && Object.keys(counts).length > 0;
+}

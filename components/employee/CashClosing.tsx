@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
   DIFF_REASONS, diffReasonLabel, explainDifference,
+  type DenominationCounts, denominationsFor, sumDenominations, hasDenominations,
 } from '@/lib/closing';
-import { useMoney, useSymbol } from '../CurrencyProvider';
+import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 
 const inputClass =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
@@ -29,6 +30,69 @@ const emptyForm = (): FormState => ({
 });
 
 const n = (s: string) => Math.round(Number(s)) || 0;
+
+/**
+ * Counting the drawer the way people actually count it: how many of each note
+ * and coin. The app does the adding — an arithmetic slip stops masquerading as
+ * a manko. Only denominations with a count show a subtotal.
+ */
+function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
+  denomSet: number[];
+  counts: DenominationCounts;
+  onChange: (next: DenominationCounts) => void;
+  money: (n: number) => string;
+  symbol: string;
+}) {
+  const setCount = (denom: number, raw: string) => {
+    const next = { ...counts };
+    const v = Math.max(0, Math.round(Number(raw)));
+    if (!raw || !Number.isFinite(v) || v === 0) delete next[String(denom)];
+    else next[String(denom)] = Math.min(v, 9999);
+    onChange(next);
+  };
+  const bump = (denom: number, delta: number) => {
+    const cur = counts[String(denom)] ?? 0;
+    setCount(denom, String(cur + delta));
+  };
+  const fmtDenom = (d: number) => (Number.isInteger(d) ? String(d) : d.toFixed(2).replace('.', ','));
+
+  return (
+    <div className="rounded-2xl bg-white/70 border border-black/[0.06] overflow-hidden">
+      <div className="divide-y divide-black/[0.05]">
+        {denomSet.map(d => {
+          const cnt = counts[String(d)] ?? 0;
+          return (
+            <div key={d} className={`flex items-center gap-2 px-3 py-1.5 ${cnt > 0 ? 'bg-[#C8F542]/[0.07]' : ''}`}>
+              <span className="w-16 shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
+                {fmtDenom(d)} <span className="text-[10px] font-medium text-black/35">{symbol}</span>
+              </span>
+              <div className="flex items-center gap-1 ml-auto">
+                <button type="button" onClick={() => bump(d, -1)} disabled={cnt <= 0} aria-label={`Ubrat ${fmtDenom(d)} ${symbol}`}
+                  className="rounded-xl glass w-9 h-9 flex items-center justify-center text-lg leading-none text-black/60 hover:text-black disabled:opacity-25 active:scale-95 transition">−</button>
+                <input
+                  type="number" inputMode="numeric" min={0}
+                  value={cnt === 0 ? '' : cnt}
+                  onChange={e => setCount(d, e.target.value)}
+                  placeholder="0"
+                  className="w-14 h-9 text-center rounded-xl bg-black/[0.04] border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                />
+                <button type="button" onClick={() => bump(d, 1)} aria-label={`Přidat ${fmtDenom(d)} ${symbol}`}
+                  className="rounded-xl bg-[#C8F542] w-9 h-9 flex items-center justify-center text-lg leading-none text-black hover:brightness-110 active:scale-95 transition">+</button>
+              </div>
+              <span className={`w-20 shrink-0 text-right text-xs tabular-nums ${cnt > 0 ? 'text-[#5B7A08] font-semibold' : 'text-black/20'}`}>
+                {cnt > 0 ? money(d * cnt) : '—'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 bg-[#16181A] text-white">
+        <span className="text-sm font-semibold">Napočítáno v kase</span>
+        <span className="text-lg font-bold tabular-nums">{money(sumDenominations(counts))}</span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Itemised cash movements. One line per thing that left (or entered) the till,
@@ -120,14 +184,16 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
 
 // A numbered, iconed section panel — one guided step of the closing flow.
 function Step({
-  num, total, icon, title, subtitle, children, tone = 'plain',
+  num, total, icon, title, subtitle, children, tone = 'plain', refCb,
 }: {
   num: number; total: number; icon: string; title: string; subtitle: string;
   children: React.ReactNode; tone?: 'plain' | 'climax';
+  refCb?: (el: HTMLElement | null) => void;
 }) {
   const climax = tone === 'climax';
   return (
     <section
+      ref={refCb}
       className={`relative rounded-3xl border p-5 sm:p-6 space-y-5 transition-all ${
         climax
           ? 'bg-[#C8F542]/[0.07] border-[#C8F542]/40 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset]'
@@ -227,8 +293,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [diffNote, setDiffNote] = useState('');
   // The previous closing's counted cash — offered as this shift's opening cash.
   const [carry, setCarry] = useState<{ amount: number; date: string; label: string | null } | null>(null);
+  // Counting the drawer by denomination instead of typing one total. When the
+  // counter is on, the counted total drives form.closingCash.
+  const [countMode, setCountMode] = useState(false);
+  const [denoms, setDenoms] = useState<DenominationCounts>({});
   const money = useMoney();
   const symbol = useSymbol();
+  const { currency } = useCurrency();
+  const denomSet = denominationsFor(currency);
 
   const load = async () => {
     // The team decides whether cash tips stay in the drawer — it changes the
@@ -337,6 +409,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
   const totalSteps = 4;
 
+  // The stepper reflects what is actually filled in, and tapping a step jumps
+  // to it. Step 3 is legitimately empty on a quiet shift, so it counts as done
+  // once the person has moved past it to the final count.
+  const stepDone = [
+    form.openingCash !== '',
+    form.cashRevenue !== '' || form.cardRevenue !== '',
+    movements.length > 0 || form.expenses !== '' || form.cashRemoved !== '' || form.selfPayout !== '' || form.closingCash !== '',
+    form.closingCash !== '',
+  ];
+  const stepRefs = useRef<(HTMLElement | null)[]>([]);
+  const scrollToStep = (i: number) =>
+    stepRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setMsg('');
     if (form.closingCash === '') { setErr('Zadej skutečný stav kasy na konci směny.'); return; }
@@ -362,6 +447,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           customers: n(form.customers), notes: form.notes,
           payoutFromRegister, tipsInDrawer,
           movements, diffReason: diffReason || null, diffNote: diffNote || null,
+          denominations: countMode ? denoms : null,
           employeeId: isSelf ? undefined : selEmployee,
           coworkers: includedCoworkers,
         }),
@@ -372,6 +458,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
         setForm(emptyForm());
         setCoworkerSel({});
+        setDenoms({});
+        setMovements([]);
+        setDiffReason(''); setDiffNote('');
         setPayoutFromRegister(teamPayoutFromRegister);
         setTipsInDrawer(teamTipsInDrawer);
         onSubmitted?.();
@@ -453,26 +542,49 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           <div className="mt-5 flex items-center gap-2">
             {['Kasa', 'Tržby', 'Výdaje', 'Kontrola'].map((lbl, i) => (
               <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial min-w-0">
-                <div className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={() => scrollToStep(i)} title={`Přejít na krok ${lbl}`}
+                  className="flex items-center gap-2 shrink-0 group">
                   <span
-                    className={`grid place-items-center h-6 w-6 shrink-0 rounded-full text-[11px] font-bold ${
-                      i === totalSteps - 1
+                    className={`grid place-items-center h-6 w-6 shrink-0 rounded-full text-[11px] font-bold transition ${
+                      stepDone[i]
                         ? 'bg-[#C8F542] text-[#16181A]'
-                        : 'bg-[#16181A] text-white'
+                        : 'bg-black/[0.08] text-black/45 group-hover:bg-black/[0.14]'
                     }`}
                   >
-                    {i + 1}
+                    {stepDone[i] ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+                    ) : i + 1}
                   </span>
-                  <span className="text-[11px] font-semibold text-black/45 hidden sm:inline">{lbl}</span>
-                </div>
-                {i < totalSteps - 1 && <span className="h-px flex-1 bg-black/[0.09]" />}
+                  <span className={`text-[11px] font-semibold hidden sm:inline transition ${stepDone[i] ? 'text-[#5B7A08]' : 'text-black/45'}`}>{lbl}</span>
+                </button>
+                {i < totalSteps - 1 && <span className={`h-px flex-1 transition ${stepDone[i] ? 'bg-[#C8F542]/60' : 'bg-black/[0.09]'}`} />}
               </div>
             ))}
           </div>
         </div>
 
+        {/* Running total that follows the person through the form, so every
+            field they fill visibly moves the number they'll be checking against. */}
+        {(form.openingCash !== '' || form.cashRevenue !== '') && (
+          <button type="button" onClick={() => scrollToStep(3)}
+            className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A]/95 backdrop-blur px-4 py-2.5 text-white shadow-lg shadow-black/15 active:scale-[0.99] transition">
+            <span className="text-xs font-medium text-white/70">Očekáváno v kase</span>
+            <span className="flex items-center gap-2.5 min-w-0">
+              <span className="text-base font-bold tabular-nums">{money(expected)}</span>
+              {diff !== null && (
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                  diff === 0 ? 'bg-[#C8F542] text-[#16181A]' : diff > 0 ? 'bg-[#0A84FF] text-white' : 'bg-red-500 text-white'
+                }`}>
+                  {diff === 0 ? 'sedí ✓' : `${diff > 0 ? '+' : ''}${money(diff)}`}
+                </span>
+              )}
+            </span>
+          </button>
+        )}
+
+
         {/* Step 1 — opening cash + when/which shift */}
-        <Step num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
+        <Step refCb={el => { stepRefs.current[0] = el; }} num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
           subtitle="Kolik bylo v kase, když směna začala.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="min-w-0 space-y-2">
@@ -481,6 +593,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   ? `Předchozí směna (${new Date(carry.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}${carry.label ? `, ${carry.label}` : ''}) skončila s ${money(carry.amount)}.`
                   : 'Počáteční stav hotovosti v kase.',
               })}
+              {closings.some(c => c.date === form.date) && (
+                <p className="text-[11px] font-medium text-orange-700 bg-orange-500/[0.1] border border-orange-500/25 rounded-xl px-3 py-2">
+                  Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
+                </p>
+              )}
               {carry && (
                 <div className="flex items-center gap-2 flex-wrap">
                   {n(form.openingCash) === Math.round(carry.amount) ? (
@@ -586,7 +703,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         {/* Step 2 — revenue */}
-        <Step num={2} total={totalSteps} icon="trend" title="Tržby"
+        <Step refCb={el => { stepRefs.current[1] = el; }} num={2} total={totalSteps} icon="trend" title="Tržby"
           subtitle="Co za směnu přišlo — hotově, kartou a spropitné.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Tržba hotově', 'cashRevenue', { hint: 'Hotovost přijatá do kasy.' })}
@@ -607,7 +724,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         {/* Step 3 — expenses & payouts */}
-        <Step num={3} total={totalSteps} icon="box" title="Výdaje a odvody"
+        <Step refCb={el => { stepRefs.current[2] = el; }} num={3} total={totalSteps} icon="box" title="Výdaje a odvody"
           subtitle="Co z kasy odešlo během směny.">
           <MovementEditor
             movements={movements} setMovements={setMovements}
@@ -692,7 +809,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         )}
 
         {/* Step 4 — the climax: expected vs counted */}
-        <Step num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
+        <Step refCb={el => { stepRefs.current[3] = el; }} num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
           {/* The arithmetic spelled out — no mystery number to argue with. */}
           <div className="rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3.5 space-y-1.5">
@@ -710,13 +827,47 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Skutečný stav kasy na konci *</label>
-            <div className="relative">
-              <input type="number" inputMode="numeric" required value={form.closingCash} onChange={set('closingCash')}
-                placeholder="0" className={`${inputClass} pr-12 !py-4 text-base font-semibold`} />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <label className="block text-xs uppercase tracking-wider text-black/45">Skutečný stav kasy na konci *</label>
+              {denomSet.length > 0 && (
+                <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
+                  {([[false, 'Zadat celkem'], [true, 'Spočítat bankovky']] as const).map(([mode, lbl]) => (
+                    <button key={String(mode)} type="button"
+                      onClick={() => setCountMode(mode)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+                        countMode === mode ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                      }`}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {countMode ? (
+              <>
+                <DrawerCounter denomSet={denomSet} counts={denoms} money={money} symbol={symbol}
+                  onChange={next => {
+                    setDenoms(next);
+                    // The counter drives the total, so the rest of the form
+                    // (diff, hints, submit) needs no special case.
+                    setForm(f => ({
+                      ...f,
+                      closingCash: hasDenominations(next) ? String(Math.round(sumDenominations(next))) : '',
+                    }));
+                  }} />
+                <p className="text-[11px] text-black/40">
+                  Napiš ke každé bankovce a minci, kolik jich v kase je — součet se doplní sám.
+                </p>
+              </>
+            ) : (
+              <div className="relative">
+                <input type="number" inputMode="numeric" required value={form.closingCash} onChange={set('closingCash')}
+                  placeholder="0" className={`${inputClass} pr-12 !py-4 text-base font-semibold`} />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
+              </div>
+            )}
           </div>
 
           {diff === null ? (
@@ -837,6 +988,20 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+                {hasDenominations(c.denominations) && (
+                  <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Kasa napočítaná po bankovkách</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(c.denominations!)
+                        .sort((a, b) => Number(b[0]) - Number(a[0]))
+                        .map(([denom, count]) => (
+                          <span key={denom} className="rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
+                            <strong>{count}×</strong> {Number(denom).toLocaleString('cs-CZ')}
+                          </span>
+                        ))}
                     </div>
                   </div>
                 )}

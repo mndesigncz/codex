@@ -525,6 +525,8 @@ export async function GET() {
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS movements JSONB`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_reason TEXT`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_note TEXT`;
+    // How the drawer was counted, by denomination — {"500": 3, "100": 7}.
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS denominations JSONB`;
 
     // ---- Public share links (customer-facing menu) ----
     await sql`
