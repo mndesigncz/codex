@@ -13,6 +13,7 @@ import {
 } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
+import StocktakeModal from '../inventory/Stocktake';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -164,6 +165,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   // Reports employees filed via "Nahlásit chybějící" on the tablet/phone.
   const [reports, setReports] = useState<any[]>([]);
   const [showReports, setShowReports] = useState(false);
+  const [showStocktake, setShowStocktake] = useState(false);
   // Movement history of the item being edited — who changed the stock and when.
   const [itemLog, setItemLog] = useState<any[]>([]);
   const [logOpen, setLogOpen] = useState(false);
@@ -561,6 +563,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
               🛒 Nakoupit ({toBuy.length})
             </button>
           )}
+          <button onClick={() => setShowStocktake(true)}
+            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
+            📋 Inventura
+          </button>
           {reports.some(r => r.status !== 'done') && (
             <button onClick={() => setShowReports(true)} className="rounded-full glass border border-orange-500/25 text-orange-600 px-4 py-2.5 text-sm font-semibold hover:bg-orange-500/[0.06] whitespace-nowrap">
               📦 Hlášení ({reports.filter(r => r.status !== 'done').length})
@@ -1026,6 +1032,10 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onChanged={load}
           createCategory={createCategory}
         />
+      )}
+
+      {showStocktake && (
+        <StocktakeModal isEmployer onClose={() => setShowStocktake(false)} onApplied={load} />
       )}
 
       {showReports && (
