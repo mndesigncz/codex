@@ -113,7 +113,7 @@ export default function EmployeeLayout({ user }: Props) {
           {sidebarOpen && (
             <div className="overflow-hidden">
               <p className="font-bold text-sm leading-tight tracking-tight">Pangea</p>
-              <p className="text-[10px] uppercase tracking-[0.14em] text-black/40 mt-0.5">Portál zaměstnance</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 mt-0.5">Portál zaměstnance</p>
             </div>
           )}
         </div>
@@ -124,7 +124,7 @@ export default function EmployeeLayout({ user }: Props) {
             return (
               <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
                 {sec.title && (sidebarOpen
-                  ? <p className="px-3.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>
+                  ? <p className="px-3.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>
                   : <div className="mx-3 mb-1.5 h-px bg-black/[0.07]" />
                 )}
                 <div className="space-y-0.5">
@@ -183,7 +183,9 @@ export default function EmployeeLayout({ user }: Props) {
         </header>
 
         <main className={`flex-1 pb-28 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
-          {renderView()}
+          {currentView === 'chat' ? renderView() : (
+            <div className="mx-auto w-full max-w-7xl">{renderView()}</div>
+          )}
         </main>
       </div>
 

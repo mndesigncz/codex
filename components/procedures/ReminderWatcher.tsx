@@ -152,7 +152,7 @@ export default function ReminderWatcher() {
   };
 
   return (
-    <div className="fixed z-50 bottom-3 inset-x-3 md:inset-x-0 md:bottom-6 md:flex md:justify-center pointer-events-none">
+    <div className="fixed z-50 bottom-[calc(96px+env(safe-area-inset-bottom))] md:bottom-6 inset-x-3 md:inset-x-0 md:flex md:justify-center pointer-events-none">
       <div className="mx-auto w-full md:max-w-sm pointer-events-auto glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-remind-pop_0.3s_ease-out]">
         <style>{`
           @keyframes pr-remind-pop { 0% { opacity:0; transform: translateY(10px) scale(0.98); } 100% { opacity:1; transform: translateY(0) scale(1); } }

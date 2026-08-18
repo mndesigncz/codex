@@ -189,7 +189,7 @@ export default function PlanningBoard() {
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
                         <div className="absolute right-3 top-11 z-20 glass-strong rounded-2xl p-2 w-48 max-w-[calc(100vw-5rem)] shadow-lg space-y-0.5">
-                          <p className="text-[10px] uppercase tracking-wider text-black/40 px-2 py-1">Přesunout do →</p>
+                          <p className="text-[11px] uppercase tracking-wider text-black/40 px-2 py-1">Přesunout do →</p>
                           {COLUMNS.filter(c => c.id !== card.column).map(c => (
                             <button
                               key={c.id}

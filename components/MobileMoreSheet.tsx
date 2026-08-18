@@ -46,7 +46,7 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
         <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
           <Icon name={item.icon} size={20} className={active ? 'text-[#C8F542]' : 'text-[#16181A]'} />
         </span>
-        <span className="text-[10.5px] font-medium text-center leading-tight truncate w-full">{item.label}</span>
+        <span className="text-[11px] font-medium text-center leading-tight truncate w-full">{item.label}</span>
       </button>
     );
   };
@@ -67,9 +67,9 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
           {renderGroups.map((g, gi) => (
             <div key={g.title ?? gi}>
               {g.title && (
-                <p className="px-1 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black/35">{g.title}</p>
+                <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-black/35">{g.title}</p>
               )}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {g.items.map(Tile)}
               </div>
             </div>

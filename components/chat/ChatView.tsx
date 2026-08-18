@@ -371,7 +371,7 @@ export function MessageBubble({
           </p>
         )}
         <div
-          className={`text-[10px] mt-1 ${own ? 'text-black/50' : 'text-black/45'} text-right`}
+          className={`text-[11px] mt-1 ${own ? 'on-accent-muted' : 'text-black/45'} text-right`}
         >
           {formatTime(msg.createdAt)}
         </div>

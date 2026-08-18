@@ -244,7 +244,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                 {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
               </span>
               {recurrenceLabel(t.recurrence) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[10px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>
               )}
             </p>
             {!compact && t.checklist && t.checklist.length > 0 && (

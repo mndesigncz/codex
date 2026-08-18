@@ -81,7 +81,7 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
       }`}
     >
       <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${
+        className={`absolute top-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow-sm transition-transform duration-300 ${
           on ? 'translate-x-[22px]' : 'translate-x-0.5'
         }`}
       />
@@ -290,7 +290,7 @@ export default function Settings({ user, initialTab }: Props) {
   const unreadCount = notifs.filter(n => !n.is_read).length;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Nastavení</h2>
         <p className="text-black/45 text-sm mt-1">Spravujte svůj profil, aplikaci, oznámení a zabezpečení.</p>
@@ -301,7 +301,7 @@ export default function Settings({ user, initialTab }: Props) {
         {sections.map(s => (
           <button key={s.id} onClick={() => setSection(s.id)}
             className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
-              section === s.id ? 'bg-[#C8F542] text-black font-semibold' : 'glass text-black/60 hover:text-black'
+              section === s.id ? 'bg-[#16181A] text-white font-semibold' : 'glass text-black/60 hover:text-black'
             }`}>
             <Icon name={s.icon} size={16} /> {s.label}
           </button>

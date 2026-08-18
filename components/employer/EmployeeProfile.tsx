@@ -73,7 +73,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
         ) : (
           <>
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-white/85 backdrop-blur border-b border-black/[0.06]">
+            <div className="sticky top-0 z-10 glass-strong border-b border-black/[0.06]">
               <div className="flex items-center gap-3.5 px-5 pt-5 pb-3">
                 <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.employee.avatar || '👤'}</span>
                 <div className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <button key={v} onClick={() => setTab(v)}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${tab === v ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:text-black'}`}>
                     {lbl}
-                    {v === 'feedback' && flaggedItems.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-white text-[10px] px-1">{flaggedItems.length}</span>}
+                    {v === 'feedback' && flaggedItems.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-white text-[11px] px-1">{flaggedItems.length}</span>}
                   </button>
                 ))}
               </div>
@@ -108,7 +108,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <div className="rounded-2xl bg-black/[0.03] border border-black/[0.05] p-4">
                     <div className="flex items-end justify-between gap-2 flex-wrap">
                       <div>
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-black/40 font-semibold">Úroveň</p>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 font-semibold">Úroveň</p>
                         <p className="text-2xl font-bold tracking-tight text-[#16181A]">{p.standing.levelName}</p>
                       </div>
                       {p.standing.next && (
@@ -130,16 +130,16 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Tento měsíc</h3>
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
-                        <p className="text-lg sm:text-xl font-bold tracking-tight text-[#16181A] tabular-nums whitespace-nowrap">{hours}<span className="text-xs font-semibold text-black/40"> h </span>{minutes > 0 && <>{minutes}<span className="text-xs font-semibold text-black/40"> m</span></>}</p>
-                        <p className="text-[10px] text-black/45 mt-0.5">odpracováno</p>
+                        <p className="text-base sm:text-xl font-bold tracking-tight text-[#16181A] tabular-nums whitespace-nowrap">{hours}<span className="text-xs font-semibold text-black/40"> h </span>{minutes > 0 && <>{minutes}<span className="text-xs font-semibold text-black/40"> m</span></>}</p>
+                        <p className="text-[11px] text-black/45 mt-0.5">odpracováno</p>
                       </div>
                       <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
                         <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.shifts}</p>
-                        <p className="text-[10px] text-black/45 mt-0.5">směn</p>
+                        <p className="text-[11px] text-black/45 mt-0.5">směn</p>
                       </div>
                       <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
                         <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.closings}</p>
-                        <p className="text-[10px] text-black/45 mt-0.5">uzávěrek</p>
+                        <p className="text-[11px] text-black/45 mt-0.5">uzávěrek</p>
                       </div>
                     </div>
                   </div>
@@ -173,7 +173,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                           <div key={`${it.kind}-${it.refId}`} className="rounded-xl px-3 py-2 bg-amber-500/[0.12] border border-amber-500/30">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Icon name="warning" size={13} className="text-amber-600 shrink-0" />
-                              <span className="text-[10px] font-semibold uppercase tracking-wider text-black/40">{KIND_LABEL[it.kind] ?? ''} · {fmtDay(it.workDate)}</span>
+                              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40">{KIND_LABEL[it.kind] ?? ''} · {fmtDay(it.workDate)}</span>
                               <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
                               <PointsBadge n={it.points} />
                             </div>
@@ -229,7 +229,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                                 <PointsBadge n={sh.reviewPoints} />
                               </span>
                             ) : (
-                              <span className="text-[10px] font-medium text-orange-600 bg-orange-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
+                              <span className="text-[11px] font-medium text-orange-600 bg-orange-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
                             )}
                             <button onClick={() => setRateDate(sh.date)}
                               className="rounded-full bg-[#16181A] text-white px-3 py-1.5 text-[11px] font-semibold hover:brightness-125 transition shrink-0">
@@ -260,7 +260,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                                 {r.rating > 0 && <Stars n={r.rating} />}
                                 <PointsBadge n={r.points} />
                                 {(r.autoPoints ?? 0) !== 0 && (
-                                  <span className={`text-[10px] tabular-nums rounded-full px-1.5 py-0.5 bg-black/[0.05] ${(r.autoPoints ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+                                  <span className={`text-[11px] tabular-nums rounded-full px-1.5 py-0.5 bg-black/[0.05] ${(r.autoPoints ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
                                     {(r.autoPoints ?? 0) > 0 ? '+' : ''}{r.autoPoints} auto
                                   </span>
                                 )}
@@ -273,7 +273,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                                   <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-amber-500/[0.12] border border-amber-500/30' : 'bg-black/[0.04]'}`}>
                                     <div className="flex items-center gap-2 flex-wrap">
                                       {it.flagged && <Icon name="warning" size={12} className="text-amber-600 shrink-0" />}
-                                      <span className="text-[10px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? ''}</span>
+                                      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? ''}</span>
                                       <span className="text-[13px] text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
                                       <PointsBadge n={it.points} />
                                     </div>

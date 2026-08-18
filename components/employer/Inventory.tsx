@@ -863,7 +863,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       )}
 
       {selecting && selected.size > 0 && (
-        <div className="sticky bottom-4 z-30 mx-auto w-fit max-w-full">
+        <div className="sticky bottom-[calc(104px+env(safe-area-inset-bottom))] md:bottom-4 z-30 mx-auto w-fit max-w-full">
           <div className="flex items-center gap-2 flex-wrap justify-center rounded-full bg-[#16181A] text-white px-4 py-2.5 shadow-xl shadow-black/20">
             <span className="text-sm font-semibold whitespace-nowrap px-1">
               {selected.size} vybráno
@@ -1159,7 +1159,7 @@ function MoreMenu({
         <Icon name="menu" size={17} className="text-black/50" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
+        <div role="menu" className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
           <button className={row} onClick={() => { onSelect(); setOpen(false); }} disabled={selecting}>
             <Icon name="check" size={16} className="text-black/40" /> Vybrat více položek
           </button>
@@ -1181,7 +1181,7 @@ function MoreMenu({
           )}
 
           <div className="border-t border-black/[0.06] pt-1.5 mt-1.5">
-            <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-black/35 font-semibold">Zobrazení</p>
+            <p className="px-3 pb-1 text-[11px] uppercase tracking-wider text-black/35 font-semibold">Zobrazení</p>
             <div className="flex gap-1 px-1.5 pb-0.5">
               {([['grid', 'Karty', 'trend'], ['list', 'Seznam', 'box']] as const).map(([v, label, icon]) => (
                 <button key={v} onClick={() => { setView(v); setOpen(false); }}
@@ -1221,7 +1221,7 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
         <Icon name="chevron" size={14} className={`text-black/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div role="listbox" className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
+        <div role="listbox" className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
           {SORTS.map(s => {
             const active = s.key === sort;
             return (
@@ -1291,7 +1291,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
               </div>
               <div className={`flex items-center gap-1 justify-end ${selecting ? 'hidden' : ''}`}>
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
-                <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[10px] text-black/40 ml-0.5">{i.unit}</span></span>
+                <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
@@ -2021,7 +2021,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
           const fromParent = (inherited as any)[f.key];
           return (
             <div key={f.key} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}>
-              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">{f.label}</label>
+              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">{f.label}</label>
               {f.kind === 'multiline' ? (
                 <textarea rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
@@ -2033,7 +2033,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
                   className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
               )}
               {fromParent != null && !values[f.key] && (
-                <p className="text-[10px] text-black/35 mt-0.5">Zdědí se z nadřazené kategorie.</p>
+                <p className="text-[11px] text-black/35 mt-0.5">Zdědí se z nadřazené kategorie.</p>
               )}
             </div>
           );
@@ -2113,21 +2113,21 @@ function PackagingEditor({ category, onSaved }: {
         <>
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Jednotka obsahu</label>
+              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">Jednotka obsahu</label>
               <select value={unit} onChange={e => setUnit(e.target.value)}
                 className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
                 {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
+              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
               <input type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
                 className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
             </div>
           </div>
 
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Hlídat zásoby podle</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Hlídat zásoby podle</p>
             <div className="flex gap-1 rounded-full bg-white border border-black/[0.08] p-1 w-fit">
               {([['package', 'Balení'], ['content', unit ? `Obsahu (${unit})` : 'Obsahu']] as const).map(([v, lbl]) => (
                 <button key={v} type="button" onClick={() => setThresholdUnit(v)}
@@ -2151,7 +2151,7 @@ function PackagingEditor({ category, onSaved }: {
           </div>
 
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-black/45 mb-1.5">Stupně měřítka</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Stupně měřítka</p>
             <div className="space-y-1.5">
               {steps.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">

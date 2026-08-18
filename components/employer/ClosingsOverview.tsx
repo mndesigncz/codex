@@ -301,7 +301,7 @@ export default function ClosingsOverview() {
                         <text x={Math.min(Math.max(x + barW / 2, 30), chartW - 30)} y={y - 5} textAnchor="middle" className="text-[9px] font-semibold fill-black/55 tabular-nums">{money(d.total)}</text>
                       )}
                       {i % labelEvery === 0 && (
-                        <text x={x + barW / 2} y={labelY} textAnchor="middle" className="text-[9px] sm:text-[10px] fill-black/40">{day}.</text>
+                        <text x={x + barW / 2} y={labelY} textAnchor="middle" className="text-[9px] sm:text-[11px] fill-black/40">{day}.</text>
                       )}
                     </g>
                   );
@@ -482,7 +482,7 @@ export default function ClosingsOverview() {
                             const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
                             return (
                               <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
-                                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
+                                <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
                                 <span className="min-w-0 flex-1 truncate text-black/55">{m.note || '—'}</span>
                                 <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
                               </div>

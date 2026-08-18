@@ -106,7 +106,7 @@ export default function KioskSettings() {
                 <span className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="text-lg shrink-0">{m.avatar ?? '👤'}</span>
                   <span className="text-sm text-[#16181A] truncate">{m.name}</span>
-                  {m.hasPin && <span className="text-[10px] rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 font-medium shrink-0">PIN</span>}
+                  {m.hasPin && <span className="text-[11px] rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 font-medium shrink-0">PIN</span>}
                 </span>
                 <input
                   value={pins[m.id] ?? ''} onChange={e => setPins(p => ({ ...p, [m.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}

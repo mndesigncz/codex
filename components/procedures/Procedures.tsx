@@ -173,7 +173,7 @@ export default function Procedures({ user }: Props) {
   const openEdit = (p: Procedure) => { setEditing(p); setEditorOpen(true); };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto w-full">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 pb-5">
         <div>
@@ -634,7 +634,7 @@ function ProcedureEditor({
                         placeholder="min"
                         className="w-[68px] rounded-xl bg-white/70 border border-black/[0.08] pl-3 pr-7 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
                       />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-black/35">m</span>
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-black/35">m</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

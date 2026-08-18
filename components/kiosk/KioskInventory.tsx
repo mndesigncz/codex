@@ -144,7 +144,7 @@ export default function KioskInventory() {
                       <button onClick={() => step(i, -1)}
                         className="rounded-2xl glass border border-black/10 w-12 h-12 flex items-center justify-center text-2xl leading-none text-black/70 active:scale-95 transition">−</button>
                       <span className="w-16 text-center font-bold text-[#16181A] tabular-nums text-lg">
-                        {i.quantity}<span className="block text-[10px] font-medium text-black/40 leading-none">{i.unit}</span>
+                        {i.quantity}<span className="block text-[11px] font-medium text-black/40 leading-none">{i.unit}</span>
                       </span>
                       <button onClick={() => step(i, 1)}
                         className="rounded-2xl bg-[#C8F542] w-12 h-12 flex items-center justify-center text-2xl leading-none text-black active:scale-95 transition">+</button>

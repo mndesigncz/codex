@@ -44,11 +44,11 @@ export default function LoginForm() {
           />
           <div className="relative flex items-center gap-2.5">
             <LogoMark size={38} />
-            <span className="font-bold text-[#16181A] tracking-tight">Pangea</span>
+            <span className="font-bold text-black tracking-tight">Pangea</span>
           </div>
           <div className="relative">
             <p className="text-[#16181A]/60 text-sm mb-2">Vítejte zpět</p>
-            <h2 className="text-3xl font-bold tracking-tight text-[#16181A] leading-snug">
+            <h2 className="text-3xl font-bold tracking-tight text-black leading-snug">
               Přehled o celém<br />podniku na jednom místě.
             </h2>
           </div>

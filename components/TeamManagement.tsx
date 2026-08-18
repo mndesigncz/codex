@@ -389,7 +389,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   if (loadError) {
     return (
-      <div className="p-6 max-w-2xl mx-auto w-full">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
       <div className="glass-card p-8 text-center space-y-3">
         <p className="text-[#16181A] font-medium">Tým se nepodařilo načíst.</p>
         <p className="text-black/45 text-sm">Vaše data jsou v pořádku — jen se je nepodařilo teď načíst.</p>
@@ -406,7 +406,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   if (!team) {
     return (
-      <div className="p-6 max-w-2xl mx-auto w-full">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
         <div className="glass-card p-8 text-center">
           <p className="text-black/45">Zatím nemáte žádný tým.</p>
         </div>
@@ -753,7 +753,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       className={`relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
                       style={{ width: '2.75rem', height: '1.6rem' }}
                     >
-                      <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
+                      <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
                     </button>
                   </label>
                 );
@@ -788,7 +788,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             onClick={() => togglePayDailyCash(!team?.pay_daily_cash)}
             className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
-            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
           </button>
         </label>
 
@@ -807,7 +807,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             onClick={() => toggleRequiresShift(!(team?.closing_requires_shift !== false))}
             className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
-            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
           </button>
         </label>
       </div>

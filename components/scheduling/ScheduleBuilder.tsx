@@ -523,7 +523,7 @@ export default function ScheduleBuilder({ user }: Props) {
                 key={m}
                 onClick={() => setMonth(m)}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-medium capitalize whitespace-nowrap transition ${
-                  month === m ? 'bg-[#C8F542] text-black font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
+                  month === m ? 'bg-[#16181A] text-white font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
                 }`}
               >
                 {m === currentMonth ? 'Tento měsíc' : 'Příští měsíc'}
@@ -609,7 +609,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     >
                       <span className="text-base opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="min-w-0 truncate">{e.name}</span>
-                      <span className="text-[10px] uppercase tracking-wide text-black/30 flex-shrink-0">čeká</span>
+                      <span className="text-[11px] uppercase tracking-wide text-black/30 flex-shrink-0">čeká</span>
                     </span>
                   ))}
                 </div>
@@ -833,7 +833,7 @@ export default function ScheduleBuilder({ user }: Props) {
                           <span
                             key={s.id}
                             title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
-                            className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden bg-black/[0.05] text-black/70"
+                            className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70"
                           >
                             <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: rt.color }} />
                             <span className="flex-shrink-0">{s.employeeAvatar}</span>
@@ -842,21 +842,21 @@ export default function ScheduleBuilder({ user }: Props) {
                         );
                       })}
                       {dayShifts.length > 3 && (
-                        <span className="text-[10px] text-black/45">+{dayShifts.length - 3} další</span>
+                        <span className="text-[11px] text-black/45">+{dayShifts.length - 3} další</span>
                       )}
                       {/* proposed (preview) */}
                       {dayProposed.slice(0, 3).map((p, idx) => (
                         <span
                           key={`p-${idx}`}
                           title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[10px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
                         >
                           <span className="flex-shrink-0">✨{p.employeeAvatar}</span>
                           <span className="truncate min-w-0">{p.startTime}</span>
                         </span>
                       ))}
                       {dayProposed.length > 3 && (
-                        <span className="text-[10px] text-[#5B7A08]/70">+{dayProposed.length - 3} návrh</span>
+                        <span className="text-[11px] text-[#5B7A08]/70">+{dayProposed.length - 3} návrh</span>
                       )}
                     </div>
                   </button>
@@ -1696,7 +1696,7 @@ function DayModal({
                   >
                     <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
                     {t.name}
-                    {(t.startsAtOpen || t.endsAtClose) && <span className={`text-[10px] ${active ? 'text-black/50' : 'text-black/35'}`}>{rt.start}–{rt.end}</span>}
+                    {(t.startsAtOpen || t.endsAtClose) && <span className={`text-[11px] ${active ? 'text-black/50' : 'text-black/35'}`}>{rt.start}–{rt.end}</span>}
                   </button>
                 );
               })}

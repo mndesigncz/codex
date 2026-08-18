@@ -105,7 +105,7 @@ export default function NotificationBell() {
       >
         <Icon name="bell" size={19} />
         {badge > 0 && (
-          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
+          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
             {badge > 9 ? '9+' : badge}
           </span>
         )}

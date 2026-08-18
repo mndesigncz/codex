@@ -68,7 +68,7 @@ function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
       </div>
 
       {r?.scope === 'shift' && (
-        <span className="inline-flex items-center gap-1 mt-1.5 rounded-full bg-black/[0.05] text-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+        <span className="inline-flex items-center gap-1 mt-1.5 rounded-full bg-black/[0.05] text-black/55 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider">
           <Icon name="users" size={11} /> Hodnocení celé směny
         </span>
       )}
@@ -81,7 +81,7 @@ function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
             <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-amber-500/[0.12] border border-amber-500/30' : 'bg-black/[0.03]'}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 {it.flagged && <Icon name="warning" size={13} className="text-amber-600 shrink-0" />}
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? 'Hodnocení'}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? 'Hodnocení'}</span>
                 <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
                 <PointsBadge n={it.points ?? 0} />
               </div>
@@ -145,13 +145,13 @@ export default function MyRewards() {
   };
 
   if (loading) return (
-    <div className="p-6 max-w-2xl mx-auto w-full space-y-4">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-4">
       <div className="glass-card h-40 animate-pulse" />
       <div className="glass-card h-32 animate-pulse" />
     </div>
   );
   if (!me) return (
-    <div className="p-6 max-w-2xl mx-auto w-full">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
       <div className="glass-card p-8 text-center text-black/45">Odměny zatím nejsou k dispozici.</div>
     </div>
   );
@@ -160,10 +160,10 @@ export default function MyRewards() {
   const fromReviews = (b.reviewPoints ?? 0) + (b.autoPoints ?? 0) + (b.itemPoints ?? 0);
 
   return (
-    <div className="p-6 max-w-2xl mx-auto w-full space-y-6">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-6">
       <div className="flex items-center gap-2.5">
         <Icon name="award" size={22} className="text-[#16181A]" />
-        <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Moje odměny</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje odměny</h1>
       </div>
 
       {/* Unacknowledged "fix this" feedback — first thing on the page */}
@@ -254,7 +254,7 @@ export default function MyRewards() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-[#16181A] text-sm">{lv.name}{current && <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-[#5B7A08]">teď</span>}</p>
+                    <p className="font-semibold text-[#16181A] text-sm">{lv.name}{current && <span className="ml-2 text-[11px] font-bold uppercase tracking-wider text-[#5B7A08]">teď</span>}</p>
                     <span className="text-xs text-black/45 tabular-nums shrink-0">{lv.minPoints} b</span>
                   </div>
                   {lv.perks && <p className="text-xs text-black/55 mt-0.5 whitespace-pre-line">{lv.perks}</p>}

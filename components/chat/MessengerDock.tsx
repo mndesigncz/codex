@@ -259,7 +259,7 @@ function ChatWindow({
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-[#16181A] text-sm truncate">{conv.name}</div>
           {conv.type === 'team' && (
-            <div className="text-[10px] text-black/45 leading-none">Týmový kanál</div>
+            <div className="text-[11px] text-black/45 leading-none">Týmový kanál</div>
           )}
         </div>
         <button

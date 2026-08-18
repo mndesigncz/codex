@@ -254,7 +254,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
                         {label}
                         {pending > 0 && (
-                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
+                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
                         )}
                       </button>
                     );

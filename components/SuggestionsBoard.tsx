@@ -136,7 +136,7 @@ export default function SuggestionsBoard() {
   const shown = filter === 'all' ? items : items.filter(s => s.status === filter);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto w-full space-y-6">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-6">
       {/* Intro */}
       <div className="glass-card p-5 sm:p-6 flex items-start gap-4">
         <div className="grid place-items-center h-12 w-12 shrink-0 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">

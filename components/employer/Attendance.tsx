@@ -317,7 +317,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 min-w-0">
           <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
-          <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">

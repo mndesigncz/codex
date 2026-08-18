@@ -65,7 +65,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
           return (
             <div key={d} className={`flex items-center gap-2 px-3 py-1.5 ${cnt > 0 ? 'bg-[#C8F542]/[0.07]' : ''}`}>
               <span className="w-16 shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
-                {fmtDenom(d)} <span className="text-[10px] font-medium text-black/35">{symbol}</span>
+                {fmtDenom(d)} <span className="text-[11px] font-medium text-black/35">{symbol}</span>
               </span>
               <div className="flex items-center gap-1 ml-auto">
                 <button type="button" onClick={() => bump(d, -1)} disabled={cnt <= 0} aria-label={`Ubrat ${fmtDenom(d)} ${symbol}`}
@@ -132,7 +132,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
             const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
             return (
               <div key={i} className="flex items-center gap-2.5 py-2">
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                   spec?.sign === 1 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-black/[0.06] text-black/50'
                 }`}>
                   {movementLabel(m.kind)}
@@ -243,7 +243,7 @@ function Toggle({ title, hint, on, onChange }: {
         onClick={() => onChange(!on)}
         className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
       >
-        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
       </button>
     </div>
   );
@@ -566,7 +566,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   <span
                     className={`grid place-items-center h-6 w-6 shrink-0 rounded-full text-[11px] font-bold transition ${
                       stepDone[i]
-                        ? 'bg-[#C8F542] text-[#16181A]'
+                        ? 'bg-[#C8F542] text-black'
                         : 'bg-black/[0.08] text-black/45 group-hover:bg-black/[0.14]'
                     }`}
                   >
@@ -592,7 +592,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
               {diff !== null && (
                 <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${
-                  diff === 0 ? 'bg-[#C8F542] text-[#16181A]' : diff > 0 ? 'bg-[#0A84FF] text-white' : 'bg-red-500 text-white'
+                  diff === 0 ? 'bg-[#C8F542] text-black' : diff > 0 ? 'bg-[#0A84FF] text-white' : 'bg-red-500 text-white'
                 }`}>
                   {diff === 0 ? 'sedí ✓' : `${diff > 0 ? '+' : ''}${money(diff)}`}
                 </span>
@@ -1050,7 +1050,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                         const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
                         return (
                           <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
-                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
+                            <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
                             <span className="min-w-0 flex-1 truncate text-black/55">{m.note || '—'}</span>
                             <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">
                               {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
