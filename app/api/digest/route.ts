@@ -72,6 +72,12 @@ export async function GET(request: Request) {
         procsMissing = (rows as any[]).map(r => r.name);
       } catch { /* ignore */ }
 
+      // Write off today's sales first, so the low-stock count below is honest.
+      try {
+        const { runPosSync } = await import('@/lib/posSync');
+        await runPosSync(Number(team.id), null, false);
+      } catch { /* sync is best-effort */ }
+
       // --- stock running low ---
       let lowCount = 0;
       try {
