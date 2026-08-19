@@ -95,31 +95,6 @@ export default async function SharePage({ params }: { params: { token: string } 
           )}
         </header>
 
-        {publicEvents.length > 0 && (
-          <section style={{ marginBottom: 36 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', color: theme.accent }}>
-              Nadcházející akce
-            </h2>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {publicEvents.map((ev: any, i2: number) => (
-                <div key={i2} style={{ background: card, border: `1px solid ${line}`, borderRadius: 16, padding: '14px 18px' }}>
-                  <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-                    {ev.kind === 'concert' ? '🎵 ' : ev.kind === 'lecture' ? '🎤 ' : ev.kind === 'workshop' ? '🫖 ' : ev.kind === 'outdoor' ? '⛺ ' : '📅 '}{ev.title}
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 14, color: muted, textTransform: 'capitalize' }}>
-                    {new Date(ev.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    {ev.start_time ? ` · ${String(ev.start_time).slice(0, 5)}` : ''}
-                    {ev.location ? ` · ${ev.location}` : ''}
-                  </p>
-                  {ev.description && (
-                    <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: muted }}>{ev.description}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
 
         {total === 0 ? (
           <p style={{ textAlign: 'center', color: muted }}>Zatím tu nic není.</p>
@@ -163,6 +138,59 @@ export default async function SharePage({ params }: { params: { token: string } 
           ))
         )}
 
+
+        {publicEvents.length > 0 && (
+          <section style={{ marginTop: 52 }}>
+            {/* A programme band that deliberately looks different from the menu
+                above: accent-tinted panel, calendar tiles, no plain list cards. */}
+            <div style={{
+              background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              border: `1px solid ${line}`,
+              borderRadius: 24,
+              padding: '26px 22px',
+            }}>
+              <p style={{ margin: 0, fontSize: 12, letterSpacing: '0.18em', textTransform: 'uppercase', color: muted, textAlign: 'center' }}>
+                Program
+              </p>
+              <h2 style={{ margin: '6px 0 20px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: theme.accent, textAlign: 'center' }}>
+                Co se u nás chystá
+              </h2>
+              <div style={{ display: 'grid', gap: 14 }}>
+                {publicEvents.map((ev: any, i2: number) => {
+                  const d = new Date(ev.date + 'T00:00:00');
+                  return (
+                    <div key={i2} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                      <div style={{
+                        flexShrink: 0, width: 58, textAlign: 'center',
+                        background: theme.accent, color: theme.background,
+                        borderRadius: 14, padding: '8px 0 9px',
+                        boxShadow: dark ? 'none' : '0 6px 16px rgba(0,0,0,0.10)',
+                      }}>
+                        <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{d.getDate()}.</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 3 }}>
+                          {d.toLocaleDateString('cs-CZ', { month: 'short' }).replace('.', '')}
+                        </div>
+                      </div>
+                      <div style={{ minWidth: 0, paddingTop: 2 }}>
+                        <p style={{ margin: 0, fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>
+                          {ev.kind === 'concert' ? '🎵 ' : ev.kind === 'lecture' ? '🎤 ' : ev.kind === 'workshop' ? '🫖 ' : ev.kind === 'outdoor' ? '⛺ ' : ''}{ev.title}
+                        </p>
+                        <p style={{ margin: '3px 0 0', fontSize: 13.5, color: muted }}>
+                          {d.toLocaleDateString('cs-CZ', { weekday: 'long' })}
+                          {ev.start_time ? ` · od ${String(ev.start_time).slice(0, 5)}` : ''}
+                          {ev.location ? ` · ${ev.location}` : ''}
+                        </p>
+                        {ev.description && (
+                          <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.55, color: muted }}>{ev.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
         {theme.footer && (
           <p style={{ marginTop: 44, paddingTop: 20, borderTop: `1px solid ${line}`, textAlign: 'center', fontSize: 13, lineHeight: 1.6, color: muted }}>
             {theme.footer}
