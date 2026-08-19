@@ -31,6 +31,16 @@ export default function ClosingsOverview() {
   const money = useMoney();
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
+  // Analytics live behind one collapsible header — the list of closings is
+  // the daily job, the numbers are the occasional deep-dive.
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  useEffect(() => {
+    try { setAnalyticsOpen(localStorage.getItem('pangea-closings-analytics') === '1'); } catch { /* ignore */ }
+  }, []);
+  const toggleAnalytics = () => setAnalyticsOpen(o => {
+    try { localStorage.setItem('pangea-closings-analytics', o ? '0' : '1'); } catch { /* ignore */ }
+    return !o;
+  });
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
   // For the month-in-numbers card: who worked (labor cost) and what was bought.
   const [attRoster, setAttRoster] = useState<any[]>([]);
@@ -405,7 +415,7 @@ export default function ClosingsOverview() {
         </div>
       </div>
 
-      {trend && pro && (
+      {analyticsOpen && trend && pro && (
         <div className="glass-card p-5 sm:p-6">
           <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📊 Trendy</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -437,8 +447,18 @@ export default function ClosingsOverview() {
         </div>
       )}
 
+      {/* Analytics, folded behind one calm header */}
+      <button onClick={toggleAnalytics}
+        className="w-full glass-card px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
+        <span className="font-bold tracking-tight text-[#16181A]">📈 Přehledy a trendy</span>
+        <span className="flex items-center gap-2 text-xs text-black/40">
+          {!analyticsOpen && 'měsíc v číslech · trendy · graf'}
+          <Icon name="chevron" size={16} className={`transition-transform ${analyticsOpen ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
+
       {/* Month in numbers — the connected view: revenue × labor × purchases */}
-      {(laborCost > 0 || purchases > 0) && pro && (
+      {analyticsOpen && (laborCost > 0 || purchases > 0) && pro && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
             <h3 className="font-bold tracking-tight text-[#16181A]">📈 {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
@@ -473,7 +493,7 @@ export default function ClosingsOverview() {
         </div>
       )}
 
-      {(laborCost > 0 || purchases > 0) && !pro && (
+      {analyticsOpen && (laborCost > 0 || purchases > 0) && !pro && (
         <button onClick={() => setUpgradeFor('Měsíční přehled podniku')}
           className="w-full glass-card p-5 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
           <div className="min-w-0">
@@ -487,7 +507,7 @@ export default function ClosingsOverview() {
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
 
       {/* Revenue trend chart */}
-      {daily.length >= 2 && (() => {
+      {analyticsOpen && daily.length >= 2 && (() => {
         const barW = 26, barGap = 10, padX = 14;
         const chartH = 160, plotTop = 18, plotBottom = 138, labelY = 152;
         const chartW = padX * 2 + daily.length * barW + (daily.length - 1) * barGap;
