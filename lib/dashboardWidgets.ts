@@ -5,6 +5,7 @@
 export type Widget = { id: string; label: string; hint?: string };
 
 export const EMPLOYER_WIDGETS: Widget[] = [
+  { id: 'posToday', label: 'Pokladna dnes', hint: 'Živé tržby ze Storyous.' },
   { id: 'nextEvent', label: 'Nejbližší akce', hint: 'Co se chystá a kdo tam bude.' },
   { id: 'sharedLink', label: 'Připnutá nabídka', hint: 'Sdílený odkaz pro zákazníky na jeden klik.' },
   { id: 'clock', label: 'Píchačky vedení', hint: 'Příchod/odchod pro tebe.' },

@@ -82,6 +82,17 @@ export async function GET(request: Request) {
         lowCount = Number(r?.n) || 0;
       } catch { /* ignore */ }
 
+      // --- POS (Storyous) real revenue, when connected ---
+      let posLine: string | null = null;
+      try {
+        const { getConnection, daySummary } = await import('@/lib/storyous');
+        const conn = await getConnection(Number(team.id));
+        if (conn) {
+          const ps = await daySummary(conn, today);
+          if (ps.bills > 0) posLine = `Pokladna: ${czk(ps.total)} (${ps.bills} účtenek, hotově ${czk(ps.cash)} / kartou ${czk(ps.card + ps.other)})`;
+        }
+      } catch { /* POS down — digest still goes out */ }
+
       // --- tomorrow's events ---
       let tomorrowEvents: any[] = [];
       try {
@@ -104,6 +115,7 @@ export async function GET(request: Request) {
         procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
         lowCount ? `${lowCount} položek dochází` : null,
         tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
+        posLine,
       ].filter(Boolean).join(' · ');
 
       const emailHtml = `
@@ -113,6 +125,7 @@ export async function GET(request: Request) {
           <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${worked.length ? worked.map(w => `${w.name} (${w.hours} h)`).join(', ') : '—'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + procsMissing.join(', ') : 'hotové ✓'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' : 'nic ✓'}</td></tr>
+          ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${posLine.replace('Pokladna: ', '')}</td></tr>` : ''}
           ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', ')}</td></tr>` : ''}
         </table>`;
 

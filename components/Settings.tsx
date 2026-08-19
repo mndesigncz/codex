@@ -7,7 +7,7 @@ import { Icon } from './Icons';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit';
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -95,6 +95,33 @@ export default function Settings({ user, initialTab }: Props) {
   const [section, setSection] = useState<SectionId>(initialTab ?? 'account');
   const [interestSent, setInterestSent] = useState(false);
   const [auditEntries, setAuditEntries] = useState<any[] | null>(null);
+  // POS (Storyous) connection form.
+  const [posStatus, setPosStatus] = useState<any | null>(null);
+  const [posForm, setPosForm] = useState({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
+  const [posBusy, setPosBusy] = useState(false);
+  const [posMsg, setPosMsg] = useState('');
+  useEffect(() => {
+    if (section !== 'pos' || posStatus) return;
+    fetch('/api/pos').then(r => r.json()).then(setPosStatus).catch(() => setPosStatus({ connected: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
+  const posConnect = async () => {
+    setPosBusy(true); setPosMsg('');
+    const res = await fetch('/api/pos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(posForm),
+    }).catch(() => null);
+    setPosBusy(false);
+    if (res?.ok) {
+      const d = await res.json();
+      setPosMsg(`Připojeno k provozovně ${d.placeName ?? ''} ✓`);
+      setPosStatus(null); setPosForm({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
+      fetch('/api/pos').then(r => r.json()).then(setPosStatus).catch(() => {});
+    } else {
+      const d = res ? await res.json().catch(() => ({})) : {};
+      setPosMsg(d.error || 'Připojení se nepodařilo.');
+    }
+  };
   useEffect(() => {
     if (section !== 'audit' || auditEntries) return;
     fetch('/api/audit').then(r => r.json())
@@ -294,6 +321,7 @@ export default function Settings({ user, initialTab }: Props) {
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
     ...(isEmployer ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
+    ...(isEmployer ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
     ...(isEmployer ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
   ];
 
@@ -657,6 +685,45 @@ export default function Settings({ user, initialTab }: Props) {
                   </table>
                 </div>
               </div>
+            </div>
+          ) : section === 'pos' ? (
+            <div className="glass-card p-6">
+              <h3 className={cardTitle}>Napojení pokladny Storyous</h3>
+              <p className="text-black/45 text-sm mt-1 mb-4">
+                Jen čtení: appka si bere tržby z účtenek — nic do pokladny nezapisuje. Klíče se ukládají bezpečně na serveru.
+              </p>
+              {posMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 mb-3 ${posMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-red-500/10 text-red-600 border border-red-500/25'}`}>{posMsg}</p>}
+              {posStatus?.connected ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3">
+                    <p className="text-sm font-semibold text-[#16181A]">✅ Připojeno: {posStatus.placeName ?? posStatus.merchantId}</p>
+                    <p className="text-xs text-black/45 mt-0.5">Client ID {posStatus.clientIdMasked} · tržby se předvyplňují v uzávěrce a večerním souhrnu.</p>
+                  </div>
+                  <button onClick={async () => {
+                    if (!confirm('Odpojit pokladnu? Tržby se přestanou načítat.')) return;
+                    await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
+                    setPosStatus({ connected: false }); setPosMsg('Pokladna odpojena.');
+                  }} className="rounded-full glass text-black/50 hover:text-red-600 px-4 py-2.5 text-sm font-medium transition">
+                    Odpojit pokladnu
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {([['clientId', 'Client ID'], ['clientSecret', 'Client Secret'], ['merchantId', 'Merchant ID'], ['placeId', 'Place ID']] as const).map(([k, lbl]) => (
+                    <div key={k}>
+                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-1">{lbl}</label>
+                      <input value={(posForm as any)[k]} onChange={e => setPosForm(f => ({ ...f, [k]: e.target.value }))}
+                        type={k === 'clientSecret' ? 'password' : 'text'} autoComplete="off"
+                        className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] font-mono focus:border-[#C8F542]/50 focus:outline-none" />
+                    </div>
+                  ))}
+                  <button onClick={posConnect} disabled={posBusy || Object.values(posForm).some(v => !v.trim())}
+                    className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-6 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                    {posBusy ? 'Ověřuji…' : 'Připojit a ověřit'}
+                  </button>
+                  <p className="text-[11px] text-black/35">Klíče získáš v back-office Storyous/Teya (API přístup).</p>
+                </div>
+              )}
             </div>
           ) : section === 'audit' ? (
             <div className="glass-card p-6">

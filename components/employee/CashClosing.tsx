@@ -299,6 +299,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [todayRuns, setTodayRuns] = useState<any[]>([]);
   // Procedures the employer marked as mandatory before the closing.
   const [requiredProcs, setRequiredProcs] = useState<{ id: number; name: string; icon?: string }[]>([]);
+  // Real numbers from the POS (Storyous), when the team connected one.
+  const [pos, setPos] = useState<any | null>(null);
   // Counting the drawer by denomination instead of typing one total. When the
   // counter is on, the counted total drives form.closingCash.
   const [countMode, setCountMode] = useState(false);
@@ -441,6 +443,15 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     : Math.max(0, n(form.closingCash) - n(leaveCash));
   const leaveTooHigh = leaveCash !== '' && form.closingCash !== '' && n(leaveCash) > n(form.closingCash);
   const hints = diff == null || diff === 0 ? [] : explainDifference(diff, { ...preview, final_removal: finalRemoval }, movements);
+
+  useEffect(() => {
+    if (!form.date) return;
+    let alive = true;
+    fetch(`/api/pos/summary?date=${form.date}`).then(r => r.json())
+      .then(d => { if (alive) setPos(d?.connected && d.bills != null ? d : null); })
+      .catch(() => { if (alive) setPos(null); });
+    return () => { alive = false; };
+  }, [form.date]);
 
   const totalSteps = 4;
 
@@ -756,6 +767,26 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         {/* Step 2 — revenue */}
         <Step refCb={el => { stepRefs.current[1] = el; }} num={2} total={totalSteps} icon="trend" title="Tržby"
           subtitle="Co za směnu přišlo — hotově, kartou a spropitné.">
+          {pos && (
+            <div className="rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-4 mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-[#16181A] min-w-0">
+                  💳 Pokladna {pos.placeName ? `(${pos.placeName})` : 'Storyous'}
+                  <span className="font-normal text-black/50"> · {pos.bills} účtenek · hotově {money(pos.cash)} · kartou {money(pos.card)}{pos.other > 0 ? ` · jinak ${money(pos.other)}` : ''}{pos.tips > 0 ? ` · spropitné ${money(pos.tips)}` : ''}</span>
+                </p>
+                <button type="button"
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    cashRevenue: String(pos.cash),
+                    cardRevenue: String(pos.card + pos.other),
+                    tips: pos.tips > 0 ? String(pos.tips) : f.tips,
+                  }))}
+                  className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-bold hover:bg-black transition">
+                  Předvyplnit z pokladny
+                </button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Tržba hotově', 'cashRevenue', { hint: 'Hotovost přijatá do kasy.' })}
             {field('Tržba kartou', 'cardRevenue', { hint: 'Nejde do kasy — jen evidence.' })}
