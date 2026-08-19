@@ -699,6 +699,35 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )`;
     await sql`CREATE INDEX IF NOT EXISTS audit_log_team ON audit_log (team_id, created_at DESC)`;
+    // events: concerts, lectures, offsite tea-house trips — with crew,
+    // checklist, packing list and a simple money outcome
+    await sql`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        kind TEXT DEFAULT 'other',
+        date TEXT NOT NULL,
+        start_time TEXT,
+        end_time TEXT,
+        location TEXT,
+        offsite BOOLEAN DEFAULT FALSE,
+        status TEXT DEFAULT 'planned',
+        public BOOLEAN DEFAULT FALSE,
+        capacity INTEGER,
+        checklist JSONB DEFAULT '[]',
+        packing JSONB DEFAULT '[]',
+        crew JSONB DEFAULT '[]',
+        revenue INTEGER,
+        costs INTEGER,
+        notes TEXT,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS events_team_date ON events (team_id, date)`;
+    // a shift can belong to an event (created from its crew assignment)
+    await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS event_id INTEGER`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

@@ -76,7 +76,7 @@ export default function MyShifts({ user }: Props) {
   const formatDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'short' });
 
   // Prefer the server-resolved configured type name; fall back to legacy labels.
-  const shiftLabel = (s: Shift) => s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna');
+  const shiftLabel = (s: Shift) => s.type === 'event' ? '📅 Akce' : (s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna'));
 
   // Client-side iCalendar export of upcoming shifts (opens in Apple/Google Calendar).
   const exportIcs = () => {

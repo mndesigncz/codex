@@ -78,6 +78,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   // can't sit unseen for weeks.
   const [pendingApprovals, setPendingApprovals] = useState({ timeoff: 0, swaps: 0, closings: 0 });
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
+  const [nextEvent, setNextEvent] = useState<any | null>(null);
   // First-steps checklist for a fresh team; goes away once done or dismissed.
   const [onboardingDismissed, setOnboardingDismissed] = useState(true);
   useEffect(() => {
@@ -131,6 +132,13 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         ]);
         setCfg(team?.team?.dashboard_config?.employer ?? {});
         setPinnedShare(team?.pinnedShare ?? null);
+        fetch('/api/events').then(r => r.json()).then(d => {
+          const today0 = new Date().toISOString().slice(0, 10);
+          const up = (Array.isArray(d.events) ? d.events : [])
+            .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
+            .sort((a: any, b: any) => a.date.localeCompare(b.date));
+          setNextEvent(up[0] ?? null);
+        }).catch(() => {});
         setEmployeeCfg(team?.team?.dashboard_config?.employee ?? {});
         setMembers((team?.members ?? []).filter((m: any) => m.role === 'employee'));
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
@@ -208,6 +216,27 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   // Each widget is a named block; the saved layout decides order and presence,
   // so the employer can rearrange the dashboard like a phone homescreen.
   const blocks: Record<string, React.ReactNode> = {
+    nextEvent: nextEvent ? (
+      <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition-all">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="font-bold text-[#16181A] truncate">📅 {nextEvent.title}</p>
+            <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
+              {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · 📍 ${nextEvent.location}` : ''}
+            </p>
+          </div>
+          <span className="shrink-0 text-sm text-[#0A6FE0]">Akce →</span>
+        </div>
+        {nextEvent.crewPeople?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2.5">
+            {nextEvent.crewPeople.map((p: any) => (
+              <span key={p.id} className="rounded-full bg-white/70 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">{p.avatar} {p.name}</span>
+            ))}
+          </div>
+        )}
+      </button>
+    ) : null,
     sharedLink: pinnedShare ? (
       <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
         className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">

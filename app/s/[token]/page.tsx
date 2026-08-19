@@ -52,6 +52,17 @@ export default async function SharePage({ params }: { params: { token: string } 
     if (!theme.businessName) theme.businessName = t?.name ?? '';
   } catch { /* defaults are fine */ }
 
+  // Public events: the shop's upcoming programme, shown on every share page.
+  let publicEvents: any[] = [];
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    publicEvents = await sql`
+      SELECT title, description, kind, date, start_time, end_time, location
+      FROM events
+      WHERE team_id = ${teamId} AND public = TRUE AND status <> 'cancelled' AND date >= ${today}
+      ORDER BY date ASC LIMIT 8`;
+  } catch { /* table not migrated — page works without it */ }
+
   const sections = link.kind === 'guides'
     ? await guideSections(teamId, excluded)
     : await inventorySections(teamId, link.category_id != null ? Number(link.category_id) : null, excluded);
@@ -83,6 +94,32 @@ export default async function SharePage({ params }: { params: { token: string } 
             <p style={{ margin: '12px auto 0', maxWidth: 520, fontSize: 15, lineHeight: 1.55, color: muted }}>{link.note}</p>
           )}
         </header>
+
+        {publicEvents.length > 0 && (
+          <section style={{ marginBottom: 36 }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', color: theme.accent }}>
+              Nadcházející akce
+            </h2>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {publicEvents.map((ev: any, i2: number) => (
+                <div key={i2} style={{ background: card, border: `1px solid ${line}`, borderRadius: 16, padding: '14px 18px' }}>
+                  <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+                    {ev.kind === 'concert' ? '🎵 ' : ev.kind === 'lecture' ? '🎤 ' : ev.kind === 'workshop' ? '🫖 ' : ev.kind === 'outdoor' ? '⛺ ' : '📅 '}{ev.title}
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: 14, color: muted, textTransform: 'capitalize' }}>
+                    {new Date(ev.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    {ev.start_time ? ` · ${String(ev.start_time).slice(0, 5)}` : ''}
+                    {ev.location ? ` · ${ev.location}` : ''}
+                  </p>
+                  {ev.description && (
+                    <p style={{ margin: '6px 0 0', fontSize: 14, lineHeight: 1.5, color: muted }}>{ev.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
 
         {total === 0 ? (
           <p style={{ textAlign: 'center', color: muted }}>Zatím tu nic není.</p>

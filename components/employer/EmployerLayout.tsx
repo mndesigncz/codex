@@ -13,6 +13,7 @@ import EmployerDashboard from './EmployerDashboard';
 import ScheduleBuilder from '../scheduling/ScheduleBuilder';
 import Inventory from './Inventory';
 import PlanningBoard from './PlanningBoard';
+import EventsView from './EventsView';
 import ClosingsOverview from './ClosingsOverview';
 import SuggestionsBoard from '../SuggestionsBoard';
 import TaskManager from './TaskManager';
@@ -39,6 +40,7 @@ const navItems = [
   { id: 'chat',       label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',     label: 'Návody',     icon: 'book' },
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
+  { id: 'events',     label: 'Akce',       icon: 'calendarCheck' },
   { id: 'reports',    label: 'Uzávěrky',   icon: 'trend' },
   { id: 'suggestions',label: 'Nápady',     icon: 'bulb' },
   { id: 'attendance', label: 'Docházka',   icon: 'clock' },
@@ -52,7 +54,7 @@ const navSections: { title: string | null; ids: string[] }[] = [
   { title: null,           ids: ['overview'] },
   { title: 'Směny',        ids: ['shifts', 'my-shifts', 'attendance'] },
   { title: 'Kasa & sklad', ids: ['reports', 'inventory'] },
-  { title: 'Práce',        ids: ['tasks', 'procedures', 'planning'] },
+  { title: 'Práce',        ids: ['tasks', 'procedures', 'planning', 'events'] },
   { title: 'Tým',          ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
 const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
@@ -102,6 +104,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
+      case 'events':    return <EventsView user={user as any} />;
       case 'tasks':     return <TaskManager user={user as any} />;
       case 'rewards':   return <RewardsView user={user as any} />;
       case 'attendance': return <Attendance user={user as any} />;
