@@ -5,6 +5,7 @@
 export type Widget = { id: string; label: string; hint?: string };
 
 export const EMPLOYER_WIDGETS: Widget[] = [
+  { id: 'nextEvent', label: 'Nejbližší akce', hint: 'Co se chystá a kdo tam bude.' },
   { id: 'sharedLink', label: 'Připnutá nabídka', hint: 'Sdílený odkaz pro zákazníky na jeden klik.' },
   { id: 'clock', label: 'Píchačky vedení', hint: 'Příchod/odchod pro tebe.' },
   { id: 'kpis', label: 'Klíčové metriky', hint: 'Zaměstnanci, směny, úkoly, sklad.' },
@@ -17,6 +18,7 @@ export const EMPLOYER_WIDGETS: Widget[] = [
 ];
 
 export const EMPLOYEE_WIDGETS: Widget[] = [
+  { id: 'nextEvent', label: 'Nejbližší akce', hint: 'Koncerty, přednášky, výjezdy.' },
   { id: 'handover', label: 'Předávka směny', hint: 'Co nechala předchozí směna.' },
   { id: 'monthly', label: 'Tenhle měsíc', hint: 'Odpracované hodiny a hodnocení.' },
   { id: 'sharedLink', label: 'Připnutá nabídka', hint: 'Sdílený odkaz pro zákazníky na jeden klik.' },

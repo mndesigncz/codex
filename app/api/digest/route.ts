@@ -82,8 +82,18 @@ export async function GET(request: Request) {
         lowCount = Number(r?.n) || 0;
       } catch { /* ignore */ }
 
+      // --- tomorrow's events ---
+      let tomorrowEvents: any[] = [];
+      try {
+        const t = new Date(today + 'T12:00:00'); t.setDate(t.getDate() + 1);
+        const tomorrow = t.toISOString().slice(0, 10);
+        tomorrowEvents = await sql`
+          SELECT title, start_time, location FROM events
+          WHERE team_id = ${team.id} AND date = ${tomorrow} AND status <> 'cancelled'`;
+      } catch { /* ignore */ }
+
       // Nothing at all happened and nothing needs eyes — stay silent.
-      if (closings.length === 0 && worked.length === 0 && procsMissing.length === 0 && lowCount === 0) continue;
+      if (closings.length === 0 && worked.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0) continue;
 
       const verdict = closings.length === 0
         ? 'uzávěrka chybí'
@@ -93,6 +103,7 @@ export async function GET(request: Request) {
         worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` : null,
         procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
         lowCount ? `${lowCount} položek dochází` : null,
+        tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
       ].filter(Boolean).join(' · ');
 
       const emailHtml = `
@@ -102,6 +113,7 @@ export async function GET(request: Request) {
           <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${worked.length ? worked.map(w => `${w.name} (${w.hours} h)`).join(', ') : '—'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + procsMissing.join(', ') : 'hotové ✓'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' : 'nic ✓'}</td></tr>
+          ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', ')}</td></tr>` : ''}
         </table>`;
 
       for (const e of employers as any[]) {

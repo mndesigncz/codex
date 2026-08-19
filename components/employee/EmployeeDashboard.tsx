@@ -36,6 +36,8 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [myEntries, setMyEntries] = useState<any[]>([]);
   const [handover, setHandover] = useState<any | null>(null);
+  const [nextEvent, setNextEvent] = useState<any | null>(null);
+  const [myId, setMyId] = useState<number | null>(null);
   const [unseenFlagged, setUnseenFlagged] = useState(0);
   const [cfg, setCfg] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,14 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         ]);
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
         setPinnedShare(tm?.pinnedShare ?? null);
+        fetch('/api/events').then(r => r.json()).then(d => {
+          const today0 = new Date().toISOString().slice(0, 10);
+          const up = (Array.isArray(d.events) ? d.events : [])
+            .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
+            .sort((a: any, b: any) => a.date.localeCompare(b.date));
+          setNextEvent(up[0] ?? null);
+        }).catch(() => {});
+        setMyId(typeof user?.id === 'string' ? parseInt(user.id) : (user?.id ?? null));
         setMyEntries(Array.isArray(att?.entries) ? att.entries : []);
         fetch('/api/closings/handover').then(r => r.json())
           .then(d => setHandover(d?.handover ? d : null)).catch(() => {});
@@ -151,6 +161,18 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   };
 
   const blocks: Record<string, React.ReactNode> = {
+    nextEvent: nextEvent ? (
+      <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
+        <p className="font-bold text-[#16181A] truncate">📅 {nextEvent.title}</p>
+        <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
+          {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · 📍 ${nextEvent.location}` : ''}
+        </p>
+        {myId != null && nextEvent.crew?.includes(myId) && (
+          <p className="mt-2 inline-block rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-xs font-semibold">Jsi na akci — směna je v rozvrhu ✓</p>
+        )}
+      </div>
+    ) : null,
     handover: handover ? (
       <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">

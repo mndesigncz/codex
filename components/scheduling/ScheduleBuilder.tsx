@@ -166,6 +166,8 @@ export default function ScheduleBuilder({ user }: Props) {
   const [openingHours, setOpeningHours] = useState<Record<string, OpeningDay>>({});
   // Approved time off — a shift must never land on someone's holiday silently.
   const [timeOff, setTimeOff] = useState<{ employeeId: number; fromDate: string; toDate: string; status: string }[]>([]);
+  // Events land in the planner too — a concert evening needs different staffing.
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
@@ -302,6 +304,9 @@ export default function ScheduleBuilder({ user }: Props) {
       setFixed(faData.assignments ?? []);
       setOpeningHours(ohData.openingHours ?? {});
       setTimeOff(Array.isArray(toData?.requests) ? toData.requests.filter((r: any) => r.status === 'approved') : []);
+      fetch('/api/events').then(r => r.json())
+        .then(d => setEvents((Array.isArray(d.events) ? d.events : []).filter((e: any) => e.status !== 'cancelled')))
+        .catch(() => {});
     } catch (e) {
       console.error(e);
     } finally {
@@ -364,6 +369,12 @@ export default function ScheduleBuilder({ user }: Props) {
     });
     return map;
   }, [preview]);
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    events.forEach(e => { (map[e.date] ||= []).push(e); });
+    return map;
+  }, [events]);
 
   const unavailableOn = (date: string) => {
     const set = new Set(
@@ -947,6 +958,13 @@ export default function ScheduleBuilder({ user }: Props) {
                   >
                     <span className="text-[11px] sm:text-xs font-medium text-black/55">{day}</span>
                     <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
+                      {(eventsByDate[cell] ?? []).map((ev: any) => (
+                        <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/12 text-[#0A6FE0]">
+                          <span className="flex-shrink-0">📅</span>
+                          <span className="truncate min-w-0">{ev.title}</span>
+                        </span>
+                      ))}
                       {dayShifts.slice(0, 3).map((s) => {
                         const rt = resolveShiftType(s, shiftTypes);
                         return (
@@ -993,6 +1011,7 @@ export default function ScheduleBuilder({ user }: Props) {
           date={dayModal}
           employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
+          events={eventsByDate[dayModal] ?? []}
           shiftTypes={shiftTypes}
           openingHours={openingHours}
           unavailable={unavailableOn(dayModal)}
@@ -1665,6 +1684,7 @@ function DayModal({
   onClose,
   onAdd,
   onRemove,
+  events = [],
 }: {
   date: string;
   employees: Member[];
@@ -1676,6 +1696,7 @@ function DayModal({
   onClose: () => void;
   onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<void>;
   onRemove: (id: number) => void;
+  events?: any[];
 }) {
   // Opening hours for THIS day (keyed 0=Mon..6=Sun).
   const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
@@ -1738,6 +1759,17 @@ function DayModal({
             ×
           </button>
         </div>
+
+        {events.length > 0 && events.map((ev: any) => (
+          <div key={ev.id} className="rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 px-4 py-3">
+            <p className="text-sm font-bold text-[#16181A]">📅 {ev.title}</p>
+            <p className="text-xs text-black/50 mt-0.5">
+              {ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : 'celý den'}
+              {ev.location ? ` · 📍 ${ev.location}` : ''}
+              {ev.crewPeople?.length ? ` · na akci: ${ev.crewPeople.map((p: any) => p.name).join(', ')}` : ' · zatím bez obsazení'}
+            </p>
+          </div>
+        ))}
 
         {/* Existing shifts */}
         {shifts.length > 0 && (
