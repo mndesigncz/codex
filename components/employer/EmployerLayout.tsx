@@ -241,13 +241,13 @@ export default function EmployerLayout({ user }: Props) {
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
               className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>
               <Icon name={item.icon} size={22} strokeWidth={currentView === item.id ? 2 : 1.7} />
-              <span className={`h-1 w-1 rounded-full transition-all ${currentView === item.id ? 'bg-[#C8F542]' : 'bg-transparent'}`} />
+              <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{item.label}</span>
             </button>
           ))}
           <button onClick={() => setMoreOpen(v => !v)} title="Více"
             className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${moreOpen || currentView === 'settings' || currentView === 'team-settings' || mobileSecondary.some(n => n.id === currentView) ? 'text-[#16181A]' : 'text-black/40'}`}>
             <Icon name="menu" size={22} />
-            <span className="h-1 w-1 rounded-full bg-transparent" />
+            <span className="text-[11px] leading-none font-medium">Více</span>
           </button>
         </nav>
 

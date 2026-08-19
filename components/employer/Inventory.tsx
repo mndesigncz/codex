@@ -169,6 +169,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   // Supplier entities — the address an order can actually be sent to.
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [showSuppliers, setShowSuppliers] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   // Movement history of the item being edited — who changed the stock and when.
   const [itemLog, setItemLog] = useState<any[]>([]);
   const [logOpen, setLogOpen] = useState(false);
@@ -569,19 +570,45 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
               🛒 Nakoupit ({toBuy.length})
             </button>
           )}
-          <button onClick={() => setShowSuppliers(true)}
-            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
-            🚚 Dodavatelé
-          </button>
-          <button onClick={() => setShowStocktake(true)}
-            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
-            📋 Inventura
-          </button>
-          {reports.some(r => r.status !== 'done') && (
-            <button onClick={() => setShowReports(true)} className="rounded-full glass border border-orange-500/25 text-orange-600 px-4 py-2.5 text-sm font-semibold hover:bg-orange-500/[0.06] whitespace-nowrap">
-              📦 Hlášení ({reports.filter(r => r.status !== 'done').length})
+          {/* Secondary actions live under one ⋯ so the header stays calm. */}
+          <div className="relative">
+            <button onClick={() => setMoreOpen(o => !o)}
+              className={`rounded-full w-11 h-11 flex items-center justify-center text-lg transition ${
+                moreOpen ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/60 hover:text-black'
+              }`}
+              title="Další akce">
+              ⋯
+              {reports.some(r => r.status !== 'done') && !moreOpen && (
+                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-orange-500 ring-2 ring-white" />
+              )}
             </button>
-          )}
+            {moreOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
+                <div className="absolute right-0 top-12 z-20 glass-strong rounded-2xl p-1.5 w-56 shadow-lg space-y-0.5">
+                  <button onClick={() => { setShowSuppliers(true); setMoreOpen(false); }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
+                    🚚 Dodavatelé
+                  </button>
+                  <button onClick={() => { setShowStocktake(true); setMoreOpen(false); }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
+                    📋 Inventura
+                  </button>
+                  {reports.length > 0 && (
+                    <button onClick={() => { setShowReports(true); setMoreOpen(false); }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors flex items-center justify-between gap-2">
+                      <span>📦 Hlášení od týmu</span>
+                      {reports.some(r => r.status !== 'done') && (
+                        <span className="rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 text-xs font-bold">
+                          {reports.filter(r => r.status !== 'done').length}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
             <Icon name="plus" size={16} /> Přidat položku
           </button>
