@@ -728,6 +728,19 @@ export async function GET() {
     await sql`CREATE INDEX IF NOT EXISTS events_team_date ON events (team_id, date)`;
     // a shift can belong to an event (created from its crew assignment)
     await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS event_id INTEGER`;
+    // POS connection (Storyous): one per team, credentials live server-side only
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_connections (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL UNIQUE,
+        provider TEXT NOT NULL DEFAULT 'storyous',
+        client_id TEXT NOT NULL,
+        client_secret TEXT NOT NULL,
+        merchant_id TEXT NOT NULL,
+        place_id TEXT NOT NULL,
+        place_name TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Icon } from '../Icons';
+import { useMoney } from '../CurrencyProvider';
 import ClockWidget from './ClockWidget';
 import AnnouncementsManager from './AnnouncementsManager';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -67,6 +68,7 @@ function StatCard({ icon, label, value, onClick, alert = false }: { icon: string
 }
 
 export default function EmployerDashboard({ user, onNavigate }: Props) {
+  const money = useMoney();
   const [members, setMembers] = useState<any[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -79,6 +81,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [pendingApprovals, setPendingApprovals] = useState({ timeoff: 0, swaps: 0, closings: 0 });
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [nextEvent, setNextEvent] = useState<any | null>(null);
+  const [posToday, setPosToday] = useState<any | null>(null);
   // First-steps checklist for a fresh team; goes away once done or dismissed.
   const [onboardingDismissed, setOnboardingDismissed] = useState(true);
   useEffect(() => {
@@ -132,6 +135,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         ]);
         setCfg(team?.team?.dashboard_config?.employer ?? {});
         setPinnedShare(team?.pinnedShare ?? null);
+        fetch(`/api/pos/summary?date=${new Date().toISOString().slice(0, 10)}`).then(r => r.json())
+          .then(d => setPosToday(d?.connected && d.bills != null ? d : null)).catch(() => {});
         fetch('/api/events').then(r => r.json()).then(d => {
           const today0 = new Date().toISOString().slice(0, 10);
           const up = (Array.isArray(d.events) ? d.events : [])
@@ -216,6 +221,18 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   // Each widget is a named block; the saved layout decides order and presence,
   // so the employer can rearrange the dashboard like a phone homescreen.
   const blocks: Record<string, React.ReactNode> = {
+    posToday: posToday ? (
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="font-bold text-[#16181A] min-w-0">💳 Pokladna dnes{posToday.placeName ? ` · ${posToday.placeName}` : ''}</p>
+          <span className="shrink-0 text-xl font-bold tabular-nums text-[#16181A]">{money(posToday.total)}</span>
+        </div>
+        <p className="text-sm text-black/50 mt-1">
+          {posToday.bills} účtenek · hotově {money(posToday.cash)} · kartou {money(posToday.card + posToday.other)}
+          {posToday.tips > 0 ? ` · spropitné ${money(posToday.tips)}` : ''}
+        </p>
+      </div>
+    ) : null,
     nextEvent: nextEvent ? (
       <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition-all">
         <div className="flex items-center justify-between gap-3 flex-wrap">
