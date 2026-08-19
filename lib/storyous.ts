@@ -120,3 +120,62 @@ export async function daySummary(conn: PosConnection, date: string): Promise<Day
   }
   return out;
 }
+
+// ---- Menu (product catalog) --------------------------------------------------
+
+export interface MenuProduct { productId: string; name: string; category: string; }
+
+/** Flattened product list with a readable category path. */
+export async function menuProducts(conn: PosConnection): Promise<MenuProduct[]> {
+  const menu = await api(conn, `/menu/${conn.merchantId}`);
+  const out: MenuProduct[] = [];
+  const walk = (items: any[], path: string[]) => {
+    for (const it of items ?? []) {
+      const kids = it.items;
+      if (Array.isArray(kids) && kids.length) {
+        walk(kids, [...path, String(it.name ?? '')]);
+      } else if (it.productId) {
+        out.push({
+          productId: String(it.productId),
+          name: String(it.name ?? '').trim(),
+          category: path.filter(Boolean).join(' › '),
+        });
+      }
+    }
+  };
+  walk(menu?.items ?? [], []);
+  return out;
+}
+
+// ---- Bills with items (for stock write-off) ----------------------------------
+
+export interface BillLite { billId: string; createdAt: string; }
+
+/** Non-refunded, non-deleted bills of a date range (paginated). */
+export async function listBills(conn: PosConnection, from: string, tillExclusive: string): Promise<BillLite[]> {
+  const out: BillLite[] = [];
+  let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${from}&till=${tillExclusive}&limit=100`;
+  let guard = 0;
+  while (path && guard < 20) {
+    guard++;
+    const page = await api(conn, path);
+    for (const b of page?.data ?? []) {
+      if (b.deleted || b.refunded) continue;
+      out.push({ billId: String(b.billId), createdAt: String(b.createdAt ?? '') });
+    }
+    path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
+  }
+  return out;
+}
+
+export interface BillItem { productId: string | null; name: string; amount: number; }
+
+/** The list endpoint has no items — each bill needs its own detail call. */
+export async function billItems(conn: PosConnection, billId: string): Promise<BillItem[]> {
+  const d = await api(conn, `/bills/${conn.merchantId}-${conn.placeId}/${billId}`);
+  return (d?.items ?? []).map((it: any) => ({
+    productId: it.productId ? String(it.productId) : null,
+    name: String(it.name ?? '').trim(),
+    amount: Number(it.amount) || 0,
+  }));
+}

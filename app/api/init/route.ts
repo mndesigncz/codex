@@ -741,6 +741,28 @@ export async function GET() {
         place_name TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP`;
+    // which POS product consumes which stock item (and how much per sale)
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_product_map (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        item_id INTEGER NOT NULL,
+        amount_per_sale NUMERIC NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, product_id)
+      )`;
+    // bills already deducted — a receipt must never be written off twice
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_processed_bills (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        bill_id TEXT NOT NULL,
+        processed_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, bill_id)
+      )`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.
