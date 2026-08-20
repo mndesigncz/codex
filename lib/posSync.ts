@@ -68,7 +68,12 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   try {
     mappings = await sql`SELECT product_id, item_id, amount_per_sale FROM pos_product_map WHERE team_id = ${teamId}`;
   } catch { return { connected: true as const, error: 'Mapování není dostupné — spusť /api/init.' }; }
-  const mapByProduct = new Map(mappings.map((m: any) => [String(m.product_id), m]));
+  // A product's recipe = every ingredient row it has.
+  const mapByProduct = new Map<string, { item_id: number; amount_per_sale: number }[]>();
+  for (const m of mappings) {
+    const key = String(m.product_id);
+    (mapByProduct.get(key) ?? mapByProduct.set(key, []).get(key)!).push(m);
+  }
 
   // Yesterday + today (Prague-ish via UTC date is fine for a day window).
   const today = new Date(); today.setHours(12, 0, 0, 0);
@@ -94,11 +99,13 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     try { items = await billItems(conn, billId); }
     catch { continue; } // leave unmarked — next sync retries
     for (const it of items) {
-      const m = it.productId ? mapByProduct.get(it.productId) : null;
-      if (m) {
-        const cur = totals.get(Number(m.item_id)) ?? { amount: 0, note: 'Prodej (Storyous)' };
-        cur.amount += (Number(m.amount_per_sale) || 1) * it.amount;
-        totals.set(Number(m.item_id), cur);
+      const recipe = it.productId ? mapByProduct.get(it.productId) : null;
+      if (recipe && recipe.length) {
+        for (const ing of recipe) {
+          const cur = totals.get(Number(ing.item_id)) ?? { amount: 0, note: 'Prodej (Storyous)' };
+          cur.amount += (Number(ing.amount_per_sale) || 1) * it.amount;
+          totals.set(Number(ing.item_id), cur);
+        }
       } else if (it.productId) {
         const u2 = unmapped.get(it.productId) ?? { name: it.name, count: 0 };
         u2.count += it.amount;
@@ -121,6 +128,18 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     audit(teamId, userId, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
   }
+  // Remember what sold without a recipe — the mapping screen serves it first.
+  for (const [productId, v] of Array.from(unmapped.entries())) {
+    try {
+      await sql`
+        INSERT INTO pos_unmapped (team_id, product_id, product_name, sold_count, last_seen)
+        VALUES (${teamId}, ${productId}, ${v.name}, ${v.count}, NOW())
+        ON CONFLICT (team_id, product_id) DO UPDATE SET
+          sold_count = pos_unmapped.sold_count + ${v.count},
+          product_name = ${v.name}, last_seen = NOW()`;
+    } catch { /* table not migrated yet */ }
+  }
+
   return {
     connected: true as const,
     processed,

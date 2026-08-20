@@ -763,6 +763,22 @@ export async function GET() {
         processed_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, bill_id)
       )`;
+    // recipes: one POS product may consume SEVERAL stock items (wine + spice…)
+    await sql`ALTER TABLE pos_product_map DROP CONSTRAINT IF EXISTS pos_product_map_team_id_product_id_key`;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS pos_product_map_ingredient
+      ON pos_product_map (team_id, product_id, item_id)`;
+    // what sold recently without a recipe — the "map me" queue
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_unmapped (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        sold_count NUMERIC NOT NULL DEFAULT 0,
+        last_seen TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, product_id)
+      )`;
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.

@@ -1,5 +1,6 @@
-// Product catalog from the POS + the team's stock mappings. Employer only —
-// this is where "Sencha 70 g" learns that one sold pot costs 7 g of stock.
+// Product recipes: which stock items one sold product consumes, and how much.
+// A glass of wine = 150 ml from the bottle; svařák = 200 ml wine + spices.
+// GET also serves the "map me" queue — what sold recently without a recipe.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -25,48 +26,84 @@ export async function GET() {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const conn = await getConnection(u.team_id);
-  if (!conn) return NextResponse.json({ connected: false, products: [], mappings: [] });
+  if (!conn) return NextResponse.json({ connected: false, products: [], recipes: [], unmapped: [] });
+
   let products: any[] = [];
   try { products = await menuProducts(conn); }
-  catch { return NextResponse.json({ connected: true, products: [], mappings: [], error: 'Menu se nepodařilo načíst.' }); }
-  let mappings: any[] = [];
+  catch { return NextResponse.json({ connected: true, products: [], recipes: [], unmapped: [], error: 'Menu se nepodařilo načíst.' }); }
+
+  // Recipes grouped per product.
+  let rows: any[] = [];
   try {
-    mappings = await sql`
+    rows = await sql`
       SELECT m.product_id AS "productId", m.product_name AS "productName",
              m.item_id AS "itemId", m.amount_per_sale AS "amountPerSale",
-             i.name AS "itemName", i.unit AS "itemUnit"
+             i.name AS "itemName", i.unit AS "itemUnit", i.package_size AS "packageSize"
       FROM pos_product_map m
       LEFT JOIN inventory_items i ON i.id = m.item_id
       WHERE m.team_id = ${u.team_id}`;
   } catch { /* not migrated */ }
-  return NextResponse.json({ connected: true, products, mappings });
+  const grouped = new Map<string, any>();
+  for (const r of rows) {
+    const g = grouped.get(r.productId) ?? { productId: r.productId, productName: r.productName, ingredients: [] };
+    g.ingredients.push({
+      itemId: r.itemId, amount: Number(r.amountPerSale) || 1,
+      itemName: r.itemName, itemUnit: r.itemUnit, packageSize: r.packageSize != null ? Number(r.packageSize) : null,
+    });
+    grouped.set(r.productId, g);
+  }
+
+  // "Map me" queue: best sellers without a recipe first.
+  let unmapped: any[] = [];
+  try {
+    unmapped = await sql`
+      SELECT product_id AS "productId", product_name AS "productName", sold_count AS "soldCount"
+      FROM pos_unmapped
+      WHERE team_id = ${u.team_id} AND product_id NOT IN (
+        SELECT product_id FROM pos_product_map WHERE team_id = ${u.team_id})
+      ORDER BY sold_count DESC LIMIT 20`;
+  } catch { /* not migrated */ }
+
+  return NextResponse.json({
+    connected: true, products,
+    recipes: Array.from(grouped.values()),
+    unmapped,
+  });
 }
 
-// Upsert / remove one mapping: { productId, productName, itemId|null, amountPerSale }
+// Replace the whole recipe of one product: { productId, productName, ingredients: [{itemId, amount}] }.
+// Empty ingredients = remove the recipe.
 export async function POST(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const b = await req.json().catch(() => ({}));
   const productId = String(b.productId ?? '').trim();
   if (!productId) return NextResponse.json({ error: 'Chybí produkt' }, { status: 400 });
+  const raw = Array.isArray(b.ingredients) ? b.ingredients : [];
+  const ingredients: { itemId: number; amount: number }[] = [];
+  for (const ing of raw.slice(0, 12)) {
+    const itemId = parseInt(ing?.itemId);
+    const amount = Number(ing?.amount);
+    if (!Number.isFinite(itemId)) continue;
+    ingredients.push({ itemId, amount: Number.isFinite(amount) && amount > 0 ? amount : 1 });
+  }
   try {
-    if (b.itemId == null) {
-      await sql`DELETE FROM pos_product_map WHERE team_id = ${u.team_id} AND product_id = ${productId}`;
-      return NextResponse.json({ ok: true });
+    await sql`DELETE FROM pos_product_map WHERE team_id = ${u.team_id} AND product_id = ${productId}`;
+    for (const ing of ingredients) {
+      const [item] = await sql`SELECT id FROM inventory_items WHERE id = ${ing.itemId} AND team_id = ${u.team_id}`;
+      if (!item) continue;
+      await sql`
+        INSERT INTO pos_product_map (team_id, product_id, product_name, item_id, amount_per_sale)
+        VALUES (${u.team_id}, ${productId}, ${b.productName ? String(b.productName).slice(0, 160) : null}, ${ing.itemId}, ${ing.amount})
+        ON CONFLICT DO NOTHING`;
     }
-    const itemId = parseInt(b.itemId);
-    const amount = Math.max(0.001, Number(b.amountPerSale) || 1);
-    const [item] = await sql`SELECT id FROM inventory_items WHERE id = ${itemId} AND team_id = ${u.team_id}`;
-    if (!item) return NextResponse.json({ error: 'Položka skladu nenalezena' }, { status: 404 });
-    await sql`
-      INSERT INTO pos_product_map (team_id, product_id, product_name, item_id, amount_per_sale)
-      VALUES (${u.team_id}, ${productId}, ${b.productName ? String(b.productName).slice(0, 160) : null}, ${itemId}, ${amount})
-      ON CONFLICT (team_id, product_id) DO UPDATE SET
-        item_id = ${itemId}, amount_per_sale = ${amount},
-        product_name = ${b.productName ? String(b.productName).slice(0, 160) : null}`;
-    audit(u.team_id, u.id, 'pos.map', 'pos', itemId, `${b.productName ?? productId} → sklad #${itemId} (${amount}/prodej)`);
+    if (ingredients.length) {
+      try { await sql`DELETE FROM pos_unmapped WHERE team_id = ${u.team_id} AND product_id = ${productId}`; } catch {}
+    }
+    audit(u.team_id, u.id, 'pos.recipe', 'pos', null,
+      `${b.productName ?? productId}: ${ingredients.length} ingrediencí`);
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: 'Mapování není dostupné — spusť /api/init.' }, { status: 400 });
+    return NextResponse.json({ error: 'Receptura není dostupná — spusť /api/init.' }, { status: 400 });
   }
 }
