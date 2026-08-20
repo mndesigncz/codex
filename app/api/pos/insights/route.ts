@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
+import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
   const meId = parseInt((session.user as any).id);
   const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
   if (!u?.team_id) return NextResponse.json({ connected: false });
+  if (!(await teamIsPro(u.team_id))) {
+    return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
+  }
   const conn = await getConnection(u.team_id);
   if (!conn) return NextResponse.json({ connected: false });
 

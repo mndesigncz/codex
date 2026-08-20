@@ -394,8 +394,11 @@ export default function ScheduleBuilder({ user }: Props) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shifts: [payload] }),
-    });
-    if (res.ok) await load();
+    }).catch(() => null);
+    if (res?.ok) { await load(); return true; }
+    const d = res ? await res.json().catch(() => ({} as any)) : {};
+    setBoardError(d?.error || 'Směnu se nepodařilo přidat.');
+    return false;
   };
 
   const removeShift = async (id: number) => {
@@ -405,9 +408,12 @@ export default function ScheduleBuilder({ user }: Props) {
   };
 
   const clearMonth = async () => {
-    const res = await fetch(`/api/schedule?month=${month}`, { method: 'DELETE' });
-    if (res.ok) {
+    const res = await fetch(`/api/schedule?month=${month}`, { method: 'DELETE' }).catch(() => null);
+    if (res?.ok) {
       setShifts([]);
+      setConfirmClear(false);
+    } else {
+      setBoardError('Vymazání měsíce se nepodařilo.');
       setConfirmClear(false);
     }
   };
@@ -439,17 +445,19 @@ export default function ScheduleBuilder({ user }: Props) {
     if (!preview || preview.proposed.length === 0) return;
     setCommitting(true);
     try {
-      if (clearBeforeCommit) {
-        await fetch(`/api/schedule?month=${month}`, { method: 'DELETE' });
-      }
+      // The server wipes + inserts in one request — a failed save must leave
+      // the existing schedule untouched, not deleted.
       const res = await fetch('/api/schedule/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, commit: true, shifts: preview.proposed }),
-      });
-      if (res.ok) {
+        body: JSON.stringify({ month, commit: true, replaceMonth: clearBeforeCommit, shifts: preview.proposed }),
+      }).catch(() => null);
+      if (res?.ok) {
         setPreview(null);
         await load();
+      } else {
+        const d = res ? await res.json().catch(() => ({} as any)) : {};
+        setBoardError(d?.error || 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.');
       }
     } finally {
       setCommitting(false);
@@ -542,10 +550,13 @@ export default function ScheduleBuilder({ user }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ month, rows: importPreview.rows }),
-      });
-      if (res.ok) {
+      }).catch(() => null);
+      if (res?.ok) {
         setImportPreview(null);
         await load();
+      } else {
+        const d = res ? await res.json().catch(() => ({} as any)) : {};
+        setBoardError(d?.error || 'Import se nepodařilo uložit.');
       }
     } finally {
       setImporting(false);
@@ -1694,7 +1705,7 @@ function DayModal({
   unavailable: Set<number>;
   submissions: Submission[];
   onClose: () => void;
-  onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<void>;
+  onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<boolean>;
   onRemove: (id: number) => void;
   events?: any[];
 }) {
@@ -1743,8 +1754,10 @@ function DayModal({
     }
     setSaving(true);
     try {
-      await onAdd({ employeeId: emp, date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
-      setEmployeeId('');
+      const ok = await onAdd({ employeeId: emp, date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
+      // Only a landed save clears the selection — a failure looking identical
+      // to success is how shifts silently go missing.
+      if (ok) setEmployeeId('');
     } finally {
       setSaving(false);
     }

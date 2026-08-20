@@ -110,7 +110,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
   const id = parseInt(params.id);
-  const [item] = await sql`SELECT * FROM inventory_items WHERE id = ${id}`;
+  // Scoped to the caller's team — item ids are sequential, so an unscoped
+  // lookup would let anyone edit another business's stock.
+  const [item] = await sql`
+    SELECT * FROM inventory_items
+    WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
   if (!item) return NextResponse.json({ error: 'Položka nenalezena' }, { status: 404 });
 
   const body = await request.json();
@@ -423,6 +427,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   const id = parseInt(params.id);
+  const [item] = await sql`
+    SELECT id FROM inventory_items
+    WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+  if (!item) return NextResponse.json({ error: 'Položka nenalezena' }, { status: 404 });
   await sql`DELETE FROM inventory_log WHERE item_id = ${id}`;
   await sql`DELETE FROM inventory_items WHERE id = ${id}`;
   audit(me.teamId, me.meId, 'inventory.delete', 'item', id);

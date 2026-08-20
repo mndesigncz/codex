@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
   if (c.role === 'kiosk' || c.role === 'employer') {
     // Roster: every employee + their currently-open entry (if clocked in)
     // + today's planned shift so the kiosk can show plan vs reality.
-    const today = new Date().toISOString().split('T')[0];
+    const today = pragueToday();
     const rosterQuery = (withRate: boolean) => sql`
       SELECT u.id, u.name, u.avatar,
              CASE WHEN ${withRate} THEN COALESCE(u.hourly_rate, 0) ELSE NULL END AS "hourlyRate",
@@ -179,7 +180,7 @@ export async function POST(req: NextRequest) {
     WHERE employee_id = ${employeeId} AND clock_out IS NULL
     ORDER BY clock_in DESC LIMIT 1`;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
 
   if (action === 'in') {
     if (open) return NextResponse.json({ error: 'Příchod už je zaznamenaný.' }, { status: 409 });
@@ -232,7 +233,7 @@ export async function POST(req: NextRequest) {
   // Nudge: does today's cash closing still need to be filled in?
   let closingDone = true;
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = pragueToday();
     const [cl] = await sql`SELECT id FROM cash_closings WHERE created_by = ${employeeId} AND date = ${today}`;
     closingDone = !!cl;
   } catch { /* ignore */ }

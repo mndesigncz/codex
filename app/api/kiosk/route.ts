@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
+import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,10 @@ export async function POST(req: NextRequest) {
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if ('forbidden' in c) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 400 });
+
+  if (!(await teamIsPro(c.teamId))) {
+    return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
+  }
 
   const b = await req.json().catch(() => ({}));
   const email = String(b.email ?? '').trim().toLowerCase();

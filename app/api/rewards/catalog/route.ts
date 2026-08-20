@@ -8,6 +8,9 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
+import { pointsAvailableFor } from '@/lib/pointsBalance';
+import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +51,9 @@ export async function POST(req: NextRequest) {
   const u = await me();
   if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const b = await req.json().catch(() => ({}));
+  if (!(await teamIsPro(u.team_id))) {
+    return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
+  }
 
   // Employer manages the catalog.
   if (b.manage === true) {
@@ -70,6 +76,14 @@ export async function POST(req: NextRequest) {
   const [reward] = await sql`
     SELECT * FROM rewards_catalog WHERE id = ${rewardId} AND team_id = ${u.team_id} AND active = TRUE`;
   if (!reward) return NextResponse.json({ error: 'Odměna nenalezena' }, { status: 404 });
+
+  // Points must exist before they're spent — pending requests count as spoken for.
+  const available = await pointsAvailableFor(u.team_id, u.id);
+  if (available < Number(reward.cost)) {
+    return NextResponse.json(
+      { error: `Nemáš dost bodů — k dispozici ${available}, odměna stojí ${reward.cost}.` },
+      { status: 400 });
+  }
 
   const [row] = await sql`
     INSERT INTO reward_redemptions (team_id, employee_id, reward_id, title, cost)
@@ -110,6 +124,18 @@ export async function PATCH(req: NextRequest) {
     SELECT * FROM reward_redemptions WHERE id = ${id} AND team_id = ${u.team_id} AND status = 'pending'`;
   if (!row) return NextResponse.json({ error: 'Žádost nenalezena nebo už je vyřízená' }, { status: 404 });
 
+  // Balance may have moved since the request was filed — approving must not
+  // drive the ledger negative. (Available already excludes this pending row's
+  // cost, so add it back before comparing.)
+  if (action === 'approve') {
+    const available = await pointsAvailableFor(u.team_id, row.employee_id) + (Number(row.cost) || 0);
+    if (available < Number(row.cost)) {
+      return NextResponse.json(
+        { error: `Zaměstnanec už nemá dost bodů (${available} k dispozici, odměna stojí ${row.cost}).` },
+        { status: 400 });
+    }
+  }
+
   const status = action === 'approve' ? 'approved' : 'declined';
   await sql`
     UPDATE reward_redemptions SET status = ${status}, decided_by = ${u.id}, decided_at = NOW()
@@ -117,7 +143,7 @@ export async function PATCH(req: NextRequest) {
 
   if (action === 'approve') {
     // Deduct through the standard points ledger — standings update themselves.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = pragueToday();
     try {
       await sql`
         INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by)

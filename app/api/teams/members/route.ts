@@ -88,6 +88,14 @@ export async function DELETE(request: Request) {
 
   // Detach the member from the team (keeps user record + history intact).
   await sql`UPDATE users SET team_id = NULL WHERE id = ${targetId}`;
+  // Chat access rides on conversation_members, not on team_id — drop the rows
+  // so an ex-member can't keep reading or writing in the team's conversations.
+  try {
+    await sql`
+      DELETE FROM conversation_members
+      WHERE user_id = ${targetId} AND conversation_id IN (
+        SELECT id FROM conversations WHERE team_id = ${team.id})`;
+  } catch { /* conversations may not be migrated yet */ }
 
   return NextResponse.json({ ok: true });
 }

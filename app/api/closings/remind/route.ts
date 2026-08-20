@@ -9,7 +9,14 @@ const sql = neon(process.env.DATABASE_URL!);
 // Daily cron (21:00 UTC): remind anyone whose shift today has ended but who
 // hasn't submitted a cash closing yet, and nudge employers about closings
 // still waiting for their approval.
-export async function GET() {
+export async function GET(request: Request) {
+  // Protected like the other crons: Vercel sends Authorization: Bearer $CRON_SECRET.
+  const auth = request.headers.get('authorization');
+  const key = new URL(request.url).searchParams.get('key');
+  const secret = process.env.CRON_SECRET;
+  const authorized = !secret || auth === `Bearer ${secret}` || key === secret;
+  if (!authorized) return NextResponse.json({ error: 'Neautorizováno' }, { status: 401 });
+
   const now = new Date();
   // Local (Europe/Prague) date + HH:MM for comparing against shift end_time.
   const parts = new Intl.DateTimeFormat('en-CA', {

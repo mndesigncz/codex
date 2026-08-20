@@ -340,18 +340,22 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       const d = await fetch('/api/closings').then(r => r.json());
       const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
       setClosings(list);
-      // What the previous shift counted is what this one starts with.
-      const prev = list[0];
-      if (prev) {
-        // The next shift starts with what physically STAYED in the drawer —
-        // the counted cash minus what was carried out at the end.
-        const left = cashLeft(prev);
-        setCarry({ amount: left, date: prev.date, label: prev.shift_label ?? null });
-        setForm(f => (f.openingCash === '' ? { ...f, openingCash: String(left) } : f));
-        // A team that removes the surplus every day leaves the same float each
-        // time — offer it prefilled, still editable.
-        if ((Number(prev.final_removal) || 0) > 0) setLeaveCash(l => (l === '' ? String(left) : l));
-      }
+      // What the previous shift left in the drawer is what this one starts
+      // with. Asked via a dedicated endpoint: the TEAM's last closing, not the
+      // author's own — with alternating shifts my own last closing can be days
+      // old (or a covered stub) and would manufacture a phantom manko.
+      try {
+        const dd = await fetch('/api/closings/drawer').then(r => r.json());
+        const prev = dd?.drawer;
+        if (prev) {
+          const left = Math.round(Number(prev.amount) || 0);
+          setCarry({ amount: left, date: prev.date, label: prev.shiftLabel ?? null });
+          setForm(f => (f.openingCash === '' ? { ...f, openingCash: String(left) } : f));
+          // A team that removes the surplus every day leaves the same float each
+          // time — offer it prefilled, still editable.
+          if ((Number(prev.finalRemoval) || 0) > 0) setLeaveCash(l => (l === '' ? String(left) : l));
+        }
+      } catch { /* prefill is a nice-to-have */ }
       setPayDailyCash(!!d.payDailyCash);
       const payoutDefault = d.payoutFromRegister !== false;
       setTeamPayoutFromRegister(payoutDefault);

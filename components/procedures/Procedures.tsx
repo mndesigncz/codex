@@ -613,7 +613,12 @@ function ProcedureEditor({
     setError('');
     const cleanName = name.trim();
     const items = steps
-      .map(s => ({ text: s.text.trim(), minutes: s.minutes, note: s.note?.trim() || null, emoji: s.emoji?.trim() || null }))
+      .map(s => ({
+        text: s.text.trim(), minutes: s.minutes, note: s.note?.trim() || null, emoji: s.emoji?.trim() || null,
+        // Scoring config must survive the round-trip — dropping it here would
+        // silently reset every "klíčový krok" back to normal on each save.
+        weight: s.weight ?? 'normal', penalty: s.penalty ?? null,
+      }))
       .filter(s => s.text.length > 0);
     if (!cleanName) { setError('Zadejte název postupu.'); return; }
     if (items.length === 0) { setError('Přidejte alespoň jeden krok.'); return; }

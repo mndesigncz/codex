@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -25,15 +25,19 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
   const [sel, setSel] = useState<string | null>(null);
   const [rating, setRating] = useState<{ person: Staff; date: string } | null>(null);
 
+  // Quick month-arrow taps overlap requests; only the newest may paint.
+  const reqRef = useRef(0);
   const load = useCallback(async () => {
+    const req = ++reqRef.current;
     setLoading(true);
     try {
       const d = await fetch(`/api/shift-reviews?month=${month}`).then(r => r.json());
+      if (req !== reqRef.current) return;
       const map: Record<string, Day> = {};
       if (Array.isArray(d?.days)) d.days.forEach((x: Day) => { map[x.date] = x; });
       setDays(map);
-    } catch { setDays({}); }
-    setLoading(false);
+    } catch { if (req === reqRef.current) setDays({}); }
+    if (req === reqRef.current) setLoading(false);
   }, [month]);
   useEffect(() => { load(); }, [load]);
 

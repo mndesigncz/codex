@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints, PointsConfig } from '@/lib/rewardLevels';
+import { pragueToday, pragueHM } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,7 +87,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     + reviewPoints + autoPoints + itemPoints;
   const st = standingForPoints(levels, totalPoints);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
   const monthKey = today.slice(0, 7);
 
   // Shifts with their review status (rating/flag per work date).
@@ -164,7 +165,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   try {
     const entries = await sql`
       SELECT clock_in, clock_out FROM time_entries
-      WHERE employee_id = ${employeeId} AND to_char(clock_in, 'YYYY-MM') = ${monthKey}`;
+      WHERE employee_id = ${employeeId} AND to_char((clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${monthKey}`;
     const nowMs = Date.now();
     monthMs = entries.reduce((sum: number, e: any) => {
       const inT = new Date(e.clock_in).getTime();
@@ -182,18 +183,22 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       SELECT s.date, s.start_time,
              (SELECT MIN(te.clock_in) FROM time_entries te
               WHERE te.employee_id = ${employeeId}
-                AND to_char(te.clock_in, 'YYYY-MM-DD') = s.date) AS first_in
+                AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = s.date) AS first_in
       FROM shifts s
       WHERE s.employee_id = ${employeeId} AND s.start_time IS NOT NULL
-        AND s.date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')
-        AND s.date <= to_char(NOW(), 'YYYY-MM-DD')`;
+        AND s.date >= to_char((NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague' - INTERVAL '30 days', 'YYYY-MM-DD')
+        AND s.date <= to_char((NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD')`;
     let checked = 0, late = 0;
     for (const r of rows as any[]) {
       if (!r.first_in) continue;
       checked++;
       const [ph, pm] = String(r.start_time).split(':').map(Number);
-      const inD = new Date(r.first_in);
-      const inMin = inD.getHours() * 60 + inD.getMinutes();
+      // clock_in is stored as UTC; the planned start is Prague wall clock —
+      // compare both in Prague or everyone is "late" by the UTC offset.
+      const raw = String(r.first_in);
+      const inD = new Date(/Z|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : raw.replace(' ', 'T') + 'Z');
+      const [ih, im] = pragueHM(inD).split(':').map(Number);
+      const inMin = ih * 60 + im;
       if (inMin - (ph * 60 + pm) > 10) late++;
     }
     if (checked > 0) punctuality = { checked, late };

@@ -76,6 +76,14 @@ export async function POST(req: Request) {
   if (body.commit) {
     const list: any[] = Array.isArray(body.shifts) ? body.shifts : [];
     if (list.length === 0) return NextResponse.json({ inserted: 0 });
+    // replaceMonth: wipe the month only here, right before inserting — the old
+    // client-side "DELETE, then hope the commit succeeds" lost the whole month
+    // whenever the second request failed.
+    if (body.replaceMonth === true && /^\d{4}-\d{2}$/.test(String(month))) {
+      await sql`
+        DELETE FROM shifts
+        WHERE team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}`;
+    }
     let inserted = 0;
     for (const s of list) {
       const employeeId = parseInt(s.employeeId);
