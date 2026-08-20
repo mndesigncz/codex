@@ -159,7 +159,7 @@ export async function POST(request: Request) {
   const name = (body.name ?? '').trim();
   if (!name) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
-  const category = body.category ?? null;
+  const category = body.category ?? '';
   const quantity = Number(body.quantity) || 0;
   const minQuantity = Number(body.minQuantity) || 0;
   const criticalQuantity = Number(body.criticalQuantity) || 0;
