@@ -179,3 +179,20 @@ export async function billItems(conn: PosConnection, billId: string): Promise<Bi
     amount: Number(it.amount) || 0,
   }));
 }
+
+/** Refunded bills of one day — count and value. */
+export async function listRefunds(conn: PosConnection, date: string): Promise<{ count: number; total: number }> {
+  const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
+  const tillEx = next.toISOString().slice(0, 10);
+  let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${date}&till=${tillEx}&limit=100`;
+  let count = 0, total = 0, guard = 0;
+  while (path && guard < 10) {
+    guard++;
+    const page = await api(conn, path);
+    for (const b of page?.data ?? []) {
+      if (b.refunded && !b.deleted) { count++; total += Number(b.finalPrice) || 0; }
+    }
+    path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
+  }
+  return { count, total };
+}

@@ -170,12 +170,18 @@ export async function POST(request: Request) {
 
   const unitCost = body.unitCost === '' || body.unitCost == null ? null : Math.max(0, Math.round(Number(body.unitCost)));
 
-  const [item] = await sql`
-    INSERT INTO inventory_items
-      (team_id, name, category, quantity, min_quantity, critical_quantity, max_quantity, unit, supplier, supplier_url, created_by, updated_by, updated_at)
-    VALUES
-      (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${me.meId}, ${me.meId}, NOW())
-    RETURNING id`;
+  let item: any;
+  try {
+    [item] = await sql`
+      INSERT INTO inventory_items
+        (team_id, name, category, quantity, min_quantity, critical_quantity, max_quantity, unit, supplier, supplier_url, created_by, updated_by, updated_at)
+      VALUES
+        (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${me.meId}, ${me.meId}, NOW())
+      RETURNING id`;
+  } catch (e) {
+    // A naked 500 here once cost a debugging session — name the reason.
+    return NextResponse.json({ error: 'Položku se nepodařilo vytvořit.', detail: String(e).slice(0, 300) }, { status: 500 });
+  }
 
   // Employee proposals wait for the employer; the columns are newer, so the
   // flag lands defensively (missing column ⇒ item is simply live right away).
