@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
@@ -151,14 +151,18 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     setSavingEdit(false);
   };
 
+  // Fast 7/30/90 toggles overlap requests; only the newest may paint.
+  const reqRef = useRef(0);
   const load = async (d: number) => {
+    const req = ++reqRef.current;
     setLoading(true);
     try {
       const data = await fetch(`/api/attendance?days=${d}`).then(r => r.json());
+      if (req !== reqRef.current) return;
       setRoster(Array.isArray(data.roster) ? data.roster : []);
       setEntries(Array.isArray(data.entries) ? data.entries : []);
     } catch { /* ignore */ }
-    setLoading(false);
+    if (req === reqRef.current) setLoading(false);
   };
 
   useEffect(() => { load(days); }, [days]);

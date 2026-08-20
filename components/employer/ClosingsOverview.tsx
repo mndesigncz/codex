@@ -206,7 +206,8 @@ export default function ClosingsOverview() {
     const rows = closings.map(c => [
       c.date, c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
       c.opening_cash, c.cash_revenue, c.card_revenue, c.tips, c.tips_in_drawer ? 'ano' : 'ne', c.expenses,
-      c.cash_removed, c.self_payout, c.closing_cash, expectedCash(c), cashDifference(c),
+      c.cash_removed, c.self_payout, c.closing_cash,
+      c.covered_by ? '' : expectedCash(c), c.covered_by ? '' : cashDifference(c),
       Number(c.final_removal) || 0, cashLeft(c),
       c.customers, (c.notes ?? '').replace(/\n/g, ' '),
     ]);
@@ -222,13 +223,16 @@ export default function ClosingsOverview() {
   };
 
   // Totals across all closings.
+  // Stub rows (covered coworkers) carry only a payout — their revenue fields are
+  // zero and their "difference" is a phantom, so the money sums skip them.
+  // Payouts stay in: the covered person's wage really left the drawer.
   const totals = closings.reduce((a, c) => ({
-    cash: a.cash + c.cash_revenue,
-    card: a.card + c.card_revenue,
-    tips: a.tips + c.tips,
+    cash: a.cash + (c.covered_by ? 0 : c.cash_revenue),
+    card: a.card + (c.covered_by ? 0 : c.card_revenue),
+    tips: a.tips + (c.covered_by ? 0 : c.tips),
     payout: a.payout + c.self_payout,
     removed: a.removed + c.cash_removed + (Number(c.final_removal) || 0),
-    diff: a.diff + cashDifference(c),
+    diff: a.diff + (c.covered_by ? 0 : cashDifference(c)),
   }), { cash: 0, card: 0, tips: 0, payout: 0, removed: 0, diff: 0 });
   const totalRevenue = totals.cash + totals.card;
 

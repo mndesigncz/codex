@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { sendInvitationEmail } from '@/lib/email';
+import { planInfoOf, canAddMember, MEMBER_LIMIT_MSG } from '@/lib/plan';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,17 @@ export async function POST(req: NextRequest) {
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 400 });
+
+  // Same limit the invitation flows enforce — this direct form must not be a
+  // side door around the Free plan's team size.
+  try {
+    const [row] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${c.teamId}`;
+    const [cnt] = await sql`
+      SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${c.teamId} AND role <> 'kiosk'`;
+    if (!canAddMember(planInfoOf(row), Number(cnt?.n) || 0)) {
+      return NextResponse.json({ error: MEMBER_LIMIT_MSG }, { status: 403 });
+    }
+  } catch { /* plan columns not migrated — no limit */ }
 
   const body = await req.json().catch(() => ({}));
   const { name, email, password, avatar, phone, jobTitle, sendInvite } = body;

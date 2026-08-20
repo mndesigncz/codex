@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import { PersonLink } from '../employer/ProfileLinkProvider';
@@ -25,14 +25,18 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState<string | null>(null);
 
+  // Quick month-arrow taps overlap requests; only the newest may paint.
+  const reqRef = useRef(0);
   const load = useCallback(async () => {
+    const req = ++reqRef.current;
     setLoading(true);
     try {
       const q = `month=${month}${scope === 'me' ? '&scope=me' : ''}`;
       const d = await fetch(`/api/closings/calendar?${q}`).then(r => r.json());
+      if (req !== reqRef.current) return;
       setDays(d.days && typeof d.days === 'object' ? d.days : {});
-    } catch { setDays({}); }
-    setLoading(false);
+    } catch { if (req === reqRef.current) setDays({}); }
+    if (req === reqRef.current) setLoading(false);
   }, [month, scope]);
   useEffect(() => { load(); }, [load]);
 

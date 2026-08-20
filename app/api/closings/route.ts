@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,7 +112,7 @@ export async function GET() {
   // closing, everyone listed in its shift_employees is done. Older rows have no
   // shift_employees, so the created_by check still covers them.
   let eligibleShifts: any[] = [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
   if (c.role === 'kiosk') {
     const cutoff = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
     try {
@@ -232,7 +233,7 @@ export async function POST(request: Request) {
   if (!c.teamId) return NextResponse.json({ error: 'Nejsi v žádném týmu.' }, { status: 400 });
 
   const b = await request.json();
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
   const date = typeof b.date === 'string' && b.date ? b.date : today;
   const isEmployer = c.role === 'employer';
   const isKiosk = c.role === 'kiosk';
@@ -342,7 +343,7 @@ export async function POST(request: Request) {
           AND NOT EXISTS (
             SELECT 1 FROM procedure_runs r
             WHERE r.procedure_id = p.id AND r.team_id = ${c.teamId} AND r.status = 'completed'
-              AND to_char(r.completed_at, 'YYYY-MM-DD') = ${date}
+              AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date}
           )`;
       if ((req as any[]).length > 0) {
         return NextResponse.json({
@@ -366,6 +367,7 @@ export async function POST(request: Request) {
 
   let row: any;
   try {
+   try {
     [row] = await sql`
       INSERT INTO cash_closings (
         team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
@@ -424,6 +426,14 @@ export async function POST(request: Request) {
         ) RETURNING *`;
     }
    }
+   }
+  } catch (e: any) {
+    // The partial unique index closes the double-submit race the SELECT above
+    // can't — turn the violation into the same friendly 409.
+    if (e?.code === '23505') {
+      return NextResponse.json({ error: 'Za tento den už je uzávěrka odeslaná.' }, { status: 409 });
+    }
+    throw e;
   }
 
   // The handover rides on the closing; separate UPDATE so a not-yet-migrated

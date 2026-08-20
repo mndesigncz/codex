@@ -44,8 +44,11 @@ export async function GET(request: Request) {
       try {
         closings = await sql`SELECT * FROM cash_closings WHERE team_id = ${team.id} AND date = ${today}`;
       } catch { /* ignore */ }
-      const revenue = closings.reduce((s, c) => s + (Number(c.cash_revenue) || 0) + (Number(c.card_revenue) || 0), 0);
-      const diff = closings.reduce((s, c) => s + cashDifference(c as any), 0);
+      // Coworker "stub" rows (covered_by set) carry only a payout — counting
+      // them would add a phantom surplus the size of every covered payout.
+      const real = closings.filter(c => c.covered_by == null);
+      const revenue = real.reduce((s, c) => s + (Number(c.cash_revenue) || 0) + (Number(c.card_revenue) || 0), 0);
+      const diff = real.reduce((s, c) => s + cashDifference(c as any), 0);
 
       // --- who worked (completed entries today) ---
       let worked: { name: string; hours: number }[] = [];
@@ -54,7 +57,7 @@ export async function GET(request: Request) {
           SELECT u.name, SUM(EXTRACT(EPOCH FROM (te.clock_out - te.clock_in))) AS secs
           FROM time_entries te JOIN users u ON u.id = te.employee_id
           WHERE te.team_id = ${team.id} AND te.clock_out IS NOT NULL
-            AND to_char(te.clock_in, 'YYYY-MM-DD') = ${today}
+            AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${today}
           GROUP BY u.name ORDER BY u.name`;
         worked = (rows as any[]).map(r => ({ name: r.name, hours: Math.round((Number(r.secs) || 0) / 360) / 10 }));
       } catch { /* ignore */ }
@@ -68,7 +71,7 @@ export async function GET(request: Request) {
             AND NOT EXISTS (
               SELECT 1 FROM procedure_runs r
               WHERE r.procedure_id = p.id AND r.status = 'completed'
-                AND to_char(r.completed_at, 'YYYY-MM-DD') = ${today})`;
+                AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${today})`;
         procsMissing = (rows as any[]).map(r => r.name);
       } catch { /* ignore */ }
 
@@ -78,14 +81,46 @@ export async function GET(request: Request) {
         await runPosSync(Number(team.id), null, false);
       } catch { /* sync is best-effort */ }
 
-      // --- stock running low ---
+      // --- stock running low: same effective measure the stock screens use,
+      // so open packages and content-unit thresholds don't fake alarms ---
       let lowCount = 0;
       try {
-        const [r] = await sql`
-          SELECT COUNT(*)::int AS n FROM inventory_items
-          WHERE team_id = ${team.id} AND archived IS NOT TRUE
-            AND (approved IS DISTINCT FROM FALSE) AND quantity <= min_quantity`;
-        lowCount = Number(r?.n) || 0;
+        const items = await sql`
+          SELECT id, name, category, category_id, quantity, min_quantity, critical_quantity,
+                 package_size, open_amount
+          FROM inventory_items
+          WHERE team_id = ${team.id} AND archived IS NOT TRUE AND (approved IS DISTINCT FROM FALSE)`;
+        let cats: any[] = [];
+        try {
+          cats = await sql`
+            SELECT id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
+            FROM inventory_categories WHERE team_id = ${team.id}`;
+        } catch { /* pre-migration */ }
+        const { stockStatus, normalizeCategoryPackaging } = await import('@/lib/packaging');
+        const { packagingSourceOf } = await import('@/lib/categoryTree');
+        const nodes = cats.map((c: any) => ({
+          id: Number(c.id), name: String(c.name), position: 0,
+          parentId: c.parent_id != null ? Number(c.parent_id) : null,
+          tracksOpen: c.tracks_open === true,
+        }));
+        for (const i of items as any[]) {
+          const own = i.category_id != null
+            ? nodes.find(n => n.id === Number(i.category_id))
+            : nodes.find(n => n.name === i.category);
+          const src = own ? packagingSourceOf(nodes, own) : null;
+          const packaging = src
+            ? normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id))
+            : null;
+          const size = i.package_size != null ? Number(i.package_size) : packaging?.defaultPackageSize ?? null;
+          const st = stockStatus({
+            quantity: Number(i.quantity) || 0,
+            packageSize: size,
+            openAmount: i.open_amount != null ? Number(i.open_amount) : null,
+            minQuantity: Number(i.min_quantity) || 0,
+            criticalQuantity: Number(i.critical_quantity) || 0,
+          } as any, packaging);
+          if (st !== 'ok') lowCount++;
+        }
       } catch { /* ignore */ }
 
       // --- POS (Storyous) real revenue, when connected ---
@@ -118,11 +153,11 @@ export async function GET(request: Request) {
       // Nothing at all happened and nothing needs eyes — stay silent.
       if (closings.length === 0 && worked.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0) continue;
 
-      const verdict = closings.length === 0
+      const verdict = real.length === 0
         ? 'uzávěrka chybí'
         : diff === 0 ? 'kasa sedí ✓' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
       const pushBody = [
-        closings.length ? `Tržba ${czk(revenue)} · ${verdict}` : 'Bez uzávěrky',
+        real.length ? `Tržba ${czk(revenue)} · ${verdict}` : 'Bez uzávěrky',
         worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` : null,
         procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
         lowCount ? `${lowCount} položek dochází` : null,

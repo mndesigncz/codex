@@ -419,20 +419,26 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       });
       if (!res.ok) return false;
       const cats = await fetch('/api/inventory/categories').then(r => r.json());
-      if (Array.isArray(cats)) setCategories(cats);
+      if (Array.isArray(cats)) { setCategories(cats); lastCats.current = cats; }
       return true;
     } catch { return false; }
   };
+  // Fresh list from the last createCategory call — state updates land too late
+  // for the caller that needs the new id right away.
+  const lastCats = useRef<any[]>([]);
 
   // Inline "+ nová kategorie" inside the item form.
   const addInlineCategory = async () => {
     const clean = newCatInline.trim();
     if (!clean) return;
     setAddingCat(true);
-    const ok = await createCategory(clean, inlineParent ? parseInt(inlineParent) : null);
+    const parentId = inlineParent ? parseInt(inlineParent) : null;
+    const ok = await createCategory(clean, parentId);
     setAddingCat(false);
     if (ok) {
-      setForm(f => ({ ...f, category: clean }));
+      const created = lastCats.current.find((c: any) =>
+        c.name === clean && (parentId == null ? c.parentId == null : Number(c.parentId) === parentId));
+      if (created) setForm(f => ({ ...f, categoryId: created.id }));
       setNewCatInline('');
     }
   };
@@ -824,7 +830,12 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                       {orphanNames.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {orphanNames.map(c => (
-                            <CatChip key={c} name={c} active={false} onPick={() => {}} />
+                            <CatChip key={c} name={c} active={false} onPick={async () => {
+                              if (await createCategory(c)) {
+                                const created = lastCats.current.find((x: any) => x.name === c);
+                                if (created) pickCategory(created.id);
+                              }
+                            }} />
                           ))}
                         </div>
                       )}
@@ -1681,6 +1692,9 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
         setReceivingId(null);
         setCostInput('');
         await Promise.all([refreshOrders(), refreshItems()]);
+      } else {
+        const d = await res.json().catch(() => ({} as any));
+        notify(d?.error || 'Potvrzení příjmu se nepodařilo — zkus to znovu.');
       }
     } catch {}
     setBusyId(null);
@@ -2106,8 +2120,14 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setErr(d.error || 'Přejmenování se nepodařilo.');
+        setBusy(false);
+        return; // keep the editor open — closing would throw the typed name away
       }
-    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+    } catch {
+      setErr('Nepodařilo se spojit se serverem.');
+      setBusy(false);
+      return;
+    }
     setBusy(false);
     setEditId(null);
     await onChanged();

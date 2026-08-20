@@ -104,7 +104,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
     doneRows = await sql`
       SELECT id, title, description, priority, checklist, review_note FROM tasks
       WHERE completed_by = ${employeeId} AND status = 'done'
-        AND (to_char(completed_at, 'YYYY-MM-DD') = ${date} OR (completed_at IS NULL AND due_date = ${date}))
+        AND (to_char((completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date} OR (completed_at IS NULL AND due_date = ${date}))
       ORDER BY title`;
   } catch {
     try {
@@ -136,7 +136,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
       SELECT r.id, p.name AS procedure_name, p.items, r.status, r.checked_items, r.skipped_items, r.total_items, r.duration_seconds, r.review_note
       FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
       WHERE r.user_id = ${employeeId}
-        AND to_char(COALESCE(r.completed_at, r.started_at), 'YYYY-MM-DD') = ${date}
+        AND to_char((COALESCE(r.completed_at, r.started_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date}
       ORDER BY r.started_at`;
   } catch {
     try {
@@ -144,7 +144,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
         SELECT r.id, p.name AS procedure_name, p.items, r.status, r.checked_items, r.total_items, r.duration_seconds
         FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
         WHERE r.user_id = ${employeeId}
-          AND to_char(COALESCE(r.completed_at, r.started_at), 'YYYY-MM-DD') = ${date}
+          AND to_char((COALESCE(r.completed_at, r.started_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date}
         ORDER BY r.started_at`;
     } catch { procRows = []; }
   }
@@ -225,11 +225,15 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
 
   let closing: any = null;
   if (closingRow) {
+    // tips + tips_in_drawer must travel into the arithmetic — otherwise teams
+    // that keep tips in the drawer see a phantom difference the size of the tips.
     const calc = {
       opening_cash: num(closingRow.opening_cash), cash_revenue: num(closingRow.cash_revenue),
       expenses: num(closingRow.expenses), cash_removed: num(closingRow.cash_removed),
       self_payout: num(closingRow.self_payout), closing_cash: num(closingRow.closing_cash),
+      tips: num(closingRow.tips),
       payout_from_register: closingRow.payout_from_register ?? null,
+      tips_in_drawer: closingRow.tips_in_drawer ?? null,
     };
     closing = {
       id: closingRow.id, approved: closingRow.approved !== false, shiftLabel: closingRow.shift_label ?? null,
@@ -382,6 +386,9 @@ export async function GET(req: NextRequest) {
   }
 
   // ---- Detail mode. ----
+  // The drill-in carries the closing's full financials — the shared tablet is
+  // deliberately blocked from financial history, so it stays on the roster modes.
+  if (c.role === 'kiosk') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
   const employeeId = parseInt(employeeIdRaw);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Neplatný zaměstnanec' }, { status: 400 });
   const [emp] = await sql`SELECT id, name, avatar, team_id FROM users WHERE id = ${employeeId}`;

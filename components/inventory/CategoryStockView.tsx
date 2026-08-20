@@ -274,7 +274,7 @@ export default function CategoryStockView({
                         </p>
                         {st !== 'ok' && (
                           <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
-                            {st === 'critical' ? 'Dochází' : 'Málo'}
+                            {st === 'critical' ? 'Kriticky' : 'Dochází'}
                           </span>
                         )}
                       </div>
@@ -338,7 +338,7 @@ export default function CategoryStockView({
                     )}
                     {st !== 'ok' && (
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
-                        {st === 'critical' ? 'Dochází' : 'Málo'}
+                        {st === 'critical' ? 'Kriticky' : 'Dochází'}
                       </span>
                     )}
                     {onEditItem && (

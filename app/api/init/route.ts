@@ -780,6 +780,15 @@ export async function GET() {
         UNIQUE (team_id, product_id)
       )`;
 
+    // ---- One closing per person per day, enforced at the database ----
+    // (stub rows for covered coworkers are exempt). Guarded: teams with historic
+    // duplicates keep working — the index just doesn't materialise for them.
+    try {
+      await sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS cash_closings_one_per_day
+        ON cash_closings (created_by, date) WHERE covered_by IS NULL`;
+    } catch { /* duplicates exist — SELECT-before-INSERT stays the only guard */ }
+
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.
     await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS tracks_open BOOLEAN DEFAULT FALSE`;

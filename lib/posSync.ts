@@ -7,18 +7,9 @@ import { audit } from './audit';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-/** Deduct `amount` from an item, spending the open package first and cracking
- *  sealed ones as needed. Never goes below zero. Returns what changed. */
-async function deduct(teamId: number, userId: number | null, itemId: number, amount: number, note: string) {
-  const [it] = await sql`
-    SELECT id, name, quantity, open_amount, package_size
-    FROM inventory_items WHERE id = ${itemId} AND team_id = ${teamId}`;
-  if (!it) return null;
-  const pkg = Number(it.package_size) || 0;
-  let qty = Number(it.quantity) || 0;
-  let open = Number(it.open_amount) || 0;
-  const oldQty = qty, oldOpen = open;
-
+/** Open-package arithmetic: spend the open package first, crack sealed ones as
+ *  needed, never below zero. Pure — the caller decides how to persist. */
+function consume(qty: number, open: number, pkg: number, amount: number) {
   if (pkg > 0) {
     open -= amount;
     while (open < 0 && qty > 0) { qty -= 1; open += pkg; }
@@ -27,41 +18,30 @@ async function deduct(teamId: number, userId: number | null, itemId: number, amo
   } else {
     qty = Math.max(0, Math.round((qty - amount) * 10) / 10);
   }
-  if (qty === oldQty && open === oldOpen) return null;
-
-  try {
-    await sql`
-      UPDATE inventory_items SET quantity = ${qty}, open_amount = ${pkg > 0 ? open : it.open_amount},
-        updated_at = NOW()
-      WHERE id = ${itemId}`;
-  } catch {
-    await sql`UPDATE inventory_items SET quantity = ${qty}, updated_at = NOW() WHERE id = ${itemId}`;
-  }
-  try {
-    await sql`
-      INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)
-      VALUES (${itemId}, ${userId}, ${oldQty}, ${qty}, ${oldOpen}, ${pkg > 0 ? open : null}, ${note}, NOW())`;
-  } catch {
-    try {
-      await sql`
-        INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note, created_at)
-        VALUES (${itemId}, ${userId}, ${oldQty}, ${qty}, ${note}, NOW())`;
-    } catch { /* log best-effort */ }
-  }
-  return { name: it.name, amount };
+  return { qty, open };
 }
 
 export async function runPosSync(teamId: number, userId: number | null, force = false) {
   const conn = await getConnection(teamId);
   if (!conn) return { connected: false as const };
 
-  // Throttle: a sync touches the POS API a lot; once per 10 minutes is plenty.
+  // Throttle + concurrency lock in one atomic claim: only the caller who moves
+  // last_sync_at forward gets to run. Two syncs at once (digest cron + a manual
+  // press) would otherwise both see the same bills and write stock off twice.
+  // force shortens the window but still refuses to run beside another sync.
   try {
-    const [row] = await sql`SELECT last_sync_at FROM pos_connections WHERE team_id = ${teamId}`;
-    if (!force && row?.last_sync_at && Date.now() - new Date(row.last_sync_at).getTime() < 10 * 60_000) {
-      return { connected: true as const, throttled: true as const };
-    }
-    await sql`UPDATE pos_connections SET last_sync_at = NOW() WHERE team_id = ${teamId}`;
+    const claimed = force
+      ? await sql`
+          UPDATE pos_connections SET last_sync_at = NOW()
+          WHERE team_id = ${teamId}
+            AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '30 seconds')
+          RETURNING team_id`
+      : await sql`
+          UPDATE pos_connections SET last_sync_at = NOW()
+          WHERE team_id = ${teamId}
+            AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '10 minutes')
+          RETURNING team_id`;
+    if (!claimed.length) return { connected: true as const, throttled: true as const };
   } catch { /* column missing — sync anyway */ }
 
   let mappings: any[] = [];
@@ -90,40 +70,76 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     } catch { return { connected: true as const, error: 'Chybí tabulka zpracovaných účtenek — spusť /api/init.' }; }
   }
 
-  const totals = new Map<number, { amount: number; note: string }>();
+  const totals = new Map<number, number>();
   const unmapped = new Map<string, { name: string; count: number }>();
-  let processed = 0;
+  const fetched: string[] = [];
 
   for (const billId of unprocessed.slice(0, 120)) {
     let items;
     try { items = await billItems(conn, billId); }
     catch { continue; } // leave unmarked — next sync retries
     for (const it of items) {
+      // Negative/zero lines are corrections and refunds — stock never grows
+      // from those, and a negative "sale" must not inflate the open package.
+      const sold = Number(it.amount);
+      if (!(sold > 0)) continue;
       const recipe = it.productId ? mapByProduct.get(it.productId) : null;
       if (recipe && recipe.length) {
         for (const ing of recipe) {
-          const cur = totals.get(Number(ing.item_id)) ?? { amount: 0, note: 'Prodej (Storyous)' };
-          cur.amount += (Number(ing.amount_per_sale) || 1) * it.amount;
-          totals.set(Number(ing.item_id), cur);
+          const add = (Number(ing.amount_per_sale) || 1) * sold;
+          totals.set(Number(ing.item_id), (totals.get(Number(ing.item_id)) ?? 0) + add);
         }
       } else if (it.productId) {
         const u2 = unmapped.get(it.productId) ?? { name: it.name, count: 0 };
-        u2.count += it.amount;
+        u2.count += sold;
         unmapped.set(it.productId, u2);
       }
     }
-    await sql`
-      INSERT INTO pos_processed_bills (team_id, bill_id)
-      VALUES (${teamId}, ${billId}) ON CONFLICT DO NOTHING`;
-    processed++;
+    fetched.push(billId);
   }
 
+  // Compute every stock change up front, then land deductions and the
+  // processed-bill marks in ONE transaction — a crash mid-run must not leave
+  // bills marked as written-off when the stock never moved (or vice versa).
   const deducted: { name: string; amount: number }[] = [];
-  const entries = Array.from(totals.entries());
-  for (const [itemId, t] of entries) {
-    const r = await deduct(teamId, userId, itemId, Math.round(t.amount * 10) / 10, t.note);
-    if (r) deducted.push(r);
+  const writes: any[] = [];
+  for (const [itemId, rawAmount] of Array.from(totals.entries())) {
+    const amount = Math.round(rawAmount * 10) / 10;
+    if (!(amount > 0)) continue;
+    const [it] = await sql`
+      SELECT id, name, quantity, open_amount, package_size
+      FROM inventory_items WHERE id = ${itemId} AND team_id = ${teamId}`;
+    if (!it) continue;
+    const pkg = Number(it.package_size) || 0;
+    const oldQty = Number(it.quantity) || 0;
+    const oldOpen = Number(it.open_amount) || 0;
+    const next = consume(oldQty, oldOpen, pkg, amount);
+    if (next.qty === oldQty && next.open === oldOpen) continue;
+    writes.push(sql`
+      UPDATE inventory_items SET quantity = ${next.qty},
+        open_amount = ${pkg > 0 ? next.open : it.open_amount}, updated_at = NOW()
+      WHERE id = ${itemId} AND team_id = ${teamId}`);
+    writes.push(sql`
+      INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)
+      VALUES (${itemId}, ${userId}, ${oldQty}, ${next.qty}, ${oldOpen}, ${pkg > 0 ? next.open : null}, ${'Prodej (Storyous)'}, NOW())`);
+    deducted.push({ name: it.name, amount });
   }
+  for (const billId of fetched) {
+    writes.push(sql`
+      INSERT INTO pos_processed_bills (team_id, bill_id)
+      VALUES (${teamId}, ${billId}) ON CONFLICT DO NOTHING`);
+  }
+
+  let processed = 0;
+  if (writes.length) {
+    try {
+      await sql.transaction(writes);
+      processed = fetched.length;
+    } catch {
+      return { connected: true as const, error: 'Zápis odpisů selhal — zkus to znovu.' };
+    }
+  }
+
   if (deducted.length) {
     audit(teamId, userId, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
@@ -148,4 +164,3 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
       .sort((a, b) => b.count - a.count).slice(0, 15),
   };
 }
-

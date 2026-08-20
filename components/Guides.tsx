@@ -184,10 +184,17 @@ export default function Guides({ user }: { user: User }) {
   const openReader = async (id: number) => {
     setReaderLoading(true);
     setReader({ id, title: '', content: '', checklist: [], categoryId: null, updatedAt: '' });
-    const r = await fetch(`/api/guides/${id}`);
-    const d = await r.json();
-    if (d.guide) setReader({ ...d.guide, checklist: Array.isArray(d.guide.checklist) ? d.guide.checklist : [] });
-    setReaderLoading(false);
+    try {
+      const r = await fetch(`/api/guides/${id}`);
+      const d = await r.json();
+      if (d.guide) setReader({ ...d.guide, checklist: Array.isArray(d.guide.checklist) ? d.guide.checklist : [] });
+      else setReader(null);
+    } catch {
+      // A dead network must not leave the reader on an endless spinner.
+      setReader(null);
+    } finally {
+      setReaderLoading(false);
+    }
   };
 
   const createDefaults = async () => {
