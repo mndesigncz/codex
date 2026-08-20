@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { normalizeCategoryPackaging, stockStatus } from '@/lib/packaging';
+import { normalizeCategoryPackaging, stockStatus, consumeContent } from '@/lib/packaging';
 import { resolveActingUser } from '@/lib/kioskActing';
 import { packagingSourceOf } from '@/lib/categoryTree';
 
@@ -66,6 +66,7 @@ async function mappedItem(id: number, teamId: number | null) {
         i.unit_cost         AS "unitCost",
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
+        i.content_unit      AS "contentUnit",
         i.brand, i.description, i.archived,
         i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",
@@ -114,6 +115,77 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const body = await request.json();
   const note = body.note ?? null;
+
+  // Direct consumption: "odešlo 150 ml" — the server cracks packages the same
+  // way the POS sync does, so a partial pour never costs a whole bottle.
+  // Available to every role; whoever poured the wine is the one who writes it off.
+  if (body.consume !== undefined) {
+    const amount = Number(body.consume);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: 'Neplatné množství' }, { status: 400 });
+    }
+    const authorId = me.role === 'employer'
+      ? me.meId
+      : await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
+    const oldQty = Number(item.quantity);
+    const oldOpen = item.open_amount != null ? Number(item.open_amount) : null;
+    const next = consumeContent({
+      quantity: oldQty,
+      packageSize: item.package_size != null ? Number(item.package_size) : null,
+      openAmount: oldOpen,
+    }, amount);
+    try {
+      await sql`
+        UPDATE inventory_items
+        SET quantity = ${next.quantity}, open_amount = ${next.openAmount}, updated_by = ${authorId}, updated_at = NOW()
+        WHERE id = ${id}`;
+    } catch {
+      await sql`
+        UPDATE inventory_items
+        SET quantity = ${next.quantity}, updated_by = ${authorId}, updated_at = NOW()
+        WHERE id = ${id}`;
+    }
+    try {
+      await sql`
+        INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)
+        VALUES (${id}, ${authorId}, ${oldQty}, ${next.quantity}, ${oldOpen}, ${next.openAmount}, ${note ?? `Odpis −${amount}`}, NOW())`;
+    } catch {
+      await sql`
+        INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note, created_at)
+        VALUES (${id}, ${authorId}, ${oldQty}, ${next.quantity}, ${note ?? `Odpis −${amount}`}, NOW())`;
+    }
+
+    // Same low-stock alert as a manual count change — the drop matters,
+    // not which door it left through.
+    const size = item.package_size != null ? Number(item.package_size) : 0;
+    let byContent = false;
+    try {
+      const [c] = await sql`
+        SELECT threshold_unit, tracks_open FROM inventory_categories
+        WHERE team_id = ${me.teamId} AND name = ${item.category}`;
+      byContent = c?.tracks_open === true && c?.threshold_unit === 'content';
+    } catch { /* pre-migration DB: stay on packages */ }
+    const effective = byContent
+      ? next.quantity * size + (next.openAmount ?? 0)
+      : (size > 0 ? next.quantity + (next.openAmount ?? 0) / size : next.quantity);
+    const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
+    if (status !== 'ok') {
+      const employers = await sql`
+        SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+      await Promise.all(
+        employers.map((e: any) =>
+          notifyUser(e.id, {
+            title: 'Nízké zásoby',
+            body: `${item.name} dochází — zbývá ${next.quantity} ${item.unit}${(next.openAmount ?? 0) > 0 ? ` + načaté balení` : ''}`,
+            type: 'inventory',
+            category: 'stock',
+            link: '/',
+          }),
+        ),
+      );
+    }
+    return NextResponse.json(await mappedItem(id, me.teamId));
+  }
 
   if (me.role !== 'employer') {
     // Employees and the shared kiosk may change the stock count, how much is
@@ -328,6 +400,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     try {
       await sql`UPDATE inventory_items SET package_size = ${size}, open_amount = ${open} WHERE id = ${id}`;
     } catch { /* columns not migrated yet */ }
+  }
+  if (body.contentUnit !== undefined) {
+    const cu = body.contentUnit ? String(body.contentUnit).trim().slice(0, 10) || null : null;
+    try { await sql`UPDATE inventory_items SET content_unit = ${cu} WHERE id = ${id}`; } catch { /* not migrated yet */ }
   }
 
   // Log any employer-driven quantity change too.

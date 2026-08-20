@@ -216,13 +216,13 @@ export default function PosMappingModal({ items, onClose, onSynced }: {
                       <input type="number" inputMode="decimal" min={0} step="0.1" value={ing.amount}
                         onChange={e => setDraft(d => d && ({ ...d, ingredients: d.ingredients.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
                         className={`${inputClass} w-24 text-right tabular-nums`} />
-                      <span className="text-xs text-black/45 w-10">{item?.unit ?? ''}</span>
+                      <span className="text-xs text-black/45 w-10">{item?.contentUnit ?? item?.unit ?? ''}</span>
                       <button onClick={() => setDraft(d => d && ({ ...d, ingredients: d.ingredients.filter((_, i) => i !== idx) }))}
                         className="rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-red-600 transition" title="Odebrat ingredienci">✕</button>
                     </div>
                     {item?.packageSize != null && (
                       <p className="text-[11px] text-black/35 mt-1.5">
-                        Balení {item.packageSize} {item.unit ?? ''} — odepisuje se nejdřív z načatého balení.
+                        Balení {item.packageSize} {item.contentUnit ?? item.unit ?? ''} — odepisuje se nejdřív z načatého balení.
                       </p>
                     )}
                   </div>

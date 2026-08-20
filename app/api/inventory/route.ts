@@ -39,6 +39,7 @@ export async function GET() {
         i.unit_cost         AS "unitCost",
         i.package_size      AS "packageSize",
         i.open_amount       AS "openAmount",
+        i.content_unit      AS "contentUnit",
         i.brand, i.description, i.archived,
         i.hide_from_overview AS "hideFromOverview",
         i.highlight,
@@ -130,6 +131,7 @@ export async function GET() {
       ...i,
       packageSize: i.packageSize != null ? Number(i.packageSize) : null,
       openAmount: i.openAmount != null ? Number(i.openAmount) : null,
+      contentUnit: i.contentUnit ?? null,
     };
     const packaging = (i.categoryId != null ? packagingById.get(Number(i.categoryId)) : undefined)
       ?? packagingByName.get(i.category) ?? null;
@@ -226,6 +228,14 @@ export async function POST(request: Request) {
   const rawSize = body.packageSize === '' || body.packageSize == null ? null : Number(body.packageSize);
   if (rawSize !== null && Number.isFinite(rawSize) && rawSize > 0) {
     try { await sql`UPDATE inventory_items SET package_size = ${rawSize} WHERE id = ${item.id}`; } catch { /* not migrated */ }
+  }
+  const contentUnit = body.contentUnit ? String(body.contentUnit).trim().slice(0, 10) || null : null;
+  if (contentUnit) {
+    try { await sql`UPDATE inventory_items SET content_unit = ${contentUnit} WHERE id = ${item.id}`; } catch { /* not migrated */ }
+  }
+  const rawOpen = body.openAmount === '' || body.openAmount == null ? null : Math.max(0, Number(body.openAmount) || 0);
+  if (rawOpen !== null) {
+    try { await sql`UPDATE inventory_items SET open_amount = ${rawOpen} WHERE id = ${item.id}`; } catch { /* not migrated */ }
   }
 
   return NextResponse.json({ ok: true, id: item.id });

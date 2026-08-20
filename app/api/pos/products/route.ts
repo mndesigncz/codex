@@ -38,7 +38,7 @@ export async function GET() {
     rows = await sql`
       SELECT m.product_id AS "productId", m.product_name AS "productName",
              m.item_id AS "itemId", m.amount_per_sale AS "amountPerSale",
-             i.name AS "itemName", i.unit AS "itemUnit", i.package_size AS "packageSize"
+             i.name AS "itemName", COALESCE(i.content_unit, i.unit) AS "itemUnit", i.package_size AS "packageSize"
       FROM pos_product_map m
       LEFT JOIN inventory_items i ON i.id = m.item_id
       WHERE m.team_id = ${u.team_id}`;

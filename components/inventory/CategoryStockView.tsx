@@ -11,6 +11,7 @@ import {
   type CategoryPackaging, resolveSteps, formatStock, fmtAmount, openPct,
   effectivePackages, totalContent, stockStatus, thresholdUnitLabel,
 } from '@/lib/packaging';
+import ConsumeControl from './ConsumeControl';
 
 export interface StockItem {
   id: number;
@@ -26,6 +27,7 @@ export interface StockItem {
   archived?: boolean;
   packageSize?: number | null;
   openAmount?: number | null;
+  contentUnit?: string | null;
 }
 
 type Mode = 'view' | 'edit';
@@ -382,6 +384,20 @@ export default function CategoryStockView({
                           </button>
                         );
                       })}
+                    </div>
+                    {/* Exact write-off: "odešlo 150 ml" — for when someone knows
+                        the amount instead of eyeballing a level. */}
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <ConsumeControl
+                        itemId={i.id}
+                        unit={i.contentUnit ?? unit ?? null}
+                        onDone={u => {
+                          onChanged(u as any);
+                          setSavedId(i.id);
+                          setTimeout(() => setSavedId(s => (s === i.id ? null : s)), 1500);
+                        }}
+                        onFail={() => flashFail(i.id)}
+                      />
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       <button
