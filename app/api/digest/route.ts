@@ -96,6 +96,12 @@ export async function GET(request: Request) {
         if (conn) {
           const ps = await daySummary(conn, today);
           if (ps.bills > 0) posLine = `Pokladna: ${czk(ps.total)} (${ps.bills} účtenek, hotově ${czk(ps.cash)} / kartou ${czk(ps.card + ps.other)})`;
+          // Refunds deserve an eye the same evening, not at the month's end.
+          try {
+            const { listRefunds } = await import('@/lib/storyous');
+            const rf = await listRefunds(conn, today);
+            if (rf.count > 0) posLine = `${posLine ? posLine + ' · ' : ''}⚠️ ${rf.count}× refundace (${czk(rf.total)})`;
+          } catch { /* optional */ }
         }
       } catch { /* POS down — digest still goes out */ }
 

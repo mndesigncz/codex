@@ -34,6 +34,8 @@ export default function ClosingsOverview() {
   // Analytics live behind one collapsible header — the list of closings is
   // the daily job, the numbers are the occasional deep-dive.
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  // Deep POS insights for the picked month (hourly peaks, per-person sales…).
+  const [posInsights, setPosInsights] = useState<any | null>(null);
   useEffect(() => {
     try { setAnalyticsOpen(localStorage.getItem('pangea-closings-analytics') === '1'); } catch { /* ignore */ }
   }, []);
@@ -56,6 +58,15 @@ export default function ClosingsOverview() {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [approving, setApproving] = useState<number | null>(null);
   const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
+  useEffect(() => {
+    if (!analyticsOpen || month === 'all') { setPosInsights(null); return; }
+    let alive = true;
+    fetch(`/api/pos/insights?month=${month}`).then(r => r.json())
+      .then(d => { if (alive) setPosInsights(d?.connected && d.bills != null ? d : null); })
+      .catch(() => { if (alive) setPosInsights(null); });
+    return () => { alive = false; };
+  }, [analyticsOpen, month]);
+
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -505,6 +516,77 @@ export default function ClosingsOverview() {
       )}
 
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
+
+      {analyticsOpen && pro && posInsights && (
+        <div className="glass-card p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <h3 className="font-bold tracking-tight text-[#16181A]">💳 Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
+            <span className="text-[11px] text-black/35">z účtenek Storyous</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržba / účtenek</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(posInsights.total)} <span className="text-xs font-semibold text-black/40">/ {posInsights.bills}</span></p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Průměrná útrata</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(posInsights.avgBill)}</p>
+              {posInsights.avgPersons != null && <p className="text-[11px] text-black/40 mt-0.5">⌀ {posInsights.avgPersons} os. na účtenku</p>}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Spropitné</p>
+              <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(posInsights.tips)}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Refundace / slevy</p>
+              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${posInsights.refunds.count > 0 ? 'text-amber-700' : 'text-[#16181A]'}`}>
+                {posInsights.refunds.count}× ({money(posInsights.refunds.total)})
+              </p>
+              {posInsights.discounts > 0 && <p className="text-[11px] text-black/40 mt-0.5">slevy {money(posInsights.discounts)}</p>}
+            </div>
+          </div>
+
+          {/* hourly peaks */}
+          {posInsights.hours.some((h: number) => h > 0) && (() => {
+            const max = Math.max(...posInsights.hours);
+            return (
+              <div className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Špičky dne (tržba po hodinách)</p>
+                <div className="flex items-end gap-[3px] h-20 overflow-x-auto scrollbar-thin">
+                  {posInsights.hours.map((v: number, h: number) => (
+                    <div key={h} className="flex flex-col items-center gap-1 min-w-[22px] flex-1" title={`${h}:00 — ${money(v)}`}>
+                      <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
+                        style={{ height: `${max ? Math.max(v > 0 ? 6 : 0, (v / max) * 64) : 0}px` }} />
+                      <span className="text-[10px] text-black/35 tabular-nums">{h}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* per-person sales */}
+          {posInsights.byPerson.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Tržby podle lidí (kdo markoval)</p>
+              <div className="space-y-1.5">
+                {posInsights.byPerson.map((p2: any) => {
+                  const pct = posInsights.total ? Math.round((p2.total / posInsights.total) * 100) : 0;
+                  return (
+                    <div key={p2.name} className="relative overflow-hidden rounded-xl border border-black/[0.06] bg-white/50 px-3.5 py-2">
+                      <span className="absolute inset-y-0 left-0 bg-[#C8F542]/25" style={{ width: `${pct}%` }} />
+                      <span className="relative flex items-center justify-between gap-2 text-sm">
+                        <span className="min-w-0 truncate text-[#16181A]">{p2.name}</span>
+                        <span className="shrink-0 text-black/55 tabular-nums">{money(p2.total)} · {p2.bills} úč. · {pct} %</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Revenue trend chart */}
       {analyticsOpen && daily.length >= 2 && (() => {
