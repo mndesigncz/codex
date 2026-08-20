@@ -5,8 +5,10 @@ import { Icon } from '../Icons';
 import CategoryStockView from '../inventory/CategoryStockView';
 import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
+  formatStock, totalContent, fmtAmount, itemContentUnit,
   CONTENT_UNITS, type ScaleStep, type CategoryPackaging,
 } from '@/lib/packaging';
+import ConsumeControl from '../inventory/ConsumeControl';
 import {
   buildTree, flattenTree, scopeIds, pathOfId, childrenOfId, possibleParents,
   packagingSourceOf, ancestryOfId, findById, matcher, type TreeNode,
@@ -32,6 +34,7 @@ interface Item {
   unitCost?: number | null;
   packageSize?: number | null;
   openAmount?: number | null;
+  contentUnit?: string | null;
   brand?: string | null;
   description?: string | null;
   archived?: boolean;
@@ -81,7 +84,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', archived: false, hideFromOverview: false, highlight: '' };
+const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', contentUnit: '', openAmount: '', archived: false, hideFromOverview: false, highlight: '' };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -397,7 +400,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
   const openEdit = (i: Item) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
@@ -447,6 +450,8 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
       brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview, highlight: form.highlight || null,
       packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
+      contentUnit: form.contentUnit || null,
+      openAmount: form.openAmount === '' ? null : Math.max(0, Number(form.openAmount) || 0),
     };
     setFormErr('');
     try {
@@ -491,6 +496,11 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       });
     } catch { setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x)); }
   };
+
+  // A write-off returns the item's fresh state from the server (packages may
+  // have been cracked open) — merge it in place instead of refetching the list.
+  const onConsumed = (updated: any) =>
+    setItems(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x));
 
   const toggleSelected = (id: number) =>
     setSelected(prev => {
@@ -753,9 +763,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
           onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
         />
       ) : view === 'list' ? (
-        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} />
+        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} />
+        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} />
       )}
 
       {/* Item form modal */}
@@ -867,17 +877,41 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
                     <input type="number" inputMode="numeric" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
                   </div>
-                  {pk(form) && (
-                    <div className="col-span-2 sm:col-span-1">
+                </div>
+
+                {/* Partial consumption: any item can say how big one package is
+                    and what's left in the open one — a bottle of wine doesn't
+                    leave whole when one glass is poured. */}
+                <div className="rounded-2xl bg-white/40 border border-black/[0.05] p-3.5 space-y-3">
+                  <p className="text-xs font-semibold text-black/50">
+                    🍾 Načaté balení <span className="font-normal text-black/35">· pro zboží, ze kterého se spotřebovává jen část (lahev vína, plechovka tabáku…)</span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Velikost balení</label>
-                      <div className="relative">
-                        <input type="number" inputMode="numeric" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
-                          placeholder={String(pk(form)?.defaultPackageSize ?? '')} className={`${inputClass} pr-12`} />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{pk(form)?.contentUnit}</span>
+                      <div className="flex gap-2">
+                        <input type="number" inputMode="decimal" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
+                          placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
+                        <select value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
+                          className={`${inputClass} w-20 shrink-0 px-2`}>
+                          <option value="">{pk(form)?.contentUnit ?? '—'}</option>
+                          {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
                       </div>
-                      <p className="text-[11px] text-black/40 mt-1.5">Prázdné = výchozí z kategorie.</p>
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">V načatém zbývá</label>
+                      <div className="relative">
+                        <input type="number" inputMode="decimal" min={0} value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
+                          placeholder="0" className={`${inputClass} pr-12`} />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{form.contentUnit || pk(form)?.contentUnit || ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-black/40">
+                    Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.
+                    {pk(form) ? ' Prázdná velikost = výchozí z kategorie.' : ''}
+                  </p>
                 </div>
               </div>
 
@@ -1443,10 +1477,11 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
 }
 
 /* ---------- List view (dense rows) ---------- */
-function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle }: {
+function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle, onConsumed }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
   pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
+  onConsumed: (updated: any) => void;
 }) {
   return (
     <div className="glass-card overflow-hidden">
@@ -1490,9 +1525,16 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 <div className="h-1.5 w-14 bg-black/[0.06] rounded-full overflow-hidden shrink-0">
                   <div className={`h-full ${bar} rounded-full`} style={{ width: `${pct}%` }} />
                 </div>
-                <span className="text-xs text-black/60 tabular-nums whitespace-nowrap">{i.quantity} {i.unit}</span>
+                <span className="text-xs text-black/60 tabular-nums whitespace-nowrap truncate">
+                  {Number(i.packageSize) > 0
+                    ? formatStock(i, itemContentUnit(i, pk(i)), i.unit)
+                    : <>{i.quantity} {i.unit}</>}
+                </span>
               </div>
-              <div className={`flex items-center gap-1 justify-end ${selecting ? 'hidden' : ''}`}>
+              <div className={`flex items-center gap-1 justify-end flex-wrap ${selecting ? 'hidden' : ''}`}>
+                {Number(i.packageSize) > 0 && (
+                  <ConsumeControl itemId={i.id} unit={itemContentUnit(i, pk(i))} onDone={onConsumed} />
+                )}
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
                 <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
@@ -1514,10 +1556,11 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
 }
 
 /* ---------- Grid view (glass cards) ---------- */
-function GridView({ items, step, openEdit, remove, money, pk, setArchived, selecting, selected, onToggle }: {
+function GridView({ items, step, openEdit, remove, money, pk, setArchived, selecting, selected, onToggle, onConsumed }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
   money: (n: number) => string; pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
+  onConsumed: (updated: any) => void;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1547,6 +1590,18 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
               <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
             </div>
+            {Number(i.packageSize) > 0 && (() => {
+              const cu = itemContentUnit(i, pk(i));
+              return (
+                <div className={`mt-2.5 flex flex-wrap items-center justify-between gap-2 ${selecting ? 'hidden' : ''}`}>
+                  <span className="text-xs text-black/55 tabular-nums min-w-0">
+                    🍾 {formatStock(i, cu, i.unit)}
+                    {cu ? <span className="text-black/35"> · celkem {fmtAmount(totalContent(i))} {cu}</span> : null}
+                  </span>
+                  <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} />
+                </div>
+              );
+            })()}
             <div className={`mt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">−</button>

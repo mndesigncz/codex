@@ -169,6 +169,37 @@ export function fmtAmount(n: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(1).replace('.', ',');
 }
 
+/**
+ * Take `amount` of content out of the stock: the open package first, then
+ * sealed ones get cracked as needed. Without a package size the amount comes
+ * straight off `quantity` — the item is simply counted in its own unit.
+ * Never goes below zero; selling from an empty shelf is a counting error,
+ * not negative stock.
+ */
+export function consumeContent(item: PackagedItem, amount: number): { quantity: number; openAmount: number | null } {
+  const size = Number(item.packageSize) || 0;
+  let qty = Math.max(0, Number(item.quantity) || 0);
+  if (size <= 0) {
+    return { quantity: Math.max(0, round1(qty - amount)), openAmount: item.openAmount ?? null };
+  }
+  let open = Math.max(0, Number(item.openAmount) || 0);
+  let left = amount;
+  while (left > 0) {
+    if (open >= left) { open = round1(open - left); left = 0; break; }
+    left = round1(left - open); open = 0;
+    if (qty > 0) { qty -= 1; open = size; } else break;
+  }
+  return { quantity: qty, openAmount: open };
+}
+
+/** The unit partial amounts are measured in — the item's own setting wins. */
+export function itemContentUnit(
+  item: { contentUnit?: string | null },
+  packaging?: CategoryPackaging | null,
+): string | null {
+  return item.contentUnit ?? packaging?.contentUnit ?? null;
+}
+
 /** How full the open package is, 0–100, for progress bars. */
 export function openPct(item: PackagedItem): number {
   const size = Number(item.packageSize) || 0;

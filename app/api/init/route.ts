@@ -815,6 +815,7 @@ export async function GET() {
     // Per item: how big its package is and how much is left in the open one.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`;
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`;
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS content_unit TEXT`;
     // Audit trail covers the open remainder too, so consumption is derivable.
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`;
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`;
