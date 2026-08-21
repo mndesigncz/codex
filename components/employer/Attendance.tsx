@@ -145,6 +145,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       const d = await res.json();
       if (res.ok && d.entry) {
         setEntries(list => list.map(x => x.id === editEntry.id ? { ...x, clockIn: d.entry.clockIn, clockOut: d.entry.clockOut } : x));
+        if (d.entry.clockOut) {
+          setRoster(rs => rs.map(r => String(r.id) === String(editEntry.employeeId) ? { ...r, openSince: null } : r));
+        }
         setEditEntry(null);
       } else setEditErr(d.error || 'Nepodařilo se uložit.');
     } catch { setEditErr('Chyba serveru.'); }
@@ -260,19 +263,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   // A shift open longer than 12 h is almost certainly a forgotten clock-out.
   const STALE_MS = 12 * 3600 * 1000;
 
-  const closeEntry = async (e: Entry) => {
-    if (!confirm(`Ukončit směnu ${e.employeeName ?? ''} teď? Čas pak případně uprav smazáním záznamu.`)) return;
-    try {
-      const res = await fetch('/api/attendance', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: e.id }),
-      });
-      const d = await res.json();
-      if (res.ok && d.entry) {
-        setEntries(list => list.map(x => x.id === e.id ? { ...x, clockOut: d.entry.clockOut } : x));
-        setRoster(rs => rs.map(r => String(r.id) === String(e.employeeId) ? { ...r, openSince: null } : r));
-      }
-    } catch { /* ignore */ }
+  // "Ukončit" opens the editor with the clock-out prefilled to now, so the
+  // employer sets the real leaving time in one step instead of close-then-fix.
+  const closeEntry = (e: Entry) => {
+    setEditEntry(e); setEditErr('');
+    setEditIn(toLocalInput(e.clockIn));
+    setEditOut(toLocalInput(new Date().toISOString()));
   };
 
   const remove = async (e: Entry) => {
@@ -369,6 +365,15 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 <span className="shrink-0 whitespace-nowrap tabular-nums font-bold text-[#16181A] text-lg">
                   {hms(now - new Date(r.openSince as string).getTime())}
                 </span>
+                {(() => {
+                  const openEntry = entries.find(e => String(e.employeeId) === String(r.id) && !e.clockOut);
+                  return openEntry ? (
+                    <button onClick={() => closeEntry(openEntry)} title="Ukončit směnu a nastavit čas odchodu"
+                      className="shrink-0 rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
+                      Ukončit
+                    </button>
+                  ) : null;
+                })()}
               </div>
             ))}
           </div>

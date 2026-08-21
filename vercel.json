@@ -3,8 +3,21 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "crons": [
-    { "path": "/api/backup", "schedule": "0 2 * * *" },
-    { "path": "/api/closings/remind", "schedule": "0 21 * * *" },
-    { "path": "/api/digest", "schedule": "30 21 * * *" }
+    {
+      "path": "/api/backup",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/closings/remind",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/digest",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/attendance/watch",
+      "schedule": "20 * * * *"
+    }
   ]
 }

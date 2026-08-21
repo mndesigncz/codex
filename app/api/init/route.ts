@@ -391,6 +391,8 @@ export async function GET() {
       )`;
     // wages: hourly rate per member (Kc/h)
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`;
+    // watchdog for forgotten clock-outs: when the person was already reminded
+    await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
 
     // ---- Announcements (pinned team board) ----
     await sql`

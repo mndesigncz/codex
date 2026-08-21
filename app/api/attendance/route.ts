@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { pragueToday } from '@/lib/pragueTime';
+import { STALE_AFTER_MS } from '@/lib/staleShifts';
+import { notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,7 +113,7 @@ export async function GET(req: NextRequest) {
 
   // Employee — own entries (last 60 days).
   const entries = await sql`
-    SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source
+    SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
     FROM time_entries
     WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '60 days'
     ORDER BY clock_in DESC`;
@@ -183,7 +185,22 @@ export async function POST(req: NextRequest) {
   const today = pragueToday();
 
   if (action === 'in') {
-    if (open) return NextResponse.json({ error: 'Příchod už je zaznamenaný.' }, { status: 409 });
+    let autoClosedPrevious = false;
+    if (open) {
+      // A forgotten clock-out from a previous day must not block today's
+      // arrival — close the stale entry at a sensible time and carry on.
+      const openMs = Date.now() - new Date(open.clock_in).getTime();
+      if (openMs > STALE_AFTER_MS) {
+        const { autoCloseEntry } = await import('@/lib/staleShifts');
+        try {
+          await autoCloseEntry({ id: open.id, employee_id: employeeId, team_id: c.teamId, clock_in: open.clock_in });
+          autoClosedPrevious = true;
+        } catch { /* fall through to the 409 below */ }
+      }
+      if (!autoClosedPrevious) {
+        return NextResponse.json({ error: 'Příchod už je zaznamenaný.' }, { status: 409 });
+      }
+    }
     const [row] = await sql`
       INSERT INTO time_entries (team_id, employee_id, source)
       VALUES (${c.teamId}, ${employeeId}, ${isKiosk ? 'kiosk' : 'self'})
@@ -219,7 +236,7 @@ export async function POST(req: NextRequest) {
       }
     } catch { /* late check is best-effort */ }
 
-    return NextResponse.json({ ok: true, action: 'in', entry: row });
+    return NextResponse.json({ ok: true, action: 'in', entry: row, autoClosedPrevious });
   }
 
   // clock out
@@ -280,7 +297,25 @@ export async function PATCH(req: NextRequest) {
   const [row] = await sql`
     UPDATE time_entries SET clock_in = ${inTs.toISOString()}, clock_out = ${outTs ? outTs.toISOString() : null}
     WHERE id = ${id}
-    RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut"`;
+
+  // The person whose hours changed deserves to know — hours are wages.
+  const changed = inTs.getTime() !== new Date(entry.clock_in).getTime()
+    || (outTs?.getTime() ?? null) !== (entry.clock_out ? new Date(entry.clock_out).getTime() : null);
+  if (changed && row && Number(row.employeeId) !== c.meId) {
+    const fmt = (d: Date | null) => d
+      ? d.toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '…';
+    try {
+      await notifyUser(Number(row.employeeId), {
+        title: '🕐 Upravená docházka',
+        body: `Vedení upravilo tvůj záznam: ${fmt(inTs)} – ${fmt(outTs)}.`,
+        type: 'info',
+        category: 'shift',
+        link: '/employee/shifts',
+      });
+    } catch { /* best-effort */ }
+  }
   return NextResponse.json({ ok: true, entry: row });
 }
 
