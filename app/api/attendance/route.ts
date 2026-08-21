@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { pragueToday } from '@/lib/pragueTime';
-import { STALE_AFTER_MS } from '@/lib/staleShifts';
+import { STALE_AFTER_MS, autoCloseEntry, pragueMoment } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -56,10 +56,11 @@ export async function GET(req: NextRequest) {
              CASE WHEN ${withRate} THEN COALESCE(u.hourly_rate, 0) ELSE NULL END AS "hourlyRate",
              (u.pin IS NOT NULL AND u.pin <> '') AS "hasPin",
              te.clock_in AS "openSince",
+             te.id AS "openEntryId", te.nudged_at AS "nudgedAt",
              sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
       FROM users u
       LEFT JOIN LATERAL (
-        SELECT clock_in FROM time_entries
+        SELECT id, clock_in, nudged_at FROM time_entries
         WHERE employee_id = u.id AND clock_out IS NULL
         ORDER BY clock_in DESC LIMIT 1
       ) te ON TRUE
@@ -94,6 +95,33 @@ export async function GET(req: NextRequest) {
         WHERE u.team_id = ${c.teamId} AND u.role IN ('employee','employer')
         ORDER BY u.role DESC, u.name ASC`;
     }
+
+    // Inline watchdog: the shop kiosk polls this endpoint all day, so every
+    // roster load doubles as the hourly check that Vercel's daily-cron limit
+    // won't give us. The daily cron stays as a backstop for quiet teams.
+    try {
+      const nowMs = Date.now();
+      for (const r of roster as any[]) {
+        if (!r.openSince || !r.openEntryId) continue;
+        const inMs = new Date(r.openSince).getTime();
+        if (nowMs - inMs > STALE_AFTER_MS) {
+          await autoCloseEntry({ id: r.openEntryId, employee_id: Number(r.id), team_id: c.teamId, clock_in: r.openSince });
+          r.openSince = null; r.openEntryId = null;
+        } else if (!r.nudgedAt && r.shiftEnd) {
+          const planned = pragueMoment(today, String(r.shiftEnd));
+          if (planned && planned.getTime() > inMs && nowMs - planned.getTime() > 30 * 60 * 1000) {
+            await notifyUser(Number(r.id), {
+              title: '🕐 Pořád jsi na směně?',
+              body: 'Směna ti už skončila a pořád jsi odpíchnutý/á. Jestli už jsi doma, odpíchni si odchod — jinak se směna po čase uzavře sama.',
+              type: 'warning',
+              category: 'shift',
+              link: '/employee/shifts',
+            });
+            try { await sql`UPDATE time_entries SET nudged_at = NOW() WHERE id = ${r.openEntryId}`; } catch { /* not migrated */ }
+          }
+        }
+      }
+    } catch { /* watchdog is best-effort */ }
 
     let entries: any[] = [];
     if (c.role === 'employer') {

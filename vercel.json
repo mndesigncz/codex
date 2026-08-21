@@ -17,7 +17,7 @@
     },
     {
       "path": "/api/attendance/watch",
-      "schedule": "20 * * * *"
+      "schedule": "45 21 * * *"
     }
   ]
 }
