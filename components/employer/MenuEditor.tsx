@@ -167,7 +167,7 @@ export default function MenuEditor() {
           const ok = confirm(
             `${d.error} Chceš ji převzít? Menu „${d.drziNazev}“ dostane jinou adresu ` +
             `a hostům se od té chvíle bude na téhle adrese ukazovat tohle menu.`);
-          if (ok) { setUkladam(false); await ulozit({ prevzitAdresu: true }); return; }
+          if (ok) { setUkladam(false); await ulozit({ ...navic, prevzitAdresu: true }); return; }
         }
         setChyba(d?.error ?? `Uložení se nepodařilo (odpověď serveru ${r.status}).`);
         return;
@@ -179,6 +179,16 @@ export default function MenuEditor() {
     } catch {
       setChyba('Uložení se nepodařilo — spojení se serverem selhalo. Změny máš pořád na obrazovce, zkus to znovu.');
     } finally { setUkladam(false); }
+  };
+
+  /**
+   * Náprava na jedno ťuknutí. Změna jde do `ulozit` zvlášť, protože stav
+   * Reactu se v tomhle tiku ještě nepřekreslil — čekat na něj by znamenalo
+   * odeslat starou hodnotu.
+   */
+  const zverejnit = async (zmena: Record<string, any>) => {
+    upravit((b) => Object.assign(b, zmena));
+    await ulozit(zmena);
   };
 
   const zrusitPin = async () => {
@@ -335,28 +345,44 @@ export default function MenuEditor() {
           )}
           {zive === 'vypnuto' && (
             <p className="text-xs text-amber-700">
-              Menu je vypnuté, takže hostům se neukazuje. Zapni ho dole přepínačem „Menu je zapnuté“ a ulož.
+              Menu je vypnuté, takže se hostům neukazuje.
             </p>
           )}
           {zive === 'chybi' && (
             <p className="text-xs text-amber-700">
-              Pozor: hostům se tohle menu na téhle adrese neukazuje. iPad otevřený na holém{' '}
-              <code className="font-mono">/menu-akce.html</code> ukazuje menu s adresou{' '}
-              <code className="font-mono">akce</code>, a to tohle menu není.
+              {ulozenySlug === VYCHOZI_SLUG
+                ? 'Pozor: server na téhle adrese žádné menu nevydává, takže iPad ukazuje záložní nabídku.'
+                : 'Pozor: iPad otevřený bez parametru bere menu s adresou „akce“, a to tohle menu není — proto se tvoje úpravy hostům neukazují.'}
             </p>
           )}
 
-          {/* Nejčastější past: menu je uložené, ale iPad kouká na jinou adresu.
-              Přepsat adresu ručně jde taky, tohle je na jedno ťuknutí. */}
-          {ulozenySlug !== VYCHOZI_SLUG && (
-            <button type="button" disabled={ukladam}
-              onClick={() => {
-                upravit((b) => { b.slug = VYCHOZI_SLUG; });
-                setHlaska(null);
-              }}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/70 disabled:opacity-50">
-              Nastavit jako menu pro iPad (adresa <code className="font-mono">{VYCHOZI_SLUG}</code>)
-            </button>
+          {/*
+            U každé hlášky musí být i náprava. Dřív se tlačítko na adresu
+            schovávalo, když adresa už seděla — u vypnutého menu tak zbyla
+            hláška, se kterou nešlo nic udělat.
+          */}
+          {(zive === 'chybi' || zive === 'vypnuto') && (
+            <div className="pt-1">
+              {/* Vypnuté menu se má zapnout, ne mu přepisovat adresu — u druhého
+                  menu s vlastní adresou by mu ji přepis vzal. */}
+              {zive === 'vypnuto' ? (
+                <button type="button" disabled={ukladam} onClick={() => zverejnit({ enabled: true })}
+                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                  {ukladam ? 'Ukládám…' : 'Zapnout menu pro hosty'}
+                </button>
+              ) : ulozenySlug !== VYCHOZI_SLUG ? (
+                <button type="button" disabled={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}
+                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                  {ukladam ? 'Ukládám…' : 'Nastavit jako menu pro iPad'}
+                </button>
+              ) : (
+                <button type="button" disabled={ukladam}
+                  onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}
+                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                  {ukladam ? 'Ukládám…' : 'Zveřejnit znovu'}
+                </button>
+              )}
+            </div>
           )}
         </div>
 
