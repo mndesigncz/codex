@@ -608,6 +608,9 @@ export async function GET() {
         position INTEGER DEFAULT 0
       )`;
     await sql`CREATE INDEX IF NOT EXISTS menu_items_section ON menu_items (section_id)`;
+    // Vzhled menu (barvy, logo, písma, prvky na pozadí). Prázdné = vzhled
+    // zapečený ve stránce, takže staré menu vypadá dál stejně.
+    await sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS theme JSONB`;
     // A closing belongs to the whole shift, not just its author.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
 

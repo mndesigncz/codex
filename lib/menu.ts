@@ -27,6 +27,8 @@ export interface MenuSection {
   items: MenuItem[];
 }
 
+import { normalizeMenuTheme, type MenuTheme } from './menuTheme';
+
 export interface MenuBoard {
   id: number;
   slug: string;
@@ -40,6 +42,7 @@ export interface MenuBoard {
   enabled: boolean;
   /** Jen informace pro administraci, samotný PIN se ven nikdy neposílá. */
   hasPin?: boolean;
+  theme: MenuTheme;
   sections: MenuSection[];
   updatedAt?: string;
 }
@@ -163,6 +166,7 @@ export function buildBoard(boardRow: any, sectionRows: any[], itemRows: any[]): 
     currency: boardRow.currency || DEFAULT_CURRENCY,
     enabled: boardRow.enabled !== false,
     hasPin: !!boardRow.pin_hash,
+    theme: normalizeMenuTheme(boardRow.theme),
     sections,
     updatedAt: boardRow.updated_at ?? undefined,
   };
@@ -177,6 +181,7 @@ export function publicShape(board: MenuBoard) {
     mena: board.currency,
     poznamka: board.note,
     wifi: board.wifiSsid ? { sit: board.wifiSsid, heslo: board.wifiPassword ?? '' } : null,
+    vzhled: board.theme,
     sekce: board.sections.map(s => ({
       nadpis: s.title,
       sloupec: s.column,

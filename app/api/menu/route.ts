@@ -14,6 +14,7 @@ import {
   buildBoard, cleanText, cleanPrice, cleanSlug, cleanColumn, cleanPin,
   MAX_NAME, MAX_DESC, SEED_BOARD, DEFAULT_CURRENCY,
 } from '@/lib/menu';
+import { normalizeMenuTheme, zeSdilenehoVzhledu, VYCHOZI_THEME } from '@/lib/menuTheme';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,13 +83,27 @@ export async function POST(request: Request) {
     }
 
     const seed = body?.seed !== false;
+
+    // Vzhled se uloží rovnou, ať je od začátku vidět a dá se upravit.
+    //   • zakládání z dnešní nabídky → vzhled zapečený ve stránce, aby
+    //     menu vypadalo přesně jako předtím
+    //   • prázdné nové menu → odvozeno z Vzhledu sdílených stránek, ať
+    //     podnik nezačíná v cizích barvách
+    let vzhled = JSON.stringify(VYCHOZI_THEME);
+    if (!seed) {
+      try {
+        const [t] = await sql`SELECT share_theme FROM teams WHERE id = ${me.teamId}`;
+        if (t?.share_theme) vzhled = JSON.stringify(zeSdilenehoVzhledu(t.share_theme));
+      } catch { /* sloupec nemusí být zmigrovaný */ }
+    }
+
     const [board] = await sql`
-      INSERT INTO menu_boards (team_id, slug, name, eyebrow, title, note, wifi_ssid, wifi_password, currency, created_by)
+      INSERT INTO menu_boards (team_id, slug, name, eyebrow, title, note, wifi_ssid, wifi_password, currency, created_by, theme)
       VALUES (${me.teamId}, ${slug}, ${name},
               ${seed ? SEED_BOARD.eyebrow : null}, ${seed ? SEED_BOARD.title : null},
               ${seed ? SEED_BOARD.note : null},
               ${seed ? SEED_BOARD.wifiSsid : null}, ${seed ? SEED_BOARD.wifiPassword : null},
-              ${DEFAULT_CURRENCY}, ${me.meId})
+              ${DEFAULT_CURRENCY}, ${me.meId}, ${vzhled}::jsonb)
       RETURNING *`;
 
     if (seed) {
@@ -152,6 +167,13 @@ export async function PUT(request: Request) {
       enabled = ${body?.enabled !== false},
       updated_at = NOW()
     WHERE id = ${id}`;
+
+  // ---- vzhled ----
+  if (body?.theme && typeof body.theme === 'object') {
+    await sql`
+      UPDATE menu_boards SET theme = ${JSON.stringify(normalizeMenuTheme(body.theme))}::jsonb
+      WHERE id = ${id}`;
+  }
 
   // ---- PIN: řetězec nastaví, prázdno zruší, chybějící klíč nechá být ----
   if (Object.prototype.hasOwnProperty.call(body ?? {}, 'pin')) {
