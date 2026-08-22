@@ -173,9 +173,24 @@ li[data-out="1"] .name::after{
   font-size:.4em;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
 }
 
+/* ---------- QR: menu do mobilu ---------- */
+.qr{display:flex;align-items:center;gap:calc(clamp(7px,1.2vh,14px) * var(--fit))}
+/* dlaždice je světlá v obou režimech — invertovaný QR čtečky zvládají hůř */
+.qr-tile{
+  background:#E3DED5;border:1px solid var(--accent);border-radius:8px;
+  padding:calc(clamp(4px,.7vh,8px) * var(--fit));line-height:0;flex:none;
+}
+/* QR se smí zmenšovat s deskou, ale nikdy pod 72 px — jinak ho mobil nepřečte */
+.qr-tile img{width:max(72px, calc(clamp(80px,11vh,104px) * var(--fit)));height:auto;display:block}
+.qr-text b{
+  display:block;font-family:var(--display);font-weight:400;
+  color:var(--accent);font-size:1.5em;line-height:1.15;
+}
+.qr-text span{display:block;margin-top:.15em}
+
 /* ---------- Patička ---------- */
 footer{
-  display:flex;justify-content:space-between;align-items:flex-end;gap:1.5rem;
+  display:flex;justify-content:space-between;align-items:center;gap:clamp(12px,2.5vw,40px);
   padding-top:calc(clamp(7px,1.4vh,16px) * var(--fit));
   border-top:1px solid var(--rule);
   font-size:calc(clamp(9px,1.6vh,14px) * var(--fit));
@@ -244,6 +259,10 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
   <div class="cols" id="cols"></div>
 
   <footer>
+    <div class="qr">
+      <div class="qr-tile"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMzAiIGhlaWdodD0iMzMwIiBjbGFzcz0ic2Vnbm8iPjxwYXRoIHRyYW5zZm9ybT0ic2NhbGUoMTApIiBjbGFzcz0icXJsaW5lIiBzdHJva2U9IiMxYzFjMWMiIGQ9Ik0wIDAuNWg3bTEgMGgxbTEgMGgxbTIgMGgybTIgMGgxbTEgMGgybTIgMGgxbTIgMGg3bS0zMyAxaDFtNSAwaDFtMiAwaDFtMSAwaDFtMyAwaDFtNSAwaDJtMyAwaDFtNSAwaDFtLTMzIDFoMW0xIDBoM20xIDBoMW0yIDBoMm01IDBoMW0yIDBoNG0zIDBoMW0xIDBoM20xIDBoMW0tMzMgMWgxbTEgMGgzbTEgMGgxbTMgMGg0bTIgMGgybTEgMGgxbTIgMGgxbTEgMGgxbTEgMGgxbTEgMGgzbTEgMGgxbS0zMyAxaDFtMSAwaDNtMSAwaDFtMSAwaDFtMSAwaDdtMSAwaDRtMSAwaDJtMSAwaDFtMSAwaDNtMSAwaDFtLTMzIDFoMW01IDBoMW0xIDBoM20xIDBoMW0zIDBoMm0zIDBoMW00IDBoMW01IDBoMW0tMzMgMWg3bTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGg3bS0yNCAxaDJtMiAwaDJtMSAwaDFtMSAwaDFtMSAwaDNtLTIyIDFoN20xIDBoMW0yIDBoMW0xIDBoMW0xIDBoMm02IDBoMW0yIDBoMm0zIDBoMW0tMzMgMWgxbTEgMGgxbTEgMGgxbTIgMGgxbTEgMGg2bTIgMGgzbTEgMGgxbTEgMGgxbTIgMGgybTEgMGgybTEgMGgxbS0zMiAxaDNtMiAwaDFtMyAwaDJtMSAwaDFtMSAwaDJtNCAwaDFtNiAwaDFtMSAwaDJtLTMyIDFoMW03IDBoMW0yIDBoNG0xIDBoMW0xIDBoNm00IDBoNW0tMzIgMWgxbTIgMGgxbTEgMGgzbTEgMGgxbTEgMGg0bTIgMGgzbTEgMGgxbTUgMGgybS0zMCAxaDFtMyAwaDJtMiAwaDVtMSAwaDFtMSAwaDVtMiAwaDFtMiAwaDFtMiAwaDRtLTMzIDFoMW0yIDBoNW0xIDBoMW0zIDBoMm0zIDBoMW0yIDBoMm0xIDBoNG0xIDBoM20tMzEgMWgxbTMgMGgxbTEgMGg3bTEgMGgxbTUgMGgzbTEgMGgzbTEgMGgybS0zMSAxaDJtMiAwaDFtMSAwaDJtNCAwaDFtMiAwaDFtMSAwaDNtMiAwaDRtMSAwaDJtMyAwaDFtLTMzIDFoMm01IDBoMW0yIDBoMm0zIDBoM20xIDBoMm0yIDBoMW0xIDBoM20xIDBoMm0xIDBoMW0tMzIgMWgxbTIgMGg1bTEgMGgxbTMgMGgxbTIgMGgybTEgMGgxbTMgMGg1bTEgMGgybS0zMSAxaDJtMiAwaDFtMSAwaDRtMSAwaDNtMyAwaDFtMiAwaDNtMSAwaDZtMSAwaDFtLTI5IDFoMW0xIDBoMm0zIDBoMW0xIDBoMW0zIDBoM20yIDBoNG0yIDBoMm0tMzAgMWgxbTIgMGgzbTEgMGgzbTEgMGg1bTMgMGgzbTEgMGgxbTIgMGgxbTIgMGgxbTIgMGgxbS0zMyAxaDFtMyAwaDNtNCAwaDFtMSAwaDNtMiAwaDFtMiAwaDJtNyAwaDJtLTMyIDFoMW0zIDBoMm0xIDBoMW0yIDBoOG0xIDBoNG00IDBoMW0yIDBoMW0xIDBoMW0tMzMgMWgxbTEgMGgxbTEgMGgxbTEgMGgybTEgMGgxbTEgMGgybTEgMGgxbTEgMGg0bTIgMGgxbTEgMGg1bTIgMGgybS0yNSAxaDFtMyAwaDJtMSAwaDFtMyAwaDNtMiAwaDFtMyAwaDFtMSAwaDNtLTMzIDFoN20xIDBoMW0yIDBoMm0xIDBoMm0yIDBoMW0xIDBoMW0yIDBoMm0xIDBoMW0xIDBoMW0xIDBoMm0tMzIgMWgxbTUgMGgxbTEgMGg2bTUgMGgxbTEgMGg0bTMgMGg0bS0zMiAxaDFtMSAwaDNtMSAwaDFtMSAwaDFtMSAwaDJtMSAwaDJtMSAwaDFtNSAwaDFtMSAwaDZtMSAwaDFtLTMyIDFoMW0xIDBoM20xIDBoMW0xIDBoMW0yIDBoMm0xIDBoM20yIDBoMW0zIDBoM20yIDBoMm0yIDBoMW0tMzMgMWgxbTEgMGgzbTEgMGgxbTEgMGgzbTMgMGgxbTEgMGgybTIgMGgxbTEgMGgxbTEgMGgxbTEgMGgybS0yOCAxaDFtNSAwaDFtMSAwaDFtMiAwaDVtMSAwaDFtMiAwaDNtMiAwaDJtMSAwaDNtLTMxIDFoN20zIDBoMm0zIDBoM20yIDBoMW0xIDBoNG0xIDBoMW0zIDBoMSIvPjwvc3ZnPgo=" alt="QR kód na menu"></div>
+      <p class="qr-text" id="qr-text"></p>
+    </div>
     <p id="note"></p>
     <p class="wifi" id="wifi"></p>
   </footer>
@@ -276,6 +295,7 @@ const MENU = {
     {
       nadpis: "Nápoje", sloupec: 1,
       polozky: [
+        { name: "Teplý čaj dle nabídky", price: 49 },
         { name: "Ledový Tuareg",       price: 69 },
         { name: "Ledový ibišek",       price: 69 },
         { name: "Masala na ledu",      price: 69 },
@@ -300,6 +320,11 @@ const MENU = {
     }
   ],
 
+  /* QR míří na https://pangea-eosin.vercel.app/menu-akce.html
+     Pozor: obrázek QR je předgenerovaný. Když se změní adresa menu,
+     musí se vygenerovat nový — samotná změna textu tady nestačí. */
+  qr: { popisek: "Menu do mobilu", podtitul: "Naskenuj a odnes si ho s sebou" },
+
   poznamka: "*Alergeny a složení na vyžádání u obsluhy",
   wifi: { sit: "Pangea", heslo: "heslojeheslo" }
 };
@@ -318,6 +343,10 @@ function render(){
   $('eyebrow').textContent = MENU.eyebrow || '';
   $('title').textContent   = MENU.title || '';
   $('note').textContent    = MENU.poznamka || '';
+
+  $('qr-text').innerHTML = MENU.qr
+    ? '<b>' + cz(MENU.qr.popisek) + '</b><span>' + cz(MENU.qr.podtitul) + '</span>'
+    : '';
 
   $('wifi').innerHTML = MENU.wifi
     ? '<b>WIFI</b><span>' + esc(MENU.wifi.sit) + '<br>heslo: ' + esc(MENU.wifi.heslo) + '</span>'
