@@ -19,8 +19,13 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   try {
     // Když je stejný slug u víc týmů, rozhoduje ten nejstarší — slug je
     // veřejná adresa, takže se nesmí přehazovat podle náhody v řazení.
+    // Sloupce se vypisují schválně. `SELECT *` sem tahá i to, co host
+    // nemá co vidět (PIN), a navíc cokoliv, co v tabulce zbylo z dřívějška —
+    // veřejné čtení pak závisí na sloupcích, o kterých ani neví.
     const [board] = await sql`
-      SELECT * FROM menu_boards
+      SELECT id, slug, name, eyebrow, title, note,
+             wifi_ssid, wifi_password, currency, enabled, theme, updated_at
+      FROM menu_boards
       WHERE slug = ${slug} AND enabled IS NOT FALSE
       ORDER BY id LIMIT 1`;
     if (!board) {
@@ -29,12 +34,25 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
       // se jen tady, takže to normální provoz nestojí nic.
       let duvod = 'nenalezeno';
       try {
+        // Stejná podmínka, jen užší SELECT. QR routa (`SELECT id`) tuhle
+        // desku najde, zatímco `SELECT *` výš ne — což nedává smysl, takže
+        // se ptáme obojím a rozdíl bude v logu černé na bílém.
+        const uzce = await sql`
+          SELECT id FROM menu_boards
+          WHERE slug = ${slug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1` as any[];
         const [vypnute] = await sql`SELECT id FROM menu_boards WHERE slug = ${slug} LIMIT 1`;
-        const vsechny = await sql`SELECT slug FROM menu_boards ORDER BY id LIMIT 20` as any[];
-        duvod = vypnute ? 'vypnuto' : (vsechny.length ? 'jina-adresa' : 'zadne-menu');
+        const vsechny = await sql`SELECT id, slug, enabled FROM menu_boards ORDER BY id LIMIT 20` as any[];
+
+        duvod = uzce.length ? 'jen-hvezdicka'
+              : vypnute ? 'vypnuto'
+              : vsechny.length ? 'jina-adresa'
+              : 'zadne-menu';
         console.error(
           `[menu] veřejné čtení „${slug}" nic nenašlo (${duvod}); ` +
-          `menu v databázi: ${vsechny.length ? vsechny.map((r) => r.slug).join(', ') : 'žádné'}`);
+          `SELECT id našel: ${uzce.length}; ` +
+          `menu v databázi: ${vsechny.length
+            ? vsechny.map((r) => `${r.id}:${r.slug}${r.enabled === false ? ' (vypnuté)' : ''}`).join(', ')
+            : 'žádné'}`);
       } catch (e: any) {
         console.error('[menu] doptání po důvodu selhalo:', e?.message ?? e);
       }
@@ -45,10 +63,12 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
     }
 
     const sections = await sql`
-      SELECT * FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id`;
+      SELECT id, title, column_no, position
+      FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id`;
     const items = sections.length
       ? await sql`
-          SELECT * FROM menu_items
+          SELECT id, section_id, name, price, description, sold_out, pos_product_id, position
+          FROM menu_items
           WHERE section_id IN (SELECT id FROM menu_sections WHERE board_id = ${board.id})
           ORDER BY position, id`
       : [];
