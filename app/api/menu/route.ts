@@ -108,8 +108,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ board: await loadBoard(board) });
   } catch (e: any) {
+    // Bez tohohle je skutečná příčina neviditelná i v logech a zbyde jen
+    // obecná hláška — což se nám už jednou vymstilo při hledání chyby.
+    console.error('[menu] založení menu selhalo:', e?.message ?? e);
     return NextResponse.json(
-      { error: 'Menu se nepodařilo založit. Nejsou hotové migrace? Zkus /api/init.' },
+      { error: `Menu se nepodařilo založit: ${e?.message ?? 'neznámá chyba'}` },
       { status: 500 },
     );
   }
