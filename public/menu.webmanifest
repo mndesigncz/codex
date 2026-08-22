@@ -1,0 +1,16 @@
+{
+  "name": "Menu Pangea",
+  "short_name": "Menu",
+  "description": "Venkovní akční menu Čajbaru Pangea",
+  "start_url": "/menu-akce.html",
+  "scope": "/menu-akce.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#E3DED5",
+  "theme_color": "#E3DED5",
+  "icons": [
+    { "src": "/menu-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/menu-icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/menu-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
