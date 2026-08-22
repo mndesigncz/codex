@@ -122,11 +122,12 @@ h1{
   align-self:center;width:100%;max-width:1200px;margin-inline:auto;
 }
 .divider{width:1px;align-self:stretch;background:var(--rule)}
+.col{display:flex;flex-direction:column;gap:calc(clamp(18px,4.8vh,56px) * var(--fit));min-width:0}
 section{min-width:0}
 h2{
   font-family:var(--display);font-weight:400;
   font-size:calc(clamp(24px,5.6vh,52px) * var(--fit));
-  line-height:1;color:var(--accent);
+  line-height:1.1;color:var(--accent);
 }
 /* bracket motiv z brand manuálu: linka + zlatý bod */
 .rule{display:flex;align-items:center;margin:calc(clamp(7px,1.3vh,14px) * var(--fit)) 0 calc(clamp(11px,2.2vh,26px) * var(--fit))}
@@ -262,9 +263,10 @@ const MENU = {
   title:   "Speciální nabídka",
   mena:    "Kč",
 
+  /* sloupec: 1 = vlevo, 2 = vpravo (na výšku se sloupce poskládají pod sebe) */
   sekce: [
     {
-      nadpis: "Nápoje",
+      nadpis: "Nápoje", sloupec: 1,
       polozky: [
         { name: "Ledový Tuareg",       price: 69 },
         { name: "Ledový ibišek",       price: 69 },
@@ -274,12 +276,18 @@ const MENU = {
       ]
     },
     {
-      nadpis: "Jídlo",
+      nadpis: "Jídlo", sloupec: 2,
       polozky: [
         { name: "Masová bagetka s trhaným masem", price: 79 },
         { name: "Vege bagetka se sýrem labneh",   price: 79 },
         { name: "Full plate", price: 139,
           desc: "Od každého trošku — salát, maso, humus, prostě všechno!" }
+      ]
+    },
+    {
+      nadpis: "Dýmky", sloupec: 2,
+      polozky: [
+        { name: "Dýmka", price: 350 }
       ]
     }
   ],
@@ -307,9 +315,8 @@ function render(){
     ? '<b>WIFI</b><span>' + esc(MENU.wifi.sit) + '<br>heslo: ' + esc(MENU.wifi.heslo) + '</span>'
     : '';
 
-  const parts = [];
+  const cols = { 1: [], 2: [] };
   MENU.sekce.forEach((s, si) => {
-    if (si) parts.push('<div class="divider" aria-hidden="true"></div>');
     const items = s.polozky.map((p, pi) => {
       const key = si + '-' + pi;
       return '<li data-key="' + key + '">' +
@@ -321,9 +328,13 @@ function render(){
         (p.desc ? '<p class="desc">' + cz(p.desc) + '</p>' : '') +
       '</li>';
     }).join('');
-    parts.push('<section><h2>' + esc(s.nadpis) + '</h2><div class="rule"><i></i></div><ul>' + items + '</ul></section>');
+    const html = '<section><h2>' + esc(s.nadpis) + '</h2><div class="rule"><i></i></div><ul>' + items + '</ul></section>';
+    cols[s.sloupec === 2 ? 2 : 1].push(html);
   });
-  $('cols').innerHTML = parts.join('');
+  $('cols').innerHTML =
+    '<div class="col">' + cols[1].join('') + '</div>' +
+    '<div class="divider" aria-hidden="true"></div>' +
+    '<div class="col">' + cols[2].join('') + '</div>';
   applySoldOut();
 }
 
