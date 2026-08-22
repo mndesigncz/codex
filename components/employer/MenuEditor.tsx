@@ -31,6 +31,10 @@ interface Board {
 }
 interface PosProduct { productId: string; name: string; category: string; price: number | null; }
 
+/* Adresa, kterou si stránka /menu-akce.html vezme, když se otevře bez parametru.
+   Menu s touhle adresou je tím pádem „to, co visí na iPadu“. */
+const VYCHOZI_SLUG = 'akce';
+
 const vstup =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none';
 
@@ -47,6 +51,13 @@ export default function MenuEditor() {
   const [vzhledOtevren, setVzhledOtevren] = useState(false);
   /* Ukládá se až tlačítkem, takže je potřeba dát najevo, že něco čeká. */
   const [neulozeno, setNeulozeno] = useState(false);
+  /*
+   * Uložení do databáze ještě neznamená, že to host uvidí: iPad má
+   * otevřenou konkrétní adresu a když ta na žádné menu nesedí, ukáže
+   * záložní obsah a tváří se, že je všechno v pořádku. Tohle to kontroluje
+   * naživo, ať se na to nepřijde až u stánku.
+   */
+  const [zive, setZive] = useState<'ceka' | 'ok' | 'chybi' | 'vypnuto' | 'neznamo'>('ceka');
 
   const load = useCallback(async () => {
     setNacitam(true);
@@ -81,6 +92,20 @@ export default function MenuEditor() {
     const b = boards.find((x) => x.id === aktivni);
     if (b) { setBoard(JSON.parse(JSON.stringify(b))); setNeulozeno(false); }
   }, [aktivni, boards]);
+
+  /* Ptáme se přesně tou cestou, kterou používá iPad i mobil hosta. */
+  const ulozenySlug = boards.find((x) => x.id === aktivni)?.slug ?? null;
+  const ulozeneZapnuto = boards.find((x) => x.id === aktivni)?.enabled ?? null;
+  useEffect(() => {
+    if (!ulozenySlug) { setZive('ceka'); return; }
+    if (ulozeneZapnuto === false) { setZive('vypnuto'); return; }
+    let platne = true;
+    setZive('ceka');
+    fetch(`/api/menu/public/${ulozenySlug}`, { cache: 'no-store' })
+      .then((r) => { if (platne) setZive(r.ok ? 'ok' : 'chybi'); })
+      .catch(() => { if (platne) setZive('neznamo'); });
+    return () => { platne = false; };
+  }, [ulozenySlug, ulozeneZapnuto]);
 
   /** Založí menu. Prvni = z dnešní nabídky, další = prázdné, ať se nekopírují ceny. */
   const zalozit = async (prvni: boolean) => {
@@ -122,11 +147,15 @@ export default function MenuEditor() {
     } finally { setUkladam(false); }
   };
 
-  const ulozit = async () => {
+  /**
+   * `prevzitAdresu` řekne serveru, že se smí zabraná adresa odebrat jinému
+   * menu stejného podniku. Bez toho by se z kolize nedalo dostat.
+   */
+  const ulozit = async (navic?: Record<string, any>) => {
     if (!board) return;
     setUkladam(true); setChyba(null); setHlaska(null);
     try {
-      const telo: any = { ...board, theme: normalizeMenuTheme(board.theme) };
+      const telo: any = { ...board, ...navic, theme: normalizeMenuTheme(board.theme) };
       if (pin.trim()) telo.pin = pin.trim();
       const r = await fetch('/api/menu', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -134,6 +163,12 @@ export default function MenuEditor() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
+        if (r.status === 409 && d?.adresuDrziNase && !navic?.prevzitAdresu) {
+          const ok = confirm(
+            `${d.error} Chceš ji převzít? Menu „${d.drziNazev}“ dostane jinou adresu ` +
+            `a hostům se od té chvíle bude na téhle adrese ukazovat tohle menu.`);
+          if (ok) { setUkladam(false); await ulozit({ prevzitAdresu: true }); return; }
+        }
         setChyba(d?.error ?? `Uložení se nepodařilo (odpověď serveru ${r.status}).`);
         return;
       }
@@ -252,7 +287,10 @@ export default function MenuEditor() {
     );
   }
 
-  const adresa = `/menu-akce.html?menu=${board.slug}`;
+  /* Relativní odkaz stačí pro proklik, ale na iPad se to opisuje ručně,
+     takže se ukazuje celá adresa i s doménou. */
+  const cesta = `/menu-akce.html?menu=${board.slug}`;
+  const adresa = typeof window === 'undefined' ? cesta : window.location.origin + cesta;
 
   return (
     <div className="space-y-4">
@@ -276,10 +314,51 @@ export default function MenuEditor() {
           </div>
         </div>
 
-        <a href={adresa} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#5B9E00] underline underline-offset-2">
-          Otevřít menu tak, jak ho vidí host ↗
-        </a>
+        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2">
+          <p className="text-xs font-semibold text-black/50">Adresa pro iPad a pro hosty</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
+            <a href={cesta} target="_blank" rel="noreferrer"
+              className="text-sm font-medium text-[#5B9E00] underline underline-offset-2">
+              Otevřít ↗
+            </a>
+          </div>
+
+          {zive === 'ok' && (
+            <p className="text-xs text-black/45">
+              Na téhle adrese se hostům ukazuje tohle menu. Úpravy se na iPadu projeví do minuty.
+            </p>
+          )}
+          {zive === 'ceka' && <p className="text-xs text-black/35">Kontroluju adresu…</p>}
+          {zive === 'neznamo' && (
+            <p className="text-xs text-black/45">Adresu se teď nepodařilo ověřit — zkontroluj připojení.</p>
+          )}
+          {zive === 'vypnuto' && (
+            <p className="text-xs text-amber-700">
+              Menu je vypnuté, takže hostům se neukazuje. Zapni ho dole přepínačem „Menu je zapnuté“ a ulož.
+            </p>
+          )}
+          {zive === 'chybi' && (
+            <p className="text-xs text-amber-700">
+              Pozor: hostům se tohle menu na téhle adrese neukazuje. iPad otevřený na holém{' '}
+              <code className="font-mono">/menu-akce.html</code> ukazuje menu s adresou{' '}
+              <code className="font-mono">akce</code>, a to tohle menu není.
+            </p>
+          )}
+
+          {/* Nejčastější past: menu je uložené, ale iPad kouká na jinou adresu.
+              Přepsat adresu ručně jde taky, tohle je na jedno ťuknutí. */}
+          {ulozenySlug !== VYCHOZI_SLUG && (
+            <button type="button" disabled={ukladam}
+              onClick={() => {
+                upravit((b) => { b.slug = VYCHOZI_SLUG; });
+                setHlaska(null);
+              }}
+              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/70 disabled:opacity-50">
+              Nastavit jako menu pro iPad (adresa <code className="font-mono">{VYCHOZI_SLUG}</code>)
+            </button>
+          )}
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
@@ -592,13 +671,30 @@ export default function MenuEditor() {
             className="rounded-full border border-red-200 px-4 py-2.5 text-sm font-medium text-red-500 disabled:opacity-50">
             Smazat menu
           </button>
-          <button type="button" onClick={ulozit} disabled={ukladam}
+          <button type="button" onClick={() => ulozit()} disabled={ukladam}
             className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${
               neulozeno ? 'bg-[#C8F542] text-black' : 'bg-[#16181A] text-white'}`}>
             {ukladam ? 'Ukládám…' : neulozeno ? 'Uložit změny' : 'Uložit menu'}
           </button>
         </div>
       </div>
+
+      {/*
+        Menu bývá dlouhé a tlačítko Uložit je až úplně dole. Kdo přidá položku
+        v polovině seznamu, snadno odejde v domnění, že je hotovo — a změny
+        se nikam neuloží. Dokud něco čeká, drží se ukládání na očích.
+      */}
+      {neulozeno && (
+        <div className="sticky bottom-4 z-20 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#16181A] text-white shadow-lg pl-5 pr-2 py-2">
+            <span className="text-sm font-medium">Neuložené změny</span>
+            <button type="button" onClick={() => ulozit()} disabled={ukladam}
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2 text-sm disabled:opacity-50">
+              {ukladam ? 'Ukládám…' : 'Uložit'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

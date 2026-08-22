@@ -153,8 +153,35 @@ export async function PUT(request: Request) {
   const name = cleanText(body?.name, MAX_NAME) || board.name;
   const slug = cleanSlug(body?.slug) || board.slug;
   if (slug !== board.slug) {
-    const [clash] = await sql`SELECT id FROM menu_boards WHERE slug = ${slug} AND id <> ${id}`;
-    if (clash) return NextResponse.json({ error: 'Takovou adresu už jiné menu má' }, { status: 409 });
+    const [clash] = await sql`
+      SELECT id, team_id, name FROM menu_boards WHERE slug = ${slug} AND id <> ${id}`;
+    if (clash) {
+      // Adresu drží jiné menu. Když je to menu stejného podniku, dá se
+      // převzít — je to pořád jejich adresa a jinak by šlo o slepou uličku:
+      // menu by se hostům neukazovalo a nešlo by to spravit. Cizímu podniku
+      // se veřejná adresa vzít nesmí, tam zbývá vybrat si jinou.
+      const nase = Number(clash.team_id) === me.teamId;
+      if (!(nase && body?.prevzitAdresu === true)) {
+        return NextResponse.json({
+          error: nase
+            ? `Adresu „${slug}“ má menu „${clash.name}“.`
+            : 'Takovou adresu už má menu jiného podniku, vyber prosím jinou.',
+          adresuDrziNase: nase,
+          drziNazev: nase ? String(clash.name) : undefined,
+        }, { status: 409 });
+      }
+      // Původnímu menu se adresa nezruší, jen odsune — ať se dá vrátit.
+      // Id je jedinečné, ale odsunutá adresa může být shodou okolností taky
+      // zabraná; unikátní index na slug by pak celé uložení shodil.
+      let odsun = cleanSlug(`${slug}-${clash.id}`);
+      for (let i = 2; i < 50; i++) {
+        const [obsazeno] = await sql`SELECT id FROM menu_boards WHERE slug = ${odsun}`;
+        if (!obsazeno) break;
+        odsun = cleanSlug(`${slug}-${clash.id}-${i}`);
+      }
+      await sql`
+        UPDATE menu_boards SET slug = ${odsun}, updated_at = NOW() WHERE id = ${clash.id}`;
+    }
   }
 
   await sql`

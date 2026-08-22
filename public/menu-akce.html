@@ -221,6 +221,19 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
   display:grid;place-items:center;
 }
 .tools button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Hlášení jen pro obsluhu: stránka jede na záložním obsahu, protože menu
+   s touhle adresou v aplikaci není. Host si toho skoro nevšimne, obsluha ano. */
+.stav{
+  position:fixed;z-index:5;
+  top:calc(env(safe-area-inset-top) + 8px);left:calc(env(safe-area-inset-left) + 8px);
+  max-width:min(36vw,390px);
+  display:none;align-items:center;gap:.5em;
+  padding:.42em .8em;border-radius:999px;
+  border:1px solid var(--rule);background:var(--shade);
+  color:var(--fg-soft);font-family:var(--body);font-size:12px;line-height:1.35;
+}
+.stav.vidno{display:flex}
+.stav i{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
 .tools button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 /* toast */
@@ -240,7 +253,7 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
 @media (max-width:640px), (max-height:480px){
   html,body{overflow:auto;height:auto}
   .board{height:auto;min-height:100dvh}
-  .tools{display:none}
+  .tools,.stav{display:none!important}
   .qr{display:none}
   footer{flex-direction:column;align-items:flex-start;gap:.55rem}
   .wifi{text-align:left}
@@ -256,7 +269,7 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
 @media print{
   html,body{overflow:visible;height:auto;background:#fff;color:#1C1C1C}
   .board{height:auto;min-height:0;padding:14mm 12mm;z-index:auto}
-  .decor,.tools,.toast{display:none!important}
+  .decor,.tools,.toast,.stav{display:none!important}
   .logo{background-color:#9C7724}
   h1,h2,.price,footer b,.qr-text b{color:#9C7724}
   .name,.desc{color:#1C1C1C}
@@ -301,6 +314,8 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
     <p class="wifi" id="wifi"></p>
   </footer>
 </div>
+
+<div class="stav" id="stav" role="status" aria-live="polite"></div>
 
 <div class="tools" id="tools">
   <button id="btn-mode" type="button" title="Den / noc" aria-label="Přepnout den / noc">
@@ -676,12 +691,33 @@ function nasadVzhled(v){
 
    Obnovuje se samo po minutě, takže když někdo přepíše cenu na telefonu,
    iPad se srovná sám a nikdo k němu nemusí. */
+function hlas(text){
+  const el = $('stav');
+  if (!el) return;
+  if (!text) { el.classList.remove('vidno'); el.textContent = ''; return; }
+  el.innerHTML = '<i></i>';
+  el.appendChild(document.createTextNode(text));
+  el.classList.add('vidno');
+}
+
 async function stahni(){
   try {
     const r = await fetch('/api/menu/public/' + SLUG, { cache: 'no-store', credentials: 'same-origin' });
-    if (!r.ok) return false;
+    if (!r.ok) {
+      /* 404 není výpadek sítě, ale špatná adresa: menu s tímhle slugem
+         v aplikaci není. Bez téhle hlášky se tiše ukazuje záloha a vypadá
+         to, jako by se úpravy v aplikaci neukládaly. */
+      if (r.status === 404 && !zivaData) {
+        hlas('Zobrazuje se záložní nabídka — menu „' + SLUG + '“ v aplikaci není. Otevři adresu, kterou ukazuje Kasa & sklad → Menu.');
+      }
+      return false;
+    }
     const data = await r.json();
-    if (!data || !Array.isArray(data.sekce) || !data.sekce.length) return false;
+    if (!data || !Array.isArray(data.sekce) || !data.sekce.length) {
+      if (!zivaData) hlas('Menu „' + SLUG + '“ je v aplikaci prázdné — zobrazuje se záložní nabídka.');
+      return false;
+    }
+    hlas('');
 
     /* Popisky u QR aplikace nezná — ty si necháme ze zálohy. */
     MENU = Object.assign({}, ZALOHA, data, { qr: ZALOHA.qr });
