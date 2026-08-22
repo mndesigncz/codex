@@ -10,6 +10,12 @@
 <meta name="theme-color" content="#1C1C1C">
 <meta name="robots" content="noindex">
 <title>Venkovní menu Pangea</title>
+<!-- Návštěvnost stránky (Vercel Web Analytics) — bez cookies, neukládá nic o návštěvníkovi.
+     Sbírat se to začne, až se v projektu na Vercelu zapne Web Analytics; do té doby
+     se skript jen nenačte a nic to nerozbije. -->
+<script defer src="/_vercel/insights/script.js"></script>
+<link rel="manifest" href="/menu.webmanifest">
+<link rel="apple-touch-icon" href="/menu-icon-180.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231C1C1C'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='%23BE973C' font-family='serif'%3EP%3C/text%3E%3C/svg%3E">
 
 <!-- ============================================================
@@ -227,15 +233,43 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
 }
 .toast.on{opacity:.92;transform:translate(-50%,0)}
 
+/* ---------- Mobil hosta: rolovat, ne ořezávat ----------
+   Deska na jednu obrazovku dává smysl na iPadu. Na telefonu se sazba
+   nemá kam zmenšit, takže se raději roluje — a QR i ovládání obsluhy
+   se schovají, host je má k ničemu. */
+@media (max-width:640px), (max-height:480px){
+  html,body{overflow:auto;height:auto}
+  .board{height:auto;min-height:100dvh}
+  .tools{display:none}
+  .qr{display:none}
+  footer{flex-direction:column;align-items:flex-start;gap:.55rem}
+  .wifi{text-align:left}
+  .name,.price{font-size:clamp(17px,4.6vw,22px)}
+  .desc{font-size:clamp(13px,3.4vw,16px)}
+  h1{font-size:clamp(34px,9vw,52px)}
+  h2{font-size:clamp(28px,7.5vw,42px)}
+  .logo{width:clamp(130px,38vw,190px)}
+  footer{font-size:clamp(12px,3.2vw,14px)}
+}
+
+/* ---------- Tisk: karta na stůl ---------- */
+@media print{
+  html,body{overflow:visible;height:auto;background:#fff;color:#1C1C1C}
+  .board{height:auto;min-height:0;padding:14mm 12mm;z-index:auto}
+  .decor,.tools,.toast{display:none!important}
+  .logo{background-color:#9C7724}
+  h1,h2,.price,footer b,.qr-text b{color:#9C7724}
+  .name,.desc{color:#1C1C1C}
+  .qr{display:flex}
+  .cols{page-break-inside:avoid}
+  section{page-break-inside:avoid}
+}
+
 /* ---------- Na výšku: sloupce pod sebe ---------- */
 @media (orientation:portrait){
   .cols{grid-template-columns:1fr;gap:clamp(16px,3.4vh,40px) 0;align-self:start;max-width:760px}
   .divider{width:auto;height:1px;align-self:auto}
   .desc{max-width:none}
-}
-@media (max-width:520px){
-  footer{flex-direction:column;align-items:flex-start;gap:.5rem}
-  .wifi{text-align:left}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}
@@ -392,6 +426,7 @@ function applySoldOut(){
 
 let pressTimer = null, pressed = null;
 function startPress(e){
+  if (mobil.matches) return;   // na telefonu hosta se nic označovat nedá
   const li = e.target.closest('#cols li');
   if (!li) return;
   pressed = li;
@@ -422,15 +457,30 @@ $('logo').addEventListener('pointerdown', () => {
 ['pointerup','pointercancel','pointerleave'].forEach(ev =>
   $('logo').addEventListener(ev, () => clearTimeout(logoTimer)));
 
-/* ---------- den / noc ---------- */
+/* ---------- den / noc ----------
+   Dokud se obsluha nerozhodne sama, řídí se to časem: 7–19 den, jinak noc.
+   První ťuknutí na tlačítko volbu zafixuje (a v localStorage zůstane). */
 const MODE = 'pangea-menu-rezim';
-function setMode(m){
+
+function podleCasu(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'den' : 'noc'; }
+
+function paint(m){
   document.documentElement.dataset.mode = m;
   const tc = document.querySelector('meta[name="theme-color"]');
   if (tc) tc.content = (m === 'noc') ? '#1C1C1C' : '#E3DED5';
+}
+function rucniVolba(){
+  try { const v = localStorage.getItem(MODE); return (v === 'den' || v === 'noc') ? v : null; }
+  catch (e) { return null; }
+}
+function setMode(m){
+  paint(m);
   try { localStorage.setItem(MODE, m); } catch (e) {}
 }
-try { setMode(localStorage.getItem(MODE) === 'noc' ? 'noc' : 'den'); } catch (e) { setMode('den'); }
+paint(rucniVolba() || podleCasu());
+/* dokud si obsluha nevybere, přepni se sám, až se přehoupne čas */
+setInterval(() => { if (!rucniVolba()) paint(podleCasu()); }, 5 * 60 * 1000);
+
 $('btn-mode').addEventListener('click', () => {
   setMode(document.documentElement.dataset.mode === 'noc' ? 'den' : 'noc');
   fit();
@@ -480,9 +530,23 @@ function toast(text){
   toastTimer = setTimeout(() => t.classList.remove('on'), 1800);
 }
 
+/* ---------- offline: ať menu naskočí i když venku vypadne wifi ----------
+   Rozsah je zúžený na tuhle jednu stránku, aby se to nebilo s /sw.js aplikace.
+   V náhledu (artifact) registrace selže a to nevadí — proto try/catch. */
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    try { navigator.serviceWorker.register('/menu-sw.js', { scope: '/menu-akce.html' }).catch(() => {}); }
+    catch (e) {}
+  });
+}
+
 /* ---------- vždy na jednu obrazovku, bez rolování ---------- */
+/* na telefonu se nezmenšuje — tam se roluje (viz CSS) */
+const mobil = window.matchMedia('(max-width:640px), (max-height:480px)');
+
 function fit(){
   const root = document.documentElement, board = $('board');
+  if (mobil.matches) { root.style.setProperty('--fit', 1); return; }
   let s = 1;
   root.style.setProperty('--fit', s);
   for (let i = 0; i < 24 && board.scrollHeight > board.clientHeight + 1 && s > 0.55; i++) {
