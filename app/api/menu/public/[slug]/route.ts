@@ -23,7 +23,26 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
       SELECT * FROM menu_boards
       WHERE slug = ${slug} AND enabled IS NOT FALSE
       ORDER BY id LIMIT 1`;
-    if (!board) return NextResponse.json({ error: 'Menu nenalezeno' }, { status: 404 });
+    if (!board) {
+      // Samotné „nenalezeno" je pro hledání chyby k ničemu — nepozná se z něj
+      // vypnuté menu od překlepu v adrese ani od prázdné databáze. Doptáváme
+      // se jen tady, takže to normální provoz nestojí nic.
+      let duvod = 'nenalezeno';
+      try {
+        const [vypnute] = await sql`SELECT id FROM menu_boards WHERE slug = ${slug} LIMIT 1`;
+        const vsechny = await sql`SELECT slug FROM menu_boards ORDER BY id LIMIT 20` as any[];
+        duvod = vypnute ? 'vypnuto' : (vsechny.length ? 'jina-adresa' : 'zadne-menu');
+        console.error(
+          `[menu] veřejné čtení „${slug}" nic nenašlo (${duvod}); ` +
+          `menu v databázi: ${vsechny.length ? vsechny.map((r) => r.slug).join(', ') : 'žádné'}`);
+      } catch (e: any) {
+        console.error('[menu] doptání po důvodu selhalo:', e?.message ?? e);
+      }
+      return NextResponse.json({
+        error: duvod === 'vypnuto' ? 'Menu je vypnuté' : 'Menu nenalezeno',
+        duvod,
+      }, { status: 404 });
+    }
 
     const sections = await sql`
       SELECT * FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id`;
