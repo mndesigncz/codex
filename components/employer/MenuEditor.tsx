@@ -40,6 +40,8 @@ export default function MenuEditor() {
   const [hlaska, setHlaska] = useState<string | null>(null);
   const [neniMigrace, setNeniMigrace] = useState(false);
   const [pin, setPin] = useState('');
+  /* Ukládá se až tlačítkem, takže je potřeba dát najevo, že něco čeká. */
+  const [neulozeno, setNeulozeno] = useState(false);
 
   const load = useCallback(async () => {
     setNacitam(true);
@@ -60,11 +62,19 @@ export default function MenuEditor() {
 
   useEffect(() => { load(); }, [load]);
 
+  /* Rozdělaná editace se nesmí ztratit zavřením okna nebo odklikem jinam. */
+  useEffect(() => {
+    if (!neulozeno) return;
+    const hlidac = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', hlidac);
+    return () => window.removeEventListener('beforeunload', hlidac);
+  }, [neulozeno]);
+
   /* Rozpracovaná deska je vždycky kopie — ať se needituje to, co drží seznam. */
   useEffect(() => {
     if (aktivni == null) { setBoard(null); return; }
     const b = boards.find((x) => x.id === aktivni);
-    if (b) setBoard(JSON.parse(JSON.stringify(b)));
+    if (b) { setBoard(JSON.parse(JSON.stringify(b))); setNeulozeno(false); }
   }, [aktivni, boards]);
 
   /** Založí menu. Prvni = z dnešní nabídky, další = prázdné, ať se nekopírují ceny. */
@@ -86,6 +96,10 @@ export default function MenuEditor() {
       setHlaska(prvni
         ? 'Menu je založené i s dnešní nabídkou.'
         : `Menu „${d?.board?.name ?? nazev}“ je založené. Adresu má /menu-akce.html?menu=${d?.board?.slug ?? ''}`);
+    } catch {
+      // Bez tohohle by selhání sítě zmizelo beze stopy: tlačítko by se
+      // odemklo a uživatel by netušil, že se nic neuložilo.
+      setChyba('Menu se nepodařilo založit — spojení se serverem selhalo. Zkus to prosím znovu.');
     } finally { setUkladam(false); }
   };
 
@@ -98,6 +112,8 @@ export default function MenuEditor() {
       if (!r.ok) { setChyba('Menu se nepodařilo smazat.'); return; }
       setAktivni(null);
       await load();
+    } catch {
+      setChyba('Menu se nepodařilo smazat — spojení se serverem selhalo.');
     } finally { setUkladam(false); }
   };
 
@@ -112,12 +128,16 @@ export default function MenuEditor() {
         body: JSON.stringify(telo),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setChyba(d?.error ?? 'Uložení se nepodařilo.'); return; }
+      if (!r.ok) {
+        setChyba(d?.error ?? `Uložení se nepodařilo (odpověď serveru ${r.status}).`);
+        return;
+      }
       setPin('');
       await load();
-      setHlaska('Uloženo. Na iPadu se to projeví po obnovení stránky.');
+      setNeulozeno(false);
+      setHlaska('Uloženo. Na iPadu se to projeví do minuty, ručně obnovovat nemusíš.');
     } catch {
-      setChyba('Uložení se nepodařilo.');
+      setChyba('Uložení se nepodařilo — spojení se serverem selhalo. Změny máš pořád na obrazovce, zkus to znovu.');
     } finally { setUkladam(false); }
   };
 
@@ -150,6 +170,7 @@ export default function MenuEditor() {
   };
 
   const upravit = (fn: (b: Board) => void) => {
+    setNeulozeno(true);
     setBoard((b) => {
       if (!b) return b;
       const kopie = JSON.parse(JSON.stringify(b)) as Board;
@@ -426,14 +447,18 @@ export default function MenuEditor() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           {chyba && <p className="text-red-600 text-sm">{chyba}</p>}
           {hlaska && !chyba && <p className="text-[#5B9E00] text-sm">{hlaska}</p>}
+          {neulozeno && !chyba && (
+            <p className="text-amber-700 text-sm font-semibold">Máš neuložené změny</p>
+          )}
           <span className="flex-1" />
           <button type="button" onClick={smazat} disabled={ukladam}
             className="rounded-full border border-red-200 px-4 py-2.5 text-sm font-medium text-red-500 disabled:opacity-50">
             Smazat menu
           </button>
           <button type="button" onClick={ulozit} disabled={ukladam}
-            className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
-            {ukladam ? 'Ukládám…' : 'Uložit menu'}
+            className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${
+              neulozeno ? 'bg-[#C8F542] text-black' : 'bg-[#16181A] text-white'}`}>
+            {ukladam ? 'Ukládám…' : neulozeno ? 'Uložit změny' : 'Uložit menu'}
           </button>
         </div>
       </div>
