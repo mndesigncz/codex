@@ -50,33 +50,54 @@ export default function MenuEditor() {
       const list: Board[] = Array.isArray(d?.boards) ? d.boards : [];
       setBoards(list);
       setAktivni((a) => (a && list.some((b) => b.id === a) ? a : list[0]?.id ?? null));
-      setBoard(list[0] ? JSON.parse(JSON.stringify(list.find((b) => b.id === (aktivni ?? list[0].id)) ?? list[0])) : null);
+      if (!list.length) setBoard(null);
     } catch {
       setChyba('Menu se nepodařilo načíst.');
     } finally {
       setNacitam(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  /* Rozpracovaná deska je vždycky kopie — ať se needituje to, co drží seznam. */
   useEffect(() => {
-    if (aktivni == null) return;
+    if (aktivni == null) { setBoard(null); return; }
     const b = boards.find((x) => x.id === aktivni);
     if (b) setBoard(JSON.parse(JSON.stringify(b)));
   }, [aktivni, boards]);
 
-  const zalozit = async () => {
-    setUkladam(true); setChyba(null);
+  /** Založí menu. Prvni = z dnešní nabídky, další = prázdné, ať se nekopírují ceny. */
+  const zalozit = async (prvni: boolean) => {
+    const nazev = prvni ? 'Venkovní akce' : (prompt('Název nového menu (třeba Stálá nabídka):') || '').trim();
+    if (!prvni && !nazev) return;
+    setUkladam(true); setChyba(null); setHlaska(null);
     try {
       const r = await fetch('/api/menu', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Venkovní akce', slug: 'akce', seed: true }),
+        body: JSON.stringify(prvni
+          ? { name: 'Venkovní akce', slug: 'akce', seed: true }
+          : { name: nazev, slug: nazev, seed: false }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setChyba(d?.error ?? 'Menu se nepodařilo založit.'); return; }
       await load();
-      setHlaska('Menu je založené i s dnešní nabídkou.');
+      if (d?.board?.id) setAktivni(d.board.id);
+      setHlaska(prvni
+        ? 'Menu je založené i s dnešní nabídkou.'
+        : `Menu „${d?.board?.name ?? nazev}“ je založené. Adresu má /menu-akce.html?menu=${d?.board?.slug ?? ''}`);
+    } finally { setUkladam(false); }
+  };
+
+  const smazat = async () => {
+    if (!board) return;
+    if (!confirm(`Smazat menu „${board.name}“ i se všemi položkami? Tohle nejde vzít zpět.`)) return;
+    setUkladam(true);
+    try {
+      const r = await fetch(`/api/menu?id=${board.id}`, { method: 'DELETE' });
+      if (!r.ok) { setChyba('Menu se nepodařilo smazat.'); return; }
+      setAktivni(null);
+      await load();
     } finally { setUkladam(false); }
   };
 
@@ -196,7 +217,7 @@ export default function MenuEditor() {
             To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód.
           </p>
         </div>
-        <button type="button" onClick={zalozit} disabled={ukladam}
+        <button type="button" onClick={() => zalozit(true)} disabled={ukladam}
           className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
           {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
         </button>
@@ -217,12 +238,16 @@ export default function MenuEditor() {
               Změny se projeví na iPadu i v mobilech hostů po obnovení stránky.
             </p>
           </div>
-          {boards.length > 1 && (
+          <div className="flex items-center gap-2 flex-wrap">
             <select value={aktivni ?? ''} onChange={(e) => setAktivni(Number(e.target.value))}
               className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-sm">
               {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
-          )}
+            <button type="button" onClick={() => zalozit(false)} disabled={ukladam}
+              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 disabled:opacity-50">
+              + Nové menu
+            </button>
+          </div>
         </div>
 
         <a href={adresa} target="_blank" rel="noreferrer"
@@ -231,6 +256,19 @@ export default function MenuEditor() {
         </a>
 
         <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-black/50">Název menu (jen pro vás)</span>
+            <input className={vstup} value={board.name} maxLength={80}
+              onChange={(e) => upravit((b) => { b.name = e.target.value; })} />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-semibold text-black/50">Adresa</span>
+            <input className={vstup} value={board.slug} maxLength={40}
+              onChange={(e) => upravit((b) => { b.slug = e.target.value; })} />
+            <span className="block text-[11px] text-black/35">
+              Bez diakritiky a mezer. Když ji změníš, přestane platit starý QR kód.
+            </span>
+          </label>
           <label className="space-y-1">
             <span className="text-xs font-semibold text-black/50">Nadpis</span>
             <input className={vstup} value={board.title ?? ''} maxLength={80}
@@ -389,6 +427,10 @@ export default function MenuEditor() {
           {chyba && <p className="text-red-600 text-sm">{chyba}</p>}
           {hlaska && !chyba && <p className="text-[#5B9E00] text-sm">{hlaska}</p>}
           <span className="flex-1" />
+          <button type="button" onClick={smazat} disabled={ukladam}
+            className="rounded-full border border-red-200 px-4 py-2.5 text-sm font-medium text-red-500 disabled:opacity-50">
+            Smazat menu
+          </button>
           <button type="button" onClick={ulozit} disabled={ukladam}
             className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
             {ukladam ? 'Ukládám…' : 'Uložit menu'}
