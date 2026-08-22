@@ -47,6 +47,13 @@ export default function MenuEditor() {
   const [vzhledOtevren, setVzhledOtevren] = useState(false);
   /* Ukládá se až tlačítkem, takže je potřeba dát najevo, že něco čeká. */
   const [neulozeno, setNeulozeno] = useState(false);
+  /*
+   * Uložení do databáze ještě neznamená, že to host uvidí: iPad má
+   * otevřenou konkrétní adresu a když ta na žádné menu nesedí, ukáže
+   * záložní obsah a tváří se, že je všechno v pořádku. Tohle to kontroluje
+   * naživo, ať se na to nepřijde až u stánku.
+   */
+  const [zive, setZive] = useState<'ceka' | 'ok' | 'chybi' | 'vypnuto' | 'neznamo'>('ceka');
 
   const load = useCallback(async () => {
     setNacitam(true);
@@ -81,6 +88,20 @@ export default function MenuEditor() {
     const b = boards.find((x) => x.id === aktivni);
     if (b) { setBoard(JSON.parse(JSON.stringify(b))); setNeulozeno(false); }
   }, [aktivni, boards]);
+
+  /* Ptáme se přesně tou cestou, kterou používá iPad i mobil hosta. */
+  const ulozenySlug = boards.find((x) => x.id === aktivni)?.slug ?? null;
+  const ulozeneZapnuto = boards.find((x) => x.id === aktivni)?.enabled ?? null;
+  useEffect(() => {
+    if (!ulozenySlug) { setZive('ceka'); return; }
+    if (ulozeneZapnuto === false) { setZive('vypnuto'); return; }
+    let platne = true;
+    setZive('ceka');
+    fetch(`/api/menu/public/${ulozenySlug}`, { cache: 'no-store' })
+      .then((r) => { if (platne) setZive(r.ok ? 'ok' : 'chybi'); })
+      .catch(() => { if (platne) setZive('neznamo'); });
+    return () => { platne = false; };
+  }, [ulozenySlug, ulozeneZapnuto]);
 
   /** Založí menu. Prvni = z dnešní nabídky, další = prázdné, ať se nekopírují ceny. */
   const zalozit = async (prvni: boolean) => {
@@ -252,7 +273,10 @@ export default function MenuEditor() {
     );
   }
 
-  const adresa = `/menu-akce.html?menu=${board.slug}`;
+  /* Relativní odkaz stačí pro proklik, ale na iPad se to opisuje ručně,
+     takže se ukazuje celá adresa i s doménou. */
+  const cesta = `/menu-akce.html?menu=${board.slug}`;
+  const adresa = typeof window === 'undefined' ? cesta : window.location.origin + cesta;
 
   return (
     <div className="space-y-4">
@@ -276,10 +300,39 @@ export default function MenuEditor() {
           </div>
         </div>
 
-        <a href={adresa} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#5B9E00] underline underline-offset-2">
-          Otevřít menu tak, jak ho vidí host ↗
-        </a>
+        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2">
+          <p className="text-xs font-semibold text-black/50">Adresa pro iPad a pro hosty</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
+            <a href={cesta} target="_blank" rel="noreferrer"
+              className="text-sm font-medium text-[#5B9E00] underline underline-offset-2">
+              Otevřít ↗
+            </a>
+          </div>
+
+          {zive === 'ok' && (
+            <p className="text-xs text-black/45">
+              Na téhle adrese se hostům ukazuje tohle menu. Úpravy se na iPadu projeví do minuty.
+            </p>
+          )}
+          {zive === 'ceka' && <p className="text-xs text-black/35">Kontroluju adresu…</p>}
+          {zive === 'neznamo' && (
+            <p className="text-xs text-black/45">Adresu se teď nepodařilo ověřit — zkontroluj připojení.</p>
+          )}
+          {zive === 'vypnuto' && (
+            <p className="text-xs text-amber-700">
+              Menu je vypnuté, takže hostům se neukazuje. Zapni ho dole přepínačem „Menu je zapnuté“ a ulož.
+            </p>
+          )}
+          {zive === 'chybi' && (
+            <p className="text-xs text-amber-700">
+              Pozor: iPad otevřený na holém <code className="font-mono">/menu-akce.html</code> ukazuje menu
+              s adresou <code className="font-mono">akce</code>, a to tohle menu není. Buď na iPadu otevři
+              adresu výše, nebo do pole „Adresa“ napiš <code className="font-mono">akce</code> a ulož —
+              teprve pak se úpravy hostům projeví.
+            </p>
+          )}
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
