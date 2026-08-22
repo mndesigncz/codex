@@ -315,11 +315,14 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
 
 <script>
 /* ============================================================
-   NASTAVENÍ MENU — tady se mění všechno, co je vidět
-   Ceny piš jako číslo (69), měnu řeší „mena“ níž.
-   Popisek (desc) je nepovinný — když ho nechceš, řádek smaž.
+   NASTAVENÍ MENU
+
+   Položky a ceny se běžně mění v aplikaci (Kasa & sklad → Menu)
+   a stránka si je stáhne sama. Tenhle blok je záložní obsah pro
+   případ, že se k aplikaci nedostane — třeba když venku vypadne
+   wifi. Menu tak naskočí vždycky, jen se starými cenami.
    ============================================================ */
-const MENU = {
+const ZALOHA = {
   eyebrow: "Venkovní akce",
   title:   "Speciální nabídka",
   mena:    "Kč",
@@ -365,6 +368,14 @@ const MENU = {
 };
 /* ====================== KONEC NASTAVENÍ ====================== */
 
+/* Které menu se má zobrazit — /menu-akce.html?menu=<slug>, jinak „akce“. */
+const SLUG = (new URLSearchParams(location.search).get('menu') || 'akce')
+  .toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'akce';
+
+/* Data, ze kterých se vykresluje. Nejdřív záloha, pak co přijde z aplikace. */
+let MENU = JSON.parse(JSON.stringify(ZALOHA));
+let zivaData = false;   // true = položky mají id z databáze
+
 
 /* ---------- vykreslení ---------- */
 const $ = (id) => document.getElementById(id);
@@ -391,7 +402,7 @@ function render(){
   MENU.sekce.forEach((s, si) => {
     const items = s.polozky.map((p, pi) => {
       const key = si + '-' + pi;
-      return '<li data-key="' + key + '">' +
+      return '<li data-key="' + key + '"' + (p.vyprodano ? ' data-vyprodano="1"' : '') + '>' +
         '<div class="row">' +
           '<span class="name">' + cz(p.name) + '</span>' +
           '<span class="dots" aria-hidden="true"></span>' +
@@ -410,18 +421,58 @@ function render(){
   applySoldOut();
 }
 
-/* ---------- vyprodáno: podrž prst na položce ---------- */
-const STORE = 'pangea-menu-vyprodano';
-let soldOut = new Set();
-try { soldOut = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch (e) {}
+/* ---------- vyprodáno: podrž prst na položce ----------
+   Stav drží aplikace, ne prohlížeč — proto ho hned uvidí i host, který
+   má menu otevřené v mobilu. Zapisovat smí jen obsluha: buď je na iPadu
+   zadaný PIN menu, nebo je někdo přihlášený do aplikace. */
+const PIN_KEY = 'pangea-menu-pin';
 
-function saveSoldOut(){
-  try { localStorage.setItem(STORE, JSON.stringify([...soldOut])); } catch (e) {}
-}
+function ulozenyPin(){ try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
+function zapamatujPin(p){ try { localStorage.setItem(PIN_KEY, p); } catch (e) {} }
+function zapomenPin(){ try { localStorage.removeItem(PIN_KEY); } catch (e) {} }
+
 function applySoldOut(){
   document.querySelectorAll('#cols li').forEach(li => {
-    if (soldOut.has(li.dataset.key)) li.dataset.out = '1'; else delete li.dataset.out;
+    if (li.dataset.vyprodano === '1') li.dataset.out = '1'; else delete li.dataset.out;
   });
+}
+
+/** Pošle změnu do aplikace. Vrací true, když se to povedlo. */
+async function oznacit(polozka, nove, pin){
+  const r = await fetch('/api/menu/public/' + SLUG + '/soldout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ itemId: polozka.id, soldOut: nove, pin: pin || undefined }),
+  });
+  if (r.status === 401) { zapomenPin(); return 'pin'; }
+  return r.ok;
+}
+
+async function prepnout(polozka){
+  const nove = !polozka.vyprodano;
+  let vysledek = await oznacit(polozka, nove, ulozenyPin()).catch(() => false);
+
+  if (vysledek === 'pin') {
+    const zadany = prompt('PIN menu pro označení vyprodaného:');
+    if (!zadany) { toast('Zrušeno'); return; }
+    vysledek = await oznacit(polozka, nove, zadany.trim()).catch(() => false);
+    if (vysledek === true) zapamatujPin(zadany.trim());
+    else if (vysledek === 'pin') { toast('Nesprávný PIN'); return; }
+  }
+
+  if (vysledek !== true) { toast('Beze spojení — neuloženo'); return; }
+
+  polozka.vyprodano = nove;
+  render();
+  toast(nove ? 'Označeno jako vyprodané' : 'Zpátky v nabídce');
+  if (navigator.vibrate) navigator.vibrate(12);
+}
+
+/** Najde položku v datech podle klíče, který nese <li>. */
+function polozkaPodleKlice(klic){
+  const [si, pi] = String(klic).split('-').map(Number);
+  return MENU.sekce?.[si]?.polozky?.[pi] ?? null;
 }
 
 let pressTimer = null, pressed = null;
@@ -432,11 +483,9 @@ function startPress(e){
   pressed = li;
   pressTimer = setTimeout(() => {
     pressTimer = null;
-    const k = li.dataset.key;
-    if (soldOut.has(k)) { soldOut.delete(k); toast('Zpátky v nabídce'); }
-    else { soldOut.add(k); toast('Označeno jako vyprodané'); }
-    saveSoldOut(); applySoldOut();
-    if (navigator.vibrate) navigator.vibrate(12);
+    if (!zivaData) { toast('Menu běží ze zálohy — vyprodáno teď nejde uložit'); return; }
+    const polozka = polozkaPodleKlice(li.dataset.key);
+    if (polozka && polozka.id) prepnout(polozka);
   }, 700);
 }
 function endPress(){ clearTimeout(pressTimer); pressTimer = null; pressed = null; }
@@ -447,11 +496,12 @@ document.addEventListener('pointercancel', endPress);
 document.addEventListener('pointermove', e => { if (pressed && e.buttons) endPress(); });
 document.addEventListener('contextmenu', e => { if (e.target.closest('#cols')) e.preventDefault(); });
 
-/* dlouhý stisk loga = zrušit všechna „vyprodáno“ */
+/* dlouhý stisk loga = stáhnout menu z aplikace znovu */
 let logoTimer = null;
 $('logo').addEventListener('pointerdown', () => {
   logoTimer = setTimeout(() => {
-    soldOut.clear(); saveSoldOut(); applySoldOut(); toast('Vyprodané položky zrušeny');
+    toast('Načítám z aplikace…');
+    stahni().then(ok => toast(ok ? 'Menu je aktuální' : 'Aplikace neodpovídá'));
   }, 1200);
 });
 ['pointerup','pointercancel','pointerleave'].forEach(ev =>
@@ -530,6 +580,31 @@ function toast(text){
   toastTimer = setTimeout(() => t.classList.remove('on'), 1800);
 }
 
+/* ---------- živá data z aplikace ----------
+   Stránka se vykreslí okamžitě ze zálohy, ať host nekouká na prázdno,
+   a teprve pak si stáhne aktuální menu. Když aplikace neodpovídá,
+   zůstane viset záloha — menu je tak vidět vždycky.
+
+   Obnovuje se samo po minutě, takže když někdo přepíše cenu na telefonu,
+   iPad se srovná sám a nikdo k němu nemusí. */
+async function stahni(){
+  try {
+    const r = await fetch('/api/menu/public/' + SLUG, { cache: 'no-store', credentials: 'same-origin' });
+    if (!r.ok) return false;
+    const data = await r.json();
+    if (!data || !Array.isArray(data.sekce) || !data.sekce.length) return false;
+
+    /* Popisky u QR aplikace nezná — ty si necháme ze zálohy. */
+    MENU = Object.assign({}, ZALOHA, data, { qr: ZALOHA.qr });
+    zivaData = true;
+    render();
+    fit();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 /* ---------- offline: ať menu naskočí i když venku vypadne wifi ----------
    Rozsah je zúžený na tuhle jednu stránku, aby se to nebilo s /sw.js aplikace.
    V náhledu (artifact) registrace selže a to nevadí — proto try/catch. */
@@ -555,6 +630,11 @@ function fit(){
   }
 }
 render();
+stahni();
+setInterval(stahni, 60 * 1000);
+/* Po probuzení iPadu ať se to srovná hned, ne až za minutu. */
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') stahni(); });
+
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 window.addEventListener('load', fit);
 window.addEventListener('resize', fit);
