@@ -563,6 +563,51 @@ export async function GET() {
       )`;
     // Colours and logo for every share page of the team.
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS share_theme JSONB`;
+
+    // ---- Zákaznické menu (iPad před podnikem + QR do mobilu hosta) ----
+    await sql`
+      CREATE TABLE IF NOT EXISTS menu_boards (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        slug TEXT NOT NULL,
+        name TEXT NOT NULL,
+        eyebrow TEXT,
+        title TEXT,
+        note TEXT,
+        wifi_ssid TEXT,
+        wifi_password TEXT,
+        currency TEXT DEFAULT 'Kč',
+        pin_hash TEXT,
+        enabled BOOLEAN DEFAULT TRUE,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`;
+    // Slug je celá veřejná adresa menu (/api/menu/public/<slug>), takže musí
+    // být jedinečný napříč všemi týmy — ne jen uvnitř jednoho. Kdyby si ho
+    // dva podniky zabraly, veřejné čtení by nevědělo, čí menu vydat.
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS menu_boards_slug ON menu_boards (slug)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS menu_sections (
+        id SERIAL PRIMARY KEY,
+        board_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        column_no INTEGER DEFAULT 1,
+        position INTEGER DEFAULT 0
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS menu_sections_board ON menu_sections (board_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id SERIAL PRIMARY KEY,
+        section_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        price INTEGER NOT NULL DEFAULT 0,
+        description TEXT,
+        sold_out BOOLEAN DEFAULT FALSE,
+        pos_product_id TEXT,
+        position INTEGER DEFAULT 0
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS menu_items_section ON menu_items (section_id)`;
     // A closing belongs to the whole shift, not just its author.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
 

@@ -10,11 +10,13 @@ export const dynamic = 'force-dynamic';
  *   team          … WHERE team_id = $team
  *   user:<col>    … WHERE <col> IN (members of $team)
  *   conversation  … WHERE conversation_id IN (conversations of $team)
+ *   scopedBy      … vlastní WHERE fragment pro tabulky, které se k týmu
+ *                   dostanou přes víc kroků (menu: board → sekce → položky)
  * Tables where the newest scoping column may not exist yet fall back from
  * `team` to `user:<col>`; if nothing works the table is skipped for that team
  * (omitting data is safe, leaking someone else's is not).
  */
-const TABLES: { name: string; team?: boolean; user?: string; conversation?: boolean }[] = [
+const TABLES: { name: string; team?: boolean; user?: string; conversation?: boolean; scopedBy?: string }[] = [
   { name: 'invitations', team: true },
   { name: 'shifts', user: 'employee_id' },
   { name: 'shift_requests', user: 'employee_id' },
@@ -42,6 +44,9 @@ const TABLES: { name: string; team?: boolean; user?: string; conversation?: bool
   { name: 'announcements', team: true, user: 'author_id' },
   { name: 'suggestions', team: true, user: 'author_id' },
   { name: 'share_links', team: true },
+  { name: 'menu_boards', team: true },
+  { name: 'menu_sections', scopedBy: 'board_id IN (SELECT id FROM menu_boards WHERE team_id = $1)' },
+  { name: 'menu_items', scopedBy: 'section_id IN (SELECT id FROM menu_sections WHERE board_id IN (SELECT id FROM menu_boards WHERE team_id = $1))' },
   { name: 'notifications', user: 'user_id' },
 ];
 
@@ -74,6 +79,9 @@ async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string
           [teamId],
         );
       } catch { rows = null; }
+    }
+    if (rows === null && t.scopedBy) {
+      try { rows = await sql(`SELECT * FROM ${t.name} WHERE ${t.scopedBy}`, [teamId]); } catch { rows = null; }
     }
     if (rows === null && t.conversation) {
       try {

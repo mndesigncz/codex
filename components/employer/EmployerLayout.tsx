@@ -15,6 +15,7 @@ import Inventory from './Inventory';
 import PlanningBoard from './PlanningBoard';
 import EventsView from './EventsView';
 import ClosingsOverview from './ClosingsOverview';
+import MenuEditor from './MenuEditor';
 import SuggestionsBoard from '../SuggestionsBoard';
 import TaskManager from './TaskManager';
 import RewardsView from './RewardsView';
@@ -35,6 +36,7 @@ const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
   { id: 'shifts',     label: 'Rozvrh',     icon: 'calendar' },
   { id: 'inventory',  label: 'Sklad',      icon: 'box' },
+  { id: 'menu',       label: 'Menu',       icon: 'leaf' },
   { id: 'procedures', label: 'Postupy',    icon: 'clipboard' },
   { id: 'tasks',      label: 'Úkoly',      icon: 'check' },
   { id: 'chat',       label: 'Chat',       icon: 'chat' }, // mobile dock only
@@ -53,7 +55,7 @@ const navItems = [
 const navSections: { title: string | null; ids: string[] }[] = [
   { title: null,           ids: ['overview'] },
   { title: 'Směny',        ids: ['shifts', 'my-shifts', 'attendance'] },
-  { title: 'Kasa & sklad', ids: ['reports', 'inventory'] },
+  { title: 'Kasa & sklad', ids: ['reports', 'inventory', 'menu'] },
   { title: 'Práce',        ids: ['tasks', 'procedures', 'planning', 'events'] },
   { title: 'Tým',          ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
@@ -100,6 +102,7 @@ export default function EmployerLayout({ user }: Props) {
         </div>
       );
       case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} />;
+      case 'menu':      return <div className="px-6 pb-6 w-full max-w-3xl mx-auto"><MenuEditor /></div>;
       case 'chat':      return <ChatView user={user as any} />;
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;

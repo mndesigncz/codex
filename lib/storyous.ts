@@ -123,7 +123,30 @@ export async function daySummary(conn: PosConnection, date: string): Promise<Day
 
 // ---- Menu (product catalog) --------------------------------------------------
 
-export interface MenuProduct { productId: string; name: string; category: string; }
+export interface MenuProduct {
+  productId: string;
+  name: string;
+  category: string;
+  /**
+   * Prodejní cena v korunách, když ji katalog uvádí. Storyous ji podle typu
+   * produktu vrací pod různými klíči, a u některých položek vůbec — proto
+   * null znamená „kasa cenu nedala“, ne nula.
+   */
+  price: number | null;
+}
+
+/** Vytáhne cenu z produktu, ať už ji kasa pojmenovala jakkoliv. */
+function productPrice(it: any): number | null {
+  const kandidati = [
+    it?.price, it?.priceWithVat, it?.finalPrice, it?.unitPrice,
+    Array.isArray(it?.prices) ? (it.prices[0]?.price ?? it.prices[0]?.priceWithVat) : undefined,
+  ];
+  for (const c of kandidati) {
+    const n = Number(c);
+    if (Number.isFinite(n) && n > 0) return Math.round(n);
+  }
+  return null;
+}
 
 /** Flattened product list with a readable category path. */
 export async function menuProducts(conn: PosConnection): Promise<MenuProduct[]> {
@@ -139,6 +162,7 @@ export async function menuProducts(conn: PosConnection): Promise<MenuProduct[]> 
           productId: String(it.productId),
           name: String(it.name ?? '').trim(),
           category: path.filter(Boolean).join(' › '),
+          price: productPrice(it),
         });
       }
     }
