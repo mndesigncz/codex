@@ -8,6 +8,9 @@
 // se ukládá dohromady tlačítkem.
 
 import { useCallback, useEffect, useState } from 'react';
+import {
+  type MenuTheme, VYCHOZI_THEME, PREDLOHY, PISMA, normalizeMenuTheme,
+} from '@/lib/menuTheme';
 
 interface Item {
   id?: number;
@@ -23,6 +26,7 @@ interface Board {
   eyebrow: string | null; title: string | null; note: string | null;
   wifiSsid: string | null; wifiPassword: string | null;
   currency: string; enabled: boolean; hasPin?: boolean;
+  theme: MenuTheme;
   sections: Section[];
 }
 interface PosProduct { productId: string; name: string; category: string; price: number | null; }
@@ -40,6 +44,7 @@ export default function MenuEditor() {
   const [hlaska, setHlaska] = useState<string | null>(null);
   const [neniMigrace, setNeniMigrace] = useState(false);
   const [pin, setPin] = useState('');
+  const [vzhledOtevren, setVzhledOtevren] = useState(false);
   /* Ukládá se až tlačítkem, takže je potřeba dát najevo, že něco čeká. */
   const [neulozeno, setNeulozeno] = useState(false);
 
@@ -121,7 +126,7 @@ export default function MenuEditor() {
     if (!board) return;
     setUkladam(true); setChyba(null); setHlaska(null);
     try {
-      const telo: any = { ...board };
+      const telo: any = { ...board, theme: normalizeMenuTheme(board.theme) };
       if (pin.trim()) telo.pin = pin.trim();
       const r = await fetch('/api/menu', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -342,6 +347,138 @@ export default function MenuEditor() {
             </label>
           </div>
         </div>
+      </div>
+
+      <div className="glass-card p-6 space-y-4">
+        <button type="button" onClick={() => setVzhledOtevren((v) => !v)}
+          className="w-full flex items-center justify-between gap-3 text-left">
+          <span className="min-w-0">
+            <span className="block font-bold tracking-tight text-[#16181A]">Vzhled menu</span>
+            <span className="block text-sm text-black/45">
+              Barvy, logo, písma a prvky na pozadí. Platí jen pro tohle menu.
+            </span>
+          </span>
+          <span className="text-black/40 text-sm">{vzhledOtevren ? 'Skrýt' : 'Upravit'}</span>
+        </button>
+
+        {vzhledOtevren && (() => {
+          const t = normalizeMenuTheme(board.theme);
+          const setT = (fn: (x: MenuTheme) => void) =>
+            upravit((b) => { const kop = normalizeMenuTheme(b.theme); fn(kop); b.theme = kop; });
+
+          const Barva = ({ popis, hodnota, zmen }: { popis: string; hodnota: string; zmen: (v: string) => void }) => (
+            <label className="space-y-1">
+              <span className="text-xs font-semibold text-black/50">{popis}</span>
+              <span className="flex items-center gap-2">
+                <input type="color" value={hodnota} onChange={(e) => zmen(e.target.value)}
+                  className="h-10 w-12 rounded-xl border border-black/[0.08] bg-transparent p-1 cursor-pointer" />
+                <input value={hodnota} maxLength={9} onChange={(e) => zmen(e.target.value)}
+                  className={`${vstup} font-mono`} />
+              </span>
+            </label>
+          );
+
+          return (
+            <div className="space-y-5">
+              <div className="flex flex-wrap gap-2">
+                {PREDLOHY.map((p) => (
+                  <button key={p.id} type="button"
+                    onClick={() => setT((x) => { x.den = { ...p.theme.den }; x.noc = { ...p.theme.noc }; })}
+                    className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 flex items-center gap-2">
+                    <span className="inline-flex">
+                      <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.theme.den.bg }} />
+                      <span className="w-3 h-3 rounded-full border border-black/10 -ml-1" style={{ background: p.theme.den.accent }} />
+                    </span>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-black/40">Den</p>
+                  <Barva popis="Pozadí" hodnota={t.den.bg} zmen={(v) => setT((x) => { x.den.bg = v; })} />
+                  <Barva popis="Text" hodnota={t.den.fg} zmen={(v) => setT((x) => { x.den.fg = v; })} />
+                  <Barva popis="Tlumený text" hodnota={t.den.fgSoft} zmen={(v) => setT((x) => { x.den.fgSoft = v; })} />
+                  <Barva popis="Nadpisy a ceny" hodnota={t.den.accent} zmen={(v) => setT((x) => { x.den.accent = v; })} />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-black/40">Noc</p>
+                  <Barva popis="Pozadí" hodnota={t.noc.bg} zmen={(v) => setT((x) => { x.noc.bg = v; })} />
+                  <Barva popis="Text" hodnota={t.noc.fg} zmen={(v) => setT((x) => { x.noc.fg = v; })} />
+                  <Barva popis="Tlumený text" hodnota={t.noc.fgSoft} zmen={(v) => setT((x) => { x.noc.fgSoft = v; })} />
+                  <Barva popis="Nadpisy a ceny" hodnota={t.noc.accent} zmen={(v) => setT((x) => { x.noc.accent = v; })} />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-black/50">Logo (odkaz na obrázek)</span>
+                  <input className={vstup} value={t.logo.url} maxLength={2000} placeholder="Prázdné = logo Pangea ve stránce"
+                    onChange={(e) => setT((x) => { x.logo.url = e.target.value; })} />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-black/50">Jak logo vykreslit</span>
+                  <select value={t.logo.rezim} className={vstup}
+                    onChange={(e) => setT((x) => { x.logo.rezim = e.target.value === 'obrazek' ? 'obrazek' : 'maska'; })}>
+                    <option value="maska">Obarvit barvou nadpisů (jednobarevné logo)</option>
+                    <option value="obrazek">Vložit tak, jak je (vícebarevné logo)</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-black/50">Písmo nadpisů</span>
+                  <select value={t.pismo.nadpisy} className={vstup}
+                    onChange={(e) => setT((x) => { x.pismo.nadpisy = e.target.value; })}>
+                    {PISMA.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-black/50">Písmo textu</span>
+                  <select value={t.pismo.text} className={vstup}
+                    onChange={(e) => setT((x) => { x.pismo.text = e.target.value; })}>
+                    {PISMA.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-black/50">Prvky na pozadí</span>
+                  <select value={t.pozadi.druh} className={vstup}
+                    onChange={(e) => setT((x) => { x.pozadi.druh = e.target.value as any; })}>
+                    <option value="listy">Listy (kresba Pangey)</option>
+                    <option value="zadne">Žádné</option>
+                    <option value="vlastni">Vlastní obrázek</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-black/50">Síla prvků: {t.pozadi.sila} %</span>
+                  <input type="range" min={0} max={20} step={0.5} value={t.pozadi.sila}
+                    className="w-full accent-[#5B9E00]"
+                    onChange={(e) => setT((x) => { x.pozadi.sila = Number(e.target.value); })} />
+                </label>
+                {t.pozadi.druh === 'vlastni' && (
+                  <label className="space-y-1 sm:col-span-2">
+                    <span className="text-xs font-semibold text-black/50">Obrázek na pozadí</span>
+                    <input className={vstup} value={t.pozadi.url} maxLength={2000} placeholder="https://…"
+                      onChange={(e) => setT((x) => { x.pozadi.url = e.target.value; })} />
+                    <span className="block text-[11px] text-black/35">
+                      Jednobarevná kresba na průhledném pozadí. Obarví se podle textu, takže drží v obou režimech.
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button type="button"
+                  onClick={() => setT((x) => { Object.assign(x, JSON.parse(JSON.stringify(VYCHOZI_THEME))); })}
+                  className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
+                  Vrátit původní vzhled
+                </button>
+                <span className="text-[11px] text-black/35">
+                  Vzhled se uloží spolu se zbytkem menu tlačítkem dole.
+                </span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {board.sections.map((s, si) => (

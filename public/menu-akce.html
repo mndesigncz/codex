@@ -580,6 +580,95 @@ function toast(text){
   toastTimer = setTimeout(() => t.classList.remove('on'), 1800);
 }
 
+/* ---------- vzhled z aplikace ----------
+   Stránka má vzhled Pangey zapečený v :root. Když aplikace pošle vlastní,
+   přepíše se jen to, co se liší — a pro menu bez nastaveného vzhledu se
+   nepřepíše nic, takže vypadá dál stejně. */
+const LINKA  = { den: 0.22, noc: 0.2 };
+const ODLESK = { den: 0.06, noc: 0.05 };
+
+function rgba(hex, a){
+  const v = String(hex || '').replace('#','');
+  const plny = v.length === 3 ? v.split('').map(c => c + c).join('') : v.slice(0, 6);
+  const n = parseInt(plny, 16);
+  if (!isFinite(n)) return 'rgba(0,0,0,' + a + ')';
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+
+/** Vestavěná písma fungují i bez internetu, ostatní se doberou z Google Fonts. */
+function rodina(id, zaloha){
+  if (!id || id === 'system') return zaloha;
+  if (id === 'nayuki')  return "'Nayuki', " + zaloha;
+  if (id === 'poppins') return "'PoppinsB', " + zaloha;
+  const nazev = String(id).replace(/[^A-Za-z0-9 ]/g, '').trim();
+  if (!nazev) return zaloha;
+  if (!document.querySelector('link[data-pismo="' + nazev + '"]')) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.dataset.pismo = nazev;
+    l.href = 'https://fonts.googleapis.com/css2?family=' +
+             encodeURIComponent(nazev).replace(/%20/g, '+') + ':wght@400;500;600&display=swap';
+    document.head.appendChild(l);
+  }
+  return "'" + nazev + "', " + zaloha;
+}
+
+let vzhledNasazen = false;
+
+function nasadVzhled(v){
+  if (!v || vzhledNasazen) return;
+  vzhledNasazen = true;
+  const r = document.documentElement;
+
+  /* Barvy pro oba režimy jdou do zvláštního <style>, aby si nepřekážely
+     s pravidly v :root a s přepínačem den/noc. */
+  const sada = (p, rezim) => [
+    '--bg:' + p.bg, '--fg:' + p.fg, '--fg-soft:' + p.fgSoft, '--accent:' + p.accent,
+    '--rule:' + rgba(p.fg, LINKA[rezim]),
+    '--shade:' + rgba(p.fg, ODLESK[rezim]),
+    '--leaf:' + rgba(p.fg, (v.pozadi && v.pozadi.sila != null ? v.pozadi.sila : 5.5) / 100),
+  ].join(';');
+
+  const st = document.createElement('style');
+  st.textContent =
+    ':root{' + sada(v.den, 'den') + '}' +
+    ':root[data-mode="noc"]{' + sada(v.noc, 'noc') + '}';
+  document.head.appendChild(st);
+
+  /* písma */
+  r.style.setProperty('--display', rodina(v.pismo && v.pismo.nadpisy, 'Georgia, serif'));
+  r.style.setProperty('--body', rodina(v.pismo && v.pismo.text, '-apple-system, "Segoe UI", sans-serif'));
+
+  /* logo */
+  const logo = $('logo');
+  if (logo && v.logo && v.logo.url) {
+    if (v.logo.rezim === 'obrazek') {
+      /* Vícebarevné logo se nesmí obarvit akcentem — vloží se tak, jak je. */
+      logo.style.webkitMaskImage = 'none';
+      logo.style.maskImage = 'none';
+      logo.style.backgroundColor = 'transparent';
+      logo.style.backgroundImage = 'url("' + v.logo.url + '")';
+      logo.style.backgroundSize = 'contain';
+      logo.style.backgroundRepeat = 'no-repeat';
+      logo.style.backgroundPosition = 'center';
+      logo.style.aspectRatio = 'auto';
+      logo.style.height = 'calc(clamp(46px,9vh,92px) * var(--fit))';
+    } else {
+      r.style.setProperty('--logo-src', 'url("' + v.logo.url + '")');
+    }
+  }
+
+  /* prvky na pozadí */
+  const druh = v.pozadi && v.pozadi.druh;
+  if (druh === 'zadne') {
+    document.querySelectorAll('.leaf').forEach(el => { el.style.display = 'none'; });
+  } else if (druh === 'vlastni' && v.pozadi.url) {
+    r.style.setProperty('--leaf-src', 'url("' + v.pozadi.url + '")');
+  }
+
+  fit();
+}
+
 /* ---------- živá data z aplikace ----------
    Stránka se vykreslí okamžitě ze zálohy, ať host nekouká na prázdno,
    a teprve pak si stáhne aktuální menu. Když aplikace neodpovídá,
@@ -597,6 +686,7 @@ async function stahni(){
     /* Popisky u QR aplikace nezná — ty si necháme ze zálohy. */
     MENU = Object.assign({}, ZALOHA, data, { qr: ZALOHA.qr });
     zivaData = true;
+    nasadVzhled(data.vzhled);
     render();
     fit();
 
