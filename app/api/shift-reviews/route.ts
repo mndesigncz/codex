@@ -6,6 +6,7 @@ import { notifyUser } from '@/lib/push';
 import { parseSteps } from '@/lib/steps';
 import { expectedCash, cashDifference } from '@/lib/closing';
 import { computeAutoPoints, normalizePoints, PointsConfig } from '@/lib/rewardLevels';
+import { shiftSpanFor, graceSpan, shiftsOverlap, type ShiftWindow } from '@/lib/shiftWindow';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,17 +65,15 @@ async function shiftsOnDay(teamId: number, date: string) {
   }
 }
 
-// Two shifts count as "the same shift" when their times overlap. Missing times
-// mean we can't tell them apart, so the whole day is treated as one shift.
-function overlaps(a: any, b: any): boolean {
-  if (!a?.start_time || !a?.end_time || !b?.start_time || !b?.end_time) return true;
-  return a.start_time < b.end_time && b.start_time < a.end_time;
-}
-
-function coworkerIdsFor(dayRows: any[], employeeId: number): number[] {
+// "The same shift" means the spans overlap in real time — which is why this
+// goes through shiftWindow: an 18:00-02:00 shift and a 20:00-02:00 shift are one
+// shift, and comparing "HH:MM" strings would get the night ones wrong.
+function coworkerIdsFor(dayRows: any[], employeeId: number, date: string): number[] {
   const mine = dayRows.filter(r => r.employee_id === employeeId);
   const others = dayRows.filter(r => r.employee_id !== employeeId);
-  const pool = mine.length ? others.filter(o => mine.some(m => overlaps(m, o))) : others;
+  const pool = mine.length
+    ? others.filter(o => mine.some(m => shiftsOverlap(m, o, date)))
+    : others;
   return Array.from(new Set(pool.map(r => r.employee_id as number)));
 }
 
@@ -98,13 +97,25 @@ async function itemMarks(employeeId: number, date: string) {
 async function buildSummary(teamId: number, emp: any, date: string, pt: PointsConfig) {
   const employeeId = emp.id as number;
 
+  // --- The shift itself defines the window everything is matched against. ---
+  // Night shifts run past midnight, so a closing filed at 00:40 belongs to the
+  // shift that started the evening before, not to the new calendar day.
+  const dayRows = await shiftsOnDay(teamId, date);
+  const mineRows = dayRows.filter((r: any) => r.employee_id === employeeId);
+  const span: ShiftWindow = shiftSpanFor(mineRows, date);
+  const { from, to } = graceSpan(span);
+  const fromIso = from.toISOString(), toIso = to.toISOString();
+  const dayA = span.days[0] ?? date;
+  const dayB = span.days[1] ?? dayA;
+
   // --- Tasks: completed that day, plus everything due that day and left undone. ---
   let doneRows: any[] = [];
   try {
     doneRows = await sql`
       SELECT id, title, description, priority, checklist, review_note FROM tasks
       WHERE completed_by = ${employeeId} AND status = 'done'
-        AND (to_char((completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date} OR (completed_at IS NULL AND due_date = ${date}))
+        AND ((completed_at >= ${fromIso} AND completed_at <= ${toIso})
+             OR (completed_at IS NULL AND (due_date = ${dayA} OR due_date = ${dayB})))
       ORDER BY title`;
   } catch {
     try {
@@ -118,7 +129,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
   try {
     missedRows = await sql`
       SELECT id, title, description, priority, checklist, review_note FROM tasks
-      WHERE due_date = ${date} AND status <> 'done'
+      WHERE (due_date = ${dayA} OR due_date = ${dayB}) AND status <> 'done'
         AND (assigned_to = ${employeeId} OR (assigned_to IS NULL AND team_id = ${teamId}))
       ORDER BY title`;
   } catch {
@@ -136,7 +147,8 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
       SELECT r.id, p.name AS procedure_name, p.items, r.status, r.checked_items, r.skipped_items, r.total_items, r.duration_seconds, r.review_note
       FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
       WHERE r.user_id = ${employeeId}
-        AND to_char((COALESCE(r.completed_at, r.started_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date}
+        AND COALESCE(r.completed_at, r.started_at) >= ${fromIso}
+        AND COALESCE(r.completed_at, r.started_at) <= ${toIso}
       ORDER BY r.started_at`;
   } catch {
     try {
@@ -144,48 +156,71 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
         SELECT r.id, p.name AS procedure_name, p.items, r.status, r.checked_items, r.total_items, r.duration_seconds
         FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
         WHERE r.user_id = ${employeeId}
-          AND to_char((COALESCE(r.completed_at, r.started_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date}
+          AND COALESCE(r.completed_at, r.started_at) >= ${fromIso}
+        AND COALESCE(r.completed_at, r.started_at) <= ${toIso}
         ORDER BY r.started_at`;
     } catch { procRows = []; }
   }
 
-  // --- Closing. A closing filed by a colleague on this person's behalf still
-  // counts as existing (so they aren't penalised), but their own row wins. ---
+  // --- Closing that belongs to THIS SHIFT. Three ways it can be theirs:
+  //   • they filed it themselves that day,
+  //   • a colleague filed one closing for the whole shift and listed them in it,
+  //   • the shift ran past midnight, so the closing carries the next day's date
+  //     but was filed inside the shift window.
+  // This is why "uzávěrka je hotová, ale u člověka se nezobrazí" happened. ---
   let closingRow: any = null;
   let closingHasCash = true;
   try {
     const [cl] = await sql`
       SELECT id, approved, shift_label, opening_cash, cash_revenue, card_revenue, tips, expenses,
              cash_removed, self_payout, closing_cash, customers, notes, review_note, covered_by,
-             payout_from_register, tips_in_drawer
-      FROM cash_closings WHERE created_by = ${employeeId} AND date = ${date}
-      ORDER BY (covered_by IS NULL) DESC, id ASC LIMIT 1`;
+             payout_from_register, tips_in_drawer, created_by, created_at, date
+      FROM cash_closings
+      WHERE (team_id = ${teamId} OR team_id IS NULL)
+        AND (created_by = ${employeeId} OR shift_employees @> to_jsonb(${employeeId}::int))
+        AND (COALESCE(shift_date, date) = ${dayA}
+             OR (date = ${dayB} AND created_at >= ${fromIso} AND created_at <= ${toIso}))
+      ORDER BY (covered_by IS NULL) DESC, (created_by = ${employeeId}) DESC,
+               (COALESCE(shift_date, date) = ${dayA}) DESC, id ASC
+      LIMIT 1`;
     closingRow = cl ?? null;
   } catch {
     try {
       const [cl] = await sql`
         SELECT id, approved, shift_label, opening_cash, cash_revenue, card_revenue, tips, expenses,
-               cash_removed, self_payout, closing_cash, customers, notes, covered_by
-        FROM cash_closings WHERE created_by = ${employeeId} AND date = ${date} ORDER BY id ASC LIMIT 1`;
+               cash_removed, self_payout, closing_cash, customers, notes, covered_by, created_by
+        FROM cash_closings
+        WHERE created_by = ${employeeId} AND (date = ${dayA} OR date = ${dayB})
+        ORDER BY (date = ${dayA}) DESC, id ASC LIMIT 1`;
       closingRow = cl ?? null;
     } catch {
       try {
-        const [cl] = await sql`SELECT id, approved, shift_label, cash_revenue, card_revenue FROM cash_closings WHERE created_by = ${employeeId} AND date = ${date} LIMIT 1`;
+        const [cl] = await sql`
+          SELECT id, approved, shift_label, cash_revenue, card_revenue, created_by FROM cash_closings
+          WHERE created_by = ${employeeId} AND date = ${dayA} LIMIT 1`;
         closingRow = cl ?? null;
         closingHasCash = false;
       } catch { closingRow = null; }
     }
   }
+  // Who actually filed it, when it wasn't this person — the review says so
+  // instead of pretending they skipped the closing.
+  let filedByName: string | null = null;
+  if (closingRow && closingRow.created_by && Number(closingRow.created_by) !== employeeId) {
+    try {
+      const [au] = await sql`SELECT name FROM users WHERE id = ${closingRow.created_by}`;
+      filedByName = au?.name ?? null;
+    } catch { /* best-effort */ }
+  }
 
   // --- Shift + coworkers on the same shift. ---
-  const dayRows = await shiftsOnDay(teamId, date);
   const label = await shiftLabeller(teamId);
-  const mine = dayRows.filter((r: any) => r.employee_id === employeeId);
+  const mine = mineRows;
   const hadShift = mine.length > 0;
   const shift = hadShift
     ? { startTime: mine[0].start_time ?? null, endTime: mine[0].end_time ?? null, label: label(mine[0]) }
     : null;
-  const coIds = coworkerIdsFor(dayRows, employeeId);
+  const coIds = coworkerIdsFor(dayRows, employeeId, date);
   let coworkers: { id: number; name: string; avatar: string | null }[] = [];
   if (coIds.length) {
     const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${teamId} AND role = 'employee' ORDER BY name ASC`;
@@ -245,6 +280,8 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
       reviewNote: closingRow.review_note ?? null,
       tipsInDrawer: closingRow.tips_in_drawer ?? null,
       coveredBy: closingRow.covered_by ?? null,
+      filedByName,
+      date: closingRow.date ?? date,
       expected: closingHasCash ? expectedCash(calc) : null,
       difference: closingHasCash ? cashDifference(calc) : null,
       item: mark('closing', closingRow.id),
@@ -272,6 +309,11 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
   return {
     employee: { id: emp.id, name: emp.name, avatar: emp.avatar },
     date, hadShift, shift, coworkers,
+    // The real span the review covers — an overnight shift says so out loud.
+    window: {
+      from: span.start.toISOString(), to: span.end.toISOString(),
+      overnight: span.overnight, days: span.days,
+    },
     tasks, procedures, closing, review, autoPoints,
   };
 }
@@ -304,7 +346,9 @@ export async function GET(req: NextRequest) {
         WHERE (s.team_id = ${c.teamId} OR u.team_id = ${c.teamId}) AND s.date >= ${from} AND s.date <= ${to}`;
     } catch { /* ignore */ }
     try {
-      closingRows = await sql`SELECT date, created_by FROM cash_closings WHERE team_id = ${c.teamId} AND date >= ${from} AND date <= ${to}`;
+      closingRows = await sql`
+        SELECT COALESCE(shift_date, date) AS date, created_by FROM cash_closings
+        WHERE team_id = ${c.teamId} AND COALESCE(shift_date, date) >= ${from} AND COALESCE(shift_date, date) <= ${to}`;
     } catch { /* ignore */ }
     try {
       reviewRows = await sql`
@@ -362,8 +406,24 @@ export async function GET(req: NextRequest) {
     const reviewBy = new Map(reviews.map((r: any) => [r.employee_id, r]));
     // Anyone with a scheduled shift, a filed closing, a completed task, or a run that day counts as "worked".
     const dayRows = await shiftsOnDay(c.teamId, date);
+    // A single closing can cover the whole shift, so everyone listed in it
+    // counts as closed — and it's matched on the shift day, not the date it
+    // happened to be filed on (night shifts file after midnight).
     let closingIds: number[] = [];
-    try { closingIds = (await sql`SELECT DISTINCT created_by FROM cash_closings WHERE team_id = ${c.teamId} AND date = ${date}`).map((r: any) => r.created_by); } catch { /* ignore */ }
+    try {
+      const rows = await sql`
+        SELECT created_by, shift_employees FROM cash_closings
+        WHERE team_id = ${c.teamId} AND COALESCE(shift_date, date) = ${date}`;
+      const ids = new Set<number>();
+      for (const r of rows as any[]) {
+        if (r.created_by) ids.add(Number(r.created_by));
+        const crew = Array.isArray(r.shift_employees) ? r.shift_employees : [];
+        crew.forEach((n: any) => { const v = Number(n); if (Number.isFinite(v)) ids.add(v); });
+      }
+      closingIds = Array.from(ids);
+    } catch {
+      try { closingIds = (await sql`SELECT DISTINCT created_by FROM cash_closings WHERE team_id = ${c.teamId} AND date = ${date}`).map((r: any) => r.created_by); } catch { /* ignore */ }
+    }
     const worked = new Set<number>([...dayRows.map((r: any) => r.employee_id as number), ...closingIds]);
     const label = await shiftLabeller(c.teamId);
     const list = members.map((m: any) => {
@@ -379,7 +439,7 @@ export async function GET(req: NextRequest) {
         shiftLabel: sh ? label(sh) : null,
         startTime: sh?.start_time ?? null,
         endTime: sh?.end_time ?? null,
-        coworkerIds: coworkerIdsFor(dayRows, m.id),
+        coworkerIds: coworkerIdsFor(dayRows, m.id, date),
       };
     }).sort((a, b) => Number(b.worked) - Number(a.worked) || a.name.localeCompare(b.name));
     return NextResponse.json({ date, list });
@@ -428,7 +488,7 @@ export async function POST(req: NextRequest) {
   const wholeShift = b.applyToShift === true || explicitIds.length > 0;
   let targetIds = [employeeId];
   if (wholeShift) {
-    const extra = explicitIds.length ? explicitIds : coworkerIdsFor(await shiftsOnDay(c.teamId, date), employeeId);
+    const extra = explicitIds.length ? explicitIds : coworkerIdsFor(await shiftsOnDay(c.teamId, date), employeeId, date);
     targetIds = Array.from(new Set([employeeId, ...extra]));
   }
   let targets: any[] = [{ id: emp.id, name: emp.name, avatar: emp.avatar }];

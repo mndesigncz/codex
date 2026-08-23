@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
-import { pragueToday } from '@/lib/pragueTime';
+import { dayPlus, pragueToday } from '@/lib/pragueTime';
+import { windowOf, coveredBy } from '@/lib/shiftWindow';
 
 export const dynamic = 'force-dynamic';
 
@@ -282,18 +283,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Uzávěrku nelze vyplnit pro budoucí datum.' }, { status: 400 });
   }
 
-  // One closing per person per day.
-  const [dupe] = await sql`
-    SELECT id FROM cash_closings WHERE created_by = ${actorId} AND date = ${date}`;
-  if (dupe) {
-    return NextResponse.json({ error: 'Za tento den už je uzávěrka odeslaná.' }, { status: 409 });
-  }
-
-  // Did the person the closing is FOR actually have a shift that day?
-  const [shift] = await sql`
+  // Which SHIFT is this closing for? Filing at 00:40 after a night shift means
+  // the shift started yesterday — the closing follows the shift, not the clock.
+  const dateExplicit = typeof b.date === 'string' && !!b.date;
+  let shiftDate = date;
+  let [shift] = await sql`
     SELECT id, start_time, end_time FROM shifts
     WHERE employee_id = ${actorId} AND date = ${date}
     ORDER BY start_time ASC LIMIT 1`;
+  if (!shift && !dateExplicit) {
+    const prev = dayPlus(date, -1);
+    try {
+      const [pShift] = await sql`
+        SELECT id, start_time, end_time FROM shifts
+        WHERE employee_id = ${actorId} AND date = ${prev}
+        ORDER BY start_time DESC LIMIT 1`;
+      const w = pShift ? windowOf({ ...pShift, date: prev }) : null;
+      if (pShift && w && w.overnight && coveredBy(w, new Date())) {
+        shift = pShift;
+        shiftDate = prev;
+      }
+    } catch { /* no shifts table — stay on today */ }
+  }
+
+  // One closing per person per shift.
+  let dupe: any = null;
+  try {
+    [dupe] = await sql`
+      SELECT id FROM cash_closings
+      WHERE created_by = ${actorId} AND (date = ${shiftDate} OR shift_date = ${shiftDate})`;
+  } catch {
+    [dupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${actorId} AND date = ${shiftDate}`;
+  }
+  if (dupe) {
+    return NextResponse.json({ error: 'Za tuto směnu už je uzávěrka odeslaná.' }, { status: 409 });
+  }
+
   const shiftId: number | null = shift?.id ?? null;
   const shiftLabel: string | null = b.shiftLabel || (shift ? `${shift.start_time}–${shift.end_time}` : null);
 
@@ -309,27 +334,29 @@ export async function POST(request: Request) {
   const wantShiftId = parseInt(b.shiftId);
   if (Number.isFinite(wantShiftId)) {
     try {
-      const [s] = await sql`SELECT id, start_time, end_time FROM shifts WHERE id = ${wantShiftId} AND date = ${date}`;
+      const [s] = await sql`SELECT id, start_time, end_time FROM shifts WHERE id = ${wantShiftId} AND date = ${shiftDate}`;
       if (s) windowShift = s;
     } catch { /* ignore — keep the author's own shift */ }
   }
+  // Who else worked this shift: real-time overlap of the spans, so a night
+  // shift (18:00–02:00) pairs correctly with 20:00–02:00 instead of falling
+  // back to "everyone rostered that day".
   const shiftEmployeeIds: number[] = [actorId];
   try {
-    const usableWindow = windowShift?.start_time && windowShift?.end_time
-      && String(windowShift.end_time) > String(windowShift.start_time);
-    const crew = usableWindow
-      ? await sql`
-          SELECT DISTINCT s.employee_id AS id
-          FROM shifts s JOIN users u ON u.id = s.employee_id
-          WHERE u.team_id = ${c.teamId} AND s.date = ${date}
-            AND s.start_time < ${windowShift.end_time} AND s.end_time > ${windowShift.start_time}`
-      : await sql`
-          SELECT DISTINCT s.employee_id AS id
-          FROM shifts s JOIN users u ON u.id = s.employee_id
-          WHERE u.team_id = ${c.teamId} AND s.date = ${date}`;
+    const mineWindow = windowShift ? windowOf({ ...windowShift, date: shiftDate }) : null;
+    const crew = await sql`
+      SELECT DISTINCT s.employee_id AS id, s.start_time, s.end_time
+      FROM shifts s JOIN users u ON u.id = s.employee_id
+      WHERE u.team_id = ${c.teamId} AND s.date = ${shiftDate}`;
     for (const r of crew as any[]) {
       const id = Number(r.id);
-      if (Number.isFinite(id) && !shiftEmployeeIds.includes(id)) shiftEmployeeIds.push(id);
+      if (!Number.isFinite(id) || shiftEmployeeIds.includes(id)) continue;
+      if (mineWindow) {
+        const theirs = windowOf({ ...r, date: shiftDate });
+        // Unknown times can't be told apart — keep them on the shift.
+        if (theirs && !(mineWindow.start < theirs.end && theirs.start < mineWindow.end)) continue;
+      }
+      shiftEmployeeIds.push(id);
     }
   } catch { /* shifts table issue — the author alone owns the closing */ }
 
@@ -431,9 +458,18 @@ export async function POST(request: Request) {
     // The partial unique index closes the double-submit race the SELECT above
     // can't — turn the violation into the same friendly 409.
     if (e?.code === '23505') {
-      return NextResponse.json({ error: 'Za tento den už je uzávěrka odeslaná.' }, { status: 409 });
+      return NextResponse.json({ error: 'Za tuto směnu už je uzávěrka odeslaná.' }, { status: 409 });
     }
     throw e;
+  }
+
+  // The business day the closing belongs to — separate from `date` so a night
+  // shift's closing stays attached to the shift that earned it.
+  if (row?.id) {
+    try {
+      await sql`UPDATE cash_closings SET shift_date = ${shiftDate} WHERE id = ${row.id}`;
+      row.shift_date = shiftDate;
+    } catch { /* column not migrated yet */ }
   }
 
   // The handover rides on the closing; separate UPDATE so a not-yet-migrated
@@ -487,26 +523,26 @@ export async function POST(request: Request) {
       try {
         const [emp] = await sql`SELECT id, team_id, role, name FROM users WHERE id = ${cid}`;
         if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') continue;
-        const [cwDupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${cid} AND date = ${date}`;
+        const [cwDupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${cid} AND date = ${shiftDate}`;
         if (cwDupe) continue;
 
         // Their shift that day, or create an auto one if they weren't scheduled.
-        let cwShift: any = (await sql`SELECT id FROM shifts WHERE employee_id = ${cid} AND date = ${date} LIMIT 1`)[0];
+        let cwShift: any = (await sql`SELECT id FROM shifts WHERE employee_id = ${cid} AND date = ${shiftDate} LIMIT 1`)[0];
         const noShift = !cwShift;
         if (noShift) {
           try {
-            try { cwShift = (await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, auto_created) VALUES (${c.teamId}, ${cid}, ${date}, ${refStart}, ${refEnd}, 'auto', TRUE) RETURNING id`)[0]; }
-            catch { cwShift = (await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type) VALUES (${c.teamId}, ${cid}, ${date}, ${refStart}, ${refEnd}, 'auto') RETURNING id`)[0]; }
+            try { cwShift = (await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, auto_created) VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${refStart}, ${refEnd}, 'auto', TRUE) RETURNING id`)[0]; }
+            catch { cwShift = (await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type) VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${refStart}, ${refEnd}, 'auto') RETURNING id`)[0]; }
           } catch { cwShift = null; }
         }
 
         const cwPayout = payDailyCash ? num(cw?.payout) : 0;
         try {
           await sql`
-            INSERT INTO cash_closings (team_id, created_by, date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout)
-            VALUES (${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${cwShift?.id ?? null}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister}, ${cwPayout})`;
+            INSERT INTO cash_closings (team_id, created_by, date, shift_date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout)
+            VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${shiftDate}, ${shiftLabel}, ${cwShift?.id ?? null}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister}, ${cwPayout})`;
         } catch {
-          await sql`INSERT INTO cash_closings (team_id, created_by, date, shift_label, covered_by, self_payout) VALUES (${c.teamId}, ${cid}, ${date}, ${shiftLabel}, ${row.id}, ${cwPayout})`;
+          await sql`INSERT INTO cash_closings (team_id, created_by, date, shift_label, covered_by, self_payout) VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${shiftLabel}, ${row.id}, ${cwPayout})`;
         }
         coveredIds.push(cid);
 
@@ -517,14 +553,14 @@ export async function POST(request: Request) {
             if (refEntry?.clock_in) {
               await sql`INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note) VALUES (${c.teamId}, ${cid}, ${refEntry.clock_in}, ${refEntry.clock_out ?? null}, 'closing', ${note})`;
             } else {
-              await sql`INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note) VALUES (${c.teamId}, ${cid}, ${`${date} ${refStart}`}, ${`${date} ${refEnd}`}, 'closing', ${note})`;
+              await sql`INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note) VALUES (${c.teamId}, ${cid}, ${`${shiftDate} ${refStart}`}, ${`${shiftDate} ${refEnd}`}, 'closing', ${note})`;
             }
           } catch { /* best-effort */ }
         }
 
         try {
           const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
-          await notifyUser(cid, { title: 'Uzávěrka za tebe', body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${date}).`, type: 'info', link: '/employee/shifts?view=closing' });
+          await notifyUser(cid, { title: 'Uzávěrka za tebe', body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${shiftDate}).`, type: 'info', link: '/employee/shifts?view=closing' });
         } catch { /* best-effort */ }
       } catch { /* skip this coworker */ }
     }
