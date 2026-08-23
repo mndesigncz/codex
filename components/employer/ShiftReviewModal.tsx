@@ -25,12 +25,14 @@ interface ClosingDetail {
   expenses: number | null; cashRemoved: number | null; selfPayout: number | null; closingCash: number | null;
   customers: number | null; notes: string | null; reviewNote: string | null;
   tipsInDrawer?: boolean | null; expected: number | null; difference: number | null; item: ItemMark | null;
+  filedByName?: string | null; date?: string;
 }
 export interface Summary {
   employee: { id: number; name: string; avatar?: string };
   date: string; hadShift: boolean;
   shift: { startTime: string | null; endTime: string | null; label: string } | null;
   coworkers: { id: number; name: string; avatar?: string | null }[];
+  window?: { from: string; to: string; overnight: boolean; days: string[] };
   tasks: TaskDetail[];
   procedures: ProcDetail[];
   closing: ClosingDetail | null;
@@ -61,8 +63,11 @@ const chev = (open: boolean) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${open ? 'rotate-90' : ''} text-black/35`}><path d="m9 6 6 6-6 6" /></svg>
 );
 
-export default function ShiftReviewModal({ employee, initialDate, onClose, onSaved }:
-  { employee: { id: number; name: string; avatar?: string }; initialDate?: string; onClose: () => void; onSaved: () => void }) {
+export default function ShiftReviewModal({ employee, initialDate, initialWholeShift, onClose, onSaved }:
+  { employee: { id: number; name: string; avatar?: string }; initialDate?: string;
+    /** Opened from "ohodnotit celou směnu" — rate everyone who worked it. */
+    initialWholeShift?: boolean;
+    onClose: () => void; onSaved: () => void }) {
   const money = useMoney();
   const [date, setDate] = useState(initialDate || todayStr());
   const [shiftDates, setShiftDates] = useState<string[]>([]);
@@ -107,12 +112,15 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
         setRating(d.review?.rating ?? 0);
         setNote(d.review?.note ?? '');
         setFlagged(d.review?.flagged ?? false);
-        setWholeShift((d.review?.scope === 'shift') && (d.coworkers?.length ?? 0) > 0);
+        // Two people on one shift shouldn't mean rating it twice — whole-shift
+        // is the default, unless an individual review already exists.
+        const crew = d.coworkers?.length ?? 0;
+        setWholeShift(crew > 0 && (initialWholeShift || (d.review ? d.review.scope === 'shift' : true)));
         if (d.review) { setPts(d.review.points ?? 0); setPtsTouched(true); } else { setPtsTouched(false); }
         setExpanded({});
       }
     }).catch(() => {}).finally(() => setLoadingSummary(false));
-  }, [date, employee.id]);
+  }, [date, employee.id, initialWholeShift]);
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
   useEffect(() => { if (!ptsTouched) setPts(rating * ratingStar); }, [rating, ptsTouched, ratingStar]);
@@ -239,10 +247,14 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
         <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 glass-strong border-b border-black/[0.06]">
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{employee.avatar || '👤'}</span>
           <div className="min-w-0 flex-1">
-            <h3 className="font-bold tracking-tight text-[#16181A] truncate">Hodnotit směnu — {employee.name}</h3>
-            <p className="text-xs text-black/45">
+            <h3 className="font-bold tracking-tight text-[#16181A] truncate">
+              {wholeShift && coworkers.length > 0
+                ? `Hodnotit směnu — ${targetNames.map(n => n.split(' ')[0]).join(' + ')}`
+                : `Hodnotit směnu — ${employee.name}`}
+            </h3>
+            <p className="text-xs text-black/45 truncate">
               {summary?.shift
-                ? `${summary.shift.label}${summary.shift.startTime ? ` · ${summary.shift.startTime}–${summary.shift.endTime ?? ''}` : ''}`
+                ? `${summary.shift.label}${summary.shift.startTime ? ` · ${summary.shift.startTime}–${summary.shift.endTime ?? ''}` : ''}${summary?.window?.overnight ? ' · přes půlnoc' : ''}`
                 : 'Rozklikni položky, oprav odškrtnutí a připiš poznámku.'}
             </p>
           </div>
@@ -267,6 +279,28 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
             )}
           </div>
 
+          {/* Who the verdict covers — first decision, so one shift is one job. */}
+          {coworkers.length > 0 && (
+            <div className="rounded-2xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-3.5">
+              <label className="block text-xs uppercase tracking-wider text-black/50 mb-2">Koho hodnotíš</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 rounded-full glass border border-black/[0.07] p-1">
+                <button onClick={() => setWholeShift(true)}
+                  className={`px-3 py-2 rounded-full text-xs font-semibold truncate transition ${wholeShift ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  Celou směnu ({targetNames.length} lidi)
+                </button>
+                <button onClick={() => setWholeShift(false)}
+                  className={`px-3 py-2 rounded-full text-xs font-semibold transition ${!wholeShift ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  Jen {employee.name.split(' ')[0]}
+                </button>
+              </div>
+              <p className="text-[11px] text-black/50 mt-2">
+                {wholeShift
+                  ? `Hvězdičky, poznámka i body se uloží všem: ${targetNames.join(', ')}. Automatické body se počítají každému zvlášť podle toho, co odvedl.`
+                  : `Uloží se jen pro ${employee.name}. Na směně byl/a ještě: ${coworkers.map(c => c.name).join(', ')}.`}
+              </p>
+            </div>
+          )}
+
           {loadingSummary ? (
             <div className="glass-card h-40 animate-pulse" />
           ) : summary && (
@@ -278,7 +312,9 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
                     <Icon name={summary.closing ? 'check' : 'warning'} size={14} />
                   </span>
                   <span className="flex-1 min-w-0 text-sm text-[#16181A]">
-                    {summary.closing ? <>Uzávěrka hotová{summary.closing.approved ? '' : ' · čeká na schválení'}</> : 'Uzávěrka nevyplněna'}
+                    {summary.closing
+                      ? <>Uzávěrka hotová{summary.closing.filedByName ? ` · vyplnil/a ${summary.closing.filedByName}` : ''}{summary.closing.approved ? '' : ' · čeká na schválení'}</>
+                      : 'Uzávěrka nevyplněna'}
                   </span>
                   {summary.closing && itemBadge(summary.closing.item)}
                   {summary.closing && chev(!!expanded['closing'])}
@@ -435,28 +471,6 @@ export default function ShiftReviewModal({ employee, initialDate, onClose, onSav
                   <p className="text-[11px] text-black/40 mt-2">Připočítají se automaticky k bodům níže.</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Scope switch */}
-          {coworkers.length > 0 && (
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Koho hodnotíš</label>
-              <div className="grid grid-cols-2 gap-1 rounded-full glass border border-black/[0.07] p-1">
-                <button onClick={() => setWholeShift(false)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${!wholeShift ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-                  Jen tohoto člověka
-                </button>
-                <button onClick={() => setWholeShift(true)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium truncate transition ${wholeShift ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-                  Hodnotit celou směnu ({coworkers.map(c => c.name.split(' ')[0]).join(' + ')})
-                </button>
-              </div>
-              <p className="text-[11px] text-black/45 mt-1.5">
-                {wholeShift
-                  ? `Stejné hodnocení se uloží pro: ${targetNames.join(', ')}.`
-                  : `Uloží se jen pro ${employee.name}.`}
-              </p>
             </div>
           )}
 

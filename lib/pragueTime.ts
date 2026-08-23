@@ -24,3 +24,30 @@ export function pragueDayOf(d: Date): string {
 export function pragueHM(d: Date = new Date()): string {
   return hmFmt.format(d);
 }
+
+/** Current Prague UTC offset as "+01:00" / "+02:00" (DST-aware). */
+function offsetAt(at: Date): string {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Europe/Prague', timeZoneName: 'longOffset',
+  }).formatToParts(at);
+  const tz = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+01:00';
+  const off = tz.replace('GMT', '');
+  return /^[+-]\d{2}:\d{2}$/.test(off) ? off : '+01:00';
+}
+
+/** A Prague wall-clock "HH:MM" on a given YYYY-MM-DD as an absolute instant. */
+export function pragueMomentOf(dateStr: string, hhmm: string): Date | null {
+  const t = String(hhmm ?? '').slice(0, 5);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !/^\d{2}:\d{2}$/.test(t)) return null;
+  const guess = new Date(`${dateStr}T${t}:00+01:00`);
+  if (Number.isNaN(guess.getTime())) return null;
+  const d = new Date(`${dateStr}T${t}:00${offsetAt(guess)}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** YYYY-MM-DD shifted by whole days. */
+export function dayPlus(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}

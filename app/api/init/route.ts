@@ -613,6 +613,11 @@ export async function GET() {
     await sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS theme JSONB`;
     // A closing belongs to the whole shift, not just its author.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
+    // Business day the closing belongs to. A night shift ending at 02:00 files
+    // its closing on the NEXT calendar date — shift_date keeps it attached to
+    // the shift that earned it. Older rows simply mirror `date`.
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_date TEXT`;
+    try { await sql`UPDATE cash_closings SET shift_date = date WHERE shift_date IS NULL`; } catch { /* best-effort */ }
 
     // ---- Shift reviews: whole-shift scope, flags, per-item scoring ----
     await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'individual'`;

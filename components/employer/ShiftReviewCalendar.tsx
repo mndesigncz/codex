@@ -23,7 +23,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
   const [days, setDays] = useState<Record<string, Day>>({});
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState<string | null>(null);
-  const [rating, setRating] = useState<{ person: Staff; date: string } | null>(null);
+  const [rating, setRating] = useState<{ person: Staff; date: string } & { whole?: boolean } | null>(null);
 
   // Quick month-arrow taps overlap requests; only the newest may paint.
   const reqRef = useRef(0);
@@ -128,9 +128,23 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
                   {detail.pending > 0 ? `${detail.pending} k ohodnocení` : 'Vše ohodnoceno'}
                 </span>
               </div>
+              {detail.staff.length > 1 && (
+                <button
+                  onClick={() => setRating({ person: detail.staff[0], date: sel, whole: true })}
+                  className="w-full flex items-center gap-2.5 rounded-2xl bg-[#16181A] text-white px-4 py-3 text-sm font-bold hover:bg-black transition">
+                  <Icon name="users" size={16} className="shrink-0" />
+                  <span className="flex-1 text-left truncate">
+                    Ohodnotit celou směnu ({detail.staff.map(p => p.name.split(' ')[0]).join(' + ')})
+                  </span>
+                  <Icon name="chevron" size={15} className="-rotate-90 opacity-60 shrink-0" />
+                </button>
+              )}
               <div className="space-y-2">
+                {detail.staff.length > 1 && (
+                  <p className="text-[11px] uppercase tracking-wider text-black/40 font-semibold pt-1">nebo jednotlivě</p>
+                )}
                 {detail.staff.map(p => (
-                  <button key={p.id} onClick={() => setRating({ person: p, date: sel })}
+                  <button key={p.id} onClick={() => setRating({ person: p, date: sel, whole: false })}
                     className={`w-full flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition hover:bg-black/[0.03] ${p.flagged ? 'border-red-500/40 bg-red-500/[0.06]' : 'border-black/[0.06] bg-white/40'}`}>
                     <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.avatar || '👤'}</span>
                     <span className="flex-1 min-w-0">
@@ -158,6 +172,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
         <ShiftReviewModal
           employee={{ id: rating.person.id, name: rating.person.name, avatar: rating.person.avatar ?? undefined }}
           initialDate={rating.date}
+          initialWholeShift={rating.whole}
           onClose={() => setRating(null)}
           onSaved={() => { setRating(null); load(); onSaved?.(); }}
         />
