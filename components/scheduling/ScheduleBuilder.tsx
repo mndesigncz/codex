@@ -142,13 +142,14 @@ function buildGrid(month: string) {
   return cells;
 }
 
-type Tab = 'rozvrh' | 'kalendar' | 'typy' | 'oteviraci' | 'pevne';
+type Tab = 'rozvrh' | 'kalendar' | 'typy' | 'oteviraci' | 'pevne' | 'pravidla';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'rozvrh', label: 'Rozvrh' },
   { id: 'kalendar', label: 'Kalendář' },
   { id: 'typy', label: 'Typy směn' },
   { id: 'oteviraci', label: 'Otevírací doba' },
   { id: 'pevne', label: 'Pevné dny' },
+  { id: 'pravidla', label: 'Pravidla' },
 ];
 
 export default function ScheduleBuilder({ user }: Props) {
@@ -656,6 +657,8 @@ export default function ScheduleBuilder({ user }: Props) {
           assignments={fixed}
           onReload={reloadFixed}
         />
+      ) : tab === 'pravidla' ? (
+        <ScheduleRulesManager />
       ) : (
         <>
           {/* Availability summary */}
@@ -1928,3 +1931,124 @@ function DayModal({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Pravidla generování — max dní v řadě, týmově + výjimky pro jednotlivce.
+// ---------------------------------------------------------------------------
+function ScheduleRulesManager() {
+  const [teamMax, setTeamMax] = useState<string>('');
+  const [members, setMembers] = useState<{ id: number; name: string; avatar: string | null; role: string; maxConsecutive: number | null }[]>([]);
+  const [overrides, setOverrides] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    fetch('/api/schedule/rules').then(r => r.json()).then(d => {
+      if (d?.error) { setErr(d.error); return; }
+      setTeamMax(d.teamMax != null ? String(d.teamMax) : '');
+      const list = Array.isArray(d.members) ? d.members : [];
+      setMembers(list);
+      const ov: Record<number, string> = {};
+      list.forEach((m: any) => { ov[m.id] = m.maxConsecutive != null ? String(m.maxConsecutive) : ''; });
+      setOverrides(ov);
+    }).catch(() => setErr('Načtení se nepodařilo.')).finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setMsg(''); setErr('');
+    try {
+      const res = await fetch('/api/schedule/rules', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamMax: teamMax === '' ? null : parseInt(teamMax),
+          overrides: members.map(m => ({
+            id: m.id,
+            maxConsecutive: overrides[m.id] === '' ? null : parseInt(overrides[m.id]),
+          })),
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) setMsg('Uloženo. Pravidlo se použije při dalším generování rozvrhu.');
+      else setErr(d.error || 'Uložení se nepodařilo.');
+    } catch { setErr('Chyba serveru.'); }
+    setSaving(false);
+  };
+
+  const teamLimit = teamMax === '' ? null : parseInt(teamMax);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      <div className="glass-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon name="clock" size={18} className="text-[#5B7A08]" />
+          <h2 className="font-bold text-[#16181A]">Maximálně dní v řadě</h2>
+        </div>
+        <p className="text-sm text-black/50">
+          Kolik dní po sobě může někdo pracovat. Generátor rozvrhu po dosažení limitu
+          člověku automaticky naplánuje volno — a počítá i směny na přelomu měsíce.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-sm font-medium text-[#16181A]">Pro celý tým:</label>
+          <select value={teamMax} onChange={e => setTeamMax(e.target.value)}
+            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+            <option value="">Bez omezení</option>
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
+              <option key={n} value={n}>max {n} {n <= 4 ? 'dny' : 'dní'} po sobě</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="glass-card p-5 space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výjimky pro jednotlivce</h3>
+        <p className="text-sm text-black/50">
+          Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse,
+          nebo někdo, komu tři dny stačí.
+        </p>
+        <div className="divide-y divide-black/[0.06]">
+          {members.map(m => {
+            const v = overrides[m.id] ?? '';
+            const effective = v === '' ? (teamLimit != null ? `podle týmu (max ${teamLimit})` : 'bez omezení')
+              : v === '0' ? 'bez omezení' : `max ${v} po sobě`;
+            return (
+              <div key={m.id} className="flex items-center gap-3 py-2.5 flex-wrap">
+                <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{m.avatar || '👤'}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#16181A] truncate">{m.name}</p>
+                  <p className="text-[11px] text-black/40">{effective}</p>
+                </div>
+                <select value={v}
+                  onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}
+                  className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                  <option value="">Podle týmu</option>
+                  <option value="0">Bez omezení</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
+                    <option key={n} value={n}>max {n} po sobě</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      {msg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-2.5">{msg}</p>}
+      <button onClick={save} disabled={saving}
+        className="rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+        {saving ? 'Ukládám…' : 'Uložit pravidla'}
+      </button>
+    </div>
+  );
+}
+
