@@ -1025,6 +1025,7 @@ export default function ScheduleBuilder({ user }: Props) {
           date={dayModal}
           employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
+          proposed={proposedByDay[dayModal] ?? []}
           events={eventsByDate[dayModal] ?? []}
           shiftTypes={shiftTypes}
           openingHours={openingHours}
@@ -1033,6 +1034,14 @@ export default function ScheduleBuilder({ user }: Props) {
           onClose={() => setDayModal(null)}
           onAdd={addShift}
           onRemove={removeShift}
+          onRemoveProposed={(p) =>
+            setPreview((prev) => prev && ({
+              ...prev,
+              proposed: prev.proposed.filter(
+                (x) => !(x.date === p.date && x.employeeId === p.employeeId && x.startTime === p.startTime),
+              ),
+            }))
+          }
         />
       )}
 
@@ -1691,6 +1700,7 @@ function DayModal({
   date,
   employees,
   shifts,
+  proposed = [],
   shiftTypes,
   openingHours,
   unavailable,
@@ -1698,11 +1708,13 @@ function DayModal({
   onClose,
   onAdd,
   onRemove,
+  onRemoveProposed,
   events = [],
 }: {
   date: string;
   employees: Member[];
   shifts: Shift[];
+  proposed?: Proposed[];
   shiftTypes: ShiftType[];
   openingHours: Record<string, OpeningDay>;
   unavailable: Set<number>;
@@ -1710,6 +1722,7 @@ function DayModal({
   onClose: () => void;
   onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<boolean>;
   onRemove: (id: number) => void;
+  onRemoveProposed?: (p: Proposed) => void;
   events?: any[];
 }) {
   // Opening hours for THIS day (keyed 0=Mon..6=Sun).
@@ -1812,6 +1825,33 @@ function DayModal({
               </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Auto-generated proposal for this day — the review the calendar icons can't give. */}
+        {proposed.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-wide text-[#5B7A08] font-semibold">✨ Navržené směny (náhled — zatím neuloženo)</p>
+            {proposed.map((p, idx) => (
+              <div key={`prop-${idx}`} className="flex items-center gap-3 rounded-2xl border border-dashed border-[#5B7A08]/50 bg-[#C8F542]/[0.08] px-3 py-2">
+                <span className="text-lg flex-shrink-0">{p.employeeAvatar}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#16181A] truncate">{p.employeeName}</p>
+                  <p className="text-xs text-black/45">{p.startTime}–{p.endTime}</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-[#C8F542]/25 text-[#5B7A08]">
+                  {p.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />}
+                  {p.shiftTypeName || 'Směna'}
+                </span>
+                {onRemoveProposed && (
+                  <button onClick={() => onRemoveProposed(p)}
+                    className="text-black/30 hover:text-red-600 transition p-1 flex-shrink-0" title="Vyhodit z návrhu">
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <p className="text-[11px] text-black/40">Uloží se až tlačítkem „Uložit rozvrh" v náhledu.</p>
           </div>
         )}
 
