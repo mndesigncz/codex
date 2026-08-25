@@ -39,6 +39,11 @@ function fitsWithin(start: string, end: string, open: string, close: string) {
   if (end <= start) return start >= open;
   return start >= open && end <= close;
 }
+function prevDay(date: string) {
+  const d = new Date(date + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
 function daysInMonth(month: string) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m, 0).getDate();
@@ -57,7 +62,11 @@ interface Emp {
   dayPrefs: Record<string, string>;
   preferredShift: string | null;
   maxShifts: number | null;
+  /** How many days in a row this person may work (null = no limit). */
+  maxConsecutive: number | null;
   assigned: number;
+  /** Every date already taken by this person — seeds the streak check. */
+  workedDates: Set<string>;
 }
 
 export async function POST(req: Request) {
@@ -146,6 +155,39 @@ export async function POST(req: Request) {
   const fixedRows = await sql`
     SELECT employee_id, weekday, shift_type_id FROM fixed_assignments WHERE team_id = ${ctx.teamId}`;
   const [team] = await sql`SELECT opening_hours FROM teams WHERE id = ${ctx.teamId}`;
+
+  // ---- Rule: how many days in a row may someone work ----
+  let teamMaxConsecutive: number | null = null;
+  try {
+    const [t] = await sql`SELECT max_consecutive_days FROM teams WHERE id = ${ctx.teamId}`;
+    teamMaxConsecutive = t?.max_consecutive_days ?? null;
+  } catch { /* not migrated yet — no limit */ }
+  const personalMax = new Map<number, number | null>();
+  try {
+    const rows = await sql`
+      SELECT id, max_consecutive_days FROM users WHERE team_id = ${ctx.teamId}`;
+    rows.forEach((r: any) => personalMax.set(r.id, r.max_consecutive_days ?? null));
+  } catch { /* not migrated yet */ }
+
+  // Shifts already standing just before this month, so a streak that started in
+  // the previous month keeps counting instead of resetting on the 1st.
+  const carryFrom = (() => {
+    const d = new Date(month + '-01T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() - 20);
+    return d.toISOString().slice(0, 10);
+  })();
+  let priorShifts: any[] = [];
+  try {
+    priorShifts = await sql`
+      SELECT employee_id, date FROM shifts
+      WHERE team_id = ${ctx.teamId} AND date >= ${carryFrom} AND date < ${month + '-01'}`;
+  } catch { /* ignore */ }
+  const priorByEmp = new Map<number, Set<string>>();
+  for (const r of priorShifts as any[]) {
+    const set = priorByEmp.get(r.employee_id) ?? new Set<string>();
+    set.add(String(r.date));
+    priorByEmp.set(r.employee_id, set);
+  }
   const openingHours =
     team?.opening_hours && Object.keys(team.opening_hours).length > 0 ? team.opening_hours : defaultsOpening();
 
@@ -173,7 +215,13 @@ export async function POST(req: Request) {
       dayPrefs: (a?.day_preferences ?? {}) as Record<string, string>,
       preferredShift: a?.preferred_shift ?? null,
       maxShifts: a?.max_shifts ?? null,
+      // Personal override wins (0 = explicitly no limit for them); otherwise
+      // the team default; null everywhere = no limit at all.
+      maxConsecutive: personalMax.get(u.id) === 0
+        ? null
+        : (personalMax.get(u.id) ?? teamMaxConsecutive ?? null),
       assigned: 0,
+      workedDates: new Set<string>(priorByEmp.get(u.id) ?? []),
     };
   });
   const empById = new Map<number, Emp>(emps.map((e) => [e.id, e]));
@@ -193,6 +241,26 @@ export async function POST(req: Request) {
   }
   function hasCapacity(emp: Emp) {
     return emp.maxShifts == null || emp.assigned < emp.maxShifts;
+  }
+  /** Days worked in an unbroken run ending the day before `date`. */
+  function streakBefore(emp: Emp, date: string) {
+    let n = 0;
+    let cursor = prevDay(date);
+    while (emp.workedDates.has(cursor) && n < 40) {
+      n++;
+      cursor = prevDay(cursor);
+    }
+    return n;
+  }
+  /** Would this shift break "max X days in a row"? */
+  function restOk(emp: Emp, date: string) {
+    if (emp.maxConsecutive == null) return true;
+    if (emp.workedDates.has(date)) return true; // already working today
+    return streakBefore(emp, date) < emp.maxConsecutive;
+  }
+  function take(emp: Emp, date: string) {
+    emp.assigned++;
+    emp.workedDates.add(date);
   }
 
   const proposed: any[] = [];
@@ -225,9 +293,14 @@ export async function POST(req: Request) {
       if (slotFilled.has(st.id)) continue;
       const emp = empById.get(fx.employeeId);
       if (!emp || !isAvailable(emp, date) || assignedToday.has(emp.id)) continue;
+      if (!restOk(emp, date)) {
+        const [, mm, dd] = date.split('-');
+        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale už by šlo o ${emp.maxConsecutive! + 1}. směnu v řadě (limit ${emp.maxConsecutive}). Vynecháno.`);
+        continue;
+      }
       slotFilled.set(st.id, emp.id);
       assignedToday.add(emp.id);
-      emp.assigned++;
+      take(emp, date);
     }
 
     // Pass 1b: fixed assignments with no specific shift type → place in first open fitting slot
@@ -239,10 +312,15 @@ export async function POST(req: Request) {
       const wantPref = emp.dayPrefs[date] && emp.dayPrefs[date] !== 'flexible' ? emp.dayPrefs[date] : emp.preferredShift;
       const openSlots = fitting.filter((s: any) => !slotFilled.has(s.id));
       if (openSlots.length === 0) continue;
+      if (!restOk(emp, date)) {
+        const [, mm, dd] = date.split('-');
+        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale už by šlo o ${emp.maxConsecutive! + 1}. směnu v řadě (limit ${emp.maxConsecutive}). Vynecháno.`);
+        continue;
+      }
       const match = openSlots.find((s: any) => categoryOf(s.start_time) === wantPref) ?? openSlots[0];
       slotFilled.set(match.id, emp.id);
       assignedToday.add(emp.id);
-      emp.assigned++;
+      take(emp, date);
     }
 
     // Pass 2: fill remaining slots with best candidate
@@ -250,7 +328,7 @@ export async function POST(req: Request) {
       if (slotFilled.has(st.id)) continue;
       const cat = categoryOf(st.start_time);
       const candidates = emps.filter(
-        (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e),
+        (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e) && restOk(e, date),
       );
       if (candidates.length === 0) continue;
 
@@ -263,16 +341,21 @@ export async function POST(req: Request) {
         const aPref = a.preferredShift === cat ? 1 : 0;
         const bPref = b.preferredShift === cat ? 1 : 0;
         if (aPref !== bPref) return bPref - aPref;
-        // 3. fairness — fewest assigned so far
+        // 3. rest — whoever has worked fewer days in a row goes first, so the
+        //    rota spreads out instead of running people to their limit.
+        const aStreak = streakBefore(a, date);
+        const bStreak = streakBefore(b, date);
+        if (aStreak !== bStreak) return aStreak - bStreak;
+        // 4. fairness — fewest assigned so far
         if (a.assigned !== b.assigned) return a.assigned - b.assigned;
-        // 4. stable by name
+        // 5. stable by name
         return a.name.localeCompare(b.name);
       });
 
       const pick = candidates[0];
       slotFilled.set(st.id, pick.id);
       assignedToday.add(pick.id);
-      pick.assigned++;
+      take(pick, date);
     }
 
     // Build proposed list + warnings for the day
@@ -280,7 +363,12 @@ export async function POST(req: Request) {
       const empId = slotFilled.get(st.id);
       if (empId == null) {
         const [, mm, dd] = date.split('-');
-        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — nepokrytá směna „${st.name}" (nikdo dostupný).`);
+        const blockedByRest = emps.some(
+          (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e) && !restOk(e, date),
+        );
+        warnings.push(
+          `${parseInt(dd)}.${parseInt(mm)}. — nepokrytá směna „${st.name}" (${blockedByRest ? 'volní lidé už mají limit dní v řadě' : 'nikdo dostupný'}).`,
+        );
         continue;
       }
       const emp = empById.get(empId)!;

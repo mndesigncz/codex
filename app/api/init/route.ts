@@ -391,6 +391,11 @@ export async function GET() {
       )`;
     // wages: hourly rate per member (Kc/h)
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`;
+    // Scheduling rule: how many days in a row a person may be rostered.
+    // Team-wide default on teams, optional per-person override on users;
+    // NULL on both means no limit.
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`;
     // watchdog for forgotten clock-outs: when the person was already reminded
     await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
 
