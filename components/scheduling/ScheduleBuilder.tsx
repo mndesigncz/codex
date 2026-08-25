@@ -1977,8 +1977,11 @@ function DayModal({
 // ---------------------------------------------------------------------------
 function ScheduleRulesManager() {
   const [teamMax, setTeamMax] = useState<string>('');
-  const [members, setMembers] = useState<{ id: number; name: string; avatar: string | null; role: string; maxConsecutive: number | null }[]>([]);
+  const [teamMaxHours, setTeamMaxHours] = useState<string>('');
+  const [balance, setBalance] = useState(true);
+  const [members, setMembers] = useState<{ id: number; name: string; avatar: string | null; role: string; maxConsecutive: number | null; maxHours?: number | null }[]>([]);
   const [overrides, setOverrides] = useState<Record<number, string>>({});
+  const [hourOverrides, setHourOverrides] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -1988,11 +1991,18 @@ function ScheduleRulesManager() {
     fetch('/api/schedule/rules').then(r => r.json()).then(d => {
       if (d?.error) { setErr(d.error); return; }
       setTeamMax(d.teamMax != null ? String(d.teamMax) : '');
+      setTeamMaxHours(d.teamMaxHours != null ? String(d.teamMaxHours) : '');
+      setBalance(d.balanceShifts !== false);
       const list = Array.isArray(d.members) ? d.members : [];
       setMembers(list);
       const ov: Record<number, string> = {};
-      list.forEach((m: any) => { ov[m.id] = m.maxConsecutive != null ? String(m.maxConsecutive) : ''; });
+      const hov: Record<number, string> = {};
+      list.forEach((m: any) => {
+        ov[m.id] = m.maxConsecutive != null ? String(m.maxConsecutive) : '';
+        hov[m.id] = m.maxHours != null ? String(m.maxHours) : '';
+      });
       setOverrides(ov);
+      setHourOverrides(hov);
     }).catch(() => setErr('Načtení se nepodařilo.')).finally(() => setLoading(false));
   }, []);
 
@@ -2003,9 +2013,12 @@ function ScheduleRulesManager() {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamMax: teamMax === '' ? null : parseInt(teamMax),
+          teamMaxHours: teamMaxHours === '' ? null : parseInt(teamMaxHours),
+          balanceShifts: balance,
           overrides: members.map(m => ({
             id: m.id,
             maxConsecutive: overrides[m.id] === '' ? null : parseInt(overrides[m.id]),
+            maxHours: hourOverrides[m.id] === '' || hourOverrides[m.id] == null ? null : parseInt(hourOverrides[m.id]),
           })),
         }),
       });
@@ -2050,6 +2063,41 @@ function ScheduleRulesManager() {
       </div>
 
       <div className="glass-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon name="users" size={18} className="text-[#5B7A08]" />
+          <h2 className="font-bold text-[#16181A]">Spravedlivé střídání</h2>
+        </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={balance} onChange={e => setBalance(e.target.checked)}
+            className="mt-0.5 h-5 w-5 rounded accent-[#8FB811]" />
+          <span className="text-sm text-black/60">
+            <span className="font-semibold text-[#16181A]">Míchat lidi a držet všem podobný počet směn.</span>{' '}
+            Generátor dá přednost tomu, kdo má zatím méně směn, a střídá, kdo s kým slouží.
+            Nedostupnost a limity mají vždy přednost; preference ranní/odpolední se dál
+            zohledňují při rovnosti.
+          </span>
+        </label>
+      </div>
+
+      <div className="glass-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon name="overview" size={18} className="text-[#5B7A08]" />
+          <h2 className="font-bold text-[#16181A]">Maximálně hodin za měsíc</h2>
+        </div>
+        <p className="text-sm text-black/50">
+          Strop odpracovaných hodin na osobu a měsíc — hodí se pro brigádníky (DPP)
+          nebo úvazky. Generátor člověku po dosažení limitu už žádnou směnu nepřidá.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-sm font-medium text-[#16181A]">Pro celý tým:</label>
+          <input type="number" inputMode="numeric" min={8} max={400} value={teamMaxHours}
+            onChange={e => setTeamMaxHours(e.target.value)} placeholder="bez omezení"
+            className="w-36 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+          <span className="text-sm text-black/45">hodin / měsíc</span>
+        </div>
+      </div>
+
+      <div className="glass-card p-5 space-y-3">
         <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výjimky pro jednotlivce</h3>
         <p className="text-sm text-black/50">
           Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse,
@@ -2060,22 +2108,37 @@ function ScheduleRulesManager() {
             const v = overrides[m.id] ?? '';
             const effective = v === '' ? (teamLimit != null ? `podle týmu (max ${teamLimit})` : 'bez omezení')
               : v === '0' ? 'bez omezení' : `max ${v} po sobě`;
+            const hv = hourOverrides[m.id] ?? '';
+            const effHours = hv === '' ? (teamMaxHours !== '' ? `podle týmu (${teamMaxHours} h)` : 'hodiny bez omezení')
+              : hv === '0' ? 'hodiny bez omezení' : `max ${hv} h/měsíc`;
             return (
               <div key={m.id} className="flex items-center gap-3 py-2.5 flex-wrap">
                 <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{m.avatar || '👤'}</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[#16181A] truncate">{m.name}</p>
-                  <p className="text-[11px] text-black/40">{effective}</p>
+                  <p className="text-[11px] text-black/40">{effective} · {effHours}</p>
                 </div>
-                <select value={v}
-                  onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}
-                  className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
-                  <option value="">Podle týmu</option>
-                  <option value="0">Bez omezení</option>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
-                    <option key={n} value={n}>max {n} po sobě</option>
-                  ))}
-                </select>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] uppercase tracking-wider text-black/35">dní po sobě</span>
+                  <select value={v}
+                    onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}
+                    className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                    <option value="">Podle týmu</option>
+                    <option value="0">Bez omezení</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
+                      <option key={n} value={n}>max {n} po sobě</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] uppercase tracking-wider text-black/35">hodin / měsíc</span>
+                  <input type="number" inputMode="numeric" min={0} max={400}
+                    value={hourOverrides[m.id] ?? ''}
+                    onChange={e => setHourOverrides(o => ({ ...o, [m.id]: e.target.value }))}
+                    placeholder="podle týmu"
+                    title="Prázdné = podle týmu, 0 = bez omezení"
+                    className="w-28 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+                </div>
               </div>
             );
           })}

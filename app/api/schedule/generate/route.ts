@@ -39,6 +39,15 @@ function fitsWithin(start: string, end: string, open: string, close: string) {
   if (end <= start) return start >= open;
   return start >= open && end <= close;
 }
+// Hours a shift spans; 18:00–02:00 crosses midnight and counts as 8.
+function shiftHours(start: string, end: string): number {
+  const [sh, sm] = String(start).slice(0, 5).split(':').map(Number);
+  const [eh, em] = String(end).slice(0, 5).split(':').map(Number);
+  if (![sh, sm, eh, em].every(Number.isFinite)) return 8;
+  let mins = (eh * 60 + em) - (sh * 60 + sm);
+  if (mins <= 0) mins += 24 * 60;
+  return mins / 60;
+}
 function prevDay(date: string) {
   const d = new Date(date + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() - 1);
@@ -67,6 +76,11 @@ interface Emp {
   assigned: number;
   /** Every date already taken by this person — seeds the streak check. */
   workedDates: Set<string>;
+  /** Monthly hour cap (null = no limit) and hours proposed so far. */
+  maxHours: number | null;
+  assignedHours: number;
+  /** Last date this person got a shift — drives the rotation tiebreak. */
+  lastAssigned: string;
 }
 
 export async function POST(req: Request) {
@@ -158,16 +172,36 @@ export async function POST(req: Request) {
 
   // ---- Rule: how many days in a row may someone work ----
   let teamMaxConsecutive: number | null = null;
+  let teamMaxHours: number | null = null;
+  let balanceShifts = true;
   try {
-    const [t] = await sql`SELECT max_consecutive_days FROM teams WHERE id = ${ctx.teamId}`;
+    const [t] = await sql`
+      SELECT max_consecutive_days, max_month_hours, balance_shifts FROM teams WHERE id = ${ctx.teamId}`;
     teamMaxConsecutive = t?.max_consecutive_days ?? null;
-  } catch { /* not migrated yet — no limit */ }
+    teamMaxHours = t?.max_month_hours ?? null;
+    balanceShifts = t?.balance_shifts !== false; // NULL = fair rotation on
+  } catch {
+    try {
+      const [t] = await sql`SELECT max_consecutive_days FROM teams WHERE id = ${ctx.teamId}`;
+      teamMaxConsecutive = t?.max_consecutive_days ?? null;
+    } catch { /* not migrated yet — no limits */ }
+  }
   const personalMax = new Map<number, number | null>();
+  const personalHours = new Map<number, number | null>();
   try {
     const rows = await sql`
-      SELECT id, max_consecutive_days FROM users WHERE team_id = ${ctx.teamId}`;
-    rows.forEach((r: any) => personalMax.set(r.id, r.max_consecutive_days ?? null));
-  } catch { /* not migrated yet */ }
+      SELECT id, max_consecutive_days, max_month_hours FROM users WHERE team_id = ${ctx.teamId}`;
+    rows.forEach((r: any) => {
+      personalMax.set(r.id, r.max_consecutive_days ?? null);
+      personalHours.set(r.id, r.max_month_hours ?? null);
+    });
+  } catch {
+    try {
+      const rows = await sql`
+        SELECT id, max_consecutive_days FROM users WHERE team_id = ${ctx.teamId}`;
+      rows.forEach((r: any) => personalMax.set(r.id, r.max_consecutive_days ?? null));
+    } catch { /* not migrated yet */ }
+  }
 
   // Shifts already standing just before this month, so a streak that started in
   // the previous month keeps counting instead of resetting on the 1st.
@@ -222,6 +256,12 @@ export async function POST(req: Request) {
         : (personalMax.get(u.id) ?? teamMaxConsecutive ?? null),
       assigned: 0,
       workedDates: new Set<string>(priorByEmp.get(u.id) ?? []),
+      // Personal 0 = explicitly unlimited; null = follow the team default.
+      maxHours: personalHours.get(u.id) === 0
+        ? null
+        : (personalHours.get(u.id) ?? teamMaxHours ?? null),
+      assignedHours: 0,
+      lastAssigned: '',
     };
   });
   const empById = new Map<number, Emp>(emps.map((e) => [e.id, e]));
@@ -258,9 +298,15 @@ export async function POST(req: Request) {
     if (emp.workedDates.has(date)) return true; // already working today
     return streakBefore(emp, date) < emp.maxConsecutive;
   }
-  function take(emp: Emp, date: string) {
+  /** Would this shift push the person over their monthly hour cap? */
+  function hoursOk(emp: Emp, hours: number) {
+    return emp.maxHours == null || emp.assignedHours + hours <= emp.maxHours + 0.01;
+  }
+  function take(emp: Emp, date: string, hours: number) {
     emp.assigned++;
     emp.workedDates.add(date);
+    emp.assignedHours += hours;
+    emp.lastAssigned = date;
   }
 
   const proposed: any[] = [];
@@ -293,14 +339,20 @@ export async function POST(req: Request) {
       if (slotFilled.has(st.id)) continue;
       const emp = empById.get(fx.employeeId);
       if (!emp || !isAvailable(emp, date) || assignedToday.has(emp.id)) continue;
+      const stHours = (() => { const rt = resolveTimes(st, oh); return shiftHours(rt.start, rt.end); })();
       if (!restOk(emp, date)) {
         const [, mm, dd] = date.split('-');
         warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale už by šlo o ${emp.maxConsecutive! + 1}. směnu v řadě (limit ${emp.maxConsecutive}). Vynecháno.`);
         continue;
       }
+      if (!hoursOk(emp, stHours)) {
+        const [, mm, dd] = date.split('-');
+        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale směna by překročila limit ${emp.maxHours} h/měsíc. Vynecháno.`);
+        continue;
+      }
       slotFilled.set(st.id, emp.id);
       assignedToday.add(emp.id);
-      take(emp, date);
+      take(emp, date, stHours);
     }
 
     // Pass 1b: fixed assignments with no specific shift type → place in first open fitting slot
@@ -318,21 +370,35 @@ export async function POST(req: Request) {
         continue;
       }
       const match = openSlots.find((s: any) => categoryOf(s.start_time) === wantPref) ?? openSlots[0];
+      const matchHours = (() => { const rt = resolveTimes(match, oh); return shiftHours(rt.start, rt.end); })();
+      if (!hoursOk(emp, matchHours)) {
+        const [, mm, dd] = date.split('-');
+        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale směna by překročila limit ${emp.maxHours} h/měsíc. Vynecháno.`);
+        continue;
+      }
       slotFilled.set(match.id, emp.id);
       assignedToday.add(emp.id);
-      take(emp, date);
+      take(emp, date, matchHours);
     }
 
     // Pass 2: fill remaining slots with best candidate
     for (const st of fitting) {
       if (slotFilled.has(st.id)) continue;
       const cat = categoryOf(st.start_time);
+      const rtSt = resolveTimes(st, oh);
+      const stHours = shiftHours(rtSt.start, rtSt.end);
       const candidates = emps.filter(
-        (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e) && restOk(e, date),
+        (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e)
+          && restOk(e, date) && hoursOk(e, stHours),
       );
       if (candidates.length === 0) continue;
 
       candidates.sort((a, b) => {
+        // 0. fair rotation (when on): fewest shifts so far goes first, so the
+        //    whole team ends the month with a similar count. Hard requests
+        //    (unavailability, day off, limits) were already filtered out;
+        //    soft preferences still break the ties below.
+        if (balanceShifts && a.assigned !== b.assigned) return a.assigned - b.assigned;
         // 1. exact day preference for this shift category
         const aDay = a.dayPrefs[date] === cat ? 1 : 0;
         const bDay = b.dayPrefs[date] === cat ? 1 : 0;
@@ -348,14 +414,17 @@ export async function POST(req: Request) {
         if (aStreak !== bStreak) return aStreak - bStreak;
         // 4. fairness — fewest assigned so far
         if (a.assigned !== b.assigned) return a.assigned - b.assigned;
-        // 5. stable by name
+        // 5. rotation — whoever waited longest since their last shift goes
+        //    first, so the same faces don't cluster on the same days.
+        if (a.lastAssigned !== b.lastAssigned) return a.lastAssigned < b.lastAssigned ? -1 : 1;
+        // 6. stable by name
         return a.name.localeCompare(b.name);
       });
 
       const pick = candidates[0];
       slotFilled.set(st.id, pick.id);
       assignedToday.add(pick.id);
-      take(pick, date);
+      take(pick, date, stHours);
     }
 
     // Build proposed list + warnings for the day
@@ -363,11 +432,16 @@ export async function POST(req: Request) {
       const empId = slotFilled.get(st.id);
       if (empId == null) {
         const [, mm, dd] = date.split('-');
-        const blockedByRest = emps.some(
-          (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e) && !restOk(e, date),
-        );
+        const free = emps.filter((e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e));
+        const rtW = resolveTimes(st, oh);
+        const hW = shiftHours(rtW.start, rtW.end);
+        const blockedByRest = free.some((e) => !restOk(e, date));
+        const blockedByHours = free.some((e) => restOk(e, date) && !hoursOk(e, hW));
         warnings.push(
-          `${parseInt(dd)}.${parseInt(mm)}. — nepokrytá směna „${st.name}" (${blockedByRest ? 'volní lidé už mají limit dní v řadě' : 'nikdo dostupný'}).`,
+          `${parseInt(dd)}.${parseInt(mm)}. — nepokrytá směna „${st.name}" (${
+            blockedByRest ? 'volní lidé už mají limit dní v řadě'
+            : blockedByHours ? 'volní lidé už mají limit hodin za měsíc'
+            : 'nikdo dostupný'}).`,
         );
         continue;
       }

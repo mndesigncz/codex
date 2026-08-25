@@ -1,6 +1,6 @@
-// Scheduling rules the generator obeys. Today that is one rule: how many days
-// in a row a person may be rostered — a team-wide default with an optional
-// per-person override (some people want doubles, some burn out on three).
+// Scheduling rules the generator obeys: how many days in a row a person may be
+// rostered, how many hours a month, and whether shifts are spread fairly across
+// the team. Team-wide defaults with per-person overrides.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -34,6 +34,23 @@ function cleanPersonLimit(v: any): number | null {
   return Math.min(14, Math.max(1, n));
 }
 
+/** Team default hours/month: null = no limit; sane range 8–400. */
+function cleanTeamHours(v: any): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(400, Math.max(8, n));
+}
+
+/** Per-person hours/month: null = follow team, 0 = explicitly no limit. */
+function cleanPersonHours(v: any): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (n === 0) return 0;
+  return Math.min(400, Math.max(8, n));
+}
+
 async function employer() {
   const s = await getServerSession(authOptions);
   if (!s?.user) return null;
@@ -48,15 +65,21 @@ export async function GET() {
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   let teamMax: number | null = null;
+  let teamMaxHours: number | null = null;
+  let balanceShifts = true;
   try {
-    const [t] = await sql`SELECT max_consecutive_days FROM teams WHERE id = ${u.team_id}`;
+    const [t] = await sql`
+      SELECT max_consecutive_days, max_month_hours, balance_shifts FROM teams WHERE id = ${u.team_id}`;
     teamMax = t?.max_consecutive_days ?? null;
+    teamMaxHours = t?.max_month_hours ?? null;
+    balanceShifts = t?.balance_shifts !== false; // NULL = on
   } catch { /* not migrated yet */ }
 
   let members: any[] = [];
   try {
     members = await sql`
-      SELECT id, name, avatar, role, max_consecutive_days AS "maxConsecutive"
+      SELECT id, name, avatar, role, max_consecutive_days AS "maxConsecutive",
+             max_month_hours AS "maxHours"
       FROM users WHERE team_id = ${u.team_id} AND role IN ('employee','employer')
       ORDER BY role DESC, name ASC`;
   } catch {
@@ -66,10 +89,10 @@ export async function GET() {
       ORDER BY role DESC, name ASC`;
   }
 
-  return NextResponse.json({ teamMax, members });
+  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, members });
 }
 
-// PUT { teamMax?: number|null, overrides?: [{ id, maxConsecutive }] }
+// PUT { teamMax?, teamMaxHours?, balanceShifts?, overrides?: [{ id, maxConsecutive?, maxHours? }] }
 export async function PUT(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -79,14 +102,27 @@ export async function PUT(req: NextRequest) {
     if (b.teamMax !== undefined) {
       await sql`UPDATE teams SET max_consecutive_days = ${cleanTeamLimit(b.teamMax)} WHERE id = ${u.team_id}`;
     }
+    if (b.teamMaxHours !== undefined) {
+      await sql`UPDATE teams SET max_month_hours = ${cleanTeamHours(b.teamMaxHours)} WHERE id = ${u.team_id}`;
+    }
+    if (b.balanceShifts !== undefined) {
+      await sql`UPDATE teams SET balance_shifts = ${b.balanceShifts === true} WHERE id = ${u.team_id}`;
+    }
     if (Array.isArray(b.overrides)) {
       for (const o of b.overrides.slice(0, 100)) {
         const id = parseInt(o?.id);
         if (!Number.isFinite(id)) continue;
         // Team-scoped: a stray id can never rewrite someone else's rota rule.
-        await sql`
-          UPDATE users SET max_consecutive_days = ${cleanPersonLimit(o?.maxConsecutive)}
-          WHERE id = ${id} AND team_id = ${u.team_id}`;
+        if (o?.maxConsecutive !== undefined) {
+          await sql`
+            UPDATE users SET max_consecutive_days = ${cleanPersonLimit(o?.maxConsecutive)}
+            WHERE id = ${id} AND team_id = ${u.team_id}`;
+        }
+        if (o?.maxHours !== undefined) {
+          await sql`
+            UPDATE users SET max_month_hours = ${cleanPersonHours(o?.maxHours)}
+            WHERE id = ${id} AND team_id = ${u.team_id}`;
+        }
       }
     }
   } catch {
