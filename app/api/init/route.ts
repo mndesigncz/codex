@@ -396,6 +396,10 @@ export async function GET() {
     // NULL on both means no limit.
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`;
+    // Fair rotation (NULL = on) + monthly hour caps (team default, per-person override).
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS balance_shifts BOOLEAN`;
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`;
     // watchdog for forgotten clock-outs: when the person was already reminded
     await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
 
