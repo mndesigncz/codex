@@ -266,6 +266,40 @@ export default function ScheduleBuilder({ user }: Props) {
   // generate preview state
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<{ proposed: Proposed[]; warnings: string[] } | null>(null);
+  const [adjust, setAdjust] = useState<{ changes: any[]; warnings: string[] } | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
+  const [applyingAdjust, setApplyingAdjust] = useState(false);
+
+  // "Automaticky upravit": check the SAVED month against the newest
+  // availability and propose the smallest set of swaps/removals.
+  const runAdjust = async () => {
+    setAdjusting(true); setBoardError('');
+    try {
+      const res = await fetch('/api/schedule/adjust', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setBoardError(d.error || 'Kontrola se nepodařila.');
+      else setAdjust({ changes: d.changes ?? [], warnings: d.warnings ?? [] });
+    } catch { setBoardError('Kontrola se nepodařila.'); }
+    setAdjusting(false);
+  };
+
+  const applyAdjust = async () => {
+    if (!adjust || adjust.changes.length === 0) { setAdjust(null); return; }
+    setApplyingAdjust(true); setBoardError('');
+    try {
+      const res = await fetch('/api/schedule/adjust', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, commit: true, changes: adjust.changes }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setBoardError(d.error || 'Úpravy se nepodařilo uložit.');
+      else { setAdjust(null); await load(); }
+    } catch { setBoardError('Úpravy se nepodařilo uložit.'); }
+    setApplyingAdjust(false);
+  };
   const [committing, setCommitting] = useState(false);
   const [clearBeforeCommit, setClearBeforeCommit] = useState(true);
 
@@ -814,6 +848,14 @@ export default function ScheduleBuilder({ user }: Props) {
               <span>✨</span> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
             </button>
             <button
+              onClick={runAdjust}
+              disabled={adjusting || shifts.length === 0}
+              title={shifts.length === 0 ? 'Nejdřív musí existovat uložený rozvrh' : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti a navrhne přeobsazení'}
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-semibold px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 disabled:opacity-40"
+            >
+              <span>🪄</span> {adjusting ? 'Kontroluji…' : 'Upravit podle nových požadavků'}
+            </button>
+            <button
               onClick={publish}
               disabled={publishing}
               className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2 disabled:opacity-50"
@@ -906,6 +948,66 @@ export default function ScheduleBuilder({ user }: Props) {
             <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
               <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />
               <p className="text-sm text-black/70">{publishNote}</p>
+            </div>
+          )}
+
+          {/* Adjust-to-new-requests preview */}
+          {adjust && (
+            <div className="rounded-3xl border border-[#0A84FF]/30 bg-[#0A84FF]/[0.06] p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="font-bold text-[#16181A]">
+                  🪄 Úprava podle nových požadavků
+                  <span className="ml-2 text-sm font-medium text-black/50">
+                    {adjust.changes.length === 0
+                      ? 'Všechno sedí — žádná směna není v rozporu s dostupností.'
+                      : `${adjust.changes.length} ${adjust.changes.length === 1 ? 'navržená změna' : adjust.changes.length <= 4 ? 'navržené změny' : 'navržených změn'}`}
+                  </span>
+                </p>
+                <button onClick={() => setAdjust(null)} className="text-black/40 hover:text-black text-sm font-medium">Zavřít ✕</button>
+              </div>
+              {adjust.changes.length > 0 && (
+                <>
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
+                    {adjust.changes.map((ch: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.06] px-3.5 py-2.5 text-sm flex-wrap">
+                        <span className="font-semibold tabular-nums text-[#16181A] shrink-0 w-14">{parseInt(ch.date.split('-')[2])}.{parseInt(ch.date.split('-')[1])}.</span>
+                        <span className="text-black/45 tabular-nums shrink-0">{ch.startTime}–{ch.endTime}</span>
+                        <span className="inline-flex items-center gap-1 min-w-0">
+                          <span>{ch.fromAvatar}</span>
+                          <span className="font-medium text-[#16181A] truncate">{ch.fromName}</span>
+                        </span>
+                        {ch.action === 'reassign' ? (
+                          <>
+                            <span className="text-black/35">→</span>
+                            <span className="inline-flex items-center gap-1 min-w-0">
+                              <span>{ch.toAvatar}</span>
+                              <span className="font-semibold text-[#5B7A08] truncate">{ch.toName}</span>
+                            </span>
+                          </>
+                        ) : (
+                          <span className="rounded-full bg-red-500/12 text-red-600 px-2.5 py-0.5 text-xs font-bold">zrušit — nikdo nemůže</span>
+                        )}
+                        <span className="text-xs text-black/40 w-full sm:w-auto sm:ml-auto">({ch.reason})</span>
+                      </div>
+                    ))}
+                  </div>
+                  {adjust.warnings.length > 0 && (
+                    <ul className="text-xs text-orange-700 space-y-0.5">
+                      {adjust.warnings.slice(0, 10).map((w, i) => <li key={i}>⚠ {w}</li>)}
+                    </ul>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={applyAdjust} disabled={applyingAdjust}
+                      className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black disabled:opacity-50 transition">
+                      {applyingAdjust ? 'Ukládám…' : `Použít úpravy (${adjust.changes.length})`}
+                    </button>
+                    <button onClick={() => setAdjust(null)} className="rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:bg-black/[0.08] transition">
+                      Zahodit
+                    </button>
+                    <span className="text-[11px] text-black/40">Dotčení lidé dostanou notifikaci o změně.</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
