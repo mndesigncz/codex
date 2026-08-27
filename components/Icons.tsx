@@ -175,14 +175,14 @@ export function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }: { n
   );
 }
 
-// Pangea brand mark — glossy 3D squircle with a lime→emerald gradient and a
+// Managero brand mark — glossy 3D squircle with a lime→emerald gradient and a
 // centered glass bookmark. Matches the app icon / favicon.
 let logoSeq = 0;
 export function LogoMark({ size = 40 }: { size?: number }) {
   const u = 'lm' + (logoSeq++);
   const bm = 'M44 38 Q44 34 48 34 H72 Q76 34 76 38 V86.5 Q76 89 73.6 87.5 L60 79 L46.4 87.5 Q44 89 44 86.5 Z';
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-label="Pangea" className="flex-shrink-0">
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-label="Managero" className="flex-shrink-0">
       <defs>
         <linearGradient id={`${u}g`} x1="34" y1="8" x2="86" y2="112" gradientUnits="userSpaceOnUse">
           <stop stopColor="#EEFFB4" /><stop offset="0.38" stopColor="#C8F542" />

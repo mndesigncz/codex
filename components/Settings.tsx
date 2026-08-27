@@ -48,7 +48,7 @@ const typeIcon: Record<string, string> = {
   chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
 };
 
-const NOTIF_PREFS_KEY = 'pangea-notif-prefs';
+const NOTIF_PREFS_KEY = 'managero-notif-prefs';
 const DEFAULT_PREFS = { push: false, messages: true, lowStock: true, shifts: true };
 type NotifPrefs = typeof DEFAULT_PREFS;
 
@@ -616,7 +616,7 @@ export default function Settings({ user, initialTab }: Props) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className={cardTitle}>Váš plán</h3>
-                    <p className="text-black/45 text-sm mt-1">Co váš podnik v Pangea aktuálně má.</p>
+                    <p className="text-black/45 text-sm mt-1">Co váš podnik v Managero aktuálně má.</p>
                   </div>
                   {plan && (
                     <span className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     // Reuse existing project if already created, else create a new one named after the team
     let projectId = team?.noisium_project_id as string | null;
     if (!projectId) {
-      const project = await createNoisiumProject(baseUrl ?? null, token, team.name, `Úkoly z Pangea — ${team.name}`);
+      const project = await createNoisiumProject(baseUrl ?? null, token, team.name, `Úkoly z Managero — ${team.name}`);
       projectId = String(project?.id ?? project?.projectId ?? '');
       if (!projectId) throw new Error('Noisium nevrátilo ID projektu.');
     }

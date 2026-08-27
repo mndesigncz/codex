@@ -82,7 +82,7 @@ export default function MyShifts({ user }: Props) {
   const exportIcs = () => {
     const pad = (n: number) => String(n).padStart(2, '0');
     const lines = [
-      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pangea//Smeny//CS', 'CALSCALE:GREGORIAN',
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Managero//Smeny//CS', 'CALSCALE:GREGORIAN',
     ];
     for (const s of upcoming) {
       const d = s.date.replace(/-/g, '');
@@ -90,10 +90,10 @@ export default function MyShifts({ user }: Props) {
       const en = (s.endTime || '16:00').replace(':', '') + '00';
       lines.push(
         'BEGIN:VEVENT',
-        `UID:pangea-shift-${s.id}@pangea`,
+        `UID:managero-shift-${s.id}@managero`,
         `DTSTART;TZID=Europe/Prague:${d}T${st}`,
         `DTEND;TZID=Europe/Prague:${d}T${en}`,
-        'SUMMARY:Směna — Pangea',
+        'SUMMARY:Směna — Managero',
         `DESCRIPTION:${s.startTime}–${s.endTime}`,
         'END:VEVENT',
       );

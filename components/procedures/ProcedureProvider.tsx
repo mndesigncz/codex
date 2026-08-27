@@ -58,7 +58,8 @@ interface ProcedureCtx {
 
 const Ctx = createContext<ProcedureCtx | null>(null);
 
-const LS_KEY = 'pangea-active-run';
+const LS_KEY = 'managero-active-run';
+const LS_KEY_OLD = 'pangea-active-run';
 
 export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<ActiveRun | null>(null);

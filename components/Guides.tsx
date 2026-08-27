@@ -599,7 +599,7 @@ export default function Guides({ user }: { user: User }) {
 // it lives in localStorage per guide on this device, and clears itself once
 // the list is completed (next open starts fresh).
 function ReaderChecklist({ steps, guideId }: { steps: string[]; guideId?: number }) {
-  const storageKey = guideId ? `pangea-guide-ticks-${guideId}` : null;
+  const storageKey = guideId ? `managero-guide-ticks-${guideId}` : null;
   const [done, setDone] = useState<boolean[]>(() => {
     if (storageKey) {
       try {

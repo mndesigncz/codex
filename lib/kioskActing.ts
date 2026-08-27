@@ -12,13 +12,15 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-const ACTING_COOKIE = 'pangea-kiosk-acting';
+const ACTING_COOKIE = 'managero-kiosk-acting';
+const ACTING_COOKIE_OLD = 'pangea-kiosk-acting';
 
 // The client mirrors the active person into a cookie so even shared components
 // that build their own request bodies attribute correctly.
 export function actingIdFromCookie(req: Request): number | null {
   const header = req.headers.get('cookie') ?? '';
-  const m = header.match(new RegExp(`(?:^|;\\s*)${ACTING_COOKIE}=(\\d+)`));
+  const m = header.match(new RegExp(`(?:^|;\\s*)${ACTING_COOKIE}=(\\d+)`))
+    ?? header.match(new RegExp(`(?:^|;\\s*)${ACTING_COOKIE_OLD}=(\\d+)`));
   if (!m) return null;
   const id = parseInt(m[1], 10);
   return Number.isFinite(id) ? id : null;

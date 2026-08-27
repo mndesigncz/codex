@@ -519,7 +519,7 @@ export default function MenuEditor() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1">
                   <span className="text-xs font-semibold text-black/50">Logo (odkaz na obrázek)</span>
-                  <input className={vstup} value={t.logo.url} maxLength={2000} placeholder="Prázdné = logo Pangea ve stránce"
+                  <input className={vstup} value={t.logo.url} maxLength={2000} placeholder="Prázdné = logo Managero ve stránce"
                     onChange={(e) => setT((x) => { x.logo.url = e.target.value; })} />
                 </label>
                 <label className="space-y-1">

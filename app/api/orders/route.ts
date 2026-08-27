@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         if (sup?.email) {
           const [team] = await sql`SELECT name FROM teams WHERE id = ${c.teamId}`;
           const text = items.map((i: any) => `• ${i.name} — ${i.qty} ${i.unit ?? ''}`.trim()).join('\n');
-          await sendOrderEmail(sup.email, team?.name ?? 'Pangea', text, b.note ?? null);
+          await sendOrderEmail(sup.email, team?.name ?? 'Podnik', text, b.note ?? null);
           await sql`UPDATE orders SET email_sent_at = NOW() WHERE id = ${row.id}`;
           emailed = true;
         }

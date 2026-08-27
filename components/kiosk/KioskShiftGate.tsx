@@ -19,12 +19,13 @@ export interface ActivePerson {
   avatar: string;
 }
 
-const LS_ACTIVE = 'pangea-kiosk-active';
+const LS_ACTIVE = 'managero-kiosk-active';
+const LS_ACTIVE_OLD = 'pangea-kiosk-active';
 // The active person is mirrored into a cookie so server routes can attribute
 // work to them even for shared components that post their own request bodies
 // (the procedure runner, for example). Server side it is only ever honoured for
 // a kiosk session whose target is clocked in — see app/api/tasks/route.ts.
-const ACTING_COOKIE = 'pangea-kiosk-acting';
+const ACTING_COOKIE = 'managero-kiosk-acting';
 const ACTING_MAX_AGE = 16 * 60 * 60; // one long shift
 
 function writeActingCookie(id: number | null) {
@@ -98,7 +99,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   // Restore the last active person after a tablet refresh.
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(LS_ACTIVE);
+      const raw = (localStorage.getItem(LS_ACTIVE) ?? localStorage.getItem(LS_ACTIVE_OLD));
       const id = raw ? parseInt(raw, 10) : NaN;
       if (Number.isFinite(id)) setActiveId(id);
     } catch { /* ignore */ }

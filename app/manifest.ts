@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Pangea',
-    short_name: 'Pangea',
+    name: 'Managero',
+    short_name: 'Managero',
     description: 'Systém pro správu podniku',
     start_url: '/',
     display: 'standalone',
