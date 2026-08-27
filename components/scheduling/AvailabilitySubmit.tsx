@@ -31,12 +31,12 @@ const DAY_META: Record<DayState, { label: string; cls: string; dot: string }> = 
     dot: 'bg-black/15 ring-1 ring-black/20',
   },
   morning: {
-    label: 'Ranní',
+    label: 'Jen ranní',
     cls: 'bg-[#C8F542]/25 border-[#C8F542]/50 text-[#5B7A08] hover:bg-[#C8F542]/35',
     dot: 'bg-[#C8F542] ring-1 ring-[#C8F542]/60',
   },
   afternoon: {
-    label: 'Odpolední',
+    label: 'Jen odpolední',
     cls: 'bg-blue-500/20 border-blue-500/40 text-blue-700 hover:bg-blue-500/30',
     dot: 'bg-blue-500 ring-1 ring-blue-500/50',
   },
@@ -250,6 +250,10 @@ export default function AvailabilitySubmit({ user }: Props) {
                 ))}
               </div>
             </div>
+            <p className="text-[11px] text-black/40 mb-2">
+              Denní volby jsou závazné — „Jen ranní / Jen odpolední / Nemůžu" generátor vždy dodrží.
+              Celková preference níže je jen orientační.
+            </p>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
               {CZ_DAYS.map((d) => (
                 <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
@@ -297,7 +301,7 @@ export default function AvailabilitySubmit({ user }: Props) {
           {/* Preferences */}
           <div className="glass-card p-5 space-y-5">
             <div>
-              <label className="block text-sm font-medium text-black/70 mb-2">Preferovaná směna (obecně)</label>
+              <label className="block text-sm font-medium text-black/70 mb-2">Preferovaná směna (obecně — nezávazné)</label>
               <div className="flex gap-1 glass rounded-full p-1 w-fit max-w-full overflow-x-auto">
                 {SHIFTS.map((s) => (
                   <button
