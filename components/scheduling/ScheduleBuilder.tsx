@@ -171,6 +171,7 @@ export default function ScheduleBuilder({ user }: Props) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [editAvail, setEditAvail] = useState<{ id: number; name: string; avatar: string } | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [publishNote, setPublishNote] = useState('');
   const { pro } = usePlan();
@@ -705,16 +706,18 @@ export default function ScheduleBuilder({ user }: Props) {
                     );
                   })}
                   {notSubmitted.map((e) => (
-                    <span
+                    <button
                       key={e.id}
-                      className="flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45"
+                      onClick={() => setEditAvail({ id: e.id, name: e.name, avatar: e.avatar ?? '👤' })}
+                      title="Vyplnit dostupnost za tohoto člověka"
+                      className="flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45 text-left hover:bg-black/[0.06] transition"
                     >
                       <span className="text-lg opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{e.name}</span>
-                        <span className="block text-[11px] uppercase tracking-wide text-black/30">čeká na vyplnění</span>
+                        <span className="block text-[11px] uppercase tracking-wide text-black/30">čeká na vyplnění · vyplnit za něj</span>
                       </span>
-                    </span>
+                    </button>
                   ))}
                 </div>
 
@@ -756,7 +759,44 @@ export default function ScheduleBuilder({ user }: Props) {
                             </span>
                           )}
                         </div>
+                        {(() => {
+                          const prefs = Object.entries(s.dayPreferences ?? {})
+                            .filter(([d, v]) => (v === 'morning' || v === 'afternoon') && d.startsWith(month + '-'))
+                            .sort(([a], [b]) => a.localeCompare(b));
+                          const chips = (kind: string, tone: string) => {
+                            const list = prefs.filter(([, v]) => v === kind);
+                            if (!list.length) return null;
+                            return (
+                              <div className="text-black/60">
+                                {kind === 'morning' ? 'Jen ranní' : 'Jen odpolední'} ({list.length}):{' '}
+                                <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
+                                  {list.map(([d]) => (
+                                    <span key={d} className={`rounded-md px-1.5 py-0.5 text-xs ${tone}`}>
+                                      {parseInt(d.split('-')[2])}.{parseInt(d.split('-')[1])}.
+                                    </span>
+                                  ))}
+                                </span>
+                              </div>
+                            );
+                          };
+                          return (
+                            <>
+                              {chips('morning', 'bg-amber-500/15 text-amber-700')}
+                              {chips('afternoon', 'bg-indigo-500/15 text-indigo-600')}
+                              {prefs.length > 0 && (
+                                <p className="text-[11px] text-black/40">
+                                  Denní volby jsou závazné — generátor jiný typ směny ten den nenasadí.
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                         {s.note && <p className="text-black/60">Poznámka: <span className="text-[#16181A]/90">{s.note}</span></p>}
+                        <button
+                          onClick={() => setEditAvail({ id: s.employeeId, name: s.employeeName, avatar: s.employeeAvatar })}
+                          className="mt-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-semibold hover:bg-black/[0.05] transition">
+                          ✏️ Upravit dostupnost
+                        </button>
                       </div>
                     );
                   })()}
@@ -1017,6 +1057,16 @@ export default function ScheduleBuilder({ user }: Props) {
             </div>
           </div>
         </>
+      )}
+
+      {editAvail && (
+        <EditAvailabilityModal
+          member={editAvail}
+          month={month}
+          initial={submissions.find((x) => x.employeeId === editAvail.id) ?? null}
+          onClose={() => setEditAvail(null)}
+          onSaved={() => { setEditAvail(null); load(); }}
+        />
       )}
 
       {/* Day modal */}
@@ -2155,3 +2205,145 @@ function ScheduleRulesManager() {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Employer's view of one person's availability — every request on one screen,
+// editable in place. Tapping a day cycles: volno → nemůže → jen ranní → jen
+// odpolední → volno. The employee is notified about any change.
+// ---------------------------------------------------------------------------
+function EditAvailabilityModal({ member, month, initial, onClose, onSaved }: {
+  member: { id: number; name: string; avatar: string };
+  month: string;
+  initial: Submission | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  // One state per day: '' | 'off' | 'morning' | 'afternoon'.
+  const [days, setDays] = useState<Record<string, string>>(() => {
+    const d: Record<string, string> = {};
+    (initial?.unavailableDates ?? []).forEach((x) => { if (x.startsWith(month + '-')) d[x] = 'off'; });
+    Object.entries(initial?.dayPreferences ?? {}).forEach(([k, v]) => {
+      if (!k.startsWith(month + '-')) return;
+      if (v === 'morning' || v === 'afternoon') d[k] = v;
+      if (v === 'off') d[k] = 'off';
+    });
+    return d;
+  });
+  const [preferred, setPreferred] = useState<string>(initial?.preferredShift ?? 'flexible');
+  const [maxShifts, setMaxShifts] = useState<string>(initial?.maxShifts != null ? String(initial.maxShifts) : '');
+  const [note, setNote] = useState<string>(initial?.note ?? '');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const CYCLE = ['', 'off', 'morning', 'afternoon'];
+  const cycle = (date: string) =>
+    setDays((d) => ({ ...d, [date]: CYCLE[(CYCLE.indexOf(d[date] ?? '') + 1) % CYCLE.length] }));
+
+  const grid = buildGrid(month);
+  const TONES: Record<string, string> = {
+    off: 'bg-red-500/15 border-red-500/40 text-red-600',
+    morning: 'bg-amber-500/15 border-amber-500/40 text-amber-700',
+    afternoon: 'bg-indigo-500/15 border-indigo-500/40 text-indigo-600',
+  };
+  const LABELS: Record<string, string> = { off: 'nemůže', morning: 'ranní', afternoon: 'odpo' };
+
+  const save = async () => {
+    setSaving(true); setErr('');
+    const unavailableDates = Object.entries(days).filter(([, v]) => v === 'off').map(([k]) => k);
+    const dayPreferences: Record<string, string> = {};
+    Object.entries(days).forEach(([k, v]) => { if (v === 'morning' || v === 'afternoon') dayPreferences[k] = v; });
+    try {
+      const res = await fetch('/api/availability', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: member.id, month,
+          unavailableDates, dayPreferences,
+          preferredShift: preferred,
+          maxShifts: maxShifts === '' ? null : parseInt(maxShifts),
+          note: note.trim() || null,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) onSaved();
+      else setErr(d.error || 'Uložení se nepodařilo.');
+    } catch { setErr('Chyba serveru.'); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
+      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3">
+          <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{member.avatar}</span>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
+            <p className="text-xs text-black/45 capitalize">{monthLabel(month)}</p>
+          </div>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0">✕</button>
+        </div>
+
+        <p className="text-xs text-black/45">
+          Klikáním na den přepínáš: volno → <span className="text-red-600 font-medium">nemůže</span> →{' '}
+          <span className="text-amber-700 font-medium">jen ranní</span> →{' '}
+          <span className="text-indigo-600 font-medium">jen odpolední</span>. Denní volby jsou pro generátor závazné.
+        </p>
+
+        <div>
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'].map((d) => (
+              <span key={d} className="text-center text-[10px] uppercase tracking-wide text-black/35">{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {grid.map((cell, i) => {
+              if (!cell) return <div key={i} />;
+              const v = days[cell] ?? '';
+              return (
+                <button key={cell} onClick={() => cycle(cell)}
+                  className={`aspect-square rounded-xl border text-center flex flex-col items-center justify-center gap-0.5 transition active:scale-95 ${
+                    v ? TONES[v] : 'bg-black/[0.03] border-black/[0.08] text-black/60 hover:bg-black/[0.06]'
+                  }`}>
+                  <span className="text-xs font-semibold leading-none">{parseInt(cell.split('-')[2])}</span>
+                  {v && <span className="text-[9px] font-medium leading-none">{LABELS[v]}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Preferuje celkově</label>
+            <select value={preferred} onChange={(e) => setPreferred(e.target.value)}
+              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+              <option value="flexible">Flexibilní</option>
+              <option value="morning">Ranní</option>
+              <option value="afternoon">Odpolední</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max směn</label>
+            <input type="number" inputMode="numeric" min={1} max={31} value={maxShifts}
+              onChange={(e) => setMaxShifts(e.target.value)} placeholder="bez limitu"
+              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Poznámka</label>
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500}
+            className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+        </div>
+
+        {err && <p className="text-sm text-red-600">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+          <button onClick={save} disabled={saving}
+            className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+            {saving ? 'Ukládám…' : 'Uložit a upozornit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

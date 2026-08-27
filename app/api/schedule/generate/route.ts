@@ -282,6 +282,15 @@ export async function POST(req: Request) {
   function hasCapacity(emp: Emp) {
     return emp.maxShifts == null || emp.assigned < emp.maxShifts;
   }
+  /**
+   * Day preferences are STRICT: "ten den můžu jen odpolední" means the
+   * generator may never hand them the opening shift that day. 'flexible'
+   * or no entry keeps every slot open; 'off' is handled by isAvailable.
+   */
+  function dayPrefOk(emp: Emp, date: string, cat: string) {
+    const p = emp.dayPrefs[date];
+    return !p || p === 'flexible' || p === 'off' || p === cat;
+  }
   /** Days worked in an unbroken run ending the day before `date`. */
   function streakBefore(emp: Emp, date: string) {
     let n = 0;
@@ -340,6 +349,11 @@ export async function POST(req: Request) {
       const emp = empById.get(fx.employeeId);
       if (!emp || !isAvailable(emp, date) || assignedToday.has(emp.id)) continue;
       const stHours = (() => { const rt = resolveTimes(st, oh); return shiftHours(rt.start, rt.end); })();
+      if (!dayPrefOk(emp, date, categoryOf(resolveTimes(st, oh).start))) {
+        const [, mm, dd] = date.split('-');
+        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale na ten den si zadal/a jen ${emp.dayPrefs[date] === 'morning' ? 'ranní' : 'odpolední'} směnu. Vynecháno.`);
+        continue;
+      }
       if (!restOk(emp, date)) {
         const [, mm, dd] = date.split('-');
         warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale už by šlo o ${emp.maxConsecutive! + 1}. směnu v řadě (limit ${emp.maxConsecutive}). Vynecháno.`);
@@ -362,7 +376,8 @@ export async function POST(req: Request) {
       if (!emp || !isAvailable(emp, date) || assignedToday.has(emp.id)) continue;
       // prefer a shift matching their day/overall preference
       const wantPref = emp.dayPrefs[date] && emp.dayPrefs[date] !== 'flexible' ? emp.dayPrefs[date] : emp.preferredShift;
-      const openSlots = fitting.filter((s: any) => !slotFilled.has(s.id));
+      const openSlots = fitting.filter((s: any) =>
+        !slotFilled.has(s.id) && dayPrefOk(emp, date, categoryOf(resolveTimes(s, oh).start)));
       if (openSlots.length === 0) continue;
       if (!restOk(emp, date)) {
         const [, mm, dd] = date.split('-');
@@ -389,7 +404,7 @@ export async function POST(req: Request) {
       const stHours = shiftHours(rtSt.start, rtSt.end);
       const candidates = emps.filter(
         (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e)
-          && restOk(e, date) && hoursOk(e, stHours),
+          && restOk(e, date) && hoursOk(e, stHours) && dayPrefOk(e, date, cat),
       );
       if (candidates.length === 0) continue;
 
@@ -435,12 +450,15 @@ export async function POST(req: Request) {
         const free = emps.filter((e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e));
         const rtW = resolveTimes(st, oh);
         const hW = shiftHours(rtW.start, rtW.end);
-        const blockedByRest = free.some((e) => !restOk(e, date));
-        const blockedByHours = free.some((e) => restOk(e, date) && !hoursOk(e, hW));
+        const catW = categoryOf(rtW.start);
+        const blockedByPref = free.some((e) => !dayPrefOk(e, date, catW));
+        const blockedByRest = free.some((e) => dayPrefOk(e, date, catW) && !restOk(e, date));
+        const blockedByHours = free.some((e) => dayPrefOk(e, date, catW) && restOk(e, date) && !hoursOk(e, hW));
         warnings.push(
           `${parseInt(dd)}.${parseInt(mm)}. — nepokrytá směna „${st.name}" (${
             blockedByRest ? 'volní lidé už mají limit dní v řadě'
             : blockedByHours ? 'volní lidé už mají limit hodin za měsíc'
+            : blockedByPref ? 'volní lidé mají ten den povolený jen jiný typ směny'
             : 'nikdo dostupný'}).`,
         );
         continue;
