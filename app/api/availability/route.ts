@@ -138,3 +138,79 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ id: inserted.id, ok: true });
 }
+
+
+// PATCH (employer) — fix a member's availability in place. The employee typed
+// it on a phone; when the employer spots a slip, they correct it here instead
+// of chasing the person to resubmit. The employee gets told about the change.
+// Body: { employeeId, month, unavailableDates?, dayPreferences?, preferredShift?, maxShifts?, note? }
+export async function PATCH(req: Request) {
+  const ctx = await context();
+  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
+  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+
+  const body = await req.json().catch(() => ({}));
+  const employeeId = parseInt(body.employeeId);
+  const month: string = String(body.month ?? '');
+  if (!Number.isFinite(employeeId) || !/^\d{4}-\d{2}$/.test(month)) {
+    return NextResponse.json({ error: 'Chybí zaměstnanec nebo měsíc' }, { status: 400 });
+  }
+  const [emp] = await sql`SELECT id, name, team_id FROM users WHERE id = ${employeeId}`;
+  if (!emp || emp.team_id !== ctx.teamId) {
+    return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
+  }
+
+  const [existing] = await sql`
+    SELECT unavailable_dates, day_preferences, preferred_shift, max_shifts, note
+    FROM availability_requests
+    WHERE team_id = ${ctx.teamId} AND employee_id = ${employeeId} AND month = ${month}
+    LIMIT 1`;
+
+  const inMonth = (d: string) => typeof d === 'string' && d.startsWith(month + '-') && /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const unavailableDates: string[] = Array.isArray(body.unavailableDates)
+    ? Array.from(new Set(body.unavailableDates.filter(inMonth))).slice(0, 62) as string[]
+    : (existing?.unavailable_dates ?? []);
+  const PREF_VALUES = ['off', 'morning', 'afternoon', 'flexible'];
+  let dayPreferences: Record<string, string> = existing?.day_preferences ?? {};
+  if (body.dayPreferences && typeof body.dayPreferences === 'object') {
+    dayPreferences = {};
+    for (const [k, v] of Object.entries(body.dayPreferences)) {
+      if (inMonth(k) && PREF_VALUES.includes(String(v))) dayPreferences[k] = String(v);
+    }
+  }
+  const preferredShift = body.preferredShift !== undefined
+    ? (['morning', 'afternoon', 'flexible'].includes(String(body.preferredShift)) ? String(body.preferredShift) : null)
+    : (existing?.preferred_shift ?? null);
+  const maxShifts = body.maxShifts !== undefined
+    ? (body.maxShifts === null || body.maxShifts === '' ? null : Math.max(1, Math.min(31, parseInt(body.maxShifts) || 0)) || null)
+    : (existing?.max_shifts ?? null);
+  const note = body.note !== undefined
+    ? (body.note ? String(body.note).slice(0, 500) : null)
+    : (existing?.note ?? null);
+
+  await sql`
+    DELETE FROM availability_requests
+    WHERE team_id = ${ctx.teamId} AND employee_id = ${employeeId} AND month = ${month}`;
+  await sql`
+    INSERT INTO availability_requests
+      (team_id, employee_id, month, unavailable_dates, day_preferences, preferred_shift, max_shifts, note, status)
+    VALUES
+      (${ctx.teamId}, ${employeeId}, ${month}, ${JSON.stringify(unavailableDates)},
+       ${JSON.stringify(dayPreferences)}, ${preferredShift}, ${maxShifts}, ${note}, 'submitted')`;
+
+  // Hours are theirs — they must know the employer touched them.
+  try {
+    const [y, m] = month.split('-');
+    const label = new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+    await notifyUser(employeeId, {
+      title: '🗓️ Upravená dostupnost',
+      body: `Vedení ${existing ? 'upravilo' : 'vyplnilo'} tvou dostupnost na ${label} — mrkni, jestli sedí.`,
+      type: 'info',
+      category: 'shift',
+      link: '/employee/shifts?view=availability',
+    });
+  } catch { /* best-effort */ }
+
+  return NextResponse.json({ ok: true });
+}
