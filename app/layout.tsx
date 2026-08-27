@@ -3,10 +3,10 @@ import './globals.css';
 import { SessionProvider } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Pangea',
+  title: 'Managero',
   description: 'Systém pro správu podniku',
   manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, title: 'Pangea', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Managero', statusBarStyle: 'default' },
 };
 
 export const viewport = {
@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('pangea-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
           }}
         />
       </head>

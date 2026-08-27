@@ -124,7 +124,7 @@ export async function GET(request: Request) {
       totalRows += rowCount;
       teamsBackedUp++;
 
-      const filename = `pangea-backup-${stamp}.json`;
+      const filename = `managero-backup-${stamp}.json`;
       const json = JSON.stringify(
         { exportedAt: new Date().toISOString(), team: team.name, rowCount, data: dump },
         null, 2,

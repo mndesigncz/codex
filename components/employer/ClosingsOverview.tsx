@@ -37,10 +37,10 @@ export default function ClosingsOverview() {
   // Deep POS insights for the picked month (hourly peaks, per-person sales…).
   const [posInsights, setPosInsights] = useState<any | null>(null);
   useEffect(() => {
-    try { setAnalyticsOpen(localStorage.getItem('pangea-closings-analytics') === '1'); } catch { /* ignore */ }
+    try { setAnalyticsOpen(localStorage.getItem('managero-closings-analytics') === '1'); } catch { /* ignore */ }
   }, []);
   const toggleAnalytics = () => setAnalyticsOpen(o => {
-    try { localStorage.setItem('pangea-closings-analytics', o ? '0' : '1'); } catch { /* ignore */ }
+    try { localStorage.setItem('managero-closings-analytics', o ? '0' : '1'); } catch { /* ignore */ }
     return !o;
   });
   const [allClosings, setAllClosings] = useState<ClosingRow[]>([]);
@@ -164,7 +164,7 @@ export default function ClosingsOverview() {
           ${row('Zákazníků', String(c.customers))}
         </table>
         ${c.notes ? `<p style="margin-top:16px;font-size:14px;color:#555;">Poznámka: ${String(c.notes).replace(/</g, '&lt;')}</p>` : ''}
-        <p style="margin-top:24px;font-size:12px;color:#999;">Vytištěno z aplikace Pangea · ${new Date().toLocaleString('cs-CZ')}</p>
+        <p style="margin-top:24px;font-size:12px;color:#999;">Vytištěno z aplikace Managero · ${new Date().toLocaleString('cs-CZ')}</p>
         <script>window.onload = () => window.print();</scr` + `ipt>
       </body></html>`);
     w.document.close();

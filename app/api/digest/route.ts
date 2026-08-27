@@ -184,7 +184,7 @@ export async function GET(request: Request) {
             type: diff < 0 || procsMissing.length ? 'warning' : 'info',
             link: '/employer/overview?view=reports',
           });
-          if (e.email) await sendDigestEmail(e.email, team.name ?? 'Pangea', dateLabel, emailHtml);
+          if (e.email) await sendDigestEmail(e.email, team.name ?? 'Podnik', dateLabel, emailHtml);
           sent++;
         } catch { /* best-effort per employer */ }
       }

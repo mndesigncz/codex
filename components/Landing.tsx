@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { LogoMark, Icon } from '@/components/Icons';
 import { PLAN_FEATURES, PRO_PRICE, TRIAL_DAYS } from '@/lib/plan';
 
-// Public storefront for logged-out visitors — what Pangea is, what it does,
+// Public storefront for logged-out visitors — what Managero is, what it does,
 // and what it will cost. Signed-in users never see this (they're redirected
 // straight into the app).
 
@@ -28,7 +28,7 @@ export default function Landing() {
       <header className="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <LogoMark size={36} />
-          <span className="text-lg font-bold tracking-tight text-[#16181A]">Pangea</span>
+          <span className="text-lg font-bold tracking-tight text-[#16181A]">Managero</span>
         </div>
         <nav className="flex items-center gap-2">
           <Link href="/login" className="rounded-full px-4 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors">
@@ -134,7 +134,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-black/40">
           <div className="flex items-center gap-2">
             <LogoMark size={22} />
-            <span>Pangea — systém pro správu podniku</span>
+            <span>Managero — systém pro správu podniku</span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/login" className="hover:text-black transition-colors">Přihlášení</Link>

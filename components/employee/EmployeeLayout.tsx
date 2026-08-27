@@ -112,7 +112,7 @@ export default function EmployeeLayout({ user }: Props) {
           <LogoMark size={40} />
           {sidebarOpen && (
             <div className="overflow-hidden">
-              <p className="font-bold text-sm leading-tight tracking-tight">Pangea</p>
+              <p className="font-bold text-sm leading-tight tracking-tight">Managero</p>
               <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 mt-0.5">Portál zaměstnance</p>
             </div>
           )}

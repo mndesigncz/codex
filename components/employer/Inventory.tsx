@@ -976,7 +976,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název dodavatele</label>
-                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} list="pangea-suppliers" />
+                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} list="managero-suppliers" />
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
@@ -1122,7 +1122,7 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         />
       )}
 
-      <datalist id="pangea-suppliers">
+      <datalist id="managero-suppliers">
         {suppliers.map(sp => <option key={sp.id} value={sp.name} />)}
       </datalist>
 
@@ -1891,7 +1891,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
 
   const buildText = () => {
     const date = new Date().toLocaleDateString('cs-CZ');
-    const lines: string[] = [`Nákupní seznam – Pangea (${date})`];
+    const lines: string[] = [`Nákupní seznam – Managero (${date})`];
     groups.forEach(([supplier, list]) => {
       lines.push('');
       lines.push(`${supplier}:`);

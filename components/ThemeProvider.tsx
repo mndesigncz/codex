@@ -19,7 +19,7 @@ export function ThemeProvider({ children, initial }: { children: React.ReactNode
 
   // Load persisted preference on mount
   useEffect(() => {
-    const stored = (localStorage.getItem('pangea-theme') as Theme | null);
+    const stored = ((localStorage.getItem('managero-theme') ?? localStorage.getItem('pangea-theme')) as Theme | null);
     const t = stored ?? initial ?? 'light';
     setThemeState(t);
     apply(t);
@@ -28,7 +28,7 @@ export function ThemeProvider({ children, initial }: { children: React.ReactNode
   const setTheme = (t: Theme) => {
     setThemeState(t);
     apply(t);
-    try { localStorage.setItem('pangea-theme', t); } catch {}
+    try { localStorage.setItem('managero-theme', t); } catch {}
     // Persist to the account (best effort)
     fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: t }) }).catch(() => {});
   };

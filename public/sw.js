@@ -4,9 +4,9 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch (e) {
-    data = { title: 'Pangea', body: event.data ? event.data.text() : '' };
+    data = { title: 'Managero', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'Pangea';
+  const title = data.title || 'Managero';
   const options = {
     body: data.body || '',
     icon: '/icon-192.png',

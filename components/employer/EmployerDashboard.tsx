@@ -85,7 +85,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   // First-steps checklist for a fresh team; goes away once done or dismissed.
   const [onboardingDismissed, setOnboardingDismissed] = useState(true);
   useEffect(() => {
-    try { setOnboardingDismissed(localStorage.getItem('pangea-onboarding-dismissed') === '1'); } catch { /* ignore */ }
+    try { setOnboardingDismissed(localStorage.getItem('managero-onboarding-dismissed') === '1'); } catch { /* ignore */ }
   }, []);
   const [closingsCount, setClosingsCount] = useState(0);
   const [rosters, setRosters] = useState<Record<string, RosterEntry[]>>({});
@@ -454,7 +454,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           <div className="glass-card p-5 border border-[#C8F542]/30">
             <div className="flex items-center justify-between gap-3 mb-2">
               <p className="font-bold text-[#16181A]">🚀 První kroky ({steps.length - remaining.length}/{steps.length})</p>
-              <button onClick={() => { setOnboardingDismissed(true); try { localStorage.setItem('pangea-onboarding-dismissed', '1'); } catch {} }}
+              <button onClick={() => { setOnboardingDismissed(true); try { localStorage.setItem('managero-onboarding-dismissed', '1'); } catch {} }}
                 className="text-xs text-black/40 hover:text-black">Skrýt</button>
             </div>
             <div className="space-y-1.5">

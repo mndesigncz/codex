@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
 
-const FIRED_KEY = 'pangea-proc-fired';
+const FIRED_KEY = 'managero-proc-fired';
 
 function pad(n: number) {
   return String(n).padStart(2, '0');
