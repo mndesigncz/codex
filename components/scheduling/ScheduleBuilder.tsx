@@ -1930,7 +1930,7 @@ function DayModal({
     if (unavailable.has(emp)) {
       if (!confirm(`⚠️ ${empName} označil/a tento den jako NEDOSTUPNÝ. Opravdu ho/ji na směnu přiřadit?`)) return;
     } else if (dayPref && dayPref !== 'off' && dayPref !== 'flexible' && dayPref !== shiftCat) {
-      if (!confirm(`⚠️ ${empName} preferuje ${dayPref === 'morning' ? 'ranní' : 'odpolední'} směnu, ne tuhle. Přesto přiřadit?`)) return;
+      if (!confirm(`⚠️ ${empName} má na tento den závaznou volbu „jen ${dayPref === 'morning' ? 'ranní' : 'odpolední'}" — tahle směna jí neodpovídá. Opravdu přiřadit?`)) return;
     } else if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
       if (!confirm(`⚠️ ${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny. Přesto přiřadit na tuhle?`)) return;
     }
