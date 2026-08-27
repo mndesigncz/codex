@@ -267,6 +267,7 @@ export default function ScheduleBuilder({ user }: Props) {
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<{ proposed: Proposed[]; warnings: string[] } | null>(null);
   const [adjust, setAdjust] = useState<{ changes: any[]; warnings: string[] } | null>(null);
+  const [adjustSkipped, setAdjustSkipped] = useState<Set<number>>(new Set());
   const [adjusting, setAdjusting] = useState(false);
   const [applyingAdjust, setApplyingAdjust] = useState(false);
 
@@ -281,18 +282,20 @@ export default function ScheduleBuilder({ user }: Props) {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setBoardError(d.error || 'Kontrola se nepodařila.');
-      else setAdjust({ changes: d.changes ?? [], warnings: d.warnings ?? [] });
+      else { setAdjust({ changes: d.changes ?? [], warnings: d.warnings ?? [] }); setAdjustSkipped(new Set()); }
     } catch { setBoardError('Kontrola se nepodařila.'); }
     setAdjusting(false);
   };
 
   const applyAdjust = async () => {
-    if (!adjust || adjust.changes.length === 0) { setAdjust(null); return; }
+    if (!adjust) return;
+    const chosen = adjust.changes.filter((_, i) => !adjustSkipped.has(i));
+    if (chosen.length === 0) { setAdjust(null); return; }
     setApplyingAdjust(true); setBoardError('');
     try {
       const res = await fetch('/api/schedule/adjust', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, commit: true, changes: adjust.changes }),
+        body: JSON.stringify({ month, commit: true, changes: chosen }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setBoardError(d.error || 'Úpravy se nepodařilo uložit.');
@@ -969,7 +972,14 @@ export default function ScheduleBuilder({ user }: Props) {
                 <>
                   <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
                     {adjust.changes.map((ch: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.06] px-3.5 py-2.5 text-sm flex-wrap">
+                      <div key={i} className={`flex items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.06] px-3.5 py-2.5 text-sm flex-wrap transition ${adjustSkipped.has(i) ? 'opacity-45' : ''}`}>
+                        <input type="checkbox" checked={!adjustSkipped.has(i)}
+                          onChange={() => setAdjustSkipped(prev => {
+                            const n = new Set(prev);
+                            if (n.has(i)) n.delete(i); else n.add(i);
+                            return n;
+                          })}
+                          className="h-[18px] w-[18px] rounded accent-[#8FB811] shrink-0" />
                         <span className="font-semibold tabular-nums text-[#16181A] shrink-0 w-14">{parseInt(ch.date.split('-')[2])}.{parseInt(ch.date.split('-')[1])}.</span>
                         <span className="text-black/45 tabular-nums shrink-0">{ch.startTime}–{ch.endTime}</span>
                         <span className="inline-flex items-center gap-1 min-w-0">
@@ -997,14 +1007,18 @@ export default function ScheduleBuilder({ user }: Props) {
                     </ul>
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={applyAdjust} disabled={applyingAdjust}
+                    <button onClick={applyAdjust}
+                      disabled={applyingAdjust || adjust.changes.length === adjustSkipped.size}
                       className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black disabled:opacity-50 transition">
-                      {applyingAdjust ? 'Ukládám…' : `Použít úpravy (${adjust.changes.length})`}
+                      {applyingAdjust ? 'Ukládám…' : `Použít vybrané (${adjust.changes.length - adjustSkipped.size})`}
                     </button>
                     <button onClick={() => setAdjust(null)} className="rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:bg-black/[0.08] transition">
                       Zahodit
                     </button>
-                    <span className="text-[11px] text-black/40">Dotčení lidé dostanou notifikaci o změně.</span>
+                    <span className="text-[11px] text-black/40">
+                      Odškrtni, co měnit nechceš. Důvody vycházejí z uložené dostupnosti — když nesedí,
+                      oprav ji v „Dostupnost týmu" → Upravit dostupnost. Dotčení lidé dostanou notifikaci.
+                    </span>
                   </div>
                 </>
               )}

@@ -113,6 +113,17 @@ export async function POST(req: Request) {
   const avail = await sql`
     SELECT employee_id, unavailable_dates, day_preferences, preferred_shift, max_shifts
     FROM availability_requests WHERE team_id = ${c.teamId} AND month = ${month}`;
+  // The morning/afternoon category follows the team's OWN shift types where the
+  // shift carries a type name — a noon-straddling "Odpolední" must not flip to
+  // morning just because it starts at 11:30.
+  let shiftTypes: any[] = [];
+  try {
+    shiftTypes = await sql`SELECT name, start_time FROM shift_types WHERE team_id = ${c.teamId}`;
+  } catch { /* ignore */ }
+  const typeCat = new Map<string, string>();
+  shiftTypes.forEach((t: any) => typeCat.set(String(t.name), categoryOf(String(t.start_time))));
+  const catOfShift = (sh: any) =>
+    typeCat.get(String(sh.type)) ?? categoryOf(String(sh.start_time));
   let timeOffRows: any[] = [];
   try {
     timeOffRows = await sql`
@@ -211,13 +222,14 @@ export async function POST(req: Request) {
   // Why the CURRENT person can no longer hold the shift (null = still fine).
   const clashReason = (p: P, s: any): string | null => {
     const date = String(s.date);
-    if (timeOffByEmp.get(p.id)?.has(date)) return 'má schválené volno';
-    if (p.unavailable.has(date)) return 'označil/a den jako nedostupný';
-    if (p.dayPrefs[date] === 'off') return 'označil/a den jako volno';
-    const cat = categoryOf(s.start_time);
+    if (timeOffByEmp.get(p.id)?.has(date)) return 'má na ten den schválené volno (žádost o volno)';
+    if (p.unavailable.has(date) || p.dayPrefs[date] === 'off') {
+      return 'v dostupnosti má ten den „nemůžu"';
+    }
+    const cat = catOfShift(s);
     const pref = p.dayPrefs[date];
     if ((pref === 'morning' || pref === 'afternoon') && pref !== cat) {
-      return `může ten den jen ${pref === 'morning' ? 'ranní' : 'odpolední'}`;
+      return `v dostupnosti má ten den „jen ${pref === 'morning' ? 'ranní' : 'odpolední'}"`;
     }
     return null;
   };
@@ -237,7 +249,7 @@ export async function POST(req: Request) {
     const reason = clashReason(holder, s);
     if (!reason) continue;
     const date = String(s.date);
-    const cat = categoryOf(s.start_time);
+    const cat = catOfShift(s);
     const h = shiftHours(s.start_time, s.end_time);
 
     const candidates = Array.from(people.values()).filter((p) =>
