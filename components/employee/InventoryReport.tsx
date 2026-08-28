@@ -6,6 +6,7 @@ import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
+import NewStockEntry from '../inventory/NewStockEntry';
 
 interface InventoryItem {
   id: number;
@@ -61,37 +62,12 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   const [showReport, setShowReport] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [note, setNote] = useState('');
-  // Proposing a brand-new item — lands in the employer's approval queue.
+  // Writing a brand-new thing into stock — live right away, employer confirms.
   const [proposeOpen, setProposeOpen] = useState(false);
-  const [propName, setPropName] = useState('');
-  const [propUnit, setPropUnit] = useState('ks');
-  const [propCatId, setPropCatId] = useState<number | ''>('');
+  const [propCatId] = useState<number | ''>('');
   const [propMsg, setPropMsg] = useState('');
-  const [proposing, setProposing] = useState(false);
   const reloadItems = () =>
     fetch('/api/inventory').then(r => r.json()).then(d => { if (Array.isArray(d)) setItems(d); }).catch(() => {});
-  const submitProposal = async () => {
-    if (!propName.trim()) return;
-    setProposing(true); setPropMsg('');
-    const cat = (allCats as any[]).find((c: any) => c.id === propCatId);
-    const res = await fetch('/api/inventory', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: propName.trim(), unit: propUnit.trim() || 'ks', quantity: 0,
-        category: cat?.name ?? null, categoryId: propCatId === '' ? undefined : propCatId,
-      }),
-    }).catch(() => null);
-    setProposing(false);
-    if (res?.ok) {
-      setPropName(''); setPropCatId(''); setProposeOpen(false);
-      setPropMsg('Návrh odeslán — vedení ho schválí. ✓');
-      setTimeout(() => setPropMsg(''), 4000);
-      reloadItems();
-    } else {
-      const d = res ? await res.json().catch(() => ({})) : {};
-      setPropMsg(d.error || 'Návrh se nepodařilo odeslat.');
-    }
-  };
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -123,7 +99,10 @@ export default function InventoryReport({ user, initialCategory }: Props) {
     [allCats, openCategory],
   );
 
-  const usable = useMemo(() => items.filter((i: any) => i.approved !== false), [items]);
+  // Newly written-in things count as stock from the moment they land — hiding
+  // them until the employer ticks them off would mean the shift can't work with
+  // what it just unpacked. They only carry a „čeká na potvrzení" badge.
+  const usable = useMemo(() => items, [items]);
   const myPending = useMemo(() => items.filter((i: any) => i.approved === false), [items]);
   const countIn = (id: number) => usable.filter(matcher(allCats as any, id)).length;
 
@@ -285,38 +264,48 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       <div className="glass-card p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <p className="font-semibold text-[#16181A]">Chybí něco v katalogu?</p>
-            <p className="text-sm text-black/45 mt-0.5">Navrhni novou položku — po schválení vedením se objeví ve skladu.</p>
+            <p className="font-semibold text-[#16181A]">Přivezl se něco nového?</p>
+            <p className="text-sm text-black/45 mt-0.5">
+              Zapiš to rovnou do skladu i s množstvím — vedení to jen potvrdí.
+            </p>
           </div>
           <button onClick={() => setProposeOpen(o => !o)}
             className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition">
-            {proposeOpen ? 'Zavřít' : '+ Navrhnout položku'}
+            {proposeOpen ? 'Zavřít' : '＋ Nová věc do skladu'}
           </button>
         </div>
         {proposeOpen && (
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_110px_1fr_auto] gap-2">
-            <input value={propName} onChange={e => setPropName(e.target.value)} placeholder="Název položky" maxLength={120}
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-            <input value={propUnit} onChange={e => setPropUnit(e.target.value)} placeholder="ks" maxLength={20}
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-            <select value={propCatId} onChange={e => setPropCatId(e.target.value === '' ? '' : parseInt(e.target.value))}
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
-              <option value="">Bez kategorie</option>
-              {(allCats as any[]).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <button onClick={submitProposal} disabled={proposing || !propName.trim()}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
-              {proposing ? 'Odesílám…' : 'Odeslat návrh'}
-            </button>
+          <div className="mt-4">
+            <NewStockEntry
+              initialCategoryId={typeof propCatId === 'number' ? propCatId : null}
+              onSaved={() => {
+                setProposeOpen(false);
+                setPropMsg('Zapsáno do skladu — vedení to potvrdí. ✓');
+                setTimeout(() => setPropMsg(''), 4000);
+                reloadItems();
+              }}
+              onCancel={() => setProposeOpen(false)}
+            />
           </div>
         )}
         {myPending.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {myPending.map((i: any) => (
-              <span key={i.id} className="rounded-full bg-amber-500/12 text-amber-700 px-3 py-1.5 text-xs font-medium">
-                {i.name} · čeká na schválení
-              </span>
-            ))}
+          <div className="mt-3 space-y-1.5">
+            <p className="text-xs font-bold uppercase tracking-wider text-black/40">Čeká na potvrzení vedením</p>
+            <div className="flex flex-wrap gap-1.5">
+              {myPending.map((i: any) => (
+                <span key={i.id} className="flex items-center gap-2 rounded-full bg-amber-500/12 text-amber-700 pl-1.5 pr-3 py-1 text-xs font-medium">
+                  {i.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={i.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                  ) : (
+                    <span className="h-6 w-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <Icon name="box" size={12} strokeWidth={2} />
+                    </span>
+                  )}
+                  {i.name}{i.quantity > 0 ? ` · ${i.quantity} ${i.unit}` : ''}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -412,6 +401,11 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                         <p className="text-sm font-medium text-[#16181A] truncate">
                           {item.name}
                           {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
+                          {(item as any).approved === false && (
+                            <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[10px] font-semibold align-middle">
+                              čeká na potvrzení
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-black/45 truncate">{item.description || item.category}</p>
                       </div>

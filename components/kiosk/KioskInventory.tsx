@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import KioskPackagedStock from './KioskPackagedStock';
+import NewStockEntry from '../inventory/NewStockEntry';
+import { useKioskShift } from './KioskShiftGate';
 
 interface Item {
   id: number;
@@ -21,7 +23,10 @@ interface Item {
 const statusOf = (i: Item) =>
   (i as any).status ?? (i.quantity <= (i.criticalQuantity ?? 0) ? 'critical' : i.quantity <= i.minQuantity ? 'low' : 'ok');
 
-export default function KioskInventory() {
+export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }: {
+  autoOpenEntry?: boolean;
+  onEntryOpened?: () => void;
+} = {}) {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,17 +38,30 @@ export default function KioskInventory() {
   // full list would only be in the way on a tablet.
   const [stockFocused, setStockFocused] = useState(false);
   const [showParked, setShowParked] = useState(false);
+  // Writing a new thing in, attributed to whoever is clocked in on this tablet.
+  const { activeId, active } = useKioskShift();
+  const [adding, setAdding] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
 
-  useEffect(() => {
+  const reload = () =>
     Promise.all([
       fetch('/api/inventory').then(r => r.json()).catch(() => []),
       fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
     ]).then(([d, c]) => {
-      if (Array.isArray(d)) setItems(Array.isArray(d) ? d.filter((i: any) => i.approved !== false) : d);
+      // Things the crew just wrote in stay in the list — badged, not hidden.
+      if (Array.isArray(d)) setItems(d);
       if (Array.isArray(c)) setCategories(c);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+
+  useEffect(() => { reload(); }, []);
+  // Arriving from the home-screen shortcut: open the entry form straight away.
+  useEffect(() => {
+    if (!autoOpenEntry) return;
+    setAdding(true);
+    setStockFocused(false);
+    onEntryOpened?.();
+  }, [autoOpenEntry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cats = useMemo(() => ['Vše', ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
   const parkedCount = items.filter(i => i.archived === true).length;
@@ -88,6 +106,32 @@ export default function KioskInventory() {
 
       {!stockFocused && (
         <div className="space-y-4">
+          {/* New arrivals get written in right here — the tablet is where the
+              crew stands when the delivery is unpacked. */}
+          {adding ? (
+            <div className="glass-card p-5 space-y-4">
+              <p className="font-bold text-lg text-[#16181A] flex items-center gap-2">
+                <Icon name="box" size={20} className="text-[#5B7A08]" /> Nová věc do skladu
+                {active && <span className="text-sm font-medium text-black/40">· zapisuje {active.name}</span>}
+              </p>
+              <NewStockEntry
+                variant="kiosk"
+                actingAs={activeId}
+                onSaved={() => { setAdding(false); setJustAdded(true); setTimeout(() => setJustAdded(false), 4000); reload(); }}
+                onCancel={() => setAdding(false)}
+              />
+            </div>
+          ) : (
+            <button onClick={() => setAdding(true)}
+              className="w-full rounded-2xl bg-[#16181A] text-white px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
+              <Icon name="plus" size={20} strokeWidth={2.2} /> Zapsat novou věc do skladu
+            </button>
+          )}
+          {justAdded && (
+            <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] px-5 py-3.5 text-base font-semibold">
+              Zapsáno do skladu ✓ Vedení to potvrdí.
+            </div>
+          )}
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={17} /></span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku…"
@@ -126,6 +170,11 @@ export default function KioskInventory() {
                       <p className="font-semibold text-[#16181A] truncate">
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
+                        {(i as any).approved === false && (
+                          <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[10px] font-semibold align-middle">
+                            čeká na potvrzení
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-black/40 truncate">{i.category}</p>
                     </div>

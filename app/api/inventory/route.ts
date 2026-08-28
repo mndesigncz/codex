@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus, type CategoryPackaging } from '@/lib/packaging';
+import { resolveActingUser } from '@/lib/kioskActing';
+import { audit } from '@/lib/audit';
 import { packagingSourceOf } from '@/lib/categoryTree';
 
 export const dynamic = 'force-dynamic';
@@ -44,12 +46,15 @@ export async function GET() {
         i.hide_from_overview AS "hideFromOverview",
         i.highlight,
         i.approved, i.submitted_by AS "submittedBy",
+        i.photo_url         AS "photoUrl",
         i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
-        u.name              AS "updatedByName"
+        u.name              AS "updatedByName",
+        s.name              AS "submittedByName"
       FROM inventory_items i
       LEFT JOIN users u ON u.id = i.updated_by
+      LEFT JOIN users s ON s.id = i.submitted_by
       WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
       ORDER BY i.name ASC`;
   } catch {
@@ -150,14 +155,17 @@ export async function GET() {
   }));
 }
 
-// POST: employer creates an item; an employee PROPOSES one (needs approval).
+// POST: employer creates an item; everyone else (crew in the app, crew on the
+// shared tablet) WRITES ONE IN — it counts as stock right away but waits for
+// the employer's tick. On the kiosk the entry is attributed to whoever is
+// clocked in, so „kdo to zapsal" is a person, not the tablet.
 export async function POST(request: Request) {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const isProposal = me.role !== 'employer';
 
   const body = await request.json();
+  const authorId = await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
   const name = (body.name ?? '').trim();
   if (!name) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
@@ -178,28 +186,44 @@ export async function POST(request: Request) {
       INSERT INTO inventory_items
         (team_id, name, category, quantity, min_quantity, critical_quantity, max_quantity, unit, supplier, supplier_url, created_by, updated_by, updated_at)
       VALUES
-        (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${me.meId}, ${me.meId}, NOW())
+        (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${authorId}, ${authorId}, NOW())
       RETURNING id`;
   } catch (e) {
     // A naked 500 here once cost a debugging session — name the reason.
     return NextResponse.json({ error: 'Položku se nepodařilo vytvořit.', detail: String(e).slice(0, 300) }, { status: 500 });
   }
 
-  // Employee proposals wait for the employer; the columns are newer, so the
+  // Crew entries wait for the employer's tick; the columns are newer, so the
   // flag lands defensively (missing column ⇒ item is simply live right away).
   if (isProposal) {
     try {
-      await sql`UPDATE inventory_items SET approved = FALSE, submitted_by = ${me.meId} WHERE id = ${item.id}`;
+      await sql`UPDATE inventory_items SET approved = FALSE, submitted_by = ${authorId} WHERE id = ${item.id}`;
       const employers = await sql`SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
-      const [author] = await sql`SELECT name FROM users WHERE id = ${me.meId}`;
+      const [author] = await sql`SELECT name FROM users WHERE id = ${authorId}`;
+      const who = author?.name ?? (me.role === 'kiosk' ? 'Někdo na iPadu' : 'Zaměstnanec');
+      const howMuch = quantity > 0 ? ` · ${quantity} ${unit}` : '';
       await notifyUsers((employers as any[]).map(e => e.id), {
-        title: '📦 Návrh položky ke schválení',
-        body: `${author?.name ?? 'Zaměstnanec'} navrhuje do skladu „${name}".`,
+        title: '📦 Nová věc ve skladu ke schválení',
+        body: `${who} zapsal/a „${name}"${howMuch}. Zkontroluj a potvrď.`,
         type: 'info',
+        category: 'stock',
         link: '/employer/overview?view=inventory',
       });
     } catch { /* best-effort */ }
   }
+
+  // Whatever came in with the item is a real stock movement — without this the
+  // first quantity would appear out of nowhere in the item's history.
+  if (quantity > 0) {
+    try {
+      await sql`
+        INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note, created_at)
+        VALUES (${item.id}, ${authorId}, 0, ${quantity},
+                ${isProposal ? 'Zapsáno jako nová věc do skladu' : 'Založení položky'}, NOW())`;
+    } catch { /* log table is best-effort */ }
+  }
+  audit(me.teamId, authorId, isProposal ? 'inventory.write-in' : 'inventory.create', 'inventory_item', item.id,
+    `${name}${quantity > 0 ? ` (${quantity} ${unit})` : ''}${me.role === 'kiosk' ? ' · z iPadu' : ''}`);
 
   // unit_cost applied separately so a not-yet-migrated column can't fail the insert.
   if (unitCost !== null && Number.isFinite(unitCost)) {
@@ -223,6 +247,12 @@ export async function POST(request: Request) {
         WHERE id = ${item.id} AND EXISTS (
           SELECT 1 FROM inventory_categories c WHERE c.id = ${categoryId} AND c.team_id = ${me.teamId})`;
     } catch { /* column not migrated yet */ }
+  }
+
+  // A photo of the actual thing — how the employer recognizes what the crew brought in.
+  const photoUrl = body.photoUrl ? String(body.photoUrl).trim().slice(0, 500) || null : null;
+  if (photoUrl) {
+    try { await sql`UPDATE inventory_items SET photo_url = ${photoUrl} WHERE id = ${item.id}`; } catch { /* not migrated */ }
   }
 
   const rawSize = body.packageSize === '' || body.packageSize == null ? null : Number(body.packageSize);

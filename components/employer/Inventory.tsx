@@ -645,13 +645,29 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
 
       {items.some(i => i.approved === false) && (
         <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
-          <p className="font-semibold text-sm text-[#16181A]">📥 Návrhy položek od týmu ({items.filter(i => i.approved === false).length})</p>
+          <p className="font-semibold text-sm text-[#16181A]">📥 Nové věci od týmu ({items.filter(i => i.approved === false).length})</p>
           <div className="space-y-2">
             {items.filter(i => i.approved === false).map(i => (
-              <div key={i.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-2.5">
-                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">
-                  {i.name}
-                  <span className="text-black/40 font-normal"> · {i.category || 'bez kategorie'} · {i.quantity} {i.unit}</span>
+              <div key={i.id} className="flex flex-wrap items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-2.5">
+                {(i as any).photoUrl ? (
+                  <a href={(i as any).photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={(i as any).photoUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-black/[0.06]" />
+                  </a>
+                ) : (
+                  <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.04] flex items-center justify-center text-black/35">
+                    <Icon name="box" size={19} strokeWidth={1.7} />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A]">
+                  <span className="block truncate">
+                    {i.name}
+                    <span className="text-black/40 font-normal"> · {i.category || 'bez kategorie'} · {i.quantity} {i.unit}</span>
+                  </span>
+                  <span className="block text-[11px] font-normal text-black/40 truncate">
+                    {(i as any).submittedByName ? `zapsal/a ${(i as any).submittedByName}` : 'zapsal někdo z týmu'}
+                    {(i as any).description ? ` · „${(i as any).description}"` : ''}
+                  </span>
                 </span>
                 <button
                   onClick={async () => {
