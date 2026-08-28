@@ -49,6 +49,14 @@ function shiftHours(start: string, end: string): number {
   if (mins <= 0) mins += 24 * 60;
   return mins / 60;
 }
+function toMin(t: string) {
+  const [h, m] = String(t).slice(0, 5).split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+function toHM(min: number) {
+  const m = ((min % (24 * 60)) + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
 function prevDay(date: string) {
   const d = new Date(date + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() - 1);
@@ -180,12 +188,14 @@ export async function POST(req: Request) {
   let teamMaxConsecutive: number | null = null;
   let teamMaxHours: number | null = null;
   let balanceShifts = true;
+  let splitShifts = false;
   try {
     const [t] = await sql`
-      SELECT max_consecutive_days, max_month_hours, balance_shifts FROM teams WHERE id = ${ctx.teamId}`;
+      SELECT max_consecutive_days, max_month_hours, balance_shifts, allow_split_shifts FROM teams WHERE id = ${ctx.teamId}`;
     teamMaxConsecutive = t?.max_consecutive_days ?? null;
     teamMaxHours = t?.max_month_hours ?? null;
     balanceShifts = t?.balance_shifts !== false; // NULL = fair rotation on
+    splitShifts = t?.allow_split_shifts === true;
   } catch {
     try {
       const [t] = await sql`SELECT max_consecutive_days FROM teams WHERE id = ${ctx.teamId}`;
@@ -457,9 +467,67 @@ export async function POST(req: Request) {
       const empId = slotFilled.get(st.id);
       if (empId == null) {
         const [, mm, dd] = date.split('-');
-        const free = emps.filter((e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e));
         const rtW = resolveTimes(st, oh);
         const hW = shiftHours(rtW.start, rtW.end);
+
+        // Nobody can hold the whole slot. With splitting enabled, cut it in
+        // half (rounded to 30 min) and look for two DIFFERENT people — a day
+        // choice like "jen odpolední" also unlocks the matching half when that
+        // type's window overlaps it.
+        if (splitShifts && hW >= 3) {
+          const startMin = toMin(rtW.start);
+          const endMinRaw = toMin(rtW.end);
+          const endMin = endMinRaw <= startMin ? endMinRaw + 24 * 60 : endMinRaw;
+          const midMin = Math.round((startMin + endMin) / 2 / 30) * 30;
+          const halves = [
+            { start: toHM(startMin), end: toHM(midMin), startMin, endMin: midMin },
+            { start: toHM(midMin), end: toHM(endMin), startMin: midMin, endMin },
+          ];
+          const halfPrefOk = (e: Emp, half: { startMin: number; endMin: number; start: string }) => {
+            if (dayPrefOk(e, date, st, half.start)) return true;
+            // "jen <typ>" also allows the half its type-window overlaps.
+            const wanted = String(emps ? e.dayPrefs[date] ?? '' : '');
+            const m = /^type:(\d+)$/.exec(wanted);
+            if (!m) return false;
+            const t = shiftTypes.find((x: any) => Number(x.id) === parseInt(m[1]));
+            if (!t) return false;
+            const rt = resolveTimes(t, oh);
+            const ts = toMin(rt.start);
+            const teRaw = toMin(rt.end);
+            const te = teRaw <= ts ? teRaw + 24 * 60 : teRaw;
+            return ts < half.endMin && half.startMin < te;
+          };
+          const picks: (Emp | null)[] = [null, null];
+          for (let hi = 0; hi < 2; hi++) {
+            const half = halves[hi];
+            const hHours = (half.endMin - half.startMin) / 60;
+            const cands = emps.filter((e) =>
+              isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e)
+              && restOk(e, date) && hoursOk(e, hHours) && halfPrefOk(e, half)
+              && picks[0]?.id !== e.id,
+            );
+            cands.sort((a, b) => a.assigned - b.assigned || a.name.localeCompare(b.name));
+            picks[hi] = cands[0] ?? null;
+          }
+          if (picks[0] && picks[1]) {
+            for (let hi = 0; hi < 2; hi++) {
+              const half = halves[hi];
+              const who = picks[hi]!;
+              assignedToday.add(who.id);
+              take(who, date, (half.endMin - half.startMin) / 60);
+              proposed.push({
+                employeeId: who.id, employeeName: who.name, employeeAvatar: who.avatar,
+                date, startTime: half.start, endTime: half.end,
+                type: st.name, shiftTypeId: st.id, shiftTypeName: st.name, color: st.color,
+                split: true,
+              });
+            }
+            warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — směna „${st.name}" rozdělena: ${picks[0]!.name} (${halves[0].start}–${halves[0].end}) + ${picks[1]!.name} (${halves[1].start}–${halves[1].end}).`);
+            continue;
+          }
+        }
+
+        const free = emps.filter((e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e));
         const blockedByPref = free.some((e) => !dayPrefOk(e, date, st, rtW.start));
         const blockedByRest = free.some((e) => dayPrefOk(e, date, st, rtW.start) && !restOk(e, date));
         const blockedByHours = free.some((e) => dayPrefOk(e, date, st, rtW.start) && restOk(e, date) && !hoursOk(e, hW));

@@ -421,6 +421,21 @@ export async function GET() {
     // A closing can belong to an off-site event (venkovní akce) — it lives
     // beside the shop's own closing for that day, never instead of it.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS event_id INTEGER`;
+    // Receipts snapped on the go (TO GO mode) — photo + amounts, optionally
+    // pushed into the stock later.
+    await sql`
+      CREATE TABLE IF NOT EXISTS receipts (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER,
+        photo_url TEXT,
+        supplier TEXT,
+        amount INTEGER,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    // Scheduling: may the generator split one shift between two people?
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS allow_split_shifts BOOLEAN`;
     // watchdog for forgotten clock-outs: when the person was already reminded
     await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
 

@@ -67,12 +67,14 @@ export async function GET() {
   let teamMax: number | null = null;
   let teamMaxHours: number | null = null;
   let balanceShifts = true;
+  let splitShifts = false;
   try {
     const [t] = await sql`
-      SELECT max_consecutive_days, max_month_hours, balance_shifts FROM teams WHERE id = ${u.team_id}`;
+      SELECT max_consecutive_days, max_month_hours, balance_shifts, allow_split_shifts FROM teams WHERE id = ${u.team_id}`;
     teamMax = t?.max_consecutive_days ?? null;
     teamMaxHours = t?.max_month_hours ?? null;
     balanceShifts = t?.balance_shifts !== false; // NULL = on
+    splitShifts = t?.allow_split_shifts === true;
   } catch { /* not migrated yet */ }
 
   let members: any[] = [];
@@ -89,7 +91,7 @@ export async function GET() {
       ORDER BY role DESC, name ASC`;
   }
 
-  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, members });
+  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, splitShifts, members });
 }
 
 // PUT { teamMax?, teamMaxHours?, balanceShifts?, overrides?: [{ id, maxConsecutive?, maxHours? }] }
@@ -107,6 +109,9 @@ export async function PUT(req: NextRequest) {
     }
     if (b.balanceShifts !== undefined) {
       await sql`UPDATE teams SET balance_shifts = ${b.balanceShifts === true} WHERE id = ${u.team_id}`;
+    }
+    if (b.splitShifts !== undefined) {
+      await sql`UPDATE teams SET allow_split_shifts = ${b.splitShifts === true} WHERE id = ${u.team_id}`;
     }
     if (Array.isArray(b.overrides)) {
       for (const o of b.overrides.slice(0, 100)) {

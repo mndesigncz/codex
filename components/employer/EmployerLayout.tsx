@@ -25,6 +25,8 @@ import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
 import TimeOffRequest from '../scheduling/TimeOffRequest';
 import TimeOffApprovals from '../scheduling/TimeOffApprovals';
 import Procedures from '../procedures/Procedures';
+import ToGoMode from './ToGoMode';
+import ReceiptsPanel from './ReceiptsPanel';
 import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
 import MobileMoreSheet from '../MobileMoreSheet';
@@ -70,6 +72,20 @@ interface Props {
 export default function EmployerLayout({ user }: Props) {
   const { plan } = usePlan();
   const [currentView, setCurrentView] = useState('overview');
+  // TO GO vs. full administration. Phones default to TO GO (the pocket view);
+  // the choice is remembered and the switch is always one tap away.
+  const [appMode, setAppMode] = useState<'togo' | 'full' | null>(null);
+  const [receiptsOpen, setReceiptsOpen] = useState(false);
+  useEffect(() => {
+    let stored: string | null = null;
+    try { stored = localStorage.getItem('managero-app-mode'); } catch { /* ignore */ }
+    if (stored === 'togo' || stored === 'full') setAppMode(stored);
+    else setAppMode(window.innerWidth < 768 ? 'togo' : 'full');
+  }, []);
+  const switchMode = (m: 'togo' | 'full') => {
+    setAppMode(m);
+    try { localStorage.setItem('managero-app-mode', m); } catch { /* ignore */ }
+  };
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
   const navigate = (view: string, arg?: string) => {
@@ -152,6 +168,18 @@ export default function EmployerLayout({ user }: Props) {
     </div>
   );
 
+  if (appMode === 'togo') {
+    return (
+      <ProfileLinkProvider>
+        <ToGoMode
+          user={user as any}
+          onExit={() => switchMode('full')}
+          onOpenView={(v) => { switchMode('full'); navigate(v); }}
+        />
+      </ProfileLinkProvider>
+    );
+  }
+
   return (
     <ProfileLinkProvider>
     <div className="flex h-screen overflow-hidden">
@@ -222,6 +250,14 @@ export default function EmployerLayout({ user }: Props) {
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>
+          <button onClick={() => setReceiptsOpen(true)} title="Účtenky"
+            className="rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors text-lg leading-none">
+            🧾
+          </button>
+          <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu"
+            className="rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
+            ☕ TO GO
+          </button>
           <NotificationBell />
         </header>
 
@@ -258,6 +294,18 @@ export default function EmployerLayout({ user }: Props) {
         </nav>
 
       </div>
+
+      {receiptsOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setReceiptsOpen(false)}>
+          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">🧾 Účtenky</h3>
+              <button onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+            </div>
+            <ReceiptsPanel />
+          </div>
+        </div>
+      )}
 
       <MobileMoreSheet
         open={moreOpen}
