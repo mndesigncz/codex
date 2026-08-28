@@ -204,12 +204,14 @@ export async function POST(req: Request) {
   }
   const personalMax = new Map<number, number | null>();
   const personalHours = new Map<number, number | null>();
+  const splitOk = new Map<number, boolean>();
   try {
     const rows = await sql`
-      SELECT id, max_consecutive_days, max_month_hours FROM users WHERE team_id = ${ctx.teamId}`;
+      SELECT id, max_consecutive_days, max_month_hours, split_shifts_ok FROM users WHERE team_id = ${ctx.teamId}`;
     rows.forEach((r: any) => {
       personalMax.set(r.id, r.max_consecutive_days ?? null);
       personalHours.set(r.id, r.max_month_hours ?? null);
+      splitOk.set(r.id, r.split_shifts_ok !== false);
     });
   } catch {
     try {
@@ -504,6 +506,7 @@ export async function POST(req: Request) {
             const cands = emps.filter((e) =>
               isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e)
               && restOk(e, date) && hoursOk(e, hHours) && halfPrefOk(e, half)
+              && (splitOk.get(e.id) !== false)
               && picks[0]?.id !== e.id,
             );
             cands.sort((a, b) => a.assigned - b.assigned || a.name.localeCompare(b.name));

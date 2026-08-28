@@ -436,6 +436,8 @@ export async function GET() {
       )`;
     // Scheduling: may the generator split one shift between two people?
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS allow_split_shifts BOOLEAN`;
+    // Per-person opt-out from split shifts (NULL = allowed when the team allows).
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS split_shifts_ok BOOLEAN`;
     // watchdog for forgotten clock-outs: when the person was already reminded
     await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
 
