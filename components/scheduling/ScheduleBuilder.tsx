@@ -1160,7 +1160,7 @@ export default function ScheduleBuilder({ user }: Props) {
                       {dayProposed.slice(0, 3).map((p, idx) => (
                         <span
                           key={`p-${idx}`}
-                          title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}`}
+                          title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ' (část směny)' : ''}`}
                           className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
                         >
                           <span className="flex-shrink-0">✨{p.employeeAvatar}</span>
@@ -2154,6 +2154,7 @@ function ScheduleRulesManager() {
   const [teamMax, setTeamMax] = useState<string>('');
   const [teamMaxHours, setTeamMaxHours] = useState<string>('');
   const [balance, setBalance] = useState(true);
+  const [split, setSplit] = useState(false);
   const [members, setMembers] = useState<{ id: number; name: string; avatar: string | null; role: string; maxConsecutive: number | null; maxHours?: number | null }[]>([]);
   const [overrides, setOverrides] = useState<Record<number, string>>({});
   const [hourOverrides, setHourOverrides] = useState<Record<number, string>>({});
@@ -2168,6 +2169,7 @@ function ScheduleRulesManager() {
       setTeamMax(d.teamMax != null ? String(d.teamMax) : '');
       setTeamMaxHours(d.teamMaxHours != null ? String(d.teamMaxHours) : '');
       setBalance(d.balanceShifts !== false);
+      setSplit(d.splitShifts === true);
       const list = Array.isArray(d.members) ? d.members : [];
       setMembers(list);
       const ov: Record<number, string> = {};
@@ -2190,6 +2192,7 @@ function ScheduleRulesManager() {
           teamMax: teamMax === '' ? null : parseInt(teamMax),
           teamMaxHours: teamMaxHours === '' ? null : parseInt(teamMaxHours),
           balanceShifts: balance,
+          splitShifts: split,
           overrides: members.map(m => ({
             id: m.id,
             maxConsecutive: overrides[m.id] === '' ? null : parseInt(overrides[m.id]),
@@ -2250,6 +2253,23 @@ function ScheduleRulesManager() {
             Generátor dá přednost tomu, kdo má zatím méně směn, a střídá, kdo s kým slouží.
             Nedostupnost a limity mají vždy přednost; preference ranní/odpolední se dál
             zohledňují při rovnosti.
+          </span>
+        </label>
+      </div>
+
+      <div className="glass-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon name="swap" size={18} className="text-[#5B7A08]" />
+          <h2 className="font-bold text-[#16181A]">Dělení směn</h2>
+        </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={split} onChange={e => setSplit(e.target.checked)}
+            className="mt-0.5 h-5 w-5 rounded accent-[#8FB811]" />
+          <span className="text-sm text-black/60">
+            <span className="font-semibold text-[#16181A]">Povolit rozdělení směny mezi dva lidi.</span>{' '}
+            Když směnu nemůže vzít nikdo celou, generátor ji rozpůlí — první část vezme ten,
+            kdo může začátek, druhou ten, kdo může až později (třeba „jen odpolední").
+            V náhledu jsou půlky označené.
           </span>
         </label>
       </div>
