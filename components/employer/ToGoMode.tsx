@@ -1,18 +1,19 @@
 'use client';
 
-// TO GO — the employer's pocket view. Standing in the doorway with a coffee:
-// how is today going, who is on shift, what is running out, snap a receipt.
-// One tap switches to the full administration and back; the light glass look
-// keeps it calm on a phone.
+// TO GO — the employer's pocket view, styled like the rest of the app's
+// iOS-27 liquid glass: one dark hero card with today's number and a weekly
+// sparkline, layered translucent tiles for everything the owner checks daily,
+// and the receipt scanner one thumb-reach away.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Icon } from '../Icons';
+import { Icon, LogoMark } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import ReceiptsPanel from './ReceiptsPanel';
 
-function pragueToday(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+function pragueToday(offset = 0): string {
+  return new Date(Date.now() + offset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
 }
+const DAY_LETTERS = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
 
 export default function ToGoMode({ user, onExit, onOpenView }: {
   user: { name?: string };
@@ -22,9 +23,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
 }) {
   const money = useMoney();
   const [pos, setPos] = useState<any | null>(null);
-  const [closToday, setClosToday] = useState<{ cash: number; card: number } | null>(null);
-  const [onShift, setOnShift] = useState<{ id: number; name: string; avatar: string | null; since: string }[]>([]);
-  const [lowStock, setLowStock] = useState<number>(0);
+  const [closings, setClosings] = useState<any[]>([]);
+  const [roster, setRoster] = useState<any[]>([]);
+  const [lowItems, setLowItems] = useState<any[]>([]);
   const [pendingClosings, setPendingClosings] = useState(0);
 
   useEffect(() => {
@@ -33,127 +34,211 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       .then(d => setPos(d?.connected && d.bills != null ? d : null)).catch(() => {});
     fetch('/api/closings').then(r => r.json()).then(d => {
       const list = Array.isArray(d.closings) ? d.closings : [];
-      const todays = list.filter((c: any) => (c.shift_date ?? c.date) === today && !c.covered_by);
-      if (todays.length) {
-        setClosToday({
-          cash: todays.reduce((s: number, c: any) => s + (Number(c.cash_revenue) || 0), 0),
-          card: todays.reduce((s: number, c: any) => s + (Number(c.card_revenue) || 0), 0),
-        });
-      }
+      setClosings(list);
       setPendingClosings(list.filter((c: any) => c.approved === false).length);
     }).catch(() => {});
     fetch('/api/attendance?days=1').then(r => r.json()).then(d => {
-      const roster = Array.isArray(d.roster) ? d.roster : [];
-      setOnShift(roster.filter((r: any) => r.openSince)
-        .map((r: any) => ({ id: r.id, name: r.name, avatar: r.avatar ?? null, since: r.openSince })));
+      setRoster(Array.isArray(d.roster) ? d.roster : []);
     }).catch(() => {});
     fetch('/api/inventory').then(r => r.json()).then(d => {
       const items = Array.isArray(d.items) ? d.items : [];
-      setLowStock(items.filter((i: any) => i.status === 'low' || i.status === 'critical').length);
+      setLowItems(items.filter((i: any) => i.status === 'low' || i.status === 'critical'));
     }).catch(() => {});
   }, []);
 
-  const revenue = pos ? Number(pos.total) || 0 : closToday ? closToday.cash + closToday.card : null;
+  // ---- Week of revenue: one bar per day, today included live from the POS. ----
+  const week = useMemo(() => {
+    const days: { date: string; label: string; total: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = pragueToday(-i);
+      days.push({ date, label: DAY_LETTERS[new Date(date + 'T12:00:00').getDay()], total: 0 });
+    }
+    const byDate = new Map(days.map(d => [d.date, d]));
+    for (const c of closings) {
+      if (c.covered_by) continue;
+      const d = byDate.get(String(c.shift_date ?? c.date));
+      if (d) d.total += (Number(c.cash_revenue) || 0) + (Number(c.card_revenue) || 0);
+    }
+    const today = byDate.get(pragueToday());
+    if (today && pos && Number(pos.total) > today.total) today.total = Number(pos.total);
+    const max = Math.max(...days.map(d => d.total), 1);
+    const sum = days.reduce((s, d) => s + d.total, 0);
+    return { days, max, sum };
+  }, [closings, pos]);
+
+  const today = pragueToday();
+  const todayTotal = week.days[6]?.total ?? 0;
+  const yesterdayTotal = week.days[5]?.total ?? 0;
+  const trendPct = yesterdayTotal > 0 ? Math.round(((todayTotal - yesterdayTotal) / yesterdayTotal) * 100) : null;
+
+  const onShift = roster.filter((r: any) => r.openSince);
+  const plannedToday = roster.filter((r: any) => r.shiftStart);
   const hour = new Date().getHours();
   const greeting = hour < 10 ? 'Dobré ráno' : hour < 18 ? 'Hezký den' : 'Dobrý večer';
   const firstName = (user?.name ?? '').split(' ')[0];
 
-  const quick = [
-    { view: 'reports', icon: 'trend', label: 'Přehledy' },
-    { view: 'inventory', icon: 'box', label: 'Sklad' },
-    { view: 'shifts', icon: 'calendar', label: 'Rozvrh' },
-    { view: 'rewards', icon: 'check', label: 'Hodnocení' },
+  const tiles = [
+    { view: 'reports', emoji: '📊', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'bg-[#0A84FF] text-white' },
+    { view: 'inventory', emoji: '📦', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' },
+    { view: 'shifts', emoji: '🗓️', label: 'Rozvrh', badge: null, badgeTone: '' },
+    { view: 'attendance', emoji: '⏱️', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#8FB811] text-white' },
+    { view: 'rewards', emoji: '⭐', label: 'Hodnocení', badge: null, badgeTone: '' },
+    { view: 'chat', emoji: '💬', label: 'Chat', badge: null, badgeTone: '' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#F1F4EC] pb-24">
-      {/* Header */}
-      <div className="sticky top-0 z-20 glass-strong border-b border-black/[0.05]">
-        <div className="max-w-lg mx-auto px-5 py-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-[#5B7A08] font-bold">☕ TO GO</p>
-            <h1 className="text-lg font-bold tracking-tight text-[#16181A] truncate">
+    <div className="min-h-screen bg-[#F1F4EC] pb-16"
+      style={{ backgroundImage: 'radial-gradient(1100px 500px at 85% -10%, rgba(200,245,66,0.22), transparent 60%), radial-gradient(900px 500px at -15% 25%, rgba(143,184,17,0.10), transparent 55%)' }}>
+
+      {/* Floating glass header */}
+      <div className="sticky top-0 z-20 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2">
+        <div className="max-w-lg mx-auto glass-strong rounded-[24px] px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
+          <LogoMark size={34} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">☕ TO GO</p>
+            <h1 className="text-[15px] font-bold tracking-tight text-[#16181A] truncate mt-0.5">
               {greeting}{firstName ? `, ${firstName}` : ''}
             </h1>
           </div>
           <button onClick={onExit}
-            className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2.5 text-xs font-bold hover:bg-black transition active:scale-95">
-            Kompletní administrace →
+            className="shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-2 text-[11px] font-extrabold tracking-wide hover:brightness-105 transition active:scale-95 shadow-[0_4px_14px_rgba(143,184,17,0.35)]">
+            ADMINISTRACE →
           </button>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-5 pt-5 space-y-5">
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="glass-card p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45">Dnešní tržba</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-[#16181A]">
-              {revenue != null ? money(revenue) : '—'}
-            </p>
-            <p className="text-[11px] text-black/40 mt-0.5">
-              {pos ? `${pos.bills} účtenek z pokladny` : closToday ? 'z uzávěrky' : 'zatím nic'}
-            </p>
-          </div>
-          <div className="glass-card p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45">Na směně</p>
-            {onShift.length === 0 ? (
-              <p className="mt-1 text-2xl font-bold text-[#16181A]">—</p>
-            ) : (
-              <div className="mt-1.5 flex items-center gap-1">
-                {onShift.slice(0, 4).map(p => (
-                  <span key={p.id} title={p.name}
-                    className="text-lg h-9 w-9 flex items-center justify-center rounded-full ring-1 ring-black/10 bg-white/70 -ml-1 first:ml-0">
-                    {p.avatar || '👤'}
-                  </span>
-                ))}
+      <div className="max-w-lg mx-auto px-4 pt-3 space-y-4">
+
+        {/* Dark hero — today's number, big and calm */}
+        <div className="relative overflow-hidden rounded-[30px] bg-[#16181A] text-white p-5 shadow-[0_18px_50px_rgba(15,20,8,0.35)]">
+          <div className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 -left-10 h-48 w-48 rounded-full bg-[#8FB811]/15 blur-3xl" />
+          <div className="relative">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-white/45 font-bold">Dnešní tržba</p>
+                <p className="mt-1.5 text-[40px] leading-none font-bold tabular-nums tracking-tight">
+                  {money(todayTotal)}
+                </p>
               </div>
-            )}
-            <p className="text-[11px] text-black/40 mt-0.5 truncate">
-              {onShift.length ? onShift.map(p => p.name.split(' ')[0]).join(', ') : 'nikdo není odpíchnutý'}
+              {trendPct != null && (
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold tabular-nums backdrop-blur-md ${
+                  trendPct >= 0 ? 'bg-[#C8F542]/20 text-[#D8FF6B]' : 'bg-red-400/15 text-red-300'
+                }`}>
+                  {trendPct >= 0 ? '↗' : '↘'} {Math.abs(trendPct)} %
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-white/40 mt-1">
+              {pos ? `${pos.bills} účtenek z pokladny · živě` : 'z uzávěrek'}
+              {trendPct != null ? ' · vs. včera' : ''}
             </p>
+
+            {/* Week bars */}
+            <div className="mt-4 flex items-end justify-between gap-1.5 h-20">
+              {week.days.map((d, i) => {
+                const h = Math.max(6, Math.round((d.total / week.max) * 72));
+                const isToday = d.date === today;
+                return (
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5">
+                    <div className="w-full rounded-full transition-all"
+                      style={{
+                        height: `${h}px`,
+                        background: isToday
+                          ? 'linear-gradient(180deg,#D8FF6B,#C8F542)'
+                          : d.total > 0 ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)',
+                        boxShadow: isToday ? '0 0 18px rgba(200,245,66,0.45)' : undefined,
+                      }} />
+                    <span className={`text-[9px] font-bold ${isToday ? 'text-[#D8FF6B]' : 'text-white/35'}`}>{d.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex items-center justify-between text-[11px] text-white/45">
+              <span>Posledních 7 dní</span>
+              <span className="font-bold text-white/70 tabular-nums">{money(week.sum)}</span>
+            </div>
           </div>
         </div>
 
-        {/* Attention */}
-        {(lowStock > 0 || pendingClosings > 0) && (
-          <div className="space-y-2">
-            {lowStock > 0 && (
-              <button onClick={() => onOpenView('inventory')}
-                className="w-full flex items-center gap-3 rounded-2xl bg-amber-500/[0.09] border border-amber-500/25 px-4 py-3 text-left active:scale-[0.99] transition">
-                <span className="text-lg">📦</span>
-                <span className="flex-1 text-sm font-semibold text-amber-800">
-                  {lowStock} {lowStock === 1 ? 'položka dochází' : lowStock <= 4 ? 'položky docházejí' : 'položek dochází'} ve skladu
-                </span>
-                <Icon name="chevron" size={15} className="-rotate-90 text-amber-700/60 shrink-0" />
-              </button>
-            )}
-            {pendingClosings > 0 && (
-              <button onClick={() => onOpenView('reports')}
-                className="w-full flex items-center gap-3 rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 px-4 py-3 text-left active:scale-[0.99] transition">
-                <span className="text-lg">📊</span>
-                <span className="flex-1 text-sm font-semibold text-[#0A6FE0]">
-                  {pendingClosings} {pendingClosings === 1 ? 'uzávěrka čeká' : 'uzávěrky čekají'} na schválení
-                </span>
-                <Icon name="chevron" size={15} className="-rotate-90 text-[#0A6FE0]/60 shrink-0" />
-              </button>
+        {/* Crew strip — who is here now / planned today */}
+        <div className="glass-card rounded-[26px] p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-black/45 font-bold">Dnes v podniku</p>
+            {onShift.length > 0 && (
+              <span className="rounded-full bg-[#C8F542]/25 text-[#5B7A08] px-2 py-0.5 text-[10px] font-extrabold">
+                {onShift.length} na směně
+              </span>
             )}
           </div>
-        )}
+          {plannedToday.length === 0 && onShift.length === 0 ? (
+            <p className="text-sm text-black/40">Dnes nikdo nemá plánovanou směnu.</p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-1">
+              {(plannedToday.length ? plannedToday : onShift).map((p: any) => {
+                const live = !!p.openSince;
+                return (
+                  <div key={p.id}
+                    className={`shrink-0 flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border backdrop-blur-md ${
+                      live ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/55 border-black/[0.06]'
+                    }`}>
+                    <span className="relative text-base h-8 w-8 flex items-center justify-center rounded-full ring-1 ring-black/10 bg-white/80">
+                      {p.avatar || '👤'}
+                      {live && <span className="absolute -bottom-0 -right-0 h-2.5 w-2.5 rounded-full bg-[#8FB811] ring-2 ring-white" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-bold text-[#16181A] leading-tight">{String(p.name).split(' ')[0]}</span>
+                      <span className="block text-[10px] text-black/40 leading-tight tabular-nums">
+                        {live ? 'právě tady' : p.shiftStart ? `${String(p.shiftStart).slice(0, 5)}–${String(p.shiftEnd ?? '').slice(0, 5)}` : ''}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-        {/* Quick jumps into the full app */}
-        <div className="grid grid-cols-4 gap-2">
-          {quick.map(q => (
-            <button key={q.view} onClick={() => onOpenView(q.view)}
-              className="glass-card p-3 flex flex-col items-center gap-1.5 active:scale-95 transition">
-              <Icon name={q.icon as any} size={20} className="text-[#16181A]" />
-              <span className="text-[11px] font-semibold text-black/60">{q.label}</span>
+        {/* Quick functions — frosted tiles with badges */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {tiles.map(t => (
+            <button key={t.view} onClick={() => onOpenView(t.view)}
+              className="relative glass-card rounded-[22px] px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
+              {t.badge != null && (
+                <span className={`absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold flex items-center justify-center ${t.badgeTone}`}>
+                  {t.badge}
+                </span>
+              )}
+              <span className="text-[22px] leading-none">{t.emoji}</span>
+              <span className="text-[11px] font-bold text-black/60">{t.label}</span>
             </button>
           ))}
         </div>
 
+        {/* Low stock — the three most urgent, actionable */}
+        {lowItems.length > 0 && (
+          <button onClick={() => onOpenView('inventory')}
+            className="w-full glass-card rounded-[26px] p-4 text-left active:scale-[0.99] transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-amber-700 font-bold">📦 Dochází ve skladu</p>
+              <span className="text-[11px] font-bold text-black/35">{lowItems.length} celkem →</span>
+            </div>
+            <div className="space-y-1.5">
+              {lowItems.slice(0, 3).map((i: any) => (
+                <div key={i.id} className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${i.status === 'critical' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                  <span className="text-sm font-semibold text-[#16181A] truncate flex-1">{i.name}</span>
+                  <span className="text-xs text-black/45 tabular-nums shrink-0">{i.quantity} {i.unit}</span>
+                </div>
+              ))}
+            </div>
+          </button>
+        )}
+
         {/* Receipts — the TO GO superpower */}
         <ReceiptsPanel compact />
+
+        <p className="text-center text-[10px] text-black/25 pb-2">Managero · TO GO režim</p>
       </div>
     </div>
   );
