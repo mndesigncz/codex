@@ -78,12 +78,12 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const firstName = (user?.name ?? '').split(' ')[0];
 
   const tiles = [
-    { view: 'reports', emoji: '📊', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'bg-[#0A84FF] text-white' },
-    { view: 'inventory', emoji: '📦', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' },
-    { view: 'shifts', emoji: '🗓️', label: 'Rozvrh', badge: null, badgeTone: '' },
-    { view: 'attendance', emoji: '⏱️', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#8FB811] text-white' },
-    { view: 'rewards', emoji: '⭐', label: 'Hodnocení', badge: null, badgeTone: '' },
-    { view: 'chat', emoji: '💬', label: 'Chat', badge: null, badgeTone: '' },
+    { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'bg-[#0A84FF] text-white' },
+    { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' },
+    { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
+    { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#8FB811] text-white' },
+    { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
+    { view: 'chat', icon: 'chat', label: 'Chat', badge: null, badgeTone: '' },
   ];
 
   return (
@@ -95,7 +95,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         <div className="max-w-lg mx-auto glass-strong rounded-[24px] px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
           <LogoMark size={34} />
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">☕ TO GO</p>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">TO GO</p>
             <h1 className="text-[15px] font-bold tracking-tight text-[#16181A] truncate mt-0.5">
               {greeting}{firstName ? `, ${firstName}` : ''}
             </h1>
@@ -209,7 +209,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
                   {t.badge}
                 </span>
               )}
-              <span className="text-[22px] leading-none">{t.emoji}</span>
+              <Icon name={t.icon as any} size={22} className="text-[#16181A]" strokeWidth={1.8} />
               <span className="text-[11px] font-bold text-black/60">{t.label}</span>
             </button>
           ))}
@@ -220,7 +220,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
           <button onClick={() => onOpenView('inventory')}
             className="w-full glass-card rounded-[26px] p-4 text-left active:scale-[0.99] transition">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-amber-700 font-bold">📦 Dochází ve skladu</p>
+              <p className="text-[11px] uppercase tracking-[0.12em] text-amber-700 font-bold flex items-center gap-1.5">
+                <Icon name="box" size={14} strokeWidth={2} /> Dochází ve skladu
+              </p>
               <span className="text-[11px] font-bold text-black/35">{lowItems.length} celkem →</span>
             </div>
             <div className="space-y-1.5">

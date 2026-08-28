@@ -251,8 +251,8 @@ export default function EmployerLayout({ user }: Props) {
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>
           <button onClick={() => setReceiptsOpen(true)} title="Účtenky"
-            className="rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors text-lg leading-none">
-            🧾
+            className="rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+            <Icon name="receipt" size={20} />
           </button>
           <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu"
             className="rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
@@ -299,7 +299,9 @@ export default function EmployerLayout({ user }: Props) {
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setReceiptsOpen(false)}>
           <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">🧾 Účtenky</h3>
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+                <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky
+              </h3>
               <button onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
             </div>
             <ReceiptsPanel />
