@@ -50,6 +50,11 @@ export async function GET() {
 
     // Do cash tips physically stay in the drawer? Drives the expected-cash math.
     let tipsInDrawer = false;
+    let drawerFloat: number | null = null;
+    try {
+      const [extra] = await sql`SELECT drawer_float FROM teams WHERE id = ${teamId}`;
+      drawerFloat = extra?.drawer_float ?? null;
+    } catch { /* not migrated */ }
     try {
       const [extra] = await sql`SELECT tips_in_drawer FROM teams WHERE id = ${teamId}`;
       tipsInDrawer = extra?.tips_in_drawer === true;
@@ -118,7 +123,7 @@ export async function GET() {
     return NextResponse.json({
       planInfo,
       pinnedShare,
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -149,6 +154,10 @@ export async function PATCH(request: Request) {
     Object.keys(body).filter(k => body[k] !== undefined).join(', ').slice(0, 200));
   if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
   if (typeof payDailyCash === 'boolean') await sql`UPDATE teams SET pay_daily_cash = ${payDailyCash} WHERE id = ${team.id}`;
+  if (body.drawerFloat !== undefined) {
+    const df = body.drawerFloat === null || body.drawerFloat === '' ? null : Math.max(0, Math.round(Number(body.drawerFloat)) || 0) || null;
+    try { await sql`UPDATE teams SET drawer_float = ${df} WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  }
   if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;
   if (typeof payoutFromRegister === 'boolean') {
     try { await sql`UPDATE teams SET payout_from_register = ${payoutFromRegister} WHERE id = ${team.id}`; } catch { /* not migrated */ }

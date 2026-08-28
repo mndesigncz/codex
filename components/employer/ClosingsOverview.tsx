@@ -734,6 +734,11 @@ export default function ClosingsOverview() {
                       <p className="font-bold tracking-tight text-[#16181A] truncate">
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
+                        {(c as any).event_title && (
+                          <span className="ml-1.5 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-bold align-middle">
+                            🎪 {(c as any).event_title}
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-black/45 truncate">Směna: {crewLabel} · Tržba {money(c.cash_revenue + c.card_revenue)}</p>
                     </div>

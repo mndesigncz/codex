@@ -28,6 +28,7 @@ interface Team {
   owner_id: number;
   join_code: string;
   pay_daily_cash?: boolean;
+  drawer_float?: number | null;
   closing_requires_shift?: boolean;
   payout_from_register?: boolean;
   currency?: string;
@@ -182,6 +183,25 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     } finally {
       setSavingPayout(false);
     }
+  };
+
+  const [floatDraft, setFloatDraft] = useState<string | null>(null);
+  const [savingFloat, setSavingFloat] = useState(false);
+  const saveFloat = async () => {
+    if (floatDraft === null) return;
+    setSavingFloat(true);
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drawerFloat: floatDraft === '' ? null : parseInt(floatDraft) }),
+      });
+      if (res.ok) {
+        setTeam(t => (t ? { ...t, drawer_float: floatDraft === '' ? null : parseInt(floatDraft) } : t));
+        setFloatDraft(null);
+        flash('Cílový stav kasy uložen.');
+      } else setError('Nastavení se nepodařilo uložit.');
+    } catch { setError('Nastavení se nepodařilo uložit.'); }
+    setSavingFloat(false);
   };
 
   const [savingRequiresShift, setSavingRequiresShift] = useState(false);
@@ -791,6 +811,31 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
           </button>
         </label>
+
+        <div className="h-px bg-black/[0.06]" />
+
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm text-[#16181A]">Stav kasy po směně</p>
+            <p className="text-xs text-black/45 mt-0.5">
+              Kolik hotovosti má v kase zůstat pro další směnu. Uzávěrka pak sama spočítá,
+              kolik odložit ven — počáteční stav, tržby a odvod se naklikají samy.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input type="number" inputMode="numeric" min={0}
+              value={floatDraft ?? (team?.drawer_float != null ? String(team.drawer_float) : '')}
+              onChange={e => setFloatDraft(e.target.value)}
+              placeholder="nenastaveno"
+              className="w-32 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-right tabular-nums" />
+            {floatDraft !== null && (
+              <button onClick={saveFloat} disabled={savingFloat}
+                className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black disabled:opacity-50 transition">
+                {savingFloat ? '…' : 'Uložit'}
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="h-px bg-black/[0.06]" />
 
