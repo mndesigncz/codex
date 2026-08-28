@@ -5,6 +5,7 @@
 // offers to restock it right away — the receipt IS the delivery note.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../Icons';
 
 const inputCls =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -54,13 +55,15 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
     if (!f) return;
     setUploading(true); setErr('');
     try {
+      const { compressImage } = await import('@/lib/clientImage');
+      const prepared = await compressImage(f);
       const fd = new FormData();
-      fd.append('file', f);
+      fd.append('file', prepared);
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.url) setPhotoUrl(d.url);
-      else setErr(d.error || 'Fotku se nepodařilo nahrát.');
-    } catch { setErr('Fotku se nepodařilo nahrát.'); }
+      else setErr(d.error || `Fotku se nepodařilo nahrát (HTTP ${res.status}).`);
+    } catch { setErr('Fotku se nepodařilo nahrát — zkontroluj připojení.'); }
     setUploading(false);
   };
 
@@ -126,7 +129,9 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
       {/* Capture card */}
       <div className="glass-card p-4 sm:p-5 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-bold text-[#16181A]">🧾 Nová účtenka</p>
+          <p className="font-bold text-[#16181A] flex items-center gap-2">
+            <Icon name="receipt" size={18} className="text-[#5B7A08]" /> Nová účtenka
+          </p>
           {msg && <span className="text-xs font-semibold text-[#5B7A08]">{msg} ✓</span>}
         </div>
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
@@ -141,7 +146,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photoUrl} alt="Účtenka" className="h-full w-full object-cover" />
               ) : (
-                <span className="text-2xl">📷</span>
+                <Icon name="camera" size={26} strokeWidth={1.7} />
               )}
           </button>
           <div className="min-w-0 flex-1 space-y-2">
@@ -194,7 +199,9 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
                   <img src={r.photoUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-black/[0.06]" />
                 </a>
               ) : (
-                <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.04] flex items-center justify-center text-lg">🧾</span>
+                <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.04] flex items-center justify-center text-black/40">
+                  <Icon name="receipt" size={20} strokeWidth={1.7} />
+                </span>
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#16181A] truncate">
