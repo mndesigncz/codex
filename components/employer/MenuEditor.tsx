@@ -312,16 +312,40 @@ export default function MenuEditor() {
               Změny se projeví na iPadu i v mobilech hostů po obnovení stránky.
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select value={aktivni ?? ''} onChange={(e) => setAktivni(Number(e.target.value))}
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-sm">
-              {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            <button type="button" onClick={() => zalozit(false)} disabled={ukladam}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 disabled:opacity-50">
-              + Nové menu
-            </button>
-          </div>
+        </div>
+
+        {/* Všechna menu jako dlaždice — na první pohled je vidět, co existuje,
+            co je zapnuté a co se právě edituje. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+          {boards.map((b) => {
+            const sekci = b.sections?.length ?? 0;
+            const polozek = (b.sections ?? []).reduce((n, sec) => n + (sec.items?.length ?? 0), 0);
+            const vybrane = b.id === aktivni;
+            return (
+              <button key={b.id} type="button" onClick={() => setAktivni(b.id)}
+                className={`rounded-2xl border p-3.5 text-left transition active:scale-[0.98] ${
+                  vybrane
+                    ? 'bg-[#C8F542]/15 border-[#C8F542]/50 ring-2 ring-[#C8F542]/30'
+                    : 'bg-black/[0.03] border-black/[0.08] hover:bg-black/[0.05]'
+                }`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-lg">📋</span>
+                  <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${b.enabled ? 'bg-[#8FB811]' : 'bg-black/20'}`}
+                    title={b.enabled ? 'Zapnuté — hosté ho vidí' : 'Vypnuté'} />
+                </div>
+                <p className="mt-1.5 text-sm font-bold text-[#16181A] truncate">{b.name}</p>
+                <p className="text-[11px] text-black/40 truncate">/{b.slug}</p>
+                <p className="text-[11px] text-black/45 mt-1 tabular-nums">
+                  {sekci} {sekci === 1 ? 'sekce' : sekci >= 2 && sekci <= 4 ? 'sekce' : 'sekcí'} · {polozek} pol.
+                </p>
+              </button>
+            );
+          })}
+          <button type="button" onClick={() => zalozit(false)} disabled={ukladam}
+            className="rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col items-center justify-center gap-1 min-h-[104px]">
+            <span className="text-xl leading-none">＋</span>
+            <span className="text-xs font-semibold">Nové menu</span>
+          </button>
         </div>
 
         <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2">

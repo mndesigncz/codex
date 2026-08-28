@@ -75,15 +75,17 @@ export async function GET() {
     ? []
     : c.role === 'employer'
     ? await sql`
-        SELECT cc.*, u.name AS author_name, u.avatar AS author_avatar
+        SELECT cc.*, u.name AS author_name, u.avatar AS author_avatar, ev.title AS event_title
         FROM cash_closings cc
         LEFT JOIN users u ON u.id = cc.created_by
+        LEFT JOIN events ev ON ev.id = cc.event_id
         WHERE cc.team_id = ${c.teamId}
         ORDER BY cc.date DESC, cc.created_at DESC`
     : await sql`
-        SELECT cc.*, u.name AS author_name, u.avatar AS author_avatar
+        SELECT cc.*, u.name AS author_name, u.avatar AS author_avatar, ev.title AS event_title
         FROM cash_closings cc
         LEFT JOIN users u ON u.id = cc.created_by
+        LEFT JOIN events ev ON ev.id = cc.event_id
         WHERE cc.team_id = ${c.teamId} AND cc.created_by = ${c.meId}
         ORDER BY cc.date DESC, cc.created_at DESC`;
 
@@ -307,16 +309,40 @@ export async function POST(request: Request) {
   }
 
   // One closing per person per shift.
+  // A closing may belong to an off-site event — it lives BESIDE the shop's
+  // closing for the day (one per person per event), never instead of it.
+  let eventId: number | null = null;
+  if (b.eventId !== undefined && b.eventId !== null && b.eventId !== '') {
+    const wantEvent = parseInt(b.eventId);
+    if (Number.isFinite(wantEvent)) {
+      try {
+        const [ev] = await sql`SELECT id FROM events WHERE id = ${wantEvent} AND team_id = ${c.teamId}`;
+        if (!ev) return NextResponse.json({ error: 'Akce nenalezena.' }, { status: 400 });
+        eventId = wantEvent;
+      } catch {
+        return NextResponse.json({ error: 'Akce nejsou dostupné — spusť /api/init.' }, { status: 400 });
+      }
+    }
+  }
+
   let dupe: any = null;
   try {
-    [dupe] = await sql`
-      SELECT id FROM cash_closings
-      WHERE created_by = ${actorId} AND (date = ${shiftDate} OR shift_date = ${shiftDate})`;
+    if (eventId != null) {
+      [dupe] = await sql`
+        SELECT id FROM cash_closings
+        WHERE created_by = ${actorId} AND event_id = ${eventId}
+          AND (date = ${shiftDate} OR shift_date = ${shiftDate})`;
+    } else {
+      [dupe] = await sql`
+        SELECT id FROM cash_closings
+        WHERE created_by = ${actorId} AND (date = ${shiftDate} OR shift_date = ${shiftDate})
+          AND event_id IS NULL`;
+    }
   } catch {
     [dupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${actorId} AND date = ${shiftDate}`;
   }
   if (dupe) {
-    return NextResponse.json({ error: 'Za tuto směnu už je uzávěrka odeslaná.' }, { status: 409 });
+    return NextResponse.json({ error: eventId != null ? 'Za tuhle akci už máš uzávěrku odeslanou.' : 'Za tuto směnu už je uzávěrka odeslaná.' }, { status: 409 });
   }
 
   const shiftId: number | null = shift?.id ?? null;
@@ -470,6 +496,12 @@ export async function POST(request: Request) {
       await sql`UPDATE cash_closings SET shift_date = ${shiftDate} WHERE id = ${row.id}`;
       row.shift_date = shiftDate;
     } catch { /* column not migrated yet */ }
+    if (eventId != null) {
+      try {
+        await sql`UPDATE cash_closings SET event_id = ${eventId} WHERE id = ${row.id}`;
+        row.event_id = eventId;
+      } catch { /* column not migrated yet */ }
+    }
   }
 
   // The handover rides on the closing; separate UPDATE so a not-yet-migrated
@@ -516,7 +548,7 @@ export async function POST(request: Request) {
   } catch { /* ignore */ }
 
   const coveredIds: number[] = [];
-  if (Array.isArray(b.coworkers) && b.coworkers.length && row?.id) {
+  if (eventId == null && Array.isArray(b.coworkers) && b.coworkers.length && row?.id) {
     for (const cw of b.coworkers) {
       const cid = parseInt(cw?.employeeId);
       if (!Number.isFinite(cid) || cid === actorId) continue;

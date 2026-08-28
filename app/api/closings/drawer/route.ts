@@ -25,7 +25,7 @@ export async function GET() {
     [row] = await sql`
       SELECT cc.date, cc.shift_label, cc.closing_cash, cc.final_removal, us.name AS author_name
       FROM cash_closings cc LEFT JOIN users us ON us.id = cc.created_by
-      WHERE cc.team_id = ${u.team_id} AND cc.covered_by IS NULL
+      WHERE cc.team_id = ${u.team_id} AND cc.covered_by IS NULL AND cc.event_id IS NULL
       ORDER BY cc.date DESC, cc.created_at DESC LIMIT 1`;
   } catch {
     try {

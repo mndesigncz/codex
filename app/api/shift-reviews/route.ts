@@ -180,7 +180,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
         AND (created_by = ${employeeId} OR shift_employees @> to_jsonb(${employeeId}::int))
         AND (COALESCE(shift_date, date) = ${dayA}
              OR (date = ${dayB} AND created_at >= ${fromIso} AND created_at <= ${toIso}))
-      ORDER BY (covered_by IS NULL) DESC, (created_by = ${employeeId}) DESC,
+      ORDER BY (event_id IS NULL) DESC, (covered_by IS NULL) DESC, (created_by = ${employeeId}) DESC,
                (COALESCE(shift_date, date) = ${dayA}) DESC, id ASC
       LIMIT 1`;
     closingRow = cl ?? null;

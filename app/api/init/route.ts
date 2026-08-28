@@ -400,6 +400,27 @@ export async function GET() {
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS balance_shifts BOOLEAN`;
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`;
+    // Uploaded files stored in Postgres when Vercel Blob is unavailable —
+    // photos must never silently stop working because a token expired.
+    await sql`
+      CREATE TABLE IF NOT EXISTS uploads (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER,
+        user_id INTEGER,
+        name TEXT,
+        mime TEXT,
+        data TEXT,
+        blob_path TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS blob_path TEXT`;
+    await sql`ALTER TABLE uploads ALTER COLUMN data DROP NOT NULL`;
+    // Desired drawer float: the closing computes the end-of-shift removal so
+    // exactly this amount stays for the next shift.
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS drawer_float INTEGER`;
+    // A closing can belong to an off-site event (venkovní akce) — it lives
+    // beside the shop's own closing for that day, never instead of it.
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS event_id INTEGER`;
     // watchdog for forgotten clock-outs: when the person was already reminded
     await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
 

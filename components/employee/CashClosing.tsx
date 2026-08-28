@@ -308,6 +308,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // End-of-shift removal: how much stays in the drawer for the next shift.
   // Empty = everything stays (no removal). The removal itself is derived.
   const [leaveCash, setLeaveCash] = useState('');
+  // Team's desired float — the removal is computed so exactly this stays.
+  const [drawerFloat, setDrawerFloat] = useState<number | null>(null);
+  // Off-site event closings: filed BESIDE the shop's closing for the day.
+  const [dayEvents, setDayEvents] = useState<{ id: number; title: string }[]>([]);
+  const [eventId, setEventId] = useState<number | ''>('');
   // Structured handover for the next shift.
   const [hoTodo, setHoTodo] = useState('');
   const [hoRunningOut, setHoRunningOut] = useState('');
@@ -325,6 +330,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       const drawer = t?.team?.tips_in_drawer === true;
       setTeamTipsInDrawer(drawer);
       setTipsInDrawer(drawer);
+      const df = t?.team?.drawer_float;
+      if (df != null && Number(df) > 0) {
+        setDrawerFloat(Math.round(Number(df)));
+        // The desired float prefills "co v kase necháš" — editable as ever.
+        setLeaveCash(l => (l === '' ? String(Math.round(Number(df))) : l));
+      }
     } catch { /* keep the safe default: tips are kept aside */ }
     try {
       const rd = await fetch('/api/procedures/runs?today=team').then(r => r.json());
@@ -356,6 +367,15 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           if ((Number(prev.finalRemoval) || 0) > 0) setLeaveCash(l => (l === '' ? String(left) : l));
         }
       } catch { /* prefill is a nice-to-have */ }
+      // Events happening on the closing's date — an off-site stall keeps its
+      // own drawer, so it gets its own closing.
+      try {
+        const evd = await fetch('/api/events').then(r => r.json());
+        const evs = (Array.isArray(evd?.events) ? evd.events : [])
+          .filter((e: any) => e.status !== 'cancelled')
+          .map((e: any) => ({ id: e.id, title: e.title, date: e.date }));
+        setDayEvents(evs.slice(0, 30));
+      } catch { /* events are a nice-to-have here */ }
       setPayDailyCash(!!d.payDailyCash);
       const payoutDefault = d.payoutFromRegister !== false;
       setTeamPayoutFromRegister(payoutDefault);
@@ -506,6 +526,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           selfPayout: effPayout, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
           payoutFromRegister, tipsInDrawer,
+          eventId: eventId === '' ? null : eventId,
           movements, diffReason: diffReason || null, diffNote: diffNote || null,
           denominations: countMode ? denoms : null,
           finalRemoval,
@@ -650,6 +671,22 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
 
         {/* Step 1 — opening cash + when/which shift */}
+        {dayEvents.length > 0 && (
+          <div className="rounded-2xl border border-[#0A84FF]/25 bg-[#0A84FF]/[0.06] p-4 space-y-2">
+            <p className="text-sm font-semibold text-[#16181A]">🎪 Uzávěrka za akci?</p>
+            <p className="text-[12px] text-black/45">
+              Venkovní akce má vlastní kasu — její uzávěrka se ukládá zvlášť a nemíchá se
+              s kasou podniku. Denní uzávěrku podniku pak uděláš normálně vedle.
+            </p>
+            <select value={eventId}
+              onChange={e => setEventId(e.target.value === '' ? '' : parseInt(e.target.value))}
+              className={inputClass}>
+              <option value="">Ne — běžná uzávěrka podniku</option>
+              {dayEvents.map(ev => <option key={ev.id} value={ev.id}>Akce: {ev.title}</option>)}
+            </select>
+          </div>
+        )}
+
         <Step refCb={el => { stepRefs.current[0] = el; }} num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
           subtitle="Kolik bylo v kase, když směna začala.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1015,7 +1052,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <div>
                 <p className="text-sm font-semibold text-[#16181A]">Odvod na konci směny</p>
                 <p className="text-[12px] text-black/45 mt-0.5">
-                  Odkládáte přebytečné bankovky ven? Napiš, kolik v kase necháváš pro další směnu — kolik odložit spočítám.
+                  {drawerFloat != null
+                    ? `Podnik má nastavený stav kasy ${drawerFloat.toLocaleString('cs-CZ')} ${symbol} — kolik odložit, spočítám tak, aby v kase zůstalo přesně tolik. Číslo můžeš upravit.`
+                    : 'Napiš, kolik v kase necháváš pro další směnu — kolik odložit spočítám. Nech prázdné, pokud v kase zůstává všechno.'}
                 </p>
               </div>
               <div>
