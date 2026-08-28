@@ -7,7 +7,7 @@ interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
 }
 
-type DayState = 'available' | 'morning' | 'afternoon' | 'off';
+type DayState = string; // 'available' | 'off' | legacy 'morning'/'afternoon' | 'type:<id>'
 
 const CZ_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 const SHIFTS = [
@@ -16,35 +16,24 @@ const SHIFTS = [
   { id: 'flexible', label: 'Flexibilní' },
 ];
 
-// tap cycle order
-const CYCLE: DayState[] = ['available', 'morning', 'afternoon', 'off'];
-const NEXT: Record<DayState, DayState> = {
-  available: 'morning',
-  morning: 'afternoon',
-  afternoon: 'off',
-  off: 'available',
+// One tone per shift type, cycled by position — the day choices mirror the
+// team's OWN shift types, nothing is hard-coded to "ranní/odpolední".
+const TYPE_TONES = [
+  { cls: 'bg-[#C8F542]/25 border-[#C8F542]/50 text-[#5B7A08] hover:bg-[#C8F542]/35', dot: 'bg-[#C8F542] ring-1 ring-[#C8F542]/60' },
+  { cls: 'bg-blue-500/20 border-blue-500/40 text-blue-700 hover:bg-blue-500/30', dot: 'bg-blue-500 ring-1 ring-blue-500/50' },
+  { cls: 'bg-purple-500/20 border-purple-500/40 text-purple-700 hover:bg-purple-500/30', dot: 'bg-purple-500 ring-1 ring-purple-500/50' },
+  { cls: 'bg-amber-500/20 border-amber-500/40 text-amber-700 hover:bg-amber-500/30', dot: 'bg-amber-500 ring-1 ring-amber-500/50' },
+  { cls: 'bg-teal-500/20 border-teal-500/40 text-teal-700 hover:bg-teal-500/30', dot: 'bg-teal-500 ring-1 ring-teal-500/50' },
+];
+const AVAILABLE_META = {
+  label: 'Dostupný',
+  cls: 'bg-black/[0.03] border-black/[0.10] text-[#16181A] hover:bg-black/[0.06]',
+  dot: 'bg-black/15 ring-1 ring-black/20',
 };
-const DAY_META: Record<DayState, { label: string; cls: string; dot: string }> = {
-  available: {
-    label: 'Dostupný',
-    cls: 'bg-black/[0.03] border-black/[0.10] text-[#16181A] hover:bg-black/[0.06]',
-    dot: 'bg-black/15 ring-1 ring-black/20',
-  },
-  morning: {
-    label: 'Jen ranní',
-    cls: 'bg-[#C8F542]/25 border-[#C8F542]/50 text-[#5B7A08] hover:bg-[#C8F542]/35',
-    dot: 'bg-[#C8F542] ring-1 ring-[#C8F542]/60',
-  },
-  afternoon: {
-    label: 'Jen odpolední',
-    cls: 'bg-blue-500/20 border-blue-500/40 text-blue-700 hover:bg-blue-500/30',
-    dot: 'bg-blue-500 ring-1 ring-blue-500/50',
-  },
-  off: {
-    label: 'Nemůžu',
-    cls: 'bg-red-500/20 border-red-500/40 text-red-600 line-through hover:bg-red-500/30',
-    dot: 'bg-red-500 ring-1 ring-red-500/50',
-  },
+const OFF_META = {
+  label: 'Nemůžu',
+  cls: 'bg-red-500/20 border-red-500/40 text-red-600 line-through hover:bg-red-500/30',
+  dot: 'bg-red-500 ring-1 ring-red-500/50',
 };
 
 function ym(d: Date) {
@@ -84,6 +73,32 @@ export default function AvailabilitySubmit({ user }: Props) {
   const [existing, setExisting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
+  const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/shift-types').then((r) => r.json())
+      .then((d) => setTypes((d.shiftTypes ?? []).map((t: any) => ({ id: t.id, name: t.name }))))
+      .catch(() => {});
+  }, []);
+  // The tap cycle follows the team's shift types; legacy binary only when none exist.
+  const stateList: DayState[] = useMemo(
+    () => (types.length
+      ? ['available', ...types.map((t) => `type:${t.id}`), 'off']
+      : ['available', 'morning', 'afternoon', 'off']),
+    [types],
+  );
+  const metaOf = (st: DayState) => {
+    if (st === 'available') return AVAILABLE_META;
+    if (st === 'off') return OFF_META;
+    if (st === 'morning') return { ...TYPE_TONES[0], label: 'Jen ranní' };
+    if (st === 'afternoon') return { ...TYPE_TONES[1], label: 'Jen odpolední' };
+    const id = parseInt(st.slice(5));
+    const idx = types.findIndex((t) => t.id === id);
+    return {
+      ...TYPE_TONES[(idx < 0 ? 0 : idx) % TYPE_TONES.length],
+      label: `Jen ${types.find((t) => t.id === id)?.name ?? 'směna'}`,
+    };
+  };
+
   const grid = useMemo(() => buildGrid(month), [month]);
   const todayStr = ym(now) === month ? `${month}-${String(now.getDate()).padStart(2, '0')}` : null;
 
@@ -100,7 +115,7 @@ export default function AvailabilitySubmit({ user }: Props) {
           const map: Record<string, DayState> = {};
           const dp = (data.dayPreferences ?? {}) as Record<string, string>;
           Object.entries(dp).forEach(([date, v]) => {
-            if (v === 'morning' || v === 'afternoon' || v === 'off') map[date] = v;
+            if (v === 'morning' || v === 'afternoon' || v === 'off' || /^type:\d+$/.test(v)) map[date] = v;
           });
           (data.unavailableDates ?? []).forEach((date: string) => {
             if (!map[date]) map[date] = 'off';
@@ -130,7 +145,8 @@ export default function AvailabilitySubmit({ user }: Props) {
     setConfirmed(false);
     setDayStates((prev) => {
       const cur = prev[date] ?? 'available';
-      const next = NEXT[cur];
+      const i = stateList.indexOf(cur);
+      const next = stateList[(i < 0 ? 0 : i + 1) % stateList.length];
       const copy = { ...prev };
       if (next === 'available') delete copy[date];
       else copy[date] = next;
@@ -174,19 +190,13 @@ export default function AvailabilitySubmit({ user }: Props) {
   };
 
   const counts = useMemo(() => {
-    let available = 0,
-      morning = 0,
-      afternoon = 0,
-      off = 0;
-    grid.forEach((c) => {
-      if (!c) return;
-      const s = dayStates[c] ?? 'available';
-      if (s === 'available') available++;
-      else if (s === 'morning') morning++;
-      else if (s === 'afternoon') afternoon++;
-      else off++;
+    const c = new Map<string, number>();
+    grid.forEach((cell) => {
+      if (!cell) return;
+      const st = dayStates[cell] ?? 'available';
+      c.set(st, (c.get(st) ?? 0) + 1);
     });
-    return { available, morning, afternoon, off };
+    return c;
   }, [grid, dayStates]);
 
   return (
@@ -194,8 +204,10 @@ export default function AvailabilitySubmit({ user }: Props) {
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje dostupnost</h1>
         <p className="text-black/45 mt-1">
-          Klepnutím na den cyklicky nastav preferenci:{' '}
-          <span className="text-black/70 font-medium">dostupný → ranní → odpolední → nemůžu</span>.
+          Klepnutím na den cyklicky nastav:{' '}
+          <span className="text-black/70 font-medium">
+            {stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}
+          </span>.
         </p>
       </div>
 
@@ -243,16 +255,16 @@ export default function AvailabilitySubmit({ user }: Props) {
                 {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs flex-wrap">
-                {(['available', 'morning', 'afternoon', 'off'] as DayState[]).map((s) => (
-                  <span key={s} className="flex items-center gap-1.5 text-black/55">
-                    <span className={`h-3 w-3 rounded-md ${DAY_META[s].dot}`} /> {DAY_META[s].label}
+                {stateList.map((st) => (
+                  <span key={st} className="flex items-center gap-1.5 text-black/55">
+                    <span className={`h-3 w-3 rounded-md ${metaOf(st).dot}`} /> {metaOf(st).label}
                   </span>
                 ))}
               </div>
             </div>
             <p className="text-[11px] text-black/40 mb-2">
-              Denní volby jsou závazné — „Jen ranní / Jen odpolední / Nemůžu" generátor vždy dodrží.
-              Celková preference níže je jen orientační.
+              Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.
+              Typy směn se berou z nastavení rozvrhu; celková preference níže je jen orientační.
             </p>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
               {CZ_DAYS.map((d) => (
@@ -266,7 +278,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                 if (!cell) return <div key={i} />;
                 const day = parseInt(cell.split('-')[2]);
                 const s = stateOf(cell);
-                const meta = DAY_META[s];
+                const meta = metaOf(s);
                 const isToday = cell === todayStr;
                 return (
                   <button
@@ -283,18 +295,11 @@ export default function AvailabilitySubmit({ user }: Props) {
               })}
             </div>
             <p className="text-xs text-black/45 mt-3 flex flex-wrap gap-x-3 gap-y-1">
-              <span>
-                Dostupných: <span className="text-black/70 font-medium">{counts.available}</span>
-              </span>
-              <span>
-                Ranní: <span className="text-[#5B7A08] font-medium">{counts.morning}</span>
-              </span>
-              <span>
-                Odpolední: <span className="text-blue-700 font-medium">{counts.afternoon}</span>
-              </span>
-              <span>
-                Nemůžu: <span className="text-red-600 font-medium">{counts.off}</span>
-              </span>
+              {stateList.map((st) => (
+                <span key={st}>
+                  {metaOf(st).label}: <span className="text-black/70 font-medium">{counts.get(st) ?? (st === 'available' ? grid.filter(Boolean).length - Array.from(counts.values()).reduce((a, b) => a + b, 0) : 0)}</span>
+                </span>
+              ))}
             </p>
           </div>
 

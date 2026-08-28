@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { dayPrefLabel, prefAllowsSlot, parseTypePref } from '@/lib/dayPrefs';
 import { Icon } from '../Icons';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -797,15 +798,19 @@ export default function ScheduleBuilder({ user }: Props) {
                           )}
                         </div>
                         {(() => {
+                          const prefTypes = shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }));
                           const prefs = Object.entries(s.dayPreferences ?? {})
-                            .filter(([d, v]) => (v === 'morning' || v === 'afternoon') && d.startsWith(month + '-'))
+                            .filter(([d, v]) => (v === 'morning' || v === 'afternoon' || /^type:\d+$/.test(String(v))) && d.startsWith(month + '-'))
                             .sort(([a], [b]) => a.localeCompare(b));
+                          const kinds = Array.from(new Set(prefs.map(([, v]) => String(v))));
+                          const CHIP_TONES = ['bg-amber-500/15 text-amber-700', 'bg-indigo-500/15 text-indigo-600', 'bg-purple-500/15 text-purple-700', 'bg-teal-500/15 text-teal-700'];
                           const chips = (kind: string, tone: string) => {
                             const list = prefs.filter(([, v]) => v === kind);
                             if (!list.length) return null;
+                            const lbl = dayPrefLabel(kind, prefTypes) ?? kind;
                             return (
-                              <div className="text-black/60">
-                                {kind === 'morning' ? 'Jen ranní' : 'Jen odpolední'} ({list.length}):{' '}
+                              <div key={kind} className="text-black/60">
+                                {lbl.charAt(0).toUpperCase() + lbl.slice(1)} ({list.length}):{' '}
                                 <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
                                   {list.map(([d]) => (
                                     <span key={d} className={`rounded-md px-1.5 py-0.5 text-xs ${tone}`}>
@@ -818,8 +823,7 @@ export default function ScheduleBuilder({ user }: Props) {
                           };
                           return (
                             <>
-                              {chips('morning', 'bg-amber-500/15 text-amber-700')}
-                              {chips('afternoon', 'bg-indigo-500/15 text-indigo-600')}
+                              {kinds.map((k, i) => chips(k, CHIP_TONES[i % CHIP_TONES.length]))}
                               {prefs.length > 0 && (
                                 <p className="text-[11px] text-black/40">
                                   Denní volby jsou závazné — generátor jiný typ směny ten den nenasadí.
@@ -1179,6 +1183,7 @@ export default function ScheduleBuilder({ user }: Props) {
         <EditAvailabilityModal
           member={editAvail}
           month={month}
+          shiftTypes={shiftTypes}
           initial={submissions.find((x) => x.employeeId === editAvail.id) ?? null}
           onClose={() => setEditAvail(null)}
           onSaved={() => { setEditAvail(null); load(); }}
@@ -1927,10 +1932,14 @@ function DayModal({
     const empName = employees.find((e) => e.id === emp)?.name ?? 'Zaměstnanec';
     const shiftCat = start < '12:00' ? 'morning' : 'afternoon';
     const dayPref = sub?.dayPreferences?.[date];
+    const prefTypesForCheck = shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }));
+    const slotTypeId = shiftTypes.find((t) => t.name === typeName)?.id ?? null;
+    const prefBlocks = dayPref && dayPref !== 'off' && dayPref !== 'flexible'
+      && !prefAllowsSlot(dayPref, { typeId: slotTypeId, start }, prefTypesForCheck);
     if (unavailable.has(emp)) {
       if (!confirm(`⚠️ ${empName} označil/a tento den jako NEDOSTUPNÝ. Opravdu ho/ji na směnu přiřadit?`)) return;
-    } else if (dayPref && dayPref !== 'off' && dayPref !== 'flexible' && dayPref !== shiftCat) {
-      if (!confirm(`⚠️ ${empName} má na tento den závaznou volbu „jen ${dayPref === 'morning' ? 'ranní' : 'odpolední'}" — tahle směna jí neodpovídá. Opravdu přiřadit?`)) return;
+    } else if (prefBlocks) {
+      if (!confirm(`⚠️ ${empName} má na tento den závaznou volbu „${dayPrefLabel(dayPref, prefTypesForCheck)}" — tahle směna jí neodpovídá. Opravdu přiřadit?`)) return;
     } else if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
       if (!confirm(`⚠️ ${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny. Přesto přiřadit na tuhle?`)) return;
     }
@@ -2327,20 +2336,21 @@ function ScheduleRulesManager() {
 // editable in place. Tapping a day cycles: volno → nemůže → jen ranní → jen
 // odpolední → volno. The employee is notified about any change.
 // ---------------------------------------------------------------------------
-function EditAvailabilityModal({ member, month, initial, onClose, onSaved }: {
+function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClose, onSaved }: {
   member: { id: number; name: string; avatar: string };
   month: string;
   initial: Submission | null;
+  shiftTypes?: ShiftType[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  // One state per day: '' | 'off' | 'morning' | 'afternoon'.
+  // One state per day: '' | 'off' | 'type:<id>' (legacy 'morning'/'afternoon' kept readable).
   const [days, setDays] = useState<Record<string, string>>(() => {
     const d: Record<string, string> = {};
     (initial?.unavailableDates ?? []).forEach((x) => { if (x.startsWith(month + '-')) d[x] = 'off'; });
     Object.entries(initial?.dayPreferences ?? {}).forEach(([k, v]) => {
       if (!k.startsWith(month + '-')) return;
-      if (v === 'morning' || v === 'afternoon') d[k] = v;
+      if (v === 'morning' || v === 'afternoon' || /^type:\d+$/.test(v)) d[k] = v;
       if (v === 'off') d[k] = 'off';
     });
     return d;
@@ -2351,23 +2361,45 @@ function EditAvailabilityModal({ member, month, initial, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
-  const CYCLE = ['', 'off', 'morning', 'afternoon'];
+  // The cycle mirrors the team's shift types; binary fallback only without them.
+  const CYCLE = shiftTypes.length
+    ? ['', 'off', ...shiftTypes.map((t) => `type:${t.id}`)]
+    : ['', 'off', 'morning', 'afternoon'];
   const cycle = (date: string) =>
-    setDays((d) => ({ ...d, [date]: CYCLE[(CYCLE.indexOf(d[date] ?? '') + 1) % CYCLE.length] }));
+    setDays((d) => {
+      const i = CYCLE.indexOf(d[date] ?? '');
+      return { ...d, [date]: CYCLE[(i < 0 ? 1 : i + 1) % CYCLE.length] };
+    });
 
   const grid = buildGrid(month);
-  const TONES: Record<string, string> = {
-    off: 'bg-red-500/15 border-red-500/40 text-red-600',
-    morning: 'bg-amber-500/15 border-amber-500/40 text-amber-700',
-    afternoon: 'bg-indigo-500/15 border-indigo-500/40 text-indigo-600',
+  const TYPE_TONES = [
+    'bg-amber-500/15 border-amber-500/40 text-amber-700',
+    'bg-indigo-500/15 border-indigo-500/40 text-indigo-600',
+    'bg-purple-500/15 border-purple-500/40 text-purple-700',
+    'bg-teal-500/15 border-teal-500/40 text-teal-700',
+  ];
+  const toneOf = (v: string) => {
+    if (v === 'off') return 'bg-red-500/15 border-red-500/40 text-red-600';
+    if (v === 'morning') return TYPE_TONES[0];
+    if (v === 'afternoon') return TYPE_TONES[1];
+    const idx = shiftTypes.findIndex((t) => `type:${t.id}` === v);
+    return TYPE_TONES[(idx < 0 ? 0 : idx) % TYPE_TONES.length];
   };
-  const LABELS: Record<string, string> = { off: 'nemůže', morning: 'ranní', afternoon: 'odpo' };
+  const labelOf = (v: string) => {
+    if (v === 'off') return 'nemůže';
+    if (v === 'morning') return 'ranní';
+    if (v === 'afternoon') return 'odpo';
+    const t = shiftTypes.find((x) => `type:${x.id}` === v);
+    return (t?.name ?? 'směna').slice(0, 6).toLowerCase();
+  };
 
   const save = async () => {
     setSaving(true); setErr('');
     const unavailableDates = Object.entries(days).filter(([, v]) => v === 'off').map(([k]) => k);
     const dayPreferences: Record<string, string> = {};
-    Object.entries(days).forEach(([k, v]) => { if (v === 'morning' || v === 'afternoon') dayPreferences[k] = v; });
+    Object.entries(days).forEach(([k, v]) => {
+      if (v === 'morning' || v === 'afternoon' || /^type:\d+$/.test(v)) dayPreferences[k] = v;
+    });
     try {
       const res = await fetch('/api/availability', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -2399,9 +2431,11 @@ function EditAvailabilityModal({ member, month, initial, onClose, onSaved }: {
         </div>
 
         <p className="text-xs text-black/45">
-          Klikáním na den přepínáš: volno → <span className="text-red-600 font-medium">nemůže</span> →{' '}
-          <span className="text-amber-700 font-medium">jen ranní</span> →{' '}
-          <span className="text-indigo-600 font-medium">jen odpolední</span>. Denní volby jsou pro generátor závazné.
+          Klikáním na den přepínáš: volno → <span className="text-red-600 font-medium">nemůže</span>
+          {shiftTypes.length
+            ? shiftTypes.map((t) => <span key={t.id}> → <span className="font-medium">jen {t.name}</span></span>)
+            : <> → <span className="text-amber-700 font-medium">jen ranní</span> → <span className="text-indigo-600 font-medium">jen odpolední</span></>}
+          . Denní volby jsou pro generátor závazné — typy se berou z nastavení „Typy směn".
         </p>
 
         <div>
@@ -2417,10 +2451,10 @@ function EditAvailabilityModal({ member, month, initial, onClose, onSaved }: {
               return (
                 <button key={cell} onClick={() => cycle(cell)}
                   className={`aspect-square rounded-xl border text-center flex flex-col items-center justify-center gap-0.5 transition active:scale-95 ${
-                    v ? TONES[v] : 'bg-black/[0.03] border-black/[0.08] text-black/60 hover:bg-black/[0.06]'
+                    v ? toneOf(v) : 'bg-black/[0.03] border-black/[0.08] text-black/60 hover:bg-black/[0.06]'
                   }`}>
                   <span className="text-xs font-semibold leading-none">{parseInt(cell.split('-')[2])}</span>
-                  {v && <span className="text-[9px] font-medium leading-none">{LABELS[v]}</span>}
+                  {v && <span className="text-[9px] font-medium leading-none">{labelOf(v)}</span>}
                 </button>
               );
             })}

@@ -171,12 +171,13 @@ export async function PATCH(req: Request) {
   const unavailableDates: string[] = Array.isArray(body.unavailableDates)
     ? Array.from(new Set(body.unavailableDates.filter(inMonth))).slice(0, 62) as string[]
     : (existing?.unavailable_dates ?? []);
-  const PREF_VALUES = ['off', 'morning', 'afternoon', 'flexible'];
+  // 'type:<id>' references one of the team's shift types; the binary values stay accepted.
+  const prefOk = (v: string) => ['off', 'morning', 'afternoon', 'flexible'].includes(v) || /^type:\d+$/.test(v);
   let dayPreferences: Record<string, string> = existing?.day_preferences ?? {};
   if (body.dayPreferences && typeof body.dayPreferences === 'object') {
     dayPreferences = {};
     for (const [k, v] of Object.entries(body.dayPreferences)) {
-      if (inMonth(k) && PREF_VALUES.includes(String(v))) dayPreferences[k] = String(v);
+      if (inMonth(k) && prefOk(String(v))) dayPreferences[k] = String(v);
     }
   }
   const preferredShift = body.preferredShift !== undefined
