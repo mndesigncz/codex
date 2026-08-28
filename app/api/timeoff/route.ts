@@ -92,18 +92,38 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   const status = b.status === 'approved' ? 'approved' : b.status === 'rejected' ? 'rejected' : null;
-  if (!Number.isFinite(id) || !status) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
+  const wantsDates = b.fromDate !== undefined || b.toDate !== undefined;
+  if (!Number.isFinite(id) || (!status && !wantsDates)) {
+    return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
+  }
+
+  const [existing] = await sql`
+    SELECT * FROM time_off_requests WHERE id = ${id} AND team_id = ${c.teamId}`;
+  if (!existing) return NextResponse.json({ error: 'Žádost nenalezena' }, { status: 404 });
+
+  // The employer may fix the dates — a holiday booked a day off by mistake
+  // must not force the person to cancel and re-request.
+  const fromDate = b.fromDate !== undefined ? String(b.fromDate) : String(existing.from_date);
+  const toDate = b.toDate !== undefined ? String(b.toDate) : String(existing.to_date);
+  if (!DATE_RE.test(fromDate) || !DATE_RE.test(toDate) || toDate < fromDate) {
+    return NextResponse.json({ error: 'Neplatné rozmezí dat.' }, { status: 400 });
+  }
+  const nextStatus = status ?? String(existing.status);
 
   const [row] = await sql`
-    UPDATE time_off_requests SET status = ${status}, decided_by = ${c.meId}
+    UPDATE time_off_requests
+    SET status = ${nextStatus}, from_date = ${fromDate}, to_date = ${toDate}, decided_by = ${c.meId}
     WHERE id = ${id} AND team_id = ${c.teamId}
     RETURNING *`;
   if (!row) return NextResponse.json({ error: 'Žádost nenalezena' }, { status: 404 });
 
+  const datesChanged = fromDate !== String(existing.from_date) || toDate !== String(existing.to_date);
   try {
     await notifyUser(row.employee_id, {
-      title: status === 'approved' ? 'Volno schváleno ✓' : 'Volno zamítnuto',
-      body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`}`,
+      title: status === 'approved' ? 'Volno schváleno ✓'
+        : status === 'rejected' ? 'Volno zamítnuto'
+        : '🗓️ Upravený termín volna',
+      body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`}${datesChanged && status ? ' (termín upraven vedením)' : ''}`,
       type: status === 'approved' ? 'info' : 'warning',
       category: 'shift',
       link: '/employee/shifts?view=availability',
@@ -113,12 +133,31 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true, request: shape(row) });
 }
 
-// DELETE ?id= — author cancels their own pending request.
+// DELETE ?id= — the author cancels their own pending request; the employer
+// may cancel ANY request (approved holidays included), the person is told.
 export async function DELETE(req: NextRequest) {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
+
+  if (c.role === 'employer') {
+    const [row] = await sql`
+      DELETE FROM time_off_requests
+      WHERE id = ${id} AND team_id = ${c.teamId}
+      RETURNING employee_id, from_date, to_date, status`;
+    if (row && row.employee_id !== c.meId) {
+      try {
+        await notifyUser(row.employee_id, {
+          title: '🗓️ Volno zrušeno vedením',
+          body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`} — kdyby to nesedělo, ozvi se vedení.`,
+          type: 'warning', category: 'shift', link: '/employee/shifts?view=availability',
+        });
+      } catch { /* best-effort */ }
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   await sql`
     DELETE FROM time_off_requests
     WHERE id = ${id} AND employee_id = ${c.meId} AND status = 'pending'`;

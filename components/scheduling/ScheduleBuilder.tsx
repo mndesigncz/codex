@@ -394,7 +394,7 @@ export default function ScheduleBuilder({ user }: Props) {
   }, [tab, loading, shiftTypes.length]);
 
   const submittedIds = new Set(submissions.map((s) => s.employeeId));
-  const notSubmitted = employees.filter((e) => !submittedIds.has(e.id));
+  const notSubmitted = assignable.filter((e) => !submittedIds.has(e.id));
   const shiftsByDay = useMemo(() => {
     const map: Record<string, Shift[]> = {};
     shifts.forEach((s) => {
@@ -708,13 +708,13 @@ export default function ScheduleBuilder({ user }: Props) {
                 <h2 className="font-bold text-[#16181A] truncate">Dostupnost týmu</h2>
               </div>
               <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
-                submissions.length >= employees.length && employees.length > 0
+                submissions.length >= assignable.length && assignable.length > 0
                   ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-black/[0.05] text-black/50'
               }`}>
-                {submissions.length}/{employees.length} odesláno
+                {submissions.length}/{assignable.length} odesláno
               </span>
             </div>
-            {employees.length === 0 ? (
+            {assignable.length === 0 ? (
               <p className="text-black/45 text-sm">Zatím nemáš v týmu žádné zaměstnance.</p>
             ) : (
               <div className="space-y-3">
@@ -753,7 +753,9 @@ export default function ScheduleBuilder({ user }: Props) {
                       <span className="text-lg opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{e.name}</span>
-                        <span className="block text-[11px] uppercase tracking-wide text-black/30">čeká na vyplnění · vyplnit za něj</span>
+                        <span className="block text-[11px] uppercase tracking-wide text-black/30">
+                          {e.role === 'employer' ? 'vedení · ' : ''}čeká na vyplnění · vyplnit za něj
+                        </span>
                       </span>
                     </button>
                   ))}
@@ -830,6 +832,25 @@ export default function ScheduleBuilder({ user }: Props) {
                                 </p>
                               )}
                             </>
+                          );
+                        })()}
+                        {(() => {
+                          const holidays = timeOff.filter((t: any) => t.employeeId === s.employeeId
+                            && t.toDate >= month + '-01' && t.fromDate <= month + '-31');
+                          if (!holidays.length) return null;
+                          return (
+                            <div className="text-black/60">
+                              🏖️ Dovolená ({holidays.length}):{' '}
+                              <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
+                                {holidays.map((t: any) => (
+                                  <span key={t.id} className="rounded-md bg-[#0A84FF]/12 text-[#0A6FE0] px-1.5 py-0.5 text-xs tabular-nums">
+                                    {parseInt(t.fromDate.split('-')[2])}.{parseInt(t.fromDate.split('-')[1])}.
+                                    {t.fromDate !== t.toDate ? `–${parseInt(t.toDate.split('-')[2])}.${parseInt(t.toDate.split('-')[1])}.` : ''}
+                                  </span>
+                                ))}
+                              </span>
+                              <span className="block text-[11px] text-black/40 mt-0.5">Generátor tyhle dny automaticky vynechá. Upravit jde v „Žádosti o volno" pod rozvrhem.</span>
+                            </div>
                           );
                         })()}
                         {s.note && <p className="text-black/60">Poznámka: <span className="text-[#16181A]/90">{s.note}</span></p>}
@@ -2155,9 +2176,10 @@ function ScheduleRulesManager() {
   const [teamMaxHours, setTeamMaxHours] = useState<string>('');
   const [balance, setBalance] = useState(true);
   const [split, setSplit] = useState(false);
-  const [members, setMembers] = useState<{ id: number; name: string; avatar: string | null; role: string; maxConsecutive: number | null; maxHours?: number | null }[]>([]);
+  const [members, setMembers] = useState<{ id: number; name: string; avatar: string | null; role: string; maxConsecutive: number | null; maxHours?: number | null; splitOk?: boolean }[]>([]);
   const [overrides, setOverrides] = useState<Record<number, string>>({});
   const [hourOverrides, setHourOverrides] = useState<Record<number, string>>({});
+  const [splitOks, setSplitOks] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -2174,12 +2196,15 @@ function ScheduleRulesManager() {
       setMembers(list);
       const ov: Record<number, string> = {};
       const hov: Record<number, string> = {};
+      const sok: Record<number, boolean> = {};
       list.forEach((m: any) => {
         ov[m.id] = m.maxConsecutive != null ? String(m.maxConsecutive) : '';
         hov[m.id] = m.maxHours != null ? String(m.maxHours) : '';
+        sok[m.id] = m.splitOk !== false;
       });
       setOverrides(ov);
       setHourOverrides(hov);
+      setSplitOks(sok);
     }).catch(() => setErr('Načtení se nepodařilo.')).finally(() => setLoading(false));
   }, []);
 
@@ -2197,6 +2222,7 @@ function ScheduleRulesManager() {
             id: m.id,
             maxConsecutive: overrides[m.id] === '' ? null : parseInt(overrides[m.id]),
             maxHours: hourOverrides[m.id] === '' || hourOverrides[m.id] == null ? null : parseInt(hourOverrides[m.id]),
+            splitOk: splitOks[m.id] !== false,
           })),
         }),
       });
@@ -2272,6 +2298,30 @@ function ScheduleRulesManager() {
             V náhledu jsou půlky označené.
           </span>
         </label>
+        {split && (
+          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-black/45 mb-1.5">
+              Komu se smí směna rozdělit
+            </p>
+            {members.map(m => (
+              <label key={m.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
+                <input type="checkbox" checked={splitOks[m.id] !== false}
+                  onChange={e => setSplitOks(o => ({ ...o, [m.id]: e.target.checked }))}
+                  className="h-[18px] w-[18px] rounded accent-[#8FB811]" />
+                <span className="text-base flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{m.avatar || '👤'}</span>
+                <span className={`text-sm ${splitOks[m.id] !== false ? 'font-semibold text-[#16181A]' : 'text-black/45'}`}>
+                  {m.name}
+                </span>
+                {splitOks[m.id] === false && (
+                  <span className="text-[11px] text-black/35">jen celé směny</span>
+                )}
+              </label>
+            ))}
+            <p className="text-[11px] text-black/40 pt-1">
+              Odškrtnutí lidé dostávají od generátoru vždy jen celé směny.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="glass-card p-5 space-y-3">

@@ -87,6 +87,29 @@ export default function TimeOffApprovals() {
     }
   };
 
+  // Edit dates / cancel — an approved holiday must stay fixable without
+  // forcing the person to cancel and re-request.
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editFrom, setEditFrom] = useState('');
+  const [editTo, setEditTo] = useState('');
+  const startEdit = (r: any) => { setEditId(r.id); setEditFrom(r.fromDate); setEditTo(r.toDate); };
+  const saveEdit = async () => {
+    if (editId == null) return;
+    const res = await fetch('/api/timeoff', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editId, fromDate: editFrom, toDate: editTo }),
+    }).catch(() => null);
+    if (res?.ok) {
+      setRequests(rs => rs.map(r => r.id === editId ? { ...r, fromDate: editFrom, toDate: editTo } : r));
+      setEditId(null);
+    }
+  };
+  const cancel = async (r: any) => {
+    if (!confirm(`Zrušit volno ${r.employeeName ?? ''} (${formatRange(r.fromDate, r.toDate)})? Dotyčný dostane notifikaci.`)) return;
+    setRequests(rs => rs.filter(x => x.id !== r.id));
+    try { await fetch(`/api/timeoff?id=${r.id}`, { method: 'DELETE' }); } catch { /* optimistic */ }
+  };
+
   if (loading || !isEmployer) return null;
 
   const pending = requests.filter((r) => r.status === 'pending');
@@ -152,6 +175,50 @@ export default function TimeOffApprovals() {
               ))}
             </ul>
           )}
+
+          {(() => {
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+            const upcoming = requests.filter(r => r.status === 'approved' && r.toDate >= today)
+              .sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+            if (!upcoming.length) return null;
+            return (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-black/45">Schválené dovolené</p>
+                <ul className="space-y-2">
+                  {upcoming.map(r => (
+                    <li key={r.id} className="rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/25 px-4 py-3">
+                      {editId === r.id ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-[#16181A]">{r.employeeName}</span>
+                          <input type="date" value={editFrom} onChange={e => setEditFrom(e.target.value)}
+                            className="rounded-xl bg-white/70 border border-black/10 px-3 py-1.5 text-sm" />
+                          <span className="text-black/40">–</span>
+                          <input type="date" value={editTo} onChange={e => setEditTo(e.target.value)}
+                            className="rounded-xl bg-white/70 border border-black/10 px-3 py-1.5 text-sm" />
+                          <button onClick={saveEdit}
+                            className="rounded-full bg-[#16181A] text-white text-xs font-bold px-3.5 py-2 hover:bg-black transition">Uložit</button>
+                          <button onClick={() => setEditId(null)}
+                            className="rounded-full bg-black/[0.05] text-black/60 text-xs font-semibold px-3.5 py-2">Zrušit</button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                          <span className="h-8 w-8 shrink-0 rounded-full bg-white/70 ring-1 ring-black/10 flex items-center justify-center text-sm">{r.employeeAvatar || '🙂'}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-[#16181A] truncate">{r.employeeName}</p>
+                            <p className="text-xs text-black/45 tabular-nums">{formatRange(r.fromDate, r.toDate)} · {TYPE_LABELS[r.type]}</p>
+                          </div>
+                          <button onClick={() => startEdit(r)}
+                            className="rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3.5 py-2 hover:bg-black/[0.05] transition">✎ Upravit</button>
+                          <button onClick={() => cancel(r)}
+                            className="rounded-full text-red-600 text-xs font-semibold px-3.5 py-2 hover:bg-red-500/[0.08] transition">Zrušit volno</button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
 
           {resolved.length > 0 && (
             <div className="space-y-2">

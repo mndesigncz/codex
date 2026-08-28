@@ -81,7 +81,7 @@ export async function GET() {
   try {
     members = await sql`
       SELECT id, name, avatar, role, max_consecutive_days AS "maxConsecutive",
-             max_month_hours AS "maxHours"
+             max_month_hours AS "maxHours", (split_shifts_ok IS NOT FALSE) AS "splitOk"
       FROM users WHERE team_id = ${u.team_id} AND role IN ('employee','employer')
       ORDER BY role DESC, name ASC`;
   } catch {
@@ -126,6 +126,11 @@ export async function PUT(req: NextRequest) {
         if (o?.maxHours !== undefined) {
           await sql`
             UPDATE users SET max_month_hours = ${cleanPersonHours(o?.maxHours)}
+            WHERE id = ${id} AND team_id = ${u.team_id}`;
+        }
+        if (o?.splitOk !== undefined) {
+          await sql`
+            UPDATE users SET split_shifts_ok = ${o.splitOk === true}
             WHERE id = ${id} AND team_id = ${u.team_id}`;
         }
       }
