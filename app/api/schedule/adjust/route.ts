@@ -11,6 +11,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { audit } from '@/lib/audit';
+import { prefAllowsSlot, dayPrefLabel, isRestrictingPref, type PrefType } from '@/lib/dayPrefs';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,12 +119,17 @@ export async function POST(req: Request) {
   // morning just because it starts at 11:30.
   let shiftTypes: any[] = [];
   try {
-    shiftTypes = await sql`SELECT name, start_time FROM shift_types WHERE team_id = ${c.teamId}`;
+    shiftTypes = await sql`SELECT id, name, start_time FROM shift_types WHERE team_id = ${c.teamId}`;
   } catch { /* ignore */ }
-  const typeCat = new Map<string, string>();
-  shiftTypes.forEach((t: any) => typeCat.set(String(t.name), categoryOf(String(t.start_time))));
-  const catOfShift = (sh: any) =>
-    typeCat.get(String(sh.type)) ?? categoryOf(String(sh.start_time));
+  const prefTypes: PrefType[] = shiftTypes.map((t: any) => ({
+    id: Number(t.id), name: String(t.name), start: String(t.start_time).slice(0, 5),
+  }));
+  const typeIdByName = new Map<string, number>();
+  shiftTypes.forEach((t: any) => typeIdByName.set(String(t.name), Number(t.id)));
+  const slotOfShift = (sh: any) => ({
+    typeId: typeIdByName.get(String(sh.type)) ?? null,
+    start: String(sh.start_time).slice(0, 5),
+  });
   let timeOffRows: any[] = [];
   try {
     timeOffRows = await sql`
@@ -204,10 +210,8 @@ export async function POST(req: Request) {
     p.monthHours += shiftHours(s.start_time, s.end_time);
   }
 
-  const dayPrefOk = (p: P, date: string, cat: string) => {
-    const pref = p.dayPrefs[date];
-    return !pref || pref === 'flexible' || pref === 'off' || pref === cat;
-  };
+  const dayPrefOk = (p: P, date: string, sh: any) =>
+    prefAllowsSlot(p.dayPrefs[date], slotOfShift(sh), prefTypes);
   const available = (p: P, date: string) => !p.unavailable.has(date) && p.dayPrefs[date] !== 'off';
   const streakBefore = (p: P, date: string) => {
     let n = 0, cursor = prevDay(date);
@@ -226,10 +230,9 @@ export async function POST(req: Request) {
     if (p.unavailable.has(date) || p.dayPrefs[date] === 'off') {
       return 'v dostupnosti má ten den „nemůžu"';
     }
-    const cat = catOfShift(s);
     const pref = p.dayPrefs[date];
-    if ((pref === 'morning' || pref === 'afternoon') && pref !== cat) {
-      return `v dostupnosti má ten den „jen ${pref === 'morning' ? 'ranní' : 'odpolední'}"`;
+    if (isRestrictingPref(pref) && !prefAllowsSlot(pref, slotOfShift(s), prefTypes)) {
+      return `v dostupnosti má ten den „${dayPrefLabel(pref, prefTypes)}"`;
     }
     return null;
   };
@@ -249,13 +252,13 @@ export async function POST(req: Request) {
     const reason = clashReason(holder, s);
     if (!reason) continue;
     const date = String(s.date);
-    const cat = catOfShift(s);
     const h = shiftHours(s.start_time, s.end_time);
+    const cat = categoryOf(s.start_time); // only steers the soft-preference tiebreak
 
     const candidates = Array.from(people.values()).filter((p) =>
       p.id !== holder.id
       && available(p, date)
-      && dayPrefOk(p, date, cat)
+      && dayPrefOk(p, date, s)
       && !(busy.get(date)?.has(p.id))
       && restOk(p, date) && hoursOk(p, h) && shiftsOk(p),
     );
