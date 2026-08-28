@@ -83,7 +83,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
     { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
     { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#8FB811] text-white' },
     { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
-    { view: 'chat', icon: 'chat', label: 'Chat', badge: null, badgeTone: '' },
+    { view: 'finance', icon: 'coins', label: 'Finance', badge: null, badgeTone: '' },
   ];
 
   return (

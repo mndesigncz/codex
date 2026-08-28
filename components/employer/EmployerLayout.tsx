@@ -15,6 +15,7 @@ import Inventory from './Inventory';
 import PlanningBoard from './PlanningBoard';
 import EventsView from './EventsView';
 import ClosingsOverview from './ClosingsOverview';
+import FinanceView from './FinanceView';
 import MenuEditor from './MenuEditor';
 import SuggestionsBoard from '../SuggestionsBoard';
 import TaskManager from './TaskManager';
@@ -46,6 +47,7 @@ const navItems = [
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
   { id: 'events',     label: 'Akce',       icon: 'calendarCheck' },
   { id: 'reports',    label: 'Uzávěrky',   icon: 'trend' },
+  { id: 'finance',    label: 'Finance',    icon: 'coins' },
   { id: 'suggestions',label: 'Nápady',     icon: 'bulb' },
   { id: 'attendance', label: 'Docházka',   icon: 'clock' },
   { id: 'my-shifts',  label: 'Moje směny', icon: 'swap' },
@@ -57,7 +59,7 @@ const navItems = [
 const navSections: { title: string | null; ids: string[] }[] = [
   { title: null,           ids: ['overview'] },
   { title: 'Směny',        ids: ['shifts', 'my-shifts', 'attendance'] },
-  { title: 'Kasa & sklad', ids: ['reports', 'inventory', 'menu'] },
+  { title: 'Kasa & sklad', ids: ['reports', 'finance', 'inventory', 'menu'] },
   { title: 'Práce',        ids: ['tasks', 'procedures', 'planning', 'events'] },
   { title: 'Tým',          ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
@@ -136,6 +138,7 @@ export default function EmployerLayout({ user }: Props) {
         </div>
       );
       case 'reports':   return <ClosingsOverview />;
+      case 'finance':   return <FinanceView />;
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab="account" />;
       case 'team-settings': return <TeamManagement user={user as any} />;
