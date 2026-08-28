@@ -884,9 +884,13 @@ export async function GET() {
     // (stub rows for covered coworkers are exempt). Guarded: teams with historic
     // duplicates keep working — the index just doesn't materialise for them.
     try {
+      // Event closings live BESIDE the shop's daily closing, so the uniqueness
+      // guard must ignore them — the old index (without event_id) blocked the
+      // shop closing whenever an event closing existed for the same day.
+      await sql`DROP INDEX IF EXISTS cash_closings_one_per_day`;
       await sql`
         CREATE UNIQUE INDEX IF NOT EXISTS cash_closings_one_per_day
-        ON cash_closings (created_by, date) WHERE covered_by IS NULL`;
+        ON cash_closings (created_by, date) WHERE covered_by IS NULL AND event_id IS NULL`;
     } catch { /* duplicates exist — SELECT-before-INSERT stays the only guard */ }
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
