@@ -934,6 +934,9 @@ export async function GET() {
     // Audit trail covers the open remainder too, so consumption is derivable.
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`;
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`;
+    // A photo of the thing itself — the crew writes new stock in from the floor
+    // and the picture is what makes „Sirup Mango" recognizable to the employer.
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS photo_url TEXT`;
 
     // Which build actually ran the migrations. `ok: true` alone is ambiguous —
     // an older deployment still answering during a rollout returns it too, and

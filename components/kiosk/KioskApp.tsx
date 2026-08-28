@@ -55,6 +55,8 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 function KioskShell({ user }: { user: KioskUser }) {
   const { active } = useKioskShift();
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('shift');
+  // Home-screen shortcut: jump to the stock tab with the entry form already open.
+  const [wantStockEntry, setWantStockEntry] = useState(false);
   const now = useNow();
   // The real kiosk session user — used where the surface is shared/read-only.
   const kioskUser = { id: user.id ?? 0, name: user.name, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;
@@ -104,7 +106,7 @@ function KioskShell({ user }: { user: KioskUser }) {
         <main className="flex-1 mt-6 space-y-5">
           <AnnouncementBanner />
           <WhoIsWorkingOrLock />
-          <KioskHomeExtras />
+          <KioskHomeExtras onWriteStock={() => { setWantStockEntry(true); setTab('inventory'); }} />
         </main>
       )}
 
@@ -114,7 +116,11 @@ function KioskShell({ user }: { user: KioskUser }) {
         <KioskShiftGate>
           {tab === 'tasks' && <main className="flex-1 mt-5"><KioskTasks /></main>}
           {tab === 'procedures' && <main className="flex-1 mt-2 -mx-1"><Procedures user={actingUser} /></main>}
-          {tab === 'inventory' && <main className="flex-1 mt-5"><KioskInventory /></main>}
+          {tab === 'inventory' && (
+            <main className="flex-1 mt-5">
+              <KioskInventory autoOpenEntry={wantStockEntry} onEntryOpened={() => setWantStockEntry(false)} />
+            </main>
+          )}
           {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
           {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} /></main>}
         </KioskShiftGate>
@@ -136,7 +142,7 @@ function WhoIsWorkingOrLock() {
 // Extra context on the tablet's home tab: today's roster, the state of
 // mandatory procedures, and the customer-facing pinned page — the things a
 // shift actually needs at a glance.
-function KioskHomeExtras() {
+function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
   const [roster, setRoster] = useState<any[]>([]);
   const [required, setRequired] = useState<{ id: number; name: string; icon?: string; done: boolean }[]>([]);
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
@@ -177,6 +183,21 @@ function KioskHomeExtras() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Deliveries land while someone is behind the bar — one tap and the new
+          thing is in stock, no walking to a computer. */}
+      {onWriteStock && (
+        <button onClick={onWriteStock}
+          className="md:col-span-2 rounded-3xl bg-[#16181A] text-white p-5 flex items-center gap-4 text-left active:scale-[0.99] transition">
+          <span className="h-12 w-12 rounded-2xl bg-[#C8F542] text-[#16181A] flex items-center justify-center shrink-0">
+            <Icon name="plus" size={24} strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-bold text-lg">Zapsat novou věc do skladu</span>
+            <span className="block text-sm text-white/55">Přišlo zboží? Vyfoť ho, napiš kolik — vedení potvrdí.</span>
+          </span>
+        </button>
+      )}
+
       {nextEvent && (
         <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
           <p className="font-bold text-[#16181A]">📅 {nextEvent.title}</p>
