@@ -611,7 +611,7 @@ export default function ClosingsOverview() {
           })()}
 
           {/* uzávěrky proti kase */}
-          {reconcile && reconcile.totals?.comparedDays > 0 && (
+          {reconcile && (reconcile.insights?.length > 0 || reconcile.totals?.comparedDays > 0) && (
             <div className="mb-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Uzávěrky proti kase</p>
               <div className="space-y-2">
@@ -629,7 +629,7 @@ export default function ClosingsOverview() {
               </div>
               <button type="button" onClick={() => setReconcileOpen(o => !o)}
                 className="mt-2 w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
-                <span>Den po dni ({reconcile.totals.comparedDays} porovnaných)</span>
+                <span>Den po dni ({reconcile.totals?.comparedDays ?? 0} porovnaných)</span>
                 <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${reconcileOpen ? 'rotate-180' : ''}`} />
               </button>
               {reconcileOpen && (
