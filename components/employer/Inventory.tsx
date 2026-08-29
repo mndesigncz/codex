@@ -131,7 +131,9 @@ function relTime(iso?: string) {
   return new Date(iso).toLocaleDateString('cs-CZ');
 }
 
-export default function Inventory({ user, initialCategory }: { user?: any; initialCategory?: string }) {
+export default function Inventory({ user, initialCategory, onNavigate }: {
+  user?: any; initialCategory?: string; onNavigate?: (view: string, arg?: string) => void;
+}) {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -830,11 +832,13 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {posUsage[String(editing.id)].map(p => (
-                      <span key={p.productId}
-                        className="rounded-full bg-white/70 border border-black/[0.06] px-3 py-1.5 text-xs text-[#16181A]">
+                      <button key={p.productId} type="button"
+                        onClick={() => { setShowForm(false); onNavigate?.('recipes', p.productId); }}
+                        title="Otevřít recepturu"
+                        className="rounded-full bg-white/70 hover:bg-white border border-black/[0.06] px-3 py-1.5 text-xs text-[#16181A] transition active:scale-95">
                         {p.productName ?? p.productId}
                         <span className="text-black/40"> · {p.amount} {editing.contentUnit ?? editing.unit}</span>
-                      </span>
+                      </button>
                     ))}
                   </div>
                   <p className="text-[11px] text-black/45 mt-1.5">

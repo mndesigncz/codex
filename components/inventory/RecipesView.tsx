@@ -46,7 +46,10 @@ function familyOf(item: any): 'l' | 'kg' | 'ks' {
 /** Číslo z pole, které přijme i desetinnou čárku — píše se tak česky. */
 const num = (s: string) => Number(String(s).replace(',', '.')) || 0;
 
-export default function RecipesView() {
+export default function RecipesView({ openProductId, onNavigate }: {
+  openProductId?: string;
+  onNavigate?: (view: string, arg?: string) => void;
+} = {}) {
   const money = useMoney();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -80,6 +83,19 @@ export default function RecipesView() {
   };
   useEffect(() => { load(); }, []);
 
+  // Příchod ze skladu („tahle surovina se používá v Blue Lagoon") — otevřeme
+  // rovnou jeho recepturu, jakmile jsou data.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (opened || !openProductId || loading) return;
+    const p = products.find(x => x.productId === openProductId);
+    const r = recipes.find((x: any) => x.productId === openProductId);
+    if (p || r) {
+      openEditor(openProductId, p?.name ?? r?.productName ?? openProductId);
+      setOpened(true);
+    }
+  }, [openProductId, loading, products, recipes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const recipeByProduct = useMemo(() => new Map(recipes.map((r: any) => [r.productId, r])), [recipes]);
   const itemById = useMemo(() => new Map(items.map((i: any) => [String(i.id), i])), [items]);
   const soldByProduct = useMemo(
@@ -106,6 +122,25 @@ export default function RecipesView() {
 
   const withRecipe = recipes.length;
   const coverage = products.length ? Math.round((withRecipe / products.length) * 100) : 0;
+
+  /** Co stojí suroviny na jednu porci produktu — a jaká z toho vyjde marže.
+   *  Chybí-li u některé suroviny cena nebo balení, vrátíme null: nadhodnocená
+   *  marže je horší než žádná, protože se podle ní mění ceny. */
+  const economyOf = (productId: string, price: number | null) => {
+    const r: any = recipeByProduct.get(productId);
+    if (!r?.ingredients?.length) return null;
+    let cost = 0;
+    for (const ing of r.ingredients) {
+      const item = itemById.get(String(ing.itemId));
+      const unitCost = Number(item?.unitCost) || 0;
+      const pkg = Number(item?.packageSize) || 0;
+      if (!item || unitCost <= 0) return null;
+      cost += pkg > 0 ? (unitCost / pkg) * Number(ing.amount) : unitCost * Number(ing.amount);
+    }
+    const c = Math.round(cost);
+    const pct = price != null && price > 0 ? Math.round(((price - c) / price) * 100) : null;
+    return { cost: c, marginPct: pct };
+  };
 
   // ---- editor ---------------------------------------------------------------
   const openEditor = (productId: string, productName: string) => {
@@ -299,6 +334,12 @@ export default function RecipesView() {
           </div>
 
           <div className="glass-card divide-y divide-black/[0.06] overflow-hidden">
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-black/35">
+              <span className="w-2" />
+              <span className="flex-1">Položka menu</span>
+              <span className="shrink-0">suroviny / marže</span>
+              <span className="w-20 text-right">akce</span>
+            </div>
             {shown.length === 0 && (
               <p className="p-8 text-center text-sm text-black/45">
                 {onlyMissing ? 'Všechno v téhle kategorii má recepturu. 👌' : 'Nic nenalezeno.'}
@@ -316,11 +357,26 @@ export default function RecipesView() {
                     <p className="text-[11px] text-black/45 truncate">
                       {r
                         ? r.ingredients.map((ing: any) =>
-                          `${ing.amount} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.trim()).join(' + ')
+                          `${Number(ing.amount).toLocaleString('cs-CZ', { maximumFractionDigits: 3 })} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.trim()).join(' + ')
                         : (p.category || 'bez kategorie')}
                     </p>
                   </div>
                   {sold > 0 && <span className="text-[11px] font-bold text-amber-700 tabular shrink-0">{sold}×</span>}
+                  {(() => {
+                    const eco = economyOf(p.productId, p.price ?? null);
+                    if (!eco) return null;
+                    return (
+                      <span className="hidden sm:flex items-baseline gap-2 shrink-0">
+                        <span className="text-[11px] text-black/45 tabular">{money(eco.cost)}</span>
+                        {eco.marginPct != null && (
+                          <span className={`text-xs font-bold tabular ${
+                            eco.marginPct >= 65 ? 'text-[#5B7A08]'
+                              : eco.marginPct >= 45 ? 'text-[#16181A]' : 'text-red-600'
+                          }`}>{eco.marginPct} %</span>
+                        )}
+                      </span>
+                    );
+                  })()}
                   <span className={`text-xs font-bold shrink-0 ${r ? 'text-black/35' : 'text-[#5B7A08]'}`}>
                     {r ? 'Upravit' : '+ receptura'}
                   </span>

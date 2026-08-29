@@ -92,8 +92,12 @@ export default function EmployerLayout({ user }: Props) {
   };
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  // Proklik ze skladu do konkrétní receptury: „tahle surovina se používá v
+  // Blue Lagoon" → jedno kliknutí a jsi v jeho receptuře.
+  const [recipeProduct, setRecipeProduct] = useState<string | undefined>();
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    setRecipeProduct(view === 'recipes' ? arg : undefined);
     setCurrentView(view);
   };
   // Deep links from notifications and old bookmarks: /employer/overview?view=X
@@ -121,9 +125,9 @@ export default function EmployerLayout({ user }: Props) {
           </div>
         </div>
       );
-      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} />;
+      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} onNavigate={navigate} />;
       case 'menu':      return <div className="px-6 pb-6 w-full max-w-3xl mx-auto"><MenuEditor /></div>;
-      case 'recipes':   return <RecipesView />;
+      case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
       case 'chat':      return <ChatView user={user as any} />;
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;
