@@ -170,6 +170,25 @@ select option { background-color: #ffffff; color: #16181A; }
 .on-accent-muted{ color:rgba(22,24,26,0.55); }
 :root[data-theme="dark"] .hover\:text-black:hover{ color:#EDF2E4 !important; }
 
+/* Status colours — the dark-theme half of the vocabulary. On the light
+   background a 600/700 red reads as urgent; on #0C0D0F it reads as unlit.
+   Same hues, lifted to where they carry on a dark glass surface. */
+:root[data-theme="dark"] .text-red-700{ color:#FF8A80 !important; }
+:root[data-theme="dark"] .text-red-600{ color:#FF7A6E !important; }
+:root[data-theme="dark"] .text-red-500{ color:#FF8F84 !important; }
+:root[data-theme="dark"] .text-orange-700{ color:#FFB067 !important; }
+:root[data-theme="dark"] .text-orange-600{ color:#FFA95C !important; }
+:root[data-theme="dark"] .text-orange-500{ color:#FFB673 !important; }
+:root[data-theme="dark"] .text-amber-800{ color:#F5C46A !important; }
+:root[data-theme="dark"] .text-amber-700{ color:#F7C665 !important; }
+:root[data-theme="dark"] .text-amber-600{ color:#F9CE75 !important; }
+:root[data-theme="dark"] .text-blue-700,
+:root[data-theme="dark"] .text-blue-600{ color:#7FB6FF !important; }
+:root[data-theme="dark"] .text-emerald-700,
+:root[data-theme="dark"] .text-emerald-600{ color:#6FDCA0 !important; }
+:root[data-theme="dark"] .text-green-700,
+:root[data-theme="dark"] .text-green-600{ color:#7BD98A !important; }
+
 /* surfaces / fills */
 :root[data-theme="dark"] .bg-white{ background-color:#171A1D !important; }
 :root[data-theme="dark"] .bg-white\/60{ background-color:rgba(255,255,255,0.10) !important; }
