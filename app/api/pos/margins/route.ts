@@ -86,6 +86,10 @@ export async function GET(req: NextRequest) {
       if (unitCost <= 0) { missing.push(r.itemName); continue; }
       total += pkg > 0 ? (unitCost / pkg) * Number(r.amount) : unitCost * Number(r.amount);
     }
+    // Chybí-li cena byť jedné suroviny, náklad by vyšel nižší, než je — a marže
+    // vyšší. Nadhodnocená marže je horší než žádná, tak radši přiznáme, že
+    // nevíme, a řekneme u čeho.
+    if (missing.length) return { cost: null, missing };
     return { cost: Math.round(total), missing };
   };
 
@@ -99,11 +103,13 @@ export async function GET(req: NextRequest) {
     }]));
   } catch { menuError = 'Menu z pokladny se nepodařilo načíst — ceny chybí.'; }
 
+  const missingPrice = new Set<string>();
   const items: ProductMargin[] = (sales as any[]).map(s => {
     const menu = priceById.get(s.productId);
     const price = menu?.price ?? null;
     const qty = Number(s.qty) || 0;
-    const { cost } = costOf(s.productId);
+    const { cost, missing } = costOf(s.productId);
+    missing.forEach(m => missingPrice.add(m));
     const revenue = price != null ? Math.round(price * qty) : null;
     const margin = price != null && cost != null ? Math.round((price - cost) * qty) : null;
     const marginPct = price != null && cost != null && price > 0
@@ -134,6 +140,15 @@ export async function GET(req: NextRequest) {
       text: noRecipeShare > 30
         ? 'U takhle velké části tržby nevíš, co tě stojí — ani se z ní neodepisuje sklad. Začni od těch nejprodávanějších v Recepturách.'
         : 'Doplň jim receptury, ať vidíš marži a sklad se odepisuje sám.',
+    });
+  }
+
+  if (missingPrice.size) {
+    const names = Array.from(missingPrice).slice(0, 4).join(', ');
+    insights.push({
+      icon: 'coins', tone: 'info',
+      title: `${missingPrice.size} surovin nemá zadanou cenu`,
+      text: `Bez ceny nejde spočítat marži položek, které je používají (${names}${missingPrice.size > 4 ? ' a další' : ''}). Doplň cenu za balení ve skladu.`,
     });
   }
 
