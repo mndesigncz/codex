@@ -7,6 +7,7 @@ export async function GET() {
   try {
     const sql = neon(process.env.DATABASE_URL!);
     let closingIndex = 'not reached';
+    let closingIndexes: string[] = [];
 
     // ---- Teams ----
     await sql`
@@ -909,6 +910,15 @@ export async function GET() {
       // duplicates exist — SELECT-before-INSERT stays the only guard
       closingIndex = 'failed: ' + String(e).slice(0, 160);
     }
+    // What the database actually ends up with. Reported because a migration
+    // that reports success while the old rule survives is worse than one that
+    // fails loudly — that combination cost a round of blind guessing.
+    try {
+      const rows = await sql`
+        SELECT indexname FROM pg_indexes
+        WHERE tablename = 'cash_closings' ORDER BY indexname`;
+      closingIndexes = (rows as any[]).map(r => r.indexname);
+    } catch { /* diagnostics only */ }
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.
@@ -964,6 +974,7 @@ export async function GET() {
       // Migrations that are allowed to fail silently report their outcome here,
       // so a swallowed one can be seen from outside instead of guessed at.
       closingIndex,
+      closingIndexes,
     });
   } catch (error) {
     console.error('Init error:', error);
