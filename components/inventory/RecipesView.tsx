@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
+import ItemInlineEdit from './ItemInlineEdit';
 
 const inputCls =
   'rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -45,7 +46,10 @@ function familyOf(item: any): 'l' | 'kg' | 'ks' {
 /** Číslo z pole, které přijme i desetinnou čárku — píše se tak česky. */
 const num = (s: string) => Number(String(s).replace(',', '.')) || 0;
 
-export default function RecipesView() {
+export default function RecipesView({ openProductId, onNavigate }: {
+  openProductId?: string;
+  onNavigate?: (view: string, arg?: string) => void;
+} = {}) {
   const money = useMoney();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -79,6 +83,19 @@ export default function RecipesView() {
   };
   useEffect(() => { load(); }, []);
 
+  // Příchod ze skladu („tahle surovina se používá v Blue Lagoon") — otevřeme
+  // rovnou jeho recepturu, jakmile jsou data.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (opened || !openProductId || loading) return;
+    const p = products.find(x => x.productId === openProductId);
+    const r = recipes.find((x: any) => x.productId === openProductId);
+    if (p || r) {
+      openEditor(openProductId, p?.name ?? r?.productName ?? openProductId);
+      setOpened(true);
+    }
+  }, [openProductId, loading, products, recipes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const recipeByProduct = useMemo(() => new Map(recipes.map((r: any) => [r.productId, r])), [recipes]);
   const itemById = useMemo(() => new Map(items.map((i: any) => [String(i.id), i])), [items]);
   const soldByProduct = useMemo(
@@ -105,6 +122,25 @@ export default function RecipesView() {
 
   const withRecipe = recipes.length;
   const coverage = products.length ? Math.round((withRecipe / products.length) * 100) : 0;
+
+  /** Co stojí suroviny na jednu porci produktu — a jaká z toho vyjde marže.
+   *  Chybí-li u některé suroviny cena nebo balení, vrátíme null: nadhodnocená
+   *  marže je horší než žádná, protože se podle ní mění ceny. */
+  const economyOf = (productId: string, price: number | null) => {
+    const r: any = recipeByProduct.get(productId);
+    if (!r?.ingredients?.length) return null;
+    let cost = 0;
+    for (const ing of r.ingredients) {
+      const item = itemById.get(String(ing.itemId));
+      const unitCost = Number(item?.unitCost) || 0;
+      const pkg = Number(item?.packageSize) || 0;
+      if (!item || unitCost <= 0) return null;
+      cost += pkg > 0 ? (unitCost / pkg) * Number(ing.amount) : unitCost * Number(ing.amount);
+    }
+    const c = Math.round(cost);
+    const pct = price != null && price > 0 ? Math.round(((price - c) / price) * 100) : null;
+    return { cost: c, marginPct: pct };
+  };
 
   // ---- editor ---------------------------------------------------------------
   const openEditor = (productId: string, productName: string) => {
@@ -227,6 +263,7 @@ export default function RecipesView() {
         <RecipeEditor
           draft={draft} items={items} itemById={itemById} money={money}
           setIng={setIng} setDraft={setDraft} save={save} saving={saving} yieldOf={yieldOf}
+          onItemSaved={(patched) => setItems(list => list.map(i => i.id === patched.id ? { ...i, ...patched } : i))}
         />
       ) : (
         <>
@@ -297,6 +334,12 @@ export default function RecipesView() {
           </div>
 
           <div className="glass-card divide-y divide-black/[0.06] overflow-hidden">
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-black/35">
+              <span className="w-2" />
+              <span className="flex-1">Položka menu</span>
+              <span className="shrink-0">suroviny / marže</span>
+              <span className="w-20 text-right">akce</span>
+            </div>
             {shown.length === 0 && (
               <p className="p-8 text-center text-sm text-black/45">
                 {onlyMissing ? 'Všechno v téhle kategorii má recepturu. 👌' : 'Nic nenalezeno.'}
@@ -314,11 +357,26 @@ export default function RecipesView() {
                     <p className="text-[11px] text-black/45 truncate">
                       {r
                         ? r.ingredients.map((ing: any) =>
-                          `${ing.amount} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.trim()).join(' + ')
+                          `${Number(ing.amount).toLocaleString('cs-CZ', { maximumFractionDigits: 3 })} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.trim()).join(' + ')
                         : (p.category || 'bez kategorie')}
                     </p>
                   </div>
                   {sold > 0 && <span className="text-[11px] font-bold text-amber-700 tabular shrink-0">{sold}×</span>}
+                  {(() => {
+                    const eco = economyOf(p.productId, p.price ?? null);
+                    if (!eco) return null;
+                    return (
+                      <span className="hidden sm:flex items-baseline gap-2 shrink-0">
+                        <span className="text-[11px] text-black/45 tabular">{money(eco.cost)}</span>
+                        {eco.marginPct != null && (
+                          <span className={`text-xs font-bold tabular ${
+                            eco.marginPct >= 65 ? 'text-[#5B7A08]'
+                              : eco.marginPct >= 45 ? 'text-[#16181A]' : 'text-red-600'
+                          }`}>{eco.marginPct} %</span>
+                        )}
+                      </span>
+                    );
+                  })()}
                   <span className={`text-xs font-bold shrink-0 ${r ? 'text-black/35' : 'text-[#5B7A08]'}`}>
                     {r ? 'Upravit' : '+ receptura'}
                   </span>
@@ -337,13 +395,16 @@ export default function RecipesView() {
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf }: {
+function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, onItemSaved }: {
   draft: Draft; items: any[]; itemById: Map<string, any>; money: (n: number) => string;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   save: () => void; saving: boolean;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
+  onItemSaved: (item: any) => void;
 }) {
+  // Která surovina se zrovna upravuje „na místě" — bez odcházení do skladu.
+  const [editingItem, setEditingItem] = useState<string | null>(null);
   const totalCost = draft.ingredients.reduce((sum, ing) => {
     const item = itemById.get(ing.itemId);
     if (!item) return sum;
@@ -396,13 +457,52 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   onClick={() => setDraft(d => d && ({ ...d, ingredients: d.ingredients.filter((_, i) => i !== idx) }))}
                   className="text-black/30 hover:text-red-600 transition px-1.5">✕</button>
               </div>
-              {item && num(ing.amount) > 0 && (
-                <p className="text-[11px] text-black/45">
-                  {y?.portions != null
-                    ? <>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="text-[#5B7A08]">{y.portions}×</b></>
-                    : <>U položky není velikost balení — porce nespočítám.</>}
-                  {y?.perPortion != null && <> · surovina za porci <b className="text-[#16181A]">{money(y.perPortion)}</b></>}
+              {/* Díly položky — definované u ní, tady se jen vyberou. */}
+              {item && Array.isArray(item.portions) && item.portions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-black/40">Díly:</span>
+                  {item.portions.map((pt: any) => {
+                    const base = opts.find(o => o.label === ing.unit)?.toBase ?? 1;
+                    const active = Math.abs(num(ing.amount) * base - Number(pt.amount)) < 1e-9;
+                    return (
+                      <button key={pt.name} type="button"
+                        onClick={() => {
+                          // Vybereme jednotku, ve které díl není samá nula.
+                          const pick = [...opts].reverse().find(o => Number(pt.amount) / o.toBase >= 1) ?? opts[0];
+                          setIng(idx, { amount: String(+(Number(pt.amount) / pick.toBase).toFixed(4)), unit: pick.label });
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition active:scale-95 ${
+                          active ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/55 hover:text-black'
+                        }`}>
+                        {pt.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {item && (
+                <p className="text-[11px] text-black/45 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {num(ing.amount) > 0 && (y?.portions != null
+                    ? <span>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="text-[#5B7A08]">{y.portions}×</b></span>
+                    : <span className="text-amber-700">Chybí velikost balení — porce ani cenu nespočítám.</span>)}
+                  {y?.perPortion != null && <span>· surovina za porci <b className="text-[#16181A]">{money(y.perPortion)}</b></span>}
+                  {num(ing.amount) > 0 && y?.perPortion == null && Number(item.unitCost) > 0 === false && (
+                    <span className="text-amber-700">· chybí cena za balení</span>
+                  )}
+                  <button type="button" onClick={() => setEditingItem(editingItem === ing.itemId ? null : ing.itemId)}
+                    className="font-bold text-[#5B7A08] hover:brightness-110 transition">
+                    {editingItem === ing.itemId ? '− zavřít úpravu' : '✎ upravit položku / díly'}
+                  </button>
                 </p>
+              )}
+
+              {item && editingItem === ing.itemId && (
+                <ItemInlineEdit
+                  item={item}
+                  onSaved={(patched) => onItemSaved(patched)}
+                  onClose={() => setEditingItem(null)}
+                />
               )}
             </div>
           );

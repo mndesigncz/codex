@@ -84,7 +84,7 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', contentUnit: '', openAmount: '', archived: false, hideFromOverview: false, highlight: '' };
+const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', contentUnit: '', openAmount: '', portions: [] as { name: string; amount: string }[], archived: false, hideFromOverview: false, highlight: '' };
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Název A→Z' },
@@ -131,7 +131,9 @@ function relTime(iso?: string) {
   return new Date(iso).toLocaleDateString('cs-CZ');
 }
 
-export default function Inventory({ user, initialCategory }: { user?: any; initialCategory?: string }) {
+export default function Inventory({ user, initialCategory, onNavigate }: {
+  user?: any; initialCategory?: string; onNavigate?: (view: string, arg?: string) => void;
+}) {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -397,10 +399,19 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
     setItemLog([]); setLogOpen(false);
     setShowForm(true);
   };
+  // Kde se položka používá v kase — čte jen tabulku párování, takže se to dá
+  // ukázat rovnou v editaci položky bez čekání na pokladnu.
+  const [posUsage, setPosUsage] = useState<Record<string, { productId: string; productName: string | null; amount: number }[]>>({});
+  useEffect(() => {
+    fetch('/api/pos/usage').then(r => r.json())
+      .then(d => setPosUsage(d?.usage ?? {}))
+      .catch(() => {});
+  }, []);
+
   const openEdit = (i: Item) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
@@ -457,6 +468,9 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
       brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview, highlight: form.highlight || null,
       packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
       contentUnit: form.contentUnit || null,
+      portions: (form.portions ?? [])
+        .filter(p => p.name.trim() && Number(String(p.amount).replace(',', '.')) > 0)
+        .map(p => ({ name: p.name.trim(), amount: Number(String(p.amount).replace(',', '.')) })),
       openAmount: form.openAmount === '' ? null : Math.max(0, Number(form.openAmount) || 0),
     };
     setFormErr('');
@@ -643,6 +657,39 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
         </div>
       )}
 
+      {/* Protějšek fronty „prodává se, ale neodepisuje" z Receptur: suroviny,
+          které kasa používá, ale nemají cenu nebo velikost balení. Bez nich
+          se marže nespočítá a odpis z načatého balení nefunguje — a nikde
+          jinde to není vidět. */}
+      {(() => {
+        const gaps = items.filter(i =>
+          (posUsage[String(i.id)]?.length ?? 0) > 0
+          && (!(Number(i.unitCost) > 0) || !(Number(i.packageSize) > 0)));
+        if (!gaps.length) return null;
+        return (
+          <div className="glass-card border-amber-500/25 bg-amber-500/[0.05] p-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 flex items-center gap-1.5">
+              <Icon name="warning" size={14} /> Používá se v recepturách, ale chybí údaje ({gaps.length})
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {gaps.slice(0, 12).map(i => (
+                <button key={i.id} onClick={() => openEdit(i)}
+                  className="rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
+                  {i.name}
+                  <span className="ml-1.5 font-normal text-amber-700">
+                    {!(Number(i.unitCost) > 0) && !(Number(i.packageSize) > 0) ? 'cena i balení'
+                      : !(Number(i.unitCost) > 0) ? 'cena' : 'velikost balení'}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-black/45">
+              Dokud chybí, nespočítá se marže položek, které je používají — a odpis nebere z načatého balení.
+            </p>
+          </div>
+        );
+      })()}
+
       {items.some(i => i.approved === false) && (
         <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
           <p className="font-semibold text-sm text-[#16181A]">📥 Nové věci od týmu ({items.filter(i => i.approved === false).length})</p>
@@ -809,6 +856,29 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Druhá strana provázání: co se z týhle položky na kase prodává.
+                  Bez toho člověk mění gramáž nebo cenu naslepo. */}
+              {editing && (posUsage[String(editing.id)]?.length ?? 0) > 0 && (
+                <div className="rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#5B7A08] mb-1.5">
+                    Používá se v kase ({posUsage[String(editing.id)].length}×)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {posUsage[String(editing.id)].map(p => (
+                      <button key={p.productId} type="button"
+                        onClick={() => { setShowForm(false); onNavigate?.('recipes', p.productId); }}
+                        title="Otevřít recepturu"
+                        className="rounded-full bg-white/70 hover:bg-white border border-black/[0.06] px-3 py-1.5 text-xs text-[#16181A] transition active:scale-95">
+                        {p.productName ?? p.productId}
+                        <span className="text-black/40"> · {p.amount} {editing.contentUnit ?? editing.unit}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-black/45 mt-1.5">
+                    Změna velikosti balení nebo ceny se propíše do marží těchhle položek.
+                  </p>
+                </div>
+              )}
               {/* Section: základ */}
               <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
@@ -939,6 +1009,32 @@ export default function Inventory({ user, initialCategory }: { user?: any; initi
                     Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.
                     {pk(form) ? ' Prázdná velikost = výchozí z kategorie.' : ''}
                   </p>
+
+                  {/* Dílčí díly: pojmenované porce, které pak receptury jen
+                      vybírají — místo aby se 0,02 přepisovalo u každého drinku. */}
+                  <div className="pt-1 space-y-2">
+                    <label className="block text-xs uppercase tracking-wider text-black/45">
+                      Dílčí díly <span className="normal-case tracking-normal text-black/35">— porce k výběru v recepturách</span>
+                    </label>
+                    {(form.portions ?? []).map((p, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input value={p.name} placeholder="panák"
+                          onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, name: e.target.value } : x) }))}
+                          className={`${inputClass} flex-1`} />
+                        <input value={p.amount} placeholder="0,04" inputMode="decimal"
+                          onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
+                          className={`${inputClass} w-24 text-center`} />
+                        <span className="text-xs text-black/40 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
+                        <button type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
+                          className="text-black/30 hover:text-red-600 transition px-1">✕</button>
+                      </div>
+                    ))}
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}
+                      className="rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
+                      <Icon name="plus" size={13} /> Přidat díl
+                    </button>
+                  </div>
                 </div>
               </div>
 

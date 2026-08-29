@@ -1028,6 +1028,10 @@ export async function GET() {
     // A photo of the thing itself — the crew writes new stock in from the floor
     // and the picture is what makes „Sirup Mango" recognizable to the employer.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS photo_url TEXT`;
+    // Pojmenované porce položky: „panák 0,04 l", „do drinku 0,02 l". Definují
+    // se jednou u položky a receptury je pak jen vybírají — místo aby se 0,02
+    // přepisovalo u každého koktejlu znovu (a někde se spletl řád).
+    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS portions JSONB DEFAULT '[]'`;
 
     // Which build actually ran the migrations. `ok: true` alone is ambiguous —
     // an older deployment still answering during a rollout returns it too, and
