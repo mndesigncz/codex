@@ -154,8 +154,7 @@ export async function GET(req: NextRequest) {
       SELECT te.clock_in, te.clock_out, us.hourly_rate FROM time_entries te
       JOIN users us ON us.id = te.employee_id
       WHERE te.team_id = ${u.team_id} AND te.clock_out IS NOT NULL
-        AND te.clock_in >= ${month + '-01'}::timestamp
-        AND te.clock_in < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}`;
     for (const e of entries as any[]) {
       const rate = num(e.hourly_rate);
       if (rate <= 0) continue;

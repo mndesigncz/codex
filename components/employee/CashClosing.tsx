@@ -278,6 +278,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [selEmployee, setSelEmployee] = useState<number | null>(null);
   const [requiresShift, setRequiresShift] = useState(true);
   const [eligible, setEligible] = useState<EligibleShift[]>([]);
+  // Which shift this closing is for — matters on a day somebody worked twice.
+  const [pickedShiftId, setPickedShiftId] = useState<number | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [meId, setMeId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -432,6 +434,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
   const pickShift = (s: EligibleShift) => {
     setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
+    setPickedShiftId(s.id);
     if (isKiosk) setSelEmployee(s.employeeId ?? null);
   };
 
@@ -529,6 +532,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: form.date, shiftLabel: form.shiftLabel,
+          shiftId: pickedShiftId ?? undefined,
           openingCash: n(form.openingCash), cashRevenue: n(form.cashRevenue), cardRevenue: n(form.cardRevenue),
           tips: n(form.tips), expenses: effExpenses, cashRemoved: effRemoved,
           selfPayout: effPayout, closingCash: n(form.closingCash),
@@ -550,6 +554,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         const forCoworkers = includedCoworkers.length > 0 ? ' (i za kolegy)' : '';
         setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
         setForm(emptyForm());
+        setPickedShiftId(null);
         setCoworkerSel({});
         setDenoms({});
         setLeaveCash('');
@@ -608,12 +613,18 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <span className="text-lg" aria-hidden>⚠️</span>
             {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${eligible.length} uzávěrky za dny, kdy jsi měl/a směnu`}
           </p>
-          <p className="text-xs text-black/55">Vyplň ji prosím — vyber den a projdi formulář níže.</p>
+          <p className="text-xs text-black/55">
+            Vyplň ji prosím — vyber směnu a projdi formulář níže.
+            {eligible.filter(s => s.date === form.date).length > 1
+              && ' Ten den máš dvě směny, každá má vlastní uzávěrku.'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {eligible.map(s => (
               <button key={s.id} type="button" onClick={() => pickShift(s)}
                 className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
-                  form.date === s.date ? 'bg-orange-500 text-white border-orange-500' : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
+                  form.date === s.date && (pickedShiftId == null || pickedShiftId === s.id)
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
                 }`}>
                 {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                 <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>

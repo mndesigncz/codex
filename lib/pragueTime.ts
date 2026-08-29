@@ -20,6 +20,13 @@ export function pragueDayOf(d: Date): string {
   return dayFmt.format(d);
 }
 
+/** Same as pragueDayOf, but a malformed timestamp yields '' instead of
+ *  throwing — one bad row must never take a whole screen down with it. */
+export function pragueDaySafe(value: unknown): string {
+  const d = value instanceof Date ? value : new Date(String(value ?? ''));
+  return Number.isNaN(d.getTime()) ? '' : dayFmt.format(d);
+}
+
 /** HH:MM wall-clock in Prague for an arbitrary timestamp (defaults to now). */
 export function pragueHM(d: Date = new Date()): string {
   return hmFmt.format(d);

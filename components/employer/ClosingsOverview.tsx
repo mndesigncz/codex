@@ -12,6 +12,7 @@ import {
 import { useMoney, useCurrency } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
 import ClosingsCalendar from './ClosingsCalendar';
+import { pragueDaySafe } from '@/lib/pragueTime';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
 // `covered_by` links a stub row to the parent closing that also closed for them.
@@ -246,7 +247,7 @@ export default function ClosingsOverview() {
   };
   const rateOf = (id: number) => Number(attRoster.find((r: any) => Number(r.id) === Number(id))?.hourlyRate) || 0;
   const laborCost = Math.round(attEntries.reduce((sum: number, e: any) => {
-    if (!e.clockOut || !inScope(String(e.clockIn).slice(0, 10))) return sum;
+    if (!e.clockOut || !inScope(pragueDaySafe(e.clockIn))) return sum;
     const h = (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
     return h > 0 && h < 24 ? sum + h * rateOf(e.employeeId) : sum;
   }, 0));

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { sendBackupEmail } from '@/lib/email';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,7 +112,7 @@ export async function GET(request: Request) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const teams = await sql`SELECT id, name FROM teams ORDER BY id`;
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = pragueToday(); // název souboru podle dne v Praze, ne v UTC
 
     let sent = 0, totalRows = 0, teamsBackedUp = 0;
     for (const team of teams as any[]) {

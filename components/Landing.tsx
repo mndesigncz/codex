@@ -26,16 +26,19 @@ export default function Landing() {
     <div className="min-h-screen">
       {/* Header */}
       <header className="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <LogoMark size={36} />
-          <span className="text-lg font-bold tracking-tight text-[#16181A]">Managero</span>
+          <span className="text-lg font-bold tracking-tight text-[#16181A] truncate">Managero</span>
         </div>
-        <nav className="flex items-center gap-2">
-          <Link href="/login" className="rounded-full px-4 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors">
-            Přihlásit se
+        {/* On a phone the full pair of labels overflows the viewport — the CTA
+            keeps its meaning with one word, the sign-in link keeps its icon. */}
+        <nav className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <Link href="/login" className="rounded-full px-2.5 sm:px-4 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors whitespace-nowrap">
+            Přihlásit
           </Link>
-          <Link href="/register" className="rounded-full bg-[#16181A] text-white px-4 sm:px-5 py-2 text-sm font-semibold hover:bg-black transition-colors whitespace-nowrap">
-            Vyzkoušet zdarma
+          <Link href="/register" className="rounded-full bg-[#16181A] text-white px-3.5 sm:px-5 py-2 text-sm font-semibold hover:bg-black transition-colors whitespace-nowrap">
+            <span className="sm:hidden">Zdarma</span>
+            <span className="hidden sm:inline">Vyzkoušet zdarma</span>
           </Link>
         </nav>
       </header>
@@ -73,8 +76,8 @@ export default function Landing() {
             width={1376} height={768} loading="eager" fetchPriority="high"
             className="w-full h-[220px] sm:h-[380px] object-cover"
           />
-          <figcaption className="absolute inset-x-0 bottom-0 p-5 sm:p-8 bg-gradient-to-t from-black/55 via-black/15 to-transparent">
-            <p className="text-white/95 text-sm sm:text-base font-semibold max-w-md leading-snug">
+          <figcaption className="absolute inset-x-0 bottom-0 p-5 sm:p-8 bg-gradient-to-t from-black/60 via-black/20 to-transparent">
+            <p className="text-white/95 text-sm sm:text-base font-semibold max-w-md leading-snug sm:ml-auto sm:pr-2">
               Ráno otevřete. Managero už ví, kdo má směnu, co došlo a co se má stihnout.
             </p>
           </figcaption>
