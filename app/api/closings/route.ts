@@ -128,8 +128,7 @@ export async function GET() {
           AND s.date <= ${today} AND s.date >= ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
-            WHERE cc.team_id = ${c.teamId} AND cc.date = s.date
-              AND (cc.shift_id = s.id OR cc.shift_id IS NULL)
+            WHERE cc.team_id = ${c.teamId} AND COALESCE(cc.shift_date, cc.date) = s.date
               AND (cc.created_by = s.employee_id OR cc.shift_employees @> to_jsonb(s.employee_id))
           )
         ORDER BY s.date DESC, s.start_time ASC`;
@@ -159,8 +158,7 @@ export async function GET() {
           AND s.date <= ${today} AND s.date >= ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
-            WHERE cc.team_id = ${c.teamId} AND cc.date = s.date
-              AND (cc.shift_id = s.id OR cc.shift_id IS NULL)
+            WHERE cc.team_id = ${c.teamId} AND COALESCE(cc.shift_date, cc.date) = s.date
               AND (cc.created_by = ${c.meId} OR cc.shift_employees @> to_jsonb(${c.meId}::int))
           )
         ORDER BY s.date DESC, s.start_time ASC`;
@@ -214,8 +212,26 @@ export async function GET() {
     } catch { /* shifts table issue — leave empty */ }
   }
 
+  // Which business day is this person closing right now? A shift that runs past
+  // midnight still belongs to the day it started, so the form must not default
+  // to the calendar date on the wall clock. Yesterday wins whenever yesterday's
+  // shift is still inside its window (with the usual grace).
+  let suggestedDate = today;
+  try {
+    const y = pragueToday(-1);
+    const [prev] = await sql`
+      SELECT start_time, end_time FROM shifts
+      WHERE employee_id = ${c.meId} AND date = ${y}
+      ORDER BY start_time DESC LIMIT 1`;
+    if (prev) {
+      const w = windowOf({ ...prev, date: y } as any, y);
+      if (w && w.overnight && coveredBy(w, new Date())) suggestedDate = y;
+    }
+  } catch { /* no shifts table — today it is */ }
+
   return NextResponse.json({
     closings,
+    suggestedDate,
     canSeeAll: c.role === 'employer',
     payDailyCash,
     payoutFromRegister,
@@ -340,9 +356,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // One closing per person per SHIFT — not per day. Somebody who covers the
-  // morning and then the evening files two closings, and the second one used to
-  // bounce with „už je odeslaná".
+  // One closing per person per BUSINESS DAY. The day is what the till is
+  // counted for: a Friday shift that closes at 00:40 still belongs to Friday,
+  // and somebody who covered both the morning and the evening of that Friday
+  // files one closing for the day, not two. `shiftId` only records which shift
+  // it was filed from — it never takes part in uniqueness.
   const shiftId: number | null = shift?.id ?? null;
   let dupe: any = null;
   try {
@@ -355,8 +373,7 @@ export async function POST(request: Request) {
       [dupe] = await sql`
         SELECT id FROM cash_closings
         WHERE created_by = ${actorId} AND (date = ${shiftDate} OR shift_date = ${shiftDate})
-          AND event_id IS NULL
-          AND COALESCE(shift_id, 0) = ${shiftId ?? 0}`;
+          AND event_id IS NULL`;
     }
   } catch {
     [dupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${actorId} AND date = ${shiftDate}`;
@@ -450,12 +467,12 @@ export async function POST(request: Request) {
    try {
     [row] = await sql`
       INSERT INTO cash_closings (
-        team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
+        team_id, created_by, date, shift_date, shift_label, shift_id, approved, approved_by, payout_from_register,
         tips_in_drawer, shift_employees, movements, diff_reason, diff_note, denominations, final_removal, event_id,
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftDate}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb, ${finalRemoval}, ${eventId},
