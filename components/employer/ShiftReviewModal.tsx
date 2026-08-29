@@ -245,7 +245,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 glass-strong border-b border-black/[0.06]">
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 glass-strong chrome-edge">
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{employee.avatar || '👤'}</span>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">

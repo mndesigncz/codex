@@ -74,7 +74,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
         ) : (
           <>
             {/* Header */}
-            <div className="sticky top-0 z-10 glass-strong border-b border-black/[0.06]">
+            <div className="sticky top-0 z-10 glass-strong chrome-edge">
               <div className="flex items-center gap-3.5 px-5 pt-5 pb-3">
                 <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.employee.avatar || '👤'}</span>
                 <div className="min-w-0 flex-1">

@@ -187,7 +187,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     return (
       <div className="p-4 sm:p-6 space-y-6">
         <div className="h-7 w-64 rounded-full bg-black/[0.05] animate-pulse" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
           {[0, 1, 2, 3].map(i => <div key={i} className="glass-card h-28 animate-pulse" />)}
         </div>
         <div className="glass-card h-36 animate-pulse" />

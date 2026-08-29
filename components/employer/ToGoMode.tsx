@@ -200,7 +200,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         </div>
 
         {/* Quick functions — frosted tiles with badges */}
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2.5 stagger">
           {tiles.map(t => (
             <button key={t.view} onClick={() => onOpenView(t.view)}
               className="relative glass-card rounded-[22px] px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
@@ -209,7 +209,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
                   {t.badge}
                 </span>
               )}
-              <Icon name={t.icon as any} size={22} className="text-[#16181A]" strokeWidth={1.8} />
+              <Icon name={t.icon as any} size={22} className="text-[#16181A] i-lead" strokeWidth={1.8} />
               <span className="text-[11px] font-bold text-black/60">{t.label}</span>
             </button>
           ))}

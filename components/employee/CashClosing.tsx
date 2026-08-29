@@ -1096,8 +1096,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         <div>
+          {/* Say WHY nothing is being demanded, so a blank space doesn't read
+              as a bug the next time somebody expects the checklist. */}
+          {missingRequired.length === 0 && requiredProcs.length > 0 && !proceduresApply && (
+            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+              <p className="text-[13px] text-black/50">
+                {eventId !== '' ? 'Uzávěrka za akci — povinné postupy prodejny se u ní neřeší.'
+                  : !closingIsToday ? 'Uzávěrka za jiný den — dnešní postupy ji neblokují.'
+                  : 'Tenhle den nemáš směnu — uzávěrku můžeš odeslat a vedení ji potvrdí.'}
+              </p>
+            </div>
+          )}
           {missingRequired.length > 0 && (
-            <div className="rounded-2xl bg-red-500/[0.07] border border-red-500/25 p-4">
+            <div className="rounded-2xl bg-red-500/[0.07] border border-red-500/25 p-4 rise-in">
               <p className="text-sm font-semibold text-red-600 flex items-center gap-2">
                 <Icon name="warning" size={16} /> Před uzávěrkou je potřeba dokončit:
               </p>

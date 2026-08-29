@@ -135,7 +135,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       <div className="p-4 sm:p-6 space-y-6">
         <div className="h-7 w-56 rounded-full bg-black/[0.05] animate-pulse" />
         <div className="glass-card h-32 animate-pulse" />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 stagger">
           <div className="glass-card h-28 animate-pulse" />
           <div className="glass-card h-28 animate-pulse" />
         </div>
@@ -190,7 +190,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     monthly: (monthHours > 0 || monthRatings.length > 0) ? (
       <div className="glass-card p-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📆 Tenhle měsíc</p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 stagger">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Odpracováno</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{fmtH(monthHours)}</p>

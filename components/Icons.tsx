@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+
 // SF-Symbols-style stroke icons — monochrome, inherit currentColor
 const paths: Record<string, React.ReactNode> = {
   overview: (
@@ -176,7 +178,28 @@ const paths: Record<string, React.ReactNode> = {
 
 export type IconName = keyof typeof paths;
 
-export function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }: { name: string; size?: number; strokeWidth?: number; className?: string }) {
+/** Motion an icon can carry. Used sparingly — an icon moves to say something
+ *  ("this is now active", "there's something new", "this finished"), never for
+ *  decoration. */
+export type IconMotion = 'draw' | 'pop' | 'ring' | 'pulse' | 'lead';
+
+/** Every shape gets pathLength="1", so one CSS rule draws any icon regardless
+ *  of how long its real outline happens to be. */
+function normalized(node: React.ReactNode): React.ReactNode {
+  return React.Children.map(node, (child) => {
+    if (!React.isValidElement(child)) return child;
+    const el = child as React.ReactElement<any>;
+    const kids = el.props?.children ? normalized(el.props.children) : el.props?.children;
+    return React.cloneElement(el, { pathLength: 1, ...(kids ? { children: kids } : {}) });
+  });
+}
+
+export function Icon({ name, size = 22, strokeWidth = 1.7, className = '', motion, title }: {
+  name: string; size?: number; strokeWidth?: number; className?: string;
+  motion?: IconMotion; title?: string;
+}) {
+  const body = paths[name] ?? null;
+  const motionCls = motion ? ` i-${motion}` : '';
   return (
     <svg
       width={size}
@@ -187,10 +210,12 @@ export function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }: { n
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
+      className={className + motionCls}
+      role={title ? 'img' : undefined}
+      aria-hidden={title ? undefined : 'true'}
     >
-      {paths[name] ?? null}
+      {title ? <title>{title}</title> : null}
+      {motion === 'draw' ? normalized(body) : body}
     </svg>
   );
 }

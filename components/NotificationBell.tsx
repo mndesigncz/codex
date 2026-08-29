@@ -103,9 +103,10 @@ export default function NotificationBell() {
         className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
         title="Notifikace"
       >
-        <Icon name="bell" size={19} />
+        {/* The bell only moves when there is actually something new. */}
+        <Icon name="bell" size={19} className="i-lead" motion={badge > 0 ? 'ring' : undefined} />
         {badge > 0 && (
-          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
+          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center rise-in ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
             {badge > 9 ? '9+' : badge}
           </span>
         )}

@@ -63,9 +63,27 @@ export default function Landing() {
         <p className="mt-4 text-xs text-black/40">Bez karty. Zaměstnanci se připojí jedním kódem.</p>
       </section>
 
+      {/* One quiet image instead of a wall of screenshots — the room the app is
+          actually used in. 22 kB, so it costs the visitor nothing. */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-14 sm:pb-20">
+        <figure className="relative overflow-hidden rounded-[32px] border border-black/[0.06] shadow-[0_30px_80px_rgba(25,35,15,0.14)] rise-in">
+          <img
+            src="/brand/hero-tea-bar.webp"
+            alt="Pult čajovny s konvicí, sklenicemi a čajovými dózami v ranním světle"
+            width={1376} height={768} loading="eager" fetchPriority="high"
+            className="w-full h-[220px] sm:h-[380px] object-cover"
+          />
+          <figcaption className="absolute inset-x-0 bottom-0 p-5 sm:p-8 bg-gradient-to-t from-black/55 via-black/15 to-transparent">
+            <p className="text-white/95 text-sm sm:text-base font-semibold max-w-md leading-snug">
+              Ráno otevřete. Managero už ví, kdo má směnu, co došlo a co se má stihnout.
+            </p>
+          </figcaption>
+        </figure>
+      </section>
+
       {/* Features */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
           {FEATURES.map(f => (
             <div key={f.title} className="glass-card p-6">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
