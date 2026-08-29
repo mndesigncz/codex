@@ -123,9 +123,13 @@ export async function GET(req: NextRequest) {
         const st = String(sh.start_time ?? '').slice(0, 5);
         const en = String(sh.end_time ?? '').slice(0, 5);
         if (!/^\d{2}:\d{2}$/.test(st) || !/^\d{2}:\d{2}$/.test(en)) continue;
+        // Stejný začátek i konec znamená, že směnu založilo odpíchnutí a
+        // ještě neskončila — délku neznáme. Rozprostřít ji přes celý den by
+        // z jednoho člověka udělalo obsazenost od rána do rána.
+        if (en === st) continue;
         const h0 = parseInt(st.slice(0, 2), 10);
         const h1 = parseInt(en.slice(0, 2), 10);
-        const span = en <= st ? (24 - h0) + h1 : h1 - h0;
+        const span = en < st ? (24 - h0) + h1 : h1 - h0;
         for (let k = 0; k < span && k < 24; k++) {
           const h = (h0 + k) % 24;
           // Hodina po půlnoci patří dalšímu dni — mimo měsíc ji nepočítáme.
