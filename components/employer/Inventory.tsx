@@ -16,7 +16,6 @@ import {
 import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import StocktakeModal from '../inventory/Stocktake';
-import PosMappingModal from '../inventory/PosMapping';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -176,7 +175,6 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const [reports, setReports] = useState<any[]>([]);
   const [showReports, setShowReports] = useState(false);
   const [showStocktake, setShowStocktake] = useState(false);
-  const [showPosMap, setShowPosMap] = useState(false);
   // Supplier entities — the address an order can actually be sent to.
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [showSuppliers, setShowSuppliers] = useState(false);
@@ -630,9 +628,11 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
                     📋 Inventura
                   </button>
-                  <button onClick={() => { setShowPosMap(true); setMoreOpen(false); }}
+                  {/* Párování s kasou má vlastní obrazovku — dvě místa na
+                      jednu věc byla hlavní důvod, proč to působilo krkolomně. */}
+                  <button onClick={() => { setMoreOpen(false); onNavigate?.('recipes'); }}
                     className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    💳 Prodeje z pokladny
+                    💳 Receptury a prodeje z kasy
                   </button>
                   {reports.length > 0 && (
                     <button onClick={() => { setShowReports(true); setMoreOpen(false); }}
@@ -1258,10 +1258,6 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             const d = await fetch('/api/suppliers').then(r => r.json()).catch(() => ({}));
             setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []);
           }} />
-      )}
-
-      {showPosMap && (
-        <PosMappingModal items={active} onClose={() => setShowPosMap(false)} onSynced={load} />
       )}
 
       {showStocktake && (
