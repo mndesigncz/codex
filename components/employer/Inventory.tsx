@@ -84,6 +84,10 @@ type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
 const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+/** Číslo z pole, které snese i desetinnou čárku. V poli type="number"
+ *  se „0,7" zahodí na prázdno — a velikost balení pak tiše zmizí. */
+const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
+
 const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', contentUnit: '', openAmount: '', portions: [] as { name: string; amount: string }[], archived: false, hideFromOverview: false, highlight: '' };
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -466,12 +470,12 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
       unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
       brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview, highlight: form.highlight || null,
-      packageSize: form.packageSize === '' ? null : Number(form.packageSize) || null,
+      packageSize: form.packageSize === '' ? null : dec(form.packageSize) || null,
       contentUnit: form.contentUnit || null,
       portions: (form.portions ?? [])
         .filter(p => p.name.trim() && Number(String(p.amount).replace(',', '.')) > 0)
         .map(p => ({ name: p.name.trim(), amount: Number(String(p.amount).replace(',', '.')) })),
-      openAmount: form.openAmount === '' ? null : Math.max(0, Number(form.openAmount) || 0),
+      openAmount: form.openAmount === '' ? null : Math.max(0, dec(form.openAmount)),
     };
     setFormErr('');
     try {
@@ -987,7 +991,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     <div>
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Velikost balení</label>
                       <div className="flex gap-2">
-                        <input type="number" inputMode="decimal" min={0} value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
+                        <input inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
                           placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
                         <select value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
                           className={`${inputClass} w-20 shrink-0 px-2`}>
@@ -999,7 +1003,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     <div>
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">V načatém zbývá</label>
                       <div className="relative">
-                        <input type="number" inputMode="decimal" min={0} value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
+                        <input inputMode="decimal" value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
                           placeholder="0" className={`${inputClass} pr-12`} />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{form.contentUnit || pk(form)?.contentUnit || ''}</span>
                       </div>

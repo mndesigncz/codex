@@ -440,7 +440,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   <option value="">— vyber ze skladu —</option>
                   {items.map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
                 </select>
-                <input type="number" inputMode="decimal" min={0} step="any"
+                <input inputMode="decimal"
                   value={ing.amount} onChange={e => setIng(idx, { amount: e.target.value })}
                   placeholder="0,02" className={`${inputCls} w-24 text-center font-semibold tabular`} />
                 <div className="flex gap-1">

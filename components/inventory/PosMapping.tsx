@@ -71,7 +71,7 @@ export default function PosMappingModal({ items, onClose, onSynced }: {
         productId: draft.productId, productName: draft.productName,
         ingredients: ingredients
           .filter(ing => ing.itemId !== '')
-          .map(ing => ({ itemId: parseInt(ing.itemId), amount: Number(ing.amount) || 1 })),
+          .map(ing => ({ itemId: parseInt(ing.itemId), amount: Number(String(ing.amount).replace(',', '.')) || 1 })),
       }),
     }).catch(() => null);
     setSaving(false);
@@ -213,7 +213,7 @@ export default function PosMappingModal({ items, onClose, onSynced }: {
                         <option value="">— vyber položku skladu —</option>
                         {items.map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
                       </select>
-                      <input type="number" inputMode="decimal" min={0} step="0.1" value={ing.amount}
+                      <input inputMode="decimal" value={ing.amount}
                         onChange={e => setDraft(d => d && ({ ...d, ingredients: d.ingredients.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
                         className={`${inputClass} w-24 text-right tabular-nums`} />
                       <span className="text-xs text-black/45 w-10">{item?.contentUnit ?? item?.unit ?? ''}</span>
