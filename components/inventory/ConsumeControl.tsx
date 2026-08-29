@@ -55,7 +55,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
         </button>
       ))}
       <input
-        autoFocus type="number" inputMode="decimal" min={0} step="any" value={amount}
+        autoFocus inputMode="decimal" value={amount}
         onChange={e => setAmount(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); consume(Number(amount.replace(',', '.'))); } }}
         placeholder={unit ?? 'množství'}

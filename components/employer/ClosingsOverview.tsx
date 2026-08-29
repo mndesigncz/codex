@@ -37,6 +37,9 @@ export default function ClosingsOverview() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   // Deep POS insights for the picked month (hourly peaks, per-person sales…).
   const [posInsights, setPosInsights] = useState<any | null>(null);
+  // Kontrola uzávěrek proti kase — den po dni za vybraný měsíc.
+  const [reconcile, setReconcile] = useState<any | null>(null);
+  const [reconcileOpen, setReconcileOpen] = useState(false);
   useEffect(() => {
     try { setAnalyticsOpen(localStorage.getItem('managero-closings-analytics') === '1'); } catch { /* ignore */ }
   }, []);
@@ -63,8 +66,14 @@ export default function ClosingsOverview() {
     if (!analyticsOpen || month === 'all') { setPosInsights(null); return; }
     let alive = true;
     fetch(`/api/pos/insights?month=${month}`).then(r => r.json())
-      .then(d => { if (alive) setPosInsights(d?.connected && d.bills != null ? d : null); })
-      .catch(() => { if (alive) setPosInsights(null); });
+      .then(d => {
+        if (!alive) return;
+        setPosInsights(d?.connected && d.bills != null ? d : null);
+        // Porovnání s uzávěrkami jede ze stejného průchodu účtenkami — druhé
+        // volání by znamenalo stáhnout celý měsíc z pokladny dvakrát.
+        setReconcile(d?.reconcile && Array.isArray(d.reconcile.days) ? d.reconcile : null);
+      })
+      .catch(() => { if (alive) { setPosInsights(null); setReconcile(null); } });
     return () => { alive = false; };
   }, [analyticsOpen, month]);
 
@@ -554,21 +563,111 @@ export default function ClosingsOverview() {
           {/* hourly peaks */}
           {posInsights.hours.some((h: number) => h > 0) && (() => {
             const max = Math.max(...posInsights.hours);
+            const maxStaff = Array.isArray(posInsights.staff) ? Math.max(...posInsights.staff, 0) : 0;
             return (
               <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Špičky dne (tržba po hodinách)</p>
-                <div className="flex items-end gap-[3px] h-20 overflow-x-auto scrollbar-thin">
-                  {posInsights.hours.map((v: number, h: number) => (
-                    <div key={h} className="flex flex-col items-center gap-1 min-w-[22px] flex-1" title={`${h}:00 — ${money(v)}`}>
-                      <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
-                        style={{ height: `${max ? Math.max(v > 0 ? 6 : 0, (v / max) * 64) : 0}px` }} />
-                      <span className="text-[10px] text-black/35 tabular-nums">{h}</span>
-                    </div>
-                  ))}
+                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
+                  Špičky dne (tržba po hodinách)
+                  {Array.isArray(posInsights.staff) && posInsights.staff.some((n: number) => n > 0) && (
+                    <span className="ml-2 font-normal normal-case tracking-normal text-black/35">
+                      · tmavý proužek = naplánovaní lidé
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-end gap-[3px] h-24 overflow-x-auto scrollbar-thin">
+                  {posInsights.hours.map((v: number, h: number) => {
+                    const people = Array.isArray(posInsights.staff) ? Number(posInsights.staff[h]) || 0 : 0;
+                    return (
+                      <div key={h} className="flex flex-col items-center gap-1 min-w-[22px] flex-1"
+                        title={`${h}:00 — ${money(v)}${people ? ` · ${people} naplánovaných hodin` : ''}`}>
+                        <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
+                          style={{ height: `${max ? Math.max(v > 0 ? 6 : 0, (v / max) * 56) : 0}px` }} />
+                        {/* Obsazenost pod sloupcem — kde je proužek širší než
+                            sloupec vysoký, platíme lidi za prázdno. */}
+                        <div className="w-full h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
+                          <div className="h-full rounded-full bg-[#16181A]/45"
+                            style={{ width: `${maxStaff ? (people / maxStaff) * 100 : 0}%` }} />
+                        </div>
+                        <span className="text-[10px] text-black/35 tabular-nums">{h}</span>
+                      </div>
+                    );
+                  })}
                 </div>
+                {Array.isArray(posInsights.staffingAdvice) && posInsights.staffingAdvice.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {posInsights.staffingAdvice.map((a: any, i: number) => (
+                      <div key={i} className={`rounded-2xl border px-4 py-2.5 ${
+                        a.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                          : a.tone === 'good' ? 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]'
+                          : 'bg-black/[0.03] border-black/[0.07] text-black/60'}`}>
+                        <p className="text-sm font-semibold">{a.title}</p>
+                        <p className="text-xs mt-0.5 opacity-80 leading-relaxed">{a.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })()}
+
+          {/* uzávěrky proti kase */}
+          {reconcile && (reconcile.insights?.length > 0 || reconcile.totals?.comparedDays > 0) && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Uzávěrky proti kase</p>
+              <div className="space-y-2">
+                {(reconcile.insights ?? []).map((i: any, idx: number) => (
+                  <div key={idx} className={`rounded-2xl border px-4 py-2.5 ${
+                    i.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                      : i.tone === 'good' ? 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]'
+                      : 'bg-black/[0.03] border-black/[0.07] text-black/60'}`}>
+                    <p className="text-sm font-semibold flex items-center gap-1.5">
+                      <Icon name={i.icon} size={14} /> {i.title}
+                    </p>
+                    <p className="text-xs mt-0.5 opacity-80 leading-relaxed">{i.text}</p>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={() => setReconcileOpen(o => !o)}
+                className="mt-2 w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
+                <span>Den po dni ({reconcile.totals?.comparedDays ?? 0} porovnaných)</span>
+                <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${reconcileOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {reconcileOpen && (
+                <>
+                  <div className="mt-2 flex items-center gap-3 px-4 text-[10px] uppercase tracking-wider text-black/35 sm:hidden">
+                    <span className="w-14">den</span><span className="flex-1" />
+                    <span>kasa</span><span>uzávěrka</span><span className="w-20 text-right">rozdíl</span>
+                  </div>
+                  <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-72 overflow-y-auto scrollbar-thin">
+                    {reconcile.days.filter((d: any) => d.diff != null || d.bills > 0 || d.closings > 0).map((d: any) => (
+                      <div key={d.day} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                        <span className="shrink-0 w-14 text-black/45 tabular-nums">
+                          {new Date(d.day + 'T12:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-black/50 text-xs hidden sm:block">
+                          {d.closings === 0 ? 'bez uzávěrky' : d.people ?? ''}
+                        </span>
+                        <span className="sm:hidden flex-1" />
+                        <span className="shrink-0 text-xs text-black/45 tabular-nums">
+                          {d.posTotal != null ? money(d.posTotal) : '—'} <span className="text-black/25 hidden sm:inline">kasa</span>
+                        </span>
+                        <span className="shrink-0 text-xs text-black/45 tabular-nums">
+                          {d.declared != null ? money(d.declared) : '—'} <span className="text-black/25 hidden sm:inline">uzáv.</span>
+                        </span>
+                        <span className={`w-20 shrink-0 text-right text-xs font-bold tabular-nums ${
+                          d.diff == null ? 'text-black/20'
+                            : Math.abs(d.diff) <= 50 ? 'text-[#5B7A08]' : 'text-amber-700'
+                        }`}>
+                          {d.diff == null ? '—' : d.diff === 0 ? '✓' : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-black/35">{reconcile.note}</p>
+                </>
+              )}
+            </div>
+          )}
 
           {/* per-person sales */}
           {posInsights.byPerson.length > 0 && (

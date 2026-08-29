@@ -7,6 +7,7 @@ import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 import NewStockEntry from '../inventory/NewStockEntry';
+import StocktakeModal from '../inventory/Stocktake';
 
 interface InventoryItem {
   id: number;
@@ -69,6 +70,13 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   const reloadItems = () =>
     fetch('/api/inventory').then(r => r.json()).then(d => { if (Array.isArray(d)) setItems(d); }).catch(() => {});
   const [submitting, setSubmitting] = useState(false);
+  const [stocktakeOpen, setStocktakeOpen] = useState(false);
+  const [counting, setCounting] = useState(false);
+  useEffect(() => {
+    fetch('/api/stocktake').then(r => r.json())
+      .then(d => setStocktakeOpen(!!d?.open))
+      .catch(() => setStocktakeOpen(false));
+  }, [counting]);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -250,6 +258,17 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
         <p className="text-black/50 text-sm mt-1">Uprav stav, když něco dochází — vedení dostane upozornění.</p>
       </div>
+
+      {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo je u regálu. */}
+      {stocktakeOpen && (
+        <button onClick={() => setCounting(true)}
+          className="w-full rounded-2xl bg-[#C8F542] text-[#16181A] px-5 py-3.5 text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
+          📋 Probíhá inventura — pomoct spočítat sklad
+        </button>
+      )}
+      {counting && (
+        <StocktakeModal isEmployer={false} onClose={() => setCounting(false)} onApplied={() => {}} />
+      )}
 
       {success && (
         <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">

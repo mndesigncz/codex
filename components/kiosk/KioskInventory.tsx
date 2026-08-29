@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import KioskPackagedStock from './KioskPackagedStock';
 import NewStockEntry from '../inventory/NewStockEntry';
+import StocktakeModal from '../inventory/Stocktake';
 import { useKioskShift } from './KioskShiftGate';
 
 interface Item {
@@ -41,6 +42,8 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   // Writing a new thing in, attributed to whoever is clocked in on this tablet.
   const { activeId, active } = useKioskShift();
   const [adding, setAdding] = useState(false);
+  const [stocktakeOpen, setStocktakeOpen] = useState(false);
+  const [counting, setCounting] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
   const reload = () =>
@@ -55,6 +58,13 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
     }).catch(() => setLoading(false));
 
   useEffect(() => { reload(); }, []);
+
+  // Běží inventura? Když ano, tablet ji nabídne — počítat může kdokoli z týmu.
+  useEffect(() => {
+    fetch('/api/stocktake').then(r => r.json())
+      .then(d => setStocktakeOpen(!!d?.open))
+      .catch(() => setStocktakeOpen(false));
+  }, [counting]);
   // Arriving from the home-screen shortcut: open the entry form straight away.
   useEffect(() => {
     if (!autoOpenEntry) return;
@@ -125,6 +135,14 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             <button onClick={() => setAdding(true)}
               className="w-full rounded-2xl bg-[#16181A] text-white px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
               <Icon name="plus" size={20} strokeWidth={2.2} /> Zapsat novou věc do skladu
+            </button>
+          )}
+          {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo stojí u regálu —
+              tedy zpravidla někdo s tímhle tabletem v ruce. */}
+          {stocktakeOpen && (
+            <button onClick={() => setCounting(true)}
+              className="w-full rounded-2xl bg-[#C8F542] text-[#16181A] px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
+              <Icon name="clipboard" size={20} strokeWidth={2.2} /> Probíhá inventura — spočítat sklad
             </button>
           )}
           {justAdded && (
@@ -206,6 +224,10 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             </div>
           )}
         </div>
+      )}
+
+      {counting && (
+        <StocktakeModal isEmployer={false} onClose={() => setCounting(false)} onApplied={reload} />
       )}
     </div>
   );

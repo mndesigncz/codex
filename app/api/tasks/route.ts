@@ -41,7 +41,9 @@ const todayStr = () => pragueToday();
 
 // Next occurrence after a 'YYYY-MM-DD' date for the given recurrence.
 function nextDueDate(due: string | null, recurrence: string): string {
-  const base = due && /^\d{4}-\d{2}-\d{2}$/.test(due) ? new Date(due + 'T00:00:00') : new Date();
+  // Bez zadaného termínu se počítá od dnešního pražského dne — new Date() by
+  // po půlnoci vrátilo ještě včerejšek podle UTC.
+  const base = new Date((due && /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : pragueToday()) + 'T00:00:00');
   const d = new Date(base);
   if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
   else if (recurrence === 'weekdays') { do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6); }

@@ -5,6 +5,7 @@
 // Bills: GET api.storyous.com/bills/{merchantId}-{placeId}?from&till&limit → { data, nextPage }.
 
 import { neon } from '@neondatabase/serverless';
+import { businessDayOf, dayPlus } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -102,21 +103,31 @@ export interface DaySummary {
   tipsOther: number;
 }
 
-/** Paid, non-refunded bills of one day, summed by payment method. */
+/** Paid, non-refunded bills of one BUSINESS day, summed by payment method.
+ *
+ *  Obchodní den končí až s poslední účtenkou, ne o půlnoci: podnik zavírá po
+ *  půlnoci a účtenka z 1:30 patří k předešlému večeru — stejně jako uzávěrka,
+ *  kterou po ní někdo vyplní. Proto se stahuje i následující kalendářní den a
+ *  účtenky se roztřídí podle obchodního dne. Bez toho by uzávěrka nabídla
+ *  menší tržbu, než jaká byla, a kontrola proti kase by hlásila rozdíl, který
+ *  si aplikace vyrobila sama. */
 export async function daySummary(conn: PosConnection, date: string): Promise<DaySummary> {
   const out: DaySummary = {
     date, bills: 0, total: 0, cash: 0, card: 0, other: 0,
     tips: 0, tipsCash: 0, tipsCard: 0, tipsOther: 0,
   };
-  const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
-  const till = next.toISOString().slice(0, 10);
+  const till = dayPlus(date, 2);
   let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${date}&till=${till}&limit=100`;
   let guard = 0;
-  while (path && guard < 10) {
+  while (path && guard < 12) {
     guard++;
     const page = await api(conn, path);
     for (const b of page?.data ?? []) {
       if (b.deleted || b.refunded) continue;
+      const when = new Date(String(b.paidAt ?? b.createdAt ?? ''));
+      // Bez čitelného času účtenku raději nezapočítáme, než abychom ji dali
+      // do špatného dne.
+      if (businessDayOf(when) !== date) continue;
       const price = Number(b.finalPrice) || 0;
       out.bills++;
       out.total += price;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { pragueToday } from '@/lib/pragueTime';
+import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { STALE_AFTER_MS, autoCloseEntry, pragueMoment } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
 
@@ -272,16 +272,25 @@ export async function POST(req: NextRequest) {
   const [row] = await sql`
     UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
     RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+  // Směna patří dni, kdy začala. Kdo se odpíchne po půlnoci, hledal by jinak
+  // svou směnu i uzávěrku pod zítřejším datem — a nenašel ani jedno.
+  const shiftDay = pragueDaySafe(open.clock_in) || today;
   // Extend the auto-created shift's end to the real clock-out time.
-  try { await sql`UPDATE shifts SET end_time = ${hhmmPrague()} WHERE employee_id = ${employeeId} AND date = ${today} AND auto_created = TRUE`; } catch { /* not migrated */ }
+  try { await sql`UPDATE shifts SET end_time = ${hhmmPrague()} WHERE employee_id = ${employeeId} AND date = ${shiftDay} AND auto_created = TRUE`; } catch { /* not migrated */ }
 
-  // Nudge: does today's cash closing still need to be filled in?
+  // Nudge: does the closing for this shift's business day still need filling?
   let closingDone = true;
   try {
-    const today = pragueToday();
-    const [cl] = await sql`SELECT id FROM cash_closings WHERE created_by = ${employeeId} AND date = ${today}`;
+    const [cl] = await sql`
+      SELECT id FROM cash_closings
+      WHERE created_by = ${employeeId} AND COALESCE(shift_date, date) = ${shiftDay}`;
     closingDone = !!cl;
-  } catch { /* ignore */ }
+  } catch {
+    try {
+      const [cl] = await sql`SELECT id FROM cash_closings WHERE created_by = ${employeeId} AND date = ${shiftDay}`;
+      closingDone = !!cl;
+    } catch { /* ignore */ }
+  }
 
   return NextResponse.json({ ok: true, action: 'out', entry: row, closingDone });
 }

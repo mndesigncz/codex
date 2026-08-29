@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
+import ShrinkageReport from '../inventory/ShrinkageReport';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -218,6 +219,10 @@ export default function FinanceView() {
               </div>
             </div>
           )}
+
+          {/* Ztráty ze skladu — poslední inventura v penězích. Patří k penězům
+              stejně jako nákupy: to, co zmizí, se nakupuje znovu. */}
+          <ShrinkageReport />
 
           {/* Co vydělává — z pokladny přes receptury na ceny skladu */}
           {pos && pos.items?.length > 0 && (

@@ -8,18 +8,11 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { sendDigestEmail } from '@/lib/email';
 import { cashDifference, czk } from '@/lib/closing';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-function pragueToday(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date());
-  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
 
 export async function GET(request: Request) {
   const auth = request.headers.get('authorization');
@@ -42,7 +35,10 @@ export async function GET(request: Request) {
       // --- closings today ---
       let closings: any[] = [];
       try {
-        closings = await sql`SELECT * FROM cash_closings WHERE team_id = ${team.id} AND date = ${today}`;
+        // Uzávěrka se váže na obchodní den směny, ne na datum, kdy se vyplnila.
+        closings = await sql`
+          SELECT * FROM cash_closings
+          WHERE team_id = ${team.id} AND COALESCE(shift_date, date) = ${today}`;
       } catch { /* ignore */ }
       // Coworker "stub" rows (covered_by set) carry only a payout — counting
       // them would add a phantom surplus the size of every covered payout.

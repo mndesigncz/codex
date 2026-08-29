@@ -32,6 +32,27 @@ export function pragueHM(d: Date = new Date()): string {
   return hmFmt.format(d);
 }
 
+/** Hodina 0–23 podle pražských hodin na zdi. Řezat 11.–13. znak z ISO řetězce
+ *  by dalo hodinu v UTC — špičku v 19:00 by to v létě ukázalo v 17:00. */
+export function pragueHourOf(d: Date): number | null {
+  if (Number.isNaN(d.getTime())) return null;
+  const h = parseInt(hmFmt.format(d).slice(0, 2), 10);
+  return Number.isFinite(h) ? h : null;
+}
+
+/** Do kolika hodin ráno patří účtenka ještě k předchozímu obchodnímu dni.
+ *  Podnik zavírá po půlnoci — účtenka z 1:30 patří k předešlému večeru,
+ *  stejně jako uzávěrka, kterou po ní někdo vyplní. */
+export const NIGHT_CUTOFF_HOUR = 6;
+
+/** Obchodní den účtenky v Praze. Vrací '' pro nečitelný čas. */
+export function businessDayOf(d: Date): string {
+  const h = pragueHourOf(d);
+  if (h == null) return '';
+  const day = dayFmt.format(d);
+  return h < NIGHT_CUTOFF_HOUR ? dayPlus(day, -1) : day;
+}
+
 /** Current Prague UTC offset as "+01:00" / "+02:00" (DST-aware). */
 function offsetAt(at: Date): string {
   const parts = new Intl.DateTimeFormat('en', {

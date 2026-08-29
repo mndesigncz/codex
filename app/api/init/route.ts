@@ -1025,6 +1025,10 @@ export async function GET() {
     // Audit trail covers the open remainder too, so consumption is derivable.
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`;
     await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`;
+    // Noční synchronizace pokladny běží bez přihlášeného člověka. Dokud sloupec
+    // vyžadoval uživatele, celý zápis odpisů spadl a sklad se automaticky
+    // neodepisoval vůbec — ručně spuštěná synchronizace to maskovala.
+    try { await sql`ALTER TABLE inventory_log ALTER COLUMN user_id DROP NOT NULL`; } catch { /* už je */ }
     // A photo of the thing itself — the crew writes new stock in from the floor
     // and the picture is what makes „Sirup Mango" recognizable to the employer.
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS photo_url TEXT`;

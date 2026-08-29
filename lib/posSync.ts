@@ -4,6 +4,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getConnection, listBills, billItems } from './storyous';
 import { audit } from './audit';
+import { businessDayOf } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -26,6 +27,18 @@ function consume(qty: number, open: number, pkg: number, amount: number) {
 export async function runPosSync(teamId: number, userId: number | null, force = false) {
   const conn = await getConnection(teamId);
   if (!conn) return { connected: false as const };
+
+  // Večerní souhrn synchronizuje bez přihlášeného člověka. Historie skladu si
+  // radši vezme vedoucího týmu, ať u pohybu někdo stojí; když ho nenajde,
+  // zůstane prázdný — sloupec to od migrace unese.
+  let actor = userId;
+  if (actor == null) {
+    try {
+      const [owner] = await sql`
+        SELECT id FROM users WHERE team_id = ${teamId} AND role = 'employer' ORDER BY id ASC LIMIT 1`;
+      if (owner?.id) actor = Number(owner.id);
+    } catch { /* zůstane null */ }
+  }
 
   // Throttle + concurrency lock in one atomic claim: only the caller who moves
   // last_sync_at forward gets to run. Two syncs at once (digest cron + a manual
@@ -75,9 +88,19 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const totals = new Map<number, number>();
   const unmapped = new Map<string, { name: string; count: number }>();
   const fetched: string[] = [];
-  // What sold, per product — recorded for every product, mapped or not, so the
-  // margin analysis has a history without asking the POS again.
-  const sales = new Map<string, { name: string; qty: number }>();
+  // What sold, per product AND per the business day the receipt belongs to.
+  // The sync covers yesterday and today, so stamping everything with today's
+  // date would push the last day of a month into the next one — and the
+  // monthly margins with it. Účtenka po půlnoci patří k předchozímu večeru.
+  const sales = new Map<string, { day: string; productId: string; name: string; qty: number }>();
+  const dayOfBill = new Map<string, string>();
+
+  for (const b of bills) {
+    if (b?.billId && b?.createdAt) {
+      const day = businessDayOf(new Date(b.createdAt));
+      if (day) dayOfBill.set(b.billId, day);
+    }
+  }
 
   for (const billId of unprocessed.slice(0, 120)) {
     let items;
@@ -89,9 +112,11 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
       const sold = Number(it.amount);
       if (!(sold > 0)) continue;
       if (it.productId) {
-        const rec = sales.get(it.productId) ?? { name: it.name, qty: 0 };
+        const day = dayOfBill.get(billId) ?? iso(today);
+        const key = `${day}|${it.productId}`;
+        const rec = sales.get(key) ?? { day, productId: it.productId, name: it.name, qty: 0 };
         rec.qty += sold;
-        sales.set(it.productId, rec);
+        sales.set(key, rec);
       }
       const recipe = it.productId ? mapByProduct.get(it.productId) : null;
       if (recipe && recipe.length) {
@@ -134,7 +159,7 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
       WHERE id = ${itemId} AND team_id = ${teamId}`);
     writes.push(sql`
       INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)
-      VALUES (${itemId}, ${userId}, ${oldQty}, ${next.qty}, ${oldOpen}, ${pkg > 0 ? next.open : null}, ${'Prodej (Storyous)'}, NOW())`);
+      VALUES (${itemId}, ${actor}, ${oldQty}, ${next.qty}, ${oldOpen}, ${pkg > 0 ? next.open : null}, ${'Prodej (Storyous)'}, NOW())`);
     deducted.push({ name: it.name, amount });
   }
   for (const billId of fetched) {
@@ -154,18 +179,15 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   }
 
   if (deducted.length) {
-    audit(teamId, userId, 'pos.sync', 'pos', null,
+    audit(teamId, actor, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
   }
-  // The day's sales, per product. Attributed to today's date: the sync runs on
-  // yesterday's and today's receipts, and for the margin view a day either way
-  // does not change the month.
-  const salesDay = iso(today);
-  for (const [productId, v] of Array.from(sales.entries())) {
+  // The day's sales, per product, stamped with the day the receipt belongs to.
+  for (const v of Array.from(sales.values())) {
     try {
       await sql`
         INSERT INTO pos_sales (team_id, date, product_id, product_name, qty)
-        VALUES (${teamId}, ${salesDay}, ${productId}, ${v.name}, ${v.qty})
+        VALUES (${teamId}, ${v.day}, ${v.productId}, ${v.name}, ${v.qty})
         ON CONFLICT (team_id, date, product_id) DO UPDATE SET
           qty = pos_sales.qty + ${v.qty},
           product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`;

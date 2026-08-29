@@ -12,6 +12,9 @@ import { Icon } from '../Icons';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
 
+/** Číslo z pole, které snese i desetinnou čárku — „0,7" jinak spadne na nulu. */
+const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
+
 interface Props {
   /** 'kiosk' grows the controls for a tablet used at arm's length. */
   variant?: 'app' | 'kiosk';
@@ -88,7 +91,7 @@ export default function NewStockEntry({
   };
 
   const bump = (by: number) =>
-    setQuantity(q => String(Math.max(0, (parseFloat(q) || 0) + by)));
+    setQuantity(q => String(Math.max(0, Math.round((dec(q) + by) * 1000) / 1000)));
 
   const save = async () => {
     if (!name.trim()) { setErr('Napiš, co to je.'); return; }
@@ -101,12 +104,12 @@ export default function NewStockEntry({
           name: name.trim(),
           category: cat?.name ?? '',
           categoryId: categoryId ?? undefined,
-          quantity: parseFloat(quantity) || 0,
+          quantity: dec(quantity),
           unit: unit.trim() || 'ks',
           photoUrl,
           description: note.trim() || undefined,
           brand: brand.trim() || undefined,
-          packageSize: packageSize === '' ? undefined : packageSize,
+          packageSize: packageSize === '' ? undefined : dec(packageSize),
           unitCost: unitCost === '' ? undefined : unitCost,
           supplier: supplier.trim() || undefined,
           minQuantity: defaults.minQuantity ?? undefined,
@@ -177,7 +180,7 @@ export default function NewStockEntry({
           <button type="button" onClick={() => bump(-1)}
             className={`shrink-0 rounded-2xl glass font-bold text-[#16181A] active:scale-95 transition ${
               big ? 'h-14 w-14 text-2xl' : 'h-11 w-11 text-lg'}`}>−</button>
-          <input type="number" inputMode="decimal" min={0} value={quantity}
+          <input inputMode="decimal" value={quantity}
             onChange={e => setQuantity(e.target.value)}
             className={`${field} text-center font-bold tabular-nums`} style={{ maxWidth: big ? 140 : 100 }} />
           <button type="button" onClick={() => bump(1)}
@@ -209,7 +212,7 @@ export default function NewStockEntry({
           </div>
           <div>
             <label className={label}>Velikost balení</label>
-            <input type="number" inputMode="decimal" value={packageSize}
+            <input inputMode="decimal" value={packageSize}
               onChange={e => setPackageSize(e.target.value)} className={field} placeholder="0,7" />
           </div>
           <div>
