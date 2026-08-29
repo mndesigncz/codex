@@ -10,6 +10,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { normalizeTheme, normalizeExcluded, isDark, type ShareTheme } from '@/lib/share';
 import { buildTree, type CategoryNode, type TreeNode } from '@/lib/categoryTree';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +56,7 @@ export default async function SharePage({ params }: { params: { token: string } 
   // Public events: the shop's upcoming programme, shown on every share page.
   let publicEvents: any[] = [];
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = pragueToday();
     publicEvents = await sql`
       SELECT title, description, kind, date, start_time, end_time, location
       FROM events

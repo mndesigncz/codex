@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
+import { pragueToday } from '@/lib/pragueTime';
 
 type Ev = any;
 
@@ -41,7 +42,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
   };
   useEffect(() => { load(); }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = pragueToday();
   const upcoming = useMemo(() => events.filter(e => e.date >= today && e.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date)), [events, today]);
   const past = useMemo(() => events.filter(e => e.date < today || e.status === 'cancelled').sort((a, b) => b.date.localeCompare(a.date)), [events, today]);
 

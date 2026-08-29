@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency, useMoney } from '../CurrencyProvider';
+import { pragueToday } from '@/lib/pragueTime';
 
 type Person = { id: number; name: string; avatar: string | null; hadClosing?: boolean };
 type Day = {
@@ -89,7 +90,7 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
   const firstDow = new Date(y, m - 1, 1).getDay();            // 0=Sun..6=Sat
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
 
   const cells: (string | null)[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);

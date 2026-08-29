@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { normalizePoints } from '@/lib/rewardLevels';
+import { pragueToday } from '@/lib/pragueTime';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -40,7 +41,7 @@ export interface Summary {
   autoPoints: { total: number; lines: { label: string; points: number }[] };
 }
 
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => pragueToday();
 const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;

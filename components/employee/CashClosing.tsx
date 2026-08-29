@@ -10,11 +10,12 @@ import {
   cashLeft,
 } from '@/lib/closing';
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
+import { pragueToday } from '@/lib/pragueTime';
 
 const inputClass =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => pragueToday();
 
 type FormState = {
   date: string; shiftLabel: string;
@@ -492,8 +493,15 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const scrollToStep = (i: number) =>
     stepRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // A required procedure counts as done when ANYONE on the team completed it today.
-  const missingRequired = requiredProcs.filter(p =>
+  // A required procedure counts as done when ANYONE on the team completed it
+  // today. The check only has meaning for today's SHOP closing filed by someone
+  // who was actually on shift — an off-site stall doesn't run the shop's
+  // routine, a backfilled day can't be fixed by doing the routine now, and
+  // someone who wasn't on shift can't be asked to finish a shift they never
+  // had (that closing goes to the employer for approval anyway).
+  const closingIsToday = form.date === today();
+  const proceduresApply = eventId === '' && closingIsToday && (!isSelf || onShift);
+  const missingRequired = !proceduresApply ? [] : requiredProcs.filter(p =>
     !todayRuns.some((r: any) => r.procedure_id === p.id && r.status === 'completed'));
 
   const submit = (e: React.FormEvent) => {

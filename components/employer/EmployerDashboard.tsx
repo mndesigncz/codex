@@ -12,6 +12,7 @@ import {
   EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS,
 } from '@/lib/dashboardWidgets';
 import { DashboardEditor, LinkTile } from '../DashboardEditor';
+import { pragueToday } from '@/lib/pragueTime';
 
 // Everything past `rating` is an optional enrichment of the roster response —
 // rendered only when the API sends it, so the row degrades to name + shift.
@@ -97,8 +98,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [editRole, setEditRole] = useState<'employer' | 'employee'>('employer');
   const [loading, setLoading] = useState(true);
   const show = (id: string) => isWidgetOn(cfg, id);
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const today = pragueToday();
+  const yesterday = pragueToday(-1);
 
   const loadRoster = useCallback(async (autoPick = false) => {
     const day = (d: string) => fetch(`/api/shift-reviews?date=${d}`).then(r => r.json()).catch(() => null);
@@ -135,10 +136,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         ]);
         setCfg(team?.team?.dashboard_config?.employer ?? {});
         setPinnedShare(team?.pinnedShare ?? null);
-        fetch(`/api/pos/summary?date=${new Date().toISOString().slice(0, 10)}`).then(r => r.json())
+        fetch(`/api/pos/summary?date=${pragueToday()}`).then(r => r.json())
           .then(d => setPosToday(d?.connected && d.bills != null ? d : null)).catch(() => {});
         fetch('/api/events').then(r => r.json()).then(d => {
-          const today0 = new Date().toISOString().slice(0, 10);
+          const today0 = pragueToday();
           const up = (Array.isArray(d.events) ? d.events : [])
             .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
             .sort((a: any, b: any) => a.date.localeCompare(b.date));

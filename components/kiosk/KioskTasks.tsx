@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useKioskShift } from './KioskShiftGate';
+import { pragueToday } from '@/lib/pragueTime';
 
 interface ChecklistItem { text: string; done: boolean }
 interface Task {
@@ -23,7 +24,7 @@ interface Task {
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
 const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => pragueToday();
 
 export default function KioskTasks() {
   const { active } = useKioskShift();
@@ -63,11 +64,7 @@ export default function KioskTasks() {
   };
 
   const today = todayStr();
-  const weekAhead = useMemo(() => {
-    const d = new Date(today + 'T00:00:00');
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  }, [today]);
+  const weekAhead = useMemo(() => pragueToday(7), [today]);
 
   const filtered = useMemo(() => tasks.filter(t => {
     if (filter === 'mine') return active != null && (t.assignedTo === active.id || t.assignedTo == null);

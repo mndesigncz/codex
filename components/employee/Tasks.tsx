@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { TaskChecklist, recurrenceLabel, ChecklistItem } from '../TaskChecklist';
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
+import { pragueToday } from '@/lib/pragueTime';
 
 interface Task {
   id: number;
@@ -45,12 +46,8 @@ export default function Tasks({ user }: Props) {
       .catch(() => setLoading(false));
   }, [userId]);
 
-  const today = new Date().toISOString().split('T')[0];
-  const weekAhead = (() => {
-    const d = new Date(today + 'T00:00:00');
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  })();
+  const today = pragueToday();
+  const weekAhead = pragueToday(7);
 
   const updateStatus = async (task: Task, newStatus: string) => {
     // Completing a task on a day that isn't its due day → warn first.

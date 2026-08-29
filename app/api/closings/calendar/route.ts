@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ async function ctx() {
   return { meId, role, teamId: u?.team_id as number | null };
 }
 
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => pragueToday();
 
 // GET ?month=YYYY-MM&scope=me — a calendar of who was on shift and who did (or
 // still owes) the closing each day. Employer sees the whole team (including the

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import { PersonLink } from '../employer/ProfileLinkProvider';
+import { pragueToday } from '@/lib/pragueTime';
 
 type Person = { id: number; name: string; avatar: string | null; startTime?: string; endTime?: string; hadClosing?: boolean };
 type Day = { onShift: Person[]; closedBy: Person[]; hasClosing: boolean; missing: boolean };
@@ -45,7 +46,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
   const firstDow = new Date(y, m - 1, 1).getDay();            // 0=Sun..6=Sat
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = pragueToday();
 
   const cells: (string | null)[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);

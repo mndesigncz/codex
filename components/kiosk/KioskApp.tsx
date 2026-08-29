@@ -11,6 +11,7 @@ import CashClosing from '../employee/CashClosing';
 import MessengerDock from '../chat/MessengerDock';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { usePlan, ProBadge } from '../Pro';
+import { pragueToday } from '@/lib/pragueTime';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
@@ -160,7 +161,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
       .then(d => setHandover(d?.handover ? d : null))
       .catch(() => {});
     fetch('/api/events').then(r => r.json()).then(d => {
-      const today0 = new Date().toISOString().slice(0, 10);
+      const today0 = pragueToday();
       const up = (Array.isArray(d.events) ? d.events : [])
         .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
         .sort((a: any, b: any) => a.date.localeCompare(b.date));

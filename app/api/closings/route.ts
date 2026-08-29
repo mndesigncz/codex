@@ -325,6 +325,10 @@ export async function POST(request: Request) {
     }
   }
 
+  // One closing per person per SHIFT — not per day. Somebody who covers the
+  // morning and then the evening files two closings, and the second one used to
+  // bounce with „už je odeslaná".
+  const shiftId: number | null = shift?.id ?? null;
   let dupe: any = null;
   try {
     if (eventId != null) {
@@ -336,7 +340,8 @@ export async function POST(request: Request) {
       [dupe] = await sql`
         SELECT id FROM cash_closings
         WHERE created_by = ${actorId} AND (date = ${shiftDate} OR shift_date = ${shiftDate})
-          AND event_id IS NULL`;
+          AND event_id IS NULL
+          AND COALESCE(shift_id, 0) = ${shiftId ?? 0}`;
     }
   } catch {
     [dupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${actorId} AND date = ${shiftDate}`;
@@ -345,7 +350,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: eventId != null ? 'Za tuhle akci už máš uzávěrku odeslanou.' : 'Za tuto směnu už je uzávěrka odeslaná.' }, { status: 409 });
   }
 
-  const shiftId: number | null = shift?.id ?? null;
   const shiftLabel: string | null = b.shiftLabel || (shift ? `${shift.start_time}–${shift.end_time}` : null);
 
   // An employer-submitted closing is always trusted. Otherwise it needs the
@@ -377,18 +381,25 @@ export async function POST(request: Request) {
     for (const r of crew as any[]) {
       const id = Number(r.id);
       if (!Number.isFinite(id) || shiftEmployeeIds.includes(id)) continue;
-      if (mineWindow) {
-        const theirs = windowOf({ ...r, date: shiftDate });
-        // Unknown times can't be told apart — keep them on the shift.
-        if (theirs && !(mineWindow.start < theirs.end && theirs.start < mineWindow.end)) continue;
-      }
+      // Without a shift of our own there is no window to compare against, so
+      // there is nothing to prove anybody shared it — claiming the whole day's
+      // roster would file other people's work under this closing.
+      if (!mineWindow) continue;
+      const theirs = windowOf({ ...r, date: shiftDate });
+      // Unknown times can't be told apart — keep them on the shift.
+      if (theirs && !(mineWindow.start < theirs.end && theirs.start < mineWindow.end)) continue;
       shiftEmployeeIds.push(id);
     }
   } catch { /* shifts table issue — the author alone owns the closing */ }
 
   // Required procedures gate the closing server-side too — the client check
   // alone would be decorative. Employers may override (they confirmed in UI).
-  if (!isEmployer) {
+  // Not for an off-site event (the stall doesn't run the shop's opening
+  // routine) and not for someone who wasn't on the shift at all — that closing
+  // already goes to the employer for approval, so blocking it would just leave
+  // the money unreported. The runs are matched against the SHIFT's day, so a
+  // night shift filed after midnight still sees what was done before midnight.
+  if (!isEmployer && eventId == null && shift) {
     try {
       const req = await sql`
         SELECT p.id, p.name FROM procedures p
@@ -396,7 +407,8 @@ export async function POST(request: Request) {
           AND NOT EXISTS (
             SELECT 1 FROM procedure_runs r
             WHERE r.procedure_id = p.id AND r.team_id = ${c.teamId} AND r.status = 'completed'
-              AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${date}
+              AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD')
+                  IN (${shiftDate}, ${date})
           )`;
       if ((req as any[]).length > 0) {
         return NextResponse.json({
@@ -424,14 +436,14 @@ export async function POST(request: Request) {
     [row] = await sql`
       INSERT INTO cash_closings (
         team_id, created_by, date, shift_label, shift_id, approved, approved_by, payout_from_register,
-        tips_in_drawer, shift_employees, movements, diff_reason, diff_note, denominations, final_removal,
+        tips_in_drawer, shift_employees, movements, diff_reason, diff_note, denominations, final_removal, event_id,
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
         ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
-        ${JSON.stringify(denominations)}::jsonb, ${finalRemoval},
+        ${JSON.stringify(denominations)}::jsonb, ${finalRemoval}, ${eventId},
         ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
         ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
       ) RETURNING *`;

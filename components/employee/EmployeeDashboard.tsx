@@ -6,6 +6,7 @@ import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
+import { pragueToday } from '@/lib/pragueTime';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -60,7 +61,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
         setPinnedShare(tm?.pinnedShare ?? null);
         fetch('/api/events').then(r => r.json()).then(d => {
-          const today0 = new Date().toISOString().slice(0, 10);
+          const today0 = pragueToday();
           const up = (Array.isArray(d.events) ? d.events : [])
             .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
             .sort((a: any, b: any) => a.date.localeCompare(b.date));
@@ -86,7 +87,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     })();
   }, [meId]);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
   const upcoming = shifts
     .filter(s => (s.date ?? '') >= today)
     .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
@@ -96,7 +97,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
 
   // Feedback the employee hasn't acknowledged yet. Capped to the last week so a
   // database without the seen_at column can't keep the card open forever.
-  const feedbackSince = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const feedbackSince = pragueToday(-7);
   const freshReviews = reviews
     .filter(r => !r.seen_at && String(r.work_date ?? '').slice(0, 10) >= feedbackSince)
     .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)));
@@ -145,7 +146,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
 
   // Named blocks; the employer-approved layout decides order and presence.
   // This month in numbers, for the person themselves.
-  const monthPrefix = new Date().toISOString().slice(0, 7);
+  const monthPrefix = pragueToday().slice(0, 7);
   const monthHours = myEntries.reduce((sum: number, e: any) => {
     if (!e.clockOut || String(e.clockIn).slice(0, 7) !== monthPrefix) return sum;
     const h = (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;

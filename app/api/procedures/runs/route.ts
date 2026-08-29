@@ -6,6 +6,7 @@ import { notifyUser } from '@/lib/push';
 import { normalizeSkipReasons, scoreRun } from '@/lib/procedureScoring';
 import { normalizePoints } from '@/lib/rewardLevels';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
   // Today's completed runs for the WHOLE team — the closing form needs to know
   // whether a required procedure was done by anyone on the shift, not just me.
   if (searchParams.get('today') === 'team') {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = pragueToday();
     let rows: any[] = [];
     try {
       rows = await sql`
@@ -307,7 +308,7 @@ export async function PATCH(request: Request) {
       const [teamCfg] = await sql`SELECT points_config FROM teams WHERE id = ${run.team_id}`;
       const cfg = normalizePoints(teamCfg?.points_config);
       const score = scoreRun(proc?.items, checked, skipped, skipReasons, cfg.procedure);
-      const workDate = new Date().toISOString().slice(0, 10);
+      const workDate = pragueToday();
       await sql`
         INSERT INTO shift_review_items (team_id, employee_id, work_date, kind, ref_id, points, note, flagged, created_by)
         VALUES (${run.team_id}, ${run.user_id}, ${workDate}, 'procedure', ${runId},
