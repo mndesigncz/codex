@@ -6,7 +6,7 @@ import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
-import { pragueToday } from '@/lib/pragueTime';
+import { pragueToday, pragueDayOf } from '@/lib/pragueTime';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -116,7 +116,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const monthKey = today.slice(0, 7);
   const workedMs = timeEntries.reduce((sum, e) => {
     const inT = new Date(e.clockIn).getTime();
-    if (Number.isNaN(inT) || String(e.clockIn).slice(0, 7) !== monthKey) return sum;
+    if (Number.isNaN(inT) || pragueDayOf(new Date(e.clockIn)).slice(0, 7) !== monthKey) return sum;
     const outT = e.clockOut ? new Date(e.clockOut).getTime() : Date.now();
     return sum + Math.max(0, outT - inT);
   }, 0);
@@ -148,7 +148,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   // This month in numbers, for the person themselves.
   const monthPrefix = pragueToday().slice(0, 7);
   const monthHours = myEntries.reduce((sum: number, e: any) => {
-    if (!e.clockOut || String(e.clockIn).slice(0, 7) !== monthPrefix) return sum;
+    if (!e.clockOut || pragueDayOf(new Date(e.clockIn)).slice(0, 7) !== monthPrefix) return sum;
     const h = (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
     return h > 0 && h < 24 ? sum + h : sum;
   }, 0);

@@ -570,7 +570,8 @@ export async function POST(request: Request) {
   try {
     [refEntry] = await sql`
       SELECT clock_in, clock_out FROM time_entries
-      WHERE employee_id = ${actorId} AND clock_in::date = ${date}::date
+      WHERE employee_id = ${actorId}
+        AND to_char((clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${shiftDate}
       ORDER BY clock_in ASC LIMIT 1`;
   } catch { /* ignore */ }
 
