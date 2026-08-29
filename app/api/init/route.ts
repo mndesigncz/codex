@@ -8,6 +8,7 @@ export async function GET() {
     const sql = neon(process.env.DATABASE_URL!);
     let closingIndex = 'not reached';
     let closingIndexes: string[] = [];
+    let closingConstraints: string[] = [];
 
     // ---- Teams ----
     await sql`
@@ -899,8 +900,31 @@ export async function GET() {
       // name so a failed rename can't leave us silently on the old rule. Its
       // outcome is reported in the response — a swallowed migration here means
       // legitimate second closings keep bouncing with a duplicate error.
-      await sql`DROP INDEX IF EXISTS cash_closings_one_per_day`;
-      await sql`DROP INDEX IF EXISTS cash_closings_one_per_shift`;
+      // Plain `DROP INDEX IF EXISTS cash_closings_one_per_day` reported success
+      // on production and left the index standing — proven by listing
+      // pg_indexes afterwards. Two things do that: the index belongs to a
+      // UNIQUE CONSTRAINT (DROP INDEX refuses to touch it), or it lives in a
+      // schema the unqualified name doesn't resolve to (IF EXISTS then quietly
+      // matches nothing). Look the rule up in the catalogue and remove it by
+      // its real schema, trying the constraint form first.
+      await sql`
+        DO $do$
+        DECLARE r record;
+        BEGIN
+          FOR r IN
+            SELECT schemaname, indexname FROM pg_indexes
+            WHERE tablename = 'cash_closings'
+              AND indexname IN ('cash_closings_one_per_day', 'cash_closings_one_per_shift')
+          LOOP
+            BEGIN
+              EXECUTE format('ALTER TABLE %I.cash_closings DROP CONSTRAINT IF EXISTS %I',
+                             r.schemaname, r.indexname);
+            EXCEPTION WHEN others THEN NULL;
+            END;
+            EXECUTE format('DROP INDEX IF EXISTS %I.%I', r.schemaname, r.indexname);
+          END LOOP;
+        END
+        $do$;`;
       await sql`
         CREATE UNIQUE INDEX cash_closings_one_per_shift
         ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
@@ -915,9 +939,14 @@ export async function GET() {
     // fails loudly — that combination cost a round of blind guessing.
     try {
       const rows = await sql`
-        SELECT indexname FROM pg_indexes
+        SELECT schemaname, indexname FROM pg_indexes
         WHERE tablename = 'cash_closings' ORDER BY indexname`;
-      closingIndexes = (rows as any[]).map(r => r.indexname);
+      closingIndexes = (rows as any[]).map(r => `${r.schemaname}.${r.indexname}`);
+      const cons = await sql`
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'cash_closings'::regclass AND contype IN ('u', 'p')
+        ORDER BY conname`;
+      closingConstraints = (cons as any[]).map(r => r.conname);
     } catch { /* diagnostics only */ }
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
@@ -975,6 +1004,7 @@ export async function GET() {
       // so a swallowed one can be seen from outside instead of guessed at.
       closingIndex,
       closingIndexes,
+      closingConstraints,
     });
   } catch (error) {
     console.error('Init error:', error);
