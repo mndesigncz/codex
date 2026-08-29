@@ -78,10 +78,10 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const firstName = (user?.name ?? '').split(' ')[0];
 
   const tiles = [
-    { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'bg-[#0A84FF] text-white' },
-    { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' },
+    { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'bg-[#16181A] text-white' },
+    { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' }, // zásoby jsou varování, ne počet
     { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
-    { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#8FB811] text-white' },
+    { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#16181A] text-white' },
     { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
     { view: 'finance', icon: 'coins', label: 'Finance', badge: null, badgeTone: '' },
   ];
@@ -174,12 +174,12 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
           {plannedToday.length === 0 && onShift.length === 0 ? (
             <p className="text-sm text-black/40">Dnes nikdo nemá plánovanou směnu.</p>
           ) : (
-            <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-1">
+            <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x snap-x snap-mandatory -mx-1 px-1 pb-1">
               {(plannedToday.length ? plannedToday : onShift).map((p: any) => {
                 const live = !!p.openSince;
                 return (
                   <div key={p.id}
-                    className={`shrink-0 flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border backdrop-blur-md ${
+                    className={`shrink-0 snap-start flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border backdrop-blur-md ${
                       live ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/55 border-black/[0.06]'
                     }`}>
                     <span className="relative text-base h-8 w-8 flex items-center justify-center rounded-full ring-1 ring-black/10 bg-white/80">

@@ -80,12 +80,12 @@ export default function MessengerDock({ user }: Props) {
           )}
           <button
             onClick={() => setListOpen((v) => !v)}
-            className="relative w-14 h-14 rounded-full bg-[#C8F542] text-black flex items-center justify-center shadow-[0_12px_40px_rgba(0,0,0,0.5)] hover:scale-105 active:scale-95 transition-transform"
+            className="relative w-14 h-14 rounded-full bg-[#C8F542] text-black flex items-center justify-center shadow-[0_10px_30px_rgba(25,35,15,0.28)] hover:scale-105 active:scale-95 transition-transform"
             aria-label="Chat"
           >
             <Icon name="chat" size={26} />
             {totalUnread > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-[#16181A] text-[11px] font-semibold flex items-center justify-center border-2 border-[#0A0A0C]">
+              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-[#16181A] text-white text-[11px] font-semibold flex items-center justify-center ring-2 ring-[#F6F7F2] dark:ring-[#0C0D0F]">
                 {totalUnread}
               </span>
             )}

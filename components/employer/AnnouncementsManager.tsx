@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Icon } from '../Icons';
 
 interface Announcement {
   id: number;
@@ -163,7 +164,7 @@ export default function AnnouncementsManager() {
               <div className="shrink-0 flex items-center gap-1">
                 <button type="button" onClick={() => { setEditing(a); setEditText(a.content); }}
                   aria-label="Upravit" title="Upravit"
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm">✎</button>
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm"><Icon name="pencil" size={15} /></button>
                 <button type="button" onClick={() => patch(a.id, { pinned: !a.pinned })}
                   aria-label={a.pinned ? 'Odepnout' : 'Připnout'} title={a.pinned ? 'Odepnout (tým ho přestane vidět)' : 'Znovu připnout'}
                   className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-xs">{a.pinned ? '⤓' : '📌'}</button>

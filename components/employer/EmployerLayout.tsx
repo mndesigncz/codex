@@ -81,10 +81,20 @@ export default function EmployerLayout({ user }: Props) {
   const [appMode, setAppMode] = useState<'togo' | 'full' | null>(null);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   useEffect(() => {
-    let stored: string | null = null;
-    try { stored = localStorage.getItem('managero-app-mode'); } catch { /* ignore */ }
-    if (stored === 'togo' || stored === 'full') setAppMode(stored);
-    else setAppMode(window.innerWidth < 768 ? 'togo' : 'full');
+    // Odkaz na konkrétní obrazovku má přednost před kapesním režimem. Bez
+    // toho notifikace „schvaluje se ti uzávěrka" otevřela na telefonu TO GO
+    // a člověk nepochopil, kam se dostal.
+    const asked = new URLSearchParams(window.location.search).get('view');
+    if (asked && asked !== 'overview') { setAppMode('full'); }
+    else {
+      let stored: string | null = null;
+      try { stored = localStorage.getItem('managero-app-mode'); } catch { /* ignore */ }
+      if (stored === 'togo' || stored === 'full') setAppMode(stored);
+      else setAppMode(window.innerWidth < 768 ? 'togo' : 'full');
+    }
+    // Na tabletu sebere rozbalený rail třetinu šířky a obsah se zmáčkne —
+    // do 1024 px startuje zúžený.
+    if (window.innerWidth < 1024) setSidebarOpen(false);
   }, []);
   const switchMode = (m: 'togo' | 'full') => {
     setAppMode(m);
@@ -279,7 +289,7 @@ export default function EmployerLayout({ user }: Props) {
             ✨ Zkoušíte Pro — zbývá {czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.
           </button>
         )}
-        <main className={`flex-1 pb-28 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
+        <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? renderView() : (
             <div className="mx-auto w-full max-w-7xl">{renderView()}</div>
           )}
@@ -290,7 +300,7 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Mobile bottom dock */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-        <nav className="glass-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
+        <nav className="dock-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
               className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
@@ -317,7 +327,7 @@ export default function EmployerLayout({ user }: Props) {
               <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky
               </h3>
-              <button onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+              <button onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             <ReceiptsPanel />
           </div>

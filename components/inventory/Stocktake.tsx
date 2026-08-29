@@ -146,7 +146,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
       <div className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">📋 Inventura skladu</h3>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
 
         {err && <p className="text-sm text-red-600 mt-2">{err}</p>}

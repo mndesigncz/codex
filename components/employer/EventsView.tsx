@@ -266,7 +266,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
               {e.location ? ` · 📍 ${e.location}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+          <button onClick={onClose} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
 
         {/* status + publicity row */}

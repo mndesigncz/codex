@@ -225,7 +225,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     posToday: posToday ? (
       <div className="glass-card p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="font-bold text-[#16181A] min-w-0">💳 Pokladna dnes{posToday.placeName ? ` · ${posToday.placeName}` : ''}</p>
+          <p className="font-bold text-[#16181A] min-w-0 flex items-center gap-2">
+            <Icon name="receipt" size={17} className="shrink-0 text-black/40" />
+            <span className="truncate">Pokladna dnes{posToday.placeName ? ` · ${posToday.placeName}` : ''}</span>
+          </p>
           <span className="shrink-0 text-xl font-bold tabular-nums text-[#16181A]">{money(posToday.total)}</span>
         </div>
         <p className="text-sm text-black/50 mt-1">
@@ -453,20 +456,32 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         if (onboardingDismissed || remaining.length === 0) return null;
         return (
           <div className="glass-card p-5 border border-[#C8F542]/30">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <p className="font-bold text-[#16181A]">🚀 První kroky ({steps.length - remaining.length}/{steps.length})</p>
+            <div className="flex items-center justify-between gap-3 mb-2.5">
+              <p className="font-bold text-[#16181A] flex items-center gap-2">
+                <Icon name="check" size={17} className="text-[#5B7A08]" />
+                První kroky
+                <span className="text-black/35 font-semibold tabular">{steps.length - remaining.length}/{steps.length}</span>
+              </p>
               <button onClick={() => { setOnboardingDismissed(true); try { localStorage.setItem('managero-onboarding-dismissed', '1'); } catch {} }}
-                className="text-xs text-black/40 hover:text-black">Skrýt</button>
+                className="shrink-0 text-xs font-semibold text-black/40 hover:text-black transition">Skrýt</button>
             </div>
             <div className="space-y-1.5">
               {steps.map((st, i) => (
                 <button key={i} onClick={() => !st.done && onNavigate(st.view)} disabled={st.done}
-                  className={`w-full flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-sm text-left transition ${
-                    st.done ? 'bg-[#C8F542]/10 text-black/40 line-through' : 'bg-black/[0.03] text-[#16181A] hover:bg-black/[0.06]'
+                  className={`group w-full flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm text-left transition ${
+                    st.done ? 'bg-[#C8F542]/10 text-black/40' : 'bg-black/[0.03] text-[#16181A] hover:bg-black/[0.06]'
                   }`}>
-                  <span className="shrink-0">{st.done ? '✅' : '⭕'}</span>
-                  <span className="min-w-0 flex-1 truncate">{st.label}</span>
-                  {!st.done && <span className="shrink-0 text-black/35">→</span>}
+                  {/* Nesplněný krok není chyba — kolečko v barvě podniku, ne
+                      červený kroužek, který vypadá jako poplach. */}
+                  <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                    st.done ? 'bg-[#C8F542] text-[#16181A]' : 'border-2 border-black/15'}`}>
+                    {st.done && <Icon name="check" size={12} strokeWidth={2.6} />}
+                  </span>
+                  <span className={`min-w-0 flex-1 ${st.done ? 'line-through' : ''}`}>{st.label}</span>
+                  {!st.done && (
+                    <Icon name="chevron" size={15}
+                      className="shrink-0 -rotate-90 text-black/25 group-hover:text-black/50 transition-colors" />
+                  )}
                 </button>
               ))}
             </div>
@@ -481,27 +496,26 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           </p>
           <div className="flex flex-wrap gap-2">
             {pendingApprovals.timeoff > 0 && (
-              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition">
-                🏖️ {pendingApprovals.timeoff}× žádost o volno
+              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+                <Icon name="calendar" size={15} className="text-black/45" /> {pendingApprovals.timeoff}× žádost o volno
               </button>
             )}
             {pendingApprovals.swaps > 0 && (
-              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition">
-                🔄 {pendingApprovals.swaps}× výměna směny
+              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+                <Icon name="swap" size={15} className="text-black/45" /> {pendingApprovals.swaps}× výměna směny
               </button>
             )}
             {pendingApprovals.closings > 0 && (
-              <button onClick={() => onNavigate('reports')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition">
-                📊 {pendingApprovals.closings}× uzávěrka ke schválení
+              <button onClick={() => onNavigate('reports')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+                <Icon name="trend" size={15} className="text-black/45" /> {pendingApprovals.closings}× uzávěrka ke schválení
               </button>
             )}
           </div>
         </div>
       )}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-black/45 text-sm">Přehled podniku</p>
-          <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Vítejte zpět, {user.name}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-[#16181A] text-balance">Vítejte zpět, {user.name}</h1>
         </div>
         <button
           onClick={() => setEditing(v => !v)}

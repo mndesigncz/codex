@@ -77,6 +77,25 @@ const paths: Record<string, React.ReactNode> = {
   menu: (
     <path d="M4 7h16M4 12h16M4 17h10" />
   ),
+  // Tužka a koš — dosud to byly znaky ✎ a ✕ ve stejné řadě jako kreslené
+  // ikony. Jeden tah, jedna sada, jeden dojem.
+  pencil: (
+    <>
+      <path d="M4 20.5h4L19.5 9a2.6 2.6 0 0 0-3.7-3.7L4.5 16.5z" />
+      <path d="M14.5 6.5 18 10" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4.5 7h15" />
+      <path d="M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" />
+      <path d="M6.5 7.5 7.4 19a1.7 1.7 0 0 0 1.7 1.5h5.8a1.7 1.7 0 0 0 1.7-1.5L17.5 7.5" />
+      <path d="M10.5 11v6M13.5 11v6" />
+    </>
+  ),
+  close: (
+    <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+  ),
   logout: (
     <>
       <path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" />
