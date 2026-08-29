@@ -354,6 +354,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       const d = await fetch('/api/closings').then(r => r.json());
       const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
       setClosings(list);
+      // Closing a Friday night at 00:40 is still Friday's closing — the server
+      // works out which business day that is, so the form doesn't open on the
+      // wrong day just because midnight passed.
+      if (typeof d.suggestedDate === 'string' && d.suggestedDate) {
+        setForm(f => (f.date === today() && f.date !== d.suggestedDate
+          ? { ...f, date: d.suggestedDate } : f));
+      }
       // What the previous shift left in the drawer is what this one starts
       // with. Asked via a dedicated endpoint: the TEAM's last closing, not the
       // author's own — with alternating shifts my own last closing can be days
@@ -614,15 +621,15 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${eligible.length} uzávěrky za dny, kdy jsi měl/a směnu`}
           </p>
           <p className="text-xs text-black/55">
-            Vyplň ji prosím — vyber směnu a projdi formulář níže.
+            Vyplň ji prosím — vyber den a projdi formulář níže.
             {eligible.filter(s => s.date === form.date).length > 1
-              && ' Ten den máš dvě směny, každá má vlastní uzávěrku.'}
+              && ' Ten den máš dvě směny; uzávěrka je za celý den jedna.'}
           </p>
           <div className="flex flex-wrap gap-2">
             {eligible.map(s => (
               <button key={s.id} type="button" onClick={() => pickShift(s)}
                 className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
-                  form.date === s.date && (pickedShiftId == null || pickedShiftId === s.id)
+                  form.date === s.date
                     ? 'bg-orange-500 text-white border-orange-500'
                     : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
                 }`}>
