@@ -480,9 +480,11 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                     return (
                       <button key={pt.name} type="button"
                         onClick={() => {
-                          // Vybereme jednotku, ve které díl není samá nula.
-                          const pick = [...opts].reverse().find(o => Number(pt.amount) / o.toBase >= 1) ?? opts[0];
-                          setIng(idx, { amount: String(+(Number(pt.amount) / pick.toBase).toFixed(4)), unit: pick.label });
+                          // Díl je v jednotce položky; převedeme na základní a
+                          // nabídneme v takové, ve které to není samá nula.
+                          const b = Number(pt.amount) * itemFactor(item);
+                          const pick = [...opts].reverse().find(o => b / o.toBase >= 1) ?? opts[0];
+                          setIng(idx, { amount: String(+(b / pick.toBase).toFixed(4)), unit: pick.label });
                         }}
                         className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition active:scale-95 ${
                           active ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/55 hover:text-black'
