@@ -66,11 +66,14 @@ export default function ClosingsOverview() {
     if (!analyticsOpen || month === 'all') { setPosInsights(null); return; }
     let alive = true;
     fetch(`/api/pos/insights?month=${month}`).then(r => r.json())
-      .then(d => { if (alive) setPosInsights(d?.connected && d.bills != null ? d : null); })
-      .catch(() => { if (alive) setPosInsights(null); });
-    fetch(`/api/pos/reconcile?month=${month}`).then(r => r.json())
-      .then(d => { if (alive) setReconcile(d?.connected && Array.isArray(d.days) ? d : null); })
-      .catch(() => { if (alive) setReconcile(null); });
+      .then(d => {
+        if (!alive) return;
+        setPosInsights(d?.connected && d.bills != null ? d : null);
+        // Porovnání s uzávěrkami jede ze stejného průchodu účtenkami — druhé
+        // volání by znamenalo stáhnout celý měsíc z pokladny dvakrát.
+        setReconcile(d?.reconcile && Array.isArray(d.reconcile.days) ? d.reconcile : null);
+      })
+      .catch(() => { if (alive) { setPosInsights(null); setReconcile(null); } });
     return () => { alive = false; };
   }, [analyticsOpen, month]);
 

@@ -12,10 +12,13 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
-import { pragueHourOf, dayPlus } from '@/lib/pragueTime';
+import { pragueHourOf, pragueDayOf, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+/** Do kolika hodin ráno se účtenka počítá k předchozímu obchodnímu dni. */
+const NIGHT_CUTOFF_HOUR = 6;
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -45,8 +48,14 @@ export async function GET(req: NextRequest) {
     let bills = 0, total = 0, tips = 0, discounts = 0, persons = 0, personBills = 0;
     let refundCount = 0, refundTotal = 0;
 
+    // Účtenky po půlnoci patří k předchozímu obchodnímu dni — proto se stahuje
+    // o den navíc. Do měsíčních součtů se pak započítají jen ty, které do
+    // měsíce opravdu patří.
+    type Bucket = { cash: number; card: number; total: number; bills: number };
+    const posByDay = new Map<string, Bucket>();
+
     // Raw pager (insights needs fields the lib summary drops).
-    let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${from}&till=${till}&limit=100`;
+    let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${from}&till=${dayPlus(till, 1)}&limit=100`;
     let guard = 0;
 
     const { clientId, clientSecret, merchantId, placeId } = conn;
@@ -66,13 +75,29 @@ export async function GET(req: NextRequest) {
       for (const b of page?.data ?? []) {
         if (b.deleted) continue;
         const price = Number(b.finalPrice) || 0;
+        const t = String(b.paidAt ?? b.createdAt ?? '');
+        const when = t ? new Date(t) : null;
+        const h = when ? pragueHourOf(when) : null;
+        const calDay = when && h != null ? pragueDayOf(when) : null;
+        const bizDay = calDay != null && h != null
+          ? (h < NIGHT_CUTOFF_HOUR ? dayPlus(calDay, -1) : calDay) : null;
+
+        if (!b.refunded && bizDay && bizDay >= from && bizDay < till) {
+          const cur = posByDay.get(bizDay) ?? { cash: 0, card: 0, total: 0, bills: 0 };
+          const pm = String(b.paymentMethod ?? '').toLowerCase();
+          if (pm === 'cash') cur.cash += price; else cur.card += price;
+          cur.total += price; cur.bills++;
+          posByDay.set(bizDay, cur);
+        }
+
+        // Měsíční čísla zůstávají podle kalendářního dne účtenky — aby seděla
+        // s tím, co ukazuje pokladna sama.
+        if (calDay != null && (calDay < from || calDay >= till)) continue;
         if (b.refunded) { refundCount++; refundTotal += price; continue; }
         bills++;
         total += price;
         tips += Number(b.tips) || 0;
         discounts += Number(b.discount) || 0;
-        const t = String(b.paidAt ?? b.createdAt ?? '');
-        const h = t ? pragueHourOf(new Date(t)) : null;
         if (h != null) hours[h] += price;
         const who = b.paidBy?.fullName ?? b.createdBy?.fullName;
         if (who) {
@@ -162,9 +187,96 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ---- uzávěrky proti kase, den po dni ----
+    let closingRows: any[] = [];
+    try {
+      closingRows = await sql`
+        SELECT COALESCE(cc.shift_date, cc.date) AS day,
+               SUM(COALESCE(cc.cash_revenue, 0))::int AS cash,
+               SUM(COALESCE(cc.card_revenue, 0))::int AS card,
+               COUNT(*)::int AS n,
+               STRING_AGG(DISTINCT us.name, ', ') AS people
+        FROM cash_closings cc LEFT JOIN users us ON us.id = cc.created_by
+        WHERE cc.team_id = ${u.team_id}
+          AND cc.covered_by IS NULL AND cc.event_id IS NULL
+          AND COALESCE(cc.shift_date, cc.date) >= ${from}
+          AND COALESCE(cc.shift_date, cc.date) < ${till}
+        GROUP BY 1`;
+    } catch { /* bez uzávěrek se porovnávat nedá */ }
+
+    const dayMap = new Map<string, any>();
+    for (const [day, v] of Array.from(posByDay.entries())) {
+      dayMap.set(day, { day, pos: v, cash: 0, card: 0, n: 0, people: null });
+    }
+    for (const c of closingRows as any[]) {
+      const day = String(c.day);
+      const row = dayMap.get(day) ?? { day, pos: null, cash: 0, card: 0, n: 0, people: null };
+      row.cash = Number(c.cash) || 0; row.card = Number(c.card) || 0;
+      row.n = Number(c.n) || 0; row.people = c.people ?? null;
+      dayMap.set(day, row);
+    }
+    const days = Array.from(dayMap.values()).map(r => {
+      const posTotal = r.pos ? r.pos.total : null;
+      const declared = r.n > 0 ? r.cash + r.card : null;
+      return {
+        day: r.day, bills: r.pos?.bills ?? 0,
+        posCash: r.pos?.cash ?? null, posCard: r.pos?.card ?? null, posTotal,
+        declaredCash: r.n > 0 ? r.cash : null, declaredCard: r.n > 0 ? r.card : null, declared,
+        diff: posTotal != null && declared != null ? declared - posTotal : null,
+        closings: r.n, people: r.people,
+      };
+    }).sort((a, b) => a.day.localeCompare(b.day));
+
+    const compared = days.filter(d => d.diff != null);
+    // 50 Kč je zaokrouhlování a drobné; nad to jde o překlep nebo chybějící platbu.
+    const off = compared.filter(d => Math.abs(d.diff as number) > 50)
+      .sort((a, b) => Math.abs(b.diff as number) - Math.abs(a.diff as number));
+    const missingClosing = days.filter(d => (d.bills ?? 0) > 0 && d.closings === 0);
+    const noPosDays = days.filter(d => d.closings > 0 && (d.bills ?? 0) === 0);
+    const csDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('cs-CZ');
+
+    const reconcileInsights: { icon: string; title: string; text: string; tone: 'good' | 'warn' | 'info' }[] = [];
+    if (compared.length && !off.length) {
+      reconcileInsights.push({
+        icon: 'check', tone: 'good', title: 'Uzávěrky sedí s pokladnou',
+        text: `Porovnáno ${compared.length} dní, nikde rozdíl nad 50 Kč.`,
+      });
+    }
+    if (off.length) {
+      const w = off[0];
+      reconcileInsights.push({
+        icon: 'warning', tone: Math.abs(w.diff as number) > 500 ? 'warn' : 'info',
+        title: `${off.length} ${off.length === 1 ? 'den nesedí' : 'dní nesedí'} s pokladnou`,
+        text: `Největší rozdíl ${csDate(w.day)}: uzávěrka ${(w.declared ?? 0).toLocaleString('cs-CZ')} Kč proti ${(w.posTotal ?? 0).toLocaleString('cs-CZ')} Kč z kasy${w.people ? ` (${w.people})` : ''}. Nejčastěji překlep v uzávěrce nebo platba, která se do kasy nedostala.`,
+      });
+    }
+    if (missingClosing.length) {
+      reconcileInsights.push({
+        icon: 'clipboard', tone: 'warn',
+        title: `${missingClosing.length} dní bez uzávěrky`,
+        text: `V kase je tržba, ale uzávěrku k ní nikdo nevyplnil: ${missingClosing.slice(0, 5).map(d => csDate(d.day)).join(', ')}${missingClosing.length > 5 ? ' a další' : ''}.`,
+      });
+    }
+    if (noPosDays.length) {
+      reconcileInsights.push({
+        icon: 'bulb', tone: 'info',
+        title: `${noPosDays.length} dní má uzávěrku bez účtenek`,
+        text: 'Uzávěrka existuje, ale kasa na ten den nic nemá. Buď se markovalo jinam, nebo je uzávěrka na špatném dni.',
+      });
+    }
+
     return NextResponse.json({
       connected: true, month, bills, total, tips, discounts,
       staff, staffing, staffingAdvice, avgRate,
+      reconcile: {
+        days,
+        totals: {
+          comparedDays: compared.length, offDays: off.length,
+          netDiff: compared.reduce((sm, d) => sm + (d.diff as number), 0),
+        },
+        insights: reconcileInsights,
+        note: `Účtenky vystavené do ${NIGHT_CUTOFF_HOUR}:00 se počítají k předchozímu dni.`,
+      },
       avgBill: bills ? Math.round(total / bills) : 0,
       avgPersons: personBills ? Math.round((persons / personBills) * 10) / 10 : null,
       hours,
