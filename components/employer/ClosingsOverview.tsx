@@ -37,6 +37,9 @@ export default function ClosingsOverview() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   // Deep POS insights for the picked month (hourly peaks, per-person sales…).
   const [posInsights, setPosInsights] = useState<any | null>(null);
+  // Kontrola uzávěrek proti kase — den po dni za vybraný měsíc.
+  const [reconcile, setReconcile] = useState<any | null>(null);
+  const [reconcileOpen, setReconcileOpen] = useState(false);
   useEffect(() => {
     try { setAnalyticsOpen(localStorage.getItem('managero-closings-analytics') === '1'); } catch { /* ignore */ }
   }, []);
@@ -65,6 +68,9 @@ export default function ClosingsOverview() {
     fetch(`/api/pos/insights?month=${month}`).then(r => r.json())
       .then(d => { if (alive) setPosInsights(d?.connected && d.bills != null ? d : null); })
       .catch(() => { if (alive) setPosInsights(null); });
+    fetch(`/api/pos/reconcile?month=${month}`).then(r => r.json())
+      .then(d => { if (alive) setReconcile(d?.connected && Array.isArray(d.days) ? d : null); })
+      .catch(() => { if (alive) setReconcile(null); });
     return () => { alive = false; };
   }, [analyticsOpen, month]);
 
@@ -600,6 +606,60 @@ export default function ClosingsOverview() {
               </div>
             );
           })()}
+
+          {/* uzávěrky proti kase */}
+          {reconcile && reconcile.totals?.comparedDays > 0 && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Uzávěrky proti kase</p>
+              <div className="space-y-2">
+                {(reconcile.insights ?? []).map((i: any, idx: number) => (
+                  <div key={idx} className={`rounded-2xl border px-4 py-2.5 ${
+                    i.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                      : i.tone === 'good' ? 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]'
+                      : 'bg-black/[0.03] border-black/[0.07] text-black/60'}`}>
+                    <p className="text-sm font-semibold flex items-center gap-1.5">
+                      <Icon name={i.icon} size={14} /> {i.title}
+                    </p>
+                    <p className="text-xs mt-0.5 opacity-80 leading-relaxed">{i.text}</p>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={() => setReconcileOpen(o => !o)}
+                className="mt-2 w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
+                <span>Den po dni ({reconcile.totals.comparedDays} porovnaných)</span>
+                <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${reconcileOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {reconcileOpen && (
+                <>
+                  <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-72 overflow-y-auto scrollbar-thin">
+                    {reconcile.days.filter((d: any) => d.diff != null || d.bills > 0 || d.closings > 0).map((d: any) => (
+                      <div key={d.day} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                        <span className="shrink-0 w-14 text-black/45 tabular-nums">
+                          {new Date(d.day + 'T12:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-black/50 text-xs">
+                          {d.closings === 0 ? 'bez uzávěrky' : d.people ?? ''}
+                        </span>
+                        <span className="shrink-0 text-xs text-black/45 tabular-nums">
+                          {d.posTotal != null ? money(d.posTotal) : '—'} <span className="text-black/25">kasa</span>
+                        </span>
+                        <span className="shrink-0 text-xs text-black/45 tabular-nums">
+                          {d.declared != null ? money(d.declared) : '—'} <span className="text-black/25">uzáv.</span>
+                        </span>
+                        <span className={`w-20 shrink-0 text-right text-xs font-bold tabular-nums ${
+                          d.diff == null ? 'text-black/20'
+                            : Math.abs(d.diff) <= 50 ? 'text-[#5B7A08]' : 'text-amber-700'
+                        }`}>
+                          {d.diff == null ? '—' : d.diff === 0 ? '✓' : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-black/35">{reconcile.note}</p>
+                </>
+              )}
+            </div>
+          )}
 
           {/* per-person sales */}
           {posInsights.byPerson.length > 0 && (

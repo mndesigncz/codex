@@ -172,10 +172,19 @@ export async function GET(req: NextRequest) {
   let stockValue = 0; let stockTop: { name: string; value: number }[] = [];
   try {
     const items = await sql`
-      SELECT name, quantity, unit_cost FROM inventory_items
+      SELECT name, quantity, unit_cost, package_size, open_amount FROM inventory_items
       WHERE team_id = ${u.team_id} AND unit_cost IS NOT NULL AND archived IS NOT TRUE`;
     const valued = (items as any[])
-      .map((i) => ({ name: i.name, value: Math.max(0, num(i.quantity)) * num(i.unit_cost) }))
+      // Načatá lahev je pořád majetek. quantity drží jen zapečetěná balení,
+      // zbytek v otevřeném se počítá jeho podílem z ceny balení.
+      .map((i) => {
+        const pkg = num(i.package_size);
+        const openShare = pkg > 0 ? Math.max(0, num(i.open_amount)) / pkg : 0;
+        return {
+          name: i.name,
+          value: Math.round((Math.max(0, num(i.quantity)) + openShare) * num(i.unit_cost)),
+        };
+      })
       .filter((i) => i.value > 0)
       .sort((a, b) => b.value - a.value);
     stockValue = valued.reduce((s, i) => s + i.value, 0);
