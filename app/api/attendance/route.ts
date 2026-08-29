@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
-import { STALE_AFTER_MS, autoCloseEntry, pragueMoment } from '@/lib/staleShifts';
+import { autoCloseEntry, isForgottenClockOut, pragueMoment } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
       for (const r of roster as any[]) {
         if (!r.openSince || !r.openEntryId) continue;
         const inMs = new Date(r.openSince).getTime();
-        if (nowMs - inMs > STALE_AFTER_MS) {
+        if (isForgottenClockOut(r.openSince)) {
           await autoCloseEntry({ id: r.openEntryId, employee_id: Number(r.id), team_id: c.teamId, clock_in: r.openSince });
           r.openSince = null; r.openEntryId = null;
         } else if (!r.nudgedAt && r.shiftEnd) {
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
           if (planned && planned.getTime() > inMs && nowMs - planned.getTime() > 30 * 60 * 1000) {
             await notifyUser(Number(r.id), {
               title: '🕐 Pořád jsi na směně?',
-              body: 'Směna ti už skončila a pořád jsi odpíchnutý/á. Jestli už jsi doma, odpíchni si odchod — jinak se směna po čase uzavře sama.',
+              body: 'Směna ti už skončila a pořád jsi odpíchnutý/á. Jestli ještě pracuješ, nic neřeš. Jestli jsi doma, odpíchni si odchod — jinak ho v noci doplníme za tebe podle uzávěrky a ráno to bude chtít zkontrolovat.',
               type: 'warning',
               category: 'shift',
               link: '/employee/shifts',
@@ -217,8 +217,10 @@ export async function POST(req: NextRequest) {
     if (open) {
       // A forgotten clock-out from a previous day must not block today's
       // arrival — close the stale entry at a sensible time and carry on.
+      // Tady denní doba nerozhoduje: kdo si píchá příchod, ten předchozí směnu
+      // prokazatelně dokončil — dvě otevřené najednou být nemůžou.
       const openMs = Date.now() - new Date(open.clock_in).getTime();
-      if (openMs > STALE_AFTER_MS) {
+      if (openMs > 60 * 60 * 1000) {
         const { autoCloseEntry } = await import('@/lib/staleShifts');
         try {
           await autoCloseEntry({ id: open.id, employee_id: employeeId, team_id: c.teamId, clock_in: open.clock_in });
