@@ -40,6 +40,19 @@ export function pragueHourOf(d: Date): number | null {
   return Number.isFinite(h) ? h : null;
 }
 
+/** Do kolika hodin ráno patří účtenka ještě k předchozímu obchodnímu dni.
+ *  Podnik zavírá po půlnoci — účtenka z 1:30 patří k předešlému večeru,
+ *  stejně jako uzávěrka, kterou po ní někdo vyplní. */
+export const NIGHT_CUTOFF_HOUR = 6;
+
+/** Obchodní den účtenky v Praze. Vrací '' pro nečitelný čas. */
+export function businessDayOf(d: Date): string {
+  const h = pragueHourOf(d);
+  if (h == null) return '';
+  const day = dayFmt.format(d);
+  return h < NIGHT_CUTOFF_HOUR ? dayPlus(day, -1) : day;
+}
+
 /** Current Prague UTC offset as "+01:00" / "+02:00" (DST-aware). */
 function offsetAt(at: Date): string {
   const parts = new Intl.DateTimeFormat('en', {

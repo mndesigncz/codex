@@ -162,10 +162,18 @@ export async function PATCH(req: NextRequest) {
         if (!cur) continue;
         const newQty = hasQty ? Number(d.counted) : Number(cur.quantity) || 0;
         const newOpen = hasOpen ? Number(d.countedOpen) : (cur.open_amount != null ? Number(cur.open_amount) : null);
-        await sql`
-          UPDATE inventory_items
-          SET quantity = ${newQty}, open_amount = ${newOpen}, updated_by = ${u.id}, updated_at = NOW()
-          WHERE id = ${d.itemId} AND team_id = ${u.team_id}`;
+        try {
+          await sql`
+            UPDATE inventory_items
+            SET quantity = ${newQty}, open_amount = ${newOpen}, updated_by = ${u.id}, updated_at = NOW()
+            WHERE id = ${d.itemId} AND team_id = ${u.team_id}`;
+        } catch {
+          // Starší schéma bez načatých balení — spočítané kusy se zapsat musí
+          // tak jako tak, jinak by celá inventura přišla vniveč.
+          await sql`
+            UPDATE inventory_items SET quantity = ${newQty}, updated_by = ${u.id}, updated_at = NOW()
+            WHERE id = ${d.itemId} AND team_id = ${u.team_id}`;
+        }
         try {
           await sql`
             INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, old_open, new_open, note, created_at)

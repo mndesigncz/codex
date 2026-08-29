@@ -12,13 +12,11 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
-import { pragueHourOf, pragueDayOf, dayPlus } from '@/lib/pragueTime';
+import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** Do kolika hodin ráno se účtenka počítá k předchozímu obchodnímu dni. */
-const NIGHT_CUTOFF_HOUR = 6;
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -79,8 +77,7 @@ export async function GET(req: NextRequest) {
         const when = t ? new Date(t) : null;
         const h = when ? pragueHourOf(when) : null;
         const calDay = when && h != null ? pragueDayOf(when) : null;
-        const bizDay = calDay != null && h != null
-          ? (h < NIGHT_CUTOFF_HOUR ? dayPlus(calDay, -1) : calDay) : null;
+        const bizDay = when ? (businessDayOf(when) || null) : null;
 
         if (!b.refunded && bizDay && bizDay >= from && bizDay < till) {
           const cur = posByDay.get(bizDay) ?? { cash: 0, card: 0, total: 0, bills: 0 };

@@ -4,7 +4,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getConnection, listBills, billItems } from './storyous';
 import { audit } from './audit';
-import { pragueDayOf } from './pragueTime';
+import { businessDayOf } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -88,15 +88,18 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const totals = new Map<number, number>();
   const unmapped = new Map<string, { name: string; count: number }>();
   const fetched: string[] = [];
-  // What sold, per product AND per the day the receipt belongs to. The sync
-  // covers yesterday and today, so stamping everything with today's date would
-  // push the last day of a month into the next one — and the monthly margins
-  // with it.
+  // What sold, per product AND per the business day the receipt belongs to.
+  // The sync covers yesterday and today, so stamping everything with today's
+  // date would push the last day of a month into the next one — and the
+  // monthly margins with it. Účtenka po půlnoci patří k předchozímu večeru.
   const sales = new Map<string, { day: string; productId: string; name: string; qty: number }>();
   const dayOfBill = new Map<string, string>();
 
   for (const b of bills) {
-    if (b?.billId && b?.createdAt) dayOfBill.set(b.billId, pragueDayOf(new Date(b.createdAt)));
+    if (b?.billId && b?.createdAt) {
+      const day = businessDayOf(new Date(b.createdAt));
+      if (day) dayOfBill.set(b.billId, day);
+    }
   }
 
   for (const billId of unprocessed.slice(0, 120)) {
