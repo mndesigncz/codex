@@ -511,7 +511,16 @@ export async function POST(request: Request) {
     // The partial unique index closes the double-submit race the SELECT above
     // can't — turn the violation into the same friendly 409.
     if (e?.code === '23505') {
-      return NextResponse.json({ error: 'Za tuto směnu už je uzávěrka odeslaná.' }, { status: 409 });
+      // Which rule fired matters: the SELECT above already let this through, so
+      // a violation here means the database still carries the older
+      // one-per-DAY index. Naming it turns „nejde to uložit" into something
+      // actionable instead of a mystery.
+      const stale = String(e?.constraint ?? '') === 'cash_closings_one_per_day';
+      return NextResponse.json({
+        error: stale
+          ? 'Uzávěrku blokuje starší databázové pravidlo „jedna uzávěrka na den". Spusť /api/init — přestaví se na pravidlo podle směn.'
+          : 'Za tuto směnu už je uzávěrka odeslaná.',
+      }, { status: 409 });
     }
     throw e;
   }
