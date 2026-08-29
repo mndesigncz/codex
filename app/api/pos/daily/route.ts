@@ -258,7 +258,18 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  if (!notes.length && posTotal > 0) {
+  if (posTotal === 0 && sum('refundCount') === 0) {
+    // Ticho není odpověď: nula může znamenat zavřeno, ještě neotevřeno, nebo
+    // že se markuje jinam. Řekneme, co z toho víme.
+    const isToday = from === today && to === today;
+    notes.push({
+      tone: 'info',
+      title: isToday ? 'Dnes zatím žádná účtenka' : 'V tomhle období nic neprošlo pokladnou',
+      text: isToday
+        ? 'Pokladna odpověděla, jen zatím nemá co poslat. Až padne první účtenka, čísla naskočí sama.'
+        : 'Pokladna za tyhle dny nevrátila žádnou účtenku — buď bylo zavřeno, nebo se markovalo na jiné provozovně.',
+    });
+  } else if (!notes.length) {
     notes.push({
       tone: 'good',
       title: 'Data sedí',
