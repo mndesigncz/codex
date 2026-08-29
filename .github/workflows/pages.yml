@@ -28,3 +28,7 @@ jobs:
       # a druhou ranní včerejšek a rozbíjí uzávěrky po noční směně.
       - name: Datum obchodního dne
         run: node scripts/check-time.mjs
+      # Česká desetinná čárka v poli type="number" znamená uloženou nulu —
+      # špatný odpis ze skladu a špatnou marži.
+      - name: Desetinná pole
+        run: node scripts/check-decimal-inputs.mjs
