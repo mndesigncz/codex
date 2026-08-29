@@ -46,6 +46,16 @@ function familyOf(item: any): 'l' | 'kg' | 'ks' {
 /** Číslo z pole, které přijme i desetinnou čárku — píše se tak česky. */
 const num = (s: string) => Number(String(s).replace(',', '.')) || 0;
 
+/** Kolik základní jednotky (l, kg) je jedna jednotka, ve které je vedená
+ *  položka. Receptura se ukládá v jednotce položky, protože v ní je i
+ *  velikost balení a cena — jinak by se z tabáku vedeného v gramech
+ *  odepisovalo tisíckrát míň, než se opravdu použije. */
+function itemFactor(item: any): number {
+  const u = String(item?.contentUnit ?? item?.unit ?? '').toLowerCase();
+  const fam = familyOf(item);
+  return UNITS[fam].find(o => o.label === u)?.toBase ?? 1;
+}
+
 export default function RecipesView({ openProductId, onNavigate }: {
   openProductId?: string;
   onNavigate?: (view: string, arg?: string) => void;
@@ -152,10 +162,10 @@ export default function RecipesView({ openProductId, onNavigate }: {
         ? r.ingredients.map((ing: any) => {
           const item = itemById.get(String(ing.itemId));
           const fam = familyOf(item);
-          // Uložené množství je v základní jednotce; nabídneme ho v takové,
-          // ve které to není samá nula (0,02 l → 20 ml).
+          // Uložené množství je v jednotce položky; převedeme na základní a
+          // nabídneme v té, ve které to není samá nula (0,02 l → 20 ml).
           const opts = UNITS[fam];
-          const base = Number(ing.amount) || 0;
+          const base = (Number(ing.amount) || 0) * itemFactor(item);
           const pick = [...opts].reverse().find(o => base / o.toBase >= 1) ?? opts[0];
           return { itemId: String(ing.itemId), amount: String(+(base / pick.toBase).toFixed(4)), unit: pick.label };
         })
@@ -174,7 +184,8 @@ export default function RecipesView({ openProductId, onNavigate }: {
       .map(ing => {
         const item = itemById.get(ing.itemId);
         const conv = UNITS[familyOf(item)].find(u => u.label === ing.unit)?.toBase ?? 1;
-        return { itemId: parseInt(ing.itemId), amount: num(ing.amount) * conv };
+        const amount = (num(ing.amount) * conv) / itemFactor(item);
+        return { itemId: parseInt(ing.itemId), amount: Math.round(amount * 1e6) / 1e6 };
       });
     try {
       const res = await fetch('/api/pos/products', {
@@ -208,13 +219,15 @@ export default function RecipesView({ openProductId, onNavigate }: {
     setSyncing(false);
   };
 
-  /** Kolik porcí z balení a co stojí jedna — tady se pozná chyba o řád. */
+  /** Kolik porcí z balení a co stojí jedna — tady se pozná chyba o řád.
+   *  Množství i velikost balení musí být ve stejné jednotce jako položka. */
   const yieldOf = (item: any, amountBase: number) => {
     if (!item || amountBase <= 0) return null;
+    const amount = amountBase / itemFactor(item);
     const pkg = Number(item.packageSize) || 0;
     const cost = Number(item.unitCost) || 0;
-    const portions = pkg > 0 ? Math.floor(pkg / amountBase) : null;
-    const perPortion = pkg > 0 && cost > 0 ? Math.round((cost / pkg) * amountBase) : null;
+    const portions = pkg > 0 ? Math.floor(pkg / amount) : null;
+    const perPortion = pkg > 0 && cost > 0 ? Math.round((cost / pkg) * amount) : null;
     return { portions, perPortion };
   };
 
@@ -463,7 +476,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   <span className="text-[11px] text-black/40">Díly:</span>
                   {item.portions.map((pt: any) => {
                     const base = opts.find(o => o.label === ing.unit)?.toBase ?? 1;
-                    const active = Math.abs(num(ing.amount) * base - Number(pt.amount)) < 1e-9;
+                    const active = Math.abs((num(ing.amount) * base) / itemFactor(item) - Number(pt.amount)) < 1e-9;
                     return (
                       <button key={pt.name} type="button"
                         onClick={() => {
