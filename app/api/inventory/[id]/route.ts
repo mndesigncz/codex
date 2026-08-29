@@ -409,6 +409,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const cu = body.contentUnit ? String(body.contentUnit).trim().slice(0, 10) || null : null;
     try { await sql`UPDATE inventory_items SET content_unit = ${cu} WHERE id = ${id}`; } catch { /* not migrated yet */ }
   }
+  // Pojmenované porce („panák 0,04 l"). Množství je v základní jednotce obsahu,
+  // stejně jako v recepturách — jméno je jen štítek pro člověka.
+  if (body.portions !== undefined) {
+    const list = Array.isArray(body.portions) ? body.portions : [];
+    const clean = list
+      .map((p: any) => ({
+        name: String(p?.name ?? '').trim().slice(0, 40),
+        amount: Number(String(p?.amount ?? '').toString().replace(',', '.')) || 0,
+      }))
+      .filter((p: any) => p.name && p.amount > 0)
+      .slice(0, 12);
+    try {
+      await sql`UPDATE inventory_items SET portions = ${JSON.stringify(clean)}::jsonb WHERE id = ${id}`;
+    } catch { /* not migrated yet */ }
+  }
 
   // Log any employer-driven quantity change too.
   if (body.quantity !== undefined && Number(item.quantity) !== quantity) {

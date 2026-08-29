@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
+import ItemInlineEdit from './ItemInlineEdit';
 
 const inputCls =
   'rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -227,6 +228,7 @@ export default function RecipesView() {
         <RecipeEditor
           draft={draft} items={items} itemById={itemById} money={money}
           setIng={setIng} setDraft={setDraft} save={save} saving={saving} yieldOf={yieldOf}
+          onItemSaved={(patched) => setItems(list => list.map(i => i.id === patched.id ? { ...i, ...patched } : i))}
         />
       ) : (
         <>
@@ -337,13 +339,16 @@ export default function RecipesView() {
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf }: {
+function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, onItemSaved }: {
   draft: Draft; items: any[]; itemById: Map<string, any>; money: (n: number) => string;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   save: () => void; saving: boolean;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
+  onItemSaved: (item: any) => void;
 }) {
+  // Která surovina se zrovna upravuje „na místě" — bez odcházení do skladu.
+  const [editingItem, setEditingItem] = useState<string | null>(null);
   const totalCost = draft.ingredients.reduce((sum, ing) => {
     const item = itemById.get(ing.itemId);
     if (!item) return sum;
@@ -396,13 +401,52 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   onClick={() => setDraft(d => d && ({ ...d, ingredients: d.ingredients.filter((_, i) => i !== idx) }))}
                   className="text-black/30 hover:text-red-600 transition px-1.5">✕</button>
               </div>
-              {item && num(ing.amount) > 0 && (
-                <p className="text-[11px] text-black/45">
-                  {y?.portions != null
-                    ? <>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="text-[#5B7A08]">{y.portions}×</b></>
-                    : <>U položky není velikost balení — porce nespočítám.</>}
-                  {y?.perPortion != null && <> · surovina za porci <b className="text-[#16181A]">{money(y.perPortion)}</b></>}
+              {/* Díly položky — definované u ní, tady se jen vyberou. */}
+              {item && Array.isArray(item.portions) && item.portions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-black/40">Díly:</span>
+                  {item.portions.map((pt: any) => {
+                    const base = opts.find(o => o.label === ing.unit)?.toBase ?? 1;
+                    const active = Math.abs(num(ing.amount) * base - Number(pt.amount)) < 1e-9;
+                    return (
+                      <button key={pt.name} type="button"
+                        onClick={() => {
+                          // Vybereme jednotku, ve které díl není samá nula.
+                          const pick = [...opts].reverse().find(o => Number(pt.amount) / o.toBase >= 1) ?? opts[0];
+                          setIng(idx, { amount: String(+(Number(pt.amount) / pick.toBase).toFixed(4)), unit: pick.label });
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition active:scale-95 ${
+                          active ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/55 hover:text-black'
+                        }`}>
+                        {pt.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {item && (
+                <p className="text-[11px] text-black/45 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {num(ing.amount) > 0 && (y?.portions != null
+                    ? <span>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="text-[#5B7A08]">{y.portions}×</b></span>
+                    : <span className="text-amber-700">Chybí velikost balení — porce ani cenu nespočítám.</span>)}
+                  {y?.perPortion != null && <span>· surovina za porci <b className="text-[#16181A]">{money(y.perPortion)}</b></span>}
+                  {num(ing.amount) > 0 && y?.perPortion == null && Number(item.unitCost) > 0 === false && (
+                    <span className="text-amber-700">· chybí cena za balení</span>
+                  )}
+                  <button type="button" onClick={() => setEditingItem(editingItem === ing.itemId ? null : ing.itemId)}
+                    className="font-bold text-[#5B7A08] hover:brightness-110 transition">
+                    {editingItem === ing.itemId ? '− zavřít úpravu' : '✎ upravit položku / díly'}
+                  </button>
                 </p>
+              )}
+
+              {item && editingItem === ing.itemId && (
+                <ItemInlineEdit
+                  item={item}
+                  onSaved={(patched) => onItemSaved(patched)}
+                  onClose={() => setEditingItem(null)}
+                />
               )}
             </div>
           );

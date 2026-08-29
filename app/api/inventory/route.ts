@@ -47,6 +47,7 @@ export async function GET() {
         i.highlight,
         i.approved, i.submitted_by AS "submittedBy",
         i.photo_url         AS "photoUrl",
+        i.portions,
         i.category_id       AS "categoryId",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
