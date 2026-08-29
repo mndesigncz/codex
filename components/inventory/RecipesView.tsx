@@ -276,6 +276,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
         <RecipeEditor
           draft={draft} items={items} itemById={itemById} money={money}
           setIng={setIng} setDraft={setDraft} save={save} saving={saving} yieldOf={yieldOf}
+          recipes={recipes} products={products}
           onItemSaved={(patched) => setItems(list => list.map(i => i.id === patched.id ? { ...i, ...patched } : i))}
         />
       ) : (
@@ -408,16 +409,40 @@ export default function RecipesView({ openProductId, onNavigate }: {
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, onItemSaved }: {
+function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, recipes, products, onItemSaved }: {
   draft: Draft; items: any[]; itemById: Map<string, any>; money: (n: number) => string;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   save: () => void; saving: boolean;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
+  recipes: any[]; products: any[];
   onItemSaved: (item: any) => void;
 }) {
   // Která surovina se zrovna upravuje „na místě" — bez odcházení do skladu.
   const [editingItem, setEditingItem] = useState<string | null>(null);
+
+  const nameOfProduct = (r: any) =>
+    products.find(p => p.productId === r.productId)?.name ?? r.productName ?? r.productId;
+  const copyable = (recipes ?? [])
+    .filter((r: any) => r.productId !== draft.productId && Array.isArray(r.ingredients) && r.ingredients.length)
+    .sort((a: any, b: any) => nameOfProduct(a).localeCompare(nameOfProduct(b), 'cs'));
+
+  /** Převezme suroviny z jiné receptury — množství se ukládá v jednotce
+   *  položky, tak ho jen nabídneme v té, ve které to není samá nula. */
+  const copyFrom = (productId: string) => {
+    const src = copyable.find((r: any) => r.productId === productId);
+    if (!src) return;
+    setDraft(d => d && ({
+      ...d,
+      ingredients: src.ingredients.map((ing: any) => {
+        const item = itemById.get(String(ing.itemId));
+        const opts = UNITS[familyOf(item)];
+        const base = (Number(ing.amount) || 0) * itemFactor(item);
+        const pick = [...opts].reverse().find(o => base / o.toBase >= 1) ?? opts[0];
+        return { itemId: String(ing.itemId), amount: String(+(base / pick.toBase).toFixed(4)), unit: pick.label };
+      }),
+    }));
+  };
   const totalCost = draft.ingredients.reduce((sum, ing) => {
     const item = itemById.get(ing.itemId);
     if (!item) return sum;
@@ -431,8 +456,26 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
       <div className="flex items-center gap-2">
         <button onClick={() => setDraft(null)}
           className="rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black transition">← Zpět</button>
-        <p className="font-bold text-[#16181A] truncate">{draft.productName}</p>
+        <p className="font-bold text-[#16181A] truncate flex-1 min-w-0">{draft.productName}</p>
       </div>
+
+      {/* Nápoje se liší jedním sirupem. Opisovat kvůli tomu celou recepturu
+          znovu je práce navíc, kterou nikdo neudělá — a produkt zůstane bez
+          receptury. */}
+      {copyable.length > 0 && (
+        <label className="flex flex-wrap items-center gap-2 text-xs text-black/50">
+          <span className="font-semibold">Převzít z jiné položky:</span>
+          <select value="" onChange={e => copyFrom(e.target.value)}
+            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none max-w-[16rem]">
+            <option value="">— vyber recepturu —</option>
+            {copyable.map(r => (
+              <option key={r.productId} value={r.productId}>
+                {nameOfProduct(r)} ({r.ingredients.length})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="space-y-3">
         {draft.ingredients.map((ing, idx) => {
