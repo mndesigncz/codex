@@ -10,6 +10,7 @@ import { Icon } from '../Icons';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
 import ShrinkageReport from '../inventory/ShrinkageReport';
+import LiveRevenue from './LiveRevenue';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -219,6 +220,10 @@ export default function FinanceView() {
               </div>
             </div>
           )}
+
+          {/* Živý pohled na dnešek patří nad měsíční rekapitulaci — podle něj
+              se rozhoduje teď, ne až na konci měsíce. */}
+          <LiveRevenue />
 
           {/* Ztráty ze skladu — poslední inventura v penězích. Patří k penězům
               stejně jako nákupy: to, co zmizí, se nakupuje znovu. */}

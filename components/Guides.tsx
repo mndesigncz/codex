@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
+import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
+import GuideStepIngredient from './guides/GuideStepIngredient';
+import GuideProductLink from './guides/GuideProductLink';
 
 interface User {
   id: number;
@@ -36,7 +39,7 @@ interface GuideFull {
   id: number;
   title: string;
   content: string;
-  checklist: string[];
+  checklist: GuideStep[];
   categoryId: number | null;
   updatedAt: string;
   createdAt?: string;
@@ -187,7 +190,7 @@ export default function Guides({ user }: { user: User }) {
     try {
       const r = await fetch(`/api/guides/${id}`);
       const d = await r.json();
-      if (d.guide) setReader({ ...d.guide, checklist: Array.isArray(d.guide.checklist) ? d.guide.checklist : [] });
+      if (d.guide) setReader({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
       else setReader(null);
     } catch {
       // A dead network must not leave the reader on an endless spinner.
@@ -402,7 +405,7 @@ export default function Guides({ user }: { user: User }) {
                               e.stopPropagation();
                               const r = await fetch(`/api/guides/${g.id}`);
                               const d = await r.json();
-                              if (d.guide) openEditor({ ...d.guide, checklist: Array.isArray(d.guide.checklist) ? d.guide.checklist : [] });
+                              if (d.guide) openEditor({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
                             }}
                             className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
                             title="Upravit"
@@ -598,7 +601,7 @@ export default function Guides({ user }: { user: User }) {
 // Interactive tick list for the reader. Progress survives closing the reader —
 // it lives in localStorage per guide on this device, and clears itself once
 // the list is completed (next open starts fresh).
-function ReaderChecklist({ steps, guideId }: { steps: string[]; guideId?: number }) {
+function ReaderChecklist({ steps, guideId }: { steps: GuideStep[]; guideId?: number }) {
   const storageKey = guideId ? `managero-guide-ticks-${guideId}` : null;
   const [done, setDone] = useState<boolean[]>(() => {
     if (storageKey) {
@@ -645,7 +648,13 @@ function ReaderChecklist({ steps, guideId }: { steps: string[]; guideId?: number
       </div>
 
       <StepTimeline
-        steps={parseSteps(steps)}
+        steps={parseSteps(steps.map(st => (
+          // Gramáž patří ke kroku, ne do zvláštního seznamu — barista čte
+          // jeden řádek, ne dva.
+          st.itemId != null && st.amount != null
+            ? `${st.text} — ${String(st.amount).replace('.', ',')} ${st.unit ?? ''}`.trim()
+            : st.text
+        )))}
         statuses={Object.fromEntries(done.map((v, i) => [i, v ? 'done' : 'pending']))}
         onToggle={toggle}
         interactive
@@ -714,12 +723,31 @@ function GuideEditor({
   const [categoryId, setCategoryId] = useState<number | null>(
     editing ? editing.categoryId : defaultCategory
   );
-  const [steps, setSteps] = useState<string[]>(editing?.checklist?.length ? [...editing.checklist] : []);
+  const [steps, setSteps] = useState<GuideStep[]>(
+    editing?.checklist?.length ? normalizeSteps(editing.checklist) : [],
+  );
+  // Návod patří k položce v kase; z jeho surovin se pak dá složit receptura.
+  const [productId, setProductId] = useState<string | null>((editing as any)?.productId ?? null);
+  const [productName, setProductName] = useState<string | null>((editing as any)?.productName ?? null);
+  const [alsoRecipe, setAlsoRecipe] = useState(true);
+  const [items, setItems] = useState<any[]>([]);
+  const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/inventory').then(r => r.json())
+      .then(d => setItems(Array.isArray(d) ? d.filter((i: any) => i.approved !== false) : []))
+      .catch(() => setItems([]));
+    fetch('/api/inventory/categories').then(r => r.json())
+      .then(d => setStockCategories(Array.isArray(d) ? d.map((c: any) => ({ id: Number(c.id), name: String(c.name) })) : []))
+      .catch(() => setStockCategories([]));
+  }, []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const addStep = () => setSteps((prev) => [...prev, '']);
-  const updateStep = (i: number, v: string) => setSteps((prev) => prev.map((s, idx) => (idx === i ? v : s)));
+  const addStep = () => setSteps((prev) => [...prev, { text: '' }]);
+  const updateStep = (i: number, v: string) =>
+    setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, text: v } : s)));
+  const patchStep = (i: number, patch: Partial<GuideStep>) =>
+    setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const removeStep = (i: number) => setSteps((prev) => prev.filter((_, idx) => idx !== i));
   const moveStep = (i: number, dir: -1 | 1) =>
     setSteps((prev) => {
@@ -737,8 +765,8 @@ function GuideEditor({
     }
     setSaving(true);
     setError('');
-    const checklist = steps.map((s) => s.trim()).filter((s) => s.length > 0);
-    const payload = { title: title.trim(), content, categoryId, checklist };
+    const checklist = normalizeSteps(steps);
+    const payload = { title: title.trim(), content, categoryId, checklist, productId, productName };
     const res = editing
       ? await fetch(`/api/guides/${editing.id}`, {
           method: 'PATCH',
@@ -750,10 +778,24 @@ function GuideEditor({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-    setSaving(false);
     if (res.ok) {
+      // Suroviny z návodu jsou receptura — psát ji podruhé ručně je přesně to
+      // místo, kde se obě verze rozejdou.
+      const ing = checklist
+        .filter(st => st.itemId != null && st.amount != null && st.amount > 0)
+        .map(st => ({ itemId: st.itemId, amount: st.amount }));
+      if (alsoRecipe && productId && ing.length) {
+        try {
+          await fetch('/api/pos/products', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId, productName, ingredients: ing }),
+          });
+        } catch { /* receptura je bonus, návod je uložený */ }
+      }
+      setSaving(false);
       onSaved();
     } else {
+      setSaving(false);
       const d = await res.json().catch(() => ({}));
       setError(d.error || 'Uložení se nezdařilo.');
     }
@@ -813,6 +855,13 @@ function GuideEditor({
             <p className="text-xs text-black/30 mt-2">Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.</p>
           </div>
 
+          {/* Vazba na položku v kase — z ní plyne, že se suroviny z návodu
+              dají uložit rovnou jako receptura. */}
+          <GuideProductLink
+            productId={productId} productName={productName}
+            onPick={(id, name) => { setProductId(id); setProductName(name); }}
+          />
+
           {/* Checklist builder */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -824,7 +873,8 @@ function GuideEditor({
             ) : (
               <div className="space-y-2 mb-3">
                 {steps.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="space-y-2">
+                  <div className="flex items-center gap-2">
                     <div className="flex flex-col flex-shrink-0">
                       <button
                         type="button"
@@ -847,7 +897,7 @@ function GuideEditor({
                     </div>
                     <span className="text-xs text-black/30 w-5 text-right flex-shrink-0">{i + 1}.</span>
                     <input
-                      value={s}
+                      value={s.text}
                       onChange={(e) => updateStep(i, e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -860,12 +910,36 @@ function GuideEditor({
                     />
                     <button
                       type="button"
+                      onClick={() => patchStep(i, s.itemId != null || s.unit != null
+                        ? { itemId: null, amount: null, unit: null }
+                        : { itemId: null, amount: null, unit: '' })}
+                      title={s.itemId != null || s.unit != null ? 'Zrušit surovinu' : 'Označit jako surovinu'}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                        s.itemId != null || s.unit != null
+                          ? 'bg-[#C8F542] text-[#16181A]'
+                          : 'glass text-black/45 hover:text-[#5B7A08]'
+                      }`}
+                    >
+                      <Icon name="box" size={14} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => removeStep(i)}
-                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-red-600 transition-all text-xs flex-shrink-0"
+                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-red-600 transition-all flex-shrink-0"
                       title="Odebrat krok"
                     >
-                      ✕
+                      <Icon name="close" size={14} />
                     </button>
+                  </div>
+                  {(s.itemId != null || s.unit != null) && (
+                    <div className="pl-12">
+                      <GuideStepIngredient
+                        step={s} items={items} categories={stockCategories}
+                        onChange={patch => patchStep(i, patch)}
+                        onItemCreated={created => setItems(list => [...list, created])}
+                      />
+                    </div>
+                  )}
                   </div>
                 ))}
               </div>
@@ -878,6 +952,19 @@ function GuideEditor({
               <Icon name="plus" size={16} strokeWidth={2} />
               Přidat krok
             </button>
+
+            {productId && steps.some(st => st.itemId != null && (st.amount ?? 0) > 0) && (
+              <label className="mt-3 flex items-start gap-3 rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3 cursor-pointer">
+                <input type="checkbox" checked={alsoRecipe} onChange={e => setAlsoRecipe(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[#8FB811]" />
+                <span className="text-sm text-[#16181A]">
+                  Uložit suroviny i jako recepturu
+                  <span className="block text-[11px] text-black/50 mt-0.5">
+                    Prodej „{productName}" pak sklad odepíše sám. Přepíše stávající recepturu téhle položky.
+                  </span>
+                </span>
+              </label>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
