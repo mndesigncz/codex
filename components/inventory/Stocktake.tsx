@@ -5,8 +5,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import ShrinkageReport from './ShrinkageReport';
 
-type Row = { itemId: number; name: string; category: string | null; unit: string; expected: number; counted: number | null };
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+const fmt = (n: number) => round3(n).toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
+
+type Row = {
+  itemId: number; name: string; category: string | null; unit: string;
+  expected: number; counted: number | null;
+  /** Položky s balením mají ještě načaté balení — to se počítá zvlášť. */
+  packageSize?: number | null; contentUnit?: string | null;
+  expectedOpen?: number | null; countedOpen?: number | null;
+  unitCost?: number | null;
+};
 type Take = { id: number; status: string; data: Row[]; createdAt: string; completedAt: string | null };
 
 export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
@@ -22,6 +33,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
   const [confirmDone, setConfirmDone] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCounts = useRef<Record<string, number | null>>({});
+  const pendingOpens = useRef<Record<string, number | null>>({});
 
   const load = async () => {
     try {
@@ -44,22 +56,38 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
   };
 
   // Debounced batched save — counting is rapid-fire typing on a tablet.
+  const flush = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const counts = pendingCounts.current;
+      const opens = pendingOpens.current;
+      pendingCounts.current = {};
+      pendingOpens.current = {};
+      const res = await fetch('/api/stocktake', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: open!.id, counts, opens }),
+      }).catch(() => null);
+      if (!res?.ok) setErr('Počty se neuložily — zkontroluj připojení.');
+      else setErr('');
+    }, 600);
+  };
+
   const setCount = (itemId: number, raw: string) => {
     if (!open) return;
     const counted = raw === '' ? null : Math.max(0, Math.round(Number(raw) || 0));
     setOpen(o => o && { ...o, data: o.data.map(r => r.itemId === itemId ? { ...r, counted } : r) });
     pendingCounts.current[String(itemId)] = counted;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      const counts = pendingCounts.current;
-      pendingCounts.current = {};
-      const res = await fetch('/api/stocktake', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: open.id, counts }),
-      }).catch(() => null);
-      if (!res?.ok) setErr('Počty se neuložily — zkontroluj připojení.');
-      else setErr('');
-    }, 600);
+    flush();
+  };
+
+  /** Zbytek v načatém balení — 0,68 l zůstane 0,68 l. */
+  const setOpenAmount = (itemId: number, raw: string) => {
+    if (!open) return;
+    const v = raw.replace(',', '.');
+    const countedOpen = v === '' ? null : Math.max(0, Math.round((Number(v) || 0) * 1000) / 1000);
+    setOpen(o => o && { ...o, data: o.data.map(r => r.itemId === itemId ? { ...r, countedOpen } : r) });
+    pendingOpens.current[String(itemId)] = countedOpen;
+    flush();
   };
 
   const complete = async () => {
@@ -68,9 +96,10 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
     // flush pending counts along with completion
     const res = await fetch('/api/stocktake', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: open.id, counts: pendingCounts.current, complete: true }),
+      body: JSON.stringify({ id: open.id, counts: pendingCounts.current, opens: pendingOpens.current, complete: true }),
     }).catch(() => null);
     pendingCounts.current = {};
+    pendingOpens.current = {};
     setBusy(false); setConfirmDone(false);
     if (res?.ok) {
       const d = await res.json().catch(() => ({}));
@@ -85,6 +114,8 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
     }
   };
   const [doneMsg, setDoneMsg] = useState('');
+  /** Kterou inventuru rozebírá report — výchozí je poslední. */
+  const [selected, setSelected] = useState<number | null>(null);
 
   const cancel = async () => {
     if (!open || !confirm('Zrušit rozpočítanou inventuru? Napočítané hodnoty se zahodí.')) return;
@@ -105,8 +136,10 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
     return Array.from(map.entries());
   }, [open]);
 
-  const countedN = open ? open.data.filter(r => r.counted != null).length : 0;
-  const diffN = open ? open.data.filter(r => r.counted != null && r.counted !== r.expected).length : 0;
+  const countedN = open ? open.data.filter(r => r.counted != null || r.countedOpen != null).length : 0;
+  const diffN = open ? open.data.filter(r =>
+    (r.counted != null && r.counted !== r.expected) ||
+    (r.countedOpen != null && r.countedOpen !== (r.expectedOpen ?? 0))).length : 0;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
@@ -136,15 +169,26 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                 <p className="text-xs text-black/40">Inventuru zahajuje vedení — pak může počítat kdokoli.</p>
               )}
             </div>
+            {isEmployer && history.length > 0 && (
+              <ShrinkageReport stocktakeId={selected ?? undefined} />
+            )}
+
             {history.length > 0 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Minulé inventury</p>
                 <div className="space-y-2">
                   {history.map(h => {
-                    const counted = h.data.filter(r => r.counted != null);
-                    const diffs = counted.filter(r => r.counted !== r.expected);
+                    const counted = h.data.filter(r => r.counted != null || r.countedOpen != null);
+                    const diffs = counted.filter(r =>
+                      (r.counted != null && r.counted !== r.expected) ||
+                      (r.countedOpen != null && r.countedOpen !== (r.expectedOpen ?? 0)));
                     return (
-                      <div key={h.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm">
+                      <button key={h.id} type="button" onClick={() => setSelected(h.id)}
+                        className={`w-full text-left flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition ${
+                          (selected ?? history[0]?.id) === h.id
+                            ? 'bg-[#C8F542]/10 border-[#C8F542]/30'
+                            : 'bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.05]'
+                        }`}>
                         <span className="font-medium text-[#16181A]">
                           {h.completedAt ? new Date(h.completedAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
                         </span>
@@ -152,7 +196,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                         <span className={diffs.length ? 'text-amber-700 font-medium' : 'text-[#5B7A08]'}>
                           · {diffs.length ? `${diffs.length} rozdílů` : 'vše sedělo ✓'}
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -192,22 +236,49 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                 <div className="rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden">
                   {rows.map(r => {
                     const diff = r.counted != null ? r.counted - r.expected : null;
+                    const pkg = Number(r.packageSize) || 0;
+                    const openDiff = r.countedOpen != null ? round3(r.countedOpen - (r.expectedOpen ?? 0)) : null;
+                    const touched = r.counted != null || r.countedOpen != null;
                     return (
-                      <div key={r.itemId} className={`flex items-center gap-3 px-4 py-2.5 ${r.counted != null ? 'bg-[#C8F542]/[0.05]' : ''}`}>
-                        <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">{r.name}</span>
-                        <span className="shrink-0 text-xs text-black/40 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
-                        <input
-                          type="number" inputMode="numeric" min={0}
-                          value={r.counted ?? ''}
-                          onChange={e => setCount(r.itemId, e.target.value)}
-                          placeholder="—"
-                          className="w-20 shrink-0 rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
-                        />
-                        <span className={`w-12 shrink-0 text-right text-xs font-semibold tabular-nums ${
-                          diff == null ? 'text-black/20' : diff === 0 ? 'text-[#5B7A08]' : 'text-amber-700'
-                        }`}>
-                          {diff == null ? '' : diff === 0 ? '✓' : diff > 0 ? `+${diff}` : diff}
-                        </span>
+                      <div key={r.itemId} className={`px-4 py-2.5 ${touched ? 'bg-[#C8F542]/[0.05]' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">{r.name}</span>
+                          <span className="shrink-0 text-xs text-black/40 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
+                          <input
+                            type="number" inputMode="numeric" min={0}
+                            value={r.counted ?? ''}
+                            onChange={e => setCount(r.itemId, e.target.value)}
+                            placeholder="—"
+                            className="w-20 shrink-0 rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                          />
+                          <span className={`w-12 shrink-0 text-right text-xs font-semibold tabular-nums ${
+                            diff == null ? 'text-black/20' : diff === 0 ? 'text-[#5B7A08]' : 'text-amber-700'
+                          }`}>
+                            {diff == null ? '' : diff === 0 ? '✓' : diff > 0 ? `+${diff}` : diff}
+                          </span>
+                        </div>
+                        {pkg > 0 && (
+                          <div className="flex items-center gap-3 pl-4 mt-1.5">
+                            <span className="min-w-0 flex-1 text-[11px] text-black/40 truncate">
+                              ↳ zbytek v načatém balení <span className="text-black/25">(z {pkg} {r.contentUnit || 'l'})</span>
+                            </span>
+                            <span className="shrink-0 text-[11px] text-black/35 tabular-nums whitespace-nowrap">
+                              evid. {fmt(r.expectedOpen ?? 0)} {r.contentUnit || ''}
+                            </span>
+                            <input
+                              inputMode="decimal"
+                              value={r.countedOpen ?? ''}
+                              onChange={e => setOpenAmount(r.itemId, e.target.value)}
+                              placeholder="—"
+                              className="w-20 shrink-0 rounded-xl bg-white/60 border border-black/[0.07] px-3 py-1.5 text-xs text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                            />
+                            <span className={`w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums ${
+                              openDiff == null ? 'text-black/20' : openDiff === 0 ? 'text-[#5B7A08]' : 'text-amber-700'
+                            }`}>
+                              {openDiff == null ? '' : openDiff === 0 ? '✓' : openDiff > 0 ? `+${fmt(openDiff)}` : fmt(openDiff)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

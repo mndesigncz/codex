@@ -554,18 +554,49 @@ export default function ClosingsOverview() {
           {/* hourly peaks */}
           {posInsights.hours.some((h: number) => h > 0) && (() => {
             const max = Math.max(...posInsights.hours);
+            const maxStaff = Array.isArray(posInsights.staff) ? Math.max(...posInsights.staff, 0) : 0;
             return (
               <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Špičky dne (tržba po hodinách)</p>
-                <div className="flex items-end gap-[3px] h-20 overflow-x-auto scrollbar-thin">
-                  {posInsights.hours.map((v: number, h: number) => (
-                    <div key={h} className="flex flex-col items-center gap-1 min-w-[22px] flex-1" title={`${h}:00 — ${money(v)}`}>
-                      <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
-                        style={{ height: `${max ? Math.max(v > 0 ? 6 : 0, (v / max) * 64) : 0}px` }} />
-                      <span className="text-[10px] text-black/35 tabular-nums">{h}</span>
-                    </div>
-                  ))}
+                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
+                  Špičky dne (tržba po hodinách)
+                  {Array.isArray(posInsights.staff) && posInsights.staff.some((n: number) => n > 0) && (
+                    <span className="ml-2 font-normal normal-case tracking-normal text-black/35">
+                      · tmavý proužek = naplánovaní lidé
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-end gap-[3px] h-24 overflow-x-auto scrollbar-thin">
+                  {posInsights.hours.map((v: number, h: number) => {
+                    const people = Array.isArray(posInsights.staff) ? Number(posInsights.staff[h]) || 0 : 0;
+                    return (
+                      <div key={h} className="flex flex-col items-center gap-1 min-w-[22px] flex-1"
+                        title={`${h}:00 — ${money(v)}${people ? ` · ${people} naplánovaných hodin` : ''}`}>
+                        <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
+                          style={{ height: `${max ? Math.max(v > 0 ? 6 : 0, (v / max) * 56) : 0}px` }} />
+                        {/* Obsazenost pod sloupcem — kde je proužek širší než
+                            sloupec vysoký, platíme lidi za prázdno. */}
+                        <div className="w-full h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
+                          <div className="h-full rounded-full bg-[#16181A]/45"
+                            style={{ width: `${maxStaff ? (people / maxStaff) * 100 : 0}%` }} />
+                        </div>
+                        <span className="text-[10px] text-black/35 tabular-nums">{h}</span>
+                      </div>
+                    );
+                  })}
                 </div>
+                {Array.isArray(posInsights.staffingAdvice) && posInsights.staffingAdvice.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {posInsights.staffingAdvice.map((a: any, i: number) => (
+                      <div key={i} className={`rounded-2xl border px-4 py-2.5 ${
+                        a.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                          : a.tone === 'good' ? 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]'
+                          : 'bg-black/[0.03] border-black/[0.07] text-black/60'}`}>
+                        <p className="text-sm font-semibold">{a.title}</p>
+                        <p className="text-xs mt-0.5 opacity-80 leading-relaxed">{a.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })()}

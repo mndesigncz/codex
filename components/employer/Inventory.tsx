@@ -1148,10 +1148,20 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] max-h-56 overflow-y-auto scrollbar-thin">
                     {itemLog.map((l: any) => {
                       const delta = Number(l.newQuantity) - Number(l.oldQuantity);
+                      // Odpis podle receptury často ubere jen z načatého balení —
+                      // kusy se nezmění a bez tohohle by řádek hlásil „0".
+                      const openDelta = l.oldOpen != null && l.newOpen != null
+                        ? Math.round((Number(l.newOpen) - Number(l.oldOpen)) * 1000) / 1000 : 0;
+                      const label = delta !== 0
+                        ? (delta > 0 ? `+${delta}` : String(delta))
+                        : openDelta !== 0
+                          ? `${openDelta > 0 ? '+' : ''}${openDelta.toLocaleString('cs-CZ', { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
+                          : '0';
+                      const tone = delta || openDelta;
                       return (
                         <div key={l.id} className="flex items-center gap-2.5 px-4 py-2.5 text-sm">
-                          <span className={`shrink-0 font-bold tabular-nums ${delta > 0 ? 'text-[#5B7A08]' : delta < 0 ? 'text-red-600' : 'text-black/40'}`}>
-                            {delta > 0 ? `+${delta}` : delta}
+                          <span className={`shrink-0 font-bold tabular-nums ${tone > 0 ? 'text-[#5B7A08]' : tone < 0 ? 'text-red-600' : 'text-black/40'}`}>
+                            {label}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-black/55">
                             {l.userName ?? 'Někdo'}{l.note ? ` · ${l.note}` : ''}

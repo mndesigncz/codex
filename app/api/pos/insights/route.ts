@@ -1,5 +1,10 @@
 // Everything else the POS data can tell us about one month: hourly peaks,
 // revenue per person, refunds and discounts, average bill and party size.
+//
+// A pak to nejcennější: špičky proti tomu, kdo na ně byl naplánovaný. Sama
+// o sobě je hodinová křivka jen hezký graf — teprve porovnaná s rozvrhem
+// řekne, jestli se v šest večer stíhá a jestli se v deset ráno platí lidi za
+// prázdnou místnost.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -7,6 +12,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
+import { pragueHourOf, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -66,8 +72,8 @@ export async function GET(req: NextRequest) {
         tips += Number(b.tips) || 0;
         discounts += Number(b.discount) || 0;
         const t = String(b.paidAt ?? b.createdAt ?? '');
-        const h = parseInt(t.slice(11, 13));
-        if (Number.isFinite(h) && h >= 0 && h < 24) hours[h] += price;
+        const h = t ? pragueHourOf(new Date(t)) : null;
+        if (h != null) hours[h] += price;
         const who = b.paidBy?.fullName ?? b.createdBy?.fullName;
         if (who) {
           const cur = byPerson.get(who) ?? { total: 0, bills: 0 };
@@ -79,8 +85,86 @@ export async function GET(req: NextRequest) {
       path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
     }
 
+    // ---- kdo na ty hodiny byl naplánovaný ----
+    // Směna 18:00–02:00 se počítá i do hodin po půlnoci; poslední hodina se
+    // bere jako otevřená, aby 18:00–22:00 pokrylo 18, 19, 20 a 21.
+    const staff = new Array(24).fill(0);
+    let staffTotal = 0;
+    let wageSum = 0, wageHours = 0;
+    try {
+      const shifts = await sql`
+        SELECT s.date, s.start_time, s.end_time, u.hourly_rate
+        FROM shifts s LEFT JOIN users u ON u.id = s.employee_id
+        WHERE s.team_id = ${u.team_id}
+          AND s.date >= ${dayPlus(from, -1)} AND s.date < ${till}`;
+      for (const sh of shifts as any[]) {
+        const st = String(sh.start_time ?? '').slice(0, 5);
+        const en = String(sh.end_time ?? '').slice(0, 5);
+        if (!/^\d{2}:\d{2}$/.test(st) || !/^\d{2}:\d{2}$/.test(en)) continue;
+        const h0 = parseInt(st.slice(0, 2), 10);
+        const h1 = parseInt(en.slice(0, 2), 10);
+        const span = en <= st ? (24 - h0) + h1 : h1 - h0;
+        for (let k = 0; k < span && k < 24; k++) {
+          const h = (h0 + k) % 24;
+          // Hodina po půlnoci patří dalšímu dni — mimo měsíc ji nepočítáme.
+          const day = h0 + k >= 24 ? dayPlus(String(sh.date), 1) : String(sh.date);
+          if (day < from || day >= till) continue;
+          staff[h] += 1;
+          staffTotal += 1;
+          const rate = Number(sh.hourly_rate) || 0;
+          if (rate > 0) { wageSum += rate; wageHours += 1; }
+        }
+      }
+    } catch { /* bez rozvrhu prostě nebude srovnání */ }
+
+    const avgRate = wageHours > 0 ? Math.round(wageSum / wageHours) : null;
+    const staffing: { hour: number; revenueShare: number; staffShare: number; perHour: number | null }[] = [];
+    for (let h = 0; h < 24; h++) {
+      if (!hours[h] && !staff[h]) continue;
+      staffing.push({
+        hour: h,
+        revenueShare: total > 0 ? Math.round((hours[h] / total) * 1000) / 10 : 0,
+        staffShare: staffTotal > 0 ? Math.round((staff[h] / staffTotal) * 1000) / 10 : 0,
+        perHour: staff[h] > 0 ? Math.round(hours[h] / staff[h]) : null,
+      });
+    }
+
+    const staffingAdvice: { title: string; text: string; tone: 'good' | 'warn' | 'info' }[] = [];
+    if (staffTotal > 0 && total > 0) {
+      const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
+      const tight = staffing.filter(x => x.revenueShare - x.staffShare >= 5)
+        .sort((a, b) => (b.revenueShare - b.staffShare) - (a.revenueShare - a.staffShare)).slice(0, 2);
+      for (const x of tight) {
+        staffingAdvice.push({
+          tone: 'warn',
+          title: `${hh(x.hour)} táhne ${x.revenueShare} % tržby, ale jen ${x.staffShare} % hodin`,
+          text: `Na jednoho člověka tu připadá ${x.perHour != null ? x.perHour.toLocaleString('cs-CZ') + ' Kč' : 'nejvíc z celého dne'} za hodinu. Přidat na tuhle hodinu překryv obvykle zvedne tržbu víc, než stojí mzda.`,
+        });
+      }
+      const idle = staffing.filter(x => x.staffShare >= 4 && x.revenueShare <= 1)
+        .sort((a, b) => b.staffShare - a.staffShare).slice(0, 2);
+      for (const x of idle) {
+        const cost = avgRate != null ? ` Hodina obsluhy vyjde v průměru na ${avgRate} Kč.` : '';
+        staffingAdvice.push({
+          tone: 'info',
+          title: `${hh(x.hour)} je zaplacená, ale skoro bez tržby`,
+          text: `Padne sem ${x.staffShare} % naplánovaných hodin a ${x.revenueShare} % tržby. Zvaž posunutí začátku nebo konce směny.${cost}`,
+        });
+      }
+      const bestHour = staffing.filter(x => x.perHour != null)
+        .sort((a, b) => (b.perHour ?? 0) - (a.perHour ?? 0))[0];
+      if (bestHour && !tight.length) {
+        staffingAdvice.push({
+          tone: 'good',
+          title: `Nejvýnosnější hodina: ${hh(bestHour.hour)}`,
+          text: `Jeden člověk tu udělá ${(bestHour.perHour ?? 0).toLocaleString('cs-CZ')} Kč za hodinu. Rozvrh na špičky sedí.`,
+        });
+      }
+    }
+
     return NextResponse.json({
       connected: true, month, bills, total, tips, discounts,
+      staff, staffing, staffingAdvice, avgRate,
       avgBill: bills ? Math.round(total / bills) : 0,
       avgPersons: personBills ? Math.round((persons / personBills) * 10) / 10 : null,
       hours,
