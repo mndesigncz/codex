@@ -657,6 +657,39 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         </div>
       )}
 
+      {/* Protějšek fronty „prodává se, ale neodepisuje" z Receptur: suroviny,
+          které kasa používá, ale nemají cenu nebo velikost balení. Bez nich
+          se marže nespočítá a odpis z načatého balení nefunguje — a nikde
+          jinde to není vidět. */}
+      {(() => {
+        const gaps = items.filter(i =>
+          (posUsage[String(i.id)]?.length ?? 0) > 0
+          && (!(Number(i.unitCost) > 0) || !(Number(i.packageSize) > 0)));
+        if (!gaps.length) return null;
+        return (
+          <div className="glass-card border-amber-500/25 bg-amber-500/[0.05] p-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 flex items-center gap-1.5">
+              <Icon name="warning" size={14} /> Používá se v recepturách, ale chybí údaje ({gaps.length})
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {gaps.slice(0, 12).map(i => (
+                <button key={i.id} onClick={() => openEdit(i)}
+                  className="rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
+                  {i.name}
+                  <span className="ml-1.5 font-normal text-amber-700">
+                    {!(Number(i.unitCost) > 0) && !(Number(i.packageSize) > 0) ? 'cena i balení'
+                      : !(Number(i.unitCost) > 0) ? 'cena' : 'velikost balení'}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-black/45">
+              Dokud chybí, nespočítá se marže položek, které je používají — a odpis nebere z načatého balení.
+            </p>
+          </div>
+        );
+      })()}
+
       {items.some(i => i.approved === false) && (
         <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
           <p className="font-semibold text-sm text-[#16181A]">📥 Nové věci od týmu ({items.filter(i => i.approved === false).length})</p>
