@@ -16,6 +16,7 @@ import {
 import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import StocktakeModal from '../inventory/Stocktake';
+import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 
 interface Item {
@@ -862,26 +863,14 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             <div className="p-6 space-y-4">
               {/* Druhá strana provázání: co se z týhle položky na kase prodává.
                   Bez toho člověk mění gramáž nebo cenu naslepo. */}
-              {editing && (posUsage[String(editing.id)]?.length ?? 0) > 0 && (
-                <div className="rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#5B7A08] mb-1.5">
-                    Používá se v kase ({posUsage[String(editing.id)].length}×)
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {posUsage[String(editing.id)].map(p => (
-                      <button key={p.productId} type="button"
-                        onClick={() => { setShowForm(false); onNavigate?.('recipes', p.productId); }}
-                        title="Otevřít recepturu"
-                        className="rounded-full bg-white/70 hover:bg-white border border-black/[0.06] px-3 py-1.5 text-xs text-[#16181A] transition active:scale-95">
-                        {p.productName ?? p.productId}
-                        <span className="text-black/40"> · {p.amount} {editing.contentUnit ?? editing.unit}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-black/45 mt-1.5">
-                    Změna velikosti balení nebo ceny se propíše do marží těchhle položek.
-                  </p>
-                </div>
+              {editing && (
+                <ItemRecipeLinks
+                  item={{ id: editing.id, name: editing.name }}
+                  links={posUsage[String(editing.id)] ?? []}
+                  unitLabel={editing.contentUnit ?? editing.unit}
+                  onChanged={next => setPosUsage(u => ({ ...u, [String(editing.id)]: next }))}
+                  onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
+                />
               )}
               {/* Section: základ */}
               <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">

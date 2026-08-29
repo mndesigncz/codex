@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import ItemInlineEdit from './ItemInlineEdit';
+import NewIngredientInline from './NewIngredientInline';
 
 const inputCls =
   'rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -66,6 +67,8 @@ export default function RecipesView({ openProductId, onNavigate }: {
   const [recipes, setRecipes] = useState<any[]>([]);
   const [unmapped, setUnmapped] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
+  // Kategorie skladu (ne menu) — potřebné, když se surovina zakládá odsud.
+  const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
   const [cat, setCat] = useState('Vše');
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
@@ -78,10 +81,16 @@ export default function RecipesView({ openProductId, onNavigate }: {
 
   const load = async () => {
     try {
-      const [d, inv] = await Promise.all([
+      const [d, inv, cats] = await Promise.all([
         fetch('/api/pos/products').then(r => r.json()),
         fetch('/api/inventory').then(r => r.json()).catch(() => []),
+        fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
       ]);
+      setStockCategories(
+        Array.isArray(cats)
+          ? cats.map((c: any) => ({ id: Number(c.id), name: String(c.name) }))
+          : [],
+      );
       setConnected(!!d.connected);
       setProducts(Array.isArray(d.products) ? d.products : []);
       setRecipes(Array.isArray(d.recipes) ? d.recipes : []);
@@ -276,8 +285,9 @@ export default function RecipesView({ openProductId, onNavigate }: {
         <RecipeEditor
           draft={draft} items={items} itemById={itemById} money={money}
           setIng={setIng} setDraft={setDraft} save={save} saving={saving} yieldOf={yieldOf}
-          recipes={recipes} products={products}
+          recipes={recipes} products={products} categories={stockCategories}
           onItemSaved={(patched) => setItems(list => list.map(i => i.id === patched.id ? { ...i, ...patched } : i))}
+          onItemCreated={(created) => setItems(list => [...list, created])}
         />
       ) : (
         <>
@@ -409,17 +419,21 @@ export default function RecipesView({ openProductId, onNavigate }: {
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, recipes, products, onItemSaved }: {
+function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, recipes, products, categories, onItemSaved, onItemCreated }: {
   draft: Draft; items: any[]; itemById: Map<string, any>; money: (n: number) => string;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   save: () => void; saving: boolean;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
-  recipes: any[]; products: any[];
+  recipes: any[]; products: any[]; categories: { id: number; name: string }[];
   onItemSaved: (item: any) => void;
+  onItemCreated: (item: any) => void;
 }) {
   // Která surovina se zrovna upravuje „na místě" — bez odcházení do skladu.
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  // Zakládání nové suroviny: index řádku, do kterého se má vložit, nebo -1 pro
+  // nový řádek na konci.
+  const [creatingAt, setCreatingAt] = useState<number | null>(null);
 
   const nameOfProduct = (r: any) =>
     products.find(p => p.productId === r.productId)?.name ?? r.productName ?? r.productId;
@@ -451,18 +465,34 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
     return sum + (y?.perPortion ?? 0);
   }, 0);
 
+  const menuPrice = products.find(p => p.productId === draft.productId)?.price ?? null;
+  const marginPct = menuPrice != null && menuPrice > 0 && totalCost > 0
+    ? Math.round(((menuPrice - totalCost) / menuPrice) * 100) : null;
+  const ready = draft.ingredients.filter(i => i.itemId && num(i.amount) > 0).length;
+
   return (
-    <div className="glass-card p-5 space-y-4 max-w-2xl rise-in">
+    <div className="space-y-4 rise-in">
       <div className="flex items-center gap-2">
         <button onClick={() => setDraft(null)}
           className="rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black transition">← Zpět</button>
-        <p className="font-bold text-[#16181A] truncate flex-1 min-w-0">{draft.productName}</p>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{draft.productName}</h2>
+          <p className="text-xs text-black/45">
+            {ready === 0 ? 'Zatím bez surovin' : `${ready} ${ready === 1 ? 'surovina' : ready < 5 ? 'suroviny' : 'surovin'} v receptuře`}
+            {menuPrice != null && <span> · v kase za {money(menuPrice)}</span>}
+          </p>
+        </div>
       </div>
+
+      {/* Práce je vlevo, čísla vpravo. Editor dřív seděl v úzkém sloupci
+          uprostřed a půlka obrazovky zůstala prázdná. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 items-start">
+      <div className="glass-card p-5 space-y-4">
 
       {/* Nápoje se liší jedním sirupem. Opisovat kvůli tomu celou recepturu
           znovu je práce navíc, kterou nikdo neudělá — a produkt zůstane bez
           receptury. */}
-      {copyable.length > 0 && (
+      {copyable.length > 0 && draft.ingredients.every(i => !i.itemId) && (
         <label className="flex flex-wrap items-center gap-2 text-xs text-black/50">
           <span className="font-semibold">Převzít z jiné položky:</span>
           <select value="" onChange={e => copyFrom(e.target.value)}
@@ -486,13 +516,13 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
           const y = item ? yieldOf(item, num(ing.amount) * conv) : null;
           return (
             <div key={idx} className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 justify-start">
                 <select value={ing.itemId}
                   onChange={e => {
                     const next = itemById.get(e.target.value);
                     setIng(idx, { itemId: e.target.value, unit: UNITS[familyOf(next)][0].label });
                   }}
-                  className={`${inputCls} flex-1 min-w-[160px]`}>
+                  className={`${inputCls} flex-1 min-w-[180px] max-w-[26rem]`}>
                   <option value="">— vyber ze skladu —</option>
                   {items.map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
                 </select>
@@ -567,34 +597,98 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
         })}
       </div>
 
-      <button type="button"
-        onClick={() => setDraft(d => d && ({ ...d, ingredients: [...d.ingredients, { itemId: '', amount: '', unit: 'ks' }] }))}
-        className="rounded-full glass px-4 py-2 text-sm font-semibold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1.5">
-        <Icon name="plus" size={15} /> Další surovina
-      </button>
-
-      {totalCost > 0 && (
-        <div className="rounded-2xl bg-[#C8F542]/[0.1] border border-[#C8F542]/25 px-4 py-3">
-          <p className="text-sm text-[#5B7A08]">
-            <span className="font-bold">Suroviny na jednu porci: {money(totalCost)}</span>
-            <span className="text-black/45"> — podle cen ve skladu.</span>
-          </p>
+      {/* Surovina, kterou sklad ještě nezná, se dá založit rovnou tady —
+          jinak se pro ni odchází jinam a receptura zůstane nedodělaná. */}
+      {creatingAt != null ? (
+        <NewIngredientInline
+          categories={categories}
+          onCancel={() => setCreatingAt(null)}
+          onCreated={(created) => {
+            onItemCreated(created);
+            const fam = familyOf(created);
+            const row = { itemId: String(created.id), amount: '', unit: UNITS[fam][0].label };
+            setDraft(d => {
+              if (!d) return d;
+              const next = [...d.ingredients];
+              // Prázdný řádek, ze kterého se zakládalo, se surovinou nahradíme;
+              // jinak ji přidáme na konec.
+              if (creatingAt >= 0 && next[creatingAt] && !next[creatingAt].itemId) next[creatingAt] = row;
+              else next.push(row);
+              return { ...d, ingredients: next };
+            });
+            setCreatingAt(null);
+          }}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button"
+            onClick={() => setDraft(d => d && ({ ...d, ingredients: [...d.ingredients, { itemId: '', amount: '', unit: 'ks' }] }))}
+            className="rounded-full glass px-4 py-2 text-sm font-semibold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1.5">
+            <Icon name="plus" size={15} /> Další surovina
+          </button>
+          <button type="button" onClick={() => setCreatingAt(draft.ingredients.findIndex(i => !i.itemId))}
+            className="rounded-full glass px-4 py-2 text-sm font-semibold text-black/55 hover:text-black transition inline-flex items-center gap-1.5">
+            <Icon name="box" size={15} /> Založit novou surovinu
+          </button>
         </div>
       )}
+      </div>
 
-      <div className="flex items-center gap-2">
-        <button onClick={save} disabled={saving}
-          className="rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
-          {saving ? 'Ukládám…' : 'Uložit recepturu'}
-        </button>
-        {draft.existing && (
-          <button
-            onClick={() => { setDraft(d => d && ({ ...d, ingredients: [] })); setTimeout(save, 0); }}
-            disabled={saving}
-            className="rounded-full glass px-5 py-3 text-sm font-semibold text-black/50 hover:text-red-600 transition">
-            Smazat recepturu
-          </button>
+      {/* Souhrn: co to stojí, co z toho zbude, a uložení na dosah. */}
+      <aside className="glass-card p-5 space-y-4 lg:sticky lg:top-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-black/45">Suroviny na porci</p>
+          <p className="text-2xl font-bold tracking-tight text-[#16181A] tabular">
+            {totalCost > 0 ? money(totalCost) : '—'}
+          </p>
+          <p className="text-[11px] text-black/40">
+            {totalCost > 0 ? 'podle cen ve skladu' : 'doplň množství a ceny balení'}
+          </p>
+        </div>
+
+        {menuPrice != null && (
+          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 space-y-1">
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="text-black/50">Cena v kase</span>
+              <span className="font-semibold tabular text-[#16181A]">{money(menuPrice)}</span>
+            </div>
+            {marginPct != null && (
+              <>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="text-black/50">Zbyde na porci</span>
+                  <span className="font-semibold tabular text-[#16181A]">{money(menuPrice - totalCost)}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1.5">
+                  <div className={`h-full rounded-full ${marginPct >= 65 ? 'bg-[#C8F542]' : marginPct >= 45 ? 'bg-amber-400' : 'bg-red-400'}`}
+                    style={{ width: `${Math.max(0, Math.min(100, marginPct))}%` }} />
+                </div>
+                <p className={`text-[11px] font-semibold ${marginPct >= 65 ? 'text-[#5B7A08]' : marginPct >= 45 ? 'text-amber-700' : 'text-red-600'}`}>
+                  marže {marginPct} %
+                </p>
+              </>
+            )}
+          </div>
         )}
+
+        <div className="space-y-2">
+          <button onClick={save} disabled={saving}
+            className="w-full rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+            {saving ? 'Ukládám…' : 'Uložit recepturu'}
+          </button>
+          {draft.existing && (
+            <button
+              onClick={() => { setDraft(d => d && ({ ...d, ingredients: [] })); setTimeout(save, 0); }}
+              disabled={saving}
+              className="w-full rounded-full glass px-5 py-2.5 text-sm font-semibold text-black/50 hover:text-red-600 transition">
+              Smazat recepturu
+            </button>
+          )}
+        </div>
+
+        <p className="text-[11px] text-black/40 leading-relaxed">
+          Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.
+        </p>
+      </aside>
       </div>
     </div>
   );
