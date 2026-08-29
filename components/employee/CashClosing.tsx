@@ -278,6 +278,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [selEmployee, setSelEmployee] = useState<number | null>(null);
   const [requiresShift, setRequiresShift] = useState(true);
   const [eligible, setEligible] = useState<EligibleShift[]>([]);
+  // Which shift this closing is for — matters on a day somebody worked twice.
+  const [pickedShiftId, setPickedShiftId] = useState<number | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [meId, setMeId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -432,6 +434,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
   const pickShift = (s: EligibleShift) => {
     setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
+    setPickedShiftId(s.id);
     if (isKiosk) setSelEmployee(s.employeeId ?? null);
   };
 
@@ -529,6 +532,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: form.date, shiftLabel: form.shiftLabel,
+          shiftId: pickedShiftId ?? undefined,
           openingCash: n(form.openingCash), cashRevenue: n(form.cashRevenue), cardRevenue: n(form.cardRevenue),
           tips: n(form.tips), expenses: effExpenses, cashRemoved: effRemoved,
           selfPayout: effPayout, closingCash: n(form.closingCash),
@@ -550,6 +554,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         const forCoworkers = includedCoworkers.length > 0 ? ' (i za kolegy)' : '';
         setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
         setForm(emptyForm());
+        setPickedShiftId(null);
         setCoworkerSel({});
         setDenoms({});
         setLeaveCash('');

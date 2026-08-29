@@ -117,7 +117,7 @@ export async function GET() {
   let eligibleShifts: any[] = [];
   const today = pragueToday();
   if (c.role === 'kiosk') {
-    const cutoff = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
+    const cutoff = pragueToday(-3);
     try {
       eligibleShifts = await sql`
         SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type,
@@ -129,6 +129,7 @@ export async function GET() {
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
             WHERE cc.team_id = ${c.teamId} AND cc.date = s.date
+              AND (cc.shift_id = s.id OR cc.shift_id IS NULL)
               AND (cc.created_by = s.employee_id OR cc.shift_employees @> to_jsonb(s.employee_id))
           )
         ORDER BY s.date DESC, s.start_time ASC`;
@@ -149,7 +150,7 @@ export async function GET() {
       } catch { /* shifts table issue — leave empty */ }
     }
   } else if (c.role !== 'employer') {
-    const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0];
+    const cutoff = pragueToday(-14);
     try {
       eligibleShifts = await sql`
         SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type
@@ -159,9 +160,10 @@ export async function GET() {
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
             WHERE cc.team_id = ${c.teamId} AND cc.date = s.date
-              AND (cc.created_by = s.employee_id OR cc.shift_employees @> to_jsonb(s.employee_id))
+              AND (cc.shift_id = s.id OR cc.shift_id IS NULL)
+              AND (cc.created_by = ${c.meId} OR cc.shift_employees @> to_jsonb(${c.meId}::int))
           )
-        ORDER BY s.date DESC`;
+        ORDER BY s.date DESC, s.start_time ASC`;
     } catch {
       try {
         eligibleShifts = await sql`
@@ -194,7 +196,7 @@ export async function GET() {
     } catch { /* ignore */ }
 
     try {
-      const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      const cutoff = pragueToday(-30);
       const sched = await sql`
         SELECT DISTINCT s.date, u.id, u.name, u.avatar
         FROM shifts s JOIN users u ON u.id = s.employee_id
@@ -289,10 +291,23 @@ export async function POST(request: Request) {
   // the shift started yesterday — the closing follows the shift, not the clock.
   const dateExplicit = typeof b.date === 'string' && !!b.date;
   let shiftDate = date;
-  let [shift] = await sql`
-    SELECT id, start_time, end_time FROM shifts
-    WHERE employee_id = ${actorId} AND date = ${date}
-    ORDER BY start_time ASC LIMIT 1`;
+  // Somebody who worked twice that day says WHICH shift they are closing;
+  // without that we would always resolve to the first one and the second
+  // closing would look like a duplicate of the first.
+  const pickedShiftId = parseInt(b.shiftId);
+  let shift: any = null;
+  if (Number.isFinite(pickedShiftId)) {
+    const [picked] = await sql`
+      SELECT id, start_time, end_time FROM shifts
+      WHERE id = ${pickedShiftId} AND employee_id = ${actorId} AND date = ${date}`;
+    if (picked) shift = picked;
+  }
+  if (!shift) {
+    [shift] = await sql`
+      SELECT id, start_time, end_time FROM shifts
+      WHERE employee_id = ${actorId} AND date = ${date}
+      ORDER BY start_time ASC LIMIT 1`;
+  }
   if (!shift && !dateExplicit) {
     const prev = dayPlus(date, -1);
     try {
