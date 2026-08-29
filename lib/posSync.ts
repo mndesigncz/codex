@@ -14,9 +14,11 @@ function consume(qty: number, open: number, pkg: number, amount: number) {
     open -= amount;
     while (open < 0 && qty > 0) { qty -= 1; open += pkg; }
     if (open < 0) open = 0;
-    open = Math.round(open * 10) / 10;
+    // Three decimals: a 0,7 l bottle minus 0,02 l has to stay 0,68 — rounding
+    // to a tenth here would give the shop back 0,02 l on every drink.
+    open = Math.round(open * 1000) / 1000;
   } else {
-    qty = Math.max(0, Math.round((qty - amount) * 10) / 10);
+    qty = Math.max(0, Math.round((qty - amount) * 1000) / 1000);
   }
   return { qty, open };
 }
@@ -104,7 +106,10 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const deducted: { name: string; amount: number }[] = [];
   const writes: any[] = [];
   for (const [itemId, rawAmount] of Array.from(totals.entries())) {
-    const amount = Math.round(rawAmount * 10) / 10;
+    // Millilitre / gram precision. One decimal used to be enough for „150 ml
+    // z lahve", but a cocktail takes 0,02 l of vodka — that rounded to 0.0 and
+    // the sale was silently written off as nothing at all.
+    const amount = Math.round(rawAmount * 1000) / 1000;
     if (!(amount > 0)) continue;
     const [it] = await sql`
       SELECT id, name, quantity, open_amount, package_size

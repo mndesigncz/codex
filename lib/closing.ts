@@ -24,6 +24,10 @@ export interface Closing {
   // Whether cash tips physically stayed in the drawer. null/undefined ⇒ false
   // (legacy behaviour: tips were set aside, so they never counted).
   tips_in_drawer?: boolean | null;
+  /** The card half of `tips` — it never reaches the drawer, whatever the
+   *  tips_in_drawer setting says. Counting it invented a manko the size of the
+   *  card tips. */
+  tips_card?: number | null;
   created_at?: string;
   author_name?: string | null;
   author_avatar?: string | null;
@@ -159,6 +163,7 @@ export type ExpectedInput = {
   cash_removed: number;
   self_payout: number;
   tips?: number;
+  tips_card?: number | null;
   payout_from_register?: boolean | null;
   tips_in_drawer?: boolean | null;
 };
@@ -185,7 +190,9 @@ export type ExpectedInput = {
  */
 export function expectedCash(c: ExpectedInput): number {
   const payout = c.payout_from_register === false ? 0 : c.self_payout;
-  const tips = c.tips_in_drawer === true ? c.tips ?? 0 : 0;
+  // Only cash tips can be in the drawer; the card half never was.
+  const cashTips = Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0));
+  const tips = c.tips_in_drawer === true ? cashTips : 0;
   return c.opening_cash + c.cash_revenue + tips - c.expenses - c.cash_removed - payout;
 }
 
@@ -212,11 +219,12 @@ export type ExpectedLine = { label: string; amount: number; sign: 1 | -1 };
 // framing lines always show; the rest only when they actually moved money.
 export function expectedCashLines(c: ExpectedInput, opts?: { payoutLabel?: string }): ExpectedLine[] {
   const payout = c.payout_from_register === false ? 0 : c.self_payout;
-  const tips = c.tips_in_drawer === true ? c.tips ?? 0 : 0;
+  const cashTips = Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0));
+  const tips = c.tips_in_drawer === true ? cashTips : 0;
   const lines: ExpectedLine[] = [
     { label: 'Kasa na začátku', amount: c.opening_cash, sign: 1 },
     { label: 'Tržba hotově', amount: c.cash_revenue, sign: 1 },
-    { label: 'Spropitné v kase', amount: tips, sign: 1 },
+    { label: 'Spropitné hotově v kase', amount: tips, sign: 1 },
     { label: 'Výdaje z kasy', amount: c.expenses, sign: -1 },
     { label: 'Odloženo ven', amount: c.cash_removed, sign: -1 },
     { label: opts?.payoutLabel ?? 'Moje výplata', amount: payout, sign: -1 },
