@@ -6,6 +6,7 @@ import { PLAN_FEATURES, PRO_PRICE, planInfoOf, planLabel, czDays, type PlanInfo 
 import { Icon } from './Icons';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
+import { dbTimeDayHM } from '@/lib/pragueTime';
 
 type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos';
 
@@ -746,7 +747,7 @@ export default function Settings({ user, initialTab }: Props) {
                           {e.detail && <span className="text-black/50"> — {e.detail}</span>}
                         </p>
                         <p className="text-[11px] text-black/35 tabular-nums">
-                          {new Date(e.createdAt).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {dbTimeDayHM(e.createdAt)}
                         </p>
                       </div>
                     </div>

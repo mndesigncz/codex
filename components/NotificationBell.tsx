@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
+import { dbTimeDayHM } from '@/lib/pragueTime';
 
 interface Notif {
   id: number;
@@ -146,7 +147,7 @@ export default function NotificationBell() {
                   <p className="text-sm font-semibold text-[#16181A] truncate">{n.title}</p>
                   {n.body && <p className="text-xs text-black/50 mt-0.5 line-clamp-2">{n.body}</p>}
                   <p className="text-[11px] text-black/35 mt-1">
-                    {new Date(n.created_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {dbTimeDayHM(n.created_at)}
                   </p>
                 </div>
                 {!n.is_read && <span className="mt-1.5 h-2 w-2 rounded-full bg-[#C8F542] flex-shrink-0" />}

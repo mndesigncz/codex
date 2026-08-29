@@ -68,7 +68,8 @@ function KioskShell({ user }: { user: KioskUser }) {
 
   // Dokud se neozve prohlížeč, držíme místo zástupným znakem — jinak by se
   // serverový a klientský čas rozešly a React by překreslil celou obrazovku.
-  const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : '—:—';
+  // Hodiny na kiosku ukazují pražský čas i na tabletu nastaveném jinam.
+  const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
   const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
 
   return (

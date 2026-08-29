@@ -79,3 +79,36 @@ export function dayPlus(dateStr: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * Čas z databáze na Date, který v prohlížeči ukáže správnou hodinu.
+ *
+ * Sloupce typu TIMESTAMP nesou UTC, ale bez značky zóny — Postgres je posílá
+ * jako "2026-08-29 22:22:01.77". `new Date()` takový tvar bere jako MÍSTNÍ čas,
+ * takže se v Praze v létě zobrazil o dvě hodiny dřív: příchod ve tři čtvrtě na
+ * jedenáct večer se ukázal jako tři čtvrtě na devět. Tady se chybějící zóna
+ * doplní; hodnoty, které zónu už mají (ISO s Z nebo +02:00) i hotová Date
+ * projdou beze změny, takže se nedá „opravit" dvakrát.
+ */
+export function parseDbTime(v: string | Date | null | undefined): Date | null {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  const raw = String(v).trim();
+  const hasZone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(raw);
+  const d = new Date(hasZone ? raw : raw.replace(' ', 'T') + 'Z');
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Pražské "HH:MM" z databázového času. '—' pro nečitelnou hodnotu. */
+export function dbTimeHM(v: string | Date | null | undefined): string {
+  const d = parseDbTime(v);
+  return d ? d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+/** Pražské "d. M. HH:MM" z databázového času. */
+export function dbTimeDayHM(v: string | Date | null | undefined): string {
+  const d = parseDbTime(v);
+  return d ? d.toLocaleString('cs-CZ', {
+    timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit',
+  }) : '—';
+}

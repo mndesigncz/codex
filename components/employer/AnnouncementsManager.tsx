@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
+import { dbTimeDayHM } from '@/lib/pragueTime';
 
 interface Announcement {
   id: number;
@@ -13,14 +14,7 @@ interface Announcement {
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleString('cs-CZ', {
-    day: 'numeric',
-    month: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return dbTimeDayHM(iso);
 }
 
 export default function AnnouncementsManager() {

@@ -6,12 +6,12 @@ import { PersonLink } from './ProfileLinkProvider';
 import { usePlan, UpgradeModal, ProBadge } from '../Pro';
 import {
   Closing, ShiftPerson, expectedCash, expectedCashLines, cashDifference,
-  cashLeft,
-  MOVEMENT_KINDS, movementLabel, diffReasonLabel, hasDenominations,
+  cashLeft, diffReasonLabel,
 } from '@/lib/closing';
 import { useMoney, useCurrency } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
 import ClosingsCalendar from './ClosingsCalendar';
+import ClosingDetail from './ClosingDetail';
 import { pragueDaySafe } from '@/lib/pragueTime';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
@@ -58,7 +58,8 @@ export default function ClosingsOverview() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [creatingDate, setCreatingDate] = useState<string | undefined>(undefined);
-  const [openId, setOpenId] = useState<number | null>(null);
+  // Rozklik uzávěrky otevře plný detail — do řádku se toho vejde jen zlomek.
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [approving, setApproving] = useState<number | null>(null);
   const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
@@ -151,34 +152,6 @@ export default function ClosingsOverview() {
   const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
   // One file the accountant can work with: per-day rows + the month's summary.
-  // One printable A5-ish sheet per closing — window.print into PDF/paper.
-  const printClosing = (c: ClosingRow) => {
-    const lines = expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' });
-    const d = cashDifference(c);
-    const w = window.open('', '_blank', 'width=640,height=800');
-    if (!w) return;
-    const row = (label: string, val: string, strong = false) =>
-      `<tr><td style="padding:6px 0;color:#555;">${label}</td><td style="text-align:right;${strong ? 'font-weight:700;' : ''}">${val}</td></tr>`;
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Uzávěrka ${c.date}</title></head>
-      <body style="font-family:-apple-system,sans-serif;max-width:420px;margin:24px auto;color:#16181A;">
-        <h2 style="margin:0 0 2px;">Uzávěrka — ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
-        <p style="margin:0 0 16px;color:#777;">${c.shift_label ?? ''} · vyplnil/a ${c.author_name ?? '—'}</p>
-        <table style="width:100%;border-collapse:collapse;font-size:15px;">
-          ${lines.map(l => row(l.label, `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
-          ${row('Očekávaný stav kasy', money(expectedCash(c)), true)}
-          ${row('Skutečný stav kasy', money(c.closing_cash), true)}
-          ${row(d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko', (d > 0 ? '+' : '') + money(d), true)}
-          ${Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('V kase zůstalo', money(cashLeft(c))) : ''}
-          ${row('Tržba kartou', money(c.card_revenue))}
-          ${row('Spropitné', money(c.tips))}
-          ${row('Zákazníků', String(c.customers))}
-        </table>
-        ${c.notes ? `<p style="margin-top:16px;font-size:14px;color:#555;">Poznámka: ${String(c.notes).replace(/</g, '&lt;')}</p>` : ''}
-        <p style="margin-top:24px;font-size:12px;color:#999;">Vytištěno z aplikace Managero · ${new Date().toLocaleString('cs-CZ')}</p>
-        <script>window.onload = () => window.print();</scr` + `ipt>
-      </body></html>`);
-    w.document.close();
-  };
 
   const exportAccountant = () => {
     if (!pro) { setUpgradeFor('Export pro účetní'); return; }
@@ -530,6 +503,10 @@ export default function ClosingsOverview() {
       )}
 
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
+      {detailId != null && (
+        <ClosingDetail id={detailId} payDailyCash={payDailyCash}
+          onClose={() => setDetailId(null)} onChanged={load} />
+      )}
 
       {analyticsOpen && pro && posInsights && (
         <div className="glass-card p-5 sm:p-6">
@@ -814,7 +791,7 @@ export default function ClosingsOverview() {
             const d = cashDifference(c);
             const expected = expectedCash(c);
             const lines = expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' });
-            const open = openId === c.id;
+
             const covered = coveredBy(c.id);
             // The closing belongs to the whole shift; the author only filled it in.
             const crew = crewOf(c);
@@ -827,7 +804,8 @@ export default function ClosingsOverview() {
             for (const p of scheduled) if (!roster.some(r => r.id === p.id)) roster.push(p);
             return (
               <div key={c.id} className="glass-card overflow-hidden">
-                <button onClick={() => setOpenId(open ? null : c.id)} className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] transition-colors">
+                <button onClick={() => setDetailId(c.id)} aria-label="Otevřít detail uzávěrky"
+                  className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] active:bg-black/[0.04] transition-colors">
                   <div className="min-w-0 flex items-center gap-3">
                     <PersonLink id={c.created_by} className="text-lg flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</PersonLink>
                     <div className="min-w-0">
@@ -862,149 +840,10 @@ export default function ClosingsOverview() {
                         <span className="hidden sm:inline font-normal opacity-75"> · {diffReasonLabel(c.diff_reason)}</span>
                       )}
                     </span>
-                    <Icon name="chevron" size={16} className={`text-black/35 transition-transform ${open ? 'rotate-180' : ''}`} />
+                    <Icon name="chevron" size={16} className="text-black/35 -rotate-90" />
                   </div>
                 </button>
 
-                {open && (
-                  <div className="px-5 pb-5 space-y-4 border-t border-black/[0.06]">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 text-sm">
-                      {[
-                        ['Kasa na začátku', c.opening_cash],
-                        ['Tržba hotově', c.cash_revenue],
-                        ['Tržba kartou', c.card_revenue],
-                        ['Spropitné', c.tips],
-                        ['Výdaje z kasy', c.expenses],
-                        ['Odloženo ven', c.cash_removed],
-                        ...(payDailyCash ? [['Výplata zaměstnance', c.self_payout] as [string, number]] : []),
-                        ['Zákazníků', c.customers],
-                      ].map(([label, val]) => (
-                        <div key={label as string} className="min-w-0">
-                          <span className="block text-black/40 text-xs truncate">{label}</span>
-                          <p className="font-semibold text-[#16181A] tabular-nums truncate">{label === 'Zákazníků' ? val : money(val as number)}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 space-y-2 text-sm">
-                      {/* Where the expectation comes from, line by line. */}
-                      <div className="space-y-1 pb-1">
-                        {lines.map(l => (
-                          <div key={l.label} className="flex justify-between gap-3 text-[13px]">
-                            <span className="text-black/45 min-w-0 truncate">{l.label}</span>
-                            <span className="text-black/60 shrink-0 whitespace-nowrap tabular-nums">{l.sign < 0 ? '− ' : '+ '}{money(l.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex justify-between gap-3 border-t border-black/[0.07] pt-2"><span className="text-black/55 min-w-0">Očekávaný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(expected)}</span></div>
-                      <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Skutečný stav kasy</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(c.closing_cash)}</span></div>
-                      {(Number(c.final_removal) || 0) > 0 && (
-                        <>
-                          <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">Odvod na konci směny</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">− {money(Number(c.final_removal))}</span></div>
-                          <div className="flex justify-between gap-3"><span className="text-black/55 min-w-0">V kase zůstalo na další směnu</span><span className="font-semibold text-[#16181A] shrink-0 whitespace-nowrap tabular-nums">{money(cashLeft(c))}</span></div>
-                        </>
-                      )}
-                      <div className={`flex justify-between gap-3 rounded-xl px-3 py-2 ${d === 0 ? 'bg-[#C8F542]/10 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
-                        <span className="font-medium min-w-0">{d === 0 ? 'Kasa sedí' : d > 0 ? 'Přebytek' : 'Manko'}</span>
-                        <span className="font-bold shrink-0 whitespace-nowrap tabular-nums">{d > 0 ? '+' : ''}{money(d)}</span>
-                      </div>
-                    </div>
-
-                    <button onClick={() => printClosing(c)}
-                      className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-medium hover:bg-black/[0.05] transition">
-                      🖨 Vytisknout uzávěrku
-                    </button>
-
-                    {/* Itemised movements — what exactly left the drawer and why. */}
-                    {(c.movements?.length ?? 0) > 0 && (
-                      <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-1.5">Pohyby v kase</p>
-                        <div className="divide-y divide-black/[0.06]">
-                          {c.movements!.map((m, i) => {
-                            const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
-                            return (
-                              <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
-                                <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
-                                <span className="min-w-0 flex-1 truncate text-black/55">{m.note || '—'}</span>
-                                <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* How the drawer was actually counted — banknote by banknote. */}
-                    {hasDenominations(c.denominations) && (
-                      <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Kasa napočítaná po bankovkách</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(c.denominations!)
-                            .sort((a, b) => Number(b[0]) - Number(a[0]))
-                            .map(([denom, count]) => (
-                              <span key={denom} className="rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
-                                <strong>{count}×</strong> {Number(denom).toLocaleString('cs-CZ')}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Why it didn't match, in the closer's words. */}
-                    {(c.diff_reason || c.diff_note) && (
-                      <div className="rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-1">Proč kasa nesedí</p>
-                        {c.diff_reason && <p className="text-sm font-medium text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
-                        {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
-                      </div>
-                    )}
-                    {covered.length > 0 && (
-                      <div className="rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/30 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-[#5B7A08] mb-2 flex items-center gap-1.5">
-                          <Icon name="users" size={14} /> Uzávěrka i za
-                        </p>
-                        <div className="space-y-1.5">
-                          {covered.map(cv => (
-                            <div key={cv.id} className="flex items-center justify-between gap-3 text-sm">
-                              <PersonLink id={cv.created_by} className="flex items-center gap-2 min-w-0">
-                                <span className="text-base shrink-0">{cv.author_avatar ?? '👤'}</span>
-                                <span className="font-medium text-[#16181A] truncate">{cv.author_name ?? 'Neznámý'}</span>
-                              </PersonLink>
-                              {payDailyCash && cv.self_payout > 0 && (
-                                <span className="shrink-0 text-black/55 tabular-nums whitespace-nowrap">Výplata {money(cv.self_payout)}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {roster.length > 0 && (
-                      <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
-                          <Icon name="users" size={14} /> Směna ten den
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {roster.map(p => {
-                            const has = coveredIds.has(p.id);
-                            const isAuthor = p.id === c.created_by;
-                            return (
-                              <PersonLink key={p.id} id={p.id}
-                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${has ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
-                                <span>{p.avatar ?? '👤'}</span> {p.name}
-                                {isAuthor && <span className="opacity-70">· vyplnil/a</span>}
-                                {has ? ' ✓' : ' — chybí'}
-                              </PersonLink>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3">{c.notes}</p>}
-                    <button onClick={() => remove(c)} disabled={deleting === c.id}
-                      className="text-sm text-red-600 hover:bg-red-500/[0.06] rounded-full px-4 py-2 font-medium transition-colors disabled:opacity-50">
-                      {deleting === c.id ? 'Mažu…' : 'Smazat uzávěrku'}
-                    </button>
-                  </div>
-                )}
               </div>
             );
           })}

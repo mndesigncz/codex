@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
+import { dbTimeHM } from '@/lib/pragueTime';
 
 type Note = { tone: 'good' | 'warn' | 'info'; title: string; text: string };
 type Day = {
@@ -99,7 +100,7 @@ export default function LiveRevenue() {
           </h3>
           <p className="text-[11px] text-black/40">
             {from === to ? csDate(from) : `${csDate(from)} – ${csDate(to)}`}
-            {d?.lastSyncAt && <span> · naposledy synchronizováno {new Date(d.lastSyncAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span>}
+            {d?.lastSyncAt && <span> · naposledy synchronizováno {dbTimeHM(d.lastSyncAt)}</span>}
           </p>
         </div>
         <button onClick={load} disabled={loading}
