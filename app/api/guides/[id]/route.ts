@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { normalizeSteps } from '@/lib/guideSteps';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -17,28 +18,17 @@ async function ctx() {
   return { meId, role, teamId: u?.team_id ?? null };
 }
 
-// Parse a stored checklist (JSONB may arrive as array or string) into string[].
-function parseChecklist(raw: any): string[] {
+// Uložený checklist (JSONB dorazí jako pole i jako řetězec) na kroky návodu.
+// Krok může nést surovinu s množstvím; staré pole řetězců projde beze změny.
+function parseChecklist(raw: any) {
   let arr: any = raw;
   if (typeof raw === 'string') {
-    try {
-      arr = JSON.parse(raw);
-    } catch {
-      arr = [];
-    }
+    try { arr = JSON.parse(raw); } catch { arr = []; }
   }
-  if (!Array.isArray(arr)) return [];
-  return arr.map((s) => String(s ?? '')).filter((s) => s.trim().length > 0);
+  return normalizeSteps(arr);
 }
 
-// Normalize an incoming checklist into a clean string[] of step texts.
-function normalizeChecklist(input: any): string[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((s) => String(s ?? '').trim())
-    .filter((s) => s.length > 0)
-    .slice(0, 100);
-}
+const normalizeChecklist = normalizeSteps;
 
 // GET — single guide full content (team members only)
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -46,11 +36,22 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
   const id = parseInt(params.id);
-  const [g] = await sql`
-    SELECT g.id, g.title, g.content, g.checklist, g.category_id, g.updated_at, g.created_at, u.name AS author
-    FROM guides g
-    LEFT JOIN users u ON u.id = g.created_by
-    WHERE g.id = ${id} AND g.team_id = ${c.teamId}`;
+  let g: any;
+  try {
+    [g] = await sql`
+      SELECT g.id, g.title, g.content, g.checklist, g.category_id, g.updated_at, g.created_at,
+             g.product_id, g.product_name, u.name AS author
+      FROM guides g
+      LEFT JOIN users u ON u.id = g.created_by
+      WHERE g.id = ${id} AND g.team_id = ${c.teamId}`;
+  } catch {
+    // Vazba na produkt je novější sloupec — bez migrace se návod přečte i tak.
+    [g] = await sql`
+      SELECT g.id, g.title, g.content, g.checklist, g.category_id, g.updated_at, g.created_at, u.name AS author
+      FROM guides g
+      LEFT JOIN users u ON u.id = g.created_by
+      WHERE g.id = ${id} AND g.team_id = ${c.teamId}`;
+  }
 
   if (!g) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
 
@@ -64,6 +65,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       updatedAt: g.updated_at,
       createdAt: g.created_at,
       author: g.author,
+      productId: g.product_id ?? null,
+      productName: g.product_name ?? null,
     },
   });
 }
@@ -125,6 +128,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
   const { title, content, categoryId, checklist } = body;
+  const hasProduct = Object.prototype.hasOwnProperty.call(body, 'productId');
+  const productId = body.productId ? String(body.productId).trim().slice(0, 120) : null;
+  const productName = body.productName ? String(body.productName).trim().slice(0, 160) : null;
 
   const nextTitle = title !== undefined && String(title).trim() ? String(title).trim() : null;
   const nextContent = content !== undefined ? content : null;
@@ -147,6 +153,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       updated_at = NOW()
     WHERE id = ${id} AND team_id = ${c.teamId}
     RETURNING id, title, content, checklist, category_id, updated_at`;
+
+  if (hasProduct) {
+    try {
+      await sql`UPDATE guides SET product_id = ${productId}, product_name = ${productName} WHERE id = ${id}`;
+    } catch { /* sloupce ještě nejsou — vazba se prostě neuloží */ }
+  }
 
   return NextResponse.json({
     guide: {

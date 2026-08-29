@@ -765,6 +765,11 @@ export async function GET() {
       )`;
     // guides that every employee must read, with read receipts
     await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS require_read BOOLEAN DEFAULT FALSE`;
+    // Návod patří k položce v kase: „takhle se dělá Blue Lagoon". Díky tomu
+    // se z jeho kroků dá rovnou složit receptura a naopak z receptury odkázat
+    // na postup.
+    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_id TEXT`;
+    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_name TEXT`;
     await sql`
       CREATE TABLE IF NOT EXISTS guide_reads (
         id SERIAL PRIMARY KEY,

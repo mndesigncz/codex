@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { normalizeSteps } from '@/lib/guideSteps';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -22,14 +23,10 @@ function excerpt(content: string) {
   return flat.length > 120 ? flat.slice(0, 120).trimEnd() + '…' : flat;
 }
 
-// Normalize an incoming checklist into a clean string[] of step texts.
-function normalizeChecklist(input: any): string[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((s) => String(s ?? '').trim())
-    .filter((s) => s.length > 0)
-    .slice(0, 100);
-}
+// Krok návodu může nést i surovinu s množstvím — normalizace je sdílená,
+// aby se editor, čtečka i uložení shodly na tvaru. Starý checklist jako pole
+// řetězců projde beze změny.
+const normalizeChecklist = normalizeSteps;
 
 function checklistLength(raw: any): number {
   if (Array.isArray(raw)) return raw.length;
@@ -57,7 +54,7 @@ export async function GET(request: Request) {
   try {
     rows = categoryId
       ? await sql`
-          SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by,
+          SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
                  g.require_read,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
                  EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
@@ -65,7 +62,7 @@ export async function GET(request: Request) {
           WHERE g.team_id = ${c.teamId} AND g.category_id = ${parseInt(categoryId)}
           ORDER BY g.updated_at DESC`
       : await sql`
-          SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by,
+          SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
                  g.require_read,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
                  EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
@@ -100,6 +97,7 @@ export async function GET(request: Request) {
     myRead: g.my_read === true,
     excerpt: excerpt(g.content),
     hasChecklist: checklistLength(g.checklist) > 0,
+    productId: g.product_id ?? null,
   }));
 
   return NextResponse.json({ guides });
@@ -114,7 +112,10 @@ export async function POST(request: Request) {
   const isProposal = c.role !== 'employer';
   if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
-  const { title, content, categoryId, checklist } = await request.json();
+  const body = await request.json();
+  const { title, content, categoryId, checklist } = body;
+  const productId = body.productId ? String(body.productId).trim().slice(0, 120) : null;
+  const productName = body.productName ? String(body.productName).trim().slice(0, 160) : null;
   if (!title || !String(title).trim()) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
   const steps = normalizeChecklist(checklist);
@@ -135,6 +136,12 @@ export async function POST(request: Request) {
       ${isProposal ? c.meId : null}
     )
     RETURNING id, title, category_id, content, checklist, updated_at`;
+    if (productId && guide?.id) {
+      // Sloupce jsou novější — když chybí, návod se uloží i tak, jen bez vazby.
+      try {
+        await sql`UPDATE guides SET product_id = ${productId}, product_name = ${productName} WHERE id = ${guide.id}`;
+      } catch { /* migrace ještě neproběhla */ }
+    }
   } catch {
     // approval columns not migrated yet — insert the old shape (auto-approved)
     [guide] = await sql`

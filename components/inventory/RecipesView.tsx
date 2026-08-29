@@ -69,6 +69,8 @@ export default function RecipesView({ openProductId, onNavigate }: {
   const [items, setItems] = useState<any[]>([]);
   // Kategorie skladu (ne menu) — potřebné, když se surovina zakládá odsud.
   const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
+  // Návod k položce: „takhle se to dělá" patří vedle „tohle se z toho odepíše".
+  const [guides, setGuides] = useState<{ id: number; title: string; productId: string | null }[]>([]);
   const [cat, setCat] = useState('Vše');
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
@@ -86,6 +88,9 @@ export default function RecipesView({ openProductId, onNavigate }: {
         fetch('/api/inventory').then(r => r.json()).catch(() => []),
         fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
       ]);
+      fetch('/api/guides').then(r => r.json())
+        .then(g => setGuides(Array.isArray(g?.guides) ? g.guides.filter((x: any) => x.productId) : []))
+        .catch(() => setGuides([]));
       setStockCategories(
         Array.isArray(cats)
           ? cats.map((c: any) => ({ id: Number(c.id), name: String(c.name) }))
@@ -286,6 +291,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
           draft={draft} items={items} itemById={itemById} money={money}
           setIng={setIng} setDraft={setDraft} save={save} saving={saving} yieldOf={yieldOf}
           recipes={recipes} products={products} categories={stockCategories}
+          guide={guides.find(g => g.productId === draft.productId) ?? null}
           onItemSaved={(patched) => setItems(list => list.map(i => i.id === patched.id ? { ...i, ...patched } : i))}
           onItemCreated={(created) => setItems(list => [...list, created])}
         />
@@ -419,13 +425,14 @@ export default function RecipesView({ openProductId, onNavigate }: {
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, recipes, products, categories, onItemSaved, onItemCreated }: {
+function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, saving, yieldOf, recipes, products, categories, guide, onItemSaved, onItemCreated }: {
   draft: Draft; items: any[]; itemById: Map<string, any>; money: (n: number) => string;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   save: () => void; saving: boolean;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
   recipes: any[]; products: any[]; categories: { id: number; name: string }[];
+  guide: { id: number; title: string } | null;
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
 }) {
@@ -684,6 +691,14 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
             </button>
           )}
         </div>
+
+        {guide && (
+          <a href={`/employer/overview?view=guides&guide=${guide.id}`}
+            className="flex items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3.5 py-2.5 text-sm text-[#16181A] hover:bg-black/[0.05] transition">
+            <Icon name="book" size={15} className="shrink-0 text-black/40" />
+            <span className="min-w-0 truncate">Návod: {guide.title}</span>
+          </a>
+        )}
 
         <p className="text-[11px] text-black/40 leading-relaxed">
           Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.
