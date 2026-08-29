@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
+import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 
 export interface RosterMember {
   id: number;
@@ -56,14 +57,16 @@ export function elapsed(fromIso: string, now: number) {
   // now === 0 znamená „prohlížeč se ještě neozval" — bez tohohle by se první
   // snímek pokusil odečíst čas od nuly a ukázal by nesmysl.
   if (!now) return '—';
-  const secs = Math.max(0, Math.round((now - new Date(fromIso).getTime()) / 1000));
+  const from = parseDbTime(fromIso)?.getTime();
+  if (from == null) return '—';
+  const secs = Math.max(0, Math.round((now - from) / 1000));
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+const timeOf = (iso: string) => dbTimeHM(iso);
 
 interface KioskShiftValue {
   roster: RosterMember[];

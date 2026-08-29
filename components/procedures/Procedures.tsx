@@ -7,6 +7,7 @@ import { PersonLink } from '../employer/ProfileLinkProvider';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, timeRange, STEP_WEIGHTS, weightSpec, stepPenalty, stepPlus, type Step } from '@/lib/steps';
+import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -81,12 +82,14 @@ function fmtDuration(sec: number | null) {
 
 function fmtWhen(iso: string) {
   if (!iso) return '';
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const time = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
-  if (sameDay) return `dnes ${time}`;
-  return `${d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })} ${time}`;
+  const d = parseDbTime(iso);
+  if (!d) return '';
+  const time = dbTimeHM(d);
+  // Porovnává se pražský den, ne den prohlížeče — jinak by se po půlnoci
+  // „dnes" rozešlo s obchodním dnem.
+  const day = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+  if (day(d) === day(new Date())) return `dnes ${time}`;
+  return `${d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'short' })} ${time}`;
 }
 
 function stepsWord(n: number) {

@@ -12,7 +12,7 @@ import {
   EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS,
 } from '@/lib/dashboardWidgets';
 import { DashboardEditor, LinkTile } from '../DashboardEditor';
-import { pragueToday } from '@/lib/pragueTime';
+import { pragueToday, dbTimeHM } from '@/lib/pragueTime';
 
 // Everything past `rating` is an optional enrichment of the roster response —
 // rendered only when the API sends it, so the row degrades to name + shift.
@@ -297,7 +297,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                       <span className="shrink-0">{r.avatar ?? '👤'}</span>
                       <span className="truncate">{r.name}</span>
                       <span className="text-xs text-[#5B7A08] tabular-nums shrink-0 whitespace-nowrap">
-                        od {new Date(r.openSince).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                        od {dbTimeHM(r.openSince)}
                       </span>
                     </PersonLink>
                   ))}

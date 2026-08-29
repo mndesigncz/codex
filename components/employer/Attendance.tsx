@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
+import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 
 type RosterMember = {
   id: number | string;
@@ -35,8 +36,8 @@ type Entry = {
 // ISO → 'YYYY-MM-DDTHH:MM' for a datetime-local input (in local time).
 function toLocalInput(iso: string | null): string {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
+  const d = parseDbTime(iso);
+  if (!d) return '';
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
@@ -78,7 +79,7 @@ function earned(ms: number, rate: number): number {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  return dbTimeHM(iso);
 }
 
 export default function Attendance({ user: _user }: { user: { id?: string | number } }) {
@@ -203,9 +204,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     const map = new Map<string, { id: string; name: string; avatar: string | null; ms: number; count: number; hasOpen: boolean }>();
     for (const e of entries) {
       const key = String(e.employeeId);
-      const start = new Date(e.clockIn).getTime();
+      const start = parseDbTime(e.clockIn)?.getTime() ?? NaN;
       const open = !e.clockOut;
-      const end = open ? now : new Date(e.clockOut as string).getTime();
+      const end = open ? now : (parseDbTime(e.clockOut)?.getTime() ?? NaN);
       const prev = map.get(key) ?? { id: key, name: e.employeeName ?? 'Neznámý', avatar: e.employeeAvatar ?? null, ms: 0, count: 0, hasOpen: false };
       prev.ms += Math.max(0, end - start);
       prev.count += 1;

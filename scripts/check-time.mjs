@@ -16,6 +16,18 @@ const ALLOW = ['lib/pragueTime.ts', 'scripts/check-time.mjs'];
 // "now" in UTC, then cut to a date or a month.
 const BAD = /new Date\(\s*(?:Date\.now\(\)[^)]*)?\)\s*\.toISOString\(\)\s*\.(?:split\('T'\)\[0\]|slice\(0,\s*(?:7|10)\))/;
 
+// Druhá rodina: čas z databáze zobrazený bez zóny.
+//
+// Sloupce TIMESTAMP nesou UTC, ale Postgres je posílá bez značky zóny
+// ("2026-08-29 22:22:01"). `new Date()` takový tvar bere jako MÍSTNÍ čas, takže
+// se hodina zobrazí posunutá o pražský offset — a když se taková hodnota vrátí
+// do formuláře a uloží, posune se záznam o dvě hodiny při každé editaci.
+//
+// Použij parseDbTime() / dbTimeHM() / dbTimeDayHM() z lib/pragueTime.
+const BAD_TZ = /new Date\([^)]*\)\s*\.toLocale(?:Time)?String\(/;
+const HAS_HOUR = /hour:\s*'2-digit'/;
+const HAS_TZ = /timeZone:/;
+
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -25,12 +37,18 @@ function* walk(dir) {
 }
 
 const hits = [];
+const tzHits = [];
 for (const root of ROOTS) {
   for (const file of walk(root)) {
     const rel = relative('.', file);
     if (ALLOW.includes(rel)) continue;
     readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
       if (BAD.test(line)) hits.push(`${rel}:${i + 1}  ${line.trim().slice(0, 110)}`);
+      // `new Date()` bez argumentu je „teď" — ten je správně v místní zóně.
+      if (BAD_TZ.test(line) && HAS_HOUR.test(line) && !HAS_TZ.test(line)
+          && !/new Date\(\s*\)/.test(line)) {
+        tzHits.push(`${rel}:${i + 1}  ${line.trim().slice(0, 110)}`);
+      }
     });
   }
 }
@@ -42,4 +60,11 @@ if (hits.length) {
   console.error(`\n${hits.length} ${hits.length === 1 ? 'místo' : 'míst'} k opravě.\n`);
   process.exit(1);
 }
-console.log('check-time: v pořádku — žádné UTC odvození obchodního dne.');
+if (tzHits.length) {
+  console.error('\nČas z databáze se nesmí zobrazovat bez zóny — použij dbTimeHM()/dbTimeDayHM() z lib/pragueTime.');
+  console.error('Postgres posílá TIMESTAMP bez značky zóny, takže prohlížeč UTC hodnotu vezme jako místní čas.\n');
+  for (const h of tzHits) console.error('  ' + h);
+  console.error(`\n${tzHits.length} ${tzHits.length === 1 ? 'místo' : 'míst'} k opravě.\n`);
+  process.exit(1);
+}
+console.log('check-time: v pořádku — obchodní den i zobrazený čas drží pražskou zónu.');
