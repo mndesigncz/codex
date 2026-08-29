@@ -241,8 +241,9 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                     const touched = r.counted != null || r.countedOpen != null;
                     return (
                       <div key={r.itemId} className={`px-4 py-2.5 ${touched ? 'bg-[#C8F542]/[0.05]' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">{r.name}</span>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="w-full sm:w-auto sm:flex-1 min-w-0 text-sm text-[#16181A] truncate">{r.name}</span>
+                          <span className="sm:hidden flex-1" />
                           <span className="shrink-0 text-xs text-black/40 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
                           <input
                             type="number" inputMode="numeric" min={0}

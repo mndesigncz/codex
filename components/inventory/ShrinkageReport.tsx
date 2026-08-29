@@ -57,20 +57,20 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3.5 py-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Chybí</p>
-          <p className="text-lg font-bold tabular-nums text-red-600">{money(Math.abs(t.lostValue))}</p>
+          <p className="text-[15px] sm:text-lg font-bold tabular-nums text-red-600 whitespace-nowrap">{money(Math.abs(t.lostValue))}</p>
           <p className="text-[11px] text-black/35">{t.missing} položek</p>
         </div>
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3.5 py-3">
+        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Přebývá</p>
-          <p className="text-lg font-bold tabular-nums text-[#5B7A08]">{money(t.surplusValue)}</p>
+          <p className="text-[15px] sm:text-lg font-bold tabular-nums text-[#5B7A08] whitespace-nowrap">{money(t.surplusValue)}</p>
           <p className="text-[11px] text-black/35">{t.surplus} položek</p>
         </div>
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3.5 py-3">
+        <div className="col-span-2 sm:col-span-1 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Celkem</p>
-          <p className={`text-lg font-bold tabular-nums ${t.netValue < 0 ? 'text-red-600' : 'text-[#16181A]'}`}>
+          <p className={`text-[15px] sm:text-lg font-bold tabular-nums whitespace-nowrap ${t.netValue < 0 ? 'text-red-600' : 'text-[#16181A]'}`}>
             {t.netValue > 0 ? '+' : ''}{money(t.netValue)}
           </p>
           <p className="text-[11px] text-black/35">rozdíl proti evidenci</p>
@@ -96,10 +96,11 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
           {open && (
             <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden">
               {d.rows.map(r => (
-                <div key={r.itemId} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-[#16181A]">{r.name}</span>
+                <div key={r.itemId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
+                  <span className="w-full sm:w-auto sm:flex-1 min-w-0 truncate text-[#16181A]">{r.name}</span>
+                  <span className="sm:hidden flex-1" />
                   {r.lossPct != null && (
-                    <span className="shrink-0 text-[11px] text-black/40 tabular-nums">
+                    <span className="shrink-0 text-[11px] text-black/40 tabular-nums hidden sm:inline">
                       {r.lossPct} % z prodaného
                     </span>
                   )}
