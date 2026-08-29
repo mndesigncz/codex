@@ -316,12 +316,14 @@ export default function FinanceView() {
                   const clickable = r.kind === 'receipt';
                   return (
                     <button key={i} onClick={() => clickable && setDetail(r)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${clickable ? 'hover:bg-black/[0.02] transition cursor-pointer' : 'cursor-default'}`}>
+                      className={`w-full flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left ${clickable ? 'hover:bg-black/[0.02] transition cursor-pointer' : 'cursor-default'}`}>
                       <span className="text-xs text-black/40 tabular-nums w-12 shrink-0">
                         {parseInt(r.date.split('-')[2])}.{parseInt(r.date.split('-')[1])}.
                       </span>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
-                      <span className="flex-1 min-w-0 text-sm font-medium text-[#16181A] truncate">
+                      {/* Na telefonu se „Objednávka Monin CZ" nevešla vedle data,
+                          štítku i částky — popis dostane vlastní řádek. */}
+                      <span className="w-full sm:w-auto order-last sm:order-none flex-1 min-w-0 text-sm font-medium text-[#16181A] truncate">
                         {r.label}
                         {r.note && <span className="text-black/40 font-normal"> · {r.note}</span>}
                       </span>

@@ -277,7 +277,7 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="receipt" size={20} />
           </button>
           <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu"
-            className="rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
+            className="tap-target rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
             ☕ TO GO
           </button>
           <NotificationBell />

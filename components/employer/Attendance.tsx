@@ -327,7 +327,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {PERIODS.map(p => (
               <button key={p} onClick={() => setDays(p)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${days === p ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${days === p ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
                 {p} dní
               </button>
             ))}
@@ -356,9 +356,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {onShift.map(r => (
-              <div key={r.id} className="flex items-center gap-3 min-w-0 rounded-2xl bg-[#C8F542]/[0.12] border border-[#C8F542]/40 px-4 py-3">
+              /* Na telefonu se do jedné řádky nevešlo jméno, stopky i tlačítko —
+                 „Kryštof Eliáš" se ořezal na „Kryštof El…". Jméno teď drží
+                 celou šířku a zbytek se zalomí pod něj. */
+              <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0 rounded-2xl bg-[#C8F542]/[0.12] border border-[#C8F542]/40 px-4 py-3">
                 <PersonLink id={Number(r.id)}>{avatar(r.avatar)}</PersonLink>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-[min(100%,8rem)]">
                   <PersonLink id={Number(r.id)}><p className="font-semibold text-[#16181A] truncate">{r.name}</p></PersonLink>
                   <p className="text-xs text-[#5B7A08]">od {fmtTime(r.openSince as string)}</p>
                 </div>

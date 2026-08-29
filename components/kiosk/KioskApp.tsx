@@ -66,8 +66,10 @@ function KioskShell({ user }: { user: KioskUser }) {
     ? ({ id: active.id, name: active.name, role: 'employee', avatar: active.avatar } as any)
     : kioskUser;
 
-  const clock = new Date(now).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
-  const dateStr = new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+  // Dokud se neozve prohlížeč, držíme místo zástupným znakem — jinak by se
+  // serverový a klientský čas rozešly a React by překreslil celou obrazovku.
+  const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : '—:—';
+  const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
 
   return (
     <div className="min-h-screen flex flex-col p-5 sm:p-8">
