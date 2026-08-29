@@ -214,7 +214,9 @@ export default function EmployerLayout({ user }: Props) {
                       className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
                         currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
                       }`}>
-                      <Icon name={item.icon} size={21} className="flex-shrink-0" />
+                      <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
+                        motion={currentView === item.id ? 'pop' : undefined}
+                        key={currentView === item.id ? 'on' : 'off'} />
                       {sidebarOpen && <span className="truncate">{item.label}</span>}
                     </button>
                   ))}
@@ -284,8 +286,11 @@ export default function EmployerLayout({ user }: Props) {
         <nav className="glass-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>
-              <Icon name={item.icon} size={22} strokeWidth={currentView === item.id ? 2 : 1.7} />
+              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
+                currentView === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
+              <Icon key={currentView === item.id ? 'on' : 'off'} name={item.icon} size={22}
+                strokeWidth={currentView === item.id ? 2 : 1.7}
+                className="i-lead" motion={currentView === item.id ? 'pop' : undefined} />
               <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{item.label}</span>
             </button>
           ))}

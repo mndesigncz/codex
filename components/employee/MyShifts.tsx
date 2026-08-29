@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { pragueToday } from '@/lib/pragueTime';
 
 interface Shift {
   id: number;
@@ -37,7 +38,7 @@ export default function MyShifts({ user }: Props) {
 
   useEffect(() => {
     fetch('/api/timeoff').then(r => r.json()).then(d => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = pragueToday();
       setTimeOff((Array.isArray(d?.requests) ? d.requests : [])
         .filter((r: any) => r.status === 'approved' && r.toDate >= today)
         .sort((a: any, b: any) => a.fromDate.localeCompare(b.fromDate)));
@@ -52,7 +53,7 @@ export default function MyShifts({ user }: Props) {
     }).catch(() => {});
   }, []);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
   const upcoming = shifts.filter(s => s.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   const past = shifts.filter(s => s.date < today).sort((a, b) => b.date.localeCompare(a.date));
 

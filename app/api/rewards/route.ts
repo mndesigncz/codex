@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
 import { breakdownFor, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +23,8 @@ async function ctx() {
 // Worked days in the recent past that still have no review — the employer's
 // "to rate" backlog. Older shifts are ignored so the number stays actionable.
 async function pendingFor(userId: number): Promise<{ n: number; oldest: string | null }> {
-  const today = new Date();
-  const from = new Date(today.getTime() - 60 * 86400000).toISOString().split('T')[0];
-  const to = today.toISOString().split('T')[0];
+  const from = pragueToday(-60);
+  const to = pragueToday();
   try {
     const [r] = await sql`
       SELECT COUNT(*)::int AS n, MIN(x.date) AS oldest FROM (

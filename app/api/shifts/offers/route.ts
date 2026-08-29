@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ async function ctx() {
   return { meId, role, teamId: u?.team_id as number | null, name: u?.name as string };
 }
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => pragueToday();
 
 // GET — the team's shift-swap board: every open offer plus anything the current
 // user is involved in. Employers see claimed offers awaiting their approval.

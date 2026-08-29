@@ -217,3 +217,109 @@ select option { background-color: #ffffff; color: #16181A; }
 :root[data-theme="dark"] .placeholder-black\/30::placeholder{ color:rgba(237,242,228,0.32) !important; }
 :root[data-theme="dark"] .placeholder-black\/25::placeholder{ color:rgba(237,242,228,0.30) !important; }
 :root[data-theme="dark"] select option{ background-color:#171A1D; color:#EDF2E4; }
+
+/* =====================================================================
+   Motion & material system — "fluid interface" rules applied to our brand.
+   CSS-only on purpose: springs in JS would cost a library on every screen,
+   and everything here is a short, interruptible, compositor-friendly move.
+   ===================================================================== */
+:root {
+  /* Critically damped feel: quick out, soft settle, no overshoot. */
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.3, 1);
+  /* A single, tiny overshoot — only for things a gesture threw. */
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.5, 1);
+  --dur-1: 0.12s;   /* press feedback */
+  --dur-2: 0.22s;   /* state change */
+  --dur-3: 0.34s;   /* surface arriving */
+}
+
+/* Feedback belongs on the press, not on the release. */
+button:active:not(:disabled), .pressable:active { transition-duration: var(--dur-1); }
+
+/* Surfaces materialise: a real material arrives with blur + scale together,
+   it doesn't just fade in. */
+@keyframes surface-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+/* Lists and tile grids arrive in sequence — set --i on each child. */
+@media (prefers-reduced-motion: no-preference) {
+  .rise-in { animation: surface-in var(--dur-3) var(--ease-out-soft) both; }
+  .stagger > * { animation: surface-in var(--dur-3) var(--ease-out-soft) both; }
+  .stagger > *:nth-child(1) { animation-delay: 0ms }
+  .stagger > *:nth-child(2) { animation-delay: 40ms }
+  .stagger > *:nth-child(3) { animation-delay: 80ms }
+  .stagger > *:nth-child(4) { animation-delay: 120ms }
+  .stagger > *:nth-child(5) { animation-delay: 160ms }
+  .stagger > *:nth-child(6) { animation-delay: 200ms }
+  .stagger > *:nth-child(n+7) { animation-delay: 240ms }
+}
+
+/* Where floating chrome overlaps content, fade the content out under it
+   instead of drawing a hard 1px rule. */
+.edge-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14px);
+  mask-image: linear-gradient(to bottom, transparent, #000 14px);
+}
+
+/* ---------- Icon motion — small, purposeful, never decorative ---------- */
+/* Every icon child carries pathLength="1", so one rule draws any of them. */
+@keyframes icon-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes icon-pop  { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes icon-ring {
+  0%, 70%, 100% { transform: rotate(0); }
+  76% { transform: rotate(11deg); } 82% { transform: rotate(-9deg); }
+  88% { transform: rotate(6deg); }  94% { transform: rotate(-4deg); }
+}
+@keyframes icon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: no-preference) {
+  .i-draw > * { stroke-dasharray: 1; animation: icon-draw 0.55s var(--ease-out-soft) forwards; }
+  .i-pop   { animation: icon-pop 0.32s var(--ease-spring); }
+  .i-ring  { animation: icon-ring 2.6s ease-in-out infinite; transform-origin: 50% 22%; }
+  .i-pulse { animation: icon-pulse 1.6s ease-in-out infinite; }
+  /* The icon leads the press: it reacts a touch before the surface settles. */
+  button:active .i-lead, .pressable:active .i-lead { transform: scale(0.9); }
+}
+.i-lead { transition: transform var(--dur-1) var(--ease-out-soft); }
+
+/* ---------- Typography: tracking is size-specific, never one value ------ */
+h1, .t-display { letter-spacing: -0.022em; line-height: 1.06; }
+h2, .t-title   { letter-spacing: -0.015em; line-height: 1.15; }
+h3             { letter-spacing: -0.01em;  line-height: 1.25; }
+.t-caption     { letter-spacing: 0.01em; }
+.tabular       { font-variant-numeric: tabular-nums; }
+
+/* ---------- Accessibility: the three signals, honoured ---------- */
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-strong, .glass-card, .modal-sheet, .modal-overlay {
+    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  }
+  .glass, .glass-card { background: rgba(255,255,255,0.94); }
+  .modal-sheet { background: #fff; }
+  :root[data-theme="dark"] .glass,
+  :root[data-theme="dark"] .glass-card { background: rgba(28,31,34,0.96); }
+  :root[data-theme="dark"] .modal-sheet { background: #1E2124; }
+}
+@media (prefers-contrast: more) {
+  .glass, .glass-card, .glass-strong { border-color: rgba(0,0,0,0.45); outline-color: rgba(0,0,0,0.25); }
+  :root[data-theme="dark"] .glass,
+  :root[data-theme="dark"] .glass-card { border-color: rgba(255,255,255,0.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Not "no feedback" — a gentler, non-vestibular equivalent. */
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .rise-in, .stagger > * { animation: none !important; }
+  button:active:not(:disabled) { transform: none; opacity: 0.8; }
+}
+
+/* Floating chrome meets content with a soft edge, not a hairline rule —
+   the content fades out underneath it the way it does on iOS. */
+.chrome-edge { position: relative; }
+.chrome-edge::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -14px; height: 14px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(241,243,237,0.55), rgba(241,243,237,0));
+}
+:root[data-theme="dark"] .chrome-edge::after {
+  background: linear-gradient(to bottom, rgba(18,20,22,0.55), rgba(18,20,22,0));
+}

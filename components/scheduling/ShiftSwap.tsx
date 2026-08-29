@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../Icons';
+import { pragueToday } from '@/lib/pragueTime';
 
 type Offer = {
   id: number; shiftId: number; offeredBy: number; claimedBy: number | null;
@@ -12,7 +13,7 @@ type Offer = {
 };
 type Shift = { id: number; date: string; startTime: string; endTime: string; type: string };
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => pragueToday();
 const fmtDay = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 
 export default function ShiftSwap({ user }: { user: { id?: string | number } }) {

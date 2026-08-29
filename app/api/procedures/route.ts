@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { sanitizeSteps } from '@/lib/steps';
 import { notifyUsers } from '@/lib/push';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +66,7 @@ export async function GET() {
     p.approved !== false || me.role === 'employer' || p.submitted_by === me.id);
 
   // Does the current user work today? (kiosk = shared device, always yes.)
-  const today = new Date().toISOString().split('T')[0];
+  const today = pragueToday();
   let hasShiftToday = me.role === 'kiosk';
   if (!hasShiftToday) {
     try {

@@ -11,6 +11,7 @@ import CashClosing from '../employee/CashClosing';
 import MessengerDock from '../chat/MessengerDock';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { usePlan, ProBadge } from '../Pro';
+import { pragueToday } from '@/lib/pragueTime';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
@@ -96,7 +97,8 @@ function KioskShell({ user }: { user: KioskUser }) {
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
               tab === t.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
             }`}>
-            <Icon name={t.icon} size={17} /> {t.label}
+            <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
+              className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
           </button>
         ))}
       </nav>
@@ -160,7 +162,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
       .then(d => setHandover(d?.handover ? d : null))
       .catch(() => {});
     fetch('/api/events').then(r => r.json()).then(d => {
-      const today0 = new Date().toISOString().slice(0, 10);
+      const today0 = pragueToday();
       const up = (Array.isArray(d.events) ? d.events : [])
         .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
         .sort((a: any, b: any) => a.date.localeCompare(b.date));

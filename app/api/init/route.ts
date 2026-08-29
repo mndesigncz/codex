@@ -889,10 +889,15 @@ export async function GET() {
       // Event closings live BESIDE the shop's daily closing, so the uniqueness
       // guard must ignore them — the old index (without event_id) blocked the
       // shop closing whenever an event closing existed for the same day.
+      // …and it is one closing per SHIFT, not per day: covering the morning and
+      // then the evening means two closings, both legitimate. Shiftless
+      // closings still collapse to one per day (COALESCE), which is what the
+      // double-submit guard was really for.
       await sql`DROP INDEX IF EXISTS cash_closings_one_per_day`;
       await sql`
         CREATE UNIQUE INDEX IF NOT EXISTS cash_closings_one_per_day
-        ON cash_closings (created_by, date) WHERE covered_by IS NULL AND event_id IS NULL`;
+        ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
+        WHERE covered_by IS NULL AND event_id IS NULL`;
     } catch { /* duplicates exist — SELECT-before-INSERT stays the only guard */ }
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----

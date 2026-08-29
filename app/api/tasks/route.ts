@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ const TARGET_UPCOMING = 5;   // keep this many future, undone occurrences per se
 const HORIZON_DAYS = 120;    // never generate further than this ahead
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => pragueToday();
 
 // Next occurrence after a 'YYYY-MM-DD' date for the given recurrence.
 function nextDueDate(due: string | null, recurrence: string): string {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
+import { pragueToday } from '@/lib/pragueTime';
 
 interface Staff { id: number; name: string; avatar: string | null; reviewed: boolean; rating: number; flagged: boolean }
 interface Day { date: string; staff: Staff[]; pending: number }
@@ -46,7 +47,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
   const firstDow = new Date(y, m - 1, 1).getDay();
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = pragueToday();
 
   const cells: (string | null)[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);
