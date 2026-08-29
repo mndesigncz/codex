@@ -260,7 +260,8 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                         {pkg > 0 && (
                           <div className="flex items-center gap-3 pl-4 mt-1.5">
                             <span className="min-w-0 flex-1 text-[11px] text-black/40 truncate">
-                              ↳ zbytek v načatém balení <span className="text-black/25">(z {pkg} {r.contentUnit || 'l'})</span>
+                              ↳ <span className="hidden sm:inline">zbytek v </span>načatém balení
+                              <span className="text-black/25 hidden sm:inline"> (z {pkg} {r.contentUnit || 'l'})</span>
                             </span>
                             <span className="shrink-0 text-[11px] text-black/35 tabular-nums whitespace-nowrap">
                               evid. {fmt(r.expectedOpen ?? 0)} {r.contentUnit || ''}

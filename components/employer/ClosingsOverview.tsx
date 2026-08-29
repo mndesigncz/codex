@@ -631,20 +631,25 @@ export default function ClosingsOverview() {
               </button>
               {reconcileOpen && (
                 <>
+                  <div className="mt-2 flex items-center gap-3 px-4 text-[10px] uppercase tracking-wider text-black/35 sm:hidden">
+                    <span className="w-14">den</span><span className="flex-1" />
+                    <span>kasa</span><span>uzávěrka</span><span className="w-20 text-right">rozdíl</span>
+                  </div>
                   <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-72 overflow-y-auto scrollbar-thin">
                     {reconcile.days.filter((d: any) => d.diff != null || d.bills > 0 || d.closings > 0).map((d: any) => (
                       <div key={d.day} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                         <span className="shrink-0 w-14 text-black/45 tabular-nums">
                           {new Date(d.day + 'T12:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-black/50 text-xs">
+                        <span className="min-w-0 flex-1 truncate text-black/50 text-xs hidden sm:block">
                           {d.closings === 0 ? 'bez uzávěrky' : d.people ?? ''}
                         </span>
+                        <span className="sm:hidden flex-1" />
                         <span className="shrink-0 text-xs text-black/45 tabular-nums">
-                          {d.posTotal != null ? money(d.posTotal) : '—'} <span className="text-black/25">kasa</span>
+                          {d.posTotal != null ? money(d.posTotal) : '—'} <span className="text-black/25 hidden sm:inline">kasa</span>
                         </span>
                         <span className="shrink-0 text-xs text-black/45 tabular-nums">
-                          {d.declared != null ? money(d.declared) : '—'} <span className="text-black/25">uzáv.</span>
+                          {d.declared != null ? money(d.declared) : '—'} <span className="text-black/25 hidden sm:inline">uzáv.</span>
                         </span>
                         <span className={`w-20 shrink-0 text-right text-xs font-bold tabular-nums ${
                           d.diff == null ? 'text-black/20'
