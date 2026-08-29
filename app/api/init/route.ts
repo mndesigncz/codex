@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const sql = neon(process.env.DATABASE_URL!);
+    let closingIndex = 'not reached';
 
     // ---- Teams ----
     await sql`
@@ -893,12 +894,21 @@ export async function GET() {
       // then the evening means two closings, both legitimate. Shiftless
       // closings still collapse to one per day (COALESCE), which is what the
       // double-submit guard was really for.
+      // The old index lives under its own name; the per-shift one gets a new
+      // name so a failed rename can't leave us silently on the old rule. Its
+      // outcome is reported in the response — a swallowed migration here means
+      // legitimate second closings keep bouncing with a duplicate error.
       await sql`DROP INDEX IF EXISTS cash_closings_one_per_day`;
+      await sql`DROP INDEX IF EXISTS cash_closings_one_per_shift`;
       await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS cash_closings_one_per_day
+        CREATE UNIQUE INDEX cash_closings_one_per_shift
         ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
         WHERE covered_by IS NULL AND event_id IS NULL`;
-    } catch { /* duplicates exist — SELECT-before-INSERT stays the only guard */ }
+      closingIndex = 'one_per_shift';
+    } catch (e) {
+      // duplicates exist — SELECT-before-INSERT stays the only guard
+      closingIndex = 'failed: ' + String(e).slice(0, 160);
+    }
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.
@@ -951,6 +961,9 @@ export async function GET() {
       message: 'Databáze inicializována — všechny tabulky připraveny.',
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
       deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
+      // Migrations that are allowed to fail silently report their outcome here,
+      // so a swallowed one can be seen from outside instead of guessed at.
+      closingIndex,
     });
   } catch (error) {
     console.error('Init error:', error);
