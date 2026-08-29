@@ -613,12 +613,18 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <span className="text-lg" aria-hidden>⚠️</span>
             {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${eligible.length} uzávěrky za dny, kdy jsi měl/a směnu`}
           </p>
-          <p className="text-xs text-black/55">Vyplň ji prosím — vyber den a projdi formulář níže.</p>
+          <p className="text-xs text-black/55">
+            Vyplň ji prosím — vyber směnu a projdi formulář níže.
+            {eligible.filter(s => s.date === form.date).length > 1
+              && ' Ten den máš dvě směny, každá má vlastní uzávěrku.'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {eligible.map(s => (
               <button key={s.id} type="button" onClick={() => pickShift(s)}
                 className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
-                  form.date === s.date ? 'bg-orange-500 text-white border-orange-500' : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
+                  form.date === s.date && (pickedShiftId == null || pickedShiftId === s.id)
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
                 }`}>
                 {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                 <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
