@@ -36,13 +36,26 @@ function writeActingCookie(id: number | null) {
   } catch { /* cookies disabled — the client still sends actingAs in bodies */ }
 }
 
+/** Tikající „teď". Vrací 0, dokud stránka nenaskočí v prohlížeči.
+ *
+ *  Brát Date.now() rovnou při renderu znamená, že server vykreslí jiný čas než
+ *  prohlížeč — hydratace se rozejde, React zahodí celý serverový strom a
+ *  překreslí ho znovu. Na iPadu to bylo vidět jako probliknutí při každém
+ *  otevření. Nula je srozumitelné „ještě nevím" a komponenty na ni umí čekat. */
 export function useNow(intervalMs = 1000) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), intervalMs); return () => clearInterval(t); }, [intervalMs]);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
   return now;
 }
 
 export function elapsed(fromIso: string, now: number) {
+  // now === 0 znamená „prohlížeč se ještě neozval" — bez tohohle by se první
+  // snímek pokusil odečíst čas od nuly a ukázal by nesmysl.
+  if (!now) return '—';
   const secs = Math.max(0, Math.round((now - new Date(fromIso).getTime()) / 1000));
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);

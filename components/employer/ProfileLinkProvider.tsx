@@ -44,7 +44,7 @@ export function PersonLink({ id, children, className = '' }: {
       title="Zobrazit profil"
       onClick={e => { e.stopPropagation(); e.preventDefault(); open(id); }}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); open(id); } }}
-      className={`cursor-pointer hover:underline decoration-black/25 underline-offset-2 ${className}`}
+      className={`tap-target-sm tap-target cursor-pointer hover:underline decoration-black/25 underline-offset-2 ${className}`}
     >
       {children}
     </span>

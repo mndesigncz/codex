@@ -6,7 +6,7 @@ import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
-import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
+import { pragueToday, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -19,9 +19,11 @@ interface ShiftReview {
 }
 
 function nextMonthStr() {
-  const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  // Z pražského dne, ne ze serverového — kolem půlnoci na přelomu měsíce by
+  // UTC ukazovalo ještě ten minulý.
+  const [y, m] = pragueToday().split('-').map(Number);
+  const d = new Date(Date.UTC(y, m, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function EmployeeDashboard({ user, onNavigate }: Props) {
@@ -124,7 +126,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const workedM = Math.floor((workedMs % 3600000) / 60000);
 
   const greeting = (() => {
-    const h = new Date().getHours();
+    // getHours() dává hodinu serveru, tedy UTC — mezi devátou a jedenáctou
+    // ráno tak server napsal „Dobré ráno" a prohlížeč „Dobrý den". Kromě
+    // špatného pozdravu to rozešlo hydrataci a React překreslil celou stránku.
+    const h = parseInt(pragueHM().slice(0, 2), 10);
     if (h < 10) return 'Dobré ráno';
     if (h < 18) return 'Dobrý den';
     return 'Dobrý večer';

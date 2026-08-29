@@ -104,7 +104,7 @@ export default function Tasks({ user }: Props) {
         <div className="flex items-start gap-3">
           <button
             onClick={() => updateStatus(task, task.status === 'done' ? 'pending' : 'done')}
-            className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
+            className={`tap-target w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
               task.status === 'done' ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15 hover:border-[#C8F542]/60'
             }`}
           >
@@ -165,7 +165,7 @@ export default function Tasks({ user }: Props) {
         <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
           {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
             <button key={v} onClick={() => setView(v)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
               {lbl}
             </button>
           ))}

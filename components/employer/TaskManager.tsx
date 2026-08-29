@@ -226,7 +226,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       <div key={t.id} className={`glass-card ${compact ? 'p-3' : 'p-4'} ${inactive ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-2.5">
           <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
-            className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
+            className={`tap-target mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
             {done && <span className="text-[11px] font-bold">✓</span>}
           </button>
           <div className="min-w-0 flex-1">
@@ -282,7 +282,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
               <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
                 {lbl}
               </button>
             ))}

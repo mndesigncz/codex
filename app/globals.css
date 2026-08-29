@@ -141,6 +141,23 @@ input::-webkit-date-and-time-value { text-align: left; }
 select option { background-color: #ffffff; color: #16181A; }
 .panel-dark select option { background-color: #1a1a1e; color: #fff; }
 
+/* Malý ovládací prvek nemusí být velký, aby se dal trefit. Pseudo-prvek
+   roztáhne dotykovou plochu na 44 px (Apple HIG), aniž by se cokoli pohnulo
+   v rozvržení — kolečko u úkolu zůstane drobné, jen se do něj konečně dá
+   strefit palcem. */
+.tap-target { position: relative; }
+.tap-target::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+/* V hustém seznamu by se plochy překrývaly — tam stačí 36 px. */
+.tap-target-sm::before { width: max(100%, 36px); height: max(100%, 36px); }
+
 /* ---------- Prohlížečové povrchy ----------
    Výběr textu, kurzor, ohnisko a posuvník kreslí prohlížeč. Ve výchozím
    modrém odstínu nepatří k ničemu — proto je bereme z palety podniku. */
