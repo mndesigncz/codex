@@ -900,21 +900,22 @@ export async function GET() {
       // name so a failed rename can't leave us silently on the old rule. Its
       // outcome is reported in the response — a swallowed migration here means
       // legitimate second closings keep bouncing with a duplicate error.
-      // Plain `DROP INDEX IF EXISTS cash_closings_one_per_day` reported success
-      // on production and left the index standing — proven by listing
-      // pg_indexes afterwards. Two things do that: the index belongs to a
-      // UNIQUE CONSTRAINT (DROP INDEX refuses to touch it), or it lives in a
-      // schema the unqualified name doesn't resolve to (IF EXISTS then quietly
-      // matches nothing). Look the rule up in the catalogue and remove it by
-      // its real schema, trying the constraint form first.
+      // Two lessons from production, both paid for:
+      //   1. `DROP INDEX IF EXISTS <name>` reported success and left the old
+      //      rule standing — it matches nothing when the object is owned by a
+      //      constraint or lives in another schema. So the rule is looked up in
+      //      the catalogue and removed by its real schema, constraint first.
+      //   2. Dropping and recreating the CURRENT rule on every init left a
+      //      window with no guard at all (and made the migration report a
+      //      success that a later call undid). The new rule is therefore only
+      //      created when it is actually missing, and never dropped.
       await sql`
         DO $do$
         DECLARE r record;
         BEGIN
           FOR r IN
             SELECT schemaname, indexname FROM pg_indexes
-            WHERE tablename = 'cash_closings'
-              AND indexname IN ('cash_closings_one_per_day', 'cash_closings_one_per_shift')
+            WHERE tablename = 'cash_closings' AND indexname = 'cash_closings_one_per_day'
           LOOP
             BEGIN
               EXECUTE format('ALTER TABLE %I.cash_closings DROP CONSTRAINT IF EXISTS %I',
@@ -925,11 +926,20 @@ export async function GET() {
           END LOOP;
         END
         $do$;`;
-      await sql`
-        CREATE UNIQUE INDEX cash_closings_one_per_shift
-        ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
-        WHERE covered_by IS NULL AND event_id IS NULL`;
-      closingIndex = 'one_per_shift';
+      const [before] = await sql`SELECT to_regclass('cash_closings_one_per_shift') AS reg`;
+      if (before?.reg == null) {
+        await sql`
+          CREATE UNIQUE INDEX cash_closings_one_per_shift
+          ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
+          WHERE covered_by IS NULL AND event_id IS NULL`;
+      }
+      // Report what the database says NOW, not what the statement claimed —
+      // a migration that reports a success it did not achieve is how this bug
+      // survived three deploys.
+      const [after] = await sql`SELECT to_regclass('cash_closings_one_per_shift') AS reg`;
+      closingIndex = after?.reg != null
+        ? (before?.reg != null ? 'one_per_shift (už existoval)' : 'one_per_shift (vytvořen)')
+        : 'CREATE prošel, ale index neexistuje';
     } catch (e) {
       // duplicates exist — SELECT-before-INSERT stays the only guard
       closingIndex = 'failed: ' + String(e).slice(0, 160);
