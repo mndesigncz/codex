@@ -938,8 +938,17 @@ export async function GET() {
           END IF;
         END
         $do$;`;
-      const [after] = await sql`SELECT to_regclass('cash_closings_one_per_business_day') AS reg`;
-      closingIndex = after?.reg != null ? 'one_per_business_day' : 'DO blok prošel, ale index neexistuje';
+      // One statement, one snapshot: asking to_regclass and pg_indexes in two
+      // separate round trips gave contradictory answers, and a contradiction
+      // between two connections tells you nothing. This asks both at once.
+      const [after] = await sql`
+        SELECT to_regclass('cash_closings_one_per_business_day')::text AS reg,
+               (SELECT string_agg(schemaname || '.' || indexname, ', ' ORDER BY indexname)
+                  FROM pg_indexes WHERE tablename = 'cash_closings') AS list,
+               current_database() AS db, current_schema() AS schema`;
+      closingIndex = after?.reg
+        ? `one_per_business_day (${after.reg})`
+        : `index nevznikl — ${after?.db}/${after?.schema}: ${after?.list ?? 'nic'}`;
     } catch (e) {
       // duplicates exist — SELECT-before-INSERT stays the only guard
       closingIndex = 'failed: ' + String(e).slice(0, 160);
