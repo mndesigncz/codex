@@ -27,6 +27,7 @@ import TimeOffRequest from '../scheduling/TimeOffRequest';
 import TimeOffApprovals from '../scheduling/TimeOffApprovals';
 import Procedures from '../procedures/Procedures';
 import ToGoMode from './ToGoMode';
+import RecipesView from '../inventory/RecipesView';
 import ReceiptsPanel from './ReceiptsPanel';
 import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
@@ -40,6 +41,7 @@ const navItems = [
   { id: 'shifts',     label: 'Rozvrh',     icon: 'calendar' },
   { id: 'inventory',  label: 'Sklad',      icon: 'box' },
   { id: 'menu',       label: 'Menu',       icon: 'leaf' },
+  { id: 'recipes',    label: 'Receptury',  icon: 'clipboard' },
   { id: 'procedures', label: 'Postupy',    icon: 'clipboard' },
   { id: 'tasks',      label: 'Úkoly',      icon: 'check' },
   { id: 'chat',       label: 'Chat',       icon: 'chat' }, // mobile dock only
@@ -59,7 +61,7 @@ const navItems = [
 const navSections: { title: string | null; ids: string[] }[] = [
   { title: null,           ids: ['overview'] },
   { title: 'Směny',        ids: ['shifts', 'my-shifts', 'attendance'] },
-  { title: 'Kasa & sklad', ids: ['reports', 'finance', 'inventory', 'menu'] },
+  { title: 'Kasa & sklad', ids: ['reports', 'finance', 'inventory', 'recipes', 'menu'] },
   { title: 'Práce',        ids: ['tasks', 'procedures', 'planning', 'events'] },
   { title: 'Tým',          ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
@@ -121,6 +123,7 @@ export default function EmployerLayout({ user }: Props) {
       );
       case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} />;
       case 'menu':      return <div className="px-6 pb-6 w-full max-w-3xl mx-auto"><MenuEditor /></div>;
+      case 'recipes':   return <RecipesView />;
       case 'chat':      return <ChatView user={user as any} />;
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;

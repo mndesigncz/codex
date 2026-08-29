@@ -14,9 +14,11 @@ function consume(qty: number, open: number, pkg: number, amount: number) {
     open -= amount;
     while (open < 0 && qty > 0) { qty -= 1; open += pkg; }
     if (open < 0) open = 0;
-    open = Math.round(open * 10) / 10;
+    // Three decimals: a 0,7 l bottle minus 0,02 l has to stay 0,68 — rounding
+    // to a tenth here would give the shop back 0,02 l on every drink.
+    open = Math.round(open * 1000) / 1000;
   } else {
-    qty = Math.max(0, Math.round((qty - amount) * 10) / 10);
+    qty = Math.max(0, Math.round((qty - amount) * 1000) / 1000);
   }
   return { qty, open };
 }
@@ -73,6 +75,9 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const totals = new Map<number, number>();
   const unmapped = new Map<string, { name: string; count: number }>();
   const fetched: string[] = [];
+  // What sold, per product — recorded for every product, mapped or not, so the
+  // margin analysis has a history without asking the POS again.
+  const sales = new Map<string, { name: string; qty: number }>();
 
   for (const billId of unprocessed.slice(0, 120)) {
     let items;
@@ -83,6 +88,11 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
       // from those, and a negative "sale" must not inflate the open package.
       const sold = Number(it.amount);
       if (!(sold > 0)) continue;
+      if (it.productId) {
+        const rec = sales.get(it.productId) ?? { name: it.name, qty: 0 };
+        rec.qty += sold;
+        sales.set(it.productId, rec);
+      }
       const recipe = it.productId ? mapByProduct.get(it.productId) : null;
       if (recipe && recipe.length) {
         for (const ing of recipe) {
@@ -104,7 +114,10 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const deducted: { name: string; amount: number }[] = [];
   const writes: any[] = [];
   for (const [itemId, rawAmount] of Array.from(totals.entries())) {
-    const amount = Math.round(rawAmount * 10) / 10;
+    // Millilitre / gram precision. One decimal used to be enough for „150 ml
+    // z lahve", but a cocktail takes 0,02 l of vodka — that rounded to 0.0 and
+    // the sale was silently written off as nothing at all.
+    const amount = Math.round(rawAmount * 1000) / 1000;
     if (!(amount > 0)) continue;
     const [it] = await sql`
       SELECT id, name, quantity, open_amount, package_size
@@ -144,6 +157,21 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     audit(teamId, userId, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
   }
+  // The day's sales, per product. Attributed to today's date: the sync runs on
+  // yesterday's and today's receipts, and for the margin view a day either way
+  // does not change the month.
+  const salesDay = iso(today);
+  for (const [productId, v] of Array.from(sales.entries())) {
+    try {
+      await sql`
+        INSERT INTO pos_sales (team_id, date, product_id, product_name, qty)
+        VALUES (${teamId}, ${salesDay}, ${productId}, ${v.name}, ${v.qty})
+        ON CONFLICT (team_id, date, product_id) DO UPDATE SET
+          qty = pos_sales.qty + ${v.qty},
+          product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`;
+    } catch { /* table not migrated yet — analysis simply has less history */ }
+  }
+
   // Remember what sold without a recipe — the mapping screen serves it first.
   for (const [productId, v] of Array.from(unmapped.entries())) {
     try {

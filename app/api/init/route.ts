@@ -424,6 +424,9 @@ export async function GET() {
     // A closing can belong to an off-site event (venkovní akce) — it lives
     // beside the shop's own closing for that day, never instead of it.
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS event_id INTEGER`;
+    // Tips split by how they were paid. Only the cash half ever reaches the
+    // drawer; counting card tips towards the expected cash invented a manko.
+    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_card INTEGER DEFAULT 0`;
     // Receipts snapped on the go (TO GO mode) — photo + amounts, optionally
     // pushed into the stock later.
     await sql`
@@ -859,6 +862,21 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, product_id)
       )`;
+    // What sold, per day and product. Kept on our side so the monthly margin
+    // analysis reads one table instead of re-downloading a month of bill items
+    // from the POS (that would be a request per receipt).
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_sales (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        qty NUMERIC NOT NULL DEFAULT 0,
+        UNIQUE (team_id, date, product_id)
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS pos_sales_team_date ON pos_sales (team_id, date)`;
+
     // bills already deducted — a receipt must never be written off twice
     await sql`
       CREATE TABLE IF NOT EXISTS pos_processed_bills (

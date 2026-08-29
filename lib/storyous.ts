@@ -93,11 +93,21 @@ export interface DaySummary {
   card: number;
   other: number;
   tips: number;
+  /** Tips split by how the bill was paid. Cash tips land in the drawer and are
+   *  counted with the takings; card tips never touch it. Bills whose payment
+   *  method we can't read keep their tips in `tipsOther` — reported honestly
+   *  instead of guessed into one of the two. */
+  tipsCash: number;
+  tipsCard: number;
+  tipsOther: number;
 }
 
 /** Paid, non-refunded bills of one day, summed by payment method. */
 export async function daySummary(conn: PosConnection, date: string): Promise<DaySummary> {
-  const out: DaySummary = { date, bills: 0, total: 0, cash: 0, card: 0, other: 0, tips: 0 };
+  const out: DaySummary = {
+    date, bills: 0, total: 0, cash: 0, card: 0, other: 0,
+    tips: 0, tipsCash: 0, tipsCard: 0, tipsOther: 0,
+  };
   const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
   const till = next.toISOString().slice(0, 10);
   let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${date}&till=${till}&limit=100`;
@@ -110,11 +120,12 @@ export async function daySummary(conn: PosConnection, date: string): Promise<Day
       const price = Number(b.finalPrice) || 0;
       out.bills++;
       out.total += price;
-      out.tips += Number(b.tips) || 0;
+      const tip = Number(b.tips) || 0;
+      out.tips += tip;
       const pm = String(b.paymentMethod ?? '').toLowerCase();
-      if (pm === 'cash') out.cash += price;
-      else if (pm.includes('card')) out.card += price;
-      else out.other += price;
+      if (pm === 'cash') { out.cash += price; out.tipsCash += tip; }
+      else if (pm.includes('card')) { out.card += price; out.tipsCard += tip; }
+      else { out.other += price; out.tipsOther += tip; }
     }
     path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
   }

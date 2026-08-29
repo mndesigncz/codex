@@ -455,6 +455,10 @@ export async function POST(request: Request) {
   const diffReason = b.diffReason ? String(b.diffReason).slice(0, 40) : null;
   const diffNote = b.diffNote ? String(b.diffNote).trim().slice(0, 500) || null : null;
   const denominations = normalizeDenominations(b.denominations);
+  // The card half of the tips: never in the drawer, so the expected cash must
+  // not count it. Clamped to the total — a card half larger than the whole is
+  // a typo, not data.
+  const tipsCard = Math.min(Math.max(0, Math.round(Number(b.tipsCard) || 0)), Math.max(0, num(b.tips)));
   // End-of-shift removal happens AFTER the count, so it can never exceed what
   // was counted — clamp instead of trusting the client.
   const finalRemoval = Math.min(
@@ -555,6 +559,13 @@ export async function POST(request: Request) {
         row.event_id = eventId;
       } catch { /* column not migrated yet */ }
     }
+  }
+
+  if (tipsCard > 0 && row?.id) {
+    try {
+      await sql`UPDATE cash_closings SET tips_card = ${tipsCard} WHERE id = ${row.id}`;
+      row.tips_card = tipsCard;
+    } catch { /* column not migrated yet */ }
   }
 
   // The handover rides on the closing; separate UPDATE so a not-yet-migrated

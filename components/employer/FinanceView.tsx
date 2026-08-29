@@ -43,6 +43,8 @@ export default function FinanceView() {
   const [filter, setFilter] = useState<string>('all');
   const [detail, setDetail] = useState<Row | null>(null);
 
+  const [pos, setPos] = useState<any | null>(null);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -50,6 +52,12 @@ export default function FinanceView() {
       .then(d => { if (alive && !d.error) setData(d); })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
+    // Prodeje z pokladny proti recepturám a cenám skladu — marže po položkách.
+    // Načítá se zvlášť, aby chybějící pokladna nezdržela zbytek přehledu.
+    setPos(null);
+    fetch(`/api/pos/margins?month=${month}`).then(r => r.json())
+      .then(d => { if (alive && d?.connected && d?.ready) setPos(d); })
+      .catch(() => {});
     return () => { alive = false; };
   }, [month]);
 
@@ -208,6 +216,71 @@ export default function FinanceView() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Co vydělává — z pokladny přes receptury na ceny skladu */}
+          {pos && pos.items?.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-end justify-between gap-3 px-1">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Co vydělává (z pokladny)</h3>
+                {pos.totals?.marginPct != null && (
+                  <span className="text-xs text-black/45">
+                    marže <b className="text-[#5B7A08]">{pos.totals.marginPct} %</b> na položkách s recepturou
+                  </span>
+                )}
+              </div>
+
+              {(pos.insights ?? []).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 stagger">
+                  {pos.insights.map((ins: Insight, i: number) => (
+                    <div key={i} className={`rounded-2xl border p-4 ${TONES[ins.tone]}`}>
+                      <p className="text-sm font-bold flex items-center gap-2">
+                        <Icon name={ins.icon as any} size={16} className="shrink-0" /> {ins.title}
+                      </p>
+                      <p className="text-[13px] mt-1 opacity-80">{ins.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="glass-card overflow-hidden">
+                <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-black/40 border-b border-black/[0.06]">
+                  <span className="flex-1">Položka</span>
+                  <span className="w-16 text-right">Prodáno</span>
+                  <span className="w-24 text-right">Tržba</span>
+                  <span className="w-24 text-right">Suroviny</span>
+                  <span className="w-20 text-right">Marže</span>
+                </div>
+                <div className="divide-y divide-black/[0.06] max-h-[420px] overflow-y-auto">
+                  {pos.items.map((it: any) => (
+                    <div key={it.productId} className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#16181A] truncate">{it.name}</p>
+                        <p className="text-[11px] text-black/40 truncate">
+                          {it.category || 'bez kategorie'}
+                          {it.cost == null && <span className="text-amber-700"> · bez receptury</span>}
+                        </p>
+                      </div>
+                      <span className="w-16 text-right text-sm tabular text-black/60">{Math.round(it.qty)}×</span>
+                      <span className="w-24 text-right text-sm tabular font-semibold text-[#16181A]">
+                        {it.revenue != null ? money(it.revenue) : '—'}
+                      </span>
+                      <span className="w-24 text-right text-sm tabular text-black/55">
+                        {it.cost != null ? money(it.cost * it.qty) : '—'}
+                      </span>
+                      <span className={`w-20 text-right text-sm tabular font-bold ${
+                        it.marginPct == null ? 'text-black/30'
+                          : it.marginPct >= 65 ? 'text-[#5B7A08]'
+                          : it.marginPct >= 45 ? 'text-[#16181A]' : 'text-red-600'
+                      }`}>
+                        {it.marginPct != null ? `${it.marginPct} %` : '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {pos.menuError && <p className="text-xs text-amber-700 px-1">{pos.menuError}</p>}
             </div>
           )}
 

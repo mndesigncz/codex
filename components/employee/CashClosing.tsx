@@ -19,13 +19,15 @@ const today = () => pragueToday();
 
 type FormState = {
   date: string; shiftLabel: string;
+  /** The card part of `tips` — evidence only, never in the drawer. */
+  tipsCard: string;
   openingCash: string; cashRevenue: string; cardRevenue: string; tips: string;
   expenses: string; cashRemoved: string; selfPayout: string; closingCash: string;
   customers: string; notes: string;
 };
 
 const emptyForm = (): FormState => ({
-  date: today(), shiftLabel: '',
+  date: today(), shiftLabel: '', tipsCard: '',
   openingCash: '', cashRevenue: '', cardRevenue: '', tips: '',
   expenses: '', cashRemoved: '', selfPayout: '', closingCash: '',
   customers: '', notes: '',
@@ -462,6 +464,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // Live preview of expected drawer cash and difference.
   const preview = {
     opening_cash: n(form.openingCash), cash_revenue: n(form.cashRevenue), tips: n(form.tips),
+    tips_card: n(form.tipsCard),
     card_revenue: n(form.cardRevenue),
     expenses: effExpenses, cash_removed: effRemoved, self_payout: effPayout,
     closing_cash: n(form.closingCash), payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer,
@@ -541,7 +544,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           date: form.date, shiftLabel: form.shiftLabel,
           shiftId: pickedShiftId ?? undefined,
           openingCash: n(form.openingCash), cashRevenue: n(form.cashRevenue), cardRevenue: n(form.cardRevenue),
-          tips: n(form.tips), expenses: effExpenses, cashRemoved: effRemoved,
+          tips: n(form.tips), tipsCard: n(form.tipsCard), expenses: effExpenses, cashRemoved: effRemoved,
           selfPayout: effPayout, closingCash: n(form.closingCash),
           customers: n(form.customers), notes: form.notes,
           payoutFromRegister, tipsInDrawer,
@@ -839,7 +842,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-[#16181A] min-w-0">
                   💳 Pokladna {pos.placeName ? `(${pos.placeName})` : 'Storyous'}
-                  <span className="font-normal text-black/50"> · {pos.bills} účtenek · hotově {money(pos.cash)} · kartou {money(pos.card)}{pos.other > 0 ? ` · jinak ${money(pos.other)}` : ''}{pos.tips > 0 ? ` · spropitné ${money(pos.tips)}` : ''}</span>
+                  <span className="font-normal text-black/50"> · {pos.bills} účtenek · hotově {money(pos.cash)} · kartou {money(pos.card)}{pos.other > 0 ? ` · jinak ${money(pos.other)}` : ''}{pos.tips > 0 ? ` · spropitné ${money(pos.tips)}` : ''}
+                    {pos.tips > 0 && (pos.tipsCard > 0 || pos.tipsCash > 0)
+                      ? ` (hotově ${money(pos.tipsCash ?? 0)} · kartou ${money(pos.tipsCard ?? 0)}${(pos.tipsOther ?? 0) > 0 ? ` · nerozlišeno ${money(pos.tipsOther)}` : ''})`
+                      : ''}</span>
                 </p>
                 <button type="button"
                   onClick={() => setForm(f => ({
@@ -847,6 +853,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     cashRevenue: String(pos.cash),
                     cardRevenue: String(pos.card + pos.other),
                     tips: pos.tips > 0 ? String(pos.tips) : f.tips,
+                    tipsCard: pos.tipsCard != null && pos.tipsCard > 0 ? String(pos.tipsCard) : f.tipsCard,
                   }))}
                   className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-bold hover:bg-black transition">
                   Předvyplnit z pokladny
@@ -857,10 +864,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {field('Tržba hotově', 'cashRevenue', { hint: 'Hotovost přijatá do kasy.' })}
             {field('Tržba kartou', 'cardRevenue', { hint: 'Nejde do kasy — jen evidence.' })}
-            {field('Spropitné', 'tips', {
+            {field('Spropitné celkem', 'tips', {
               hint: tipsInDrawer
-                ? 'Zůstává v kase — připočte se k očekávanému stavu.'
+                ? 'Hotovostní část zůstává v kase a počítá se k očekávanému stavu.'
                 : 'Bereš ho stranou — očekávaný stav kasy neovlivní.',
+            })}
+            {field('Z toho kartou', 'tipsCard', {
+              hint: 'Do kasy se nedostane — jen evidence. Zbytek bereme jako hotovost.',
             })}
             {field('Zákazníků (volitelné)', 'customers', { unit: null, placeholder: 'počet' })}
           </div>
