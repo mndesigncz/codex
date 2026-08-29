@@ -339,7 +339,7 @@ export default function FinanceView() {
               <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> {detail.label}
               </h3>
-              <button onClick={() => setDetail(null)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+              <button onClick={() => setDetail(null)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             <p className="text-sm text-black/50">
               {new Date(detail.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}

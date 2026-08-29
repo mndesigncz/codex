@@ -866,14 +866,15 @@ export default function ScheduleBuilder({ user }: Props) {
             )}
           </div>
 
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Toolbar — jedna hlavní akce, zbytek vedle ní tiše. Sedm stejně
+              hlasitých tlačítek vedle sebe neříká, čím začít. */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={generate}
               disabled={generating}
               className="rounded-full bg-[#16181A] text-white font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-125 transition inline-flex items-center gap-2 disabled:opacity-50"
             >
-              <span>✨</span> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
+              <Icon name="bulb" size={18} /> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
             </button>
             <button
               onClick={runAdjust}
@@ -881,7 +882,7 @@ export default function ScheduleBuilder({ user }: Props) {
               title={shifts.length === 0 ? 'Nejdřív musí existovat uložený rozvrh' : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti a navrhne přeobsazení'}
               className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-semibold px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 disabled:opacity-40"
             >
-              <span>🪄</span> {adjusting ? 'Kontroluji…' : 'Upravit podle nových požadavků'}
+              <Icon name="swap" size={18} /> {adjusting ? 'Kontroluji…' : 'Upravit podle nových požadavků'}
             </button>
             <button
               onClick={publish}
@@ -893,21 +894,21 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={exportCsv}
               disabled={shifts.length === 0}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 disabled:opacity-40"
+              className="rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 text-black/60 hover:text-black hover:bg-black/[0.05] disabled:opacity-40"
             >
-              <Icon name="trend" size={18} /> Export CSV
+              <Icon name="trend" size={16} /> Export CSV
             </button>
             <button
               onClick={() => { setCopyOpen(true); setCopyMsg(''); setCopySrc(''); setCopyDst(''); }}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2"
+              className="rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 text-black/60 hover:text-black hover:bg-black/[0.05]"
             >
-              <Icon name="swap" size={18} /> Kopírovat týden
+              <Icon name="swap" size={16} /> Kopírovat týden
             </button>
             <button
               onClick={() => fileRef.current?.click()}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2"
+              className="rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 text-black/60 hover:text-black hover:bg-black/[0.05]"
             >
-              <Icon name="plus" size={18} /> Import CSV
+              <Icon name="plus" size={16} /> Import CSV
             </button>
             <input
               ref={fileRef}
@@ -922,13 +923,13 @@ export default function ScheduleBuilder({ user }: Props) {
             />
             <button
               onClick={() => (confirmClear ? clearMonth() : setConfirmClear(true))}
-              className={`rounded-full px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 border ${
+              className={`rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 ${
                 confirmClear
-                  ? 'bg-red-500/20 border-red-500/40 text-red-500'
-                  : 'glass border-black/10 text-black/70 hover:bg-black/[0.05]'
+                  ? 'bg-red-500/15 border border-red-500/35 text-red-600 font-semibold'
+                  : 'text-red-600/60 hover:text-red-600 hover:bg-red-500/[0.07]'
               }`}
             >
-              <Icon name="warning" size={18} /> {confirmClear ? 'Opravdu vymazat?' : 'Vymazat měsíc'}
+              <Icon name="warning" size={16} /> {confirmClear ? 'Opravdu vymazat?' : 'Vymazat měsíc'}
             </button>
             {confirmClear && (
               <button onClick={() => setConfirmClear(false)} className="text-black/45 text-sm hover:text-black">
@@ -2497,7 +2498,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
             <p className="text-xs text-black/45 capitalize">{monthLabel(month)}</p>
           </div>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0">✕</button>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0"><Icon name="close" size={15} /></button>
         </div>
 
         <p className="text-xs text-black/45">

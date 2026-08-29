@@ -108,6 +108,19 @@ input::-webkit-date-and-time-value { text-align: left; }
   box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
+/* Spodní lišta na telefonu leží nad obsahem, ne vedle něj — potřebuje víc
+   krytí než plovoucí panel, jinak se pod popiskami čte text stránky. */
+.dock-strong {
+  background: rgba(252,253,250,0.97);
+  backdrop-filter: blur(30px) saturate(1.6);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,0.75);
+}
+:root[data-theme="dark"] .dock-strong {
+  background: rgba(22,24,26,0.97);
+  border-color: rgba(255,255,255,0.10);
+}
+
 /* ---------- Dark charcoal panels (nav rail, topbar, dock) ---------- */
 .panel-dark {
   background: rgba(17,18,20,0.88);
@@ -127,6 +140,28 @@ input::-webkit-date-and-time-value { text-align: left; }
 /* ---------- Form controls ---------- */
 select option { background-color: #ffffff; color: #16181A; }
 .panel-dark select option { background-color: #1a1a1e; color: #fff; }
+
+/* ---------- Prohlížečové povrchy ----------
+   Výběr textu, kurzor, ohnisko a posuvník kreslí prohlížeč. Ve výchozím
+   modrém odstínu nepatří k ničemu — proto je bereme z palety podniku. */
+::selection { background: rgba(200,245,66,0.42); color: #16181A; }
+:root[data-theme="dark"] ::selection { background: rgba(200,245,66,0.30); color: #F2F4EE; }
+input, textarea, [contenteditable] { caret-color: #5B7A08; }
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea { caret-color: #C8F542; }
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid rgba(143,184,17,0.65);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Okraj vodorovného posuvníku — useknutá dlaždice musí vypadat useknutě,
+   ne rozbitě. Maska nechá poslední kousek zesvětlat do ztracena. */
+.scroll-fade-x {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+.scroll-fade-x.at-end { -webkit-mask-image: none; mask-image: none; }
 
 /* ---------- Scrollbars ---------- */
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
@@ -245,8 +280,9 @@ select option { background-color: #ffffff; color: #16181A; }
 :root {
   /* Critically damped feel: quick out, soft settle, no overshoot. */
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.3, 1);
-  /* A single, tiny overshoot — only for things a gesture threw. */
-  --ease-spring: cubic-bezier(0.34, 1.32, 0.5, 1);
+  /* Jediné, drobné přeběhnutí — jen tam, kde něco odhodí gesto. Původních
+     1.32 už bylo cítit jako odskok; 1.12 dá pohybu život, ne pružinu. */
+  --ease-spring: cubic-bezier(0.34, 1.12, 0.42, 1);
   --dur-1: 0.12s;   /* press feedback */
   --dur-2: 0.22s;   /* state change */
   --dur-3: 0.34s;   /* surface arriving */

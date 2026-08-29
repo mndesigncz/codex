@@ -418,7 +418,7 @@ export default function Procedures({ user }: Props) {
             <div className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between gap-3 mb-1">
                 <h3 className="text-lg font-bold tracking-tight text-[#16181A] min-w-0">{runDetail.procedure_name}</h3>
-                <button onClick={() => setRunDetail(null)} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+                <button onClick={() => setRunDetail(null)} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
               </div>
               <p className="text-sm text-black/50 mb-4">
                 {runDetail.user_avatar ?? '👤'} {runDetail.user_name} · {fmtWhen(runDetail.completed_at || runDetail.started_at)} · {fmtDuration(runDetail.duration_seconds)}

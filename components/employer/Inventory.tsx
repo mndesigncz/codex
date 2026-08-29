@@ -1269,7 +1269,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">📦 Hlášení ze skladu</h3>
-              <button onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+              <button onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             {reports.length === 0 ? (
               <p className="text-black/45 text-sm text-center py-8">Žádná hlášení od zaměstnanců.</p>
@@ -1677,8 +1677,10 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
-                <button onClick={() => openEdit(i)} title="Upravit" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
-                <button onClick={() => remove(i)} title="Smazat" className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+                <button onClick={() => openEdit(i)} title="Upravit" aria-label="Upravit"
+                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black"><Icon name="pencil" size={15} /></button>
+                <button onClick={() => remove(i)} title="Smazat" aria-label="Smazat"
+                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600"><Icon name="trash" size={15} /></button>
               </div>
             </div>
           );
@@ -1705,7 +1707,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
         return (
           <div key={i.id}
             onClick={selecting ? () => onToggle(i.id) : undefined}
-            className={`glass-card p-5 transition ${
+            className={`glass-card p-5 flex flex-col h-full transition ${
               selecting ? `cursor-pointer ${selected.has(i.id) ? 'ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.02]'}` : ''
             }`}>
             <div className="flex items-start justify-between gap-2">
@@ -1728,14 +1730,14 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
               return (
                 <div className={`mt-2.5 flex flex-wrap items-center justify-between gap-2 ${selecting ? 'hidden' : ''}`}>
                   <span className="text-xs text-black/55 tabular-nums min-w-0">
-                    🍾 {formatStock(i, cu, i.unit)}
+                    <Icon name="box" size={13} className="inline-block -mt-0.5 mr-1 text-black/35" />{formatStock(i, cu, i.unit)}
                     {cu ? <span className="text-black/35"> · celkem {fmtAmount(totalContent(i))} {cu}</span> : null}
                   </span>
                   <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} />
                 </div>
               );
             })()}
-            <div className={`mt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
+            <div className={`mt-auto pt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">−</button>
                 <span className="text-lg font-bold text-[#16181A] w-16 text-center tabular-nums">{i.quantity} <span className="text-xs text-black/45">{i.unit}</span></span>
@@ -1748,8 +1750,10 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
-                <button onClick={() => openEdit(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm">✎</button>
-                <button onClick={() => remove(i)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+                <button onClick={() => openEdit(i)} title="Upravit" aria-label="Upravit"
+                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black"><Icon name="pencil" size={15} /></button>
+                <button onClick={() => remove(i)} title="Smazat" aria-label="Smazat"
+                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600"><Icon name="trash" size={15} /></button>
               </div>
             </div>
             <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
@@ -2398,7 +2402,7 @@ function CategoryRow({
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
           <Icon name="box" size={15} />
         </button>
-        <button onClick={startEdit} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm">✎</button>
+        <button onClick={startEdit} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
         <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
       </div>
 
@@ -2675,7 +2679,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
       <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">🚚 Dodavatelé</h3>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black">✕</button>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
@@ -2714,7 +2718,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                   <>
                     <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-amber-700'}`}>{sp.email ?? 'bez e-mailu'}</span>
                     <button onClick={() => { setEditId(sp.id); setEditEmail(sp.email ?? ''); }}
-                      className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-black text-xs">✎</button>
+                      className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-black text-xs"><Icon name="pencil" size={15} /></button>
                     <button onClick={async () => {
                       if (!confirm(`Smazat dodavatele „${sp.name}"?`)) return;
                       const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
