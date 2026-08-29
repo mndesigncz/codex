@@ -926,12 +926,23 @@ export async function GET() {
           END LOOP;
         END
         $do$;`;
+      // The bare `CREATE UNIQUE INDEX` returned without error and left no
+      // index behind — proven by asking the catalogue right after it. The DROP
+      // in the DO block above did take effect, so the creation goes through the
+      // same door: one server-side statement, which sidesteps whatever the HTTP
+      // driver does with standalone DDL.
       const [before] = await sql`SELECT to_regclass('cash_closings_one_per_shift') AS reg`;
       if (before?.reg == null) {
         await sql`
-          CREATE UNIQUE INDEX cash_closings_one_per_shift
-          ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
-          WHERE covered_by IS NULL AND event_id IS NULL`;
+          DO $do$
+          BEGIN
+            IF to_regclass('cash_closings_one_per_shift') IS NULL THEN
+              CREATE UNIQUE INDEX cash_closings_one_per_shift
+              ON cash_closings (created_by, date, (COALESCE(shift_id, 0)))
+              WHERE covered_by IS NULL AND event_id IS NULL;
+            END IF;
+          END
+          $do$;`;
       }
       // Report what the database says NOW, not what the statement claimed —
       // a migration that reports a success it did not achieve is how this bug
