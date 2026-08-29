@@ -1,13 +1,15 @@
-// Hourly watchdog for forgotten clock-outs (cron):
-//  1. Shift end passed and the person is still clocked in → one push reminder.
-//  2. Entry open longer than 12 h → close it automatically at the planned
-//     shift end (or +12 h), flag it for review, tell both sides.
+// Hlídač zapomenutých odpíchnutí (cron):
+//  1. Směna podle plánu skončila a člověk je pořád píchnutý → jedno pripomenutí.
+//  2. Zavírat smí až noční průchod, kdy v podniku prokazatelně nikdo není.
+//     Večerní běh připomíná, ale nezavírá — ve tři čtvrtě na dvanáct se
+//     v čajovně ještě pracuje a ukončit někomu směnu uprostřed práce znamená
+//     sebrat mu odpracované hodiny a nechat den bez uzávěrky.
 // Protected like the other crons: Vercel sends Authorization: Bearer $CRON_SECRET.
 
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { autoCloseEntry, plannedEndFor, STALE_AFTER_MS } from '@/lib/staleShifts';
+import { autoCloseEntry, plannedEndFor, isForgottenClockOut } from '@/lib/staleShifts';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,8 +42,8 @@ export async function GET(request: Request) {
     const inTs = new Date(e.clock_in);
     const openMs = now - inTs.getTime();
 
-    // 12+ h → this is not a shift any more; close and flag.
-    if (openMs > STALE_AFTER_MS) {
+    // Zapomenuté odpíchnutí — pozná se podle denní doby, ne podle délky.
+    if (isForgottenClockOut(inTs)) {
       try {
         const row = await autoCloseEntry(e);
         if (row) closed++;
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
     try {
       await notifyUser(e.employee_id, {
         title: '🕐 Pořád jsi na směně?',
-        body: 'Směna ti už skončila a pořád jsi odpíchnutý/á. Jestli už jsi doma, odpíchni si odchod — jinak se směna po čase uzavře sama.',
+        body: 'Směna ti už skončila a pořád jsi odpíchnutý/á. Jestli ještě pracuješ, nic neřeš. Jestli jsi doma, odpíchni si odchod — jinak ho v noci doplníme za tebe podle uzávěrky a ráno to bude chtít zkontrolovat.',
         type: 'warning',
         category: 'shift',
         link: '/employee/shifts',

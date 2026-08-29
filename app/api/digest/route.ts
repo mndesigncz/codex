@@ -58,6 +58,19 @@ export async function GET(request: Request) {
         worked = (rows as any[]).map(r => ({ name: r.name, hours: Math.round((Number(r.secs) || 0) / 360) / 10 }));
       } catch { /* ignore */ }
 
+      // Kdo je v půl dvanácté večer pořád píchnutý. Souhrn chodí uprostřed
+      // provozu, takže „odpracováno" ještě není konečné číslo — kdyby tu tihle
+      // lidé chyběli, vypadalo by to, že se ten večer nepracovalo.
+      let stillOn: string[] = [];
+      try {
+        const rows = await sql`
+          SELECT u.name FROM time_entries te JOIN users u ON u.id = te.employee_id
+          WHERE te.team_id = ${team.id} AND te.clock_out IS NULL
+            AND te.clock_in > NOW() - INTERVAL '20 hours'
+          ORDER BY u.name`;
+        stillOn = (rows as any[]).map(r => String(r.name));
+      } catch { /* ignore */ }
+
       // --- required procedures ---
       let procsMissing: string[] = [];
       try {
@@ -147,14 +160,14 @@ export async function GET(request: Request) {
       } catch { /* ignore */ }
 
       // Nothing at all happened and nothing needs eyes — stay silent.
-      if (closings.length === 0 && worked.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0) continue;
+      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0) continue;
 
       const verdict = real.length === 0
         ? 'uzávěrka chybí'
         : diff === 0 ? 'kasa sedí ✓' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
       const pushBody = [
         real.length ? `Tržba ${czk(revenue)} · ${verdict}` : 'Bez uzávěrky',
-        worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` : null,
+        worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` + (stillOn.length ? `, ${stillOn.length} ještě na směně` : '') : stillOn.length ? `${stillOn.length} ještě na směně` : null,
         procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
         lowCount ? `${lowCount} položek dochází` : null,
         tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
@@ -165,7 +178,7 @@ export async function GET(request: Request) {
         <table style="width:100%; border-collapse: collapse; font-size: 15px;">
           <tr><td style="padding:8px 0; color:#666;">Tržba</td><td style="text-align:right; font-weight:700;">${czk(revenue)}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${verdict}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${worked.length ? worked.map(w => `${w.name} (${w.hours} h)`).join(', ') : '—'}</td></tr>
+          <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${[...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + procsMissing.join(', ') : 'hotové ✓'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' : 'nic ✓'}</td></tr>
           ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${posLine.replace('Pokladna: ', '')}</td></tr>` : ''}
