@@ -369,11 +369,14 @@ export async function GET(req: NextRequest) {
     }
   } catch { blind.push('Docházku se nepodařilo načíst, takže mzdové náklady v doporučeních chybí.'); }
 
+  const workedLabel = workedMin >= 60
+    ? `${Math.round(workedMin / 60)} hodin`
+    : `${Math.round(workedMin)} minut`;
   if (workedMin > 0 && wageCost === 0) {
     add({
       group: 'people', tone: 'warn', icon: 'users',
       title: 'U zaměstnanců není hodinová sazba',
-      text: `Odpracovalo se ${Math.round(workedMin / 60)} hodin, ale bez sazby se z toho nedá spočítat mzdový náklad ani podíl na tržbě.`,
+      text: `Odpracovalo se ${workedLabel}, ale bez sazby se z toho nedá spočítat mzdový náklad ani podíl na tržbě.`,
       action: 'Doplň hodinovou sazbu v profilu každého člena týmu. Je to jedno číslo a odemkne celý blok doporučení k provozu.',
     });
   }
@@ -428,6 +431,10 @@ export async function GET(req: NextRequest) {
       SELECT COUNT(DISTINCT to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD'))::int AS days
       FROM time_entries te
       WHERE te.team_id = ${teamId}
+        -- Pár minut není směna, jen omylem píchnutý příchod. Bez téhle
+        -- hranice by appka hlásila chybějící uzávěrku za den, kdy se
+        -- nepracovalo.
+        AND (te.clock_out IS NULL OR te.clock_out - te.clock_in >= INTERVAL '30 minutes')
         AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') >= ${from}
         AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') < ${till}
         AND NOT EXISTS (
