@@ -805,8 +805,11 @@ export default function ClosingsOverview() {
             return (
               <div key={c.id} className="glass-card overflow-hidden">
                 <button onClick={() => setDetailId(c.id)} aria-label="Otevřít detail uzávěrky"
-                  className="w-full text-left p-5 flex items-center justify-between gap-3 hover:bg-black/[0.02] active:bg-black/[0.04] transition-colors">
-                  <div className="min-w-0 flex items-center gap-3">
+                  className="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-x-3 gap-y-2 flex-wrap hover:bg-black/[0.02] active:bg-black/[0.04] transition-colors">
+                  {/* basis-full: na telefonu si datum a směna berou celý řádek,
+                      odznaky se zalomí pod ně. Bez toho zbylo na „Směna: …"
+                      padesát pixelů. */}
+                  <div className="min-w-0 basis-full sm:basis-0 sm:flex-1 flex items-center gap-3">
                     <PersonLink id={c.created_by} className="text-lg flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</PersonLink>
                     <div className="min-w-0">
                       <p className="font-bold tracking-tight text-[#16181A] truncate">

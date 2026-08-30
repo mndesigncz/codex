@@ -399,7 +399,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold tracking-tight text-[#16181A]">Nízké zásoby</h3>
-                  <button onClick={() => onNavigate('inventory')} className="text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
+                  <button onClick={() => onNavigate('inventory')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
                 </div>
                 {lowStock.length === 0 ? (
                   <p className="text-sm text-black/45">Zásoby jsou v pořádku.</p>
@@ -422,7 +422,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold tracking-tight text-[#16181A]">Dnešní směny</h3>
-                  <button onClick={() => onNavigate('shifts')} className="text-sm text-[#5B7A08] hover:brightness-110">Rozvrh →</button>
+                  <button onClick={() => onNavigate('shifts')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Rozvrh →</button>
                 </div>
                 {todayShifts.length === 0 ? (
                   <p className="text-sm text-black/45">Dnes nejsou naplánované žádné směny.</p>
@@ -463,7 +463,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 <span className="text-black/35 font-semibold tabular">{steps.length - remaining.length}/{steps.length}</span>
               </p>
               <button onClick={() => { setOnboardingDismissed(true); try { localStorage.setItem('managero-onboarding-dismissed', '1'); } catch {} }}
-                className="shrink-0 text-xs font-semibold text-black/40 hover:text-black transition">Skrýt</button>
+                className="tap-target-sm shrink-0 text-xs font-semibold text-black/40 hover:text-black transition">Skrýt</button>
             </div>
             <div className="space-y-1.5">
               {steps.map((st, i) => (

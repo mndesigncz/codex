@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { pragueToday } from '@/lib/pragueTime';
+import TeamSchedule from './TeamSchedule';
 
 interface Shift {
   id: number;
@@ -134,6 +135,9 @@ export default function MyShifts({ user }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Kdo má kdy směnu — vidí se jen když to vedení nechá zapnuté. */}
+      <TeamSchedule />
 
       {timeOff.length > 0 && (
         <div className="glass-card p-5">

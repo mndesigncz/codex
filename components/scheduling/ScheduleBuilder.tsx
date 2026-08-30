@@ -647,7 +647,7 @@ export default function ScheduleBuilder({ user }: Props) {
               <button
                 key={m}
                 onClick={() => setMonth(m)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium capitalize whitespace-nowrap transition ${
+                className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-medium capitalize whitespace-nowrap transition ${
                   month === m ? 'bg-[#16181A] text-white font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
                 }`}
               >

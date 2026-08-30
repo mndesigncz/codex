@@ -302,22 +302,22 @@ export function WhoIsWorking() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 mt-3.5">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 mt-3.5">
         {onShift.map(m => {
           const isActive = m.id === activeId;
           return (
             <div key={m.id} className="relative">
               <button
                 onClick={() => selectPerson(m.id)}
-                className={`w-full text-left rounded-3xl p-4 pr-12 min-h-[112px] border transition active:scale-[0.98] ${
+                className={`w-full text-left rounded-3xl p-3.5 pr-10 sm:p-4 sm:pr-12 min-h-[112px] border transition active:scale-[0.98] ${
                   isActive
                     ? 'bg-[#C8F542]/[0.18] border-[#C8F542] ring-2 ring-[#C8F542]/35'
                     : 'glass-card hover:bg-black/[0.03]'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl leading-none">{m.avatar || '👤'}</span>
-                  <span className="min-w-0">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <span className="text-3xl sm:text-4xl leading-none shrink-0">{m.avatar || '👤'}</span>
+                  <span className="min-w-0 flex-1">
                     <span className="block font-bold text-[#16181A] truncate">{m.name}</span>
                     <span className="block text-sm font-semibold text-[#5B7A08] tabular-nums">
                       {elapsed(m.openSince!, now)}

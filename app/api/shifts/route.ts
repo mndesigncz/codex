@@ -71,6 +71,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(rows.map((r: any) => shape(r, resolve)));
   }
 
+  // Náhled rozvrhu celého týmu. Zaměstnanec ho dostane jen když ho vedení
+  // nechá zapnutý — a jen jako jména a časy, bez sazeb a bez čehokoli, co
+  // do rozvrhu nepatří.
+  if (searchParams.get('team') === '1' && c.teamId) {
+    if (c.role !== 'employer') {
+      let allowed = true;
+      try {
+        const [t] = await sql`SELECT show_team_schedule FROM teams WHERE id = ${c.teamId}`;
+        allowed = t?.show_team_schedule !== false;
+      } catch { /* sloupec ještě není — výchozí je vidět */ }
+      if (!allowed) return NextResponse.json({ shifts: [], people: [], enabled: false });
+    }
+    const resolveTeam = await typeResolver(c.teamId);
+    const month = searchParams.get('month');
+    const rows = /^\d{4}-\d{2}$/.test(String(month))
+      ? await sql`
+          SELECT s.*, u.name AS employee_name, u.avatar AS employee_avatar
+          FROM shifts s JOIN users u ON u.id = s.employee_id
+          WHERE (u.team_id = ${c.teamId} OR s.team_id = ${c.teamId})
+            AND to_char(s.date::date, 'YYYY-MM') = ${month}
+          ORDER BY s.date ASC, s.start_time ASC`
+      : await sql`
+          SELECT s.*, u.name AS employee_name, u.avatar AS employee_avatar
+          FROM shifts s JOIN users u ON u.id = s.employee_id
+          WHERE (u.team_id = ${c.teamId} OR s.team_id = ${c.teamId})
+          ORDER BY s.date ASC, s.start_time ASC`;
+    return NextResponse.json({
+      enabled: true,
+      shifts: (rows as any[]).map(r => ({
+        ...shape(r, resolveTeam),
+        employeeName: r.employee_name,
+        employeeAvatar: r.employee_avatar,
+        isMine: r.employee_id === c.meId,
+      })),
+    });
+  }
+
   const resolve = await typeResolver(c.teamId);
   if (c.role === 'employer' && c.teamId) {
     const rows = await sql`

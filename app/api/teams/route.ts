@@ -38,6 +38,7 @@ export async function GET() {
     let payDailyCash = false;
     let closingRequiresShift = true;
     let payoutFromRegister = true;
+    let showTeamSchedule = true;
     try {
       const [extra] = await sql`SELECT pay_daily_cash, closing_requires_shift FROM teams WHERE id = ${teamId}`;
       payDailyCash = !!extra?.pay_daily_cash;
@@ -46,6 +47,10 @@ export async function GET() {
     try {
       const [extra] = await sql`SELECT payout_from_register FROM teams WHERE id = ${teamId}`;
       payoutFromRegister = extra?.payout_from_register !== false;
+    } catch { /* column not migrated yet */ }
+    try {
+      const [extra] = await sql`SELECT show_team_schedule FROM teams WHERE id = ${teamId}`;
+      showTeamSchedule = extra?.show_team_schedule !== false;
     } catch { /* column not migrated yet */ }
 
     // Do cash tips physically stay in the drawer? Drives the expected-cash math.
@@ -123,7 +128,7 @@ export async function GET() {
     return NextResponse.json({
       planInfo,
       pinnedShare,
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -140,6 +145,7 @@ export async function PATCH(request: Request) {
   const sql = neon(process.env.DATABASE_URL!);
   const body = await request.json();
   const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, tipsInDrawer, dashboardConfig,
+          showTeamSchedule,
           levelsConfig, pointsConfig,
           currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body;
 
@@ -159,6 +165,9 @@ export async function PATCH(request: Request) {
     try { await sql`UPDATE teams SET drawer_float = ${df} WHERE id = ${team.id}`; } catch { /* not migrated */ }
   }
   if (typeof closingRequiresShift === 'boolean') await sql`UPDATE teams SET closing_requires_shift = ${closingRequiresShift} WHERE id = ${team.id}`;
+  if (typeof showTeamSchedule === 'boolean') {
+    try { await sql`UPDATE teams SET show_team_schedule = ${showTeamSchedule} WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  }
   if (typeof payoutFromRegister === 'boolean') {
     try { await sql`UPDATE teams SET payout_from_register = ${payoutFromRegister} WHERE id = ${team.id}`; } catch { /* not migrated */ }
   }
