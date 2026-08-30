@@ -324,7 +324,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
               <div className="flex flex-wrap gap-1.5">
                 {unmapped.map((u: any) => (
                   <button key={u.productId} onClick={() => openEditor(u.productId, u.productName ?? u.productId)}
-                    className="rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
+                    className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-2 text-xs font-semibold text-[#16181A] transition active:scale-95">
                     {u.productName ?? u.productId}
                     <span className="ml-1.5 text-amber-700 tabular">{Number(u.soldCount) || 0}×</span>
                   </button>
@@ -383,7 +383,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
                   className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-black/[0.02] transition">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${r ? 'bg-[#C8F542]' : 'bg-amber-500'}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#16181A] truncate">{p.name}</p>
+                    <p className="text-sm font-semibold text-[#16181A] line-clamp-2 sm:truncate">{p.name}</p>
                     <p className="text-[11px] text-black/45 truncate">
                       {r
                         ? r.ingredients.map((ing: any) =>

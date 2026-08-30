@@ -264,21 +264,26 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="px-6 pt-5 pb-1 flex items-center gap-3 flex-shrink-0">
+        {/* Na 320px byla tahle hlavička nejtěsnější místo v aplikaci: 48 px
+            odsazení, značka, dvě ikony a nápis „☕ TO GO" nechaly na název
+            obrazovky 29 pixelů, takže z „Nastavení týmu" zbyla jedna tečka.
+            Odsazení a mezery se na telefonu zmenšily a TO GO je tam jen
+            ikona — název stránky má přednost před vším ostatním. */}
+        <header className="px-4 sm:px-6 pt-5 pb-1 flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <button onClick={() => setSidebarOpen(v => !v)} className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="menu" size={20} />
           </button>
-          <div className="md:hidden"><LogoMark size={36} /></div>
+          <div className="md:hidden shrink-0"><LogoMark size={30} /></div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>
-          <button onClick={() => setReceiptsOpen(true)} title="Účtenky"
-            className="rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+          <button onClick={() => setReceiptsOpen(true)} title="Účtenky" aria-label="Účtenky"
+            className="tap-target-sm shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="receipt" size={20} />
           </button>
-          <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu"
-            className="tap-target rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
-            ☕ TO GO
+          <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu" aria-label="Přepnout do TO GO režimu"
+            className="tap-target shrink-0 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
+            ☕<span className="hidden sm:inline"> TO GO</span>
           </button>
           <NotificationBell />
         </header>

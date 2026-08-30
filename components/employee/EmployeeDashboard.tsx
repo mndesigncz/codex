@@ -325,7 +325,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold tracking-tight text-[#16181A]">Zásoby, které docházejí</h3>
-                  <button onClick={() => onNavigate('inventory')} className="text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
+                  <button onClick={() => onNavigate('inventory')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lowStock.slice(0, 8).map(i => (

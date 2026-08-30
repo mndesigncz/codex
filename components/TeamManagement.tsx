@@ -30,6 +30,7 @@ interface Team {
   pay_daily_cash?: boolean;
   drawer_float?: number | null;
   closing_requires_shift?: boolean;
+  show_team_schedule?: boolean;
   payout_from_register?: boolean;
   currency?: string;
   locale?: string;
@@ -202,6 +203,26 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       } else setError('Nastavení se nepodařilo uložit.');
     } catch { setError('Nastavení se nepodařilo uložit.'); }
     setSavingFloat(false);
+  };
+
+  const [savingTeamSchedule, setSavingTeamSchedule] = useState(false);
+  const toggleTeamSchedule = async (value: boolean) => {
+    setSavingTeamSchedule(true);
+    setTeam(t => (t ? { ...t, show_team_schedule: value } : t)); // optimisticky
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showTeamSchedule: value }),
+      });
+      if (res.ok) flash(value ? 'Tým teď vidí, kdo má kdy směnu.' : 'Zaměstnanci vidí jen svoje směny.');
+      else { setTeam(t => (t ? { ...t, show_team_schedule: !value } : t)); setError('Nastavení se nepodařilo uložit.'); }
+    } catch {
+      setTeam(t => (t ? { ...t, show_team_schedule: !value } : t));
+      setError('Nastavení se nepodařilo uložit.');
+    } finally {
+      setSavingTeamSchedule(false);
+    }
   };
 
   const [savingRequiresShift, setSavingRequiresShift] = useState(false);
@@ -836,6 +857,25 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             )}
           </div>
         </div>
+
+        <div className="h-px bg-black/[0.06]" />
+
+        <label className="flex items-start justify-between gap-4 cursor-pointer">
+          <div className="min-w-0">
+            <p className="font-semibold text-sm text-[#16181A]">Tým vidí rozvrh ostatních</p>
+            <p className="text-xs text-black/45 mt-0.5">Zaměstnanci uvidí, kdo má kdy směnu — jen jména a časy, žádné sazby. Když vypneš, uvidí každý jen sebe.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={team?.show_team_schedule !== false}
+            disabled={savingTeamSchedule}
+            onClick={() => toggleTeamSchedule(!(team?.show_team_schedule !== false))}
+            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.show_team_schedule !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.show_team_schedule !== false ? 'translate-x-5' : ''}`} />
+          </button>
+        </label>
 
         <div className="h-px bg-black/[0.06]" />
 

@@ -659,7 +659,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             {['Kasa', 'Tržby', 'Výdaje', 'Kontrola'].map((lbl, i) => (
               <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial min-w-0">
                 <button type="button" onClick={() => scrollToStep(i)} title={`Přejít na krok ${lbl}`}
-                  className="flex items-center gap-2 shrink-0 group">
+                  aria-label={`Přejít na krok ${lbl}`}
+                  className="tap-target-sm flex items-center gap-2 shrink-0 group">
                   <span
                     className={`grid place-items-center h-6 w-6 shrink-0 rounded-full text-[11px] font-bold transition ${
                       stepDone[i]
@@ -855,7 +856,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     tips: pos.tips > 0 ? String(pos.tips) : f.tips,
                     tipsCard: pos.tipsCard != null && pos.tipsCard > 0 ? String(pos.tipsCard) : f.tipsCard,
                   }))}
-                  className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-bold hover:bg-black transition">
+                  className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
                   Předvyplnit z pokladny
                 </button>
               </div>
@@ -994,7 +995,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   {([[false, 'Zadat celkem'], [true, 'Spočítat bankovky']] as const).map(([mode, lbl]) => (
                     <button key={String(mode)} type="button"
                       onClick={() => setCountMode(mode)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+                      className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition ${
                         countMode === mode ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
                       }`}>
                       {lbl}

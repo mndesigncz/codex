@@ -435,9 +435,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 {summary.map(s => {
                   const rate = rateById.get(s.id);
                   return (
-                    <div key={s.id} className="glass-card p-4 flex items-center gap-3 min-w-0">
+                    <div key={s.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-1.5 flex-wrap min-w-0">
                       <PersonLink id={Number(s.id)}>{avatar(s.avatar)}</PersonLink>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 basis-24">
                         <PersonLink id={Number(s.id)}><p className="font-semibold text-[#16181A] truncate">{s.name}</p></PersonLink>
                         <p className="text-xs text-black/45 truncate">
                           {s.count} {s.count === 1 ? 'směna' : s.count >= 2 && s.count <= 4 ? 'směny' : 'směn'}
@@ -480,10 +480,13 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                       const end = open ? now : new Date(e.clockOut as string).getTime();
                       const stale = open && (now - start) > STALE_MS;
                       return (
-                        <div key={e.id} className="flex items-center gap-3 flex-wrap p-3 sm:p-4">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div key={e.id} className="flex items-center gap-x-3 gap-y-2 flex-wrap p-3 sm:p-4">
+                          {/* Na úzkém telefonu si identita bere celý řádek a
+                              ovládání se zalomí pod ni. Dřív se dělila o šířku
+                              s nezalomitelným časem a jméno spadlo na 2 px. */}
+                          <div className="flex items-center gap-3 min-w-0 basis-full sm:basis-0 sm:flex-1">
                             <PersonLink id={Number(e.employeeId)}>{avatar(e.employeeAvatar, 'h-9 w-9 text-base')}</PersonLink>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <PersonLink id={Number(e.employeeId)}><p className="font-semibold text-[#16181A] truncate">{e.employeeName ?? 'Neznámý'}</p></PersonLink>
                               <p className="text-xs text-black/45 tabular-nums whitespace-nowrap">
                                 {fmtTime(e.clockIn)} – {open ? '…' : fmtTime(e.clockOut as string)}
@@ -524,7 +527,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             <div className="w-full flex items-center gap-1.5 rounded-xl bg-orange-500/[0.07] border border-orange-500/20 px-3 py-2 text-xs text-orange-700">
                               <Icon name="warning" size={13} className="shrink-0" />
                               <span className="min-w-0">{e.note}</span>
-                              <button onClick={() => openEdit(e)} className="ml-auto shrink-0 font-semibold text-orange-700 hover:underline whitespace-nowrap">Zkontrolovat čas</button>
+                              <button onClick={() => openEdit(e)} className="tap-target-sm ml-auto shrink-0 font-semibold text-orange-700 hover:underline whitespace-nowrap">Zkontrolovat čas</button>
                             </div>
                           )}
                         </div>

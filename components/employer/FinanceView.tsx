@@ -11,6 +11,7 @@ import { useMoney, useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
 import ShrinkageReport from '../inventory/ShrinkageReport';
 import LiveRevenue from './LiveRevenue';
+import FinanceAdvice from './FinanceAdvice';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -204,22 +205,9 @@ export default function FinanceView() {
             </div>
           )}
 
-          {/* Advice */}
-          {(data.insights ?? []).length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55 px-1">Rady k financím</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                {data.insights.map((ins: Insight, i: number) => (
-                  <div key={i} className={`rounded-2xl border p-4 ${TONES[ins.tone]}`}>
-                    <p className="text-sm font-bold flex items-center gap-2">
-                      <Icon name={ins.icon as any} size={16} className="shrink-0" /> {ins.title}
-                    </p>
-                    <p className="text-[13px] mt-1 opacity-80">{ins.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Doporučení — co s čísly udělat. Nahradilo krátký seznam rad;
+              dvě sady doporučení vedle sebe by si konkurovaly. */}
+          <FinanceAdvice month={month} />
 
           {/* Živý pohled na dnešek patří nad měsíční rekapitulaci — podle něj
               se rozhoduje teď, ne až na konci měsíce. */}
@@ -301,7 +289,7 @@ export default function FinanceView() {
               <div className="flex gap-1 glass rounded-full p-1 overflow-x-auto">
                 {[['all', 'Vše'], ['receipt', 'Účtenky'], ['order', 'Objednávky'], ['expense', 'Z kasy'], ['wage', 'Výplaty']].map(([id, label]) => (
                   <button key={id} onClick={() => setFilter(id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                    className={`tap-target-sm shrink-0 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${
                       filter === id ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
                     }`}>{label}</button>
                 ))}
@@ -322,8 +310,10 @@ export default function FinanceView() {
                       </span>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
                       {/* Na telefonu se „Objednávka Monin CZ" nevešla vedle data,
-                          štítku i částky — popis dostane vlastní řádek. */}
-                      <span className="w-full sm:w-auto order-last sm:order-none flex-1 min-w-0 text-sm font-medium text-[#16181A] truncate">
+                          štítku i částky — popis dostane vlastní řádek.
+                          Musí to být basis-full, ne w-full: flex-1 nastavuje
+                          flex-basis:0, a ten šířku přebije, takže se nezalomí. */}
+                      <span className="basis-full sm:basis-0 order-last sm:order-none grow min-w-0 text-sm font-medium text-[#16181A] truncate">
                         {r.label}
                         {r.note && <span className="text-black/40 font-normal"> · {r.note}</span>}
                       </span>

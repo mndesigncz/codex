@@ -84,7 +84,7 @@ function RewardsViewInner() {
         <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
           {([['board', 'Žebříček'], ['calendar', 'Kalendář'], ['settings', 'Nastavení']] as const).map(([v, lbl]) => (
             <button key={v} onClick={() => setTab(v)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${tab === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${tab === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
               {lbl}
             </button>
           ))}

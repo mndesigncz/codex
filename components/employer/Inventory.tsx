@@ -756,7 +756,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
             {low.length > 0 && <span className="text-orange-600">{low.length} dochází</span>}
           </p>
-          <p className="text-black/55 text-sm mt-1 truncate">{[...critical, ...low].map(i => i.name).join(', ')}</p>
+          <p className="text-black/55 text-sm mt-1 line-clamp-2 sm:truncate">{[...critical, ...low].map(i => i.name).join(', ')}</p>
         </div>
       )}
 

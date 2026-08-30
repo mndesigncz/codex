@@ -75,10 +75,13 @@ function KioskShell({ user }: { user: KioskUser }) {
   return (
     <div className="min-h-screen flex flex-col p-5 sm:p-8">
       {/* Header */}
-      <header className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Kiosk běží hlavně na tabletu, ale na úzkém displeji se jméno mačkalo
+          mezi značku a velké hodiny na 28 px. Identita si vezme celý řádek
+          a hodiny se zalomí pod ni. */}
+      <header className="flex items-center justify-between gap-x-4 gap-y-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0 basis-full sm:basis-0 sm:flex-1">
           <LogoMark size={44} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-bold text-lg tracking-tight text-[#16181A] truncate">{user.name}</p>
             <p className="text-sm text-black/45 capitalize truncate">{dateStr}</p>
           </div>

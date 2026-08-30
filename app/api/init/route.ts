@@ -574,6 +574,9 @@ export async function GET() {
     // ---- Cash tips: do they physically stay in the drawer? ----
     // Team default + per-closing override (mirrors payout_from_register).
     await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN DEFAULT FALSE`;
+    // Vidí zaměstnanci rozvrh celého týmu, nebo jen svoje směny? Většina
+    // podniků chce první — kdo ví, s kým bude ve službě, se domluví sám.
+    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS show_team_schedule BOOLEAN DEFAULT TRUE`;
     await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN`;
     // Itemised cash movements behind the aggregate columns, plus why the drawer
     // didn't match when it didn't.

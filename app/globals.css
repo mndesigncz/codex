@@ -145,8 +145,8 @@ select option { background-color: #ffffff; color: #16181A; }
    roztáhne dotykovou plochu na 44 px (Apple HIG), aniž by se cokoli pohnulo
    v rozvržení — kolečko u úkolu zůstane drobné, jen se do něj konečně dá
    strefit palcem. */
-.tap-target { position: relative; }
-.tap-target::before {
+.tap-target, .tap-target-sm { position: relative; }
+.tap-target::before, .tap-target-sm::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -155,7 +155,10 @@ select option { background-color: #ffffff; color: #16181A; }
   height: max(100%, 44px);
   transform: translate(-50%, -50%);
 }
-/* V hustém seznamu by se plochy překrývaly — tam stačí 36 px. */
+/* V hustém seznamu by se plochy překrývaly — tam stačí 36 px.
+   Pozor: tahle třída musí umět stát sama. Dokud jen přepisovala rozměry
+   ::before z .tap-target, byla bez ní úplně neúčinná — a tak se taky
+   půlka aplikace používala, takže „zvětšené" cíle měly pořád 16 px. */
 .tap-target-sm::before { width: max(100%, 36px); height: max(100%, 36px); }
 
 /* ---------- Prohlížečové povrchy ----------
