@@ -81,7 +81,7 @@ export default function FinanceAdvice({ month }: { month: string }) {
           <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Co zlepšit</h3>
           {advice && advice.length > 0 && (
             <p className="text-xs text-black/45 mt-0.5">
-              {advice.length} {advice.length === 1 ? 'pozorování' : advice.length < 5 ? 'pozorování' : 'pozorování'} z čísel tohohle měsíce
+              {advice.length} pozorování z čísel tohohle měsíce
               {totalImpact > 0 && <> · dohromady se tu mluví o <strong className="text-[#16181A] tabular-nums">{money(totalImpact)}</strong></>}
             </p>
           )}
