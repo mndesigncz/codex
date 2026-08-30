@@ -369,14 +369,18 @@ export async function GET(req: NextRequest) {
     }
   } catch { blind.push('Docházku se nepodařilo načíst, takže mzdové náklady v doporučeních chybí.'); }
 
+  // Čeština skloňuje podle počtu: 1 minuta, 2–4 minuty, 5+ minut. „1 minut"
+  // v jinak pečlivém textu okamžitě prozradí, že ho psal stroj.
+  const plural = (n: number, one: string, few: string, many: string) =>
+    `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
   const workedLabel = workedMin >= 60
-    ? `${Math.round(workedMin / 60)} hodin`
-    : `${Math.round(workedMin)} minut`;
+    ? plural(Math.round(workedMin / 60), 'hodina', 'hodiny', 'hodin')
+    : plural(Math.round(workedMin), 'minuta', 'minuty', 'minut');
   if (workedMin > 0 && wageCost === 0) {
     add({
       group: 'people', tone: 'warn', icon: 'users',
       title: 'U zaměstnanců není hodinová sazba',
-      text: `Odpracovalo se ${workedLabel}, ale bez sazby se z toho nedá spočítat mzdový náklad ani podíl na tržbě.`,
+      text: `V docházce je za měsíc ${workedLabel}, ale bez sazby se z toho nedá spočítat mzdový náklad ani podíl na tržbě.`,
       action: 'Doplň hodinovou sazbu v profilu každého člena týmu. Je to jedno číslo a odemkne celý blok doporučení k provozu.',
     });
   }
