@@ -278,7 +278,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Úkoly</h1>
           <p className="text-black/50 text-sm mt-1">Úkoly na den nebo pro konkrétní lidi — a jejich plnění.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
               <button key={v} onClick={() => setView(v)}

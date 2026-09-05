@@ -587,7 +587,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               {invitations.map(inv => (
                 <div key={inv.id} className="flex items-center justify-between py-3 gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-[#16181A] truncate">{inv.email}</p>
+                    <p className="text-sm text-[#16181A] line-clamp-2 break-all sm:break-normal">{inv.email}</p>
                     <p className="text-xs text-black/45">{inv.job_title || 'Barista'}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
@@ -649,7 +649,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
                       {owner && <span className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
                     </div>
-                    <p className="text-sm text-black/45 truncate">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
+                    <p className="text-sm text-black/45 line-clamp-2 break-all sm:break-normal">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>
                   {!owner && !editing && (
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -791,7 +791,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <button
                       type="button" role="switch" aria-checked={on}
                       onClick={() => toggleWidget(role, w.id, !on)}
-                      className={`relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+                      className={`tap-target-sm relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
                       style={{ width: '2.75rem', height: '1.6rem' }}
                     >
                       <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
@@ -843,7 +843,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               kolik odložit ven — počáteční stav, tržby a odvod se naklikají samy.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             <input type="number" inputMode="numeric" min={0}
               value={floatDraft ?? (team?.drawer_float != null ? String(team.drawer_float) : '')}
               onChange={e => setFloatDraft(e.target.value)}

@@ -329,7 +329,7 @@ export default function CategoryStockView({
                       {size > 0 && <span className="text-black/30"> · balení {fmtAmount(size)} {unit}</span>}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                     {savedId === i.id && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
                     {failedId === i.id && (
                       <span className="text-xs font-semibold text-red-600 flex items-center gap-1">

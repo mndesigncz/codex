@@ -353,7 +353,7 @@ export default function MenuEditor() {
           <div className="flex items-center gap-2 flex-wrap">
             <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
             <a href={cesta} target="_blank" rel="noreferrer"
-              className="text-sm font-medium text-[#5B9E00] underline underline-offset-2">
+              className="tap-target-sm text-sm font-medium text-[#5B9E00] underline underline-offset-2">
               Otevřít ↗
             </a>
           </div>

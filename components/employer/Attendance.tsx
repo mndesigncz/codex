@@ -324,7 +324,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {PERIODS.map(p => (
               <button key={p} onClick={() => setDays(p)}
@@ -494,7 +494,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </div>
                           </div>
                           {stale && (
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 whitespace-nowrap">
                                 <Icon name="warning" size={12} /> Zapomenutý odchod?
                               </span>

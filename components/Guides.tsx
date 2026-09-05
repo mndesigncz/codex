@@ -407,7 +407,7 @@ export default function Guides({ user }: { user: User }) {
                               const d = await r.json();
                               if (d.guide) openEditor({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
                             }}
-                            className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
                             title="Upravit"
                           >
                             ✎
@@ -417,7 +417,7 @@ export default function Guides({ user }: { user: User }) {
                               e.stopPropagation();
                               deleteGuide(g.id);
                             }}
-                            className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
                             title="Smazat"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>

@@ -234,7 +234,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                             <span className="text-sm font-medium text-[#16181A] capitalize min-w-0 flex-1 truncate">{fmtDayLong(sh.date)}</span>
                             <span className="text-xs text-black/45 tabular-nums shrink-0 hidden sm:inline">{sh.startTime}–{sh.endTime}</span>
                             {sh.reviewed ? (
-                              <span className="flex items-center gap-1.5 shrink-0">
+                              <span className="flex items-center gap-1.5 flex-wrap min-w-0">
                                 {sh.rating > 0 && <Stars n={sh.rating} />}
                                 {sh.flagged && <Icon name="warning" size={13} className="text-red-600" />}
                                 <PointsBadge n={sh.reviewPoints} />

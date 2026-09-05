@@ -721,7 +721,7 @@ export default function ClosingsOverview() {
 
       <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <button onClick={() => openCreate()}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
             <Icon name="plus" size={16} /> Nová uzávěrka
@@ -747,7 +747,7 @@ export default function ClosingsOverview() {
             {fmtMissing(selectedDate)}
             <span className="font-normal text-black/45"> · {topLevel.length === 0 ? 'bez uzávěrky' : `${topLevel.length}× uzávěrka`}</span>
           </p>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {topLevel.length === 0 && (
               <button onClick={() => openCreate(selectedDate)}
                 className="rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black transition inline-flex items-center gap-1.5">

@@ -182,11 +182,11 @@ export default function MyShifts({ user }: Props) {
                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-[#16181A] text-sm truncate min-w-0">{formatDate(s.date)}</p>
+                        <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
+                          <p className="font-semibold text-[#16181A] text-sm truncate min-w-0 basis-full min-[380px]:basis-auto">{formatDate(s.date)}</p>
                           {isToday && <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
                         </div>
-                        <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
+                        <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                       </div>
                     </div>
                   );
@@ -204,7 +204,7 @@ export default function MyShifts({ user }: Props) {
                     <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-[#16181A] font-medium truncate">{formatDate(s.date)}</p>
-                      <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
+                      <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                     </div>
                     {ratingByDate[s.date] ? (
                       <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">★ {ratingByDate[s.date]}/5</span>

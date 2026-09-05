@@ -880,7 +880,7 @@ export default function ScheduleBuilder({ user }: Props) {
               onClick={runAdjust}
               disabled={adjusting || shifts.length === 0}
               title={shifts.length === 0 ? 'Nejdřív musí existovat uložený rozvrh' : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti a navrhne přeobsazení'}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-semibold px-4 py-2.5 whitespace-nowrap transition inline-flex items-center gap-2 disabled:opacity-40"
+              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-semibold px-4 py-2.5 min-[380px]:whitespace-nowrap text-left transition inline-flex items-center gap-2 min-w-0 max-w-full disabled:opacity-40"
             >
               <Icon name="swap" size={18} /> {adjusting ? 'Kontroluji…' : 'Upravit podle nových požadavků'}
             </button>

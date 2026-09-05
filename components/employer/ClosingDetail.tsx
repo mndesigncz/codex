@@ -185,7 +185,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
               {c?.created_at ? ` · ${dayTime(c.created_at)}` : ''}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {c && !c.covered_by && (
               <span className={`tap-target-sm text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
                 diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'}`}>

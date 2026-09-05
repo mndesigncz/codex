@@ -1870,7 +1870,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                       </p>
                       <p className="text-xs text-black/50 min-w-0 truncate">{summary(o)}</p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
                       <button
                         onClick={() => { setReceivingId(receivingId === o.id ? null : o.id); setCostInput(''); }}
                         disabled={busyId === o.id}
