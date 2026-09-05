@@ -983,7 +983,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                         <input inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
                           placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
                         <select value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
-                          className={`${inputClass} w-20 shrink-0 px-2`}>
+                          className={`${inputClass} !w-20 shrink-0 px-2`}>
                           <option value="">{pk(form)?.contentUnit ?? '—'}</option>
                           {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
@@ -1016,7 +1016,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                           className={`${inputClass} flex-1`} />
                         <input value={p.amount} placeholder="0,04" inputMode="decimal"
                           onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
-                          className={`${inputClass} w-24 text-center`} />
+                          className={`${inputClass} !w-24 text-center`} />
                         <span className="text-xs text-black/40 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
                         <button type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
                           className="text-black/30 hover:text-red-600 transition px-1">✕</button>
