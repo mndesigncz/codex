@@ -827,7 +827,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             aria-checked={!!team?.pay_daily_cash}
             disabled={savingPayout}
             onClick={() => togglePayDailyCash(!team?.pay_daily_cash)}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+            className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
           </button>
@@ -871,7 +871,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             aria-checked={team?.show_team_schedule !== false}
             disabled={savingTeamSchedule}
             onClick={() => toggleTeamSchedule(!(team?.show_team_schedule !== false))}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.show_team_schedule !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+            className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.show_team_schedule !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.show_team_schedule !== false ? 'translate-x-5' : ''}`} />
           </button>
@@ -890,7 +890,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             aria-checked={team?.closing_requires_shift !== false}
             disabled={savingRequiresShift}
             onClick={() => toggleRequiresShift(!(team?.closing_requires_shift !== false))}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+            className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
           </button>

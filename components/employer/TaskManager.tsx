@@ -232,7 +232,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1.5">
               <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${prio.dot}`} title={`Priorita: ${prio.label}`} />
-              <p className={`font-semibold text-sm text-[#16181A] ${compact ? '' : 'truncate'} ${done ? 'line-through text-black/40' : ''}`}>{t.title}</p>
+              <p className={`font-semibold text-sm text-[#16181A] ${compact ? '' : 'line-clamp-2 sm:truncate'} ${done ? 'line-through text-black/40' : ''}`}>{t.title}</p>
             </div>
             <p className={`text-xs text-black/45 mt-0.5 flex items-center gap-1.5 ${compact ? 'flex-wrap' : 'truncate'}`}>
               <span className={compact ? '' : 'truncate'}>

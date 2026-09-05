@@ -469,7 +469,7 @@ export default function MenuEditor() {
                 Zrušit PIN
               </button>
             )}
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-black/60 py-2.5">
+            <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60 py-2.5">
               <input type="checkbox" checked={board.enabled} className="h-5 w-5 rounded accent-[#5B9E00]"
                 onChange={(e) => upravit((b) => { b.enabled = e.target.checked; })} />
               Menu je veřejně dostupné

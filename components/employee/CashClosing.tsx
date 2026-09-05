@@ -178,7 +178,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
           placeholder={MOVEMENT_KINDS.find(k => k.kind === kind)?.hint ?? 'Za co'}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
         <button type="button" onClick={add} disabled={!amount}
-          className="shrink-0 rounded-2xl bg-[#C8F542] text-black px-4 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
+          className="tap-target-sm shrink-0 rounded-2xl bg-[#C8F542] text-black px-4 py-2 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
           Přidat
         </button>
       </div>

@@ -203,8 +203,8 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
             <span className="w-7 text-center text-sm font-bold text-black/50 tabular-nums shrink-0">{medal(i)}</span>
             <span className="text-xl flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{s.avatar || '👤'}</span>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
+              <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
+                <p className="font-semibold text-[#16181A] truncate basis-full sm:basis-auto">{s.name}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-0.5 text-[11px] font-bold">{s.levelName}</span>
                 {!!s.flagged && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-500/12 text-red-600 px-2 py-0.5 text-[11px] font-semibold">

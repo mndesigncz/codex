@@ -992,7 +992,7 @@ export default function ScheduleBuilder({ user }: Props) {
                       : `${adjust.changes.length} ${adjust.changes.length === 1 ? 'navržená změna' : adjust.changes.length <= 4 ? 'navržené změny' : 'navržených změn'}`}
                   </span>
                 </p>
-                <button onClick={() => setAdjust(null)} className="text-black/40 hover:text-black text-sm font-medium">Zavřít ✕</button>
+                <button onClick={() => setAdjust(null)} className="tap-target-sm text-black/40 hover:text-black text-sm font-medium">Zavřít ✕</button>
               </div>
               {adjust.changes.length > 0 && (
                 <>

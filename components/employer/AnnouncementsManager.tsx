@@ -113,7 +113,7 @@ export default function AnnouncementsManager() {
           placeholder="Např. V pátek zavíráme dřív…"
           className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none"
         />
-        <label className="flex items-center gap-2 cursor-pointer text-sm text-black/60">
+        <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60">
           <input type="checkbox" checked={alsoChat} onChange={e => setAlsoChat(e.target.checked)}
             className="h-5 w-5 rounded accent-[#5B9E00]" />
           Poslat i do týmového chatu

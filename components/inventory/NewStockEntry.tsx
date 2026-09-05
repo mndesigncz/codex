@@ -206,7 +206,7 @@ export default function NewStockEntry({
 
       {/* Everything the shop can also fill in later */}
       <button type="button" onClick={() => setMore(m => !m)}
-        className={`font-semibold text-[#5B7A08] hover:brightness-110 transition ${big ? 'text-base' : 'text-sm'}`}>
+        className={`tap-target-sm font-semibold text-[#5B7A08] hover:brightness-110 transition ${big ? 'text-base' : 'text-sm'}`}>
         {more ? '− Skrýt detaily' : '＋ Značka, cena, dodavatel…'}
       </button>
       {more && (
