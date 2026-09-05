@@ -186,7 +186,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                   // Na telefonu tak na název zbylo 56 px z potřebných 176 —
                   // z „Sirup Monin Levandule" bylo vidět „Siru…". Název si
                   // proto bere celý řádek a tlačítka se zalomí pod něj.
-                  <div key={i.id} className={`glass-card p-4 flex items-center gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-red-500/25' : ''}`}>
+                  <div key={i.id} className={`glass-card p-3 min-[360px]:p-4 flex items-center gap-x-2 min-[360px]:gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-red-500/25' : ''}`}>
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
                     <div className="min-w-0 flex-1 basis-[calc(100%-1.5rem)] min-[520px]:basis-0">
                       <p className="font-semibold text-[#16181A] truncate">
@@ -209,16 +209,16 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                       ) : (
                       <>
                       <button onClick={() => setParked(i, true)} title="Momentálně nevedeme"
-                        className="rounded-2xl glass border border-black/10 w-12 h-12 flex items-center justify-center text-black/40 active:scale-95 transition">
+                        className="rounded-2xl glass border border-black/10 w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 flex items-center justify-center text-black/40 active:scale-95 transition">
                         <Icon name="warning" size={18} />
                       </button>
                       <button onClick={() => step(i, -1)}
-                        className="rounded-2xl glass border border-black/10 w-12 h-12 flex items-center justify-center text-2xl leading-none text-black/70 active:scale-95 transition">−</button>
-                      <span className="w-16 text-center font-bold text-[#16181A] tabular-nums text-lg">
+                        className="rounded-2xl glass border border-black/10 w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 flex items-center justify-center text-xl min-[360px]:text-2xl leading-none text-black/70 active:scale-95 transition">−</button>
+                      <span className="w-12 min-[360px]:w-16 text-center font-bold text-[#16181A] tabular-nums text-base min-[360px]:text-lg">
                         {i.quantity}<span className="block text-[11px] font-medium text-black/40 leading-none">{i.unit}</span>
                       </span>
                       <button onClick={() => step(i, 1)}
-                        className="rounded-2xl bg-[#C8F542] w-12 h-12 flex items-center justify-center text-2xl leading-none text-black active:scale-95 transition">+</button>
+                        className="rounded-2xl bg-[#C8F542] w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 flex items-center justify-center text-xl min-[360px]:text-2xl leading-none text-black active:scale-95 transition">+</button>
                       </>
                       )}
                     </div>

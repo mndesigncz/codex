@@ -68,8 +68,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 /** Řádek štítek → hodnota, zarovnaný na desetinné čárce. */
 function Row({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'plus' | 'minus' | 'strong' }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-[13px] text-black/50 min-w-0">{label}</span>
+    <div className="flex items-baseline justify-between gap-x-4 gap-y-0.5 flex-wrap py-1.5">
+      <span className="text-[13px] text-black/50 min-w-0 flex-1 basis-24">{label}</span>
       <span className={`shrink-0 whitespace-nowrap tabular-nums text-sm ${
         tone === 'strong' ? 'font-bold text-[#16181A]'
           : tone === 'plus' ? 'font-semibold text-[#5B7A08]'
