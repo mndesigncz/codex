@@ -1699,15 +1699,15 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
             className={`glass-card p-5 flex flex-col h-full transition ${
               selecting ? `cursor-pointer ${selected.has(i.id) ? 'ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.02]'}` : ''
             }`}>
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start justify-between gap-x-2 gap-y-1 flex-wrap">
               {selecting && <Tick on={selected.has(i.id)} className="mt-0.5 mr-1" />}
-              <div className="min-w-0">
-                <p className="font-semibold text-[#16181A] truncate">
+              <div className="min-w-0 flex-1 basis-[calc(100%-5rem)] min-[420px]:basis-0">
+                <p className="font-semibold text-[#16181A] line-clamp-2">
                   {i.name}
                   {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                 </p>
                 {i.description && <p className="text-xs text-black/55 line-clamp-2 mt-0.5">{i.description}</p>}
-                <p className="text-xs text-black/40 truncate mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
+                <p className="text-xs text-black/40 line-clamp-2 mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
               <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium shrink-0 ${chip}`}>{st === 'critical' ? 'Kriticky' : st === 'low' ? 'Dochází' : 'OK'}</span>
             </div>

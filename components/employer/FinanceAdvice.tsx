@@ -124,10 +124,10 @@ export default function FinanceAdvice({ month }: { month: string }) {
         if (!list.length) return null;
         return (
           <section key={g.id} className="glass-card p-4 sm:p-5">
-            <div className="flex items-baseline gap-2 mb-3 min-w-0">
+            <div className="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap mb-3 min-w-0">
               <Icon name={g.icon as any} size={15} className="text-black/45 shrink-0 translate-y-0.5" />
               <h4 className="text-sm font-bold text-[#16181A] shrink-0">{g.label}</h4>
-              <p className="text-xs text-black/40 truncate min-w-0">{g.hint}</p>
+              <p className="text-xs text-black/40 min-w-0 basis-full sm:basis-auto">{g.hint}</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
               {list.map((a, i) => {

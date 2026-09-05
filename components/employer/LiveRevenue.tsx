@@ -231,7 +231,7 @@ export default function LiveRevenue() {
                   return (
                     <div key={p.name} className="relative overflow-hidden rounded-xl border border-black/[0.06] bg-white/50 px-3.5 py-2">
                       <span className="absolute inset-y-0 left-0 bg-[#C8F542]/25" style={{ width: `${pct}%` }} />
-                      <span className="relative flex items-center justify-between gap-2 text-sm">
+                      <span className="relative flex items-center justify-between gap-x-2 gap-y-0.5 flex-wrap text-sm">
                         <span className="min-w-0 truncate text-[#16181A]">{p.name}</span>
                         <span className="shrink-0 text-black/55 tabular-nums">{money(p.total)} · {p.bills} úč.</span>
                       </span>

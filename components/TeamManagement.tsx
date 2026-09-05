@@ -492,7 +492,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{team.name}</p>
+            <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 line-clamp-2">{team.name}</p>
             <button onClick={() => setEditingName(true)}
               className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all flex-shrink-0 whitespace-nowrap">
               Přejmenovat
@@ -639,7 +639,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   >
                     {m.avatar ?? '👤'}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] min-[420px]:basis-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p
                         onClick={() => m.role === 'employee' && setProfileId(m.id)}

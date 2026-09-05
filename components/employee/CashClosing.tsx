@@ -937,7 +937,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       <button
                         type="button"
                         onClick={() => setCoworkerSel(s => ({ ...s, [cw.id]: { on: !on, payout: s[cw.id]?.payout ?? '' } }))}
-                        className="flex items-center gap-2.5 min-w-0 text-left"
+                        className="flex items-center gap-2.5 min-w-0 text-left flex-wrap"
                       >
                         <span className={`shrink-0 flex h-6 w-6 items-center justify-center rounded-full border-2 transition ${on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>

@@ -189,7 +189,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                   <div key={i.id} className={`glass-card p-3 min-[360px]:p-4 flex items-center gap-x-2 min-[360px]:gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-red-500/25' : ''}`}>
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
                     <div className="min-w-0 flex-1 basis-[calc(100%-1.5rem)] min-[520px]:basis-0">
-                      <p className="font-semibold text-[#16181A] truncate">
+                      <p className="font-semibold text-[#16181A] line-clamp-2">
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                         {(i as any).approved === false && (
