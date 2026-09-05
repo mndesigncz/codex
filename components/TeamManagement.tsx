@@ -652,7 +652,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <p className="text-sm text-black/45 line-clamp-2 break-all sm:break-normal">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>
                   {!owner && !editing && (
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
                       {m.role === 'employee' && (
                         <button onClick={() => setProfileId(m.id)}
                           className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-medium hover:brightness-125 transition-all whitespace-nowrap">

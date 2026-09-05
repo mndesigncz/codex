@@ -177,11 +177,11 @@ export default function MyShifts({ user }: Props) {
                 {upcoming.slice(0, 8).map(s => {
                   const isToday = s.date === today;
                   return (
-                    <div key={s.id} className={`flex items-center gap-3 p-3 rounded-2xl transition-colors hover:bg-black/[0.03] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
+                    <div key={s.id} className={`flex items-center gap-x-3 gap-y-2 flex-wrap p-3 rounded-2xl transition-colors hover:bg-black/[0.03] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
                       <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center ${isToday ? 'bg-[#C8F542]/15' : 'bg-black/[0.04]'}`}>
                         <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] min-[380px]:basis-0">
                         <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
                           <p className="font-semibold text-[#16181A] text-sm truncate min-w-0 basis-full min-[380px]:basis-auto">{formatDate(s.date)}</p>
                           {isToday && <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
@@ -200,9 +200,9 @@ export default function MyShifts({ user }: Props) {
               <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📋 Minulé směny</h3>
               <div className="divide-y divide-black/[0.06]">
                 {past.slice(0, 5).map(s => (
-                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
+                  <div key={s.id} className="flex items-center gap-x-3 gap-y-2 flex-wrap p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
                     <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 basis-[calc(100%-1.75rem)] min-[380px]:basis-0">
                       <p className="text-sm text-[#16181A] font-medium truncate">{formatDate(s.date)}</p>
                       <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                     </div>

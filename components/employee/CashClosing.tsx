@@ -991,7 +991,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <label className="block text-xs uppercase tracking-wider text-black/45">Skutečný stav kasy na konci *</label>
               {denomSet.length > 0 && (
-                <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
+                <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 max-w-full flex-wrap">
                   {([[false, 'Zadat celkem'], [true, 'Spočítat bankovky']] as const).map(([mode, lbl]) => (
                     <button key={String(mode)} type="button"
                       onClick={() => setCountMode(mode)}
@@ -1226,7 +1226,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                     {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                   </p>
-                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
                   {pending && (
                     <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
@@ -1241,7 +1241,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     }}
                     className="rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
                   >✕</button>
-                  <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
+                  <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 max-w-full ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
