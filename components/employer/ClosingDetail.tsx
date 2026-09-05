@@ -295,9 +295,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 ) : (
                   <p className="text-sm text-black/45">Bez dat z pokladny.</p>
                 )}
-                {d.notes.length > 0 && (
+                {(d.notes?.length ?? 0) > 0 && (
                   <ul className="mt-3 space-y-1.5">
-                    {d.notes.map((n, i) => (
+                    {(d.notes ?? []).map((n, i) => (
                       <li key={i} className="flex gap-2 text-[13px] text-black/55 leading-snug">
                         <Icon name="warning" size={13} className="shrink-0 mt-0.5 text-amber-600" />
                         <span>{n}</span>
