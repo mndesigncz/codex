@@ -244,7 +244,7 @@ function Toggle({ title, hint, on, onChange }: {
         aria-checked={on}
         aria-label={title}
         onClick={() => onChange(!on)}
-        className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+        className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
       >
         <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
       </button>
