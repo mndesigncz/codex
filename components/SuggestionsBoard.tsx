@@ -229,7 +229,7 @@ export default function SuggestionsBoard() {
                     {s.content && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-wrap break-words">{s.content}</p>}
                     <div className="flex items-center gap-2 mt-2.5 text-xs text-black/45">
                       <span className="text-base leading-none">{s.authorAvatar ?? '👤'}</span>
-                      <span className="font-medium text-black/55 truncate">{s.authorName ?? 'Neznámý'}{mine ? ' (ty)' : ''}</span>
+                      <span className="font-medium text-black/55 truncate min-w-0 basis-24 flex-1">{s.authorName ?? 'Neznámý'}{mine ? ' (ty)' : ''}</span>
                       <span className="text-black/25">·</span>
                       <span className="whitespace-nowrap">{relDate(s.createdAt)}</span>
                     </div>

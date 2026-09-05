@@ -712,11 +712,11 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   </span>
                 )}
                 <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A]">
-                  <span className="block truncate">
+                  <span className="block line-clamp-2">
                     {i.name}
                     <span className="text-black/40 font-normal"> · {i.category || 'bez kategorie'} · {i.quantity} {i.unit}</span>
                   </span>
-                  <span className="block text-[11px] font-normal text-black/40 truncate">
+                  <span className="block text-[11px] font-normal text-black/40 line-clamp-2">
                     {(i as any).submittedByName ? `zapsal/a ${(i as any).submittedByName}` : 'zapsal někdo z týmu'}
                     {(i as any).description ? ` · „${(i as any).description}"` : ''}
                   </span>
@@ -1632,7 +1632,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
               )}
               <div className="min-w-0">
-                <p className="font-medium text-sm text-[#16181A] truncate">
+                <p className="font-medium text-sm text-[#16181A] line-clamp-2">
                   {i.name}
                   {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                 </p>

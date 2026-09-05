@@ -86,13 +86,13 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
           <div className="space-y-2">
             {offerable.map(s => (
               <div key={s.id} className="rounded-2xl bg-black/[0.02] border border-black/[0.06] px-4 py-3 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex items-center justify-between gap-x-3 gap-y-2 flex-wrap">
+                  <div className="min-w-0 flex-1 basis-40">
                     <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(s.date)}</p>
                     <p className="text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</p>
                   </div>
                   <button onClick={() => act({ shiftId: s.id, note: offerNote[s.id]?.trim() || undefined }, s.id, 'Směna je v burze. ✓')} disabled={busy === s.id}
-                    className="shrink-0 rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
+                    className="shrink-0 ml-auto rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
                     Nabídnout
                   </button>
                 </div>
@@ -112,15 +112,15 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
           <div className="glass-card p-6 text-center text-sm text-black/45">Právě žádné volné směny.</div>
         ) : (
           board.map(o => (
-            <div key={o.id} className="glass-card p-4 flex items-center gap-3">
+            <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
               <span className="text-lg flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{o.offeredByAvatar ?? '👤'}</span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-40">
                 <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(o.date)}</p>
                 <p className="text-xs text-black/45 tabular-nums">{o.startTime}–{o.endTime} · {o.offeredByName ?? 'Kolega'}</p>
                 {o.note && <p className="text-xs text-black/50 mt-1 italic">„{o.note}"</p>}
               </div>
               <button onClick={() => act({ id: o.id, action: 'claim' }, o.id, 'Vzato — čeká na schválení vedení. ✓')} disabled={busy === o.id}
-                className="shrink-0 rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 hover:brightness-110 disabled:opacity-50 transition">
+                className="shrink-0 ml-auto rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 hover:brightness-110 disabled:opacity-50 transition">
                 Vezmu si to
               </button>
             </div>
@@ -133,22 +133,22 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
         <div className="space-y-3">
           <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Moje výměny</h3>
           {mine.map(o => (
-            <div key={o.id} className="glass-card p-4 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
+            <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
+              <div className="min-w-0 flex-1 basis-40">
                 <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
                 <p className="text-xs text-black/45">
                   {o.status === 'claimed' ? `${o.claimedByName ?? 'Kolega'} si ji bere — čeká na vedení` : 'Nabídnuto — čeká na zájemce'}
                 </p>
               </div>
               <button onClick={() => act({ id: o.id, action: 'cancel' }, o.id, 'Nabídka stažena.')} disabled={busy === o.id}
-                className="shrink-0 rounded-full bg-black/[0.05] text-black/60 text-sm px-4 py-2 hover:bg-black/[0.08] disabled:opacity-50 transition">
+                className="shrink-0 ml-auto rounded-full bg-black/[0.05] text-black/60 text-sm px-4 py-2 hover:bg-black/[0.08] disabled:opacity-50 transition">
                 Stáhnout
               </button>
             </div>
           ))}
           {claimedByMe.map(o => (
-            <div key={o.id} className="glass-card p-4 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
+            <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
+              <div className="min-w-0 flex-1 basis-40">
                 <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
                 <p className="text-xs text-black/45">Bereš si od {o.offeredByName ?? 'kolegy'} — čeká na schválení vedení</p>
               </div>

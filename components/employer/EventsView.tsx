@@ -74,12 +74,12 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         className="w-full glass-card p-5 text-left hover:bg-black/[0.02] transition">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-bold tracking-tight text-[#16181A] truncate">{k.icon} {e.title}</p>
-            <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
+            <p className="font-bold tracking-tight text-[#16181A] line-clamp-2">{k.icon} {e.title}</p>
+            <p className="text-sm text-black/50 mt-0.5 capitalize line-clamp-2">
               {fmtDate(e.date)}{e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
             {(e.offsite || e.location) && (
-              <p className="text-xs text-black/40 mt-0.5 truncate">📍 {e.location || 'mimo podnik'}{e.offsite ? ' · venkovní' : ''}</p>
+              <p className="text-xs text-black/40 mt-0.5 line-clamp-2">📍 {e.location || 'mimo podnik'}{e.offsite ? ' · venkovní' : ''}</p>
             )}
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -144,7 +144,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
 
           {past.length > 0 && (
             <div>
-              <button onClick={() => setShowPast(o => !o)} className="text-sm text-black/45 hover:text-black transition flex items-center gap-1.5">
+              <button onClick={() => setShowPast(o => !o)} className="tap-target-sm text-sm text-black/45 hover:text-black transition flex items-center gap-1.5">
                 <Icon name="chevron" size={14} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
                 Minulé a zrušené ({past.length})
               </button>
