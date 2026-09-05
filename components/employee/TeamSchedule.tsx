@@ -78,10 +78,10 @@ export default function TeamSchedule() {
 
   return (
     <section className="glass-card p-4 sm:p-5">
-      <div className="flex items-baseline gap-2 mb-3 min-w-0">
+      <div className="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap mb-3 min-w-0">
         <Icon name="users" size={16} className="text-black/45 shrink-0 translate-y-0.5" />
         <h3 className="font-bold tracking-tight text-[#16181A] shrink-0">Kdo má směnu</h3>
-        <p className="text-xs text-black/40 truncate min-w-0">Nejbližší dva týdny</p>
+        <p className="text-xs text-black/40 min-w-0 basis-full sm:basis-auto">Nejbližší dva týdny</p>
       </div>
 
       {shifts === null && <p className="text-sm text-black/40 py-4 text-center">Načítám…</p>}

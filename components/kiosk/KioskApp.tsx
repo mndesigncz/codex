@@ -240,10 +240,10 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📅 Dnešní směny</p>
           <div className="space-y-2">
             {roster.map((r: any) => (
-              <div key={r.id} className="flex items-center gap-3 min-w-0">
+              <div key={r.id} className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0">
                 <span className="text-xl shrink-0">{r.avatar ?? '👤'}</span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#16181A]">{r.name}</span>
-                <span className="shrink-0 text-sm text-black/50 tabular-nums">{String(r.shiftStart).slice(0, 5)}–{String(r.shiftEnd ?? '').slice(0, 5)}</span>
+                <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[400px]:basis-0 truncate text-sm font-medium text-[#16181A]">{r.name}</span>
+                <span className="shrink-0 ml-auto text-sm text-black/50 tabular-nums">{String(r.shiftStart).slice(0, 5)}–{String(r.shiftEnd ?? '').slice(0, 5)}</span>
                 {r.openSince && <span className="shrink-0 h-2 w-2 rounded-full bg-[#5B9E00]" title="Na směně" />}
               </div>
             ))}

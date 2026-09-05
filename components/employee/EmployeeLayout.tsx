@@ -178,7 +178,7 @@ export default function EmployeeLayout({ user }: Props) {
           <button onClick={() => setSidebarOpen(v => !v)} className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="menu" size={20} />
           </button>
-          <div className="md:hidden shrink-0"><LogoMark size={30} /></div>
+          <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>

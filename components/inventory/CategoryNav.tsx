@@ -111,7 +111,7 @@ export default function CategoryNav<T extends CategoryNode>({
 
       {/* One level in. Only rendered when there is somewhere to go. */}
       {(level.length > 0 || (current === null && extraRoots.length > 0)) && (
-        <div className={`grid gap-2 ${touch ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4'}`}>
+        <div className={`grid gap-2 ${touch ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-4'}`}>
           {level.map(c => {
             const kids = childrenOfId(categories, c.id).length;
             const count = countOf ? countOf(c.id) : null;
@@ -127,8 +127,8 @@ export default function CategoryNav<T extends CategoryNode>({
                   <Icon name="box" size={touch ? 20 : 16} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`block font-bold text-[#16181A] truncate ${touch ? 'text-base' : 'text-sm'}`}>{c.name}</span>
-                  <span className="block text-[11px] text-black/40 truncate">
+                  <span className={`block font-bold text-[#16181A] line-clamp-2 ${touch ? 'text-base' : 'text-sm'}`}>{c.name}</span>
+                  <span className="block text-[11px] text-black/40 line-clamp-2">
                     {count !== null && <>{count} {plural(count)}</>}
                     {kids > 0 && <>{count !== null ? ' · ' : ''}{kids} podkat.</>}
                     {alerts > 0 && <span className="text-orange-600 font-semibold"> · {alerts} dochází</span>}

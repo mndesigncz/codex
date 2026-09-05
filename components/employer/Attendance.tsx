@@ -396,7 +396,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Mzdy</h3>
               <div className="grid grid-cols-2 gap-4 max-w-md">
                 <div className="glass-card p-5 min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Mzdové náklady</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">
                     {money(laborCost)}
                   </p>
@@ -409,7 +409,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                     : over ? 'text-red-600' : 'text-[#5B7A08]';
                   return (
                     <div className={`glass-card p-5 min-w-0 ${over ? 'ring-1 ring-red-500/30' : ''}`}>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Podíl na tržbách</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Podíl na tržbách</p>
                       <p className={`mt-1 text-xl font-bold tabular-nums whitespace-nowrap ${tone}`}>
                         {pct != null ? `${pct.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %` : '—'}
                       </p>
@@ -471,7 +471,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 <div key={g.key} className="space-y-2">
                   <div className="flex items-center gap-2 px-1 pt-1">
                     <Icon name="calendar" size={14} className="text-black/35 shrink-0" />
-                    <p className="text-xs font-semibold uppercase tracking-wider text-black/45 capitalize truncate">{g.label}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black/45 capitalize line-clamp-2">{g.label}</p>
                   </div>
                   <div className="glass-card divide-y divide-black/[0.06] overflow-hidden">
                     {g.list.map(e => {

@@ -285,7 +285,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                     key={cell}
                     onClick={() => cycleDay(cell)}
                     title={meta.label}
-                    className={`aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-all duration-200 border ${meta.cls} ${
+                    className={`tap-target-sm aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-all duration-200 border ${meta.cls} ${
                       isToday ? 'ring-2 ring-[#C8F542]/60' : ''
                     }`}
                   >

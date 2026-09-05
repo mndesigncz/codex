@@ -162,7 +162,7 @@ export default function NewStockEntry({
             {flat.map(({ cat, depth }: any) => (
               <button key={cat.id} type="button" onClick={() => pickCategory(cat.id)}
                 className={`tap-target-sm rounded-full font-semibold transition active:scale-95 max-w-full truncate ${
-                  big ? 'px-3 py-2 text-sm sm:px-4 sm:py-2.5 sm:text-base' : 'px-3.5 py-1.5 text-xs'
+                  big ? 'px-2.5 py-2 text-xs min-[360px]:px-3 min-[360px]:text-sm sm:px-4 sm:py-2.5 sm:text-base' : 'px-3 py-1.5 text-xs'
                 } ${categoryId === cat.id
                   ? 'bg-[#16181A] text-white'
                   : 'glass text-black/60 hover:text-[#16181A]'}`}>
@@ -183,14 +183,14 @@ export default function NewStockEntry({
         <div className="flex items-center gap-2 flex-wrap">
           <button type="button" onClick={() => bump(-1)}
             className={`shrink-0 rounded-2xl glass font-bold text-[#16181A] active:scale-95 transition ${
-              big ? 'h-12 w-12 sm:h-14 sm:w-14 text-xl sm:text-2xl' : 'h-11 w-11 text-lg'}`}>−</button>
+              big ? 'h-11 w-11 min-[360px]:h-12 min-[360px]:w-12 sm:h-14 sm:w-14 text-lg min-[360px]:text-xl sm:text-2xl' : 'h-10 w-10 min-[360px]:h-11 min-[360px]:w-11 text-base min-[360px]:text-lg'}`}>−</button>
           <input inputMode="decimal" value={quantity}
             onChange={e => setQuantity(e.target.value)}
             className={`${field} text-center font-bold tabular-nums min-w-0 flex-1`}
             style={{ maxWidth: big ? 120 : 100 }} />
           <button type="button" onClick={() => bump(1)}
             className={`shrink-0 rounded-2xl glass font-bold text-[#16181A] active:scale-95 transition ${
-              big ? 'h-12 w-12 sm:h-14 sm:w-14 text-xl sm:text-2xl' : 'h-11 w-11 text-lg'}`}>+</button>
+              big ? 'h-11 w-11 min-[360px]:h-12 min-[360px]:w-12 sm:h-14 sm:w-14 text-lg min-[360px]:text-xl sm:text-2xl' : 'h-10 w-10 min-[360px]:h-11 min-[360px]:w-11 text-base min-[360px]:text-lg'}`}>+</button>
           <div className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
             {UNITS.map(u => (
               <button key={u} type="button" onClick={() => setUnit(u)}
