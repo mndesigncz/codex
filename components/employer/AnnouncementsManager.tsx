@@ -115,7 +115,7 @@ export default function AnnouncementsManager() {
         />
         <label className="flex items-center gap-2 cursor-pointer text-sm text-black/60">
           <input type="checkbox" checked={alsoChat} onChange={e => setAlsoChat(e.target.checked)}
-            className="h-4 w-4 rounded accent-[#5B9E00]" />
+            className="h-5 w-5 rounded accent-[#5B9E00]" />
           Poslat i do týmového chatu
         </label>
         <div className="flex items-center justify-between gap-3 flex-wrap">

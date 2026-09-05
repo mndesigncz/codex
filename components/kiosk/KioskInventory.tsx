@@ -182,9 +182,13 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                 const st = statusOf(i);
                 const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#C8F542]';
                 return (
-                  <div key={i.id} className={`glass-card p-4 flex items-center gap-3 ${st === 'critical' ? 'border-red-500/25' : ''}`}>
+                  // Ovládání zabere 226 px (čtyři tlačítka 48 px a počítadlo).
+                  // Na telefonu tak na název zbylo 56 px z potřebných 176 —
+                  // z „Sirup Monin Levandule" bylo vidět „Siru…". Název si
+                  // proto bere celý řádek a tlačítka se zalomí pod něj.
+                  <div key={i.id} className={`glass-card p-4 flex items-center gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-red-500/25' : ''}`}>
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 basis-[calc(100%-1.5rem)] min-[520px]:basis-0">
                       <p className="font-semibold text-[#16181A] truncate">
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
@@ -196,7 +200,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                       </p>
                       <p className="text-xs text-black/40 truncate">{i.category}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                       {i.archived ? (
                         <button onClick={() => setParked(i, false)}
                           className="rounded-2xl bg-[#C8F542] text-black px-4 h-12 text-sm font-bold active:scale-95 transition">

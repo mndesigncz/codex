@@ -428,13 +428,13 @@ export default function Guides({ user }: { user: User }) {
                     {g.excerpt && <p className="text-sm text-black/55 leading-relaxed line-clamp-3 flex-1">{g.excerpt}</p>}
                     <div className="flex items-center gap-2 mt-4 flex-wrap">
                       {cat && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08]">
+                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08]">
                           <Icon name={cat.icon} size={12} strokeWidth={2} />
                           {cat.name}
                         </span>
                       )}
                       {g.requireRead && (
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        <span className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
                           g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'
                         }`}>
                           📖 {g.myRead ? 'přečteno ✓' : 'povinné čtení'}
@@ -442,7 +442,7 @@ export default function Guides({ user }: { user: User }) {
                         </span>
                       )}
                       {g.hasChecklist && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
+                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
                           <Icon name="check" size={12} strokeWidth={2.2} />
                           checklist
                         </span>
@@ -475,7 +475,7 @@ export default function Guides({ user }: { user: User }) {
                 {(() => {
                   const cat = reader.categoryId != null ? catById.get(reader.categoryId) : undefined;
                   return cat ? (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08] mb-3">
+                    <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08] mb-3">
                       <Icon name={cat.icon} size={12} strokeWidth={2} />
                       {cat.name}
                     </span>
@@ -507,7 +507,7 @@ export default function Guides({ user }: { user: User }) {
                         </button>
                       )}
                       {summary.requireRead && summary.myRead && (
-                        <span className="rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno ✓</span>
+                        <span className="tap-target-sm rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno ✓</span>
                       )}
                       {isEmployer && (
                         <button
@@ -518,7 +518,7 @@ export default function Guides({ user }: { user: User }) {
                             }).catch(() => null);
                             if (res?.ok) await loadGuides();
                           }}
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                             summary.requireRead ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
                           }`}>
                           {summary.requireRead ? 'Zrušit povinné čtení' : '📖 Označit jako povinné čtení'}
@@ -956,7 +956,7 @@ function GuideEditor({
             {productId && steps.some(st => st.itemId != null && (st.amount ?? 0) > 0) && (
               <label className="mt-3 flex items-start gap-3 rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3 cursor-pointer">
                 <input type="checkbox" checked={alsoRecipe} onChange={e => setAlsoRecipe(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[#8FB811]" />
+                  className="mt-0.5 h-5 w-5 accent-[#8FB811]" />
                 <span className="text-sm text-[#16181A]">
                   Uložit suroviny i jako recepturu
                   <span className="block text-[11px] text-black/50 mt-0.5">

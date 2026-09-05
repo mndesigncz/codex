@@ -113,7 +113,7 @@ export default function LiveRevenue() {
       <div className="flex flex-wrap items-center gap-2">
         {presets.map(([label, a, b]) => (
           <button key={label} onClick={() => preset(a, b)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
+            className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
               isPreset(a, b) ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
             }`}>
             {label}
@@ -121,10 +121,10 @@ export default function LiveRevenue() {
         ))}
         <span className="text-black/20">·</span>
         <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)}
-          className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
         <span className="text-xs text-black/35">–</span>
         <input type="date" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
-          className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
       </div>
 
       {err && <p className="text-sm text-amber-800 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">{err}</p>}

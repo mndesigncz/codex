@@ -168,7 +168,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
             <div className="flex flex-wrap gap-1.5">
               {matches.map((i: any) => (
                 <button key={i.id} onClick={() => restock(i)} disabled={restocked[i.id]}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
+                  className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
                     restocked[i.id]
                       ? 'bg-[#C8F542]/40 text-[#3E5406]'
                       : 'bg-white/70 text-[#16181A] hover:bg-white border border-black/[0.06]'

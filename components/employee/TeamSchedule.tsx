@@ -98,7 +98,7 @@ export default function TeamSchedule() {
             <div className="flex flex-wrap gap-1.5 min-w-0">
               {list.map(s => (
                 <span key={s.id}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs max-w-full ${
+                  className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs max-w-full ${
                     s.isMine
                       ? 'bg-[#C8F542]/25 text-[#3E5406] font-semibold ring-1 ring-[#C8F542]/50'
                       : 'bg-black/[0.045] text-black/65'}`}>

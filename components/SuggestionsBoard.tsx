@@ -224,7 +224,7 @@ export default function SuggestionsBoard() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0">{s.title}</h4>
-                      <span className={`shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${meta.chip}`}>{meta.label}</span>
+                      <span className={`tap-target-sm shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${meta.chip}`}>{meta.label}</span>
                     </div>
                     {s.content && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-wrap break-words">{s.content}</p>}
                     <div className="flex items-center gap-2 mt-2.5 text-xs text-black/45">
@@ -239,7 +239,7 @@ export default function SuggestionsBoard() {
                       <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-black/[0.06]">
                         {STATUS_FLOW.map(st => (
                           <button key={st.id} onClick={() => setStatus(s, st.id)} disabled={s.status === st.id}
-                            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
                               s.status === st.id
                                 ? 'bg-[#16181A] text-white cursor-default'
                                 : 'bg-black/[0.04] text-black/55 hover:bg-black/[0.08]'
@@ -264,19 +264,19 @@ export default function SuggestionsBoard() {
                           if (res?.ok) await load();
                           else setErr('Do plánování se to nepodařilo přesunout.');
                         }}
-                        className="text-xs text-[#5B7A08] hover:underline rounded-full px-2 py-1 transition"
+                        className="tap-target-sm text-xs text-[#5B7A08] hover:underline rounded-full px-2 py-1 transition"
                         title="Vytvoří kartu na plánovací tabuli a označí podnět jako naplánovaný">
                         → Do plánování
                       </button>
                     )}
                     {mine && (
                       <button onClick={() => { setEditing(s); setEditTitle(s.title); setEditContent(s.content ?? ''); }}
-                        className="text-xs text-black/35 hover:text-black rounded-full px-2 py-1 transition">
+                        className="tap-target-sm text-xs text-black/35 hover:text-black rounded-full px-2 py-1 transition">
                         Upravit
                       </button>
                     )}
                     <button onClick={() => remove(s)}
-                      className="text-xs text-black/35 hover:text-red-600 rounded-full px-2 py-1 transition">
+                      className="tap-target-sm text-xs text-black/35 hover:text-red-600 rounded-full px-2 py-1 transition">
                       Smazat
                     </button>
                   </div>

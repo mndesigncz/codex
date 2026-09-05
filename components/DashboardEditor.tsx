@@ -67,7 +67,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
         <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 w-fit">
           {([['employer', 'Můj přehled'], ['employee', 'Přehled zaměstnanců']] as const).map(([r, lbl]) => (
             <button key={r} onClick={() => onSwitchRole(r)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+              className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                 role === r ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
               }`}>
               {lbl}
@@ -159,7 +159,7 @@ function AddPanel({ spare, onAdd, onClose }: {
           <div className="flex flex-wrap gap-1.5">
             {spare.map(w => (
               <button key={w.id} onClick={() => onAdd({ type: 'widget', id: w.id })} title={w.hint}
-                className="rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs font-medium text-[#16181A] hover:border-[#C8F542] transition">
+                className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs font-medium text-[#16181A] hover:border-[#C8F542] transition">
                 {w.label}
               </button>
             ))}
@@ -172,14 +172,14 @@ function AddPanel({ spare, onAdd, onClose }: {
         <div className="flex flex-wrap gap-1.5">
           {LINK_SOURCES.map(s => (
             <button key={s.kind} onClick={() => setSource(source === s.kind ? null : s.kind)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+              className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                 source === s.kind ? 'bg-[#16181A] text-white' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
               }`}>
               <Icon name={s.icon} size={13} /> {s.label}
             </button>
           ))}
           <button onClick={() => setSource(source === 'view' ? null : 'view')}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
               source === 'view' ? 'bg-[#16181A] text-white' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
             }`}>
             <Icon name="menu" size={13} /> Záložka
@@ -191,7 +191,7 @@ function AddPanel({ spare, onAdd, onClose }: {
         <div className="flex flex-wrap gap-1.5 pt-1">
           {PLAIN_VIEWS.map(v => (
             <button key={v.id} onClick={() => onAdd({ type: 'link', label: v.label, target: `view:${v.id}`, icon: v.icon })}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] hover:border-[#C8F542] transition">
+              className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] hover:border-[#C8F542] transition">
               <Icon name={v.icon} size={13} /> {v.label}
             </button>
           ))}
@@ -211,7 +211,7 @@ function AddPanel({ spare, onAdd, onClose }: {
                 return (
                   <button key={o.value}
                     onClick={() => onAdd({ type: 'link', label: o.label, target: `${source}:${o.value}`, icon: src.icon })}
-                    className="rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] hover:border-[#C8F542] transition">
+                    className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] hover:border-[#C8F542] transition">
                     {o.label}
                   </button>
                 );
@@ -222,7 +222,7 @@ function AddPanel({ spare, onAdd, onClose }: {
       )}
 
       <button onClick={onClose}
-        className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-1.5 text-xs font-medium hover:bg-black/[0.05] transition">
+        className="tap-target-sm rounded-full glass border border-black/10 text-[#16181A] px-4 py-1.5 text-xs font-medium hover:bg-black/[0.05] transition">
         Zavřít
       </button>
     </div>

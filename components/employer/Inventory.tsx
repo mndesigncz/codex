@@ -679,7 +679,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             <div className="flex flex-wrap gap-1.5">
               {gaps.slice(0, 12).map(i => (
                 <button key={i.id} onClick={() => openEdit(i)}
-                  className="rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
+                  className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
                   {i.name}
                   <span className="ml-1.5 font-normal text-amber-700">
                     {!(Number(i.unitCost) > 0) && !(Number(i.packageSize) > 0) ? 'cena i balení'
@@ -730,7 +730,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     if (res?.ok) await load();
                     else showNotice('Schválení se nepodařilo.');
                   }}
-                  className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">
+                  className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">
                   Schválit ✓
                 </button>
                 <button
@@ -739,7 +739,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     const res = await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' }).catch(() => null);
                     if (res?.ok) await load();
                   }}
-                  className="shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">
+                  className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">
                   Zamítnout
                 </button>
               </div>
@@ -815,7 +815,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         </span>
         {showArchived && (
           <button onClick={() => setShowArchived(false)}
-            className="rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-medium">
+            className="tap-target-sm rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-medium">
             Zpět na aktivní sklad
           </button>
         )}
@@ -1024,7 +1024,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     ))}
                     <button type="button"
                       onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}
-                      className="rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
+                      className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
                       <Icon name="plus" size={13} /> Přidat díl
                     </button>
                   </div>
@@ -1095,7 +1095,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               {/* Section: dostupnost */}
               <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 cursor-pointer">
                 <input type="checkbox" checked={form.archived} onChange={e => setForm(f => ({ ...f, archived: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 accent-[#C8F542]" />
+                  className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-[#16181A]">Momentálně nevedeme</span>
                   <span className="block text-[11px] text-black/45 mt-0.5">
@@ -1109,7 +1109,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <div className="flex gap-1.5">
                   {([['', 'Nic'], ['new', '✨ Novinka'], ['tip', '👍 Tip']] as const).map(([v, lbl]) => (
                     <button key={v} type="button" onClick={() => setForm(f => ({ ...f, highlight: v }))}
-                      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                      className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                         form.highlight === v ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
                       }`}>
                       {lbl}
@@ -1119,7 +1119,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               </div>
               <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 cursor-pointer">
                 <input type="checkbox" checked={form.hideFromOverview} onChange={e => setForm(f => ({ ...f, hideFromOverview: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 accent-[#C8F542]" />
+                  className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-[#16181A]">Jen ve své kategorii</span>
                   <span className="block text-[11px] text-black/45 mt-0.5">
@@ -1193,19 +1193,19 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               {selected.size} vybráno
             </span>
             <button onClick={() => setSelected(new Set(filtered.map(i => i.id)))}
-              className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
+              className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
               Vybrat vše ({filtered.length})
             </button>
             <button onClick={() => setShowBulk(true)}
-              className="rounded-full bg-[#C8F542] text-black px-4 py-1.5 text-xs font-bold hover:brightness-110 transition whitespace-nowrap">
+              className="tap-target-sm rounded-full bg-[#C8F542] text-black px-4 py-1.5 text-xs font-bold hover:brightness-110 transition whitespace-nowrap">
               Upravit
             </button>
             <button onClick={async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); }}
-              className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
+              className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
               {showArchived ? 'Naskladnit' : 'Odložit'}
             </button>
             <button onClick={bulkDelete}
-              className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/25 transition whitespace-nowrap">
+              className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/25 transition whitespace-nowrap">
               Smazat
             </button>
             <button onClick={exitSelection} title="Zrušit výběr"
@@ -1288,7 +1288,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                             setShowReports(false);
                             setShowShopping(true);
                           }}
-                          className="rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition glass text-[#5B7A08] hover:brightness-105"
+                          className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition glass text-[#5B7A08] hover:brightness-105"
                         >
                           🛒 Do nákupu
                         </button>
@@ -1300,7 +1300,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                             });
                             if (res.ok) setReports(prev => prev.map(x => x.id === r.id ? { ...x, status: done ? 'new' : 'done' } : x));
                           }}
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
                             done ? 'glass text-black/50 hover:text-black' : 'bg-[#16181A] text-white hover:bg-black'
                           }`}>
                           {done ? 'Vyřízeno ✓' : 'Označit vyřízené'}
@@ -1477,7 +1477,7 @@ function CatChip({ name, active, small, onPick }: {
 }) {
   return (
     <button type="button" onClick={onPick}
-      className={`rounded-full font-medium transition-all inline-flex items-center gap-1.5 ${
+      className={`tap-target-sm rounded-full font-medium transition-all inline-flex items-center gap-1.5 ${
         small ? 'px-3 py-1 text-[11px]' : 'px-3.5 py-1.5 text-xs'
       } ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
       {active && <Icon name="check" size={small ? 11 : 13} />}{name}
@@ -1709,7 +1709,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 {i.description && <p className="text-xs text-black/55 line-clamp-2 mt-0.5">{i.description}</p>}
                 <p className="text-xs text-black/40 truncate mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-medium shrink-0 ${chip}`}>{st === 'critical' ? 'Kriticky' : st === 'low' ? 'Dochází' : 'OK'}</span>
+              <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium shrink-0 ${chip}`}>{st === 'critical' ? 'Kriticky' : st === 'low' ? 'Dochází' : 'OK'}</span>
             </div>
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
               <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
@@ -2546,7 +2546,7 @@ function PackagingEditor({ category, onSaved }: {
   return (
     <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
       <label className="flex items-start gap-2.5 cursor-pointer">
-        <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#C8F542]" />
+        <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
         <span className="min-w-0">
           <span className="block text-sm font-medium text-[#16181A]">Sledovat zbytek v načatém balení</span>
           <span className="block text-[11px] text-black/45 mt-0.5">
@@ -2577,7 +2577,7 @@ function PackagingEditor({ category, onSaved }: {
             <div className="flex gap-1 rounded-full bg-white border border-black/[0.08] p-1 w-fit">
               {([['package', 'Balení'], ['content', unit ? `Obsahu (${unit})` : 'Obsahu']] as const).map(([v, lbl]) => (
                 <button key={v} type="button" onClick={() => setThresholdUnit(v)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                  className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
                     thresholdUnit === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
                   }`}>
                   {lbl}
@@ -2615,7 +2615,7 @@ function PackagingEditor({ category, onSaved }: {
               ))}
             </div>
             <button onClick={() => setSteps(l => [...l, { label: 'Nový stupeň', pct: 50 }])}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
+              className="tap-target-sm mt-2 inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
               <Icon name="plus" size={13} /> Přidat stupeň
             </button>
             <p className="text-[11px] text-black/40 mt-1.5">
@@ -2694,14 +2694,14 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                 {editId === sp.id ? (
                   <span className="flex items-center gap-1.5">
                     <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="e-mail"
-                      className="w-52 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                      className="tap-target-sm w-52 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
                     <button onClick={async () => {
                       const res = await fetch('/api/suppliers', {
                         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
                       }).catch(() => null);
                       if (res?.ok) { setEditId(null); await onChanged(); }
-                    }} className="rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-semibold">Uložit</button>
+                    }} className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-semibold">Uložit</button>
                   </span>
                 ) : (
                   <>

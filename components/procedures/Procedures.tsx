@@ -234,7 +234,7 @@ export default function Procedures({ user }: Props) {
                 <h3 className="mt-4 text-lg font-bold tracking-tight text-[#16181A]">{p.name}</h3>
                 {p.approved === false && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
+                    <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
                     {isEmployer && (
                       <button
                         onClick={async (e) => {
@@ -245,7 +245,7 @@ export default function Procedures({ user }: Props) {
                           }).catch(() => null);
                           if (res?.ok) await load();
                         }}
-                        className="rounded-full bg-[#16181A] text-white px-3 py-1 text-xs font-semibold hover:bg-black transition">
+                        className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1 text-xs font-semibold hover:bg-black transition">
                         Schválit ✓
                       </button>
                     )}
@@ -336,16 +336,16 @@ export default function Procedures({ user }: Props) {
                     {done ? (
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {missing > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 tabular-nums">
+                          <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 tabular-nums">
                             <Icon name="warning" size={12} /> {missing} nedokončeno
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2.5 py-1 text-xs font-medium text-[#5B7A08] tabular-nums">
+                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2.5 py-1 text-xs font-medium text-[#5B7A08] tabular-nums">
                           <Icon name="clock" size={13} /> {fmtDuration(r.duration_seconds)}
                         </span>
                       </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-medium text-black/55 flex-shrink-0">
+                      <span className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-medium text-black/55 flex-shrink-0">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] motion-safe:animate-pulse" />
                         {Array.isArray(r.checked_items) ? r.checked_items.length : 0}/{r.total_items}
                       </span>
@@ -756,7 +756,7 @@ function ProcedureEditor({
                         value={s.penalty ?? ''}
                         onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
                         placeholder={String(weightSpec(s.weight ?? 'normal').minus)}
-                        className="w-[64px] rounded-xl bg-white/60 border border-black/[0.07] pl-6 pr-2 py-1.5 text-xs tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+                        className="tap-target-sm w-[64px] rounded-xl bg-white/60 border border-black/[0.07] pl-6 pr-2 py-1.5 text-xs tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-red-500/70">−</span>
                     </div>
                     <input

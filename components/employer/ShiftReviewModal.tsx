@@ -272,7 +272,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {shiftDates.map(d => (
-                  <button key={d} onClick={() => setDate(d)} className={`rounded-full px-3 py-1 text-xs font-medium transition ${date === d ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:bg-black/[0.09]'}`}>
+                  <button key={d} onClick={() => setDate(d)} className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium transition ${date === d ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:bg-black/[0.09]'}`}>
                     {fmtChip(d)}
                   </button>
                 ))}

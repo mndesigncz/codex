@@ -312,7 +312,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             <p className="text-xs font-bold uppercase tracking-wider text-black/40">Čeká na potvrzení vedením</p>
             <div className="flex flex-wrap gap-1.5">
               {myPending.map((i: any) => (
-                <span key={i.id} className="flex items-center gap-2 rounded-full bg-amber-500/12 text-amber-700 pl-1.5 pr-3 py-1 text-xs font-medium">
+                <span key={i.id} className="tap-target-sm flex items-center gap-2 rounded-full bg-amber-500/12 text-amber-700 pl-1.5 pr-3 py-1 text-xs font-medium">
                   {i.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={i.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
@@ -401,7 +401,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
               </p>
               {(parkedCount > 0 || showParked) && (
                 <button onClick={() => setShowParked(v => !v)}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                  className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
                     showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
                   }`}>
                   {showParked ? 'Zpět na to, co máme' : `Nevedeme (${parkedCount})`}

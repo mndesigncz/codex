@@ -175,7 +175,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · 📍 ${nextEvent.location}` : ''}
         </p>
         {myId != null && nextEvent.crew?.includes(myId) && (
-          <p className="mt-2 inline-block rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-xs font-semibold">Jsi na akci — směna je v rozvrhu ✓</p>
+          <p className="tap-target-sm mt-2 inline-block rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-xs font-semibold">Jsi na akci — směna je v rozvrhu ✓</p>
         )}
       </div>
     ) : null,
@@ -329,7 +329,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lowStock.slice(0, 8).map(i => (
-                    <span key={i.id} className="rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-600">{i.name} · {i.quantity} {i.unit}</span>
+                    <span key={i.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-600">{i.name} · {i.quantity} {i.unit}</span>
                   ))}
                 </div>
               </div>

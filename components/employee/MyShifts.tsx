@@ -184,7 +184,7 @@ export default function MyShifts({ user }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-[#16181A] text-sm truncate min-w-0">{formatDate(s.date)}</p>
-                          {isToday && <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
+                          {isToday && <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
                         </div>
                         <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                       </div>
@@ -207,9 +207,9 @@ export default function MyShifts({ user }: Props) {
                       <p className="text-xs text-black/45 truncate">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                     </div>
                     {ratingByDate[s.date] ? (
-                      <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">★ {ratingByDate[s.date]}/5</span>
+                      <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">★ {ratingByDate[s.date]}/5</span>
                     ) : (
-                      <span className="flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/40">Bez hodnocení</span>
+                      <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/40">Bez hodnocení</span>
                     )}
                   </div>
                 ))}

@@ -216,7 +216,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           {nextEvent.crewPeople?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {nextEvent.crewPeople.map((p: any) => (
-                <span key={p.id} className="rounded-full bg-white/70 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">{p.avatar} {p.name}</span>
+                <span key={p.id} className="tap-target-sm rounded-full bg-white/70 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">{p.avatar} {p.name}</span>
               ))}
             </div>
           )}

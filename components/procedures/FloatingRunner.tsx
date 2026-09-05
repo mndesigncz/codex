@@ -288,7 +288,7 @@ export default function FloatingRunner() {
                             setSkipReason(skipFor, r.id, r.id === 'other' ? skipNote.trim() : undefined);
                             setSkipFor(null);
                           }}
-                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
                             r.excused ? 'bg-white/70 text-[#5B7A08] border border-[#C8F542]/40' : 'bg-white/70 text-black/60 border border-black/10'
                           } hover:brightness-105 ${r.id === 'other' && !skipNote.trim() ? 'opacity-50' : ''}`}>
                           {r.label}{r.excused ? '' : ' (−body)'}

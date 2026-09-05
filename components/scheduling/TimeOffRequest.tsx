@@ -228,7 +228,7 @@ export default function TimeOffRequest() {
                   <button
                     type="button"
                     onClick={() => cancelRequest(r.id)}
-                    className="ml-auto rounded-full bg-black/[0.05] border border-black/10 text-black/60 text-xs px-3 py-1.5 whitespace-nowrap hover:bg-black/[0.08] transition"
+                    className="tap-target-sm ml-auto rounded-full bg-black/[0.05] border border-black/10 text-black/60 text-xs px-3 py-1.5 whitespace-nowrap hover:bg-black/[0.08] transition"
                   >
                     Zrušit
                   </button>

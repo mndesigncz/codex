@@ -85,7 +85,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
         </p>
         {!adding && (
           <button type="button" onClick={() => { setAdding(true); setErr(''); }}
-            className="rounded-full bg-white/70 hover:bg-white border border-black/[0.07] px-3 py-1.5 text-xs font-bold text-[#5B7A08] transition inline-flex items-center gap-1">
+            className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-black/[0.07] px-3 py-1.5 text-xs font-bold text-[#5B7A08] transition inline-flex items-center gap-1">
             <Icon name="plus" size={13} /> Přidat do receptury
           </button>
         )}
@@ -111,7 +111,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
                   const v = dec(e.target.value);
                   if (v > 0 && v !== l.amount) send(l.productId, l.productName, v);
                 }}
-                className="w-20 shrink-0 rounded-xl bg-black/[0.04] border border-black/[0.07] px-2.5 py-1.5 text-xs text-right tabular-nums text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none"
+                className="tap-target-sm w-20 shrink-0 rounded-xl bg-black/[0.04] border border-black/[0.07] px-2.5 py-1.5 text-xs text-right tabular-nums text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none"
               />
               <span className="shrink-0 text-[11px] text-black/40 w-8">{unitLabel}</span>
               <button type="button" onClick={() => send(l.productId, l.productName, 0)}

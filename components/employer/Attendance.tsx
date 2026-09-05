@@ -373,7 +373,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   const openEntry = entries.find(e => String(e.employeeId) === String(r.id) && !e.clockOut);
                   return openEntry ? (
                     <button onClick={() => closeEntry(openEntry)} title="Ukončit směnu a nastavit čas odchodu"
-                      className="shrink-0 rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
+                      className="tap-target-sm shrink-0 rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
                       Ukončit
                     </button>
                   ) : null;
@@ -499,7 +499,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                                 <Icon name="warning" size={12} /> Zapomenutý odchod?
                               </span>
                               <button onClick={() => closeEntry(e)}
-                                className="rounded-full bg-[#16181A] text-white text-xs font-semibold px-3 py-1.5 hover:bg-black transition whitespace-nowrap">
+                                className="tap-target-sm rounded-full bg-[#16181A] text-white text-xs font-semibold px-3 py-1.5 hover:bg-black transition whitespace-nowrap">
                                 Ukončit
                               </button>
                             </div>

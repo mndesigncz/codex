@@ -361,7 +361,7 @@ export default function ClosingsOverview() {
                       {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                     </p>
                   </div>
-                  <span className={`shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
+                  <span className={`tap-target-sm shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                 </div>
@@ -826,14 +826,14 @@ export default function ClosingsOverview() {
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     {covered.length > 0 && (
-                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium whitespace-nowrap">
+                      <span className="tap-target-sm hidden sm:inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium whitespace-nowrap">
                         <Icon name="users" size={12} /> +{covered.length}
                       </span>
                     )}
                     {c.approved === false && (
-                      <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                      <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                     )}
-                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
+                    <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                     }`}>
                       {d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}

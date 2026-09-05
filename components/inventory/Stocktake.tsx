@@ -272,7 +272,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                               value={r.countedOpen ?? ''}
                               onChange={e => setOpenAmount(r.itemId, e.target.value)}
                               placeholder="—"
-                              className="w-20 shrink-0 rounded-xl bg-white/60 border border-black/[0.07] px-3 py-1.5 text-xs text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                              className="tap-target-sm w-20 shrink-0 rounded-xl bg-white/60 border border-black/[0.07] px-3 py-1.5 text-xs text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                             />
                             <span className={`w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums ${
                               openDiff == null ? 'text-black/20' : openDiff === 0 ? 'text-[#5B7A08]' : 'text-amber-700'

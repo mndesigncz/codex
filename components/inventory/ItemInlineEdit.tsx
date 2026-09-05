@@ -113,7 +113,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
           </div>
         ))}
         <button type="button" onClick={() => setPortions(list => [...list, { name: '', amount: '' }])}
-          className="rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
+          className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
           <Icon name="plus" size={13} /> Přidat díl
         </button>
       </div>

@@ -609,7 +609,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         Zrušit
                       </button>
                     )}
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
+                    <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
                       {statusLabel(inv.status)}
                     </span>
                   </div>
@@ -646,8 +646,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         className={`font-bold tracking-tight text-[#16181A] truncate ${m.role === 'employee' ? 'cursor-pointer hover:underline decoration-black/25 underline-offset-2' : ''}`}
                         title={m.role === 'employee' ? 'Zobrazit profil' : undefined}
                       >{m.name}</p>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
-                      {owner && <span className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
+                      <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
+                      {owner && <span className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
                     </div>
                     <p className="text-sm text-black/45 truncate">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>

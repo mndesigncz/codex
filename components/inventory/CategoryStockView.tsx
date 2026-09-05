@@ -229,7 +229,7 @@ export default function CategoryStockView({
           )}
           {(parkedCount > 0 || showParked) && (
             <button onClick={() => setShowParked(v => !v)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+              className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition ${
                 showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
               }`}>
               {showParked ? 'Zpět na skladem' : `Nevedeme (${parkedCount})`}
@@ -424,7 +424,7 @@ export default function CategoryStockView({
                       )}
                       {i.supplierUrl && (
                         <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
-                          className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 py-1.5 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+                          className="tap-target-sm rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 py-1.5 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                       )}
                     </div>
                   </>

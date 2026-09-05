@@ -252,7 +252,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         {nextEvent.crewPeople?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2.5">
             {nextEvent.crewPeople.map((p: any) => (
-              <span key={p.id} className="rounded-full bg-white/70 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">{p.avatar} {p.name}</span>
+              <span key={p.id} className="tap-target-sm rounded-full bg-white/70 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">{p.avatar} {p.name}</span>
             ))}
           </div>
         )}
@@ -322,7 +322,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                     const pending = (rosters[d] ?? []).filter(r => r.worked && !r.reviewed).length;
                     return (
                       <button key={d} onClick={() => setReviewDate(d)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                        className={`tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
                         {label}
                         {pending > 0 && (
                           <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
@@ -353,13 +353,13 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                           </div>
                           {r.flagged && <Icon name="warning" size={14} className="text-amber-600 shrink-0" />}
                           {r.reviewed ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
+                            <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
                               {r.rating > 0 ? `${r.rating}★` : ''} Hodnoceno
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
                           )}
-                          <button onClick={() => setRating(r)} className="rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
+                          <button onClick={() => setRating(r)} className="tap-target-sm rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
                             {r.reviewed ? 'Upravit' : 'Ohodnotit'}
                           </button>
                         </div>
@@ -384,7 +384,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   <p className="text-xs uppercase tracking-wider text-black/45 mb-2">Ještě nezadali</p>
                   <div className="flex flex-wrap gap-2">
                     {notSubmitted.map(m => (
-                      <PersonLink key={m.id} id={m.id} className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</PersonLink>
+                      <PersonLink key={m.id} id={m.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</PersonLink>
                     ))}
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                       return (
                         <div key={i.id} className="flex items-center justify-between p-3 rounded-2xl bg-black/[0.04]">
                           <span className="text-sm text-[#16181A]">{i.name}</span>
-                          <span className={`rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-orange-500/15 text-orange-600'}`}>{i.quantity} {i.unit}</span>
+                          <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-orange-500/15 text-orange-600'}`}>{i.quantity} {i.unit}</span>
                         </div>
                       );
                     })}

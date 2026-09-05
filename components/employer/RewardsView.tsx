@@ -108,9 +108,9 @@ function RewardsViewInner() {
                     <span className="text-black/40"> · {r.cost} b.</span>
                   </span>
                   <button onClick={() => decide(r.id, 'approve')}
-                    className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">Schválit ✓</button>
+                    className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">Schválit ✓</button>
                   <button onClick={() => decide(r.id, 'decline')}
-                    className="shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">Zamítnout</button>
+                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">Zamítnout</button>
                 </div>
               ))}
             </div>
@@ -332,7 +332,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-bold tracking-tight text-[#16181A]">Úrovně a výhody</h3>
-          <button onClick={addLevel} className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
+          <button onClick={addLevel} className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
             <Icon name="plus" size={14} /> Přidat
           </button>
         </div>

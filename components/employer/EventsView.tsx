@@ -83,7 +83,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
             )}
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
+            <span className={`tap-target-sm rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
               e.status === 'confirmed' ? 'bg-[#C8F542]/20 text-[#5B7A08]'
               : e.status === 'done' ? 'bg-black/[0.06] text-black/50'
               : e.status === 'cancelled' ? 'bg-red-500/10 text-red-600'
@@ -100,7 +100,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         {e.crewPeople?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3">
             {e.crewPeople.map((p: any) => (
-              <span key={p.id} className="rounded-full bg-white/60 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">
+              <span key={p.id} className="tap-target-sm rounded-full bg-white/60 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">
                 {p.avatar} {p.name}
               </span>
             ))}
@@ -203,7 +203,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
           <div className="flex flex-wrap gap-1.5">
             {EVENT_KINDS.map(k => (
               <button key={k.id} type="button" onClick={() => { setKind(k.id); if (k.id === 'outdoor') setOffsite(true); }}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${kind === k.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${kind === k.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
                 {k.icon} {k.label}
               </button>
             ))}
@@ -273,7 +273,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
         <div className="flex flex-wrap items-center gap-1.5 mt-3">
           {EVENT_STATUSES.map(st => (
             <button key={st.id} onClick={() => patch(e.id, { status: st.id })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                 e.status === st.id ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
               }`}>
               {st.label}
@@ -281,14 +281,14 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
           ))}
           <span className="flex-1" />
           <button onClick={() => patch(e.id, { public: !e.public })}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
               e.public ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'glass text-black/50 hover:text-black'
             }`}
             title="Veřejná akce se ukáže zákazníkům na sdílené stránce">
             {e.public ? '🌍 Veřejná ✓' : 'Zveřejnit zákazníkům'}
           </button>
           <button onClick={() => patch(e.id, { publishToTeam: true }).then(ok => ok && alert('Tým dostal notifikaci o akci. ✓'))}
-            className="rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
+            className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
             📣 Oznámit týmu
           </button>
         </div>
@@ -345,13 +345,13 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
               <div className="flex gap-1.5">
                 {e.packing.some((p: any) => p.itemId && !p.packed) && (
                   <button onClick={() => { if (confirm('Vyskladnit vše nesbalené? Množství se odečte ze skladu (s poznámkou u položek).')) patch(e.id, { packAction: 'checkout' }); }}
-                    className="rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
+                    className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
                     📦 Vyskladnit
                   </button>
                 )}
                 {e.packing.some((p: any) => p.itemId && p.packed && p.returned == null) && (
                   <button onClick={() => { if (confirm('Vrátit sbalené položky zpět do skladu? (Vrací se plné množství — spotřebu pak uprav ve skladu.)')) patch(e.id, { packAction: 'return' }); }}
-                    className="rounded-full bg-[#C8F542] text-black px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">
+                    className="tap-target-sm rounded-full bg-[#C8F542] text-black px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">
                     ↩️ Vrátit do skladu
                   </button>
                 )}

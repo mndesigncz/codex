@@ -157,7 +157,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         {kinds.map(k => (
           <button key={k.kind} type="button" onClick={() => setKind(k.kind)}
             title={k.hint}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
               kind === k.kind ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
             }`}>
             {k.label}
@@ -1067,7 +1067,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 {DIFF_REASONS.map(r => (
                   <button key={r.id} type="button" title={r.hint}
                     onClick={() => setDiffReason(diffReason === r.id ? '' : r.id)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
                       diffReason === r.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
                     }`}>
                     {r.label}
@@ -1162,7 +1162,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     - (Array.isArray(r.skipped_items) ? r.skipped_items.length : 0));
                   const running = r.status === 'running';
                   return (
-                    <span key={r.id} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
+                    <span key={r.id} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
                       running ? 'bg-orange-500/12 text-orange-600'
                       : missing > 0 ? 'bg-amber-500/12 text-amber-700'
                       : 'bg-[#C8F542]/15 text-[#5B7A08]'
@@ -1228,7 +1228,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </p>
                   <div className="flex items-center gap-2 flex-wrap shrink-0">
                   {pending && (
-                    <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                    <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
                   <button
                     type="button"
@@ -1241,7 +1241,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     }}
                     className="rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
                   >✕</button>
-                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
+                  <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
@@ -1278,7 +1278,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       {Object.entries(c.denominations!)
                         .sort((a, b) => Number(b[0]) - Number(a[0]))
                         .map(([denom, count]) => (
-                          <span key={denom} className="rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
+                          <span key={denom} className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
                             <strong>{count}×</strong> {Number(denom).toLocaleString('cs-CZ')}
                           </span>
                         ))}

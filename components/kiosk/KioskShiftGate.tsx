@@ -449,7 +449,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
             : 'Zaznamenej příchod na směnu'}
         </p>
         {!on && member.shiftStart && (
-          <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] px-3 py-1 text-xs font-medium tabular-nums">
+          <p className="tap-target-sm mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] px-3 py-1 text-xs font-medium tabular-nums">
             <Icon name="calendar" size={13} /> Dnes máš směnu {member.shiftStart}–{member.shiftEnd}
           </p>
         )}

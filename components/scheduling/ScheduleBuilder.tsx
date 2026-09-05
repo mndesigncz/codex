@@ -707,7 +707,7 @@ export default function ScheduleBuilder({ user }: Props) {
                 <Icon name="users" size={20} className="text-black/70 shrink-0" />
                 <h2 className="font-bold text-[#16181A] truncate">Dostupnost týmu</h2>
               </div>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
+              <span className={`tap-target-sm shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
                 submissions.length >= assignable.length && assignable.length > 0
                   ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-black/[0.05] text-black/50'
               }`}>
@@ -1648,7 +1648,7 @@ function OpeningHoursEditor({
               <span className="w-24 font-medium text-[#16181A] truncate">{label}</span>
               <button
                 onClick={() => update(d, { closed: !day.closed })}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition-all ${
+                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition-all ${
                   day.closed
                     ? 'bg-red-500/15 border-red-500/30 text-red-600'
                     : 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
@@ -2012,7 +2012,7 @@ function DayModal({
                     {s.startTime}–{s.endTime}
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-black/[0.05] text-black/70">
+                <span className="tap-target-sm inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-black/[0.05] text-black/70">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: rt.color }} />
                   {rt.label}
                 </span>
@@ -2036,7 +2036,7 @@ function DayModal({
                   <p className="text-sm font-medium text-[#16181A] truncate">{p.employeeName}</p>
                   <p className="text-xs text-black/45">{p.startTime}–{p.endTime}</p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-[#C8F542]/25 text-[#5B7A08]">
+                <span className="tap-target-sm inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-[#C8F542]/25 text-[#5B7A08]">
                   {p.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />}
                   {p.shiftTypeName || 'Směna'}
                 </span>
