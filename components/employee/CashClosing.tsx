@@ -198,7 +198,7 @@ function Step({
   return (
     <section
       ref={refCb}
-      className={`relative rounded-3xl border p-5 sm:p-6 space-y-5 transition-all ${
+      className={`relative rounded-3xl border p-3.5 min-[400px]:p-5 sm:p-6 space-y-4 sm:space-y-5 transition-all ${
         climax
           ? 'bg-[#C8F542]/[0.07] border-[#C8F542]/40 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset]'
           : 'bg-black/[0.025] border-black/[0.06]'
@@ -604,7 +604,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
       {msg && (
         <div className="p-3.5 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={17} /> {msg}
@@ -644,7 +644,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </div>
       )}
 
-      <form onSubmit={submit} className="glass-card p-6 sm:p-7 space-y-6">
+      <form onSubmit={submit} className="glass-card p-3.5 min-[400px]:p-5 sm:p-7 space-y-5 sm:space-y-6">
         {/* Header + visual step progress */}
         <div>
           <div className="flex items-start justify-between gap-4">
