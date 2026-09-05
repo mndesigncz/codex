@@ -199,12 +199,12 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
     <div className="space-y-3">
       {standings.map((s, i) => (
         <div key={s.id} className="glass-card p-4 cursor-pointer hover:bg-black/[0.02] transition" onClick={() => onOpen(s)} title="Otevřít profil">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
             <span className="w-7 text-center text-sm font-bold text-black/50 tabular-nums shrink-0">{medal(i)}</span>
             <span className="text-xl flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{s.avatar || '👤'}</span>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-[calc(100%-5.5rem)] min-[420px]:basis-0">
               <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
-                <p className="font-semibold text-[#16181A] truncate basis-full sm:basis-auto">{s.name}</p>
+                <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-0.5 text-[11px] font-bold">{s.levelName}</span>
                 {!!s.flagged && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-500/12 text-red-600 px-2 py-0.5 text-[11px] font-semibold">
@@ -228,7 +228,7 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
               )}
             </div>
             <button onClick={e => { e.stopPropagation(); onRate(s); }}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 transition whitespace-nowrap shrink-0">
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 transition whitespace-nowrap shrink-0 ml-auto">
               Ohodnotit
             </button>
           </div>
