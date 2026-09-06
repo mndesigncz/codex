@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { timingSafeEqual } from 'crypto';
+import { hit, clear } from '@/lib/rateLimit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -194,15 +197,43 @@ export async function POST(req: NextRequest) {
   if (!isKiosk && employeeId !== c.meId) {
     return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   }
+  let empPinHash: string | null = null;
   const [emp] = await sql`SELECT id, team_id, pin FROM users WHERE id = ${employeeId}`;
+  try {
+    const [h] = await sql`SELECT pin_hash FROM users WHERE id = ${employeeId}`;
+    empPinHash = h?.pin_hash ?? null;
+  } catch { /* sloupec ještě není — jede se po staru */ }
   if (!emp || emp.team_id !== c.teamId) {
     return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
   }
   // PIN check for shared-kiosk clock-ins when the employee has one set.
-  if (isKiosk && emp.pin) {
-    if (String(b.pin ?? '') !== String(emp.pin)) {
-      return NextResponse.json({ error: 'Nesprávný PIN' }, { status: 403 });
+  if (isKiosk && (empPinHash || emp.pin)) {
+    // Čtyřmístný PIN má deset tisíc kombinací. Bez omezení pokusů se dá projít
+    // za pár minut přímo z tabletu na baru, proto pět pokusů za deset minut.
+    const gate = await hit(`pin:${employeeId}`, 5, 10 * 60);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: `Moc pokusů. Zkus to za ${Math.ceil(gate.retryAfter / 60)} min.` },
+        { status: 429 });
     }
+    const given = String(b.pin ?? '');
+    let okPin = false;
+    if (empPinHash) {
+      okPin = await bcrypt.compare(given, empPinHash);
+    } else if (emp.pin) {
+      // Starý čitelný PIN. Porovná se časově konstantně a hned se převede na
+      // hash, aby další přihlášení už čitelný nepotřebovalo.
+      const a = Buffer.from(given), c = Buffer.from(String(emp.pin));
+      okPin = a.length === c.length && timingSafeEqual(a, c);
+      if (okPin) {
+        try {
+          const nh = await bcrypt.hash(given, 10);
+          await sql`UPDATE users SET pin_hash = ${nh}, pin = NULL WHERE id = ${employeeId}`;
+        } catch { /* převod počká na příště */ }
+      }
+    }
+    if (!okPin) return NextResponse.json({ error: 'Nesprávný PIN' }, { status: 403 });
+    await clear(`pin:${employeeId}`);
   }
 
   const [open] = await sql`

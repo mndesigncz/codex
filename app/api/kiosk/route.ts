@@ -84,6 +84,15 @@ export async function PATCH(req: NextRequest) {
   const [target] = await sql`SELECT id FROM users WHERE id = ${userId} AND team_id = ${c.teamId} AND role <> 'kiosk'`;
   if (!target) return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
 
-  await sql`UPDATE users SET pin = ${pin} WHERE id = ${userId}`;
+  // PIN se ukládá zahašovaný. Dřív ležel v databázi čitelný, takže kdo se
+  // dostal k výpisu, mohl se odpíchnout za kohokoli z týmu.
+  const pinHash = pin === null ? null : await bcrypt.hash(pin, 10);
+  try {
+    await sql`UPDATE users SET pin_hash = ${pinHash}, pin = NULL WHERE id = ${userId}`;
+  } catch {
+    // Sloupec pin_hash ještě nemusí existovat (chybí migrace) — ať zápis PINu
+    // neselže, uloží se postaru a při první migraci se převede.
+    await sql`UPDATE users SET pin = ${pin} WHERE id = ${userId}`;
+  }
   return NextResponse.json({ ok: true });
 }

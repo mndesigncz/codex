@@ -2,6 +2,7 @@
 // leaves the server — GET returns just a masked status.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { seal } from '@/lib/secretBox';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -50,9 +51,9 @@ export async function POST(req: NextRequest) {
   try {
     await sql`
       INSERT INTO pos_connections (team_id, provider, client_id, client_secret, merchant_id, place_id, place_name)
-      VALUES (${u.team_id}, 'storyous', ${clientId}, ${clientSecret}, ${merchantId}, ${placeId}, ${probe.placeName ?? null})
+      VALUES (${u.team_id}, 'storyous', ${clientId}, ${seal(clientSecret)}, ${merchantId}, ${placeId}, ${probe.placeName ?? null})
       ON CONFLICT (team_id) DO UPDATE SET
-        client_id = ${clientId}, client_secret = ${clientSecret},
+        client_id = ${clientId}, client_secret = ${seal(clientSecret)},
         merchant_id = ${merchantId}, place_id = ${placeId}, place_name = ${probe.placeName ?? null}`;
     audit(u.team_id, u.id, 'pos.connect', 'pos', null, `Storyous · ${probe.placeName ?? placeId}`);
     return NextResponse.json({ ok: true, placeName: probe.placeName ?? null });

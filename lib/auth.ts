@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
+import { hit, clear } from './rateLimit';
 import { db } from './db';
 import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
@@ -48,12 +49,22 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        // Deset neúspěchů na e-mail za čtvrt hodiny. Bez tohohle šlo heslo
+        // hádat donekonečna — bcrypt sice zdržuje, ale útočníka neodradí.
+        const email = String(credentials.email).trim().toLowerCase();
+        const gate = await hit(`login:${email}`, 10, 15 * 60);
+        if (!gate.ok) {
+          // Stejná odpověď jako u špatného hesla: ať se nedá zjistit, které
+          // e-maily v aplikaci existují.
+          return null;
+        }
         const user = await db.query.users.findFirst({
           where: eq(users.email, credentials.email),
         });
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
+        await clear(`login:${email}`);
         let teamId: number | null = user.teamId ?? null;
         if (user.role === 'employer') {
           teamId = await ensureEmployerTeam(user.id, user.name, teamId);
@@ -78,11 +89,21 @@ export const authOptions: NextAuthOptions = {
         token.jobTitle = (user as any).jobTitle;
         token.teamId = (user as any).teamId;
       }
-      // Allow client-side session.update() to refresh profile fields
+      // session.update() volá PROHLÍŽEČ. Smí proto obnovit jen to, co je
+      // kosmetické — jméno a avatar. Příslušnost k týmu odsud přijímat nelze:
+      // kdo si ji nastaví sám, čte cizí podnik. Aktuální tým se bere z
+      // databáze při každém požadavku (viz níže), takže tady chybět může.
       if (trigger === 'update' && session?.user) {
         if (session.user.name) token.name = session.user.name;
         if ((session.user as any).avatar) token.avatar = (session.user as any).avatar;
-        if ((session.user as any).teamId !== undefined) token.teamId = (session.user as any).teamId;
+      }
+      // Tým se osvěží ze zdroje pravdy, ne z toho, co pošle klient.
+      if (trigger === 'update' && token.sub) {
+        try {
+          const sql = neon(process.env.DATABASE_URL!);
+          const [u] = await sql`SELECT team_id, role FROM users WHERE id = ${parseInt(String(token.sub))}`;
+          if (u) { token.teamId = u.team_id ?? null; token.role = u.role; }
+        } catch { /* při výpadku databáze zůstane token, jaký byl */ }
       }
       return token;
     },
