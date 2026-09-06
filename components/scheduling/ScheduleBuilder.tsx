@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { dayPrefLabel, prefAllowsSlot, parseTypePref } from '@/lib/dayPrefs';
+import { openSpan, uncovered, typeFitsDay, toHM } from '@/lib/coverage';
 import { Icon } from '../Icons';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -36,6 +37,18 @@ interface Shift {
   startTime: string;
   endTime: string;
   type: string;
+}
+/** Úsek otevírací doby, kdy v podniku není nikdo. */
+interface Gap {
+  date: string;
+  from: string;
+  to: string;
+  minutes: number;
+}
+/** Typ směny, který se na ten den vejde, ale nikdo na něm není. */
+interface MissingSlot {
+  date: string;
+  shiftTypeName: string;
 }
 interface ShiftType {
   id: number;
@@ -264,9 +277,14 @@ export default function ScheduleBuilder({ user }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const seededRef = useRef(false);
 
+  // Díry v pokrytí otevírací doby a neobsazená místa — uložený rozvrh je
+  // hlásí stejně jako návrh, protože vzniknou i ruční úpravou.
+  const [gaps, setGaps] = useState<Gap[]>([]);
+  const [understaffed, setUnderstaffed] = useState<MissingSlot[]>([]);
+
   // generate preview state
   const [generating, setGenerating] = useState(false);
-  const [preview, setPreview] = useState<{ proposed: Proposed[]; warnings: string[] } | null>(null);
+  const [preview, setPreview] = useState<{ proposed: Proposed[]; warnings: string[]; gaps: Gap[]; understaffed: MissingSlot[] } | null>(null);
   const [adjust, setAdjust] = useState<{ changes: any[]; warnings: string[] } | null>(null);
   const [adjustSkipped, setAdjustSkipped] = useState<Set<number>>(new Set());
   const [adjusting, setAdjusting] = useState(false);
@@ -340,6 +358,8 @@ export default function ScheduleBuilder({ user }: Props) {
       setMembers(tData.members ?? []);
       setSubmissions(aData.submissions ?? []);
       setShifts(sData.shifts ?? []);
+      setGaps(Array.isArray(sData.gaps) ? sData.gaps : []);
+      setUnderstaffed(Array.isArray(sData.understaffed) ? sData.understaffed : []);
       setShiftTypes(stData.shiftTypes ?? []);
       setFixed(faData.assignments ?? []);
       setOpeningHours(ohData.openingHours ?? {});
@@ -410,6 +430,25 @@ export default function ScheduleBuilder({ user }: Props) {
     return map;
   }, [preview]);
 
+  // Návrh přebíjí uložený stav: když je na obrazovce náhled, svítí červeně to,
+  // co by po uložení opravdu chybělo, ne to, co chybí teď.
+  const activeGaps = preview ? preview.gaps : gaps;
+  const activeUnderstaffed = preview ? preview.understaffed : understaffed;
+  const problemsByDate = useMemo(() => {
+    const map: Record<string, { gaps: Gap[]; missing: MissingSlot[] }> = {};
+    for (const g of activeGaps) {
+      (map[g.date] ||= { gaps: [], missing: [] }).gaps.push(g);
+    }
+    for (const m of activeUnderstaffed) {
+      (map[m.date] ||= { gaps: [], missing: [] }).missing.push(m);
+    }
+    return map;
+  }, [activeGaps, activeUnderstaffed]);
+  const problemDates = useMemo(
+    () => Object.keys(problemsByDate).sort(),
+    [problemsByDate],
+  );
+
   const eventsByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
     events.forEach(e => { (map[e.date] ||= []).push(e); });
@@ -470,12 +509,17 @@ export default function ScheduleBuilder({ user }: Props) {
       });
       const data = await res.json();
       if (res.ok) {
-        setPreview({ proposed: data.proposed ?? [], warnings: data.warnings ?? [] });
+        setPreview({
+          proposed: data.proposed ?? [],
+          warnings: data.warnings ?? [],
+          gaps: Array.isArray(data.gaps) ? data.gaps : [],
+          understaffed: Array.isArray(data.understaffed) ? data.understaffed : [],
+        });
       } else {
-        setPreview({ proposed: [], warnings: [data.error ?? 'Generování selhalo.'] });
+        setPreview({ proposed: [], warnings: [data.error ?? 'Generování selhalo.'], gaps: [], understaffed: [] });
       }
     } catch {
-      setPreview({ proposed: [], warnings: ['Generování selhalo.'] });
+      setPreview({ proposed: [], warnings: ['Generování selhalo.'], gaps: [], understaffed: [] });
     } finally {
       setGenerating(false);
     }
@@ -1114,6 +1158,47 @@ export default function ScheduleBuilder({ user }: Props) {
             </div>
           )}
 
+          {/* Díry v obsazení — nejdřív jako seznam s konkrétními časy, protože
+              do políčka v kalendáři se rozsah hodin na mobilu nevejde. */}
+          {problemDates.length > 0 && (
+            <div className="glass-card p-4 sm:p-5 border border-red-500/40 bg-red-500/[0.06] space-y-3">
+              <div className="min-w-0">
+                <h3 className="font-bold text-red-700 flex items-center gap-2">
+                  <Icon name="warning" size={18} /> Díry v obsazení ({problemDates.length})
+                </h3>
+                <p className="text-sm text-red-900/70 mt-0.5">
+                  {preview ? 'V navrženém rozvrhu' : 'V uloženém rozvrhu'} jsou dny, kdy je otevřeno a není tam
+                  dost lidí. Klikni na den a doplň směnu ručně.
+                </p>
+              </div>
+              <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                {problemDates.slice(0, 14).map((date) => {
+                  const pr = problemsByDate[date];
+                  return (
+                    <li key={date}>
+                      <button
+                        onClick={() => setDayModal(date)}
+                        className="w-full text-left rounded-2xl bg-white/60 border border-red-500/25 px-3.5 py-2.5 hover:bg-white/80 transition"
+                      >
+                        <span className="block text-sm font-semibold text-[#16181A] capitalize">{dayLabel(date)}</span>
+                        <span className="block text-xs text-red-800/85 mt-0.5 leading-relaxed">
+                          {pr.gaps.map((g) => `Nikdo v podniku ${g.from}–${g.to}.`).join(' ')}
+                          {pr.gaps.length > 0 && pr.missing.length > 0 ? ' ' : ''}
+                          {pr.missing.length > 0
+                            ? `Neobsazeno: ${pr.missing.map((m) => m.shiftTypeName).join(', ')}.`
+                            : ''}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+                {problemDates.length > 14 && (
+                  <li className="text-xs text-red-800/60 px-1">…a dalších {problemDates.length - 14} dnů</li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {/* Calendar grid */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -1131,6 +1216,11 @@ export default function ScheduleBuilder({ user }: Props) {
                     <span className="h-3 w-3 rounded-md border-2 border-dashed border-[#5B7A08]" /> Návrh
                   </span>
                 )}
+                {problemDates.length > 0 && (
+                  <span className="flex items-center gap-1.5 text-red-700">
+                    <span className="h-3 w-3 rounded-md bg-red-500/25 border border-red-500/60" /> Díra v obsazení
+                  </span>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
@@ -1146,13 +1236,35 @@ export default function ScheduleBuilder({ user }: Props) {
                 const day = parseInt(cell.split('-')[2]);
                 const dayShifts = shiftsByDay[cell] ?? [];
                 const dayProposed = proposedByDay[cell] ?? [];
+                const problem = problemsByDate[cell];
+                const hole = (problem?.gaps.length ?? 0) > 0;
+                // Prázdný podnik je horší než chybějící druhý člověk, ale obojí
+                // svítí červeně — je to díra v obsazení, ne kosmetika.
+                const problemTitle = problem
+                  ? [
+                      ...problem.gaps.map(g => `Nikdo v podniku ${g.from}–${g.to}, přitom je otevřeno`),
+                      ...problem.missing.map(m => `Neobsazená směna „${m.shiftTypeName}"`),
+                    ].join(' · ')
+                  : undefined;
                 return (
                   <button
                     key={cell}
                     onClick={() => setDayModal(cell)}
-                    className="min-h-[84px] min-w-0 rounded-xl bg-black/[0.03] border border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04] p-1 sm:p-1.5 text-left transition-all flex flex-col gap-1 overflow-hidden"
+                    title={problemTitle}
+                    className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition-all flex flex-col gap-1 overflow-hidden border ${
+                      hole
+                        ? 'bg-red-500/12 border-red-500/60 hover:bg-red-500/[0.18]'
+                        : problem
+                          ? 'bg-red-500/[0.06] border-red-500/35 hover:bg-red-500/10'
+                          : 'bg-black/[0.03] border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04]'
+                    }`}
                   >
-                    <span className="text-[11px] sm:text-xs font-medium text-black/55">{day}</span>
+                    <span className="flex items-center gap-1 min-w-0">
+                      <span className={`text-[11px] sm:text-xs font-medium ${problem ? 'text-red-700' : 'text-black/55'}`}>{day}</span>
+                      {problem && (
+                        <span className={`flex-shrink-0 rounded-full ${hole ? 'h-2 w-2 bg-red-600' : 'h-1.5 w-1.5 bg-red-500/70'}`} />
+                      )}
+                    </span>
                     <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
                       {(eventsByDate[cell] ?? []).map((ev: any) => (
                         <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
@@ -1929,6 +2041,20 @@ function DayModal({
     end: t.endsAtClose && dayClose ? dayClose : t.endTime,
   });
 
+  // Pokrytí toho jednoho dne. Modal je místo, kde se díra opravuje, takže
+  // musí být vidět přímo tady — ne jen v seznamu nad kalendářem.
+  const dayGaps = useMemo(
+    () => uncovered(openSpan(oh ?? null), [...shifts, ...proposed].map((x) => ({ start: x.startTime, end: x.endTime }))),
+    [oh, shifts, proposed],
+  );
+  const missingHere = useMemo(() => {
+    if (!oh || oh.closed) return [] as string[];
+    const taken = new Set([...shifts, ...proposed].map((x) => String((x as any).type ?? (x as any).shiftTypeName ?? '').trim().toLowerCase()));
+    return shiftTypes
+      .filter((t) => typeFitsDay(t as any, oh as any) && !taken.has(t.name.trim().toLowerCase()))
+      .map((t) => t.name);
+  }, [oh, shifts, proposed, shiftTypes]);
+
   const first = shiftTypes[0];
   const [employeeId, setEmployeeId] = useState<number | ''>('');
   // The chosen type name ('' = manual custom time).
@@ -1985,6 +2111,24 @@ function DayModal({
             ×
           </button>
         </div>
+
+        {(dayGaps.length > 0 || missingHere.length > 0) && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/35 p-3.5">
+            <p className="text-sm font-semibold text-red-700 flex items-center gap-1.5">
+              <Icon name="warning" size={16} /> Díra v obsazení
+            </p>
+            <ul className="text-xs text-red-900/80 mt-1 space-y-0.5">
+              {dayGaps.map((g, i) => (
+                <li key={`g-${i}`}>
+                  Od {toHM(g.start)} do {toHM(g.end)} není v podniku nikdo, přitom je otevřeno.
+                </li>
+              ))}
+              {missingHere.map((n) => (
+                <li key={`m-${n}`}>Směna „{n}" nemá nikoho.</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {events.length > 0 && events.map((ev: any) => (
           <div key={ev.id} className="rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 px-4 py-3">

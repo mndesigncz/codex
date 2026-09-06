@@ -6,6 +6,7 @@
 // POST { month, commit: true, changes } → apply the confirmed changes
 
 import { NextResponse } from 'next/server';
+import { coverageGaps } from '@/lib/coverage';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -121,6 +122,14 @@ export async function POST(req: Request) {
   try {
     shiftTypes = await sql`SELECT id, name, start_time FROM shift_types WHERE team_id = ${c.teamId}`;
   } catch { /* ignore */ }
+  // Otevírací doba — přeplánování smí sáhnout jen tam, kde po něm zůstane
+  // podnik obsazený. Když návrh znamená „zrušit", musí být vidět, že tím
+  // vznikne díra.
+  let openingHours: Record<string, any> | null = null;
+  try {
+    const [t] = await sql`SELECT opening_hours FROM teams WHERE id = ${c.teamId}`;
+    if (t?.opening_hours && typeof t.opening_hours === 'object') openingHours = t.opening_hours as any;
+  } catch { /* bez otevírací doby se pokrytí neřeší */ }
   const prefTypes: PrefType[] = shiftTypes.map((t: any) => ({
     id: Number(t.id), name: String(t.name), start: String(t.start_time).slice(0, 5),
   }));
@@ -286,6 +295,24 @@ export async function POST(req: Request) {
     } else {
       changes.push({ ...base, action: 'remove' });
       warnings.push(`${dayNum(date)} — směnu ${base.startTime}–${base.endTime} nemá kdo převzít (${holder.name}: ${reason}). Návrh: zrušit.`);
+    }
+  }
+
+  // Kontrola pokrytí PO provedení návrhu: zrušená směna může nechat podnik
+  // otevřený a prázdný, a to je horší než konflikt, který se řešil.
+  if (openingHours) {
+    const removed = new Set(changes.filter((ch) => ch.action === 'remove').map((ch) => ch.shiftId));
+    const byDate = new Map<string, { start: string; end: string }[]>();
+    for (const sh of shifts as any[]) {
+      if (removed.has(sh.id)) continue;
+      const date = String(sh.date);
+      const list = byDate.get(date) ?? [];
+      list.push({ start: String(sh.start_time).slice(0, 5), end: String(sh.end_time).slice(0, 5) });
+      byDate.set(date, list);
+    }
+    const touched = Array.from(new Set(changes.map((ch) => String(ch.date)))).sort();
+    for (const g of coverageGaps(openingHours as any, byDate, touched)) {
+      warnings.unshift(`${dayNum(g.date)} — po úpravě by ${g.from}–${g.to} nebyl v podniku nikdo, přitom je otevřeno.`);
     }
   }
 
