@@ -25,8 +25,11 @@ export async function GET() {
 
   try {
     // Resolve team from the user record (session teamId may be stale)
+    // Jen z databáze. Dřív tu byl fallback na teamId ze session — a ten si
+    // šel z prohlížeče přepsat, takže účet bez týmu si mohl nechat vypsat
+    // cizí podnik i s join kódem.
     const [dbUser] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-    const teamId = dbUser?.team_id ?? me.teamId;
+    const teamId = dbUser?.team_id ?? null;
     if (!teamId) return NextResponse.json({ team: null });
 
     // Core columns only — never depend on newer optional columns here, so a

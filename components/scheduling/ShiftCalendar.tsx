@@ -99,7 +99,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
               const active = sel === date;
               return (
                 <button key={i} onClick={() => day ? setSel(active ? null : date) : undefined}
-                  className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}>
+                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}>
                   <span className={`text-[11px] font-semibold leading-none mt-0.5 ${isToday ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{dnum}</span>
                   {day && day.onShift.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-0.5 leading-none">
@@ -128,7 +128,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.onShift.map(p => (
-                      <PersonLink key={p.id} id={p.id} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.05] text-black/60'}`}>
+                      <PersonLink key={p.id} id={p.id} className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.05] text-black/60'}`}>
                         <span>{p.avatar ?? '👤'}</span> {p.name}
                         {p.startTime && <span className="opacity-60 tabular-nums">{p.startTime}–{p.endTime}</span>}
                         {p.hadClosing ? ' ✓' : ''}
@@ -144,7 +144,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (
-                      <PersonLink key={p.id} id={p.id} className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-white px-2.5 py-1 text-xs font-medium">
+                      <PersonLink key={p.id} id={p.id} className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#16181A] text-white px-2.5 py-1 text-xs font-medium">
                         <span>{p.avatar ?? '👤'}</span> {p.name}
                       </PersonLink>
                     ))}

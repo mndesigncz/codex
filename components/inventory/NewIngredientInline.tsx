@@ -152,7 +152,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-black/45">
-        <label className="flex items-center gap-2 shrink-0">
+        <label className="flex items-center gap-2 flex-wrap min-w-0">
           <span className="font-semibold text-black/50 whitespace-nowrap">Máme na skladě</span>
           <input inputMode="decimal" value={quantity} onChange={e => setQuantity(e.target.value)}
             placeholder="0" className="w-20 shrink-0 rounded-2xl bg-white/70 border border-black/[0.08] px-2.5 py-1.5 text-sm text-center tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />

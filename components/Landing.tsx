@@ -45,7 +45,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-10 sm:pt-20 pb-14 text-center">
-        <p className="inline-flex items-center gap-2 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] px-4 py-1.5 text-xs font-semibold uppercase tracking-wider">
+        <p className="tap-target-sm inline-flex items-center gap-2 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] px-4 py-1.5 text-xs font-semibold uppercase tracking-wider">
           Pro čajovny, kavárny a malé podniky
         </p>
         <h1 className="mt-5 text-4xl sm:text-6xl font-bold tracking-tight text-[#16181A] leading-[1.05] text-balance">

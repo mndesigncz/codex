@@ -94,12 +94,12 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
             ))}
             <div className="flex flex-wrap gap-2">
               {opts.length < 8 && (
-                <button onClick={() => setOpts(prev => [...prev, ''])} className="rounded-full glass px-3 py-1.5 text-xs text-black/55 hover:text-black">+ možnost</button>
+                <button onClick={() => setOpts(prev => [...prev, ''])} className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs text-black/55 hover:text-black">+ možnost</button>
               )}
               <span className="flex-1" />
-              <button onClick={() => setCreating(false)} className="rounded-full glass px-3.5 py-1.5 text-xs font-semibold text-black/55 hover:text-black">Zrušit</button>
+              <button onClick={() => setCreating(false)} className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-semibold text-black/55 hover:text-black">Zrušit</button>
               <button onClick={create} disabled={!question.trim() || opts.filter(o => o.trim()).length < 2}
-                className="rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-bold disabled:opacity-40 hover:bg-black transition">
+                className="tap-target-sm rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-bold disabled:opacity-40 hover:bg-black transition">
                 Založit anketu
               </button>
             </div>

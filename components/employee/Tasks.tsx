@@ -118,7 +118,7 @@ export default function Tasks({ user }: Props) {
               <select
                 value={task.status}
                 onChange={e => updateStatus(task, e.target.value)}
-                className={`text-xs px-3 py-1 min-h-[36px] rounded-full border-0 font-medium cursor-pointer ${statusOpt.color} focus:outline-none`}
+                className={`tap-target-sm text-xs px-3 py-1 min-h-[36px] rounded-full border-0 font-medium cursor-pointer ${statusOpt.color} focus:outline-none`}
               >
                 {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>

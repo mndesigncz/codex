@@ -90,7 +90,7 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
         <div>
           <button type="button" onClick={() => setOpen(o => !o)}
             className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
-            <span>Rozdíly po položkách ({d.rows.length})</span>
+            <span>Rozdíly po položkách ({d.rows?.length ?? 0})</span>
             <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${open ? 'rotate-180' : ''}`} />
           </button>
           {open && (

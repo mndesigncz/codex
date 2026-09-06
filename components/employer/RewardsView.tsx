@@ -103,14 +103,14 @@ function RewardsViewInner() {
             <div className="space-y-2">
               {redemptions.filter(r => r.status === 'pending').map(r => (
                 <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5">
-                  <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">
+                  <span className="min-w-0 flex-1 basis-full sm:basis-0 text-sm text-[#16181A] line-clamp-2 sm:truncate">
                     {r.employee_avatar ?? '👤'} <strong>{r.employee_name}</strong> · {r.title}
                     <span className="text-black/40"> · {r.cost} b.</span>
                   </span>
                   <button onClick={() => decide(r.id, 'approve')}
-                    className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">Schválit ✓</button>
+                    className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">Schválit ✓</button>
                   <button onClick={() => decide(r.id, 'decline')}
-                    className="shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">Zamítnout</button>
+                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">Zamítnout</button>
                 </div>
               ))}
             </div>
@@ -199,11 +199,11 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
     <div className="space-y-3">
       {standings.map((s, i) => (
         <div key={s.id} className="glass-card p-4 cursor-pointer hover:bg-black/[0.02] transition" onClick={() => onOpen(s)} title="Otevřít profil">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
             <span className="w-7 text-center text-sm font-bold text-black/50 tabular-nums shrink-0">{medal(i)}</span>
             <span className="text-xl flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{s.avatar || '👤'}</span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="min-w-0 flex-1 basis-[calc(100%-5.5rem)] min-[420px]:basis-0">
+              <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
                 <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-0.5 text-[11px] font-bold">{s.levelName}</span>
                 {!!s.flagged && (
@@ -228,7 +228,7 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
               )}
             </div>
             <button onClick={e => { e.stopPropagation(); onRate(s); }}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 transition whitespace-nowrap shrink-0">
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 transition whitespace-nowrap shrink-0 ml-auto">
               Ohodnotit
             </button>
           </div>
@@ -332,7 +332,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-bold tracking-tight text-[#16181A]">Úrovně a výhody</h3>
-          <button onClick={addLevel} className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
+          <button onClick={addLevel} className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
             <Icon name="plus" size={14} /> Přidat
           </button>
         </div>

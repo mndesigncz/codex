@@ -492,7 +492,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{team.name}</p>
+            <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 line-clamp-2">{team.name}</p>
             <button onClick={() => setEditingName(true)}
               className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all flex-shrink-0 whitespace-nowrap">
               Přejmenovat
@@ -587,7 +587,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               {invitations.map(inv => (
                 <div key={inv.id} className="flex items-center justify-between py-3 gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-[#16181A] truncate">{inv.email}</p>
+                    <p className="text-sm text-[#16181A] line-clamp-2 break-all sm:break-normal">{inv.email}</p>
                     <p className="text-xs text-black/45">{inv.job_title || 'Barista'}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
@@ -609,7 +609,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         Zrušit
                       </button>
                     )}
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
+                    <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${statusChip(inv.status)}`}>
                       {statusLabel(inv.status)}
                     </span>
                   </div>
@@ -639,20 +639,20 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   >
                     {m.avatar ?? '👤'}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] min-[420px]:basis-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p
                         onClick={() => m.role === 'employee' && setProfileId(m.id)}
                         className={`font-bold tracking-tight text-[#16181A] truncate ${m.role === 'employee' ? 'cursor-pointer hover:underline decoration-black/25 underline-offset-2' : ''}`}
                         title={m.role === 'employee' ? 'Zobrazit profil' : undefined}
                       >{m.name}</p>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
-                      {owner && <span className="rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
+                      <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
+                      {owner && <span className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
                     </div>
-                    <p className="text-sm text-black/45 truncate">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
+                    <p className="text-sm text-black/45 line-clamp-2 break-all sm:break-normal">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>
                   {!owner && !editing && (
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
                       {m.role === 'employee' && (
                         <button onClick={() => setProfileId(m.id)}
                           className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-medium hover:brightness-125 transition-all whitespace-nowrap">
@@ -791,7 +791,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <button
                       type="button" role="switch" aria-checked={on}
                       onClick={() => toggleWidget(role, w.id, !on)}
-                      className={`relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+                      className={`tap-target-sm relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
                       style={{ width: '2.75rem', height: '1.6rem' }}
                     >
                       <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
@@ -827,7 +827,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             aria-checked={!!team?.pay_daily_cash}
             disabled={savingPayout}
             onClick={() => togglePayDailyCash(!team?.pay_daily_cash)}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+            className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.pay_daily_cash ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.pay_daily_cash ? 'translate-x-5' : ''}`} />
           </button>
@@ -843,7 +843,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               kolik odložit ven — počáteční stav, tržby a odvod se naklikají samy.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             <input type="number" inputMode="numeric" min={0}
               value={floatDraft ?? (team?.drawer_float != null ? String(team.drawer_float) : '')}
               onChange={e => setFloatDraft(e.target.value)}
@@ -871,7 +871,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             aria-checked={team?.show_team_schedule !== false}
             disabled={savingTeamSchedule}
             onClick={() => toggleTeamSchedule(!(team?.show_team_schedule !== false))}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.show_team_schedule !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+            className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.show_team_schedule !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.show_team_schedule !== false ? 'translate-x-5' : ''}`} />
           </button>
@@ -890,7 +890,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             aria-checked={team?.closing_requires_shift !== false}
             disabled={savingRequiresShift}
             onClick={() => toggleRequiresShift(!(team?.closing_requires_shift !== false))}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+            className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${team?.closing_requires_shift !== false ? 'bg-[#C8F542]' : 'bg-black/15'}`}
           >
             <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${team?.closing_requires_shift !== false ? 'translate-x-5' : ''}`} />
           </button>

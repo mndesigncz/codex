@@ -42,7 +42,7 @@ export function TaskChecklist({ items, onToggle }: {
             type="button"
             onClick={onToggle ? () => onToggle(i) : undefined}
             disabled={!onToggle}
-            className={`flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
+            className={`tap-target-sm flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
           >
             <span className={`grid place-items-center h-4 w-4 shrink-0 rounded-[5px] border transition ${
               it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/25 text-transparent'

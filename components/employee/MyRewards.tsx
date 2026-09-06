@@ -284,7 +284,7 @@ function MyRewardsInner() {
           {myRedemptions.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {myRedemptions.slice(0, 6).map(r => (
-                <span key={r.id} className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                <span key={r.id} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium ${
                   r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#5B7A08]'
                   : r.status === 'declined' ? 'bg-red-500/10 text-red-600'
                   : 'bg-amber-500/12 text-amber-700'

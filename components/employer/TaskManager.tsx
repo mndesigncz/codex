@@ -232,10 +232,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1.5">
               <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${prio.dot}`} title={`Priorita: ${prio.label}`} />
-              <p className={`font-semibold text-sm text-[#16181A] ${compact ? '' : 'truncate'} ${done ? 'line-through text-black/40' : ''}`}>{t.title}</p>
+              <p className={`font-semibold text-sm text-[#16181A] ${compact ? '' : 'line-clamp-2 sm:truncate'} ${done ? 'line-through text-black/40' : ''}`}>{t.title}</p>
             </div>
-            <p className={`text-xs text-black/45 mt-0.5 flex items-center gap-1.5 ${compact ? 'flex-wrap' : 'truncate'}`}>
-              <span className={compact ? '' : 'truncate'}>
+            <p className={`text-xs text-black/45 mt-0.5 flex items-center gap-1.5 flex-wrap`}>
+              <span className={compact ? '' : 'min-w-0 line-clamp-2'}>
                 {t.assignedTo != null ? <PersonLink id={t.assignedTo}>{who}</PersonLink> : who}
                 {!compact && t.dueDate ? ` · ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}` : ''}
                 {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
@@ -278,7 +278,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Úkoly</h1>
           <p className="text-black/50 text-sm mt-1">Úkoly na den nebo pro konkrétní lidi — a jejich plnění.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
               <button key={v} onClick={() => setView(v)}

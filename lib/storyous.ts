@@ -5,6 +5,7 @@
 // Bills: GET api.storyous.com/bills/{merchantId}-{placeId}?from&till&limit → { data, nextPage }.
 
 import { neon } from '@neondatabase/serverless';
+import { seal, open } from './secretBox';
 import { businessDayOf, dayPlus } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -25,7 +26,9 @@ export async function getConnection(teamId: number): Promise<PosConnection | nul
     return {
       teamId,
       clientId: row.client_id,
-      clientSecret: row.client_secret,
+      // Uloženo zašifrovaně; staré čitelné záznamy projdou beze změny a
+      // přepíšou se při nejbližším uložení připojení.
+      clientSecret: open(row.client_secret) ?? '',
       merchantId: row.merchant_id,
       placeId: row.place_id,
       placeName: row.place_name ?? null,

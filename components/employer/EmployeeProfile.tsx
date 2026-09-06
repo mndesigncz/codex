@@ -94,7 +94,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
               <div className="flex gap-1 px-5 pb-3">
                 {([['overview', 'Přehled'], ['shifts', 'Směny'], ['feedback', 'Hodnocení']] as const).map(([v, lbl]) => (
                   <button key={v} onClick={() => setTab(v)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${tab === v ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:text-black'}`}>
+                    className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${tab === v ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:text-black'}`}>
                     {lbl}
                     {v === 'feedback' && flaggedItems.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-white text-[11px] px-1">{flaggedItems.length}</span>}
                   </button>
@@ -234,7 +234,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                             <span className="text-sm font-medium text-[#16181A] capitalize min-w-0 flex-1 truncate">{fmtDayLong(sh.date)}</span>
                             <span className="text-xs text-black/45 tabular-nums shrink-0 hidden sm:inline">{sh.startTime}–{sh.endTime}</span>
                             {sh.reviewed ? (
-                              <span className="flex items-center gap-1.5 shrink-0">
+                              <span className="flex items-center gap-1.5 flex-wrap min-w-0">
                                 {sh.rating > 0 && <Stars n={sh.rating} />}
                                 {sh.flagged && <Icon name="warning" size={13} className="text-red-600" />}
                                 <PointsBadge n={sh.reviewPoints} />

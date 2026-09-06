@@ -128,12 +128,12 @@ export default function FinanceView() {
           <Icon name="coins" size={22} className="text-[#16181A] shrink-0" />
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Finance</h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <div className="flex items-center gap-1 glass rounded-full p-1">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 basis-full sm:basis-auto sm:justify-end">
+          <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0">
             <button onClick={() => shiftMonth(-1)} className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
-            <span className="px-2 min-w-[9rem] text-center text-sm font-semibold capitalize text-[#16181A]">{monthLabel(month)}</span>
+            <span className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold capitalize text-[#16181A] truncate">{monthLabel(month)}</span>
             <button onClick={() => shiftMonth(1)} className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="-rotate-90" />
             </button>

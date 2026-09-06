@@ -270,10 +270,10 @@ export default function PlanningBoard() {
                     className="w-full text-xs rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all resize-none"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleAddCard} disabled={adding} className="flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
+                    <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
                       {adding ? 'Přidávám…' : 'Přidat'}
                     </button>
-                    <button onClick={() => setNewCard(null)} className="flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition-all">
+                    <button onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition-all">
                       Zrušit
                     </button>
                   </div>

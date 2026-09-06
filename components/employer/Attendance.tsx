@@ -324,7 +324,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {PERIODS.map(p => (
               <button key={p} onClick={() => setDays(p)}
@@ -373,7 +373,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   const openEntry = entries.find(e => String(e.employeeId) === String(r.id) && !e.clockOut);
                   return openEntry ? (
                     <button onClick={() => closeEntry(openEntry)} title="Ukončit směnu a nastavit čas odchodu"
-                      className="shrink-0 rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
+                      className="tap-target-sm shrink-0 rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
                       Ukončit
                     </button>
                   ) : null;
@@ -396,7 +396,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Mzdy</h3>
               <div className="grid grid-cols-2 gap-4 max-w-md">
                 <div className="glass-card p-5 min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Mzdové náklady</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
                   <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">
                     {money(laborCost)}
                   </p>
@@ -409,7 +409,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                     : over ? 'text-red-600' : 'text-[#5B7A08]';
                   return (
                     <div className={`glass-card p-5 min-w-0 ${over ? 'ring-1 ring-red-500/30' : ''}`}>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-black/45 truncate">Podíl na tržbách</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Podíl na tržbách</p>
                       <p className={`mt-1 text-xl font-bold tabular-nums whitespace-nowrap ${tone}`}>
                         {pct != null ? `${pct.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %` : '—'}
                       </p>
@@ -471,7 +471,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 <div key={g.key} className="space-y-2">
                   <div className="flex items-center gap-2 px-1 pt-1">
                     <Icon name="calendar" size={14} className="text-black/35 shrink-0" />
-                    <p className="text-xs font-semibold uppercase tracking-wider text-black/45 capitalize truncate">{g.label}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black/45 capitalize line-clamp-2">{g.label}</p>
                   </div>
                   <div className="glass-card divide-y divide-black/[0.06] overflow-hidden">
                     {g.list.map(e => {
@@ -494,12 +494,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </div>
                           </div>
                           {stale && (
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 whitespace-nowrap">
                                 <Icon name="warning" size={12} /> Zapomenutý odchod?
                               </span>
                               <button onClick={() => closeEntry(e)}
-                                className="rounded-full bg-[#16181A] text-white text-xs font-semibold px-3 py-1.5 hover:bg-black transition whitespace-nowrap">
+                                className="tap-target-sm rounded-full bg-[#16181A] text-white text-xs font-semibold px-3 py-1.5 hover:bg-black transition whitespace-nowrap">
                                 Ukončit
                               </button>
                             </div>

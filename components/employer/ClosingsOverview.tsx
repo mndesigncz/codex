@@ -293,7 +293,7 @@ export default function ClosingsOverview() {
   // Employer fills a closing themselves (e.g. nobody on the crew did it today).
   if (creating) {
     return (
-      <div className="p-4 sm:p-6 space-y-4">
+      <div className="p-2 sm:p-6 space-y-4">
         <button onClick={() => { setCreating(false); setCreatingDate(undefined); }}
           className="inline-flex items-center gap-2 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="rotate-90" /> Zpět na přehled
@@ -361,7 +361,7 @@ export default function ClosingsOverview() {
                       {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                     </p>
                   </div>
-                  <span className={`shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
+                  <span className={`tap-target-sm shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                 </div>
@@ -385,27 +385,27 @@ export default function ClosingsOverview() {
       {/* Summary tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-5 min-w-0">
-          <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržba celkem</p>
+          <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Tržba celkem</p>
           <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totalRevenue)}</p>
           <p className="text-[11px] text-black/40 mt-1 truncate">Hotově {money(totals.cash)} · Kartou {money(totals.card)}</p>
         </div>
         <div className="glass-card p-5 min-w-0">
-          <p className="text-xs uppercase tracking-wider text-black/45 truncate">Odvedeno / odloženo</p>
+          <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Odvedeno / odloženo</p>
           <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totals.removed)}</p>
         </div>
         {payDailyCash ? (
           <div className="glass-card p-5 min-w-0">
-            <p className="text-xs uppercase tracking-wider text-black/45 truncate">Vyplaceno v hotovosti</p>
+            <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Vyplaceno v hotovosti</p>
             <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totals.payout)}</p>
           </div>
         ) : (
           <div className="glass-card p-5 min-w-0">
-            <p className="text-xs uppercase tracking-wider text-black/45 truncate">Spropitné celkem</p>
+            <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Spropitné celkem</p>
             <p className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-[#16181A] mt-1.5 truncate">{money(totals.tips)}</p>
           </div>
         )}
         <div className="glass-card p-5 min-w-0">
-          <p className="text-xs uppercase tracking-wider text-black/45 truncate">Rozdíl kasy</p>
+          <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Rozdíl kasy</p>
           <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-red-600'}`}>
             {totals.diff > 0 ? '+' : ''}{money(totals.diff)}
           </p>
@@ -418,12 +418,12 @@ export default function ClosingsOverview() {
           <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📊 Trendy</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tento týden</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Tento týden</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(trend.thisWeek)}</p>
               <p className="text-[11px] text-black/40 mt-0.5">od pondělí do dneška</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">vs. minulý týden</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">vs. minulý týden</p>
               <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${
                 trend.wow == null ? 'text-black/40' : trend.wow >= 0 ? 'text-[#5B7A08]' : 'text-red-600'
               }`}>
@@ -432,12 +432,12 @@ export default function ClosingsOverview() {
               <p className="text-[11px] text-black/40 mt-0.5 truncate">stejné dny: {money(trend.lastWeekSame)}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Nejsilnější den</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Nejsilnější den</p>
               <p className="text-lg sm:text-xl font-bold text-[#16181A] mt-1 capitalize truncate">{trend.bestWdLabel}</p>
               <p className="text-[11px] text-black/40 mt-0.5 truncate">průměr {money(Math.round(trend.bestAvg))}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Rekordní den</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Rekordní den</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(trend.recordVal)}</p>
               <p className="text-[11px] text-black/40 mt-0.5 truncate">{trend.recordDay && new Date(trend.recordDay + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
@@ -464,11 +464,11 @@ export default function ClosingsOverview() {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržby</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Tržby</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(totalRevenue)}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Mzdové náklady</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">− {money(laborCost)}</p>
               {laborPct != null && (
                 <p className={`text-[11px] mt-0.5 truncate ${laborTargetPct != null && laborPct > laborTargetPct ? 'text-red-600 font-semibold' : 'text-black/40'}`}>
@@ -477,12 +477,12 @@ export default function ClosingsOverview() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Nákupy zboží</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Nákupy zboží</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">− {money(purchases)}</p>
               <p className="text-[11px] text-black/40 mt-0.5 truncate">přijaté objednávky</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Provozní výsledek</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Provozní výsledek</p>
               <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${operating >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
                 {operating >= 0 ? '+' : ''}{money(operating)}
               </p>
@@ -516,20 +516,20 @@ export default function ClosingsOverview() {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Tržba / účtenek</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Tržba / účtenek</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(posInsights.total)} <span className="text-xs font-semibold text-black/40">/ {posInsights.bills}</span></p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Průměrná útrata</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Průměrná útrata</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(posInsights.avgBill)}</p>
               {posInsights.avgPersons != null && <p className="text-[11px] text-black/40 mt-0.5">⌀ {posInsights.avgPersons} os. na účtenku</p>}
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Spropitné</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Spropitné</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">{money(posInsights.tips)}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-black/45 truncate">Refundace / slevy</p>
+              <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Refundace / slevy</p>
               <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${posInsights.refunds.count > 0 ? 'text-amber-700' : 'text-[#16181A]'}`}>
                 {posInsights.refunds.count}× ({money(posInsights.refunds.total)})
               </p>
@@ -721,7 +721,7 @@ export default function ClosingsOverview() {
 
       <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
         <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <button onClick={() => openCreate()}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
             <Icon name="plus" size={16} /> Nová uzávěrka
@@ -747,7 +747,7 @@ export default function ClosingsOverview() {
             {fmtMissing(selectedDate)}
             <span className="font-normal text-black/45"> · {topLevel.length === 0 ? 'bez uzávěrky' : `${topLevel.length}× uzávěrka`}</span>
           </p>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {topLevel.length === 0 && (
               <button onClick={() => openCreate(selectedDate)}
                 className="rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black transition inline-flex items-center gap-1.5">
@@ -826,14 +826,14 @@ export default function ClosingsOverview() {
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     {covered.length > 0 && (
-                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium whitespace-nowrap">
+                      <span className="tap-target-sm hidden sm:inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium whitespace-nowrap">
                         <Icon name="users" size={12} /> +{covered.length}
                       </span>
                     )}
                     {c.approved === false && (
-                      <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                      <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                     )}
-                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
+                    <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                     }`}>
                       {d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}

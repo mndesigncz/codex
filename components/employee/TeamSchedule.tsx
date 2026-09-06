@@ -78,10 +78,10 @@ export default function TeamSchedule() {
 
   return (
     <section className="glass-card p-4 sm:p-5">
-      <div className="flex items-baseline gap-2 mb-3 min-w-0">
+      <div className="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap mb-3 min-w-0">
         <Icon name="users" size={16} className="text-black/45 shrink-0 translate-y-0.5" />
         <h3 className="font-bold tracking-tight text-[#16181A] shrink-0">Kdo má směnu</h3>
-        <p className="text-xs text-black/40 truncate min-w-0">Nejbližší dva týdny</p>
+        <p className="text-xs text-black/40 min-w-0 basis-full sm:basis-auto">Nejbližší dva týdny</p>
       </div>
 
       {shifts === null && <p className="text-sm text-black/40 py-4 text-center">Načítám…</p>}
@@ -98,7 +98,7 @@ export default function TeamSchedule() {
             <div className="flex flex-wrap gap-1.5 min-w-0">
               {list.map(s => (
                 <span key={s.id}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs max-w-full ${
+                  className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs max-w-full ${
                     s.isMine
                       ? 'bg-[#C8F542]/25 text-[#3E5406] font-semibold ring-1 ring-[#C8F542]/50'
                       : 'bg-black/[0.045] text-black/65'}`}>

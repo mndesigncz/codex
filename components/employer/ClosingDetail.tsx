@@ -68,8 +68,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 /** Řádek štítek → hodnota, zarovnaný na desetinné čárce. */
 function Row({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'plus' | 'minus' | 'strong' }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-[13px] text-black/50 min-w-0">{label}</span>
+    <div className="flex items-baseline justify-between gap-x-4 gap-y-0.5 flex-wrap py-1.5">
+      <span className="text-[13px] text-black/50 min-w-0 flex-1 basis-24">{label}</span>
       <span className={`shrink-0 whitespace-nowrap tabular-nums text-sm ${
         tone === 'strong' ? 'font-bold text-[#16181A]'
           : tone === 'plus' ? 'font-semibold text-[#5B7A08]'
@@ -185,9 +185,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
               {c?.created_at ? ` · ${dayTime(c.created_at)}` : ''}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {c && !c.covered_by && (
-              <span className={`text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
+              <span className={`tap-target-sm text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
                 diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'}`}>
                 {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </span>
@@ -295,9 +295,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 ) : (
                   <p className="text-sm text-black/45">Bez dat z pokladny.</p>
                 )}
-                {d.notes.length > 0 && (
+                {(d.notes?.length ?? 0) > 0 && (
                   <ul className="mt-3 space-y-1.5">
-                    {d.notes.map((n, i) => (
+                    {(d.notes ?? []).map((n, i) => (
                       <li key={i} className="flex gap-2 text-[13px] text-black/55 leading-snug">
                         <Icon name="warning" size={13} className="shrink-0 mt-0.5 text-amber-600" />
                         <span>{n}</span>
@@ -328,7 +328,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 <Section title="Kasa napočítaná po bankovkách">
                   <div className="flex flex-wrap gap-1.5">
                     {Object.entries(c.denominations!).sort((a, b) => Number(b[0]) - Number(a[0])).map(([den, count]) => (
-                      <span key={den} className="rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
+                      <span key={den} className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
                         <strong>{count}×</strong> {Number(den).toLocaleString('cs-CZ')}
                       </span>
                     ))}
@@ -378,14 +378,14 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {d.crew.map(p => (
                     <PersonLink key={p.id} id={p.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
+                      className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
                       <span>{p.avatar ?? '👤'}</span>{p.name}
                       {p.id === c.created_by && <span className="opacity-70">· vyplnil/a</span>}
                     </PersonLink>
                   ))}
                   {d.covered.map(cv => (
                     <PersonLink key={cv.id} id={cv.employeeId}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
+                      className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
                       <span>{cv.avatar ?? '👤'}</span>{cv.name ?? 'Neznámý'}
                       {payDailyCash && cv.selfPayout > 0 && <span className="opacity-70">· výplata {money(cv.selfPayout)}</span>}
                     </PersonLink>
@@ -493,7 +493,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 <Section title="Co se ten den prodalo" hint="Z prodejů stažených z pokladny — podle nich se odepisuje sklad.">
                   <div className="flex flex-wrap gap-1.5">
                     {d.products.map((p, i) => (
-                      <span key={i} className="rounded-full bg-black/[0.04] border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">
+                      <span key={i} className="tap-target-sm rounded-full bg-black/[0.04] border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">
                         <strong className="tabular-nums">{Math.round(p.qty * 10) / 10}×</strong> {p.name ?? 'bez názvu'}
                       </span>
                     ))}

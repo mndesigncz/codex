@@ -32,3 +32,7 @@ jobs:
       # špatný odpis ze skladu a špatnou marži.
       - name: Desetinná pole
         run: node scripts/check-decimal-inputs.mjs
+      # Dvě šířkové třídy v jednom className: ta z konstanty přebije tu
+      # zamýšlenou a pole se roztáhne přes vedlejší sloupec.
+      - name: Soupeřící šířky
+        run: node scripts/check-width-clash.mjs

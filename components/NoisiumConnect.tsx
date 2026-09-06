@@ -53,7 +53,7 @@ export default function NoisiumConnect() {
           </h3>
           <p className="text-black/45 text-sm mt-1">Publikuj úkoly z Plánování přímo do Noisium (Plan app).</p>
         </div>
-        {connected && <span className="rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08] whitespace-nowrap flex-shrink-0">Připojeno</span>}
+        {connected && <span className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08] whitespace-nowrap flex-shrink-0">Připojeno</span>}
       </div>
 
       {msg && <div className="p-3 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 text-[#5B7A08] text-sm">{msg}</div>}

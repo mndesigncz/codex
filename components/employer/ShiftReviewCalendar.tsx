@@ -100,7 +100,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
               const active = sel === date;
               return (
                 <button key={i} onClick={() => day ? setSel(active ? null : date) : undefined}
-                  className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}>
+                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}>
                   <span className={`text-[11px] font-semibold leading-none mt-0.5 ${isToday ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{dnum}</span>
                   {day && (
                     <div className="flex flex-wrap justify-center gap-0.5 leading-none">

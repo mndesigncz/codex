@@ -89,7 +89,7 @@ export default function LiveRevenue() {
   }
 
   const t = d?.totals;
-  const maxHour = d ? Math.max(...d.hours, 0) : 0;
+  const maxHour = d ? Math.max(...(d.hours ?? []), 0) : 0;
 
   return (
     <div className="glass-card p-5 sm:p-6 space-y-5">
@@ -113,7 +113,7 @@ export default function LiveRevenue() {
       <div className="flex flex-wrap items-center gap-2">
         {presets.map(([label, a, b]) => (
           <button key={label} onClick={() => preset(a, b)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
+            className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
               isPreset(a, b) ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
             }`}>
             {label}
@@ -121,10 +121,10 @@ export default function LiveRevenue() {
         ))}
         <span className="text-black/20">·</span>
         <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)}
-          className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
         <span className="text-xs text-black/35">–</span>
         <input type="date" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
-          className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
       </div>
 
       {err && <p className="text-sm text-amber-800 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">{err}</p>}
@@ -168,9 +168,9 @@ export default function LiveRevenue() {
           </div>
 
           {/* Sedí to? */}
-          {d.notes.length > 0 && (
+          {(d.notes?.length ?? 0) > 0 && (
             <div className="space-y-2">
-              {d.notes.map((n, i) => (
+              {(d.notes ?? []).map((n, i) => (
                 <div key={i} className={`rounded-2xl border px-4 py-2.5 ${toneCls[n.tone]}`}>
                   <p className="text-sm font-semibold flex items-center gap-1.5">
                     <Icon name={toneIcon[n.tone]} size={14} /> {n.title}
@@ -186,7 +186,7 @@ export default function LiveRevenue() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Kdy se protáčelo</p>
               <div className="flex items-end gap-[3px] h-16">
-                {d.hours.map((v, h) => (
+                {(d.hours ?? []).map((v, h) => (
                   <div key={h} className="flex-1 min-w-[8px] flex flex-col items-center gap-1" title={`${h}:00 — ${money(v)}`}>
                     <div className={`w-full rounded-t ${v === maxHour ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
                       style={{ height: `${maxHour ? Math.max(v > 0 ? 4 : 0, (v / maxHour) * 48) : 0}px` }} />
@@ -198,7 +198,7 @@ export default function LiveRevenue() {
           )}
 
           {/* Co se prodalo */}
-          {d.items.length > 0 && (
+          {(d.items?.length ?? 0) > 0 && (
             <div>
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-black/45">Co se prodalo</p>
@@ -207,7 +207,7 @@ export default function LiveRevenue() {
                 </p>
               </div>
               <div className="rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-80 overflow-y-auto scrollbar-thin">
-                {d.items.map(i => (
+                {(d.items ?? []).map(i => (
                   <div key={i.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
                     <span className="w-full sm:w-auto sm:flex-1 min-w-0 truncate text-[#16181A]">{i.name}</span>
                     <span className="sm:hidden flex-1" />
@@ -222,16 +222,16 @@ export default function LiveRevenue() {
           )}
 
           {/* Kdo markoval */}
-          {d.byPerson.length > 0 && (
+          {(d.byPerson?.length ?? 0) > 0 && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Kdo markoval</p>
               <div className="space-y-1.5">
-                {d.byPerson.map(p => {
+                {(d.byPerson ?? []).map(p => {
                   const pct = t.total ? Math.round((p.total / t.total) * 100) : 0;
                   return (
                     <div key={p.name} className="relative overflow-hidden rounded-xl border border-black/[0.06] bg-white/50 px-3.5 py-2">
                       <span className="absolute inset-y-0 left-0 bg-[#C8F542]/25" style={{ width: `${pct}%` }} />
-                      <span className="relative flex items-center justify-between gap-2 text-sm">
+                      <span className="relative flex items-center justify-between gap-x-2 gap-y-0.5 flex-wrap text-sm">
                         <span className="min-w-0 truncate text-[#16181A]">{p.name}</span>
                         <span className="shrink-0 text-black/55 tabular-nums">{money(p.total)} · {p.bills} úč.</span>
                       </span>
@@ -243,16 +243,16 @@ export default function LiveRevenue() {
           )}
 
           {/* Den po dni */}
-          {d.days.length > 1 && (
+          {(d.days?.length ?? 0) > 1 && (
             <div>
               <button type="button" onClick={() => setOpenDays(o => !o)}
                 className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
-                <span>Den po dni ({d.days.length})</span>
+                <span>Den po dni ({d.days?.length ?? 0})</span>
                 <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${openDays ? 'rotate-180' : ''}`} />
               </button>
               {openDays && (
                 <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-72 overflow-y-auto scrollbar-thin">
-                  {d.days.map(day => (
+                  {(d.days ?? []).map(day => (
                     <div key={day.day} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                       <span className="w-14 shrink-0 text-black/45 tabular-nums">{csDate(day.day)}</span>
                       <span className="min-w-0 flex-1 truncate text-[11px] text-black/40">

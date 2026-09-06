@@ -378,11 +378,11 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
           ⬚
         </button>
         <button onClick={onCopy} title="Zkopírovat odkaz"
-          className="shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-1.5 text-xs font-bold hover:brightness-110">
+          className="tap-target-sm shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-1.5 text-xs font-bold hover:brightness-110">
           Kopírovat
         </button>
         <a href={url} target="_blank" rel="noopener" title="Otevřít stránku"
-          className="shrink-0 rounded-full glass border border-black/10 px-3.5 py-1.5 text-xs font-medium text-[#16181A] hover:bg-black/[0.05]">
+          className="tap-target-sm shrink-0 rounded-full glass border border-black/10 px-3.5 py-1.5 text-xs font-medium text-[#16181A] hover:bg-black/[0.05]">
           Otevřít ↗
         </a>
         <button onClick={() => setOpen(o => !o)} title="Nastavení odkazu"
@@ -412,7 +412,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
                 return (
                   <button key={e.id} onClick={() => toggle(e.id)}
                     style={{ marginLeft: e.depth * 10 }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
                       off ? 'bg-red-500/15 text-red-600 line-through' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
                     }`}>
                     {e.name}

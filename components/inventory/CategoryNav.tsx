@@ -46,7 +46,7 @@ export default function CategoryNav<T extends CategoryNode>({
     return (
       <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1 py-0.5">
         <button onClick={() => onNavigate(null)}
-          className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+          className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
             current === null ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
           }`}>
           {rootLabel}
@@ -55,7 +55,7 @@ export default function CategoryNav<T extends CategoryNode>({
           <span key={c.id} className="flex items-center gap-1 shrink-0">
             <Icon name="chevron" size={12} className="text-black/20 -rotate-90 shrink-0" />
             <button onClick={() => onNavigate(c.id)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
+              className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
                 c.id === current ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
               }`}>
               {c.name}
@@ -69,7 +69,7 @@ export default function CategoryNav<T extends CategoryNode>({
           const alerts = alertOf ? alertOf(c.id) : 0;
           return (
             <button key={c.id} onClick={() => onNavigate(c.id)}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/60 hover:text-black transition">
+              className="tap-target-sm shrink-0 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/60 hover:text-black transition">
               <Icon name="box" size={12} className="text-[#5B7A08]" />
               {c.name}
               {alerts > 0 && <span className="text-orange-600 font-bold tabular-nums">{alerts}</span>}
@@ -78,7 +78,7 @@ export default function CategoryNav<T extends CategoryNode>({
         })}
         {current === null && extraRoots.map(name => (
           <button key={name} onClick={() => onNavigateOrphan?.(name)}
-            className="shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/50 hover:text-black transition">
+            className="tap-target-sm shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/50 hover:text-black transition">
             {name}
           </button>
         ))}
@@ -111,7 +111,7 @@ export default function CategoryNav<T extends CategoryNode>({
 
       {/* One level in. Only rendered when there is somewhere to go. */}
       {(level.length > 0 || (current === null && extraRoots.length > 0)) && (
-        <div className={`grid gap-2 ${touch ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4'}`}>
+        <div className={`grid gap-2 ${touch ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-4'}`}>
           {level.map(c => {
             const kids = childrenOfId(categories, c.id).length;
             const count = countOf ? countOf(c.id) : null;
@@ -127,8 +127,8 @@ export default function CategoryNav<T extends CategoryNode>({
                   <Icon name="box" size={touch ? 20 : 16} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`block font-bold text-[#16181A] truncate ${touch ? 'text-base' : 'text-sm'}`}>{c.name}</span>
-                  <span className="block text-[11px] text-black/40 truncate">
+                  <span className={`block font-bold text-[#16181A] line-clamp-2 ${touch ? 'text-base' : 'text-sm'}`}>{c.name}</span>
+                  <span className="block text-[11px] text-black/40 line-clamp-2">
                     {count !== null && <>{count} {plural(count)}</>}
                     {kids > 0 && <>{count !== null ? ' · ' : ''}{kids} podkat.</>}
                     {alerts > 0 && <span className="text-orange-600 font-semibold"> · {alerts} dochází</span>}

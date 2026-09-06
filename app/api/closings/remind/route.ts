@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 
@@ -11,11 +12,8 @@ const sql = neon(process.env.DATABASE_URL!);
 // still waiting for their approval.
 export async function GET(request: Request) {
   // Protected like the other crons: Vercel sends Authorization: Bearer $CRON_SECRET.
-  const auth = request.headers.get('authorization');
-  const key = new URL(request.url).searchParams.get('key');
-  const secret = process.env.CRON_SECRET;
-  const authorized = !secret || auth === `Bearer ${secret}` || key === secret;
-  if (!authorized) return NextResponse.json({ error: 'Neautorizováno' }, { status: 401 });
+  const gate = checkCron(request);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   const now = new Date();
   // Local (Europe/Prague) date + HH:MM for comparing against shift end_time.

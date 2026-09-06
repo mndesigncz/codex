@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { sendBackupEmail } from '@/lib/email';
 import { pragueToday } from '@/lib/pragueTime';
@@ -102,12 +103,9 @@ async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string
 // nobody ever receives another business's rows.
 // Protected: Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically.
 export async function GET(request: Request) {
-  const auth = request.headers.get('authorization');
+  const gate = checkCron(request);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
   const url = new URL(request.url);
-  const key = url.searchParams.get('key');
-  const secret = process.env.CRON_SECRET;
-  const authorized = !secret || auth === `Bearer ${secret}` || key === secret;
-  if (!authorized) return NextResponse.json({ error: 'Neautorizováno' }, { status: 401 });
 
   try {
     const sql = neon(process.env.DATABASE_URL!);
@@ -137,6 +135,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ ok: true, teams: teamsBackedUp, rowCount: totalRows, emailedTo: sent });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
+    console.error('backup failed', error);
+    // Ven jde jen to, že se nepovedlo. Hlášky Postgresu prozrazují schéma.
+    return NextResponse.json({ ok: false, error: 'Zálohu se nepodařilo vytvořit.' }, { status: 500 });
   }
 }

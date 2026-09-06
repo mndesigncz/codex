@@ -407,7 +407,7 @@ export default function Guides({ user }: { user: User }) {
                               const d = await r.json();
                               if (d.guide) openEditor({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
                             }}
-                            className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
                             title="Upravit"
                           >
                             ✎
@@ -417,7 +417,7 @@ export default function Guides({ user }: { user: User }) {
                               e.stopPropagation();
                               deleteGuide(g.id);
                             }}
-                            className="w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
                             title="Smazat"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -428,13 +428,13 @@ export default function Guides({ user }: { user: User }) {
                     {g.excerpt && <p className="text-sm text-black/55 leading-relaxed line-clamp-3 flex-1">{g.excerpt}</p>}
                     <div className="flex items-center gap-2 mt-4 flex-wrap">
                       {cat && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08]">
+                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08]">
                           <Icon name={cat.icon} size={12} strokeWidth={2} />
                           {cat.name}
                         </span>
                       )}
                       {g.requireRead && (
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        <span className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
                           g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'
                         }`}>
                           📖 {g.myRead ? 'přečteno ✓' : 'povinné čtení'}
@@ -442,7 +442,7 @@ export default function Guides({ user }: { user: User }) {
                         </span>
                       )}
                       {g.hasChecklist && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
+                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
                           <Icon name="check" size={12} strokeWidth={2.2} />
                           checklist
                         </span>
@@ -475,7 +475,7 @@ export default function Guides({ user }: { user: User }) {
                 {(() => {
                   const cat = reader.categoryId != null ? catById.get(reader.categoryId) : undefined;
                   return cat ? (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08] mb-3">
+                    <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08] mb-3">
                       <Icon name={cat.icon} size={12} strokeWidth={2} />
                       {cat.name}
                     </span>
@@ -507,7 +507,7 @@ export default function Guides({ user }: { user: User }) {
                         </button>
                       )}
                       {summary.requireRead && summary.myRead && (
-                        <span className="rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno ✓</span>
+                        <span className="tap-target-sm rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno ✓</span>
                       )}
                       {isEmployer && (
                         <button
@@ -518,7 +518,7 @@ export default function Guides({ user }: { user: User }) {
                             }).catch(() => null);
                             if (res?.ok) await loadGuides();
                           }}
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                             summary.requireRead ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
                           }`}>
                           {summary.requireRead ? 'Zrušit povinné čtení' : '📖 Označit jako povinné čtení'}
@@ -956,7 +956,7 @@ function GuideEditor({
             {productId && steps.some(st => st.itemId != null && (st.amount ?? 0) > 0) && (
               <label className="mt-3 flex items-start gap-3 rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3 cursor-pointer">
                 <input type="checkbox" checked={alsoRecipe} onChange={e => setAlsoRecipe(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[#8FB811]" />
+                  className="mt-0.5 h-5 w-5 accent-[#8FB811]" />
                 <span className="text-sm text-[#16181A]">
                   Uložit suroviny i jako recepturu
                   <span className="block text-[11px] text-black/50 mt-0.5">

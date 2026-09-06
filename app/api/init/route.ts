@@ -1,9 +1,41 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Endpoint spouští dvě stě příkazů DDL. Volat ho smí migrace při nasazení
+  // (hlavičkou s CRON_SECRET), přihlášené vedení, nebo kdokoli — ale pak jen
+  // pro zjištění, která verze běží, bez sahání na databázi. Bez toho stačilo
+  // pouštět ho ve smyčce a účtovat majiteli výpočetní čas Neonu.
+  //
+  // Cron běží jednou denně (víc Hobby plán Vercelu nedovolí), takže se po
+  // nasazení nečeká na něj: první otevření aplikace vedením migrace provede.
+  const version = {
+    commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
+  };
+  let allowed = false;
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const auth = request.headers.get('authorization') ?? '';
+    const key = new URL(request.url).searchParams.get('key');
+    allowed = (auth.startsWith('Bearer ') && auth.slice(7) === secret) || key === secret;
+  }
+  if (!allowed) {
+    try {
+      const session = await getServerSession(authOptions);
+      allowed = (session?.user as any)?.role === 'employer';
+    } catch { /* bez session zůstává zakázáno */ }
+  }
+  if (!allowed) {
+    // Verze ano — ta se dá vyčíst i z hlaviček Vercelu a hodí se pro kontrolu
+    // po nasazení. Migrace ne.
+    return NextResponse.json({ ok: false, migrated: false, ...version });
+  }
+
   try {
     const sql = neon(process.env.DATABASE_URL!);
     let closingIndex = 'not reached';
@@ -1045,11 +1077,29 @@ export async function GET() {
     // přepisovalo u každého koktejlu znovu (a někde se spletl řád).
     await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS portions JSONB DEFAULT '[]'`;
 
+    // ---- Počítadlo neúspěšných pokusů (heslo, PIN, join kód) ----
+    // Bez něj šlo čtyřmístný PIN uhodnout za pár minut a heslo hádat donekonečna.
+    await sql`
+      CREATE TABLE IF NOT EXISTS auth_attempts (
+        key TEXT PRIMARY KEY,
+        count INTEGER NOT NULL DEFAULT 0,
+        window_start TIMESTAMP NOT NULL DEFAULT NOW()
+      )`;
+    // Staré řádky se nehromadí; okno je krátké, záznam po dni nemá smysl držet.
+    try { await sql`DELETE FROM auth_attempts WHERE window_start < NOW() - INTERVAL '1 day'`; } catch { /* nevadí */ }
+
+    // ---- PIN na kiosku se ukládá zahašovaný ----
+    // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
+    // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;
+    // starý se po prvním úspěšném přihlášení sám přepíše a vyprázdní.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT`;
+
     // Which build actually ran the migrations. `ok: true` alone is ambiguous —
     // an older deployment still answering during a rollout returns it too, and
     // then the new columns silently never get created.
     return NextResponse.json({
       ok: true,
+      migrated: true,
       message: 'Databáze inicializována — všechny tabulky připraveny.',
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
       deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
@@ -1061,9 +1111,11 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Init error:', error);
+    // Hlášky Postgresu prozrazují názvy tabulek a sloupců — ven jde jen fakt,
+    // že migrace selhala. Podrobnost je v serverovém logu.
     return NextResponse.json({
       ok: false,
-      error: String(error),
+      error: 'Migrace se nezdařila. Podrobnosti jsou v logu serveru.',
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     }, { status: 500 });
   }

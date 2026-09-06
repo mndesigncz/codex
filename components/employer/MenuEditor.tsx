@@ -353,7 +353,7 @@ export default function MenuEditor() {
           <div className="flex items-center gap-2 flex-wrap">
             <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
             <a href={cesta} target="_blank" rel="noreferrer"
-              className="text-sm font-medium text-[#5B9E00] underline underline-offset-2">
+              className="tap-target-sm text-sm font-medium text-[#5B9E00] underline underline-offset-2">
               Otevřít ↗
             </a>
           </div>
@@ -469,8 +469,8 @@ export default function MenuEditor() {
                 Zrušit PIN
               </button>
             )}
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-black/60 py-2.5">
-              <input type="checkbox" checked={board.enabled} className="h-4 w-4 rounded accent-[#5B9E00]"
+            <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60 py-2.5">
+              <input type="checkbox" checked={board.enabled} className="h-5 w-5 rounded accent-[#5B9E00]"
                 onChange={(e) => upravit((b) => { b.enabled = e.target.checked; })} />
               Menu je veřejně dostupné
             </label>

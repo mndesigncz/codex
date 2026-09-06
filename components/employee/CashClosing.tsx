@@ -157,7 +157,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         {kinds.map(k => (
           <button key={k.kind} type="button" onClick={() => setKind(k.kind)}
             title={k.hint}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
               kind === k.kind ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
             }`}>
             {k.label}
@@ -178,7 +178,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
           placeholder={MOVEMENT_KINDS.find(k => k.kind === kind)?.hint ?? 'Za co'}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
         <button type="button" onClick={add} disabled={!amount}
-          className="shrink-0 rounded-2xl bg-[#C8F542] text-black px-4 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
+          className="tap-target-sm shrink-0 rounded-2xl bg-[#C8F542] text-black px-4 py-2 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
           Přidat
         </button>
       </div>
@@ -198,7 +198,7 @@ function Step({
   return (
     <section
       ref={refCb}
-      className={`relative rounded-3xl border p-5 sm:p-6 space-y-5 transition-all ${
+      className={`relative rounded-3xl border p-3.5 min-[400px]:p-5 sm:p-6 space-y-4 sm:space-y-5 transition-all ${
         climax
           ? 'bg-[#C8F542]/[0.07] border-[#C8F542]/40 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset]'
           : 'bg-black/[0.025] border-black/[0.06]'
@@ -244,7 +244,7 @@ function Toggle({ title, hint, on, onChange }: {
         aria-checked={on}
         aria-label={title}
         onClick={() => onChange(!on)}
-        className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
+        className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
       >
         <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
       </button>
@@ -604,7 +604,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
       {msg && (
         <div className="p-3.5 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={17} /> {msg}
@@ -644,7 +644,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </div>
       )}
 
-      <form onSubmit={submit} className="glass-card p-6 sm:p-7 space-y-6">
+      <form onSubmit={submit} className="glass-card p-3.5 min-[400px]:p-5 sm:p-7 space-y-5 sm:space-y-6">
         {/* Header + visual step progress */}
         <div>
           <div className="flex items-start justify-between gap-4">
@@ -937,7 +937,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       <button
                         type="button"
                         onClick={() => setCoworkerSel(s => ({ ...s, [cw.id]: { on: !on, payout: s[cw.id]?.payout ?? '' } }))}
-                        className="flex items-center gap-2.5 min-w-0 text-left"
+                        className="flex items-center gap-2.5 min-w-0 text-left flex-wrap"
                       >
                         <span className={`shrink-0 flex h-6 w-6 items-center justify-center rounded-full border-2 transition ${on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
@@ -991,7 +991,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <label className="block text-xs uppercase tracking-wider text-black/45">Skutečný stav kasy na konci *</label>
               {denomSet.length > 0 && (
-                <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
+                <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 max-w-full flex-wrap">
                   {([[false, 'Zadat celkem'], [true, 'Spočítat bankovky']] as const).map(([mode, lbl]) => (
                     <button key={String(mode)} type="button"
                       onClick={() => setCountMode(mode)}
@@ -1067,7 +1067,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 {DIFF_REASONS.map(r => (
                   <button key={r.id} type="button" title={r.hint}
                     onClick={() => setDiffReason(diffReason === r.id ? '' : r.id)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
                       diffReason === r.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
                     }`}>
                     {r.label}
@@ -1162,7 +1162,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     - (Array.isArray(r.skipped_items) ? r.skipped_items.length : 0));
                   const running = r.status === 'running';
                   return (
-                    <span key={r.id} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
+                    <span key={r.id} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
                       running ? 'bg-orange-500/12 text-orange-600'
                       : missing > 0 ? 'bg-amber-500/12 text-amber-700'
                       : 'bg-[#C8F542]/15 text-[#5B7A08]'
@@ -1226,9 +1226,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                     {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                   </p>
-                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
                   {pending && (
-                    <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                    <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
                   <button
                     type="button"
@@ -1241,7 +1241,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     }}
                     className="rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
                   >✕</button>
-                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 ${
+                  <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 max-w-full ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
@@ -1278,7 +1278,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       {Object.entries(c.denominations!)
                         .sort((a, b) => Number(b[0]) - Number(a[0]))
                         .map(([denom, count]) => (
-                          <span key={denom} className="rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
+                          <span key={denom} className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
                             <strong>{count}×</strong> {Number(denom).toLocaleString('cs-CZ')}
                           </span>
                         ))}
