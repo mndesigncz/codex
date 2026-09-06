@@ -10,6 +10,9 @@ export async function GET(request: Request) {
   // (hlavičkou s CRON_SECRET), přihlášené vedení, nebo kdokoli — ale pak jen
   // pro zjištění, která verze běží, bez sahání na databázi. Bez toho stačilo
   // pouštět ho ve smyčce a účtovat majiteli výpočetní čas Neonu.
+  //
+  // Cron běží jednou denně (víc Hobby plán Vercelu nedovolí), takže se po
+  // nasazení nečeká na něj: první otevření aplikace vedením migrace provede.
   const version = {
     commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
