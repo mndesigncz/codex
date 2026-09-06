@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { coverageGaps, missingSlots } from '@/lib/coverage';
 import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -47,7 +48,32 @@ export async function GET(req: Request) {
     endTime: r.end_time,
     type: r.type,
   }));
-  return NextResponse.json({ shifts });
+  // Díry v pokrytí se počítají i pro uložený rozvrh — vzniknou i ruční
+  // úpravou, ne jen generováním, a vedení je musí vidět hned.
+  let gaps: { date: string; from: string; to: string; minutes: number }[] = [];
+  let understaffed: { date: string; shiftTypeName: string }[] = [];
+  try {
+    const [team] = await sql`SELECT opening_hours FROM teams WHERE id = ${ctx.teamId}`;
+    const oh = team?.opening_hours;
+    if (oh && typeof oh === 'object') {
+      const byDate = new Map<string, { start: string; end: string; type: string }[]>();
+      for (const sh of shifts) {
+        const list = byDate.get(sh.date) ?? [];
+        list.push({ start: sh.startTime, end: sh.endTime, type: sh.type });
+        byDate.set(sh.date, list);
+      }
+      // Kontrolují se jen dny, na které je něco naplánované — prázdný budoucí
+      // měsíc by jinak svítil celý červeně.
+      const dates = Array.from(byDate.keys()).sort();
+      gaps = coverageGaps(oh as any, byDate, dates);
+      const types = await sql`
+        SELECT name, start_time, end_time, starts_at_open, ends_at_close
+        FROM shift_types WHERE team_id = ${ctx.teamId}` as any[];
+      understaffed = missingSlots(oh as any, types as any, byDate, dates);
+    }
+  } catch { /* bez otevírací doby se pokrytí neřeší */ }
+
+  return NextResponse.json({ shifts, gaps, understaffed });
 }
 
 // POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type}] } bulk append

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { openSpan, uncovered, gapText, type Interval } from '@/lib/coverage';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -339,6 +340,10 @@ export async function POST(req: Request) {
   }
 
   const proposed: any[] = [];
+  // Díry v pokrytí a neobsazená místa se vracejí i strukturovaně, aby je
+  // kalendář mohl rozsvítit červeně, ne jen vypsat do seznamu textů.
+  const gaps: { date: string; from: string; to: string; minutes: number }[] = [];
+  const understaffed: { date: string; shiftTypeName: string }[] = [];
   const monthDays = daysInMonth(month);
 
   for (let d = 1; d <= monthDays; d++) {
@@ -353,7 +358,32 @@ export async function POST(req: Request) {
       const rt = resolveTimes(st, oh);
       return fitsWithin(rt.start, rt.end, oh.open, oh.close);
     });
-    if (fitting.length === 0) continue;
+
+    // Kontrola pokrytí dne — volá se i pro den, na který se nevejde žádný typ
+    // směny. Otevřeno bez jediné použitelné směny je taky díra, jen se na ni
+    // dřív nikdo neptal.
+    const reportGaps = (placed: { start: string; end: string }[]) => {
+      const open = openSpan(oh);
+      if (!open) return;
+      for (const g of uncovered(open, placed)) {
+        const [, mm2, dd2] = date.split('-');
+        gaps.push({ date, from: toHM(g.start), to: toHM(g.end), minutes: g.end - g.start });
+        warnings.unshift(
+          `${parseInt(dd2)}.${parseInt(mm2)}. — NIKDO V PODNIKU ${gapText(g)}, přitom je otevřeno. Doplň někoho ručně.`,
+        );
+      }
+    };
+
+    if (fitting.length === 0) {
+      reportGaps([]);
+      if (shiftTypes.length > 0) {
+        const [, mm0, dd0] = date.split('-');
+        warnings.push(
+          `${parseInt(dd0)}.${parseInt(mm0)}. — žádný nastavený typ směny se nevejde do otevírací doby ${oh.open}–${oh.close}.`,
+        );
+      }
+      continue;
+    }
 
     const assignedToday = new Set<number>(); // employee ids already placed this day
     const slotFilled = new Map<number, number>(); // shiftTypeId → employeeId
@@ -418,8 +448,38 @@ export async function POST(req: Request) {
       take(emp, date, matchHours);
     }
 
-    // Pass 2: fill remaining slots with best candidate
-    for (const st of fitting) {
+    // Pass 2: fill remaining slots with best candidate.
+    //
+    // Pořadí není libovolné. Dřív se typy braly tak, jak přišly, a každý se
+    // řešil sám za sebe — takže když na otvíračku 14–22 nikdo nebyl a na
+    // odpolední 17–22 ano, obsadila se odpolední a od dvou do pěti bylo
+    // otevřeno a prázdno. Teď se pokaždé bere ten typ, který zakryje nejvíc
+    // zbývající nepokryté otevírací doby; kdo drží podnik otevřený, jde první.
+    const openSpanToday = openSpan(oh);
+    const filledSpans = () => fitting
+      .filter((s: any) => slotFilled.has(s.id))
+      .map((s: any) => { const r = resolveTimes(s, oh); return { start: r.start, end: r.end }; });
+    const remainingGain = (st: any) => {
+      if (!openSpanToday) return 0;
+      const before = uncovered(openSpanToday, filledSpans())
+        .reduce((n, g) => n + (g.end - g.start), 0);
+      const r = resolveTimes(st, oh);
+      const after = uncovered(openSpanToday, [...filledSpans(), { start: r.start, end: r.end }])
+        .reduce((n, g) => n + (g.end - g.start), 0);
+      return before - after;
+    };
+
+    const pending = fitting.filter((s: any) => !slotFilled.has(s.id));
+    while (pending.length > 0) {
+      pending.sort((a: any, b: any) => {
+        const ga = remainingGain(a), gb = remainingGain(b);
+        if (ga !== gb) return gb - ga;                    // víc pokryje = dřív
+        const ra = resolveTimes(a, oh), rb = resolveTimes(b, oh);
+        const ha = shiftHours(ra.start, ra.end), hb = shiftHours(rb.start, rb.end);
+        if (ha !== hb) return hb - ha;                    // pak delší směna
+        return String(a.name).localeCompare(String(b.name));
+      });
+      const st = pending.shift()!;
       if (slotFilled.has(st.id)) continue;
       const cat = categoryOf(st.start_time);
       const rtSt = resolveTimes(st, oh);
@@ -463,6 +523,7 @@ export async function POST(req: Request) {
       assignedToday.add(pick.id);
       take(pick, date, stHours);
     }
+
 
     // Build proposed list + warnings for the day
     for (const st of fitting) {
@@ -541,6 +602,7 @@ export async function POST(req: Request) {
             : blockedByPref ? 'volní lidé mají ten den povolený jen jiný typ směny'
             : 'nikdo dostupný'}).`,
         );
+        understaffed.push({ date, shiftTypeName: st.name });
         continue;
       }
       const emp = empById.get(empId)!;
@@ -558,7 +620,13 @@ export async function POST(req: Request) {
         color: st.color,
       });
     }
+
+    // Poslední kontrola dne: je v každé minutě otevírací doby někdo?
+    // Tohle je jiná otázka než „je obsazená každá směna" — a právě ta chyběla.
+    // Podnik s otevřeno 14–22 a jedinou směnou 17–22 měl všechny směny
+    // obsazené a přesto tři hodiny prázdno.
+    reportGaps(proposed.filter(p => p.date === date).map(p => ({ start: p.startTime, end: p.endTime })));
   }
 
-  return NextResponse.json({ proposed, warnings });
+  return NextResponse.json({ proposed, warnings, gaps, understaffed });
 }
