@@ -166,9 +166,14 @@ export interface MissingSlot { date: string; shiftTypeName: string }
 /**
  * Typy směn, které se na den vejdou, ale nikdo na nich není.
  *
- * Porovnává se podle názvu typu — to je jediné, co se u směny ukládá.
- * Kontrolují se jen dny, kde už něco naplánováno je; prázdný měsíc není
- * podstav, jen prázdný měsíc.
+ * Porovnává se podle názvu typu — to je jediné, co se u směny ukládá. Právě
+ * název odlišuje dvě situace, které mají stejné časy: „otvíračka 14–22 nikoho
+ * nemá, kryje ji jen odpolední 17–22" (díra) od „na odpolední mají být dva a
+ * je tam jeden" (podstav). Obojí je nález, ale poznají se jen podle typu.
+ *
+ * Den, kde nikdo nepoužil nastavený typ směny, se neřeší — ručně napsané časy
+ * jsou vědomé rozhodnutí, ne chybějící člověk. Prázdný den se neřeší taky;
+ * prázdný měsíc není podstav, jen prázdný měsíc.
  */
 export function missingSlots(
   openingHours: Record<string, OpeningDay> | null | undefined,
@@ -184,6 +189,8 @@ export function missingSlots(
     const dayShifts = shiftsByDate.get(date) ?? [];
     if (dayShifts.length === 0) continue;
     const covered = new Set(dayShifts.map(s => String(s.type ?? '').trim().toLowerCase()));
+    const known = new Set(shiftTypes.map(t => String(t.name).trim().toLowerCase()));
+    if (!Array.from(covered).some(c => known.has(c))) continue;   // den psaný ručně
     for (const st of shiftTypes) {
       if (!typeFitsDay(st, oh)) continue;
       if (covered.has(String(st.name).trim().toLowerCase())) continue;

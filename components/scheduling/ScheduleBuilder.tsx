@@ -2050,6 +2050,10 @@ function DayModal({
   const missingHere = useMemo(() => {
     if (!oh || oh.closed) return [] as string[];
     const taken = new Set([...shifts, ...proposed].map((x) => String((x as any).type ?? (x as any).shiftTypeName ?? '').trim().toLowerCase()));
+    // Den psaný ručně (vlastní časy, žádný nastavený typ) se neřeší — chybějící
+    // typ směny se hlásí jen tam, kde se s typy opravdu pracuje.
+    const known = new Set(shiftTypes.map((t) => t.name.trim().toLowerCase()));
+    if (taken.size === 0 || !Array.from(taken).some((t) => known.has(t))) return [] as string[];
     return shiftTypes
       .filter((t) => typeFitsDay(t as any, oh as any) && !taken.has(t.name.trim().toLowerCase()))
       .map((t) => t.name);
