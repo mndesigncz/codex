@@ -159,7 +159,7 @@ export default function ShareSettings() {
         {kind === 'inventory' && (
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Co sdílet</label>
-            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={inputClass}>
+            <select value={categoryId} aria-label="Co sdílet" onChange={e => setCategoryId(e.target.value)} className={inputClass}>
               <option value="">Celý sklad</option>
               {flat.map(({ cat: c, depth }) => (
                 <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}</option>
