@@ -160,10 +160,10 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
                   {dnum}
                 </span>
                 {state === 'done' && revenue > 0 && (
-                  <span className="text-[9px] leading-none font-semibold text-[#5B7A08] tabular-nums truncate max-w-full">{compact(revenue)}</span>
+                  <span className="text-[11px] leading-none font-semibold text-[#5B7A08] tabular-nums truncate max-w-full">{compact(revenue)}</span>
                 )}
                 {day && day.onShift.length > 0 && state !== 'done' && (
-                  <span className="text-[9px] leading-none text-black/40 tabular-nums">{day.onShift.length}×</span>
+                  <span className="text-[11px] leading-none text-black/40 tabular-nums">{day.onShift.length}×</span>
                 )}
                 <span className={`mt-auto w-1.5 h-1.5 rounded-full ${DOT[state]}`} />
               </button>

@@ -95,7 +95,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         <div className="max-w-lg mx-auto glass-strong rounded-[24px] px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
           <LogoMark size={34} />
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">TO GO</p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">TO GO</p>
             <h1 className="text-[15px] font-bold tracking-tight text-[#16181A] truncate mt-0.5">
               {greeting}{firstName ? `, ${firstName}` : ''}
             </h1>
@@ -149,7 +149,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
                           : d.total > 0 ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)',
                         boxShadow: isToday ? '0 0 18px rgba(200,245,66,0.45)' : undefined,
                       }} />
-                    <span className={`text-[9px] font-bold ${isToday ? 'text-[#D8FF6B]' : 'text-white/35'}`}>{d.label}</span>
+                    <span className={`text-[11px] font-bold ${isToday ? 'text-[#D8FF6B]' : 'text-white/35'}`}>{d.label}</span>
                   </div>
                 );
               })}
@@ -166,7 +166,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
           <div className="flex items-center justify-between mb-2.5">
             <p className="text-[11px] uppercase tracking-[0.12em] text-black/45 font-bold">Dnes v podniku</p>
             {onShift.length > 0 && (
-              <span className="rounded-full bg-[#C8F542]/25 text-[#5B7A08] px-2 py-0.5 text-[10px] font-extrabold">
+              <span className="rounded-full bg-[#C8F542]/25 text-[#5B7A08] px-2 py-0.5 text-[11px] font-extrabold">
                 {onShift.length} na směně
               </span>
             )}
@@ -188,7 +188,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
                     </span>
                     <span className="min-w-0">
                       <span className="block text-xs font-bold text-[#16181A] leading-tight">{String(p.name).split(' ')[0]}</span>
-                      <span className="block text-[10px] text-black/40 leading-tight tabular-nums">
+                      <span className="block text-[11px] text-black/40 leading-tight tabular-nums">
                         {live ? 'právě tady' : p.shiftStart ? `${String(p.shiftStart).slice(0, 5)}–${String(p.shiftEnd ?? '').slice(0, 5)}` : ''}
                       </span>
                     </span>
@@ -205,7 +205,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             <button key={t.view} onClick={() => onOpenView(t.view)}
               className="relative glass-card rounded-[22px] px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
               {t.badge != null && (
-                <span className={`absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold flex items-center justify-center ${t.badgeTone}`}>
+                <span className={`absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-extrabold flex items-center justify-center ${t.badgeTone}`}>
                   {t.badge}
                 </span>
               )}
@@ -240,7 +240,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         {/* Receipts — the TO GO superpower */}
         <ReceiptsPanel compact />
 
-        <p className="text-center text-[10px] text-black/25 pb-2">Managero · TO GO režim</p>
+        <p className="text-center text-[11px] text-black/25 pb-2">Managero · TO GO režim</p>
       </div>
     </div>
   );

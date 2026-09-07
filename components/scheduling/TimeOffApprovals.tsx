@@ -190,10 +190,10 @@ export default function TimeOffApprovals() {
                       {editId === r.id ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-semibold text-[#16181A]">{r.employeeName}</span>
-                          <input type="date" value={editFrom} onChange={e => setEditFrom(e.target.value)}
+                          <input type="date" aria-label="Volno od" value={editFrom} onChange={e => setEditFrom(e.target.value)}
                             className="rounded-xl bg-white/70 border border-black/10 px-3 py-1.5 text-sm" />
                           <span className="text-black/40">–</span>
-                          <input type="date" value={editTo} onChange={e => setEditTo(e.target.value)}
+                          <input type="date" aria-label="Volno do" value={editTo} onChange={e => setEditTo(e.target.value)}
                             className="rounded-xl bg-white/70 border border-black/10 px-3 py-1.5 text-sm" />
                           <button onClick={saveEdit}
                             className="rounded-full bg-[#16181A] text-white text-xs font-bold px-3.5 py-2 hover:bg-black transition">Uložit</button>

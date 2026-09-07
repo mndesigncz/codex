@@ -2513,7 +2513,7 @@ function ScheduleRulesManager() {
                   <p className="text-[11px] text-black/40">{effective} · {effHours}</p>
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] uppercase tracking-wider text-black/35">dní po sobě</span>
+                  <span className="text-[11px] uppercase tracking-wider text-black/35">dní po sobě</span>
                   <select value={v}
                     onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}
                     className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
@@ -2525,7 +2525,7 @@ function ScheduleRulesManager() {
                   </select>
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] uppercase tracking-wider text-black/35">hodin / měsíc</span>
+                  <span className="text-[11px] uppercase tracking-wider text-black/35">hodin / měsíc</span>
                   <input type="number" inputMode="numeric" min={0} max={400}
                     value={hourOverrides[m.id] ?? ''}
                     onChange={e => setHourOverrides(o => ({ ...o, [m.id]: e.target.value }))}
@@ -2660,7 +2660,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
         <div>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'].map((d) => (
-              <span key={d} className="text-center text-[10px] uppercase tracking-wide text-black/35">{d}</span>
+              <span key={d} className="text-center text-[11px] uppercase tracking-wide text-black/35">{d}</span>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -2673,7 +2673,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
                     v ? toneOf(v) : 'bg-black/[0.03] border-black/[0.08] text-black/60 hover:bg-black/[0.06]'
                   }`}>
                   <span className="text-xs font-semibold leading-none">{parseInt(cell.split('-')[2])}</span>
-                  {v && <span className="text-[9px] font-medium leading-none">{labelOf(v)}</span>}
+                  {v && <span className="text-[11px] font-medium leading-none">{labelOf(v)}</span>}
                 </button>
               );
             })}

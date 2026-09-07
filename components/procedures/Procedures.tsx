@@ -446,7 +446,7 @@ export default function Procedures({ user }: Props) {
                           <div className="min-w-0 flex-1">
                             <p className={`text-sm ${isDone ? 'text-[#16181A]' : 'text-black/70'}`}>
                               {st.emoji ? `${st.emoji} ` : ''}{st.text}
-                              {st.weight === 'key' && <span className="ml-1.5 rounded-full bg-[#16181A] text-white px-1.5 py-0.5 text-[10px] font-bold align-middle">KLÍČOVÝ</span>}
+                              {st.weight === 'key' && <span className="ml-1.5 rounded-full bg-[#16181A] text-white px-1.5 py-0.5 text-[11px] font-bold align-middle">KLÍČOVÝ</span>}
                             </p>
                             {isSkip && (
                               <p className={`text-xs mt-0.5 ${excused ? 'text-black/45' : 'text-red-600'}`}>
@@ -744,7 +744,7 @@ function ProcedureEditor({
                       {STEP_WEIGHTS.map(w => (
                         <button key={w.id} type="button" title={`${w.hint} (+${w.plus} / −${s.penalty ?? w.minus})`}
                           onClick={() => patchStep(i, { weight: w.id })}
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                          className={`tap-target-sm rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                             (s.weight ?? 'normal') === w.id ? 'bg-[#16181A] text-white' : 'text-black/45 hover:text-black'
                           }`}>
                           {w.label}

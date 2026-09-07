@@ -120,13 +120,16 @@ function RewardsViewInner() {
         <div className="glass-card p-5">
           <p className="font-bold text-[#16181A] mb-1">🎁 Katalog odměn</p>
           <p className="text-sm text-black/45 mb-3">Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.</p>
-          <div className="grid grid-cols-[56px_1fr_90px_auto] gap-2 mb-3">
-            <input value={newIcon} onChange={e => setNewIcon(e.target.value)} maxLength={4}
+          {/* Čtyři sloupce vedle sebe se na telefon nevejdou — políčka mají
+              vlastní minimální šířku, kterou mřížka nesmí podlézt, a řádek pak
+              roztáhl celou obrazovku. Na mobilu jsou proto pod sebou. */}
+          <div className="grid grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[56px_minmax(0,1fr)_90px_auto] gap-2 mb-3">
+            <input value={newIcon} onChange={e => setNewIcon(e.target.value)} maxLength={4} aria-label="Ikona odměny"
               className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2.5 text-center text-lg focus:outline-none focus:border-[#C8F542]/50" />
             <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Např. Směna končí o hodinu dřív" maxLength={120}
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+              className="min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
             <input value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="body" type="number" inputMode="numeric" min={1}
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+              className="col-span-2 sm:col-span-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
             <button
               onClick={async () => {
                 if (!newTitle.trim() || !Number(newCost)) return;
@@ -137,7 +140,7 @@ function RewardsViewInner() {
                 if (res?.ok) { setNewTitle(''); setNewCost(''); await loadShop(); }
               }}
               disabled={!newTitle.trim() || !Number(newCost)}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
+              className="col-span-2 sm:col-span-1 rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
               Přidat
             </button>
           </div>
@@ -146,24 +149,27 @@ function RewardsViewInner() {
           ) : (
             <div className="divide-y divide-black/[0.05] rounded-2xl border border-black/[0.06] overflow-hidden">
               {catalog.map(rw => (
-                <div key={rw.id} className={`flex items-center gap-3 px-4 py-2.5 ${rw.active === false ? 'opacity-50' : ''}`}>
+                // Název odměny je to jediné, co se v řádku doopravdy čte. Dřív mu
+                // po ikoně, ceně a dvou tlačítkách zbylo na úzkém telefonu osm
+                // pixelů. Teď má na mobilu vlastní řádek a ovládání se zalomí pod něj.
+                <div key={rw.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 ${rw.active === false ? 'opacity-50' : ''}`}>
                   <span className="text-xl shrink-0">{rw.icon ?? '🎁'}</span>
-                  <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">{rw.title}</span>
-                  <span className="shrink-0 text-xs text-black/45 tabular-nums">{rw.cost} b.</span>
+                  <span className="min-w-0 flex-1 basis-[calc(100%-2.75rem)] sm:basis-0 text-sm font-medium text-[#16181A]">{rw.title}</span>
+                  <span className="shrink-0 text-xs text-black/45 tabular-nums ml-auto sm:ml-0">{rw.cost} b.</span>
                   <button onClick={async () => {
                     await fetch('/api/rewards/catalog', {
                       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ manage: true, id: rw.id, active: rw.active === false }),
                     }).catch(() => null);
                     await loadShop();
-                  }} className="shrink-0 rounded-full glass px-3 py-1 text-[11px] font-semibold text-black/50 hover:text-black transition">
+                  }} className="tap-target-sm shrink-0 rounded-full glass px-3 py-1 text-[11px] font-semibold text-black/50 hover:text-black transition">
                     {rw.active === false ? 'Zapnout' : 'Vypnout'}
                   </button>
                   <button onClick={async () => {
                     if (!confirm(`Smazat odměnu „${rw.title}"?`)) return;
                     await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
                     await loadShop();
-                  }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
+                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
                 </div>
               ))}
             </div>

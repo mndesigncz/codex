@@ -42,7 +42,7 @@ export default function ChatView({ user }: Props) {
       <aside
         className={`${
           activeId ? 'hidden md:flex' : 'flex'
-        } flex-col w-full md:w-80 md:flex-shrink-0 border-r border-black/[0.06] h-full`}
+        } flex-col w-full md:w-80 xl:w-96 2xl:w-[26rem] md:flex-shrink-0 border-r border-black/[0.06] h-full`}
       >
         <div className="px-5 py-4 border-b border-black/[0.06] flex items-center gap-2">
           <Icon name="chat" size={22} className="text-[#5B7A08]" />
@@ -115,8 +115,11 @@ function ConversationRow({
             {formatTime(conv.lastTime)}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-black/45 truncate">
+        {/* V provozním chatu nese zpráva pokyn („dodávka dorazí mezi devátou
+            a jedenáctou"). Z jednoho useknutého řádku se přečetla třetina,
+            takže náhled dostal řádky dva. */}
+        <div className="flex items-start justify-between gap-2">
+          <span className="min-w-0 flex-1 text-sm text-black/45 line-clamp-2">
             {conv.lastMessage ?? 'Zatím žádné zprávy'}
           </span>
           {conv.unreadCount > 0 && (
@@ -235,7 +238,7 @@ function Thread({
       <header className="px-4 py-3 border-b border-black/[0.06] flex items-center gap-3">
         <button
           onClick={onBack}
-          className="md:hidden text-black/60 hover:text-black p-1 -ml-1"
+          className="tap-target-sm md:hidden text-black/60 hover:text-black p-1 -ml-1"
           aria-label="Zpět"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

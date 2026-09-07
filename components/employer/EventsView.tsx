@@ -208,7 +208,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
               </button>
             ))}
           </div>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
+          <input type="date" aria-label="Datum akce" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
           <div className="grid grid-cols-2 gap-2">
             <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inputClass} />
             <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inputClass} />

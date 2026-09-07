@@ -107,7 +107,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
                       {day.staff.slice(0, 3).map(p => (
                         <span key={p.id} className="text-[11px]" title={`${p.name}${p.reviewed ? ` · ${p.rating}★` : ' · nehodnoceno'}`}>{p.avatar || '👤'}</span>
                       ))}
-                      {day.staff.length > 3 && <span className="text-[9px] text-black/40">+{day.staff.length - 3}</span>}
+                      {day.staff.length > 3 && <span className="text-[11px] text-black/40">+{day.staff.length - 3}</span>}
                     </div>
                   )}
                   {day && (

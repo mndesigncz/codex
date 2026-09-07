@@ -364,7 +364,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
           </div>
 
           <div className="glass-card divide-y divide-black/[0.06] overflow-hidden">
-            <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-black/35">
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black/45">
               <span className="w-2" />
               <span className="flex-1">Položka menu</span>
               <span className="shrink-0">suroviny / marže</span>

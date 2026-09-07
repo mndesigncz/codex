@@ -157,9 +157,9 @@ export default function FinanceView() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="relative overflow-hidden rounded-[26px] bg-[#16181A] text-white p-4">
               <div className="pointer-events-none absolute -top-14 -right-10 h-32 w-32 rounded-full bg-[#C8F542]/25 blur-2xl" />
-              <p className="text-[11px] uppercase tracking-wider text-white/45 font-bold">Tržby</p>
+              <p className="text-[11px] uppercase tracking-wider text-white/70 font-bold">Tržby</p>
               <p className="mt-1 text-xl font-bold tabular-nums">{money(s.revenue)}</p>
-              <p className="text-[11px] text-white/40 mt-0.5">
+              <p className="text-[11px] text-white/70 mt-0.5">
                 {trendPct != null ? `${trendPct >= 0 ? '+' : ''}${trendPct} % vs. minulý měsíc` : `${s.closingsCount} uzávěrek`}
               </p>
             </div>
@@ -308,7 +308,7 @@ export default function FinanceView() {
                       <span className="text-xs text-black/40 tabular-nums w-12 shrink-0">
                         {parseInt(r.date.split('-')[2])}.{parseInt(r.date.split('-')[1])}.
                       </span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
                       {/* Na telefonu se „Objednávka Monin CZ" nevešla vedle data,
                           štítku i částky — popis dostane vlastní řádek.
                           Musí to být basis-full, ne w-full: flex-1 nastavuje

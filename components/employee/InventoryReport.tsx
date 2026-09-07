@@ -220,14 +220,18 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1 shrink-0">
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) - 1)}
+            aria-label={`Ubrat — ${item.name}`}
             className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
           <input
             type="number" inputMode="numeric"
+            // Bez popisku odečítátko přečte jen „číslo" a člověk neví, čeho.
+            aria-label={`Množství — ${item.name}${item.unit ? ` (${item.unit})` : ''}`}
             value={qtyOf(item)}
             onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
             className="w-16 text-center rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2 text-sm font-semibold text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
           />
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) + 1)}
+            aria-label={`Přidat — ${item.name}`}
             className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">+</button>
           <span className="text-xs text-black/40 w-6">{item.unit}</span>
         </div>
@@ -421,7 +425,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                           {item.name}
                           {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
                           {(item as any).approved === false && (
-                            <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[10px] font-semibold align-middle">
+                            <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[11px] font-semibold align-middle">
                               čeká na potvrzení
                             </span>
                           )}
