@@ -708,7 +708,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               Venkovní akce má vlastní kasu — její uzávěrka se ukládá zvlášť a nemíchá se
               s kasou podniku. Denní uzávěrku podniku pak uděláš normálně vedle.
             </p>
-            <select value={eventId}
+            <select value={eventId} aria-label="Uzávěrka za akci"
               onChange={e => setEventId(e.target.value === '' ? '' : parseInt(e.target.value))}
               className={inputClass}>
               <option value="">Ne — běžná uzávěrka podniku</option>

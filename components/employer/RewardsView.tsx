@@ -124,7 +124,7 @@ function RewardsViewInner() {
               vlastní minimální šířku, kterou mřížka nesmí podlézt, a řádek pak
               roztáhl celou obrazovku. Na mobilu jsou proto pod sebou. */}
           <div className="grid grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[56px_minmax(0,1fr)_90px_auto] gap-2 mb-3">
-            <input value={newIcon} onChange={e => setNewIcon(e.target.value)} maxLength={4}
+            <input value={newIcon} onChange={e => setNewIcon(e.target.value)} maxLength={4} aria-label="Ikona odměny"
               className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2.5 text-center text-lg focus:outline-none focus:border-[#C8F542]/50" />
             <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Např. Směna končí o hodinu dřív" maxLength={120}
               className="min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />

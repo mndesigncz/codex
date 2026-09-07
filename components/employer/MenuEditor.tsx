@@ -613,9 +613,9 @@ export default function MenuEditor() {
       {board.sections.map((s, si) => (
         <div key={s.id ?? `nova-${si}`} className="glass-card p-6 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <input className={`${vstup} flex-1 min-w-[8rem] font-semibold`} value={s.title} maxLength={80}
+            <input aria-label="Název sekce menu" className={`${vstup} flex-1 min-w-[8rem] font-semibold`} value={s.title} maxLength={80}
               onChange={(e) => upravit((b) => { b.sections[si].title = e.target.value; })} />
-            <select value={s.column} className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-3 text-sm"
+            <select value={s.column} aria-label="Sloupec sekce" className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-3 text-sm"
               onChange={(e) => upravit((b) => { b.sections[si].column = Number(e.target.value) === 2 ? 2 : 1; })}>
               <option value={1}>Vlevo</option>
               <option value={2}>Vpravo</option>

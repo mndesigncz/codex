@@ -253,11 +253,12 @@ export default function ShareSettings() {
             <div key={key}>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">{label}</label>
               <div className="flex items-center gap-2">
-                <input type="color" value={theme[key]}
+                <input type="color" value={theme[key]} aria-label={`${label} — barva`}
                   onChange={e => setTheme(t => ({ ...t, [key]: e.target.value }))}
                   onBlur={() => saveTheme(theme)}
                   className="h-11 w-14 rounded-xl border border-black/[0.08] bg-white cursor-pointer" />
-                <input value={theme[key]} onChange={e => setTheme(t => ({ ...t, [key]: e.target.value }))}
+                <input value={theme[key]} aria-label={`${label} — barva v kódu`}
+                  onChange={e => setTheme(t => ({ ...t, [key]: e.target.value }))}
                   onBlur={() => saveTheme(theme)} className={`${inputClass} font-mono`} />
               </div>
             </div>

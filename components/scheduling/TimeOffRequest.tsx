@@ -146,6 +146,7 @@ export default function TimeOffRequest() {
             <label className="block text-sm font-medium text-black/70 mb-1.5">Od</label>
             <input
               type="date"
+              aria-label="Volno od"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
               className={inputCls}
@@ -156,6 +157,7 @@ export default function TimeOffRequest() {
             <label className="block text-sm font-medium text-black/70 mb-1.5">Do</label>
             <input
               type="date"
+              aria-label="Volno do"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
               className={inputCls}
