@@ -565,7 +565,7 @@ export default function ClosingsOverview() {
                           <div className="h-full rounded-full bg-[#16181A]/45"
                             style={{ width: `${maxStaff ? (people / maxStaff) * 100 : 0}%` }} />
                         </div>
-                        <span className="text-[10px] text-black/35 tabular-nums">{h}</span>
+                        <span className="text-[11px] text-black/35 tabular-nums">{h}</span>
                       </div>
                     );
                   })}
@@ -611,7 +611,7 @@ export default function ClosingsOverview() {
               </button>
               {reconcileOpen && (
                 <>
-                  <div className="mt-2 flex items-center gap-3 px-4 text-[10px] uppercase tracking-wider text-black/35 sm:hidden">
+                  <div className="mt-2 flex items-center gap-3 px-4 text-[11px] uppercase tracking-wider text-black/35 sm:hidden">
                     <span className="w-14">den</span><span className="flex-1" />
                     <span>kasa</span><span>uzávěrka</span><span className="w-20 text-right">rozdíl</span>
                   </div>
@@ -700,16 +700,16 @@ export default function ClosingsOverview() {
                       {/* rx rounds both ends; the bottom radius is clipped flat at the baseline */}
                       <rect x={x} y={y} width={barW} height={h + 4} rx={3} fill={i === maxIdx ? '#8FB811' : '#C8F542'} clipPath="url(#trend-bars-clip)" />
                       {i === maxIdx && (
-                        <text x={Math.min(Math.max(x + barW / 2, 30), chartW - 30)} y={y - 5} textAnchor="middle" className="text-[9px] font-semibold fill-black/55 tabular-nums">{money(d.total)}</text>
+                        <text x={Math.min(Math.max(x + barW / 2, 30), chartW - 30)} y={y - 5} textAnchor="middle" className="text-[11px] font-semibold fill-black/55 tabular-nums">{money(d.total)}</text>
                       )}
                       {i % labelEvery === 0 && (
-                        <text x={x + barW / 2} y={labelY} textAnchor="middle" className="text-[9px] sm:text-[11px] fill-black/40">{day}.</text>
+                        <text x={x + barW / 2} y={labelY} textAnchor="middle" className="text-[11px] sm:text-[11px] fill-black/40">{day}.</text>
                       )}
                     </g>
                   );
                 })}
                 <line x1={padX} y1={avgY} x2={chartW - padX} y2={avgY} stroke="#16181A" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="4 4" />
-                <text x={padX} y={avgY - 4} className="text-[9px] fill-black/45 tabular-nums">Ø {money(avg)}</text>
+                <text x={padX} y={avgY - 4} className="text-[11px] fill-black/45 tabular-nums">Ø {money(avg)}</text>
               </svg>
             </div>
           </div>

@@ -795,7 +795,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
-                  <input type="date" value={form.date} onChange={set('date')}
+                  <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
                     className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
                     style={{ WebkitAppearance: 'none' }} />
                 </div>
@@ -826,7 +826,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
-                  <input type="date" value={form.date} onChange={set('date')}
+                  <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
                     className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
                     style={{ WebkitAppearance: 'none' }} />
                 </div>

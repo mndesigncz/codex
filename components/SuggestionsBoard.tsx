@@ -43,6 +43,9 @@ const FILTERS: { id: string; label: string }[] = [
 
 const relDate = (iso: string) => {
   const d = new Date(iso);
+  // Chybějící nebo poškozené datum se nesmí ukázat jako „Invalid Date" —
+  // radši nic než hláška z prohlížeče.
+  if (!iso || Number.isNaN(d.getTime())) return '';
   const diff = Date.now() - d.getTime();
   const day = 86400000;
   if (diff < day && d.getDate() === new Date().getDate()) return 'dnes';

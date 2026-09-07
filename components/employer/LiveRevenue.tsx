@@ -120,10 +120,10 @@ export default function LiveRevenue() {
           </button>
         ))}
         <span className="text-black/20">·</span>
-        <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)}
+        <input type="date" aria-label="Od data" value={from} max={to} onChange={e => setFrom(e.target.value)}
           className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
         <span className="text-xs text-black/35">–</span>
-        <input type="date" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
+        <input type="date" aria-label="Do data" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
           className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
       </div>
 
@@ -190,7 +190,7 @@ export default function LiveRevenue() {
                   <div key={h} className="flex-1 min-w-[8px] flex flex-col items-center gap-1" title={`${h}:00 — ${money(v)}`}>
                     <div className={`w-full rounded-t ${v === maxHour ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
                       style={{ height: `${maxHour ? Math.max(v > 0 ? 4 : 0, (v / maxHour) * 48) : 0}px` }} />
-                    <span className="text-[9px] text-black/30 tabular-nums">{h % 3 === 0 ? h : ''}</span>
+                    <span className="text-[11px] text-black/30 tabular-nums">{h % 3 === 0 ? h : ''}</span>
                   </div>
                 ))}
               </div>

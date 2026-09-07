@@ -193,6 +193,36 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
 /* ============================================================
    Dark theme — remaps the shared design vocabulary in one place
    ============================================================ */
+/* ---------- Čitelnost šedého textu ve světlém režimu ----------
+   Šedá přes průhlednost vypadá elegantně a na papíře pozadí #F1F3ED neprojde:
+   text-black/40 vychází 2,81:1 proti 4,5:1, které WCAG AA žádá pro běžný text.
+   Změřeno sondou napříč aplikací — pod hranicí bylo přes osm tisíc výskytů.
+
+   Opravuje se tady, na jednom místě, a ne v tisícovce míst ve zdrojích:
+   třídy si v kódu dál nesou svůj význam (tenčí číslo = méně důležitý text),
+   jen se jejich skutečná sytost zvedne do čitelného pásma. Tmavý režim má
+   svůj vlastní blok níž a ten tímhle není dotčen.
+
+   Odstupňování zůstává trojí, ale hierarchii teď nese hlavně velikost
+   a tučnost písma — na to je spolehnutí i za ostrého slunce na baru. */
+.text-black\/20, .text-black\/25, .text-black\/30, .text-black\/35 { color: rgba(0,0,0,0.55); }   /* 4,63:1 */
+.text-black\/40, .text-black\/45 { color: rgba(0,0,0,0.60); }                                    /* 5,55:1 */
+.text-black\/50 { color: rgba(0,0,0,0.66); }                                                    /* 7,10:1 */
+
+/* Barevné popisky a štítky. Odstíny z Tailwindu jsou laděné na bílou, ne na
+   naše nazelenalé #F1F3ED — oranžová 600 tam vychází 3,18:1 místo 4,5:1.
+   Posun o jeden stupeň tmavší barvu zachová a text zvedne nad normu.
+   Změřeno, ne odhadnuto; hodnota v závorce je výsledný kontrast. */
+.text-orange-600 { color: #C2410C; }   /* 4,63:1 */
+.text-red-600    { color: #B91C1C; }   /* 5,79:1 */
+.text-amber-700  { color: #92400E; }   /* 6,34:1 */
+.text-orange-700 { color: #9A3412; }   /* 6,54:1 */
+/* Firemní zelená je o vlas pod normou (4,44:1) — ztmavením o dva tóny se
+   dostane na 5,53:1 a v barvě je pořád tatáž. */
+.text-\[\#5B7A08\], .text-\[\#5B7A08\]\/70 { color: #4F6A07; }   /* 5,53:1 */
+.text-\[\#5B9E00\] { color: #4F6A07; }
+.text-\[\#0A6FE0\] { color: #0A5CC0; }   /* 5,68:1 */
+
 :root[data-theme="dark"] { color-scheme: dark; }
 :root[data-theme="dark"] body{
   background:#0C0D0F;

@@ -81,7 +81,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
               <span className={`w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} />
               {label && <span className="text-[11px] text-black/50 truncate max-w-[9rem]">{label}</span>}
               {recurrenceLabel(t.recurrence) && (
-                <span className="inline-flex items-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-1.5 py-0.5 text-[9px] font-semibold">↻</span>
+                <span className="inline-flex items-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-1.5 py-0.5 text-[11px] font-semibold">↻</span>
               )}
             </div>
             {done && t.completedByName && <p className="text-[11px] text-black/35 mt-1">splnil {t.completedByName}</p>}

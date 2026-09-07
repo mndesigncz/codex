@@ -115,8 +115,11 @@ function ConversationRow({
             {formatTime(conv.lastTime)}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-black/45 truncate">
+        {/* V provozním chatu nese zpráva pokyn („dodávka dorazí mezi devátou
+            a jedenáctou"). Z jednoho useknutého řádku se přečetla třetina,
+            takže náhled dostal řádky dva. */}
+        <div className="flex items-start justify-between gap-2">
+          <span className="min-w-0 flex-1 text-sm text-black/45 line-clamp-2">
             {conv.lastMessage ?? 'Zatím žádné zprávy'}
           </span>
           {conv.unreadCount > 0 && (

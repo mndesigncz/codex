@@ -104,7 +104,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                   {day && day.onShift.length > 0 && (
                     <div className="flex flex-wrap justify-center gap-0.5 leading-none">
                       {day.onShift.slice(0, 3).map(p => <span key={p.id} className="text-[11px]" title={p.name}>{p.avatar ?? '👤'}</span>)}
-                      {day.onShift.length > 3 && <span className="text-[9px] text-black/40">+{day.onShift.length - 3}</span>}
+                      {day.onShift.length > 3 && <span className="text-[11px] text-black/40">+{day.onShift.length - 3}</span>}
                     </div>
                   )}
                   {day && (

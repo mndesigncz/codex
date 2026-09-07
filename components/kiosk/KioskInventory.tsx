@@ -197,7 +197,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                         {(i as any).approved === false && (
-                          <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[10px] font-semibold align-middle">
+                          <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[11px] font-semibold align-middle">
                             čeká na potvrzení
                           </span>
                         )}

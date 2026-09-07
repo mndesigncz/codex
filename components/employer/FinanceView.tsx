@@ -308,7 +308,7 @@ export default function FinanceView() {
                       <span className="text-xs text-black/40 tabular-nums w-12 shrink-0">
                         {parseInt(r.date.split('-')[2])}.{parseInt(r.date.split('-')[1])}.
                       </span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
                       {/* Na telefonu se „Objednávka Monin CZ" nevešla vedle data,
                           štítku i částky — popis dostane vlastní řádek.
                           Musí to být basis-full, ne w-full: flex-1 nastavuje

@@ -314,7 +314,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                       const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
                       return (
                         <div key={i} className="flex items-center gap-2.5 py-2 text-sm">
-                          <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-black/40 w-24">{movementLabel(m.kind)}</span>
+                          <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-black/40 w-24">{movementLabel(m.kind)}</span>
                           <span className="min-w-0 flex-1 text-black/60">{m.note || '—'}</span>
                           <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
                         </div>
@@ -439,7 +439,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                             className={`shrink-0 ${p.status === 'completed' ? 'text-[#5B7A08]' : 'text-black/30'}`} />
                           <span className="min-w-0 flex-1 truncate text-[#16181A]">
                             {p.name}
-                            {p.required && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wider text-black/35">povinný</span>}
+                            {p.required && <span className="ml-1.5 text-[11px] font-bold uppercase tracking-wider text-black/35">povinný</span>}
                           </span>
                           <span className="shrink-0 text-black/45 text-[13px] tabular-nums whitespace-nowrap">
                             {p.done}/{p.total} · {p.employee?.name ?? '—'} · {hhmm(p.completedAt)}

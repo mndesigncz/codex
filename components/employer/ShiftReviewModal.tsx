@@ -268,7 +268,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           {/* Date picker */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Den směny</label>
-            <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
+            <input type="date" aria-label="Datum směny" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {shiftDates.map(d => (

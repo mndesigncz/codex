@@ -117,6 +117,7 @@ export default function Tasks({ user }: Props) {
               </p>
               <select
                 value={task.status}
+                aria-label={`Stav úkolu — ${task.title}`}
                 onChange={e => updateStatus(task, e.target.value)}
                 className={`tap-target-sm text-xs px-3 py-1 min-h-[36px] rounded-full border-0 font-medium cursor-pointer ${statusOpt.color} focus:outline-none`}
               >

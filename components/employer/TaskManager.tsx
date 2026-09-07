@@ -322,7 +322,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">
                 {editingSeries ? 'Termín (od kdy)' : `Termín ${form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}`}
               </label>
-              <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
+              <input type="date" aria-label="Termín úkolu" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             </div>
           </div>
           {editingSeries && (
