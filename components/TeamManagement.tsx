@@ -678,7 +678,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pl-0 sm:pl-15">
                     <div>
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Role</label>
-                      <select value={editRole} onChange={e => setEditRole(e.target.value)}
+                      <select value={editRole} aria-label="Role člena" onChange={e => setEditRole(e.target.value)}
                         className={inputClass + ' appearance-none'}>
                         <option value="employee" className="bg-neutral-900">Zaměstnanec</option>
                         <option value="employer" className="bg-neutral-900">Vedoucí</option>
@@ -728,7 +728,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="min-w-0">
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Měna</label>
-            <select value={team?.currency ?? 'CZK'} disabled={savingBiz}
+            <select value={team?.currency ?? 'CZK'} aria-label="Měna" disabled={savingBiz}
               onChange={e => saveBiz({ currency: e.target.value })}
               className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
               {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
@@ -736,7 +736,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           </div>
           <div className="min-w-0">
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Formát čísel (jazyk)</label>
-            <select value={team?.locale ?? 'cs-CZ'} disabled={savingBiz}
+            <select value={team?.locale ?? 'cs-CZ'} aria-label="Jazyk a formát" disabled={savingBiz}
               onChange={e => saveBiz({ locale: e.target.value })}
               className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
               {LOCALES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
@@ -744,7 +744,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           </div>
           <div className="min-w-0">
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Začátek týdne</label>
-            <select value={String(team?.week_start ?? 1)} disabled={savingBiz}
+            <select value={String(team?.week_start ?? 1)} aria-label="Začátek týdne" disabled={savingBiz}
               onChange={e => saveBiz({ weekStart: Number(e.target.value) })}
               className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
               <option value="1">Pondělí</option>

@@ -36,3 +36,7 @@ jobs:
       # zamýšlenou a pole se roztáhne přes vedlejší sloupec.
       - name: Soupeřící šířky
         run: node scripts/check-width-clash.mjs
+      # Šedý text pod 55 % a písmo pod 11 px se na baru ve dne nepřečte.
+      # Kontrast se měří v prohlížeči; tohle hlídá jen to, co je vidět ze zdroje.
+      - name: Čitelnost textu
+        run: node scripts/check-contrast-classes.mjs

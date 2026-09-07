@@ -410,20 +410,20 @@ export default function Settings({ user, initialTab }: Props) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Jméno</label>
-                  <input value={name} onChange={e => setName(e.target.value)} className={inputClass} />
+                  <input value={name} aria-label="Jméno" onChange={e => setName(e.target.value)} className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>Email</label>
-                  <input value={account?.email ?? ''} disabled
+                  <input value={account?.email ?? ''} aria-label="E-mail" disabled
                     className={inputClass + ' opacity-60 cursor-not-allowed'} />
                 </div>
                 <div>
                   <label className={labelClass}>Telefon</label>
-                  <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
+                  <input value={phone} aria-label="Telefon" onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>Pozice</label>
-                  <input value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Barista" className={inputClass} />
+                  <input value={jobTitle} aria-label="Pozice" onChange={e => setJobTitle(e.target.value)} placeholder="Barista" className={inputClass} />
                 </div>
                 {!isEmployer && (
                   <div className="sm:col-span-2">
@@ -592,15 +592,15 @@ export default function Settings({ user, initialTab }: Props) {
               <div className="space-y-4">
                 <div>
                   <label className={labelClass}>Současné heslo</label>
-                  <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
+                  <input type="password" value={currentPassword} aria-label="Stávající heslo" onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>Nové heslo</label>
-                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputClass} />
+                  <input type="password" value={newPassword} aria-label="Nové heslo" onChange={e => setNewPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>Potvrdit nové heslo</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
+                  <input type="password" value={confirmPassword} aria-label="Nové heslo znovu" onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
                 </div>
               </div>
 

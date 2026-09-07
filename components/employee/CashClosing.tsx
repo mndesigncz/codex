@@ -784,7 +784,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
                 <div className="min-w-0">
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Za koho</label>
-                  <select value={selEmployee ?? ''} onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
+                  <select value={selEmployee ?? ''} aria-label="Kdo byl na směně" onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
                     className={`${inputClass} appearance-none min-w-0 h-[46px]`} style={{ WebkitAppearance: 'none' }}>
                     {members.map(m => (
                       <option key={m.id} value={m.id}>{m.avatar ? `${m.avatar} ` : ''}{m.name}{m.id === meId ? ' (já)' : ''}</option>

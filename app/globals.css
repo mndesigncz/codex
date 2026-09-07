@@ -208,13 +208,16 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
 .text-black\/20, .text-black\/25, .text-black\/30, .text-black\/35 { color: rgba(0,0,0,0.58); }   /* 4,87:1 i na barevném štítku */
 .text-black\/40, .text-black\/45 { color: rgba(0,0,0,0.63); }
 .text-black\/50 { color: rgba(0,0,0,0.68); }
+/* I 55 % je na barevném štítku těsně pod normou (4,42:1) — štítek má tmavší
+   podklad než stránka, na kterou byla stupnice laděná. */
+.text-black\/55 { color: rgba(0,0,0,0.60); }
 
 /* Barevné popisky a štítky. Odstíny z Tailwindu jsou laděné na bílou, ne na
    naše nazelenalé #F1F3ED — oranžová 600 tam vychází 3,18:1 místo 4,5:1.
    Posun o jeden stupeň tmavší barvu zachová a text zvedne nad normu.
    Změřeno, ne odhadnuto; hodnota v závorce je výsledný kontrast. */
 .text-orange-600 { color: #9A3412; }   /* 5,42:1 i na oranžovém štítku */
-.text-red-600    { color: #B91C1C; }   /* 4,80:1 i na červeném štítku */
+.text-red-600    { color: #991B1B; }   /* 6,16:1 i na červeném štítku */
 .text-red-500    { color: #B91C1C; }
 .text-blue-600   { color: #1D4ED8; }   /* 4,97:1 i na modrém štítku */
 /* Tlumená varianta téže barvy: 60 % dá 2,98:1, teprve 90 % projde. Ztlumení
