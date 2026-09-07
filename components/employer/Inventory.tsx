@@ -756,7 +756,13 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
             {low.length > 0 && <span className="text-orange-600">{low.length} dochází</span>}
           </p>
-          <p className="text-black/55 text-sm mt-1 line-clamp-2 sm:truncate">{[...critical, ...low].map(i => i.name).join(', ')}</p>
+          {/* Není to název, je to výčet — u 190 položek chtěl řádek 17 000 px.
+              Na desktopu se z něj po `truncate` četlo pět procent, takže se
+              zalamuje všude stejně a zbytek je za „a další". */}
+          <p className="text-black/55 text-sm mt-1 line-clamp-2">
+            {[...critical, ...low].slice(0, 12).map(i => i.name).join(', ')}
+            {critical.length + low.length > 12 && ` a další ${critical.length + low.length - 12}`}
+          </p>
         </div>
       )}
 

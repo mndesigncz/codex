@@ -744,7 +744,7 @@ function ProcedureEditor({
                       {STEP_WEIGHTS.map(w => (
                         <button key={w.id} type="button" title={`${w.hint} (+${w.plus} / −${s.penalty ?? w.minus})`}
                           onClick={() => patchStep(i, { weight: w.id })}
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                          className={`tap-target-sm rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                             (s.weight ?? 'normal') === w.id ? 'bg-[#16181A] text-white' : 'text-black/45 hover:text-black'
                           }`}>
                           {w.label}

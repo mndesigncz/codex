@@ -188,7 +188,11 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                   // proto bere celý řádek a tlačítka se zalomí pod něj.
                   <div key={i.id} className={`glass-card p-3 min-[360px]:p-4 flex items-center gap-x-2 min-[360px]:gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-red-500/25' : ''}`}>
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
-                    <div className="min-w-0 flex-1 basis-[calc(100%-1.5rem)] min-[520px]:basis-0">
+                    {/* Zlom podle šířky okna tady klame: od 520 px se karty
+                        srovnají do dvou sloupců, takže karta je zase úzká a na
+                        název zbylo 52 px. Na jeden řádek se to vrací až od
+                        1024 px, kde je karta doopravdy široká. */}
+                    <div className="min-w-0 flex-1 basis-[calc(100%-1.5rem)] lg:basis-0">
                       <p className="font-semibold text-[#16181A] line-clamp-2">
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}

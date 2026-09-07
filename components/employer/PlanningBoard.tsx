@@ -199,7 +199,7 @@ export default function PlanningBoard() {
                       </div>
                       <button
                         onClick={() => setMenuId(m => (m === card.id ? null : card.id))}
-                        className="rounded-full glass w-7 h-7 flex items-center justify-center text-black/50 hover:text-black shrink-0 leading-none"
+                        className="tap-target-sm rounded-full glass w-7 h-7 flex items-center justify-center text-black/50 hover:text-black shrink-0 leading-none"
                         title="Možnosti"
                       >
                         ···

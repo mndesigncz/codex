@@ -83,7 +83,7 @@ function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
               <div className="flex items-center gap-2 flex-wrap">
                 {it.flagged && <Icon name="warning" size={13} className="text-amber-600 shrink-0" />}
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? 'Hodnocení'}</span>
-                <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
+                <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 basis-[calc(100%-1rem)] min-[420px]:basis-0">{it.label}</span>
                 <PointsBadge n={it.points ?? 0} />
               </div>
               {it.note && <p className="text-[13px] text-black/60 mt-1 whitespace-pre-line">{it.note}</p>}
@@ -263,14 +263,18 @@ function MyRewardsInner() {
               const afford = me.points >= rw.cost;
               const pending = myRedemptions.some(r => r.reward_id === rw.id && r.status === 'pending');
               return (
-                <div key={rw.id} className="flex items-center gap-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+                // Dvousloupcová mřížka drží kartu úzkou i na velkém monitoru,
+                // takže na název zbývalo 116 px z potřebných 262 a četla se
+                // z něj necelá polovina. Název se teď zalomí místo useknutí
+                // a tlačítko spadne pod něj, když se vedle nevejde.
+                <div key={rw.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
                   <span className="text-2xl shrink-0">{rw.icon ?? '🎁'}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#16181A] truncate">{rw.title}</p>
+                  <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[420px]:basis-0">
+                    <p className="text-sm font-semibold text-[#16181A]">{rw.title}</p>
                     <p className="text-xs text-black/45 tabular-nums">{rw.cost} bodů</p>
                   </div>
                   <button onClick={() => redeem(rw)} disabled={!afford || pending}
-                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition ${
+                    className={`tap-target-sm shrink-0 ml-auto rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition ${
                       pending ? 'bg-amber-500/12 text-amber-700 cursor-default'
                       : afford ? 'bg-[#16181A] text-white hover:bg-black'
                       : 'bg-black/[0.05] text-black/35 cursor-not-allowed'

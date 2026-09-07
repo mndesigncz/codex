@@ -639,7 +639,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   >
                     {m.avatar ?? '👤'}
                   </div>
-                  <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] min-[420px]:basis-0">
+                  {/* Na jeden řádek se jméno, role a tři tlačítka vejdou až od
+                      640 px. Do té doby dostane jméno vlastní řádek — dřív se
+                      od 420 px mačkalo do 39 px a „Eva Testová" byla „Eva…". */}
+                  <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] sm:basis-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p
                         onClick={() => m.role === 'employee' && setProfileId(m.id)}
@@ -652,7 +655,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <p className="text-sm text-black/45 line-clamp-2 break-all sm:break-normal">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>
                   {!owner && !editing && (
-                    <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0 basis-full sm:basis-auto sm:ml-auto">
                       {m.role === 'employee' && (
                         <button onClick={() => setProfileId(m.id)}
                           className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-medium hover:brightness-125 transition-all whitespace-nowrap">
