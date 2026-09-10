@@ -224,8 +224,15 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
     await flush();
 
     // Kurzor se posune jen po úplném průchodu — jinak by se přeskočila stránka.
-    if (complete && maxModified > 0) {
-      await sql`UPDATE pos_connections SET bills_cursor = ${new Date(maxModified).toISOString()} WHERE team_id = ${teamId}`;
+    //
+    // Když v okně žádná účtenka nebyla (zavřeno, nebo se ještě nemarkovalo),
+    // není z čeho kurzor vzít — a bez něj by synchronizace natrvalo zůstala
+    // v režimu prvního stažení a všechna čtení by chodila na pokladnu místo
+    // do zrcadla. Prázdná odpověď je ale plnohodnotná informace: do začátku
+    // běhu nic nepřibylo. Přesah dvou hodin pak pokryje, co se změnilo během.
+    if (complete) {
+      const at = maxModified > 0 ? new Date(maxModified) : new Date(started);
+      await sql`UPDATE pos_connections SET bills_cursor = ${at.toISOString()} WHERE team_id = ${teamId}`;
     }
 
     // ---- 2. Historie po týdnech dozadu -------------------------------------
