@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { Icon } from '../Icons';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -118,7 +119,7 @@ export default function TimeOffApprovals() {
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="font-bold tracking-tight text-[#16181A]">🏖️ Žádosti o volno</h2>
+        <h2 className="font-bold tracking-tight text-[#16181A]"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o volno</h2>
         {pending.length > 0 && (
           <span className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-0.5 text-xs font-semibold tabular-nums">
             {pending.length}

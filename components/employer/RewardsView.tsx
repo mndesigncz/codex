@@ -86,7 +86,7 @@ function RewardsViewInner() {
         <>
         {redemptions.some(r => r.status === 'pending') && (
           <div className="glass-card p-5 border border-[#C8F542]/30">
-            <p className="font-bold text-[#16181A] mb-2.5">🎁 Žádosti o odměny</p>
+            <p className="font-bold text-[#16181A] mb-2.5"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o odměny</p>
             <div className="space-y-2">
               {redemptions.filter(r => r.status === 'pending').map(r => (
                 <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5">
@@ -105,7 +105,7 @@ function RewardsViewInner() {
         )}
         <StandingsBoard standings={standings} onRate={setRating} onOpen={s => setProfileId(s.id)} />
         <div className="glass-card p-5">
-          <p className="font-bold text-[#16181A] mb-1">🎁 Katalog odměn</p>
+          <p className="font-bold text-[#16181A] mb-1"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Katalog odměn</p>
           <p className="text-sm text-black/45 mb-3">Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.</p>
           {/* Čtyři sloupce vedle sebe se na telefon nevejdou — políčka mají
               vlastní minimální šířku, kterou mřížka nesmí podlézt, a řádek pak
@@ -156,7 +156,7 @@ function RewardsViewInner() {
                     if (!confirm(`Smazat odměnu „${rw.title}"?`)) return;
                     await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
                     await loadShop();
-                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
+                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs"><Icon name="close" size={15} /></button>
                 </div>
               ))}
             </div>

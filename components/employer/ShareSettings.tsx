@@ -215,7 +215,7 @@ export default function ShareSettings() {
             <p className="font-bold text-[#16181A] flex items-center gap-2"><Icon name="sun" size={17} className="text-[#5B7A08]" /> Vzhled sdílených stránek <ProBadge /></p>
             <p className="text-sm text-black/45 mt-0.5">Barvy, logo a patička podle vašeho podniku.</p>
           </div>
-          <span className="shrink-0 text-2xl">🔒</span>
+          <span className="shrink-0 text-2xl"><Icon name="lock" size={15} /></span>
         </button>
       ) : (
       <div className="glass-card p-6 space-y-4">
@@ -372,7 +372,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
             link.pinned ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
           }`}>
-          📌
+          <Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
         </button>
         <button onClick={onQr} title="Zobrazit QR kód"
           className="shrink-0 rounded-full w-8 h-8 flex items-center justify-center glass text-black/50 hover:text-black text-xs transition">

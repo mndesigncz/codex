@@ -80,7 +80,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
               {fmtDate(e.date)}{e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
             {(e.offsite || e.location) && (
-              <p className="text-xs text-black/40 mt-0.5 line-clamp-2">📍 {e.location || 'mimo podnik'}{e.offsite ? ' · venkovní' : ''}</p>
+              <p className="text-xs text-black/40 mt-0.5 line-clamp-2"><Icon name="location" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {e.location || 'mimo podnik'}{e.offsite ? ' · venkovní' : ''}</p>
             )}
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -90,7 +90,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
               : e.status === 'cancelled' ? 'bg-red-500/10 text-red-600'
               : 'bg-[#0A84FF]/10 text-[#0A6FE0]'
             }`}>{statusLabel(e.status)}</span>
-            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná ✓</span>}
+            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná</span>}
             {result != null && (
               <span className={`text-xs font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
                 {result >= 0 ? '+' : ''}{money(result)}
@@ -126,7 +126,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         <>
           {upcoming.length === 0 ? (
             <div className="glass-card p-10 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-2xl mb-3">📅</div>
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-2xl mb-3"><Icon name="calendarCheck" size={15} /></div>
               <p className="text-black/55 text-sm">Žádná naplánovaná akce. Založ první — obsadíš ji lidmi, sbalíš sklad a dáš vědět zákazníkům.</p>
             </div>
           ) : (
@@ -256,7 +256,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
             <p className="text-sm text-black/50 capitalize mt-0.5">
               {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               {e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
-              {e.location ? ` · 📍 ${e.location}` : ''}
+              {e.location ? ` · ${e.location}` : ''}
             </p>
           </div>
           <button onClick={onClose} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
@@ -278,7 +278,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
               e.public ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'glass text-black/50 hover:text-black'
             }`}
             title="Veřejná akce se ukáže zákazníkům na sdílené stránce">
-            {e.public ? '🌍 Veřejná ✓' : 'Zveřejnit zákazníkům'}
+            {e.public ? 'Veřejná' : 'Zveřejnit zákazníkům'}
           </button>
           <button onClick={() => patch(e.id, { publishToTeam: true }).then(ok => ok && alert('Tým dostal notifikaci o akci. ✓'))}
             className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
@@ -297,7 +297,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
                   className={`rounded-full px-3 py-1.5 text-sm transition ${
                     on ? 'bg-[#C8F542]/20 text-[#5B7A08] border border-[#C8F542]/40 font-semibold' : 'glass text-black/55 hover:text-black border border-transparent'
                   }`}>
-                  {m.avatar ?? '👤'} {m.name}{on ? ' ✓' : ''}
+                  {m.avatar ?? ''} {m.name}{on ? <Icon name="check" size={13} className="inline ml-1 -mt-0.5" /> : null}
                 </button>
               );
             })}
@@ -314,10 +314,10 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
                 className={`w-full flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-left text-sm transition ${
                   c.done ? 'border-[#C8F542]/30 bg-[#C8F542]/[0.08] text-black/45 line-through' : 'border-black/[0.07] bg-white/50 text-[#16181A] hover:bg-white/80'
                 }`}>
-                <span>{c.done ? '✅' : '⬜'}</span>
+                <span className={c.done ? 'text-[#4F6A07]' : 'text-black/30'}><Icon name={c.done ? 'check' : 'box'} size={16} /></span>
                 <span className="min-w-0 flex-1">{c.text}</span>
                 <span onClick={(ev3) => { ev3.stopPropagation(); patch(e.id, { checklist: e.checklist.filter((_: any, j: number) => j !== i) }); }}
-                  className="shrink-0 text-black/25 hover:text-red-600 px-1">✕</span>
+                  className="shrink-0 text-black/25 hover:text-red-600 px-1"><Icon name="close" size={15} /></span>
               </button>
             ))}
           </div>
@@ -339,7 +339,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
                 {e.packing.some((p: any) => p.itemId && !p.packed) && (
                   <button onClick={() => { if (confirm('Vyskladnit vše nesbalené? Množství se odečte ze skladu (s poznámkou u položek).')) patch(e.id, { packAction: 'checkout' }); }}
                     className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
-                    📦 Vyskladnit
+                    <Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Vyskladnit
                   </button>
                 )}
                 {e.packing.some((p: any) => p.itemId && p.packed && p.returned == null) && (
@@ -362,7 +362,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
                   </span>
                   {!p2.packed && (
                     <button onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
-                      className="shrink-0 text-black/25 hover:text-red-600">✕</button>
+                      className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
                   )}
                 </div>
               ))}

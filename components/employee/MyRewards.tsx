@@ -235,7 +235,7 @@ function MyRewardsInner() {
               <p className="mt-1.5 text-xs text-black/45">Ještě {Math.max(0, me.pointsForNext - me.pointsIntoLevel)} bodů a postupuješ výš.</p>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-[#5B7A08] font-medium">Máš nejvyšší úroveň — skvělá práce! 🎉</p>
+            <p className="mt-4 text-sm text-[#5B7A08] font-medium">Máš nejvyšší úroveň — skvělá práce.</p>
           )}
 
           {me.perks && (
@@ -251,7 +251,7 @@ function MyRewardsInner() {
       {catalog.length > 0 && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-            <h3 className="font-bold tracking-tight text-[#16181A]">🎁 Katalog odměn</h3>
+            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Katalog odměn</h3>
             <span className="text-xs text-black/40">máš {me.points} bodů</span>
           </div>
           <p className="text-sm text-black/45 mb-4">Vyměň body za odměnu — žádost schválí vedení a body se odečtou.</p>
@@ -328,7 +328,7 @@ function MyRewardsInner() {
             return (
               <div key={i} className={`flex items-start gap-3 rounded-2xl p-3 border ${current ? 'bg-[#C8F542]/12 border-[#C8F542]/40' : reached ? 'bg-black/[0.02] border-black/[0.05]' : 'bg-white border-black/[0.05] opacity-70'}`}>
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${reached ? 'bg-[#16181A] text-[#C8F542]' : 'bg-black/[0.06] text-black/40'}`}>
-                  {reached ? '✓' : i + 1}
+                  {reached ? <Icon name="check" size={14} /> : i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">

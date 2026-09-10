@@ -201,7 +201,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Kontakt</h3>
                       <div className="rounded-2xl bg-black/[0.03] p-3.5 space-y-1 text-sm">
-                        {p.employee.email && <p className="text-[#16181A] truncate">✉️ {p.employee.email}</p>}
+                        {p.employee.email && <p className="text-[#16181A] truncate"><Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.employee.email}</p>}
                         {p.employee.phone && <p className="text-[#16181A]">📞 {p.employee.phone}</p>}
                       </div>
                     </div>

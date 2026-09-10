@@ -68,7 +68,7 @@ export default function KioskSettings() {
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-start justify-between gap-3 text-left">
         <div className="min-w-0">
           <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
-            <span className="text-lg">📟</span> Tabletový účet (píchačky)
+            <span className="text-lg"><Icon name="clipboard" size={15} /></span> Tabletový účet (píchačky)
           </h3>
           <p className="text-black/45 text-sm mt-1">
             {kiosk ? `Připojeno — ${kiosk.email}` : 'Sdílené zařízení na provozovně, kde se zaměstnanci odpíchávají na směnu.'}

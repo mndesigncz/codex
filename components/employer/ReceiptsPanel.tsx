@@ -173,7 +173,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
                       ? 'bg-[#C8F542]/40 text-[#3E5406]'
                       : 'bg-white/70 text-[#16181A] hover:bg-white border border-black/[0.06]'
                   }`}>
-                  {restocked[i.id] ? `✓ ${i.name} +1` : `＋1 ${i.name} (${i.quantity} ${i.unit})`}
+                  {restocked[i.id] ? `${i.name} +1` : `＋1 ${i.name} (${i.quantity} ${i.unit})`}
                 </button>
               ))}
             </div>
@@ -213,7 +213,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
                   {r.note ? ` · ${r.note}` : ''}
                 </p>
               </div>
-              <button onClick={() => remove(r)} className="shrink-0 text-black/30 hover:text-red-600 transition p-1.5" title="Smazat">✕</button>
+              <button onClick={() => remove(r)} className="shrink-0 text-black/30 hover:text-red-600 transition p-1.5" title="Smazat"><Icon name="close" size={15} /></button>
             </div>
           ))}
         </div>

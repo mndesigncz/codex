@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { Icon } from '../Icons';
 export default function PollsStrip({ canCreate = true, isEmployer = false, meId }: {
   canCreate?: boolean; isEmployer?: boolean; meId?: number;
 }) {
@@ -48,7 +49,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
       {polls.map(p => (
         <div key={p.id} className="rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/25 p-3.5">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <p className="text-sm font-semibold text-[#16181A] min-w-0">📊 {p.question}
+            <p className="text-sm font-semibold text-[#16181A] min-w-0"><Icon name="chart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.question}
               <span className="font-normal text-black/40"> · {p.authorName}</span>
             </p>
             {(isEmployer || p.createdBy === meId) && (
@@ -107,7 +108,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
         ) : (
           <button onClick={() => setCreating(true)}
             className="w-full rounded-2xl border border-dashed border-black/15 px-3 py-2 text-xs text-black/40 hover:text-black hover:border-black/30 transition">
-            📊 Založit anketu
+            <Icon name="chart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Založit anketu
           </button>
         )
       )}

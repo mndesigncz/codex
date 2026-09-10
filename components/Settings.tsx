@@ -698,7 +698,7 @@ export default function Settings({ user, initialTab }: Props) {
               {posStatus?.connected ? (
                 <div className="space-y-3">
                   <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3">
-                    <p className="text-sm font-semibold text-[#16181A]">✅ Připojeno: {posStatus.placeName ?? posStatus.merchantId}</p>
+                    <p className="text-sm font-semibold text-[#16181A]"><Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Připojeno: {posStatus.placeName ?? posStatus.merchantId}</p>
                     <p className="text-xs text-black/45 mt-0.5">Client ID {posStatus.clientIdMasked} · tržby se předvyplňují v uzávěrce a večerním souhrnu.</p>
                   </div>
                   <button onClick={async () => {

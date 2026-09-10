@@ -371,10 +371,11 @@ export function ActivePersonChip() {
           canSwitch ? 'hover:bg-[#C8F542]/20' : 'cursor-default'
         }`}
       >
-        <span className="text-2xl leading-none">{active.avatar}</span>
-        <span className="text-left leading-tight">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40">Zapisuje se jako</span>
-          <span className="block font-bold text-[#16181A] text-sm truncate max-w-[9rem]">{active.name}</span>
+        <Avatar emoji={active.avatar} size="sm" ring={false} />
+        <span className="text-left leading-tight min-w-0">
+          {/* Na telefonu popisek ustoupí jménu — 49 px na „Eva Testová" nestačilo. */}
+          <span className="hidden sm:block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">Zapisuje se jako</span>
+          <span className="block font-bold text-[#16181A] text-sm truncate max-w-[7rem] sm:max-w-[11rem]">{active.name}</span>
         </span>
         {canSwitch && <Icon name="chevron" size={15} className="text-black/35" />}
       </button>

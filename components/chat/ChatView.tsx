@@ -276,7 +276,7 @@ function Thread({
 
       {sendError && (
         <p className="px-3 pt-2 text-xs font-medium text-red-600 flex items-center gap-1.5">
-          <span aria-hidden>⚠️</span> {sendError}
+          <span aria-hidden><Icon name="warning" size={15} /></span> {sendError}
         </p>
       )}
 

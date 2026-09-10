@@ -372,7 +372,7 @@ export default function Guides({ user }: { user: User }) {
                                   if (res?.ok) await loadGuides();
                                 }}
                                 className="rounded-full bg-[#16181A] text-white px-2.5 py-0.5 text-[11px] font-semibold hover:bg-black transition whitespace-nowrap">
-                                Schválit ✓
+                                Schválit
                               </button>
                             )}
                           </span>
@@ -417,7 +417,7 @@ export default function Guides({ user }: { user: User }) {
                         <span className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
                           g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'
                         }`}>
-                          📖 {g.myRead ? 'přečteno ✓' : 'povinné čtení'}
+                          <Icon name="book" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {g.myRead ? 'přečteno' : 'povinné čtení'}
                           {isEmployer && <span className="font-normal opacity-70">· {g.readCount ?? 0}×</span>}
                         </span>
                       )}
@@ -483,11 +483,11 @@ export default function Guides({ user }: { user: User }) {
                             if (res?.ok) await loadGuides();
                           }}
                           className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
-                          ✓ Potvrzuji přečtení
+                          <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Potvrzuji přečtení
                         </button>
                       )}
                       {summary.requireRead && summary.myRead && (
-                        <span className="tap-target-sm rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno ✓</span>
+                        <span className="tap-target-sm rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno</span>
                       )}
                       {isEmployer && (
                         <button
@@ -501,7 +501,7 @@ export default function Guides({ user }: { user: User }) {
                           className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                             summary.requireRead ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
                           }`}>
-                          {summary.requireRead ? 'Zrušit povinné čtení' : '📖 Označit jako povinné čtení'}
+                          {summary.requireRead ? 'Zrušit povinné čtení' : 'Označit jako povinné čtení'}
                         </button>
                       )}
                     </div>
@@ -534,7 +534,7 @@ export default function Guides({ user }: { user: User }) {
                   title="Zavřít"
                   className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all"
                 >
-                  ✕
+                  <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
                 </button>
               </div>
             </div>
@@ -790,7 +790,7 @@ function GuideEditor({
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0">
-            ✕
+            <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
 
@@ -1026,7 +1026,7 @@ function ManageCategories({
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">Kategorie</h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0">
-            ✕
+            <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
 
@@ -1050,7 +1050,7 @@ function ManageCategories({
                 className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-red-600 transition-all text-xs flex-shrink-0"
                 title="Smazat"
               >
-                ✕
+                <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
               </button>
             </div>
           ))}

@@ -346,7 +346,7 @@ export default function ClosingsOverview() {
       {pending.length > 0 && (
         <div className="rounded-3xl bg-orange-500/[0.08] border border-orange-500/25 p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg" aria-hidden>⚠️</span>
+            <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
             <h3 className="font-bold text-[#16181A]">Uzávěrky ke schválení</h3>
             <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
           </div>
@@ -416,7 +416,7 @@ export default function ClosingsOverview() {
 
       {analyticsOpen && trend && pro && (
         <div className="glass-card p-5 sm:p-6">
-          <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📊 Trendy</h3>
+          <h3 className="font-bold tracking-tight text-[#16181A] mb-4"><Icon name="chart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Trendy</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Tento týden</p>
@@ -449,7 +449,7 @@ export default function ClosingsOverview() {
       {/* Analytics, folded behind one calm header */}
       <button onClick={toggleAnalytics}
         className="w-full glass-card px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
-        <span className="font-bold tracking-tight text-[#16181A]">📈 Přehledy a trendy</span>
+        <span className="font-bold tracking-tight text-[#16181A]"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Přehledy a trendy</span>
         <span className="flex items-center gap-2 text-xs text-black/40">
           {!analyticsOpen && 'měsíc v číslech · trendy · graf'}
           <Icon name="chevron" size={16} className={`transition-transform ${analyticsOpen ? 'rotate-180' : ''}`} />
@@ -460,7 +460,7 @@ export default function ClosingsOverview() {
       {analyticsOpen && (laborCost > 0 || purchases > 0) && pro && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold tracking-tight text-[#16181A]">📈 {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
+            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
             <span className="text-[11px] text-black/35">orientační — bez DPH a fixních nákladů</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -496,10 +496,10 @@ export default function ClosingsOverview() {
         <button onClick={() => setUpgradeFor('Měsíční přehled podniku')}
           className="w-full glass-card p-5 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
           <div className="min-w-0">
-            <p className="font-bold text-[#16181A] flex items-center gap-2">📈 Měsíc v číslech <ProBadge /></p>
+            <p className="font-bold text-[#16181A] flex items-center gap-2"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Měsíc v číslech <ProBadge /></p>
             <p className="text-sm text-black/50 mt-0.5">Tržby × mzdové náklady × nákupy a provozní výsledek na jeden pohled.</p>
           </div>
-          <span className="shrink-0 text-2xl">🔒</span>
+          <span className="shrink-0 text-2xl"><Icon name="lock" size={15} /></span>
         </button>
       )}
 
@@ -512,7 +512,7 @@ export default function ClosingsOverview() {
       {analyticsOpen && pro && posInsights && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold tracking-tight text-[#16181A]">💳 Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
+            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
             <span className="text-[11px] text-black/35">z účtenek Storyous</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
@@ -636,7 +636,7 @@ export default function ClosingsOverview() {
                           d.diff == null ? 'text-black/20'
                             : Math.abs(d.diff) <= 50 ? 'text-[#5B7A08]' : 'text-amber-700'
                         }`}>
-                          {d.diff == null ? '—' : d.diff === 0 ? '✓' : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
+                          {d.diff == null ? '—' : d.diff === 0 ? <Icon name="check" size={14} className="inline text-[#4F6A07]" /> : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
                         </span>
                       </div>
                     ))}
@@ -735,7 +735,7 @@ export default function ClosingsOverview() {
               </button>
               <button onClick={exportAccountant}
                 className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
-                🧾 Pro účetní ↓
+                <Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro účetní ↓
               </button>
             </>
           )}
@@ -820,7 +820,7 @@ export default function ClosingsOverview() {
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                         {(c as any).event_title && (
                           <span className="ml-1.5 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-bold align-middle">
-                            🎪 {(c as any).event_title}
+                            <Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {(c as any).event_title}
                           </span>
                         )}
                       </p>

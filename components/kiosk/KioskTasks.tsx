@@ -101,7 +101,7 @@ export default function KioskTasks() {
               isDone ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]'
             }`}
           >
-            {isDone && <span className="text-sm font-bold">✓</span>}
+            {isDone && <span className="text-sm font-bold"><Icon name="check" size={15} /></span>}
           </button>
           <div className="min-w-0 flex-1">
             <p className={`font-semibold text-[#16181A] leading-snug ${isDone ? 'line-through text-black/45' : ''}`}>
@@ -110,7 +110,7 @@ export default function KioskTasks() {
             </p>
             {t.description && !isDone && <p className="text-sm text-black/50 mt-1">{t.description}</p>}
             <p className="text-xs text-black/40 mt-1.5 truncate">
-              {t.teamTask || t.assignedTo == null ? '🗓️ Kdokoliv' : `${t.assigneeAvatar ?? '👤'} ${t.assigneeName ?? ''}`}
+              {t.teamTask || t.assignedTo == null ? 'Kdokoliv' : `${t.assigneeAvatar ?? '👤'} ${t.assigneeName ?? ''}`}
               {t.dueDate && (
                 <span className={overdueTask ? 'text-red-600 font-medium' : ''}>
                   {' · '}{new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
@@ -127,7 +127,7 @@ export default function KioskTasks() {
                     <span className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
                       it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20'
                     }`}>
-                      {it.done && <span className="text-[11px] font-bold">✓</span>}
+                      {it.done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
                     </span>
                     <span className={`text-sm ${it.done ? 'text-black/40 line-through' : 'text-[#16181A]'}`}>{it.text}</span>
                   </button>

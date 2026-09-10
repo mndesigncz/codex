@@ -6,6 +6,7 @@ import { parseSteps } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
 
+import { Icon } from '../Icons';
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
   const s = Math.max(0, sec) % 60;
@@ -85,7 +86,7 @@ export default function FloatingRunner() {
           <div className="relative overflow-hidden glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-pop_0.4s_ease-out]">
             <Confetti />
             <div className="relative px-6 py-7 text-center">
-              <div className="text-5xl motion-safe:animate-[pr-bounce_0.7s_ease-out]">🎉</div>
+              <div className="text-5xl motion-safe:animate-[pr-bounce_0.7s_ease-out]"><Icon name="sparkle" size={15} /></div>
               <h3 className="mt-3 text-2xl font-bold tracking-tight text-[#16181A]">Hotovo!</h3>
               <p className="mt-1 text-sm text-black/60 truncate">{justCompleted.name}</p>
               <div className="mt-5 flex items-center justify-center gap-2 tabular-nums">
@@ -169,7 +170,7 @@ export default function FloatingRunner() {
               employer wouldn't see the run at all. */}
           {syncFailed && (
             <p className="flex items-start gap-1.5 bg-amber-500/[0.12] px-4 py-2 text-[11px] font-medium leading-snug text-amber-800">
-              <span aria-hidden className="mt-px shrink-0">⚠️</span>
+              <span aria-hidden className="mt-px shrink-0"><Icon name="warning" size={15} /></span>
               Odškrtnuté kroky se neukládají na server — zkontroluj připojení, ať se postup nezapíše jako neudělaný.
             </p>
           )}

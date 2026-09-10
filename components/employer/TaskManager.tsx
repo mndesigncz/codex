@@ -218,7 +218,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const renderCard = (t: Task, compact = false) => {
     const m = t.assignedTo != null ? memberById.get(t.assignedTo) : undefined;
-    const who = t.teamTask ? '🗓️ Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
+    const who = t.teamTask ? 'Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
     const prio = PRIORITIES.find(p => p.value === t.priority) ?? PRIORITIES[1];
     const done = t.status === 'done';
     // Future occurrences aren't active yet → show them greyed until their day comes.
@@ -228,7 +228,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <div className="flex items-start gap-2.5">
           <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
             className={`tap-target mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
-            {done && <span className="text-[11px] font-bold">✓</span>}
+            {done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1.5">
@@ -304,7 +304,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             <div>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
               <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
-                <option value="">🗓️ Kdokoliv (podle dne)</option>
+                <option value="">Kdokoliv (podle dne)</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
               </select>
               <p className="text-[11px] text-black/40 mt-1.5">

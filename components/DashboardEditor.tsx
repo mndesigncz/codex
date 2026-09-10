@@ -102,7 +102,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
                 <span className="text-[11px] uppercase tracking-wider text-black/30 shrink-0">odkaz</span>
               )}
               <button onClick={() => onChange(layout.filter((_, idx) => idx !== i))} title="Odebrat z přehledu"
-                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600">✕</button>
+                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600"><Icon name="close" size={15} /></button>
             </div>
           ))}
         </div>

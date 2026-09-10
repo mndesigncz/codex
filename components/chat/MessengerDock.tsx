@@ -290,7 +290,7 @@ function ChatWindow({
 
       {sendError && (
         <p className="px-2.5 pt-1.5 text-[11px] font-medium text-red-600 flex items-center gap-1">
-          <span aria-hidden>⚠️</span> {sendError}
+          <span aria-hidden><Icon name="warning" size={15} /></span> {sendError}
         </p>
       )}
 

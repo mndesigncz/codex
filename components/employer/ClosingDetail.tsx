@@ -233,7 +233,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     </span>
                   )}
                   {c.event_title && (
-                    <span className="rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2.5 py-1 text-[11px] font-bold">🎪 {c.event_title}</span>
+                    <span className="rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2.5 py-1 text-[11px] font-bold"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {c.event_title}</span>
                   )}
                   {c.shift_date && c.shift_date !== c.date && (
                     <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-medium text-black/55">

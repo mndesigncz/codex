@@ -7,6 +7,7 @@ import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
 
 import { EmptyState, PageHeader, Segmented } from '../ui';
+import { Icon } from '../Icons';
 interface Task {
   id: number;
   title: string;
@@ -109,7 +110,7 @@ export default function Tasks({ user }: Props) {
               task.status === 'done' ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15 hover:border-[#C8F542]/60'
             }`}
           >
-            {task.status === 'done' && <span className="text-xs font-bold">✓</span>}
+            {task.status === 'done' && <span className="text-xs font-bold"><Icon name="check" size={15} /></span>}
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -134,7 +135,7 @@ export default function Tasks({ user }: Props) {
                 </p>
               )}
               {task.teamTask && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-semibold">🗓️ Pro kohokoliv</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-semibold"><Icon name="calendar" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro kohokoliv</span>
               )}
               {recurrenceLabel(task.recurrence) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold">↻ {recurrenceLabel(task.recurrence)}</span>
