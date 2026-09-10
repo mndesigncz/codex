@@ -247,7 +247,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
               <span className="truncate">{nextEvent.title}</span>
             </p>
-            <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
+            <p className="text-sm text-black/50 mt-0.5 cz-sentence truncate">
               {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
               {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
             </p>

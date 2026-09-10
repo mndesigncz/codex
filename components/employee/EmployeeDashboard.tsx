@@ -174,7 +174,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
           <span className="truncate">{nextEvent.title}</span>
         </p>
-        <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
+        <p className="text-sm text-black/50 mt-0.5 cz-sentence truncate">
           {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
           {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
         </p>
@@ -201,15 +201,15 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Tenhle měsíc</p>
         <div className="grid grid-cols-3 gap-3 stagger">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Odpracováno</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Odpracováno</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{fmtH(monthHours)}</p>
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Hodnocených směn</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Hodnocených směn</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5">{monthRatings.length}</p>
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Průměr hodnocení</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Průměr hodnocení</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? <><Icon name="star" size={16} className="inline -mt-0.5 mr-1 text-[#4F6A07]" />{monthAvg.toFixed(1)}</> : '—'}</p>
           </div>
         </div>
@@ -239,7 +239,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
               </div>
               {nextShift ? (
                 <div>
-                  <p className="text-3xl font-bold tracking-tight text-[#16181A]">
+                  <p className="text-3xl font-bold tracking-tight text-[#16181A] cz-sentence">
                     {new Date((nextShift.date) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </p>
                   <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.typeLabel ?? (nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna')}</p>

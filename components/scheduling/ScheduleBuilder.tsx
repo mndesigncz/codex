@@ -652,7 +652,7 @@ export default function ScheduleBuilder({ user }: Props) {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Rozvrh směn</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Rozvrh</h1>
           <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
         </div>
         {/* Month selector — arrows for any month, chips for the usual ones.
@@ -675,7 +675,7 @@ export default function ScheduleBuilder({ user }: Props) {
             >
               <Icon name="chevron" size={17} className="rotate-90" />
             </button>
-            <span className="px-2 min-w-[9.5rem] text-center text-sm font-semibold capitalize text-[#16181A] tabular-nums">
+            <span className="px-2 min-w-[9.5rem] text-center text-sm font-semibold cz-sentence text-[#16181A] tabular-nums">
               {monthLabel(month)}
             </span>
             <button
@@ -692,7 +692,7 @@ export default function ScheduleBuilder({ user }: Props) {
               <button
                 key={m}
                 onClick={() => setMonth(m)}
-                className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-medium capitalize whitespace-nowrap transition ${
+                className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-medium cz-sentence whitespace-nowrap transition ${
                   month === m ? 'bg-[#16181A] text-white font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
                 }`}
               >
@@ -1163,7 +1163,7 @@ export default function ScheduleBuilder({ user }: Props) {
                         onClick={() => setDayModal(date)}
                         className="w-full text-left rounded-2xl bg-white/60 border border-red-500/25 px-3.5 py-2.5 hover:bg-white/80 transition"
                       >
-                        <span className="block text-sm font-semibold text-[#16181A] capitalize">{dayLabel(date)}</span>
+                        <span className="block text-sm font-semibold text-[#16181A] cz-sentence">{dayLabel(date)}</span>
                         <span className="block text-xs text-red-800/85 mt-0.5 leading-relaxed">
                           {pr.gaps.map((g) => `Nikdo v podniku ${g.from}–${g.to}.`).join(' ')}
                           {pr.gaps.length > 0 && pr.missing.length > 0 ? ' ' : ''}
@@ -1185,7 +1185,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {/* Calendar grid */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-bold text-[#16181A] capitalize flex items-center gap-2">
+              <h2 className="font-bold text-[#16181A] cz-sentence flex items-center gap-2">
                 <Icon name="calendar" size={20} /> {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs flex-wrap">
@@ -2093,7 +2093,7 @@ function DayModal({
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
       <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-xl font-bold text-[#16181A] capitalize min-w-0 truncate">{dayLabel(date)}</h3>
+          <h3 className="text-xl font-bold text-[#16181A] cz-sentence min-w-0 truncate">{dayLabel(date)}</h3>
           <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
             ×
           </button>
@@ -2627,7 +2627,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{member.avatar}</span>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
-            <p className="text-xs text-black/45 capitalize">{monthLabel(month)}</p>
+            <p className="text-xs text-black/45 cz-sentence">{monthLabel(month)}</p>
           </div>
           <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0"><Icon name="close" size={15} /></button>
         </div>

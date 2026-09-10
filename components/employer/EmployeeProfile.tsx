@@ -217,7 +217,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                       <div className="space-y-1.5">
                         {p.shifts.upcoming.map(sh => (
                           <div key={sh.id} className="flex items-center gap-3 rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/20 px-3.5 py-2.5">
-                            <span className="text-sm font-semibold text-[#16181A] capitalize flex-1 min-w-0 truncate">{fmtDayLong(sh.date)}</span>
+                            <span className="text-sm font-semibold text-[#16181A] cz-sentence flex-1 min-w-0 truncate">{fmtDayLong(sh.date)}</span>
                             <span className="text-xs text-black/50 tabular-nums shrink-0">{sh.startTime}–{sh.endTime}</span>
                           </div>
                         ))}
@@ -232,7 +232,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                       <div className="space-y-1.5">
                         {p.shifts.recent.map(sh => (
                           <div key={sh.id} className={`flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 ${sh.flagged ? 'bg-red-500/[0.06] border border-red-500/20' : 'bg-black/[0.03]'}`}>
-                            <span className="text-sm font-medium text-[#16181A] capitalize min-w-0 flex-1 truncate">{fmtDayLong(sh.date)}</span>
+                            <span className="text-sm font-medium text-[#16181A] cz-sentence min-w-0 flex-1 truncate">{fmtDayLong(sh.date)}</span>
                             <span className="text-xs text-black/45 tabular-nums shrink-0 hidden sm:inline">{sh.startTime}–{sh.endTime}</span>
                             {sh.reviewed ? (
                               <span className="flex items-center gap-1.5 flex-wrap min-w-0">

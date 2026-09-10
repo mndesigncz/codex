@@ -92,7 +92,7 @@ export default function TeamSchedule() {
       <div className="divide-y divide-black/[0.06]">
         {days.map(({ date, list }) => (
           <div key={date} className="py-2.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
-            <p className={`shrink-0 sm:w-32 text-xs font-semibold ${date === today ? 'text-[#5B7A08]' : 'text-black/45'}`}>
+            <p className={`shrink-0 sm:w-32 text-xs font-semibold cz-sentence ${date === today ? 'text-[#5B7A08]' : 'text-black/45'}`}>
               {label(date)}
             </p>
             <div className="flex flex-wrap gap-1.5 min-w-0">

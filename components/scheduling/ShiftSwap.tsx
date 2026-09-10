@@ -88,7 +88,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
               <div key={s.id} className="rounded-2xl bg-black/[0.02] border border-black/[0.06] px-4 py-3 space-y-2">
                 <div className="flex items-center justify-between gap-x-3 gap-y-2 flex-wrap">
                   <div className="min-w-0 flex-1 basis-40">
-                    <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(s.date)}</p>
+                    <p className="text-sm font-semibold text-[#16181A] cz-sentence truncate">{fmtDay(s.date)}</p>
                     <p className="text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</p>
                   </div>
                   <button onClick={() => act({ shiftId: s.id, note: offerNote[s.id]?.trim() || undefined }, s.id, 'Směna je v burze. ✓')} disabled={busy === s.id}
@@ -115,7 +115,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
             <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
               <span className="text-lg flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{o.offeredByAvatar ?? '👤'}</span>
               <div className="min-w-0 flex-1 basis-40">
-                <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(o.date)}</p>
+                <p className="text-sm font-semibold text-[#16181A] cz-sentence truncate">{fmtDay(o.date)}</p>
                 <p className="text-xs text-black/45 tabular-nums">{o.startTime}–{o.endTime} · {o.offeredByName ?? 'Kolega'}</p>
                 {o.note && <p className="text-xs text-black/50 mt-1 italic">„{o.note}"</p>}
               </div>
@@ -135,7 +135,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
           {mine.map(o => (
             <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
               <div className="min-w-0 flex-1 basis-40">
-                <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
+                <p className="text-sm font-semibold text-[#16181A] cz-sentence truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
                 <p className="text-xs text-black/45">
                   {o.status === 'claimed' ? `${o.claimedByName ?? 'Kolega'} si ji bere — čeká na vedení` : 'Nabídnuto — čeká na zájemce'}
                 </p>
@@ -149,7 +149,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
           {claimedByMe.map(o => (
             <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
               <div className="min-w-0 flex-1 basis-40">
-                <p className="text-sm font-semibold text-[#16181A] capitalize truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
+                <p className="text-sm font-semibold text-[#16181A] cz-sentence truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
                 <p className="text-xs text-black/45">Bereš si od {o.offeredByName ?? 'kolegy'} — čeká na schválení vedení</p>
               </div>
               <span className="tap-target-sm shrink-0 rounded-full bg-orange-500/15 text-orange-600 px-3 py-1 text-xs font-medium whitespace-nowrap">Ke schválení</span>

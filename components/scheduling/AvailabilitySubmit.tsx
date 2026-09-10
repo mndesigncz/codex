@@ -202,7 +202,7 @@ export default function AvailabilitySubmit({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
-      <PageHeader title="Moje dostupnost"
+      <PageHeader title="Dostupnost"
         subtitle={<>Klepnutím na den cyklicky nastav:{' '}
           <span className="text-black/70 font-medium">{stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}</span>.</>} />
 
@@ -224,7 +224,7 @@ export default function AvailabilitySubmit({ user }: Props) {
             >
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
-            <span className="px-3 min-w-[9.5rem] text-center text-sm font-semibold capitalize text-[#16181A]">{monthLabel(month)}</span>
+            <span className="px-3 min-w-[9.5rem] text-center text-sm font-semibold cz-sentence text-[#16181A]">{monthLabel(month)}</span>
             <button
               onClick={() => setMonth(nextM)}
               aria-label="Další měsíc"
@@ -245,7 +245,7 @@ export default function AvailabilitySubmit({ user }: Props) {
           {/* Calendar */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-bold text-[#16181A] capitalize flex items-center gap-2">
+              <h2 className="font-bold text-[#16181A] cz-sentence flex items-center gap-2">
                 <Icon name="calendar" size={20} />
                 {monthLabel(month)}
               </h2>

@@ -590,7 +590,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <PageHeader
-        title="Sklad & zásoby"
+        title="Sklad"
         subtitle={<>
           {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
           {(() => {

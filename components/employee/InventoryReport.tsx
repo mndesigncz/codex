@@ -259,7 +259,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader title="Sklad & zásoby" subtitle="Uprav stav, když něco dochází — vedení dostane upozornění." />
+      <PageHeader title="Sklad" subtitle="Uprav stav, když něco dochází — vedení dostane upozornění." />
 
       {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo je u regálu. */}
       {stocktakeOpen && (

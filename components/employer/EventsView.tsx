@@ -76,7 +76,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-bold tracking-tight text-[#16181A] line-clamp-2"><Icon name={k.icon} size={16} className="inline -mt-0.5 mr-1.5 text-[#0A6FE0]" />{e.title}</p>
-            <p className="text-sm text-black/50 mt-0.5 capitalize line-clamp-2">
+            <p className="text-sm text-black/50 mt-0.5 cz-sentence line-clamp-2">
               {fmtDate(e.date)}{e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
             {(e.offsite || e.location) && (
@@ -253,7 +253,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
         <div className="flex items-start justify-between gap-3 mb-1">
           <div className="min-w-0">
             <h3 className="text-xl font-bold tracking-tight text-[#16181A]"><Icon name={k.icon} size={20} className="inline -mt-1 mr-2 text-[#0A6FE0]" />{e.title}</h3>
-            <p className="text-sm text-black/50 capitalize mt-0.5">
+            <p className="text-sm text-black/50 cz-sentence mt-0.5">
               {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               {e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
               {e.location ? ` · ${e.location}` : ''}

@@ -63,7 +63,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
         <button onClick={() => step(-1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
-        <h3 className="font-bold tracking-tight text-[#16181A] capitalize">{MONTHS[m - 1]} {y}</h3>
+        <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence">{MONTHS[m - 1]} {y}</h3>
         <button onClick={() => step(1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="-rotate-90" />
         </button>
@@ -118,7 +118,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
           {/* Day detail */}
           {detail && sel && (
             <div className="mt-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-3">
-              <p className="font-bold tracking-tight text-[#16181A] capitalize">
+              <p className="font-bold tracking-tight text-[#16181A] cz-sentence">
                 {new Date(sel + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
               </p>
               <div>
