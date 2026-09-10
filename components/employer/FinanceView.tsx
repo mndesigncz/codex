@@ -133,7 +133,7 @@ export default function FinanceView() {
             <button onClick={() => shiftMonth(-1)} className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
-            <span className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold capitalize text-[#16181A] truncate">{monthLabel(month)}</span>
+            <span className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold cz-sentence text-[#16181A] truncate">{monthLabel(month)}</span>
             <button onClick={() => shiftMonth(1)} className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="-rotate-90" />
             </button>

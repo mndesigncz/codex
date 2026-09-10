@@ -55,7 +55,7 @@ export default function ShiftSwapApprovals() {
             <Icon name="swap" size={15} className="text-black/35" />
             <span className="font-semibold text-[#16181A]">{o.claimedByName ?? 'Kolega'}</span>
           </div>
-          <p className="text-xs text-black/50 capitalize">{fmtDay(o.date)} · <span className="tabular-nums">{o.startTime}–{o.endTime}</span></p>
+          <p className="text-xs text-black/50 cz-sentence">{fmtDay(o.date)} · <span className="tabular-nums">{o.startTime}–{o.endTime}</span></p>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => decide(o.id, 'approve')} disabled={busy === o.id}
               className="rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 disabled:opacity-50">

@@ -175,7 +175,7 @@ export default function LiveRevenue() {
               <span className="text-[11px] uppercase tracking-wider text-black/55 mr-1">Jinak zaplaceno</span>
               {t.methods!.map(m => (
                 <span key={m.id} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] border border-black/[0.06] px-3 py-1 text-xs text-[#16181A]">
-                  <span className="capitalize">{m.label}</span>
+                  <span className="cz-sentence">{m.label}</span>
                   <span className="font-semibold tabular-nums">{money(m.amount)}</span>
                 </span>
               ))}

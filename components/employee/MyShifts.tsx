@@ -184,7 +184,7 @@ export default function MyShifts({ user }: Props) {
                       </div>
                       <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] min-[380px]:basis-0">
                         <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
-                          <p className="font-semibold text-[#16181A] text-sm truncate min-w-0 basis-full min-[380px]:basis-auto">{formatDate(s.date)}</p>
+                          <p className="font-semibold text-[#16181A] text-sm truncate min-w-0 basis-full min-[380px]:basis-auto cz-sentence">{formatDate(s.date)}</p>
                           {isToday && <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
                         </div>
                         <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
@@ -204,7 +204,7 @@ export default function MyShifts({ user }: Props) {
                   <div key={s.id} className="flex items-center gap-x-3 gap-y-2 flex-wrap p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
                     <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
                     <div className="flex-1 min-w-0 basis-[calc(100%-1.75rem)] min-[380px]:basis-0">
-                      <p className="text-sm text-[#16181A] font-medium truncate">{formatDate(s.date)}</p>
+                      <p className="text-sm text-[#16181A] font-medium truncate cz-sentence">{formatDate(s.date)}</p>
                       <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
                     </div>
                     {ratingByDate[s.date] ? (

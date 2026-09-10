@@ -464,3 +464,25 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 :root[data-theme="dark"] .chrome-edge::after {
   background: linear-gradient(to bottom, rgba(18,20,22,0.55), rgba(18,20,22,0));
 }
+
+/* České datum se píše větně: „úterý 18. srpna" → „Úterý 18. srpna".
+   Tailwindí `capitalize` zvětší KAŽDÉ slovo a udělá z toho anglický
+   Title Case („Úterý 18. Srpna"), což je v češtině chyba — a protože se
+   používalo jen na některých místech, tentýž den se v aplikaci psal
+   dvakrát jinak. Tohle zvětší jen první písmeno.
+   ::first-letter platí jen pro blokové boxy; položky flexu jsou blokové
+   samy o sobě, osamocený <span> se musí dorovnat. */
+.cz-sentence::first-letter { text-transform: uppercase; }
+span.cz-sentence { display: inline-block; max-width: 100%; }
+
+/* Pod rolovatelným seznamem navigace: měkký přechod místo useknuté hrany.
+   Bez něj vypadá poslední viditelná položka jako poslední, která existuje. */
+.nav-fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 22px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(241,243,237,0), rgba(241,243,237,0.85));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .nav-fade { background: linear-gradient(to bottom, rgba(18,20,22,0), rgba(18,20,22,0.85)); }
+}
+:root[data-theme="dark"] .nav-fade { background: linear-gradient(to bottom, rgba(18,20,22,0), rgba(18,20,22,0.85)); }

@@ -471,7 +471,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 <div key={g.key} className="space-y-2">
                   <div className="flex items-center gap-2 px-1 pt-1">
                     <Icon name="calendar" size={14} className="text-black/35 shrink-0" />
-                    <p className="text-xs font-semibold uppercase tracking-wider text-black/45 capitalize line-clamp-2">{g.label}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-black/45 cz-sentence line-clamp-2">{g.label}</p>
                   </div>
                   <div className="glass-card divide-y divide-black/[0.06] overflow-hidden">
                     {g.list.map(e => {

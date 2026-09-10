@@ -111,7 +111,7 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
           className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
-        <h3 className="font-bold tracking-tight text-[#16181A] capitalize truncate">{MONTHS[m - 1]} {y}</h3>
+        <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence truncate">{MONTHS[m - 1]} {y}</h3>
         <button onClick={() => step(1)} aria-label="Další měsíc"
           className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="-rotate-90" />

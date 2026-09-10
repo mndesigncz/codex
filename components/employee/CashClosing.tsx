@@ -632,11 +632,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           <div className="flex flex-wrap gap-2">
             {eligible.map(s => (
               <button key={s.id} type="button" onClick={() => pickShift(s)}
-                className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
+                className={`rounded-full border px-3.5 py-2 text-xs font-semibold cz-sentence transition ${
                   form.date === s.date
                     ? 'bg-orange-500 text-white border-orange-500'
                     : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
-                }`}>
+                } cz-sentence`}>
                 {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                 <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
               </button>
@@ -766,7 +766,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                         <span className="min-w-0 flex items-center gap-2.5">
                           {s.employeeName && <span className="text-xl shrink-0">{s.employeeAvatar ?? '👤'}</span>}
                           <span className="min-w-0">
-                            <span className="block text-sm font-semibold text-[#16181A] capitalize truncate">
+                            <span className="block text-sm font-semibold text-[#16181A] cz-sentence truncate">
                               {s.employeeName ? `${s.employeeName} · ` : ''}
                               {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </span>
@@ -812,7 +812,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                           key={s.id}
                           type="button"
                           onClick={() => pickShift(s)}
-                          className={`rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition ${
+                          className={`rounded-full border px-3.5 py-2 text-xs font-semibold cz-sentence transition ${
                             active ? 'bg-[#C8F542]/[0.18] border-[#C8F542]/50 text-[#5B7A08]' : 'bg-white border-black/[0.08] text-[#16181A] hover:border-black/20'
                           }`}
                         >
@@ -1223,7 +1223,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             return (
               <div key={c.id} className="glass-card p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <p className="font-bold tracking-tight text-[#16181A] min-w-0">
+                  <p className="font-bold tracking-tight text-[#16181A] min-w-0 cz-sentence">
                     {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                     {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                   </p>

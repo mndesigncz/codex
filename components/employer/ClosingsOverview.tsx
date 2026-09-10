@@ -323,7 +323,7 @@ export default function ClosingsOverview() {
           {missing.map(m => (
             <div key={m.date} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 flex flex-wrap items-center gap-x-3 gap-y-2">
               <div className="min-w-0 flex-1">
-                <p className="font-bold tracking-tight text-[#16181A] capitalize">{fmtMissing(m.date)}</p>
+                <p className="font-bold tracking-tight text-[#16181A] cz-sentence">{fmtMissing(m.date)}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span className="text-xs text-black/45">Na směně:</span>
                   {m.employees.map(e => (
@@ -434,7 +434,7 @@ export default function ClosingsOverview() {
             </div>
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Nejsilnější den</p>
-              <p className="text-lg sm:text-xl font-bold text-[#16181A] mt-1 capitalize truncate">{trend.bestWdLabel}</p>
+              <p className="text-lg sm:text-xl font-bold text-[#16181A] mt-1 cz-sentence truncate">{trend.bestWdLabel}</p>
               <p className="text-[11px] text-black/40 mt-0.5 truncate">průměr {money(Math.round(trend.bestAvg))}</p>
             </div>
             <div className="min-w-0">
@@ -744,7 +744,7 @@ export default function ClosingsOverview() {
 
       {selectedDate && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#C8F542]/[0.10] border border-[#C8F542]/35 px-4 py-3">
-          <p className="text-sm font-semibold text-[#16181A] capitalize min-w-0">
+          <p className="text-sm font-semibold text-[#16181A] cz-sentence min-w-0">
             {fmtMissing(selectedDate)}
             <span className="font-normal text-black/45"> · {topLevel.length === 0 ? 'bez uzávěrky' : `${topLevel.length}× uzávěrka`}</span>
           </p>
@@ -771,7 +771,7 @@ export default function ClosingsOverview() {
           </button>
           {months.map(m => (
             <button key={m} onClick={() => setMonth(m)}
-              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all capitalize ${month === m ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all cz-sentence ${month === m ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
               {monthLabel(m)}
             </button>
           ))}

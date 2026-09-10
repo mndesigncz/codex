@@ -65,7 +65,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
         <button onClick={() => step(-1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition" aria-label="Předchozí měsíc">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
-        <h3 className="font-bold tracking-tight text-[#16181A] capitalize">{MONTHS[m - 1]} {y}</h3>
+        <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence">{MONTHS[m - 1]} {y}</h3>
         <button onClick={() => step(1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition" aria-label="Další měsíc">
           <Icon name="chevron" size={16} className="-rotate-90" />
         </button>
@@ -122,7 +122,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
           {detail && sel && (
             <div className="mt-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="font-bold tracking-tight text-[#16181A] capitalize">
+                <p className="font-bold tracking-tight text-[#16181A] cz-sentence">
                   {new Date(sel + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
                 <span className={`text-xs font-medium ${detail.pending > 0 ? 'text-amber-600' : 'text-[#5B7A08]'}`}>

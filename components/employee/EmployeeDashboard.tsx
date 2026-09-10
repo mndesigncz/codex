@@ -174,7 +174,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
           <span className="truncate">{nextEvent.title}</span>
         </p>
-        <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
+        <p className="text-sm text-black/50 mt-0.5 cz-sentence truncate">
           {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
           {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
         </p>
@@ -239,7 +239,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
               </div>
               {nextShift ? (
                 <div>
-                  <p className="text-3xl font-bold tracking-tight text-[#16181A]">
+                  <p className="text-3xl font-bold tracking-tight text-[#16181A] cz-sentence">
                     {new Date((nextShift.date) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </p>
                   <p className="text-black/55 mt-1">{(nextShift.startTime ?? nextShift.start_time)} – {(nextShift.endTime ?? nextShift.end_time)} · {nextShift.typeLabel ?? (nextShift.type === 'morning' ? 'Ranní' : nextShift.type === 'afternoon' ? 'Odpolední' : 'Směna')}</p>

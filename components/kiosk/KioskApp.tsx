@@ -86,7 +86,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           <LogoMark size={44} />
           <div className="min-w-0 flex-1">
             <p className="font-bold text-lg tracking-tight text-[#16181A] truncate">{user.name}</p>
-            <p className="text-sm text-black/45 capitalize truncate">{dateStr}</p>
+            <p className="text-sm text-black/45 cz-sentence truncate">{dateStr}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap justify-end">
@@ -215,7 +215,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
             <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
             <span className="min-w-0">{nextEvent.title}</span>
           </p>
-          <p className="text-sm text-black/50 mt-0.5 capitalize">
+          <p className="text-sm text-black/50 mt-0.5 cz-sentence">
             {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
             {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
           </p>

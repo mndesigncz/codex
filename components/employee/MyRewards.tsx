@@ -190,7 +190,7 @@ function MyRewardsInner() {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-6">
-      <PageHeader title="Moje odměny" subtitle="Body za směny, úroveň a co si za ně můžeš vybrat." />
+      <PageHeader title="Odměny" subtitle="Body za směny, úroveň a co si za ně můžeš vybrat." />
 
       {/* Unacknowledged "fix this" feedback — first thing on the page */}
       {unseenFlagged > 0 && (
