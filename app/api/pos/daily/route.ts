@@ -14,7 +14,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, paymentLabel } from '@/lib/storyous';
-import { billsOfDays, productsFromMirror, mirrorCovers } from '@/lib/posMirror';
+import { billsOfDays, productsFromMirror, mirrorCovers, soldLines, soldDays, type SoldLine } from '@/lib/posMirror';
 import { pragueToday, businessDayOf, dayPlus, pragueHourOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -117,24 +117,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ connected: true, error: 'Zrcadlo pokladny není připravené — spusť migraci a synchronizaci v Nastavení → Pokladna.' }, { status: 502 });
   }
 
-  // ---- co se prodalo, po produktech (z našich uložených prodejů) ----
-  let sales: any[] = [];
+  // ---- co se prodalo, po produktech (z položek účtenek v zrcadle) ----
+  let sales: SoldLine[] = [];
+  let itemsPending = 0;
   try {
-    sales = await sql`
-      SELECT product_id AS "productId", MAX(product_name) AS name, SUM(qty)::float AS qty
-      FROM pos_sales
-      WHERE team_id = ${teamId} AND date >= ${from} AND date <= ${to}
-      GROUP BY product_id`;
+    sales = await soldLines(teamId, from, to);
+    const [pend] = await sql`
+      SELECT COUNT(*)::int AS n FROM pos_bills
+      WHERE team_id = ${teamId} AND day >= ${from} AND day <= ${to} AND deleted = FALSE AND items_synced = FALSE`;
+    itemsPending = Number(pend?.n) || 0;
   } catch { /* tabulka ještě není — zůstane prázdné */ }
 
   const priceById = await productsFromMirror(teamId);
   const menuError: string | null = priceById.size === 0 ? 'Katalog z pokladny se ještě nesynchronizoval — u položek zatím chybí ceny.' : null;
 
   const noPrice: string[] = [];
-  const items = (sales as any[]).map(s => {
+  const items = sales.map(s => {
     const menu = priceById.get(s.productId);
-    const price = menu?.price ?? null;
-    const qty = Number(s.qty) || 0;
+    const qty = s.qty;
+    // Skutečná cena z účtenky má přednost; ceníková jen když na řádku chybí.
+    const price = s.hasPrice && qty > 0 ? Math.round((s.revenue / qty) * 100) / 100 : (menu?.price ?? null);
     if (price == null) noPrice.push(menu?.name ?? s.name ?? s.productId);
     return {
       productId: s.productId,
@@ -142,7 +144,7 @@ export async function GET(req: NextRequest) {
       category: menu?.category ?? null,
       qty,
       price,
-      revenue: price != null ? Math.round(price * qty) : null,
+      revenue: s.hasPrice ? s.revenue : (price != null ? Math.round(price * qty) : null),
     };
   }).sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0));
 
@@ -168,10 +170,7 @@ export async function GET(req: NextRequest) {
   try {
     const [c] = await sql`SELECT last_sync_at FROM pos_connections WHERE team_id = ${teamId}`;
     lastSyncAt = c?.last_sync_at ?? null;
-    const [d] = await sql`
-      SELECT COUNT(DISTINCT date)::int AS n FROM pos_sales
-      WHERE team_id = ${teamId} AND date >= ${from} AND date <= ${to}`;
-    recordedDays = Number(d?.n) || 0;
+    recordedDays = await soldDays(teamId, from, to);
   } catch { /* volitelné */ }
 
   const list = Array.from(days.values()).sort((a, b) => a.day.localeCompare(b.day));
@@ -187,15 +186,17 @@ export async function GET(req: NextRequest) {
 
   if (items.length === 0 && posTotal > 0) {
     notes.push({
-      tone: 'warn',
-      title: 'Rozpis po produktech chybí',
-      text: 'Účtenky pokladna vrátila, ale co přesně se prodalo, se do aplikace ještě nesynchronizovalo. Spusť synchronizaci v Recepturách — do té doby jsou dole jen peníze, ne položky.',
+      tone: itemsPending > 0 ? 'info' : 'warn',
+      title: itemsPending > 0 ? `Položky ${itemsPending} účtenek se ještě stahují` : 'Rozpis po produktech chybí',
+      text: itemsPending > 0
+        ? 'Účtenky už tu jsou, jejich položky pokladna posílá po jedné — za chvíli se rozpis doplní sám.'
+        : 'Účtenky pokladna vrátila, ale bez položek. Zkus Synchronizovat teď v Nastavení → Pokladna; do té doby jsou dole jen peníze, ne položky.',
     });
-  } else if (recordedDays < expectedDays && posTotal > 0) {
+  } else if (itemsPending > 0 && posTotal > 0) {
     notes.push({
       tone: 'info',
-      title: `Rozpis pokrývá ${recordedDays} z ${expectedDays} dní`,
-      text: 'Prodeje po produktech se ukládají při synchronizaci; dny před jejím zapnutím zůstanou bez rozpisu, i když peníze z účtenek sedí.',
+      title: `Položky ${itemsPending} účtenek se ještě stahují`,
+      text: 'Rozpis po produktech se doplní sám, jak pokladna položky pošle.',
     });
   }
 

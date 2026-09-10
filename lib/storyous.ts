@@ -165,7 +165,8 @@ export function paymentBuckets(bill: any): Buckets {
   const pays: any[] = Array.isArray(bill?.payments) && bill.payments.length ? bill.payments : null as any;
   const add = (methodRaw: string, amount: number) => {
     const m = String(methodRaw ?? '').toLowerCase();
-    if (!(amount > 0) && amount !== 0) return;
+    // Storno je účtenka se záporem — v kase opravdu ubylo, takže se počítá.
+    if (!Number.isFinite(amount)) return;
     if (m === 'cash') out.cash += amount;
     else if (m.includes('card') || m === 'terminal') out.card += amount;
     else { out.other += amount; out.methods[m || 'unknown'] = (out.methods[m || 'unknown'] ?? 0) + amount; }

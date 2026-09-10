@@ -956,6 +956,11 @@ export async function GET(request: Request) {
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS webhook_secret TEXT`;
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_webhook_at TIMESTAMP`;
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS stock_id TEXT`;
+    // Verze zrcadla: když se změní, jak se účtenky rozkládají (v2 = storno
+    // se zápornou platbou se počítá do hotovosti/karty), stáhne se historie
+    // znovu od původního začátku — kurzor pryč, synced_from zůstává.
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS mirror_version INTEGER NOT NULL DEFAULT 0`;
+    await sql`UPDATE pos_connections SET bills_cursor = NULL, mirror_version = 2 WHERE mirror_version < 2`;
     await sql`
       CREATE TABLE IF NOT EXISTS pos_bills (
         id SERIAL PRIMARY KEY,

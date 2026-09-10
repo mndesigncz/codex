@@ -2,7 +2,7 @@
 // tržba, náklad na suroviny a marže po položkách za měsíc — a z toho konkrétní
 // rady, kde jsou peníze.
 //
-// Čte prodeje z naší tabulky pos_sales (plní ji synchronizace), ne z pokladny —
+// Čte prodeje z položek účtenek v našem zrcadle pokladny, ne živě —
 // měsíc účtenek by znamenal jeden požadavek na účet.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,7 +10,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
-import { productsFromMirror } from '@/lib/posMirror';
+import { productsFromMirror, soldLines, type SoldLine } from '@/lib/posMirror';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -48,15 +48,12 @@ export async function GET(req: NextRequest) {
   if (!conn) return NextResponse.json({ connected: false });
 
   // ---- what sold ----
-  let sales: any[] = [];
+  let sales: SoldLine[] = [];
   try {
-    sales = await sql`
-      SELECT product_id AS "productId", MAX(product_name) AS name, SUM(qty)::float AS qty
-      FROM pos_sales
-      WHERE team_id = ${teamId} AND date LIKE ${month + '%'}
-      GROUP BY product_id`;
+    const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+    sales = await soldLines(teamId, `${month}-01`, `${month}-${String(last).padStart(2, '0')}`);
   } catch {
-    return NextResponse.json({ connected: true, ready: false, error: 'Historie prodejů se teprve sbírá — spusť /api/init.' });
+    return NextResponse.json({ connected: true, ready: false, error: 'Zrcadlo pokladny se teprve plní — spusť synchronizaci v Nastavení → Pokladna.' });
   }
 
   // ---- recipes and what the ingredients cost ----
@@ -109,13 +106,14 @@ export async function GET(req: NextRequest) {
   }
 
   const missingPrice = new Set<string>();
-  const items: ProductMargin[] = (sales as any[]).map(s => {
+  const items: ProductMargin[] = sales.map(s => {
     const menu = priceById.get(s.productId);
-    const price = menu?.price ?? null;
-    const qty = Number(s.qty) || 0;
+    const qty = s.qty;
+    // Skutečně vybraná cena z účtenek (průměr za měsíc); ceníková jen jako záloha.
+    const price = s.hasPrice && qty > 0 ? Math.round((s.revenue / qty) * 100) / 100 : (menu?.price ?? null);
     const { cost, missing } = costOf(s.productId);
     missing.forEach(m => missingPrice.add(m));
-    const revenue = price != null ? Math.round(price * qty) : null;
+    const revenue = s.hasPrice ? s.revenue : (price != null ? Math.round(price * qty) : null);
     const margin = price != null && cost != null ? Math.round((price - cost) * qty) : null;
     const marginPct = price != null && cost != null && price > 0
       ? Math.round(((price - cost) / price) * 100) : null;

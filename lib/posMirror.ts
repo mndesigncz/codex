@@ -160,7 +160,11 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
     if (!cursor) {
       stats.mode = 'backfill';
       const days = Math.max(1, Math.min(400, opts.backfillDays ?? DEFAULT_BACKFILL_DAYS));
-      const from = dayPlus(pragueToday(), -days);
+      // Když už zrcadlo někdy začalo (synced_from), znovu se stahuje od
+      // stejného začátku — např. po změně verze zrcadla v migraci.
+      const prevFrom: string | null = claimed[0].synced_from ?? null;
+      const wanted = dayPlus(pragueToday(), -days);
+      const from = prevFrom && prevFrom < wanted ? prevFrom : wanted;
       const till = dayPlus(pragueToday(), 2);
       const r = await billsInRange(conn, from, till, (b) => {
         stats.billsSeen++; seen(b);
@@ -320,6 +324,40 @@ export async function health(teamId: number): Promise<MirrorHealth> {
 }
 
 /** Ceny a názvy produktů ze zrcadla (rychlé, bez volání pokladny). */
+export interface SoldLine { productId: string; name: string; qty: number; revenue: number; hasPrice: boolean }
+
+/**
+ * Co se prodalo v období, po produktech — z položek účtenek v zrcadle.
+ * Tržba je ta skutečná z účtenky (cena × množství po slevách na řádku),
+ * ne ceníková. Refundace a smazané účtenky se nepočítají.
+ */
+export async function soldLines(teamId: number, from: string, to: string): Promise<SoldLine[]> {
+  const rows = await sql`
+    SELECT i.product_id AS "productId", MAX(i.name) AS name,
+           SUM(i.amount)::float AS qty,
+           SUM(i.amount * COALESCE(i.price, 0))::float AS revenue,
+           BOOL_OR(i.price IS NOT NULL) AS "hasPrice"
+    FROM pos_bill_items i
+    JOIN pos_bills b ON b.team_id = i.team_id AND b.bill_id = i.bill_id
+    WHERE i.team_id = ${teamId} AND b.day >= ${from} AND b.day <= ${to}
+      AND b.deleted = FALSE AND b.refunded = FALSE AND i.product_id IS NOT NULL
+    GROUP BY i.product_id`;
+  return (rows as any[]).map(r => ({
+    productId: String(r.productId), name: String(r.name ?? r.productId),
+    qty: Number(r.qty) || 0, revenue: Math.round(Number(r.revenue) || 0), hasPrice: !!r.hasPrice,
+  }));
+}
+
+/** Kolik dní v období má v zrcadle položky účtenek (rozpis po produktech). */
+export async function soldDays(teamId: number, from: string, to: string): Promise<number> {
+  const [r] = await sql`
+    SELECT COUNT(DISTINCT b.day)::int AS n
+    FROM pos_bills b
+    WHERE b.team_id = ${teamId} AND b.day >= ${from} AND b.day <= ${to}
+      AND b.deleted = FALSE AND b.items_synced = TRUE`;
+  return Number(r?.n) || 0;
+}
+
 export async function productsFromMirror(teamId: number): Promise<Map<string, { name: string; category: string | null; price: number | null; vatRate: number | null }>> {
   const map = new Map<string, { name: string; category: string | null; price: number | null; vatRate: number | null }>();
   try {
