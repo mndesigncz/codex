@@ -1,22 +1,26 @@
-// Sales → stock write-off engine. Separate from the route so the evening
-// digest can run the same sync server-side.
+// Prodeje → odpis skladu. Bere položky účtenek ze zrcadla (pos_bill_items),
+// ne z pokladny — pokladna se volá jen v synchronizaci (lib/posMirror.ts).
+// Oddělené od route, aby stejný odpis pustil i večerní souhrn a cron.
 
 import { neon } from '@neondatabase/serverless';
-import { getConnection, listBills, billItems } from './storyous';
+import { getConnection } from './storyous';
 import { audit } from './audit';
-import { businessDayOf } from './pragueTime';
+import { pragueToday, dayPlus } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-/** Open-package arithmetic: spend the open package first, crack sealed ones as
- *  needed, never below zero. Pure — the caller decides how to persist. */
+/** Kolik dní zpět se odepisují neprocesované účtenky — starší se nechají být,
+ *  ať zapnutí receptury dnes neodepíše sklad za půl roku zpětně. */
+const WRITE_OFF_WINDOW_DAYS = 7;
+
+/** Odečet z načatého balení: nejdřív načaté, pak se načne nové, nikdy pod nulu. */
 function consume(qty: number, open: number, pkg: number, amount: number) {
   if (pkg > 0) {
     open -= amount;
     while (open < 0 && qty > 0) { qty -= 1; open += pkg; }
     if (open < 0) open = 0;
-    // Three decimals: a 0,7 l bottle minus 0,02 l has to stay 0,68 — rounding
-    // to a tenth here would give the shop back 0,02 l on every drink.
+    // Tři desetinná místa: 0,7 l minus 0,02 l musí zůstat 0,68 — zaokrouhlení
+    // na desetiny by podniku vracelo 0,02 l při každém drinku.
     open = Math.round(open * 1000) / 1000;
   } else {
     qty = Math.max(0, Math.round((qty - amount) * 1000) / 1000);
@@ -29,8 +33,7 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   if (!conn) return { connected: false as const };
 
   // Večerní souhrn synchronizuje bez přihlášeného člověka. Historie skladu si
-  // radši vezme vedoucího týmu, ať u pohybu někdo stojí; když ho nenajde,
-  // zůstane prázdný — sloupec to od migrace unese.
+  // radši vezme vedoucího týmu, ať u pohybu někdo stojí.
   let actor = userId;
   if (actor == null) {
     try {
@@ -40,108 +43,89 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     } catch { /* zůstane null */ }
   }
 
-  // Throttle + concurrency lock in one atomic claim: only the caller who moves
-  // last_sync_at forward gets to run. Two syncs at once (digest cron + a manual
-  // press) would otherwise both see the same bills and write stock off twice.
-  // force shortens the window but still refuses to run beside another sync.
+  // Zámek + škrticí klapka v jednom atomickém kroku: běží jen ten, kdo posune
+  // last_sync_at. Dva odpisy vedle sebe by tytéž účtenky odepsaly dvakrát.
   try {
     const claimed = force
       ? await sql`
           UPDATE pos_connections SET last_sync_at = NOW()
           WHERE team_id = ${teamId}
-            AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '30 seconds')
+            AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '15 seconds')
           RETURNING team_id`
       : await sql`
           UPDATE pos_connections SET last_sync_at = NOW()
           WHERE team_id = ${teamId}
-            AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '10 minutes')
+            AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '3 minutes')
           RETURNING team_id`;
     if (!claimed.length) return { connected: true as const, throttled: true as const };
-  } catch { /* column missing — sync anyway */ }
+  } catch { /* sloupec chybí — jede se dál */ }
 
   let mappings: any[] = [];
   try {
     mappings = await sql`SELECT product_id, item_id, amount_per_sale FROM pos_product_map WHERE team_id = ${teamId}`;
   } catch { return { connected: true as const, error: 'Mapování není dostupné — spusť /api/init.' }; }
-  // A product's recipe = every ingredient row it has.
   const mapByProduct = new Map<string, { item_id: number; amount_per_sale: number }[]>();
   for (const m of mappings) {
     const key = String(m.product_id);
     (mapByProduct.get(key) ?? mapByProduct.set(key, []).get(key)!).push(m);
   }
 
-  // Yesterday + today (Prague-ish via UTC date is fine for a day window).
-  const today = new Date(); today.setHours(12, 0, 0, 0);
-  const till = new Date(today); till.setDate(till.getDate() + 1);
-  const from = new Date(today); from.setDate(from.getDate() - 1);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  // Účtenky ze zrcadla, které mají stažené položky a ještě se neodepsaly.
+  const since = dayPlus(pragueToday(), -WRITE_OFF_WINDOW_DAYS);
+  let bills: any[] = [];
+  try {
+    bills = await sql`
+      SELECT b.bill_id, b.day FROM pos_bills b
+      WHERE b.team_id = ${teamId} AND b.items_synced = TRUE AND b.refunded = FALSE AND b.deleted = FALSE
+        AND b.day >= ${since}
+        AND NOT EXISTS (SELECT 1 FROM pos_processed_bills p WHERE p.team_id = ${teamId} AND p.bill_id = b.bill_id)
+      ORDER BY b.day ASC LIMIT 400`;
+  } catch { return { connected: true as const, error: 'Zrcadlo účtenek chybí — spusť /api/init.' }; }
+  if (!bills.length) return { connected: true as const, processed: 0, deducted: [], unmapped: [] };
 
-  const bills = await listBills(conn, iso(from), iso(till));
-  const unprocessed: string[] = [];
-  for (const b of bills) {
-    try {
-      const [seen] = await sql`SELECT 1 FROM pos_processed_bills WHERE team_id = ${teamId} AND bill_id = ${b.billId}`;
-      if (!seen) unprocessed.push(b.billId);
-    } catch { return { connected: true as const, error: 'Chybí tabulka zpracovaných účtenek — spusť /api/init.' }; }
-  }
+  const ids = bills.map(b => String(b.bill_id));
+  const dayOf = new Map(bills.map(b => [String(b.bill_id), String(b.day)]));
+  const items = await sql`
+    SELECT bill_id, product_id, name, amount FROM pos_bill_items
+    WHERE team_id = ${teamId} AND bill_id = ANY(${ids})`;
 
   const totals = new Map<number, number>();
   const unmapped = new Map<string, { name: string; count: number }>();
-  const fetched: string[] = [];
-  // What sold, per product AND per the business day the receipt belongs to.
-  // The sync covers yesterday and today, so stamping everything with today's
-  // date would push the last day of a month into the next one — and the
-  // monthly margins with it. Účtenka po půlnoci patří k předchozímu večeru.
+  // Co se prodalo, po produktu A po obchodním dni účtenky — účtenka po půlnoci
+  // patří k předchozímu večeru, jinak by poslední den měsíce utekl do dalšího.
   const sales = new Map<string, { day: string; productId: string; name: string; qty: number }>();
-  const dayOfBill = new Map<string, string>();
 
-  for (const b of bills) {
-    if (b?.billId && b?.createdAt) {
-      const day = businessDayOf(new Date(b.createdAt));
-      if (day) dayOfBill.set(b.billId, day);
+  for (const it of items as any[]) {
+    // Záporné a nulové řádky jsou opravy — sklad z nich nikdy neroste.
+    const sold = Number(it.amount);
+    if (!(sold > 0)) continue;
+    const productId = it.product_id ? String(it.product_id) : null;
+    const day = dayOf.get(String(it.bill_id)) ?? pragueToday();
+    if (productId) {
+      const key = `${day}|${productId}`;
+      const rec = sales.get(key) ?? { day, productId, name: String(it.name ?? ''), qty: 0 };
+      rec.qty += sold;
+      sales.set(key, rec);
+    }
+    const recipe = productId ? mapByProduct.get(productId) : null;
+    if (recipe && recipe.length) {
+      for (const ing of recipe) {
+        const add = (Number(ing.amount_per_sale) || 1) * sold;
+        totals.set(Number(ing.item_id), (totals.get(Number(ing.item_id)) ?? 0) + add);
+      }
+    } else if (productId) {
+      const u2 = unmapped.get(productId) ?? { name: String(it.name ?? ''), count: 0 };
+      u2.count += sold;
+      unmapped.set(productId, u2);
     }
   }
 
-  for (const billId of unprocessed.slice(0, 120)) {
-    let items;
-    try { items = await billItems(conn, billId); }
-    catch { continue; } // leave unmarked — next sync retries
-    for (const it of items) {
-      // Negative/zero lines are corrections and refunds — stock never grows
-      // from those, and a negative "sale" must not inflate the open package.
-      const sold = Number(it.amount);
-      if (!(sold > 0)) continue;
-      if (it.productId) {
-        const day = dayOfBill.get(billId) ?? iso(today);
-        const key = `${day}|${it.productId}`;
-        const rec = sales.get(key) ?? { day, productId: it.productId, name: it.name, qty: 0 };
-        rec.qty += sold;
-        sales.set(key, rec);
-      }
-      const recipe = it.productId ? mapByProduct.get(it.productId) : null;
-      if (recipe && recipe.length) {
-        for (const ing of recipe) {
-          const add = (Number(ing.amount_per_sale) || 1) * sold;
-          totals.set(Number(ing.item_id), (totals.get(Number(ing.item_id)) ?? 0) + add);
-        }
-      } else if (it.productId) {
-        const u2 = unmapped.get(it.productId) ?? { name: it.name, count: 0 };
-        u2.count += sold;
-        unmapped.set(it.productId, u2);
-      }
-    }
-    fetched.push(billId);
-  }
-
-  // Compute every stock change up front, then land deductions and the
-  // processed-bill marks in ONE transaction — a crash mid-run must not leave
-  // bills marked as written-off when the stock never moved (or vice versa).
+  // Všechny změny skladu se spočítají dopředu a zapíšou v JEDNÉ transakci
+  // spolu se značkou „zpracováno" — pád uprostřed nesmí nechat účtenku
+  // označenou jako odepsanou, když se sklad nepohnul (ani naopak).
   const deducted: { name: string; amount: number }[] = [];
   const writes: any[] = [];
   for (const [itemId, rawAmount] of Array.from(totals.entries())) {
-    // Millilitre / gram precision. One decimal used to be enough for „150 ml
-    // z lahve", but a cocktail takes 0,02 l of vodka — that rounded to 0.0 and
-    // the sale was silently written off as nothing at all.
     const amount = Math.round(rawAmount * 1000) / 1000;
     if (!(amount > 0)) continue;
     const [it] = await sql`
@@ -162,27 +146,24 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
       VALUES (${itemId}, ${actor}, ${oldQty}, ${next.qty}, ${oldOpen}, ${pkg > 0 ? next.open : null}, ${'Prodej (Storyous)'}, NOW())`);
     deducted.push({ name: it.name, amount });
   }
-  for (const billId of fetched) {
+  for (const billId of ids) {
     writes.push(sql`
       INSERT INTO pos_processed_bills (team_id, bill_id)
       VALUES (${teamId}, ${billId}) ON CONFLICT DO NOTHING`);
   }
 
   let processed = 0;
-  if (writes.length) {
-    try {
-      await sql.transaction(writes);
-      processed = fetched.length;
-    } catch {
-      return { connected: true as const, error: 'Zápis odpisů selhal — zkus to znovu.' };
-    }
+  try {
+    for (let i = 0; i < writes.length; i += 150) await sql.transaction(writes.slice(i, i + 150));
+    processed = ids.length;
+  } catch {
+    return { connected: true as const, error: 'Zápis odpisů selhal — zkus to znovu.' };
   }
 
   if (deducted.length) {
     audit(teamId, actor, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
   }
-  // The day's sales, per product, stamped with the day the receipt belongs to.
   for (const v of Array.from(sales.values())) {
     try {
       await sql`
@@ -191,10 +172,8 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
         ON CONFLICT (team_id, date, product_id) DO UPDATE SET
           qty = pos_sales.qty + ${v.qty},
           product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`;
-    } catch { /* table not migrated yet — analysis simply has less history */ }
+    } catch { /* tabulka ještě není */ }
   }
-
-  // Remember what sold without a recipe — the mapping screen serves it first.
   for (const [productId, v] of Array.from(unmapped.entries())) {
     try {
       await sql`
@@ -203,7 +182,7 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
         ON CONFLICT (team_id, product_id) DO UPDATE SET
           sold_count = pos_unmapped.sold_count + ${v.count},
           product_name = ${v.name}, last_seen = NOW()`;
-    } catch { /* table not migrated yet */ }
+    } catch { /* tabulka ještě není */ }
   }
 
   return {

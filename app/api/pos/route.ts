@@ -7,9 +7,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, verifyConnection } from '@/lib/storyous';
+import { runFullSync, rememberStock } from '@/lib/posMirror';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -56,7 +58,14 @@ export async function POST(req: NextRequest) {
         client_id = ${clientId}, client_secret = ${seal(clientSecret)},
         merchant_id = ${merchantId}, place_id = ${placeId}, place_name = ${probe.placeName ?? null}`;
     audit(u.team_id, u.id, 'pos.connect', 'pos', null, `Storyous · ${probe.placeName ?? placeId}`);
-    return NextResponse.json({ ok: true, placeName: probe.placeName ?? null });
+    // Nové připojení začíná načisto: kurzor pryč, historie se stáhne hned.
+    try { await sql`UPDATE pos_connections SET bills_cursor = NULL, synced_from = NULL, sync_lock_at = NULL, last_error = NULL WHERE team_id = ${u.team_id}`; } catch { /* starší schéma */ }
+    let first: any = null;
+    try {
+      const conn = await getConnection(u.team_id);
+      if (conn) { await rememberStock(u.team_id, conn); first = await runFullSync(u.team_id, u.id, { force: true }); }
+    } catch { /* tik to dožene */ }
+    return NextResponse.json({ ok: true, placeName: probe.placeName ?? null, sync: first?.bills ?? null });
   } catch {
     return NextResponse.json({ error: 'Pokladna není dostupná — spusť /api/init.' }, { status: 400 });
   }

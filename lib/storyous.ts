@@ -1,11 +1,26 @@
-// Storyous (Teya) POS client. Read-only: we pull closed bills to know the real
-// revenue — nothing is ever written back to the register.
+// Storyous (Teya) POS — klient nad veřejným API. Jen čtení, do pokladny se
+// nikdy nic nezapisuje.
 //
-// Auth: POST login.storyous.com/api/auth/authorize (client_credentials) → 1h token.
-// Bills: GET api.storyous.com/bills/{merchantId}-{placeId}?from&till&limit → { data, nextPage }.
+// Co API opravdu nabízí (ověřeno naživo, ne z dokumentace):
+//   auth      POST login.storyous.com/api/auth/authorize (client_credentials) → token na hodinu;
+//             endpoint je omezený, token se musí cachovat.
+//   merchant  GET /merchants/{m}                       → provozovny, DPH, měna
+//   menu      GET /menu/{m}?placeId=                   → strom kategorií a produktů;
+//             cena NENÍ na kořeni produktu, ale v placeValues.priceLevels.default.price
+//             (bez placeId v placesValues[placeId]) — proto tu dřív byly samé nuly.
+//   bills     GET /bills/{m}-{p}?from&till | ?modifiedSince | &lastBillId | &includeDeleted
+//             → seznam bez položek; _lastModifiedAt umožňuje přírůstkovou synchronizaci.
+//   bill      GET /bills/{m}-{p}/{billId}              → i položky (produkt, množství, cena, DPH)
+//   stocks    GET /stocks/{m}/stocks, …/{stockId}/items, …/stockUps, …/stockTakings, /stocks/{m}/suppliers
+//   datasync  Storyous umí sám posílat změny na náš webhook — zapíná to jejich
+//             podpora pro provozovnu na základě URL + tajemství.
+//
+// Platba: účtenka má `paymentMethod` (cash | card | split | bondus | checksApi |
+// prepaidCredit | …) a `payments[]` s rozpadem. „split" je hotovost + karta
+// dohromady; dřív padal do „jinak" a uzávěrka proti kase pak nesedela.
 
 import { neon } from '@neondatabase/serverless';
-import { seal, open } from './secretBox';
+import { open } from './secretBox';
 import { businessDayOf, dayPlus } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -17,6 +32,11 @@ export interface PosConnection {
   merchantId: string;
   placeId: string;
   placeName: string | null;
+}
+
+export class StoryousError extends Error {
+  status: number;
+  constructor(message: string, status: number) { super(message); this.status = status; }
 }
 
 export async function getConnection(teamId: number): Promise<PosConnection | null> {
@@ -36,8 +56,8 @@ export async function getConnection(teamId: number): Promise<PosConnection | nul
   } catch { return null; }
 }
 
-// Serverless instances are short-lived; a tiny in-memory cache still saves the
-// auth round-trip within one warm instance.
+// Serverless instance žije krátce; i tak malá cache v paměti ušetří autorizaci
+// v rámci jedné teplé instance — a autorizační endpoint je limitovaný.
 const tokenCache = new Map<string, { token: string; exp: number }>();
 
 async function getToken(conn: Pick<PosConnection, 'clientId' | 'clientSecret'>): Promise<string> {
@@ -53,9 +73,9 @@ async function getToken(conn: Pick<PosConnection, 'clientId' | 'clientSecret'>):
       grant_type: 'client_credentials',
     }),
   });
-  if (!res.ok) throw new Error(`Storyous auth failed (${res.status})`);
+  if (!res.ok) throw new StoryousError(`Přihlášení ke Storyous selhalo (${res.status})`, res.status);
   const d = await res.json();
-  if (!d?.access_token) throw new Error('Storyous auth: no token');
+  if (!d?.access_token) throw new StoryousError('Storyous nevrátil token', 502);
   const exp = d.expires_at ? new Date(d.expires_at).getTime() : Date.now() + 55 * 60_000;
   tokenCache.set(key, { token: d.access_token, exp });
   return d.access_token;
@@ -63,30 +83,243 @@ async function getToken(conn: Pick<PosConnection, 'clientId' | 'clientSecret'>):
 
 async function api(conn: PosConnection, path: string): Promise<any> {
   const token = await getToken(conn);
-  const res = await fetch(`https://api.storyous.com${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const call = (t: string) => fetch(`https://api.storyous.com${path}`, { headers: { Authorization: `Bearer ${t}` } });
+  let res = await call(token);
   if (res.status === 401) {
     tokenCache.delete(conn.clientId);
-    const t2 = await getToken(conn);
-    const res2 = await fetch(`https://api.storyous.com${path}`, { headers: { Authorization: `Bearer ${t2}` } });
-    if (!res2.ok) throw new Error(`Storyous API ${res2.status}`);
-    return res2.json();
+    res = await call(await getToken(conn));
   }
-  if (!res.ok) throw new Error(`Storyous API ${res.status}`);
+  if (res.status === 429) throw new StoryousError('Storyous omezuje počet požadavků — zkusí se znovu za chvíli.', 429);
+  if (!res.ok) throw new StoryousError(`Storyous API ${res.status}`, res.status);
   return res.json();
 }
 
-/** Verify credentials and resolve the place name — used when connecting. */
-export async function verifyConnection(conn: PosConnection): Promise<{ ok: boolean; placeName?: string; error?: string }> {
-  try {
-    const m = await api(conn, `/merchants/${conn.merchantId}`);
-    const place = (m?.places ?? []).find((p: any) => p.placeId === conn.placeId);
-    if (!place) return { ok: false, error: 'Provozovna (placeId) u tohoto merchanta neexistuje.' };
-    return { ok: true, placeName: place.name ?? null };
-  } catch (e) {
-    return { ok: false, error: 'Přihlášení ke Storyous selhalo — zkontroluj Client ID a Secret.' };
+/** Dotaz na stránkovaný seznam: volá `onPage` pro každou stránku, dokud je nextPage. */
+async function paged(conn: PosConnection, firstPath: string, onPage: (data: any[]) => void | boolean, maxPages = 60): Promise<{ pages: number; complete: boolean }> {
+  let path: string | null = firstPath;
+  let pages = 0;
+  while (path && pages < maxPages) {
+    pages++;
+    const page = await api(conn, path);
+    const stop = onPage(page?.data ?? []);
+    if (stop === true) return { pages, complete: true };
+    path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
   }
+  return { pages, complete: !path };
+}
+
+// ---- Provozovna ---------------------------------------------------------------
+
+export interface MerchantInfo {
+  merchantId: string; name: string; isVatPayer: boolean; currencyCode: string;
+  places: { placeId: string; name: string; state?: string }[];
+}
+
+export async function merchantInfo(conn: PosConnection): Promise<MerchantInfo> {
+  const m = await api(conn, `/merchants/${conn.merchantId}`);
+  return {
+    merchantId: String(m.merchantId), name: String(m.name ?? ''), isVatPayer: !!m.isVatPayer,
+    currencyCode: String(m.currencyCode ?? 'CZK'),
+    places: (m.places ?? []).map((p: any) => ({ placeId: String(p.placeId), name: String(p.name ?? ''), state: p.state })),
+  };
+}
+
+/** Ověření přístupů při připojování — a rovnou název provozovny. */
+export async function verifyConnection(conn: PosConnection): Promise<{ ok: boolean; placeName?: string; error?: string; places?: { placeId: string; name: string }[] }> {
+  try {
+    const m = await merchantInfo(conn);
+    const place = m.places.find(p => p.placeId === conn.placeId);
+    if (!place) {
+      return { ok: false, error: 'Provozovna (Place ID) u tohoto merchanta neexistuje. Nabízí se: ' + m.places.map(p => `${p.name} (${p.placeId})`).join(', '), places: m.places };
+    }
+    return { ok: true, placeName: place.name ?? null, places: m.places };
+  } catch (e) {
+    const status = e instanceof StoryousError ? e.status : 0;
+    return { ok: false, error: status === 401 || status === 403
+      ? 'Přihlášení ke Storyous selhalo — zkontroluj Client ID a Secret.'
+      : 'Storyous teď neodpovídá — zkus to za chvíli.' };
+  }
+}
+
+// ---- Platby --------------------------------------------------------------------
+
+/** Lidský název způsobu platby, jak ho posílá Storyous. */
+export function paymentLabel(method: string): string {
+  const m = method.toLowerCase();
+  const map: Record<string, string> = {
+    cash: 'hotově', card: 'kartou', split: 'kombinace', bondus: 'stravenky', checksapi: 'stravenky (elektronické)',
+    prepaidcredit: 'kredit / předplatné', invoice: 'faktura', bank: 'převodem', banktransfer: 'převodem',
+    loyalty: 'věrnostní', voucher: 'poukaz', gift: 'dárkový poukaz', online: 'online', qr: 'QR platba',
+    delivery: 'rozvoz', unpaid: 'nezaplaceno', check: 'stravenky', meal: 'stravenky',
+  };
+  return map[m] ?? method;
+}
+
+export interface Buckets { cash: number; card: number; other: number; methods: Record<string, number> }
+
+/** Rozpad účtenky na hotovost / kartu / ostatní podle `payments[]`. Když
+ *  rozpad chybí, bere se `paymentMethod` a celá částka. */
+export function paymentBuckets(bill: any): Buckets {
+  const out: Buckets = { cash: 0, card: 0, other: 0, methods: {} };
+  const price = Number(bill?.finalPrice) || 0;
+  const pays: any[] = Array.isArray(bill?.payments) && bill.payments.length ? bill.payments : null as any;
+  const add = (methodRaw: string, amount: number) => {
+    const m = String(methodRaw ?? '').toLowerCase();
+    if (!(amount > 0) && amount !== 0) return;
+    if (m === 'cash') out.cash += amount;
+    else if (m.includes('card') || m === 'terminal') out.card += amount;
+    else { out.other += amount; out.methods[m || 'unknown'] = (out.methods[m || 'unknown'] ?? 0) + amount; }
+  };
+  if (pays) {
+    let sum = 0;
+    for (const p of pays) {
+      const a = Number(p?.priceWithVat ?? p?.amount ?? 0) || 0;
+      sum += a;
+      add(String(p?.paymentMethod ?? ''), a);
+    }
+    // Rozpad nesedí na účtenku (zaokrouhlení, chybějící řádek) — zbytek
+    // přičti k převažujícímu způsobu, ať součet vždycky dává finalPrice.
+    const rest = Math.round((price - sum) * 100) / 100;
+    if (Math.abs(rest) >= 0.01) {
+      const main = String(bill?.paymentMethod ?? '').toLowerCase();
+      if (main === 'cash' || (main === 'split' && out.cash >= out.card)) out.cash += rest;
+      else if (main.includes('card') || main === 'split') out.card += rest;
+      else out.other += rest;
+    }
+  } else {
+    add(String(bill?.paymentMethod ?? ''), price);
+  }
+  const r = (n: number) => Math.round(n * 100) / 100;
+  out.cash = r(out.cash); out.card = r(out.card); out.other = r(out.other);
+  return out;
+}
+
+// ---- Účtenky ----------------------------------------------------------------------
+
+export interface BillHead {
+  billId: string;
+  createdAt: string;
+  paidAt: string | null;
+  modifiedAt: string;
+  /** Obchodní den (účtenka po půlnoci patří k předchozímu večeru). */
+  day: string;
+  finalPrice: number;
+  withoutTax: number | null;
+  tips: number;
+  discount: number;
+  rounding: number;
+  currency: string;
+  paymentMethod: string;
+  buckets: Buckets;
+  refunded: boolean;
+  deleted: boolean;
+  refundedBillId: string | null;
+  personCount: number | null;
+  deskId: string | null;
+  createdById: string | null; createdByName: string | null;
+  paidById: string | null; paidByName: string | null;
+  orderProvider: string | null;
+  taxSummaries: Record<string, number> | null;
+  fiscalized: boolean;
+}
+
+export function toBillHead(b: any): BillHead | null {
+  if (!b?.billId) return null;
+  const whenStr = String(b.paidAt ?? b.createdAt ?? '');
+  const when = whenStr ? new Date(whenStr) : null;
+  const day = when && !Number.isNaN(when.getTime()) ? businessDayOf(when) : '';
+  if (!day) return null;
+  const ts: Record<string, number> | null = b.taxSummaries && typeof b.taxSummaries === 'object'
+    ? Object.fromEntries(Object.entries(b.taxSummaries).map(([k, v]) => [k, Number(v) || 0])) : null;
+  return {
+    billId: String(b.billId),
+    createdAt: String(b.createdAt ?? whenStr),
+    paidAt: b.paidAt ? String(b.paidAt) : null,
+    modifiedAt: String(b._lastModifiedAt ?? b.createdAt ?? whenStr),
+    day,
+    finalPrice: Number(b.finalPrice) || 0,
+    withoutTax: b.finalPriceWithoutTax != null && Number.isFinite(Number(b.finalPriceWithoutTax)) ? Number(b.finalPriceWithoutTax) : null,
+    tips: Number(b.tips) || 0,
+    discount: Number(b.discount) || 0,
+    rounding: Number(b.rounding) || 0,
+    currency: String(b.currencyCode ?? 'CZK'),
+    paymentMethod: String(b.paymentMethod ?? ''),
+    buckets: paymentBuckets(b),
+    refunded: !!b.refunded,
+    deleted: !!b.deleted,
+    refundedBillId: b.refundedBillIdentifier ? String(b.refundedBillIdentifier) : null,
+    personCount: Number(b.personCount) > 0 ? Number(b.personCount) : null,
+    deskId: b.deskId != null ? String(b.deskId) : null,
+    createdById: b.createdBy?.personId != null ? String(b.createdBy.personId) : null,
+    createdByName: b.createdBy?.fullName ?? null,
+    paidById: b.paidBy?.personId != null ? String(b.paidBy.personId) : null,
+    paidByName: b.paidBy?.fullName ?? null,
+    orderProvider: b.orderProvider ? String(b.orderProvider) : null,
+    taxSummaries: ts,
+    fiscalized: !!b.fiscalizedAt,
+  };
+}
+
+const src = (conn: PosConnection) => `${conn.merchantId}-${conn.placeId}`;
+
+/** Účtenky změněné od daného okamžiku (včetně refundací a smazaných). */
+export async function billsModifiedSince(conn: PosConnection, sinceIso: string, onBill: (b: BillHead, raw: any) => void, maxPages = 40) {
+  const q = `modifiedSince=${encodeURIComponent(sinceIso)}&includeDeleted=true&limit=100`;
+  return paged(conn, `/bills/${src(conn)}?${q}`, (data) => {
+    for (const raw of data) { const h = toBillHead(raw); if (h) onBill(h, raw); }
+  }, maxPages);
+}
+
+/** Účtenky z období (kalendářní dny `from` až `tillExclusive`), včetně refundací a smazaných. */
+export async function billsInRange(conn: PosConnection, from: string, tillExclusive: string, onBill: (b: BillHead, raw: any) => void, maxPages = 80) {
+  const q = `from=${from}&till=${tillExclusive}&includeDeleted=true&limit=100`;
+  return paged(conn, `/bills/${src(conn)}?${q}`, (data) => {
+    for (const raw of data) { const h = toBillHead(raw); if (h) onBill(h, raw); }
+  }, maxPages);
+}
+
+export interface BillItem {
+  productId: string | null;
+  name: string;
+  amount: number;
+  /** Jednotková cena s DPH, jak ji vydala pokladna. */
+  price: number | null;
+  vatRate: number | null;
+  categoryId: string | null;
+  measure: string | null;
+  discounts: any | null;
+}
+
+/** Detail účtenky — seznam položky nemá, každá účtenka je jeden dotaz. */
+export async function billDetail(conn: PosConnection, billId: string): Promise<{ head: BillHead | null; items: BillItem[] }> {
+  const d = await api(conn, `/bills/${src(conn)}/${encodeURIComponent(billId)}`);
+  const items: BillItem[] = (d?.items ?? []).map((it: any) => ({
+    productId: it.productId ? String(it.productId) : null,
+    name: String(it.name ?? '').trim(),
+    amount: Number(it.amount) || 0,
+    price: it.price != null && Number.isFinite(Number(it.price)) ? Number(it.price) : null,
+    vatRate: it.vatRate != null && Number.isFinite(Number(it.vatRate)) ? Number(it.vatRate) : null,
+    categoryId: it.categoryId ? String(it.categoryId) : null,
+    measure: it.measure ? String(it.measure) : null,
+    discounts: it.discounts ?? null,
+  }));
+  return { head: toBillHead(d), items };
+}
+
+/** Jen položky — pro odpis skladu. */
+export async function billItems(conn: PosConnection, billId: string): Promise<BillItem[]> {
+  return (await billDetail(conn, billId)).items;
+}
+
+export interface BillLite { billId: string; createdAt: string; }
+
+/** Nesmazané, nerefundované účtenky období (kompatibilita se starým odpisem). */
+export async function listBills(conn: PosConnection, from: string, tillExclusive: string): Promise<BillLite[]> {
+  const out: BillLite[] = [];
+  await billsInRange(conn, from, tillExclusive, (b) => {
+    if (!b.deleted && !b.refunded) out.push({ billId: b.billId, createdAt: b.createdAt });
+  }, 20);
+  return out;
 }
 
 export interface DaySummary {
@@ -96,86 +329,92 @@ export interface DaySummary {
   cash: number;
   card: number;
   other: number;
+  /** Ostatní způsoby platby rozepsané (stravenky, kredit, faktura…). */
+  methods: Record<string, number>;
   tips: number;
-  /** Tips split by how the bill was paid. Cash tips land in the drawer and are
-   *  counted with the takings; card tips never touch it. Bills whose payment
-   *  method we can't read keep their tips in `tipsOther` — reported honestly
-   *  instead of guessed into one of the two. */
   tipsCash: number;
   tipsCard: number;
   tipsOther: number;
+  withoutTax: number | null;
+  discounts: number;
+  refundCount: number;
+  refundTotal: number;
 }
 
-/** Paid, non-refunded bills of one BUSINESS day, summed by payment method.
- *
- *  Obchodní den končí až s poslední účtenkou, ne o půlnoci: podnik zavírá po
- *  půlnoci a účtenka z 1:30 patří k předešlému večeru — stejně jako uzávěrka,
- *  kterou po ní někdo vyplní. Proto se stahuje i následující kalendářní den a
- *  účtenky se roztřídí podle obchodního dne. Bez toho by uzávěrka nabídla
- *  menší tržbu, než jaká byla, a kontrola proti kase by hlásila rozdíl, který
- *  si aplikace vyrobila sama. */
+export function emptyDay(date: string): DaySummary {
+  return { date, bills: 0, total: 0, cash: 0, card: 0, other: 0, methods: {}, tips: 0, tipsCash: 0, tipsCard: 0, tipsOther: 0, withoutTax: 0, discounts: 0, refundCount: 0, refundTotal: 0 };
+}
+
+/** Přičte účtenku do denního souhrnu — jedna logika pro zrcadlo i živé API. */
+export function addToDay(out: DaySummary, b: BillHead) {
+  if (b.deleted) return;
+  if (b.refunded) { out.refundCount++; out.refundTotal += b.finalPrice; return; }
+  out.bills++;
+  out.total += b.finalPrice;
+  out.cash += b.buckets.cash; out.card += b.buckets.card; out.other += b.buckets.other;
+  for (const [m, v] of Object.entries(b.buckets.methods)) out.methods[m] = (out.methods[m] ?? 0) + v;
+  out.tips += b.tips;
+  // Spropitné jde tam, kam šla většina peněz z účtenky.
+  if (b.buckets.cash >= b.buckets.card && b.buckets.cash >= b.buckets.other) out.tipsCash += b.tips;
+  else if (b.buckets.card >= b.buckets.other) out.tipsCard += b.tips;
+  else out.tipsOther += b.tips;
+  if (out.withoutTax != null) out.withoutTax = b.withoutTax != null ? out.withoutTax + b.withoutTax : null;
+  out.discounts += b.discount;
+}
+
+export function roundDay(out: DaySummary): DaySummary {
+  const r = (n: number | null) => (n == null ? null : Math.round(n * 100) / 100);
+  return { ...out, total: r(out.total)!, cash: r(out.cash)!, card: r(out.card)!, other: r(out.other)!,
+    tips: r(out.tips)!, tipsCash: r(out.tipsCash)!, tipsCard: r(out.tipsCard)!, tipsOther: r(out.tipsOther)!,
+    withoutTax: r(out.withoutTax), discounts: r(out.discounts)!, refundTotal: r(out.refundTotal)!,
+    methods: Object.fromEntries(Object.entries(out.methods).map(([k, v]) => [k, r(v)!])) };
+}
+
+/** Souhrn jednoho OBCHODNÍHO dne přímo z pokladny (bez zrcadla). Obchodní den
+ *  končí až poslední účtenkou: stahují se dva kalendářní dny a třídí podle
+ *  obchodního dne, jinak by uzávěrka nabídla menší tržbu, než jaká byla. */
 export async function daySummary(conn: PosConnection, date: string): Promise<DaySummary> {
-  const out: DaySummary = {
-    date, bills: 0, total: 0, cash: 0, card: 0, other: 0,
-    tips: 0, tipsCash: 0, tipsCard: 0, tipsOther: 0,
-  };
-  const till = dayPlus(date, 2);
-  let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${date}&till=${till}&limit=100`;
-  let guard = 0;
-  while (path && guard < 12) {
-    guard++;
-    const page = await api(conn, path);
-    for (const b of page?.data ?? []) {
-      if (b.deleted || b.refunded) continue;
-      const when = new Date(String(b.paidAt ?? b.createdAt ?? ''));
-      // Bez čitelného času účtenku raději nezapočítáme, než abychom ji dali
-      // do špatného dne.
-      if (businessDayOf(when) !== date) continue;
-      const price = Number(b.finalPrice) || 0;
-      out.bills++;
-      out.total += price;
-      const tip = Number(b.tips) || 0;
-      out.tips += tip;
-      const pm = String(b.paymentMethod ?? '').toLowerCase();
-      if (pm === 'cash') { out.cash += price; out.tipsCash += tip; }
-      else if (pm.includes('card')) { out.card += price; out.tipsCard += tip; }
-      else { out.other += price; out.tipsOther += tip; }
-    }
-    path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
-  }
-  return out;
+  const out = emptyDay(date);
+  await billsInRange(conn, date, dayPlus(date, 2), (b) => { if (b.day === date) addToDay(out, b); }, 12);
+  return roundDay(out);
 }
 
-// ---- Menu (product catalog) --------------------------------------------------
+/** Refundované účtenky jednoho dne — počet a hodnota (kompatibilita). */
+export async function listRefunds(conn: PosConnection, date: string): Promise<{ count: number; total: number }> {
+  const s = await daySummary(conn, date);
+  return { count: s.refundCount, total: s.refundTotal };
+}
+
+// ---- Menu (katalog produktů) ---------------------------------------------------
 
 export interface MenuProduct {
   productId: string;
   name: string;
   category: string;
-  /**
-   * Prodejní cena v korunách, když ji katalog uvádí. Storyous ji podle typu
-   * produktu vrací pod různými klíči, a u některých položek vůbec — proto
-   * null znamená „kasa cenu nedala“, ne nula.
-   */
+  /** Prodejní cena s DPH pro NAŠI provozovnu; null = pokladna cenu nedala. */
   price: number | null;
+  vatRate: number | null;
+  measure: string | null;
+  ean: string | null;
+  imageUrl: string | null;
+  showInPos: boolean;
+  priceVariable: boolean;
+  type: string | null;
 }
 
-/** Vytáhne cenu z produktu, ať už ji kasa pojmenovala jakkoliv. */
-function productPrice(it: any): number | null {
-  const kandidati = [
-    it?.price, it?.priceWithVat, it?.finalPrice, it?.unitPrice,
-    Array.isArray(it?.prices) ? (it.prices[0]?.price ?? it.prices[0]?.priceWithVat) : undefined,
-  ];
-  for (const c of kandidati) {
-    const n = Number(c);
-    if (Number.isFinite(n) && n > 0) return Math.round(n);
-  }
+export interface MenuSnapshot { products: MenuProduct[]; modifiedAt: string | null; version: string | null; currency: string }
+
+/** Cena a DPH z hodnot pro provozovnu — s `?placeId=` je to `placeValues`,
+ *  bez něj `placesValues[placeId]`. Nikde jinde cena není. */
+function placeValuesOf(it: any, placeId: string): any {
+  if (it?.placeValues && typeof it.placeValues === 'object') return it.placeValues;
+  const all = it?.placesValues;
+  if (all && typeof all === 'object') return all[placeId] ?? null;
   return null;
 }
 
-/** Flattened product list with a readable category path. */
-export async function menuProducts(conn: PosConnection): Promise<MenuProduct[]> {
-  const menu = await api(conn, `/menu/${conn.merchantId}`);
+export async function fetchMenu(conn: PosConnection): Promise<MenuSnapshot> {
+  const menu = await api(conn, `/menu/${conn.merchantId}?placeId=${encodeURIComponent(conn.placeId)}`);
   const out: MenuProduct[] = [];
   const walk = (items: any[], path: string[]) => {
     for (const it of items ?? []) {
@@ -183,65 +422,109 @@ export async function menuProducts(conn: PosConnection): Promise<MenuProduct[]> 
       if (Array.isArray(kids) && kids.length) {
         walk(kids, [...path, String(it.name ?? '')]);
       } else if (it.productId) {
+        const pv = placeValuesOf(it, conn.placeId);
+        const p = Number(pv?.priceLevels?.default?.price);
         out.push({
           productId: String(it.productId),
           name: String(it.name ?? '').trim(),
           category: path.filter(Boolean).join(' › '),
-          price: productPrice(it),
+          price: Number.isFinite(p) && p > 0 ? Math.round(p * 100) / 100 : null,
+          vatRate: pv?.vatRate != null && Number.isFinite(Number(pv.vatRate)) ? Number(pv.vatRate) : null,
+          measure: it.measure ? String(it.measure) : null,
+          ean: it.ean ? String(it.ean) : null,
+          imageUrl: it.imageUrl ? String(it.imageUrl) : null,
+          showInPos: pv?.showInPos !== false,
+          priceVariable: !!it.isPriceVariable,
+          type: it.type ? String(it.type) : null,
         });
       }
     }
   };
   walk(menu?.items ?? [], []);
-  return out;
+  return {
+    products: out,
+    modifiedAt: menu?._lastModifiedAt ? String(menu._lastModifiedAt) : null,
+    version: menu?._version != null ? String(menu._version) : null,
+    currency: String(menu?.currencyCode ?? 'CZK'),
+  };
 }
 
-// ---- Bills with items (for stock write-off) ----------------------------------
-
-export interface BillLite { billId: string; createdAt: string; }
-
-/** Non-refunded, non-deleted bills of a date range (paginated). */
-export async function listBills(conn: PosConnection, from: string, tillExclusive: string): Promise<BillLite[]> {
-  const out: BillLite[] = [];
-  let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${from}&till=${tillExclusive}&limit=100`;
-  let guard = 0;
-  while (path && guard < 20) {
-    guard++;
-    const page = await api(conn, path);
-    for (const b of page?.data ?? []) {
-      if (b.deleted || b.refunded) continue;
-      out.push({ billId: String(b.billId), createdAt: String(b.createdAt ?? '') });
-    }
-    path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
-  }
-  return out;
+/** Plochý seznam produktů (kompatibilita se staršími místy). */
+export async function menuProducts(conn: PosConnection): Promise<MenuProduct[]> {
+  return (await fetchMenu(conn)).products;
 }
 
-export interface BillItem { productId: string | null; name: string; amount: number; }
+// ---- Sklad ve Storyous -----------------------------------------------------------
 
-/** The list endpoint has no items — each bill needs its own detail call. */
-export async function billItems(conn: PosConnection, billId: string): Promise<BillItem[]> {
-  const d = await api(conn, `/bills/${conn.merchantId}-${conn.placeId}/${billId}`);
-  return (d?.items ?? []).map((it: any) => ({
-    productId: it.productId ? String(it.productId) : null,
-    name: String(it.name ?? '').trim(),
-    amount: Number(it.amount) || 0,
+export interface PosStock { stockId: string; name: string | null; isCentral: boolean; placeId: string | null }
+export interface PosStockItem {
+  itemId: string; name: string; categoryName: string | null; measure: string | null;
+  amount: number | null; priceWithoutVat: number | null; priceWithVat: number | null;
+  criticalAmount: number | null; optimalAmount: number | null; ean: string | null;
+}
+export interface PosStockUp {
+  stockUpId: string; createdAt: string; note: string | null; number: string | null;
+  supplierName: string | null; supplierId: string | null; personName: string | null;
+  totalPriceWithoutVat: number | null; isDraft: boolean;
+}
+
+export async function listStocks(conn: PosConnection): Promise<PosStock[]> {
+  const d = await api(conn, `/stocks/${conn.merchantId}/stocks`);
+  return (d?.data ?? []).map((s: any) => ({
+    stockId: String(s.stockId), name: s.name ?? null, isCentral: !!s.isCentral, placeId: s.placeId ? String(s.placeId) : null,
   }));
 }
 
-/** Refunded bills of one day — count and value. */
-export async function listRefunds(conn: PosConnection, date: string): Promise<{ count: number; total: number }> {
-  const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
-  const tillEx = next.toISOString().slice(0, 10);
-  let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${date}&till=${tillEx}&limit=100`;
-  let count = 0, total = 0, guard = 0;
-  while (path && guard < 10) {
+/** Sklad provozovny (nebo centrální, když vlastní nemá). */
+export async function stockForPlace(conn: PosConnection): Promise<PosStock | null> {
+  const all = await listStocks(conn);
+  return all.find(s => s.placeId === conn.placeId) ?? all.find(s => s.isCentral) ?? null;
+}
+
+export async function stockItems(conn: PosConnection, stockId: string, maxPages = 20): Promise<PosStockItem[]> {
+  const out: PosStockItem[] = [];
+  let path: string | null = `/stocks/${conn.merchantId}/stocks/${encodeURIComponent(stockId)}/items`;
+  let guard = 0;
+  while (path && guard < maxPages) {
     guard++;
-    const page = await api(conn, path);
-    for (const b of page?.data ?? []) {
-      if (b.refunded && !b.deleted) { count++; total += Number(b.finalPrice) || 0; }
+    const d = await api(conn, path);
+    const data: any[] = d?.data ?? [];
+    for (const it of data) {
+      const n = (v: any) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+      out.push({
+        itemId: String(it.itemId), name: String(it.name ?? ''), categoryName: it.categoryName ?? null,
+        measure: it.measure ?? null, amount: n(it.amount), priceWithoutVat: n(it.priceWithoutVat),
+        priceWithVat: n(it.priceWithVat), criticalAmount: n(it.criticalAmount), optimalAmount: n(it.optimalAmount),
+        ean: it.ean ?? null,
+      });
     }
-    path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
+    path = d?.nextPage ? String(d.nextPage).replace('https://api.storyous.com', '') : null;
   }
-  return { count, total };
+  return out;
+}
+
+export async function stockUps(conn: PosConnection, stockId: string, maxPages = 5): Promise<PosStockUp[]> {
+  const out: PosStockUp[] = [];
+  let path: string | null = `/stocks/${conn.merchantId}/stocks/${encodeURIComponent(stockId)}/stockUps`;
+  let guard = 0;
+  while (path && guard < maxPages) {
+    guard++;
+    const d = await api(conn, path);
+    for (const s of d?.data ?? []) {
+      out.push({
+        stockUpId: String(s.stockUpId), createdAt: String(s.createdAt ?? ''), note: s.note ?? null,
+        number: s.number != null ? String(s.number) : null, supplierName: s.supplierName ?? null,
+        supplierId: s.supplierId != null ? String(s.supplierId) : null, personName: s.personName ?? null,
+        totalPriceWithoutVat: s.totalPriceWithoutVat != null ? Number(s.totalPriceWithoutVat) : null,
+        isDraft: !!s.isDraft,
+      });
+    }
+    path = d?.nextPage ? String(d.nextPage).replace('https://api.storyous.com', '') : null;
+  }
+  return out;
+}
+
+export async function suppliers(conn: PosConnection): Promise<{ supplierId: string; supplierName: string }[]> {
+  const d = await api(conn, `/stocks/${conn.merchantId}/suppliers`);
+  return (d?.data ?? []).map((s: any) => ({ supplierId: String(s.supplierId), supplierName: String(s.supplierName ?? '') }));
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
+import PosTick from '../PosTick';
 import { Avatar } from '../ui';
 import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
@@ -49,6 +50,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 
   return (
     <KioskShiftProvider>
+      <PosTick />
       <KioskShell user={user} />
     </KioskShiftProvider>
   );

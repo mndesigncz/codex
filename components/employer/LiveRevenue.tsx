@@ -24,7 +24,8 @@ type Data = {
   from: string; to: string; today: string; placeName?: string | null; lastSyncAt?: string | null;
   totals: { bills: number; total: number; cash: number; card: number; other: number; tips: number;
     tipsCash: number; tipsCard: number; discounts: number; refundCount: number; refundTotal: number;
-    avgBill: number; soldQty: number; productRevenue: number };
+    avgBill: number; soldQty: number; productRevenue: number;
+    methods?: { id: string; label: string; amount: number }[] };
   days: Day[]; hours: number[]; byPerson: { name: string; total: number; bills: number }[];
   items: Item[]; notes: Note[]; note: string;
 };
@@ -166,6 +167,20 @@ export default function LiveRevenue() {
               </p>
             </div>
           </div>
+
+          {/* Co není hotově ani kartou: stravenky, kredit, faktura… Dřív se to
+              schovalo do „jinak" a uzávěrka proti kase nesedela. */}
+          {(t.methods?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] uppercase tracking-wider text-black/55 mr-1">Jinak zaplaceno</span>
+              {t.methods!.map(m => (
+                <span key={m.id} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] border border-black/[0.06] px-3 py-1 text-xs text-[#16181A]">
+                  <span className="capitalize">{m.label}</span>
+                  <span className="font-semibold tabular-nums">{money(m.amount)}</span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Sedí to? */}
           {(d.notes?.length ?? 0) > 0 && (

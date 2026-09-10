@@ -102,11 +102,38 @@ export default function Settings({ user, initialTab }: Props) {
   const [posForm, setPosForm] = useState({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
   const [posBusy, setPosBusy] = useState(false);
   const [posMsg, setPosMsg] = useState('');
+  // Zdraví zrcadla pokladny (od kdy máme data, poslední synchronizace, chyby).
+  const [posHealth, setPosHealth] = useState<any | null>(null);
+  const [posAction, setPosAction] = useState<string>('');
+  const loadPosHealth = () =>
+    fetch('/api/pos/status').then(r => r.json()).then(setPosHealth).catch(() => setPosHealth(null));
   useEffect(() => {
     if (section !== 'pos' || posStatus) return;
     fetch('/api/pos').then(r => r.json()).then(setPosStatus).catch(() => setPosStatus({ connected: false }));
+    loadPosHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
+  const posDo = async (action: string, extra: Record<string, any> = {}) => {
+    setPosAction(action); setPosMsg('');
+    const res = await fetch('/api/pos/status', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...extra }),
+    }).catch(() => null);
+    const d = res ? await res.json().catch(() => ({})) : {};
+    setPosAction('');
+    if (!res?.ok || d?.error) { setPosMsg(d?.error || 'Akce se nepodařila.'); return; }
+    if (action === 'sync') {
+      const b = d.bills ?? {};
+      setPosMsg(b.skipped === 'throttled'
+        ? 'Synchronizace běžela před chvílí — pokladna se ptá nejvýš jednou za pár minut. ✓'
+        : `Synchronizováno ✓ ${b.billsSeen ?? 0} účtenek prošlo, ${b.billsChanged ?? 0} nových či změněných${b.itemsPending ? `, ${b.itemsPending} položek se dotáhne příště` : ''}.`);
+    } else if (action === 'backfill') {
+      setPosMsg(`Historie načtena ✓ ${d.bills?.billsSeen ?? 0} účtenek.`);
+    } else if (action === 'webhook-secret') {
+      setPosMsg('Nové tajemství pro DataSync vygenerováno ✓ Pošli URL i tajemství podpoře Storyous.');
+    }
+    loadPosHealth();
+  };
   const posConnect = async () => {
     setPosBusy(true); setPosMsg('');
     const res = await fetch('/api/pos', {
@@ -119,6 +146,7 @@ export default function Settings({ user, initialTab }: Props) {
       setPosMsg(`Připojeno k provozovně ${d.placeName ?? ''} ✓`);
       setPosStatus(null); setPosForm({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
       fetch('/api/pos').then(r => r.json()).then(setPosStatus).catch(() => {});
+      loadPosHealth();
     } else {
       const d = res ? await res.json().catch(() => ({})) : {};
       setPosMsg(d.error || 'Připojení se nepodařilo.');
@@ -696,16 +724,88 @@ export default function Settings({ user, initialTab }: Props) {
               </p>
               {posMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 mb-3 ${posMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-red-500/10 text-red-600 border border-red-500/25'}`}>{posMsg}</p>}
               {posStatus?.connected ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3">
                     <p className="text-sm font-semibold text-[#16181A]"><Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Připojeno: {posStatus.placeName ?? posStatus.merchantId}</p>
-                    <p className="text-xs text-black/45 mt-0.5">Client ID {posStatus.clientIdMasked} · tržby se předvyplňují v uzávěrce a večerním souhrnu.</p>
+                    <p className="text-xs text-black/55 mt-0.5">Client ID {posStatus.clientIdMasked} · účtenky, položky i katalog se zrcadlí do aplikace samy.</p>
                   </div>
+
+                  {/* Zdraví: aplikace se synchronizuje sama, tady je vidět, že to opravdu dělá. */}
+                  {posHealth?.connected && (
+                    <div className="rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4 space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {([
+                          ['Účtenek u nás', posHealth.billsCount.toLocaleString('cs-CZ')],
+                          ['Data od', posHealth.firstDay ? new Date(posHealth.firstDay + 'T12:00:00').toLocaleDateString('cs-CZ') : '—'],
+                          ['Produktů s cenou', `${posHealth.productsWithPrice} / ${posHealth.productsCount}`],
+                          ['Poslední sync', posHealth.lastSyncAt ? dbTimeDayHM(posHealth.lastSyncAt) : 'zatím ne'],
+                        ] as const).map(([k, v]) => (
+                          <div key={k} className="min-w-0">
+                            <p className="text-[11px] uppercase tracking-wider text-black/55 truncate">{k}</p>
+                            <p className="text-sm font-bold text-[#16181A] tabular-nums truncate">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {posHealth.lastError && (
+                        <p className="text-xs rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 px-3 py-2">
+                          Poslední chyba{posHealth.lastErrorAt ? ` (${dbTimeDayHM(posHealth.lastErrorAt)})` : ''}: {posHealth.lastError}
+                        </p>
+                      )}
+                      {posHealth.itemsPending > 0 && (
+                        <p className="text-xs text-black/60">U {posHealth.itemsPending} účtenek se položky ještě dotahují — každý běh jich vezme sto padesát.</p>
+                      )}
+                      <p className="text-xs text-black/60">
+                        Synchronizuje se při každém otevření aplikace i kiosku (nejvýš jednou za pár minut), ráno cronem a večer před souhrnem. Ručně jen když nechceš čekat.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button onClick={() => posDo('sync')} disabled={!!posAction}
+                          className="rounded-full bg-[#C8F542] text-[#16181A] px-4 py-2 text-sm font-semibold hover:brightness-105 disabled:opacity-50 transition inline-flex items-center gap-1.5">
+                          <Icon name="refresh" size={15} /> {posAction === 'sync' ? 'Synchronizuji…' : 'Synchronizovat teď'}
+                        </button>
+                        <button onClick={() => { if (confirm('Načíst účtenky za posledních 180 dní? Trvá to pár desítek sekund.')) posDo('backfill', { days: 180 }); }} disabled={!!posAction}
+                          className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-50 transition">
+                          {posAction === 'backfill' ? 'Načítám…' : 'Načíst historii (180 dní)'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DataSync: Storyous umí změny posílat sám — zapíná to jejich podpora. */}
+                  {posHealth?.connected && (
+                    <div className="rounded-2xl border border-black/[0.07] p-4 space-y-2.5">
+                      <p className="text-sm font-semibold text-[#16181A]">Okamžité změny z pokladny (DataSync)</p>
+                      <p className="text-xs text-black/60">
+                        Storyous umí každou změnu poslat rovnou sem, bez čekání na další otevření aplikace. Zapíná to podpora Storyous/Teya pro tvoji provozovnu — pošli jim adresu a tajemství níže.
+                        {posHealth.lastWebhookAt && <> Naposledy přišlo <strong>{dbTimeDayHM(posHealth.lastWebhookAt)}</strong>.</>}
+                      </p>
+                      {posHealth.webhookSecret ? (
+                        <div className="space-y-1.5">
+                          {([['Adresa (URL)', posHealth.webhookUrl], ['Tajemství (Authorization)', posHealth.webhookSecret]] as const).map(([k, v]) => (
+                            <div key={k} className="flex items-center gap-2 min-w-0">
+                              <span className="text-[11px] uppercase tracking-wider text-black/55 w-28 shrink-0">{k}</span>
+                              <code className="flex-1 min-w-0 truncate rounded-xl bg-black/[0.04] px-3 py-1.5 text-xs">{v}</code>
+                              <button onClick={() => { navigator.clipboard?.writeText(String(v)); setPosMsg('Zkopírováno ✓'); }}
+                                className="tap-target-sm shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium text-black/60 hover:text-black">Kopírovat</button>
+                            </div>
+                          ))}
+                          <p className="text-[11px] text-black/55">Metoda POST, data od dneška. Bez tajemství v hlavičce se požadavek zahodí.</p>
+                          <button onClick={() => { if (confirm('Vypnout příjem změn? Staré tajemství přestane platit.')) posDo('webhook-off'); }}
+                            className="text-xs text-black/55 hover:text-red-600">Vypnout</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => posDo('webhook-secret')} disabled={!!posAction}
+                          className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-50 transition">
+                          Vygenerovat adresu a tajemství
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <button onClick={async () => {
                     if (!confirm('Odpojit pokladnu? Tržby se přestanou načítat.')) return;
                     await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
-                    setPosStatus({ connected: false }); setPosMsg('Pokladna odpojena.');
-                  }} className="rounded-full glass text-black/50 hover:text-red-600 px-4 py-2.5 text-sm font-medium transition">
+                    setPosStatus({ connected: false }); setPosHealth(null); setPosMsg('Pokladna odpojena.');
+                  }} className="rounded-full glass text-black/55 hover:text-red-600 px-4 py-2.5 text-sm font-medium transition">
                     Odpojit pokladnu
                   </button>
                 </div>

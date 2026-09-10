@@ -84,8 +84,8 @@ export async function GET(request: Request) {
 
       // Write off today's sales first, so the low-stock count below is honest.
       try {
-        const { runPosSync } = await import('@/lib/posSync');
-        await runPosSync(Number(team.id), null, false);
+        const { runFullSync } = await import('@/lib/posMirror');
+        await runFullSync(Number(team.id), null, { force: true });
       } catch { /* sync is best-effort */ }
 
       // --- stock running low: same effective measure the stock screens use,
@@ -133,10 +133,11 @@ export async function GET(request: Request) {
       // --- POS (Storyous) real revenue, when connected ---
       let posLine: string | null = null;
       try {
-        const { getConnection, daySummary } = await import('@/lib/storyous');
+        const { getConnection } = await import('@/lib/storyous');
+        const { daySummaryFor } = await import('@/lib/posMirror');
         const conn = await getConnection(Number(team.id));
         if (conn) {
-          const ps = await daySummary(conn, today);
+          const ps = await daySummaryFor(Number(team.id), today);
           if (ps.bills > 0) posLine = `Pokladna: ${czk(ps.total)} (${ps.bills} účtenek, hotově ${czk(ps.cash)} / kartou ${czk(ps.card + ps.other)})`;
           // Refunds deserve an eye the same evening, not at the month's end.
           try {
