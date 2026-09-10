@@ -322,19 +322,19 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 min-w-0">
           <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h2>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
             {PERIODS.map(p => (
-              <button key={p} onClick={() => setDays(p)}
+              <button key={p} onClick={() => setDays(p)} aria-pressed={days === p}
                 className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${days === p ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
                 {p} dní
               </button>
             ))}
           </div>
           <button onClick={() => { setAddOpen(true); setAddErr(''); }}
-            className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
+            className="rounded-full bg-[#C8F542] text-[#16181A] px-4 py-2 text-sm font-semibold hover:brightness-105 transition whitespace-nowrap">
             + Přidat záznam
           </button>
           {entries.length > 0 && (

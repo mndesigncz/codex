@@ -25,7 +25,7 @@ import MobileMoreSheet from '../MobileMoreSheet';
 
 const navItems = [
   { id: 'home',        label: 'Přehled',    icon: 'overview' },
-  { id: 'my-shifts',   label: 'Směny',      icon: 'calendar' },
+  { id: 'my-shifts',   label: 'Moje směny', icon: 'calendar', short: 'Směny' },
   { id: 'procedures',  label: 'Postupy',    icon: 'clipboard' },
   { id: 'availability',label: 'Dostupnost', icon: 'swap' },
   { id: 'inventory',   label: 'Sklad',      icon: 'box' },
@@ -204,7 +204,7 @@ export default function EmployeeLayout({ user }: Props) {
               <Icon key={currentView === item.id ? 'on' : 'off'} name={item.icon} size={22}
                 strokeWidth={currentView === item.id ? 2 : 1.7}
                 className="i-lead" motion={currentView === item.id ? 'pop' : undefined} />
-              <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{item.label}</span>
+              <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{(item as any).short ?? item.label}</span>
             </button>
           ))}
           <button onClick={() => setMoreOpen(v => !v)} title="Více"

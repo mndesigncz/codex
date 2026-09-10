@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState } from '../ui';
+import { EmptyState, PageHeader } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { usePlan, UpgradeModal, ProBadge } from '../Pro';
 import {
@@ -311,6 +311,10 @@ export default function ClosingsOverview() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {/* Nadpis obrazovky — dřív začínala rovnou červenou kartou „Chybí
+          uzávěrka" a nebylo poznat, kde je člověk, jakmile horní lišta
+          odrolovala. */}
+      <PageHeader title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
       {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
       {missing.length > 0 && (
         <div className="rounded-3xl bg-red-500/[0.06] border border-red-500/25 p-5 space-y-3">

@@ -360,14 +360,14 @@ export default function Settings({ user, initialTab }: Props) {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Nastavení</h2>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Nastavení</h1>
         <p className="text-black/45 text-sm mt-1">Spravujte svůj profil, aplikaci, oznámení a zabezpečení.</p>
       </div>
 
       {/* Mobile: top pills */}
       <div className="md:hidden -mx-1 flex gap-1 overflow-x-auto scrollbar-thin pb-1 px-1">
         {sections.map(s => (
-          <button key={s.id} onClick={() => setSection(s.id)}
+          <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
             className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
               section === s.id ? 'bg-[#16181A] text-white font-semibold' : 'glass text-black/60 hover:text-black'
             }`}>
@@ -380,7 +380,7 @@ export default function Settings({ user, initialTab }: Props) {
         {/* Desktop: left vertical section list */}
         <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0">
           {sections.map(s => (
-            <button key={s.id} onClick={() => setSection(s.id)}
+            <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
               className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
                 section === s.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'
               }`}>
