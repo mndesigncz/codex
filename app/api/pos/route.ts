@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         merchant_id = ${merchantId}, place_id = ${placeId}, place_name = ${probe.placeName ?? null}`;
     audit(u.team_id, u.id, 'pos.connect', 'pos', null, `Storyous · ${probe.placeName ?? placeId}`);
     // Nové připojení začíná načisto: kurzor pryč, historie se stáhne hned.
-    try { await sql`UPDATE pos_connections SET bills_cursor = NULL, synced_from = NULL, sync_lock_at = NULL, last_error = NULL WHERE team_id = ${u.team_id}`; } catch { /* starší schéma */ }
+    try { await sql`UPDATE pos_connections SET bills_cursor = NULL, synced_from = NULL, backfill_until = NULL, sync_lock_at = NULL, last_error = NULL WHERE team_id = ${u.team_id}`; } catch { /* starší schéma */ }
     let first: any = null;
     try {
       const conn = await getConnection(u.team_id);

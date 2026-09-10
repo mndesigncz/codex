@@ -24,6 +24,19 @@ const sql = neon(process.env.DATABASE_URL!);
 export const DEFAULT_BACKFILL_DAYS = 60;
 /** Kolik detailů účtenek se stihne v jednom běhu (každý je jeden dotaz). */
 const ITEMS_PER_RUN = 150;
+/**
+ * Kolik času si běh dá, než uklidí a nechá zbytek na příště.
+ *
+ * Funkce na Vercelu má minutu. Testovací podnik má 77 účtenek a stihne se
+ * celý; ostrá čajovna jich má za dva měsíce tisíce a jedním dechem se
+ * stáhnout nedají. Proto se každý běh vejde do rozpočtu a co nestihne,
+ * dobere ten další — historie se plní sama po kouscích.
+ */
+const RUN_BUDGET_MS = 35_000;
+/** Po kolika dnech se historie dotahuje dozadu. */
+const HISTORY_WINDOW_DAYS = 7;
+/** Kolik zápisů účtenek jde do databáze najednou (jedna transakce = jedno kolo). */
+const UPSERT_BATCH = 50;
 /** Přesah přírůstkové synchronizace — hodiny na serveru a v pokladně nejsou stejné. */
 const OVERLAP_MS = 2 * 60 * 60 * 1000;
 
@@ -36,13 +49,17 @@ export interface SyncStats {
   itemsFetched: number;
   itemsPending: number;
   menuUpdated: boolean;
+  /** Kam až se v tomto běhu stihla dotáhnout historie. */
+  historyFrom?: string;
+  /** True, když je historie kompletní až k cíli — dál se nic dotahovat nebude. */
+  historyDone?: boolean;
   error?: string;
 }
 
-async function upsertBill(teamId: number, b: BillHead): Promise<boolean> {
-  // Vrací true, když se řádek změnil (nový nebo jiný _lastModifiedAt) — jen
-  // pro takové se stahuje detail s položkami.
-  const rows = await sql`
+function upsertBillQuery(teamId: number, b: BillHead) {
+  // Vrací dotaz; spouští se po dávkách v jedné transakci. Kdyby šla každá
+  // účtenka zvlášť, znamenaly by tisíce účtenek tisíce kol do databáze.
+  return sql`
     INSERT INTO pos_bills (
       team_id, bill_id, day, created_at, paid_at, modified_at, final_price, without_tax, tips, discount, rounding,
       currency, payment_method, cash, card, other, other_methods, refunded, deleted, refunded_bill_id,
@@ -67,11 +84,26 @@ async function upsertBill(teamId: number, b: BillHead): Promise<boolean> {
       items_synced = CASE WHEN pos_bills.modified_at IS DISTINCT FROM EXCLUDED.modified_at THEN FALSE ELSE pos_bills.items_synced END,
       updated_at = NOW()
     RETURNING (xmax = 0) AS inserted, items_synced`;
-  const r = rows[0] as any;
-  return !!r && (r.inserted === true || r.items_synced === false);
 }
 
-async function fetchPendingItems(conn: PosConnection, teamId: number, limit: number): Promise<{ fetched: number; pending: number }> {
+/**
+ * Zapíše účtenky po dávkách a spočítá, kolik se jich opravdu změnilo
+ * (nová nebo jiný `_lastModifiedAt`) — jen u těch se pak stahují položky.
+ */
+async function upsertBills(teamId: number, bills: BillHead[]): Promise<number> {
+  let changed = 0;
+  for (let i = 0; i < bills.length; i += UPSERT_BATCH) {
+    const chunk = bills.slice(i, i + UPSERT_BATCH);
+    const res: any = await sql.transaction(chunk.map(b => upsertBillQuery(teamId, b)));
+    for (const rows of (res ?? []) as any[]) {
+      const r = Array.isArray(rows) ? rows[0] : rows;
+      if (r && (r.inserted === true || r.items_synced === false)) changed++;
+    }
+  }
+  return changed;
+}
+
+async function fetchPendingItems(conn: PosConnection, teamId: number, limit: number, budget?: () => boolean): Promise<{ fetched: number; pending: number }> {
   const pending = await sql`
     SELECT bill_id FROM pos_bills
     WHERE team_id = ${teamId} AND items_synced = FALSE AND deleted = FALSE
@@ -80,6 +112,7 @@ async function fetchPendingItems(conn: PosConnection, teamId: number, limit: num
   const todo = ids.slice(0, limit);
   let fetched = 0;
   for (const billId of todo) {
+    if (budget && !budget()) break;
     let d;
     try { d = await billDetail(conn, billId); }
     catch (e) {
@@ -135,6 +168,11 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
   const conn = await getConnection(teamId);
   if (!conn) return { ...stats, ok: false, skipped: 'not-connected' };
 
+  // Hlídač času: každý krok se ptá, jestli ještě má cenu začínat další kolo.
+  const started = Date.now();
+  const left = () => RUN_BUDGET_MS - (Date.now() - started);
+  const budget = () => left() > 6000;
+
   // Zámek: kdo posune sync_lock_at, běží; druhý čeká na příště.
   const throttleSec = opts.force ? 20 : 5 * 60;
   let claimed: any[] = [];
@@ -143,54 +181,79 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
       UPDATE pos_connections SET sync_lock_at = NOW()
       WHERE team_id = ${teamId}
         AND (sync_lock_at IS NULL OR sync_lock_at < NOW() - (${throttleSec} || ' seconds')::interval)
-      RETURNING bills_cursor, synced_from`;
+      RETURNING bills_cursor, synced_from, backfill_until`;
   } catch { return { ...stats, ok: false, error: 'Tabulky zrcadla chybí — spusť migraci (/api/init).' }; }
   if (!claimed.length) return { ...stats, skipped: 'throttled' };
   const cursor: string | null = claimed[0].bills_cursor ? new Date(claimed[0].bills_cursor).toISOString() : null;
 
-  const pendingUpserts: Promise<void>[] = [];
   try {
     // Menu první — ceny a názvy položek potřebuje všechno ostatní.
     try { stats.menuUpdated = await syncMenu(teamId, conn, false); } catch { /* menu zvlášť, účtenky jedou dál */ }
 
     let maxModified = cursor ? new Date(cursor).getTime() : 0;
-    const seen = (b: BillHead) => { const t = new Date(b.modifiedAt).getTime(); if (t > maxModified) maxModified = t; };
-    let complete = true;
+    const batch: BillHead[] = [];
+    const take = (b: BillHead) => {
+      stats.billsSeen++;
+      const t = new Date(b.modifiedAt).getTime();
+      if (t > maxModified) maxModified = t;
+      batch.push(b);
+    };
+    const flush = async () => { if (batch.length) stats.billsChanged += await upsertBills(teamId, batch.splice(0)); };
 
-    if (!cursor) {
-      stats.mode = 'backfill';
-      const days = Math.max(1, Math.min(400, opts.backfillDays ?? DEFAULT_BACKFILL_DAYS));
-      // Když už zrcadlo někdy začalo (synced_from), znovu se stahuje od
-      // stejného začátku — např. po změně verze zrcadla v migraci.
-      const prevFrom: string | null = claimed[0].synced_from ?? null;
-      const wanted = dayPlus(pragueToday(), -days);
-      const from = prevFrom && prevFrom < wanted ? prevFrom : wanted;
-      const till = dayPlus(pragueToday(), 2);
-      const r = await billsInRange(conn, from, till, (b) => {
-        stats.billsSeen++; seen(b);
-        // upsert je async, ale pořadí nevadí — sbíráme sliby níž
-        pendingUpserts.push(upsertBill(teamId, b).then(ch => { if (ch) stats.billsChanged++; }));
-      });
-      complete = r.complete;
-      await Promise.all(pendingUpserts.splice(0));
-      await sql`UPDATE pos_connections SET synced_from = ${from} WHERE team_id = ${teamId} AND synced_from IS NULL`;
-    } else {
+    // ---- 1. Čerstvé účtenky -------------------------------------------------
+    // Nejdřív to, co je vidět na dashboardu: dnešek. Historie se doplní až
+    // potom, takže po připojení jsou dnešní tržby na obrazovce hned a nečeká
+    // se, než se prokoušeme dvěma měsíci dozadu.
+    let complete: boolean;
+    if (cursor) {
       stats.mode = 'incremental';
       const since = new Date(new Date(cursor).getTime() - OVERLAP_MS).toISOString();
-      const r = await billsModifiedSince(conn, since, (b) => {
-        stats.billsSeen++; seen(b);
-        pendingUpserts.push(upsertBill(teamId, b).then(ch => { if (ch) stats.billsChanged++; }));
-      });
+      const r = await billsModifiedSince(conn, since, take, 40, budget);
       complete = r.complete;
-      await Promise.all(pendingUpserts.splice(0));
+    } else {
+      stats.mode = 'backfill';
+      const from = dayPlus(pragueToday(), -1);
+      const r = await billsInRange(conn, from, dayPlus(pragueToday(), 2), take, 80, budget);
+      complete = r.complete;
+      if (complete) {
+        await sql`
+          UPDATE pos_connections SET synced_from = ${from}
+          WHERE team_id = ${teamId} AND (synced_from IS NULL OR synced_from > ${from})`;
+      }
     }
+    await flush();
 
     // Kurzor se posune jen po úplném průchodu — jinak by se přeskočila stránka.
     if (complete && maxModified > 0) {
       await sql`UPDATE pos_connections SET bills_cursor = ${new Date(maxModified).toISOString()} WHERE team_id = ${teamId}`;
     }
 
-    const it = await fetchPendingItems(conn, teamId, ITEMS_PER_RUN);
+    // ---- 2. Historie po týdnech dozadu -------------------------------------
+    // Ostrý podnik má za dva měsíce tisíce účtenek; do jednoho běhu se
+    // nevejdou. Každé dokončené okno se uloží (synced_from), takže další běh
+    // plynule naváže a nic se nestahuje dvakrát.
+    const target = claimed[0].backfill_until
+      ?? dayPlus(pragueToday(), -Math.max(1, Math.min(400, opts.backfillDays ?? DEFAULT_BACKFILL_DAYS)));
+    if (!claimed[0].backfill_until) {
+      await sql`UPDATE pos_connections SET backfill_until = ${target} WHERE team_id = ${teamId} AND backfill_until IS NULL`;
+    }
+    let edge: string | null = complete
+      ? ((await sql`SELECT synced_from FROM pos_connections WHERE team_id = ${teamId}`)[0] as any)?.synced_from ?? null
+      : null;
+    while (edge && edge > target && budget()) {
+      const back = dayPlus(edge, -HISTORY_WINDOW_DAYS);
+      const from = back < target ? target : back;
+      const r = await billsInRange(conn, from, edge, take, 80, budget);
+      await flush();
+      if (!r.complete) break;           // okno nedoběhlo — hranice zůstává, dobere se příště
+      await sql`UPDATE pos_connections SET synced_from = ${from} WHERE team_id = ${teamId}`;
+      edge = from;
+      stats.historyFrom = from;
+    }
+    stats.historyDone = !!edge && edge <= target;
+
+    // ---- 3. Položky účtenek do zbytku času ---------------------------------
+    const it = await fetchPendingItems(conn, teamId, ITEMS_PER_RUN, budget);
     stats.itemsFetched = it.fetched; stats.itemsPending = it.pending;
 
     await sql`UPDATE pos_connections SET last_sync_at = NOW(), last_error = NULL, last_error_at = NULL WHERE team_id = ${teamId}`;
@@ -203,7 +266,11 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
 }
 /** Stáhne znovu historii od zadaného počtu dní (např. při prvním nastavení nebo po výpadku). */
 export async function backfill(teamId: number, days: number): Promise<SyncStats> {
-  await sql`UPDATE pos_connections SET bills_cursor = NULL, synced_from = NULL, sync_lock_at = NULL WHERE team_id = ${teamId}`;
+  const until = dayPlus(pragueToday(), -Math.max(1, Math.min(400, days)));
+  await sql`
+    UPDATE pos_connections
+    SET bills_cursor = NULL, synced_from = NULL, sync_lock_at = NULL, backfill_until = ${until}
+    WHERE team_id = ${teamId}`;
   return syncBills(teamId, { force: true, backfillDays: days });
 }
 
@@ -290,13 +357,17 @@ export interface MirrorHealth {
   stockId: string | null;
   firstDay: string | null;
   lastDay: string | null;
+  /** Kam až má historie dosáhnout (nejstarší den, který chceme mít). */
+  backfillUntil: string | null;
+  /** Historie je stažená celá; už se nic nedotahuje na pozadí. */
+  historyComplete: boolean;
 }
 
 export async function health(teamId: number): Promise<MirrorHealth> {
   const empty: MirrorHealth = {
     connected: false, placeName: null, merchantId: null, clientIdMasked: null, lastSyncAt: null, billsCursor: null,
     syncedFrom: null, lastError: null, lastErrorAt: null, billsCount: 0, itemsPending: 0, productsCount: 0,
-    productsWithPrice: 0, menuSyncedAt: null, webhookSecret: null, lastWebhookAt: null, stockId: null, firstDay: null, lastDay: null,
+    productsWithPrice: 0, menuSyncedAt: null, webhookSecret: null, lastWebhookAt: null, stockId: null, firstDay: null, lastDay: null, backfillUntil: null, historyComplete: false,
   };
   let c: any;
   try { [c] = await sql`SELECT * FROM pos_connections WHERE team_id = ${teamId}`; } catch { return empty; }
@@ -306,6 +377,9 @@ export async function health(teamId: number): Promise<MirrorHealth> {
     clientIdMasked: String(c.client_id).slice(0, 4) + '…' + String(c.client_id).slice(-4),
     lastSyncAt: c.last_sync_at ?? null, billsCursor: c.bills_cursor ?? null, syncedFrom: c.synced_from ?? null,
     lastError: c.last_error ?? null, lastErrorAt: c.last_error_at ?? null, menuSyncedAt: c.menu_synced_at ?? null,
+    backfillUntil: c.backfill_until ?? null,
+    // Historie je hotová, když zrcadlo sahá až k cíli (nebo cíl ještě není znám).
+    historyComplete: !!c.synced_from && !!c.backfill_until && String(c.synced_from) <= String(c.backfill_until),
     webhookSecret: c.webhook_secret ?? null, lastWebhookAt: c.last_webhook_at ?? null, stockId: c.stock_id ?? null,
   };
   try {

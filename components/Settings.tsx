@@ -754,6 +754,14 @@ export default function Settings({ user, initialTab }: Props) {
                       {posHealth.itemsPending > 0 && (
                         <p className="text-xs text-black/60">U {posHealth.itemsPending} účtenek se položky ještě dotahují — každý běh jich vezme sto padesát.</p>
                       )}
+                      {/* Historie se u většího podniku stahuje po týdnech na pozadí. Bez
+                          téhle věty vypadá „Data od" jako chyba, přitom se to jen plní. */}
+                      {!posHealth.historyComplete && posHealth.backfillUntil && (
+                        <p className="text-xs text-black/60">
+                          Historie se ještě dotahuje na pozadí — po týdnech zpátky až k{' '}
+                          {new Date(posHealth.backfillUntil + 'T12:00:00').toLocaleDateString('cs-CZ')}. Dnešní tržby to nezdržuje.
+                        </p>
+                      )}
                       <p className="text-xs text-black/60">
                         Synchronizuje se při každém otevření aplikace i kiosku (nejvýš jednou za pár minut), ráno cronem a večer před souhrnem. Ručně jen když nechceš čekat.
                       </p>

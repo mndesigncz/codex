@@ -948,6 +948,9 @@ export async function GET(request: Request) {
     // jde z těchto tabulek. Viz lib/posMirror.ts.
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS bills_cursor TIMESTAMP`;
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS synced_from TEXT`;
+    // Kam až má historie sahat. Bez toho by běh, který se do minuty nevejde,
+    // nevěděl, kde příště navázat, a začínal by pořád od začátku.
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS backfill_until TEXT`;
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS sync_lock_at TIMESTAMP`;
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error TEXT`;
     await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMP`;
