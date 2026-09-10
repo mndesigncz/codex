@@ -366,7 +366,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.3, 1);
   /* Jediné, drobné přeběhnutí — jen tam, kde něco odhodí gesto. Původních
      1.32 už bylo cítit jako odskok; 1.12 dá pohybu život, ne pružinu. */
-  --ease-spring: cubic-bezier(0.34, 1.12, 0.42, 1);
+  /* Bez přestřelení. Odskok patří k pohybu, který nesl hybnost (švih, tah);
+     klepnutí na záložku žádnou nemá, takže ikona jen měkce dosedne. */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-1: 0.12s;   /* press feedback */
   --dur-2: 0.22s;   /* state change */
   --dur-3: 0.34s;   /* surface arriving */

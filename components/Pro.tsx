@@ -48,7 +48,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
   return (
     <div className="p-4 sm:p-6 max-w-xl mx-auto">
       <div className="glass-card p-8 text-center space-y-3">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-2xl">🔒</div>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={24} /></div>
         <div className="flex items-center justify-center gap-2">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{feature}</h3>
           <ProBadge />
@@ -62,7 +62,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
             e.preventDefault();
             window.location.href = '/employer/overview?view=settings';
           }}
-            className="inline-flex items-center gap-2 rounded-full bg-[#16181A] text-white font-semibold px-6 py-3 text-sm hover:bg-black transition">
+            className="inline-flex items-center gap-2 rounded-full bg-[#C8F542] text-[#16181A] font-semibold px-6 py-3 text-sm hover:brightness-105 shadow-[0_6px_18px_rgba(200,245,66,0.35)] transition">
             Zjistit víc o Pro <Icon name="chevron" size={14} className="-rotate-90" />
           </a>
         ) : (
@@ -79,7 +79,7 @@ export function UpgradeModal({ feature, onClose }: { feature: string; onClose: (
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center space-y-3" onClick={e => e.stopPropagation()}>
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-xl">🔒</div>
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={20} /></div>
         <div className="flex items-center justify-center gap-2">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{feature}</h3>
           <ProBadge />
@@ -88,7 +88,7 @@ export function UpgradeModal({ feature, onClose }: { feature: string; onClose: (
         <div className="flex gap-2 pt-1">
           <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
           <button onClick={() => { window.location.href = '/employer/overview?view=settings'; }}
-            className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black transition">
+            className="flex-1 rounded-full bg-[#C8F542] text-[#16181A] font-semibold px-5 py-3 text-sm hover:brightness-105 transition">
             Zjistit víc
           </button>
         </div>

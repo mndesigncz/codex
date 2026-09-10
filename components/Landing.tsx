@@ -36,7 +36,7 @@ export default function Landing() {
           <Link href="/login" className="rounded-full px-2.5 sm:px-4 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors whitespace-nowrap">
             Přihlásit
           </Link>
-          <Link href="/register" className="rounded-full bg-[#16181A] text-white px-3.5 sm:px-5 py-2 text-sm font-semibold hover:bg-black transition-colors whitespace-nowrap">
+          <Link href="/register" className="rounded-full bg-[#C8F542] text-[#16181A] px-3.5 sm:px-5 py-2 text-sm font-semibold hover:brightness-105 transition-colors whitespace-nowrap">
             <span className="sm:hidden">Zdarma</span>
             <span className="hidden sm:inline">Vyzkoušet zdarma</span>
           </Link>
@@ -45,18 +45,17 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-10 sm:pt-20 pb-14 text-center">
-        <p className="tap-target-sm inline-flex items-center gap-2 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] px-4 py-1.5 text-xs font-semibold uppercase tracking-wider">
-          Pro čajovny, kavárny a malé podniky
-        </p>
-        <h1 className="mt-5 text-4xl sm:text-6xl font-bold tracking-tight text-[#16181A] leading-[1.05] text-balance">
+        {/* Nadpis unese sám sebe — štítek nad ním („eyebrow") byl jen ozdoba,
+            a to, co říkal, patří do věty pod nadpisem. */}
+        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-[#16181A] leading-[1.05] text-balance">
           Provoz vašeho podniku<br className="hidden sm:block" /> na jednom místě
         </h1>
-        <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-black/55">
-          Směny, uzávěrky, sklad, úkoly i týmový chat — místo pěti aplikací a papírků jedna,
-          které rozumí celý tým od první směny.
+        <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-black/55 text-pretty">
+          Směny, uzávěrky, sklad, úkoly i týmový chat pro čajovny, kavárny a malé podniky —
+          místo pěti aplikací a papírků jedna, které rozumí celý tým od první směny.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link href="/register" className="w-full sm:w-auto rounded-full bg-[#16181A] text-white px-8 py-3.5 text-sm font-semibold hover:bg-black transition-all inline-flex items-center justify-center gap-2">
+          <Link href="/register" className="w-full sm:w-auto rounded-full bg-[#C8F542] text-[#16181A] px-8 py-3.5 text-sm font-semibold hover:brightness-105 shadow-[0_8px_24px_rgba(200,245,66,0.35)] transition-all inline-flex items-center justify-center gap-2">
             Vyzkoušet {TRIAL_DAYS} dní zdarma <Icon name="chevron" size={15} className="-rotate-90" />
           </Link>
           <a href="#cenik" className="w-full sm:w-auto rounded-full glass border border-black/[0.08] px-8 py-3.5 text-sm font-semibold text-black/70 hover:text-black transition-all inline-flex items-center justify-center">
