@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
+import { EmptyState } from './ui';
 import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
@@ -581,7 +582,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         <div className="pt-2">
           <p className="text-xs uppercase tracking-wider text-black/45 mb-3">Odeslané pozvánky ({pending.length})</p>
           {invitations.length === 0 ? (
-            <p className="text-sm text-black/45">Zatím žádné pozvánky.</p>
+            <EmptyState illustration="tym" title="Zatím žádná pozvánka" hint="Pošli kód nebo odkaz — člověk se připojí za minutu a hned vidí rozvrh." compact />
           ) : (
             <div className="divide-y divide-black/[0.06]">
               {invitations.map(inv => (

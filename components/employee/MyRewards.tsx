@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState, PageHeader } from '../ui';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { ProGate } from '../Pro';
 
@@ -189,10 +190,7 @@ function MyRewardsInner() {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-6">
-      <div className="flex items-center gap-2.5">
-        <Icon name="award" size={22} className="text-[#16181A]" />
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje odměny</h1>
-      </div>
+      <PageHeader title="Moje odměny" subtitle="Body za směny, úroveň a co si za ně můžeš vybrat." />
 
       {/* Unacknowledged "fix this" feedback — first thing on the page */}
       {unseenFlagged > 0 && (
@@ -237,7 +235,7 @@ function MyRewardsInner() {
               <p className="mt-1.5 text-xs text-black/45">Ještě {Math.max(0, me.pointsForNext - me.pointsIntoLevel)} bodů a postupuješ výš.</p>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-[#5B7A08] font-medium">Máš nejvyšší úroveň — skvělá práce! 🎉</p>
+            <p className="mt-4 text-sm text-[#5B7A08] font-medium">Máš nejvyšší úroveň — skvělá práce.</p>
           )}
 
           {me.perks && (
@@ -253,7 +251,7 @@ function MyRewardsInner() {
       {catalog.length > 0 && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-            <h3 className="font-bold tracking-tight text-[#16181A]">🎁 Katalog odměn</h3>
+            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Katalog odměn</h3>
             <span className="text-xs text-black/40">máš {me.points} bodů</span>
           </div>
           <p className="text-sm text-black/45 mb-4">Vyměň body za odměnu — žádost schválí vedení a body se odečtou.</p>
@@ -330,7 +328,7 @@ function MyRewardsInner() {
             return (
               <div key={i} className={`flex items-start gap-3 rounded-2xl p-3 border ${current ? 'bg-[#C8F542]/12 border-[#C8F542]/40' : reached ? 'bg-black/[0.02] border-black/[0.05]' : 'bg-white border-black/[0.05] opacity-70'}`}>
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${reached ? 'bg-[#16181A] text-[#C8F542]' : 'bg-black/[0.06] text-black/40'}`}>
-                  {reached ? '✓' : i + 1}
+                  {reached ? <Icon name="check" size={14} /> : i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
@@ -366,7 +364,7 @@ function MyRewardsInner() {
         <h3 className="font-bold tracking-tight text-[#16181A] mb-3">Hodnocení směn</h3>
         {normalDays.length === 0 ? (
           <p className="text-sm text-black/45">
-            {flaggedDays.length > 0 ? 'Další hodnocení zatím nemáš.' : 'Zatím žádné hodnocení. Vedení ohodnotí tvé směny průběžně.'}
+            {flaggedDays.length > 0 ? 'Další hodnocení zatím nemáš.' : <EmptyState illustration="odmeny" title="Zatím žádné hodnocení" hint="Vedení hodnotí směny průběžně — body za úkoly, postupy a uzávěrky se přičítají samy." compact />}
           </p>
         ) : (
           <div className="space-y-2.5">

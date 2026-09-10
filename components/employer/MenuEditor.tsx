@@ -8,6 +8,7 @@
 // se ukládá dohromady tlačítkem.
 
 import { useCallback, useEffect, useState } from 'react';
+import { Icon } from '../Icons';
 import {
   type MenuTheme, VYCHOZI_THEME, PREDLOHY, PISMA, normalizeMenuTheme,
 } from '@/lib/menuTheme';
@@ -329,7 +330,7 @@ export default function MenuEditor() {
                     : 'bg-black/[0.03] border-black/[0.08] hover:bg-black/[0.05]'
                 }`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-lg">📋</span>
+                  <span className="text-lg"><Icon name="clipboard" size={15} /></span>
                   <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${b.enabled ? 'bg-[#8FB811]' : 'bg-black/20'}`}
                     title={b.enabled ? 'Zapnuté — hosté ho vidí' : 'Vypnuté'} />
                 </div>

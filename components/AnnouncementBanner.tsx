@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 
+import { Icon } from './Icons';
 interface Announcement {
   id: number;
   content: string;
@@ -47,7 +48,7 @@ export default function AnnouncementBanner() {
           className="rounded-3xl bg-[#FFD60A]/[0.12] border border-[#FFD60A]/30 px-4 py-3 flex items-start gap-3 min-w-0"
         >
           <span className="shrink-0 text-lg leading-6" aria-hidden>
-            📌
+            <Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm text-[#16181A] whitespace-pre-wrap break-words">

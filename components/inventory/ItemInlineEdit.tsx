@@ -109,7 +109,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
               className={`${field} w-24 text-center`} />
             <span className="text-xs text-black/40 w-8">{contentUnit || item.unit}</span>
             <button type="button" onClick={() => setPortions(list => list.filter((_, i) => i !== idx))}
-              className="text-black/30 hover:text-red-600 transition px-1">✕</button>
+              className="text-black/30 hover:text-red-600 transition px-1"><Icon name="close" size={15} /></button>
           </div>
         ))}
         <button type="button" onClick={() => setPortions(list => [...list, { name: '', amount: '' }])}

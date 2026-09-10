@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 
+import { PageHeader } from '../ui';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
 }
@@ -201,15 +202,9 @@ export default function AvailabilitySubmit({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje dostupnost</h1>
-        <p className="text-black/45 mt-1">
-          Klepnutím na den cyklicky nastav:{' '}
-          <span className="text-black/70 font-medium">
-            {stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}
-          </span>.
-        </p>
-      </div>
+      <PageHeader title="Moje dostupnost"
+        subtitle={<>Klepnutím na den cyklicky nastav:{' '}
+          <span className="text-black/70 font-medium">{stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}</span>.</>} />
 
       {/* Month selector — navigate freely into the future (no limit), but not
           before the current month (submitting availability for the past makes

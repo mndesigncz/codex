@@ -9,6 +9,14 @@
                  radial-gradient(ellipse 80% 50% at 50% 110%, rgba(200,245,66,0.10), transparent);
   --ink: #16181A;
   --lime: #C8F542;
+
+  /* Stupnice zaoblení — jedna pro celou aplikaci. Dřív se střídalo 26, 24,
+     16 a 12 px podle toho, kdo kterou obrazovku dělal. Kontejner nejměkčí,
+     ovládací prvek nejtvrdší, čip kulatý. */
+  --r-card: 1.75rem;   /* karta, panel, modál       */
+  --r-panel: 1.25rem;  /* vnořený blok v kartě       */
+  --r-control: 0.875rem; /* pole, výběr, dlaždice    */
+  --r-chip: 9999px;    /* tlačítko, štítek, přepínač */
 }
 
 * { box-sizing: border-box; padding: 0; margin: 0; }
@@ -183,6 +191,22 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
 }
 .scroll-fade-x.at-end { -webkit-mask-image: none; mask-image: none; }
 
+/* ---------- Zaostření z klávesnice ----------
+   Prohlížeč kreslí modrý obdélník, který nepatří k žádnému designu. Kroužek
+   v barvě značky říká totéž a je vidět i na limetkovém tlačítku. Myš a prst
+   ho nevyvolají — jen klávesnice. */
+:focus-visible {
+  outline: 2px solid #8FB811;
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: rgba(200,245,66,0.7) !important;
+  box-shadow: 0 0 0 3px rgba(200,245,66,0.28);
+}
+
 /* ---------- Scrollbars ---------- */
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
@@ -342,7 +366,9 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.3, 1);
   /* Jediné, drobné přeběhnutí — jen tam, kde něco odhodí gesto. Původních
      1.32 už bylo cítit jako odskok; 1.12 dá pohybu život, ne pružinu. */
-  --ease-spring: cubic-bezier(0.34, 1.12, 0.42, 1);
+  /* Bez přestřelení. Odskok patří k pohybu, který nesl hybnost (švih, tah);
+     klepnutí na záložku žádnou nemá, takže ikona jen měkce dosedne. */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-1: 0.12s;   /* press feedback */
   --dur-2: 0.22s;   /* state change */
   --dur-3: 0.34s;   /* surface arriving */

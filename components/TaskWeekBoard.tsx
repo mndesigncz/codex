@@ -73,7 +73,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
         <div className="flex items-start gap-2">
           <button onClick={() => onComplete(t, !done)} title={done ? 'Zrušit hotové' : 'Hotovo'}
             className={`mt-0.5 w-5 h-5 shrink-0 rounded-full border flex items-center justify-center transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/25 hover:border-[#C8F542]/70 bg-white/60'}`}>
-            {done && <span className="text-[11px] font-bold leading-none">✓</span>}
+            {done && <span className="text-[11px] font-bold leading-none"><Icon name="check" size={15} /></span>}
           </button>
           <button onClick={() => onOpen?.(t)} className="min-w-0 flex-1 text-left">
             <p className={`font-semibold text-sm break-words ${done ? 'line-through text-black/40' : 'text-[#16181A]'}`}>{t.title}</p>

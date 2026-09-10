@@ -53,7 +53,9 @@ export default function MessengerDock({ user }: Props) {
     .filter((c): c is Conversation => !!c);
 
   return (
-    <div className="fixed bottom-[calc(92px+env(safe-area-inset-bottom))] right-3 md:bottom-4 md:right-4 z-40 max-w-[calc(100vw-1.5rem)]">
+    // Na telefonu je chat v dolním doku; bublina nad ním byla podruhé totéž
+    // a zakrývala tlačítka v rohu. Na monitoru, kde dok není, má smysl.
+    <div className="hidden md:block fixed md:bottom-4 md:right-4 z-40 max-w-[calc(100vw-1.5rem)]">
       <style>{`@keyframes chatDockIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
       <div className="flex flex-col md:flex-row items-end gap-3">
         {/* Open chat windows (mobile shows only the most recent one) */}
@@ -112,7 +114,7 @@ function ConvAvatar({ conv, size = 40 }: { conv: Conversation; size?: number }) 
       className="inline-flex items-center justify-center rounded-full bg-black/[0.04] border border-black/[0.08] flex-shrink-0"
       style={{ width: size, height: size, fontSize: size * 0.5 }}
     >
-      {conv.avatar ?? '👤'}
+      {conv.avatar ?? <Icon name="user" size={Math.round(size * 0.45)} className="text-black/45" />}
     </span>
   );
 }
@@ -288,7 +290,7 @@ function ChatWindow({
 
       {sendError && (
         <p className="px-2.5 pt-1.5 text-[11px] font-medium text-red-600 flex items-center gap-1">
-          <span aria-hidden>⚠️</span> {sendError}
+          <span aria-hidden><Icon name="warning" size={15} /></span> {sendError}
         </p>
       )}
 

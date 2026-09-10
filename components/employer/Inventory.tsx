@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import { Button, PageHeader, EmptyState } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
@@ -588,73 +589,36 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
-          <p className="text-black/45 text-sm">
-            {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
-            {(() => {
-              const val = items.reduce((s, i) => s + (i.unitCost ? i.quantity * i.unitCost : 0), 0);
-              return val > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(val)}</span></> : ' · přidávejte a hlídejte limity';
-            })()}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          {toBuy.length > 0 && (
-            <button onClick={() => setShowShopping(true)} className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
-              🛒 Nakoupit ({toBuy.length})
-            </button>
-          )}
-          {/* Secondary actions live under one ⋯ so the header stays calm. */}
-          <div className="relative">
-            <button onClick={() => setMoreOpen(o => !o)}
-              className={`rounded-full w-11 h-11 flex items-center justify-center text-lg transition ${
-                moreOpen ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/60 hover:text-black'
-              }`}
-              title="Další akce">
-              ⋯
-              {reports.some(r => r.status !== 'done') && !moreOpen && (
-                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-orange-500 ring-2 ring-white" />
-              )}
-            </button>
-            {moreOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
-                <div className="absolute right-0 top-12 z-20 glass-strong rounded-2xl p-1.5 w-56 shadow-lg space-y-0.5">
-                  <button onClick={() => { setShowSuppliers(true); setMoreOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    🚚 Dodavatelé
-                  </button>
-                  <button onClick={() => { setShowStocktake(true); setMoreOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    📋 Inventura
-                  </button>
-                  {/* Párování s kasou má vlastní obrazovku — dvě místa na
-                      jednu věc byla hlavní důvod, proč to působilo krkolomně. */}
-                  <button onClick={() => { setMoreOpen(false); onNavigate?.('recipes'); }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    💳 Receptury a prodeje z kasy
-                  </button>
-                  {reports.length > 0 && (
-                    <button onClick={() => { setShowReports(true); setMoreOpen(false); }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors flex items-center justify-between gap-2">
-                      <span>📦 Hlášení od týmu</span>
-                      {reports.some(r => r.status !== 'done') && (
-                        <span className="rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 text-xs font-bold">
-                          {reports.filter(r => r.status !== 'done').length}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
-            <Icon name="plus" size={16} /> Přidat položku
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Sklad & zásoby"
+        subtitle={<>
+          {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
+          {(() => {
+            const val = items.reduce((s, i) => s + (i.unitCost ? i.quantity * i.unitCost : 0), 0);
+            return val > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(val)}</span></> : ' · přidávejte a hlídejte limity';
+          })()}
+        </>}
+        secondary={toBuy.length > 0 && (
+          <Button variant="secondary" icon="cart" onClick={() => setShowShopping(true)}>Nakoupit ({toBuy.length})</Button>
+        )}
+        menu={[
+          ...(toBuy.length > 0 ? [{ label: `Nakoupit (${toBuy.length})`, icon: 'cart', onClick: () => setShowShopping(true),
+            hint: 'Nákupní seznam z položek pod limitem.' }] : []),
+          { label: 'Dodavatelé', icon: 'users', onClick: () => setShowSuppliers(true) },
+          { label: 'Inventura', icon: 'clipboard', onClick: () => setShowStocktake(true),
+            hint: 'Přepočítat sklad a zapsat rozdíly.' },
+          // Párování s kasou má vlastní obrazovku — dvě místa na jednu věc
+          // byla hlavní důvod, proč to působilo krkolomně.
+          { label: 'Receptury a prodeje z kasy', icon: 'card', onClick: () => onNavigate?.('recipes') },
+          ...(reports.length > 0 ? [{
+            label: reports.some(r => r.status !== 'done')
+              ? `Hlášení od týmu (${reports.filter(r => r.status !== 'done').length} nových)`
+              : 'Hlášení od týmu',
+            icon: 'inbox', onClick: () => setShowReports(true),
+          }] : []),
+        ]}
+        primary={<Button variant="accent" icon="plus" onClick={openNew}>Přidat položku</Button>}
+      />
 
       {notice && (
         <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm font-semibold px-4 py-3">
@@ -697,7 +661,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
       {items.some(i => i.approved === false) && (
         <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
-          <p className="font-semibold text-sm text-[#16181A]">📥 Nové věci od týmu ({items.filter(i => i.approved === false).length})</p>
+          <p className="font-semibold text-sm text-[#16181A]"><Icon name="inbox" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nové věci od týmu ({items.filter(i => i.approved === false).length})</p>
           <div className="space-y-2">
             {items.filter(i => i.approved === false).map(i => (
               <div key={i.id} className="flex flex-wrap items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-2.5">
@@ -731,7 +695,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     else showNotice('Schválení se nepodařilo.');
                   }}
                   className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">
-                  Schválit ✓
+                  Schválit
                 </button>
                 <button
                   onClick={async () => {
@@ -863,7 +827,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   <p className="text-xs text-black/45 truncate">{editing ? editing.name : 'Přidejte novou zásobu do skladu'}</p>
                 </div>
               </div>
-              <button type="button" onClick={() => setShowForm(false)} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+              <button type="button" onClick={() => setShowForm(false)} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
 
             <div className="p-6 space-y-4">
@@ -1025,7 +989,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                           className={`${inputClass} !w-24 text-center`} />
                         <span className="text-xs text-black/40 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
                         <button type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
-                          className="text-black/30 hover:text-red-600 transition px-1">✕</button>
+                          className="text-black/30 hover:text-red-600 transition px-1"><Icon name="close" size={15} /></button>
                       </div>
                     ))}
                     <button type="button"
@@ -1113,7 +1077,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <span className="block text-sm font-medium text-[#16181A]">Zvýraznit zákazníkům</span>
                 <span className="block text-[11px] text-black/45 mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</span>
                 <div className="flex gap-1.5">
-                  {([['', 'Nic'], ['new', '✨ Novinka'], ['tip', '👍 Tip']] as const).map(([v, lbl]) => (
+                  {([['', 'Nic'], ['new', 'Novinka'], ['tip', '👍 Tip']] as const).map(([v, lbl]) => (
                     <button key={v} type="button" onClick={() => setForm(f => ({ ...f, highlight: v }))}
                       className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                         form.highlight === v ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
@@ -1215,7 +1179,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               Smazat
             </button>
             <button onClick={exitSelection} title="Zrušit výběr"
-              className="rounded-full w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition">✕</button>
+              className="rounded-full w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition"><Icon name="close" size={15} /></button>
           </div>
         </div>
       )}
@@ -1263,7 +1227,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
           <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">📦 Hlášení ze skladu</h3>
+              <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
               <button onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             {reports.length === 0 ? (
@@ -1296,7 +1260,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                           }}
                           className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition glass text-[#5B7A08] hover:brightness-105"
                         >
-                          🛒 Do nákupu
+                          <Icon name="cart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Do nákupu
                         </button>
                         <button
                           onClick={async () => {
@@ -1309,7 +1273,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                           className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
                             done ? 'glass text-black/50 hover:text-black' : 'bg-[#16181A] text-white hover:bg-black'
                           }`}>
-                          {done ? 'Vyřízeno ✓' : 'Označit vyřízené'}
+                          {done ? 'Vyřízeno' : 'Označit vyřízené'}
                         </button>
                       </div>
                       {list.length > 0 && (
@@ -1409,7 +1373,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
             <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Hromadná úprava</h3>
             <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="space-y-2">
@@ -1533,7 +1497,7 @@ function MoreMenu({
           </button>
           {onShopping && (
             <button className={row} onClick={() => { onShopping(); setOpen(false); }}>
-              <span className="w-4 text-center" aria-hidden>🛒</span> Nákupní seznam
+              <span className="w-4 text-center" aria-hidden><Icon name="cart" size={15} /></span> Nákupní seznam
               <span className="ml-auto text-xs text-black/35 tabular-nums">{shoppingCount}</span>
             </button>
           )}
@@ -1850,7 +1814,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
       {/* Header */}
       <button type="button" onClick={() => setExpandedOverride(!expanded)} className="w-full flex items-center gap-2 text-left min-w-0">
         <span className="font-bold tracking-tight text-[#16181A] flex items-center gap-2 min-w-0">
-          <span aria-hidden>📦</span> <span className="truncate">Objednávky</span>
+          <span aria-hidden><Icon name="box" size={15} /></span> <span className="truncate">Objednávky</span>
         </span>
         {open.length > 0 && (
           <span className="shrink-0 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-0.5 text-xs font-semibold tabular-nums">{open.length}</span>
@@ -1881,7 +1845,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                         onClick={() => { setReceivingId(receivingId === o.id ? null : o.id); setCostInput(''); }}
                         disabled={busyId === o.id}
                         className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 whitespace-nowrap shrink-0">
-                        Přišlo ✓
+                        Přišlo
                       </button>
                       <button
                         onClick={() => cancelOrder(o)}
@@ -1941,7 +1905,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                         disabled={busyId === o.id}
                         title="Smazat"
                         className="rounded-full glass w-7 h-7 flex items-center justify-center text-red-600/60 hover:text-red-600 text-xs disabled:opacity-50 shrink-0">
-                        🗑
+                        <Icon name="trash" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
                       </button>
                     </div>
                   ))}
@@ -2064,7 +2028,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
         {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
 
@@ -2077,7 +2041,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   {supplierByName(supplier)?.email && (
                     <button onClick={() => emailGroup(supplier, list)} disabled={emailing === supplier}
                       className="rounded-full bg-[#16181A] text-white px-3 py-1 text-[11px] font-semibold hover:bg-black disabled:opacity-50 transition whitespace-nowrap">
-                      {emailing === supplier ? 'Odesílám…' : '✉️ Objednat e-mailem'}
+                      {emailing === supplier ? 'Odesílám…' : 'Objednat e-mailem'}
                     </button>
                   )}
                 </div>
@@ -2107,13 +2071,13 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
             {ordering ? 'Vytvářím…' : 'Vytvořit objednávku'}
           </button>
           <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 px-4 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
-            {copied ? 'Zkopírováno ✓' : 'Zkopírovat seznam'}
+            {copied ? 'Zkopírováno' : 'Zkopírovat seznam'}
           </button>
           <a
             href={`mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`}
             className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap inline-flex items-center gap-1.5"
             title="Otevře e-mail s předvyplněným seznamem — doplň adresu dodavatele">
-            ✉️ Poslat e-mailem
+            <Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Poslat e-mailem
           </a>
           {canShare && (
             <button onClick={share} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 px-4 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">
@@ -2290,7 +2254,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
       <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Kategorie</h3>
-          <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black">✕</button>
+          <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="flex gap-2">
@@ -2314,7 +2278,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
         {categories.length === 0 ? (
           <div className="text-center space-y-3 py-4">
-            <p className="text-sm text-black/45">Zatím žádné kategorie.</p>
+            <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — čaje, sirupy, mléko, drogerie. Můžeš je nechat založit podle čajovny a upravit." compact />
             <button onClick={seedDefaults} disabled={busy} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm font-medium disabled:opacity-40">
               Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}
             </button>
@@ -2398,7 +2362,7 @@ function CategoryRow({
           <Icon name="box" size={15} />
         </button>
         <button onClick={startEdit} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
-        <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+        <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
       </div>
 
       {moveOpen && (
@@ -2496,7 +2460,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
           className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 transition">
           {busy ? 'Ukládám…' : 'Uložit'}
         </button>
-        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
+        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo</span>}
         {err && <span className="text-xs font-medium text-red-600">{err}</span>}
       </div>
     </div>
@@ -2616,7 +2580,7 @@ function PackagingEditor({ category, onSaved }: {
                     <span className="text-xs text-black/40">%</span>
                   </div>
                   <button onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))}
-                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600">✕</button>
+                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600"><Icon name="close" size={15} /></button>
                 </div>
               ))}
             </div>
@@ -2636,7 +2600,7 @@ function PackagingEditor({ category, onSaved }: {
           className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 transition">
           {busy ? 'Ukládám…' : 'Uložit'}
         </button>
-        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
+        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo</span>}
         {err && <span className="text-xs font-medium text-red-600">{err}</span>}
       </div>
     </div>
@@ -2673,7 +2637,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">🚚 Dodavatelé</h3>
+          <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
           <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
@@ -2691,7 +2655,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
         </div>
 
         {suppliers.length === 0 ? (
-          <p className="text-sm text-black/40 text-center py-6">Zatím žádní dodavatelé.</p>
+          <EmptyState illustration="sklad" title="Zatím žádný dodavatel" hint="S dodavatelem u položky pošleš objednávku e-mailem rovnou z nákupního seznamu." compact />
         ) : (
           <div className="divide-y divide-black/[0.06] rounded-2xl border border-black/[0.06] overflow-hidden">
             {suppliers.map(sp => (
@@ -2718,7 +2682,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                       if (!confirm(`Smazat dodavatele „${sp.name}"?`)) return;
                       const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
                       if (res?.ok) await onChanged();
-                    }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
+                    }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs"><Icon name="close" size={15} /></button>
                   </>
                 )}
               </div>

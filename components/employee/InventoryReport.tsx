@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
+import { PageHeader } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
@@ -258,16 +259,13 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="glass-card p-5">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
-        <p className="text-black/50 text-sm mt-1">Uprav stav, když něco dochází — vedení dostane upozornění.</p>
-      </div>
+      <PageHeader title="Sklad & zásoby" subtitle="Uprav stav, když něco dochází — vedení dostane upozornění." />
 
       {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo je u regálu. */}
       {stocktakeOpen && (
         <button onClick={() => setCounting(true)}
           className="w-full rounded-2xl bg-[#C8F542] text-[#16181A] px-5 py-3.5 text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
-          📋 Probíhá inventura — pomoct spočítat sklad
+          <Icon name="clipboard" size={18} /> Probíhá inventura — pomoct spočítat sklad
         </button>
       )}
       {counting && (
@@ -276,7 +274,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
       {success && (
         <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">
-          ✅ Hlášení bylo odesláno zaměstnavateli.
+          <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení bylo odesláno zaměstnavateli.
         </div>
       )}
 
@@ -365,7 +363,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           {/* Prominent low / critical items on top */}
           {lowItems.length > 0 && (
             <div className="glass-card border-orange-500/20 bg-orange-500/[0.06] p-5 space-y-3">
-              <p className="font-semibold text-sm flex items-center gap-2 text-orange-700">⚠️ Dochází — uprav stav</p>
+              <p className="font-semibold text-sm flex items-center gap-2 text-orange-700"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dochází — uprav stav</p>
               <div className="space-y-2">
                 {lowItems.map(i => {
                   const st = statusOf(i);
@@ -464,7 +462,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                     return (
                       <label key={item.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-black/[0.03] transition-colors ${isChecked ? 'bg-[#C8F542]/[0.06]' : ''}`}>
                         <span className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${isChecked ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15'}`}>
-                          {isChecked && <span className="text-xs font-bold">✓</span>}
+                          {isChecked && <span className="text-xs font-bold"><Icon name="check" size={15} /></span>}
                         </span>
                         <input type="checkbox" checked={isChecked} onChange={() => toggle(item.id)} className="sr-only" />
                         <div className="flex-1 min-w-0">
@@ -472,7 +470,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                           <p className="text-xs text-black/45 truncate">{item.category}</p>
                         </div>
                         <span className={`text-xs font-medium shrink-0 whitespace-nowrap ${isLow ? 'text-red-600' : 'text-black/55'}`}>
-                          {item.quantity} {item.unit}{isLow && ' ⚠️'}
+                          {item.quantity} {item.unit}{isLow && <Icon name="warning" size={13} className="inline ml-1 -mt-0.5 text-orange-600" />}
                         </span>
                       </label>
                     );

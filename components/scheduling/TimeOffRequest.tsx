@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { EmptyState } from '../ui';
+import { Icon } from '../Icons';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -133,7 +135,7 @@ export default function TimeOffRequest() {
   return (
     <div className="glass-card p-6 space-y-4">
       <div>
-        <h2 className="font-bold tracking-tight text-[#16181A]">🏖️ Dovolená a volno</h2>
+        <h2 className="font-bold tracking-tight text-[#16181A]"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dovolená a volno</h2>
         <p className="text-sm text-black/45 mt-0.5">
           Požádej o volno — vedoucí dostane notifikaci a žádost schválí.
         </p>
@@ -209,7 +211,7 @@ export default function TimeOffRequest() {
         {loading ? (
           <p className="text-sm text-black/40">Načítám…</p>
         ) : requests.length === 0 ? (
-          <p className="text-sm text-black/40">Zatím žádné žádosti.</p>
+          <EmptyState illustration="volno" title="Zatím žádná žádost o volno" hint="Dovolená, doktor, zkoušky — napiš termín a vedení to vidí v rozvrhu." compact />
         ) : (
           <ul className="space-y-2">
             {requests.map((r) => (

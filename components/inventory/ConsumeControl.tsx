@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 
+import { Icon } from '../Icons';
 export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onFail }: {
   itemId: number;
   /** Unit the amount is measured in — content unit for packaged items, the item's own unit otherwise. */
@@ -68,7 +69,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
         {saving ? '…' : 'Odepsat'}
       </button>
       <button onClick={() => { setOpen(false); setAmount(''); }}
-        className="rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-black text-sm">✕</button>
+        className="rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-black text-sm"><Icon name="close" size={15} /></button>
     </div>
   );
 }

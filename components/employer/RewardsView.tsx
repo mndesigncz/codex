@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState, PageHeader, Segmented } from '../ui';
 import { DEFAULT_POINTS, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
@@ -73,23 +74,9 @@ function RewardsViewInner() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <Icon name="award" size={22} className="text-[#16181A]" />
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Odměny a hodnocení</h1>
-            <p className="text-black/50 text-sm">Úrovně, body a hodnocení směn zaměstnanců.</p>
-          </div>
-        </div>
-        <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
-          {([['board', 'Žebříček'], ['calendar', 'Kalendář'], ['settings', 'Nastavení']] as const).map(([v, lbl]) => (
-            <button key={v} onClick={() => setTab(v)}
-              className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${tab === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader title="Odměny a hodnocení" subtitle="Úrovně, body a hodnocení směn zaměstnanců."
+        primary={<Segmented size="sm" ariaLabel="Část" value={tab} onChange={setTab}
+          options={[{ id: 'board', label: 'Žebříček' }, { id: 'calendar', label: 'Kalendář' }, { id: 'settings', label: 'Nastavení' }]} />} />
 
       {tab === 'calendar' ? (
         <ShiftReviewCalendar onSaved={load} />
@@ -99,7 +86,7 @@ function RewardsViewInner() {
         <>
         {redemptions.some(r => r.status === 'pending') && (
           <div className="glass-card p-5 border border-[#C8F542]/30">
-            <p className="font-bold text-[#16181A] mb-2.5">🎁 Žádosti o odměny</p>
+            <p className="font-bold text-[#16181A] mb-2.5"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o odměny</p>
             <div className="space-y-2">
               {redemptions.filter(r => r.status === 'pending').map(r => (
                 <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5">
@@ -118,7 +105,7 @@ function RewardsViewInner() {
         )}
         <StandingsBoard standings={standings} onRate={setRating} onOpen={s => setProfileId(s.id)} />
         <div className="glass-card p-5">
-          <p className="font-bold text-[#16181A] mb-1">🎁 Katalog odměn</p>
+          <p className="font-bold text-[#16181A] mb-1"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Katalog odměn</p>
           <p className="text-sm text-black/45 mb-3">Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.</p>
           {/* Čtyři sloupce vedle sebe se na telefon nevejdou — políčka mají
               vlastní minimální šířku, kterou mřížka nesmí podlézt, a řádek pak
@@ -169,7 +156,7 @@ function RewardsViewInner() {
                     if (!confirm(`Smazat odměnu „${rw.title}"?`)) return;
                     await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
                     await loadShop();
-                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs">✕</button>
+                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs"><Icon name="close" size={15} /></button>
                 </div>
               ))}
             </div>
@@ -198,7 +185,12 @@ function RewardsViewInner() {
 
 function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; onRate: (s: Standing) => void; onOpen: (s: Standing) => void }) {
   if (standings.length === 0) {
-    return <div className="glass-card p-8 text-center text-black/45">Zatím žádní zaměstnanci k hodnocení.</div>;
+    return (
+      <div className="glass-card">
+        <EmptyState illustration="tym" title="Zatím tu nikdo není"
+          hint="Až přidáš zaměstnance v Nastavení týmu, uvidíš tady jejich body, úroveň a hodnocení směn." />
+      </div>
+    );
   }
   const medal = (i: number) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`);
   return (

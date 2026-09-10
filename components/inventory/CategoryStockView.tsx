@@ -63,7 +63,7 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
         )}
         {onRemoveItem && (
           <button onClick={() => onRemoveItem(item)} title="Smazat položku"
-            className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+            className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
         )}
       </div>
     </div>
@@ -347,7 +347,7 @@ export default function CategoryStockView({
                     )}
                     {onRemoveItem && (
                       <button onClick={() => onRemoveItem(i)} title="Smazat položku"
-                        className="rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm">✕</button>
+                        className="rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
                     )}
                   </div>
                 </div>

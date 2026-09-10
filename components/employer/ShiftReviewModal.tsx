@@ -381,7 +381,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                   {t.checklist.map((it, i) => (
                                     <button key={i} onClick={() => toggleTaskCheck(t.id, i)} className="w-full flex items-center gap-2.5 text-left group">
                                       <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 group-hover:border-[#C8F542]/60'}`}>
-                                        {it.done && <span className="text-[11px] font-bold">✓</span>}
+                                        {it.done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
                                       </span>
                                       <span className={`text-[13px] ${it.done ? 'text-black/45 line-through' : 'text-[#16181A]'}`}>{it.text}</span>
                                     </button>
@@ -431,7 +431,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                   return (
                                     <button key={i} onClick={() => toggleProcStep(p.id, i)} className="w-full flex items-center gap-2.5 text-left group">
                                       <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : skipped ? 'bg-amber-400/80 border-amber-400 text-white' : 'border-red-500/40 group-hover:border-[#C8F542]/60'}`}>
-                                        {checked ? <span className="text-[11px] font-bold">✓</span> : skipped ? <span className="text-[11px] font-bold">⤳</span> : null}
+                                        {checked ? <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span> : skipped ? <span className="text-[11px] font-bold">⤳</span> : null}
                                       </span>
                                       <span className={`text-[13px] ${checked ? 'text-black/45 line-through' : skipped ? 'text-amber-700' : 'text-red-700'}`}>{p.steps[i] ?? `Krok ${i + 1}`}</span>
                                       {!checked && !skipped && <span className="text-[11px] text-red-600 shrink-0">neuděláno</span>}
@@ -505,7 +505,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
         <div className="sticky bottom-0 flex gap-2 px-5 py-4 glass-strong border-t border-black/[0.06]">
           <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition" title="Body a poznámky u položek se ukládají průběžně">Hotovo</button>
           {saveErr && (
-            <p className="w-full text-sm font-medium text-red-600">⚠️ {saveErr}</p>
+            <p className="w-full text-sm font-medium text-red-600"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {saveErr}</p>
           )}
           <button onClick={saveRating} disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition">
             {saving ? 'Ukládám…' : wholeShift ? `Uložit pro ${targetNames.length} ${plural(targetNames.length, 'člověka', 'lidi', 'lidí')}` : 'Uložit hodnocení'}

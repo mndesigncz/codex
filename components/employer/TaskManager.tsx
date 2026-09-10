@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
+import { Button, PageHeader, Segmented, EmptyState } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
 import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
 import TaskWeekBoard from '../TaskWeekBoard';
@@ -217,7 +218,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const renderCard = (t: Task, compact = false) => {
     const m = t.assignedTo != null ? memberById.get(t.assignedTo) : undefined;
-    const who = t.teamTask ? '🗓️ Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
+    const who = t.teamTask ? 'Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
     const prio = PRIORITIES.find(p => p.value === t.priority) ?? PRIORITIES[1];
     const done = t.status === 'done';
     // Future occurrences aren't active yet → show them greyed until their day comes.
@@ -227,7 +228,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <div className="flex items-start gap-2.5">
           <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
             className={`tap-target mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
-            {done && <span className="text-[11px] font-bold">✓</span>}
+            {done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1.5">
@@ -273,26 +274,20 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto w-full">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Úkoly</h1>
-          <p className="text-black/50 text-sm mt-1">Úkoly na den nebo pro konkrétní lidi — a jejich plnění.</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
-            {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
-              <button key={v} onClick={() => setView(v)}
-                className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-                {lbl}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => { if (showForm) closeForm(); else { setForm(emptyForm()); setEditingId(null); setShowForm(true); setError(''); } }}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition inline-flex items-center gap-1.5 whitespace-nowrap">
-            <Icon name="plus" size={18} /> Nový úkol
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Úkoly"
+        subtitle="Úkoly na den nebo pro konkrétní lidi — a jejich plnění."
+        secondary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
+          options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />}
+        primary={
+          <Button variant="accent" icon="plus"
+            onClick={() => { if (showForm) closeForm(); else { setForm(emptyForm()); setEditingId(null); setShowForm(true); setError(''); } }}>
+            Nový úkol
+          </Button>
+        }
+        aside={<div className="md:hidden"><Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
+          options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} /></div>}
+      />
 
       {showForm && (
         <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">
@@ -309,7 +304,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             <div>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
               <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
-                <option value="">🗓️ Kdokoliv (podle dne)</option>
+                <option value="">Kdokoliv (podle dne)</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
               </select>
               <p className="text-[11px] text-black/40 mt-1.5">
@@ -407,7 +402,11 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           onMove={(t, date) => moveTask(t as Task, date)}
           onAddForDay={openCreateForDay} />
       ) : tasks.length === 0 ? (
-        <div className="glass-card p-8 text-center text-black/45">Zatím žádné úkoly. Vytvoř první tlačítkem „Nový úkol".</div>
+        <div className="glass-card">
+          <EmptyState illustration="ukoly" title="Zatím žádné úkoly"
+            hint="Zadej, co se má udělat a kdy — jednorázově nebo každý den. Tým to uvidí v přehledu i na kiosku."
+            action={<Button variant="accent" icon="plus" onClick={() => { setForm(emptyForm()); setEditingId(null); setShowForm(true); setError(''); }}>Nový úkol</Button>} />
+        </div>
       ) : (
         <div className="space-y-6">
           {section('Po termínu', overdue, 'text-red-600')}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
+import { Avatar } from '../ui';
 import NotificationBell from '../NotificationBell';
 import ChatView from '../chat/ChatView';
 import MessengerDock from '../chat/MessengerDock';
@@ -248,7 +249,7 @@ export default function EmployerLayout({ user }: Props) {
           )}
           <button onClick={() => setAccountOpen(v => !v)} title="Účet"
             className={`w-full flex items-center gap-3 rounded-2xl transition-colors ${accountOpen ? 'bg-black/[0.06]' : 'bg-black/[0.04] hover:bg-black/[0.05]'} ${sidebarOpen ? 'p-2' : 'p-2 justify-center'}`}>
-            <span className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{user.avatar ?? '👤'}</span>
+            <Avatar emoji={user.avatar} size="md" />
             {sidebarOpen && (
               <>
                 <div className="flex-1 min-w-0 text-left">
@@ -282,8 +283,8 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="receipt" size={20} />
           </button>
           <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu" aria-label="Přepnout do TO GO režimu"
-            className="tap-target shrink-0 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
-            ☕<span className="hidden sm:inline"> TO GO</span>
+            className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#4F6A07] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
+            <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">TO GO</span>
           </button>
           <NotificationBell />
         </header>
@@ -291,7 +292,7 @@ export default function EmployerLayout({ user }: Props) {
         {plan?.trialing && (
           <button onClick={() => setCurrentView('settings')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
-            ✨ Zkoušíte Pro — zbývá {czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Zkoušíte Pro — zbývá {czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.
           </button>
         )}
         <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>

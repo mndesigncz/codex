@@ -548,7 +548,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                 </div>
                 <button type="button" title="Odebrat"
                   onClick={() => setDraft(d => d && ({ ...d, ingredients: d.ingredients.filter((_, i) => i !== idx) }))}
-                  className="text-black/30 hover:text-red-600 transition px-1.5">✕</button>
+                  className="text-black/30 hover:text-red-600 transition px-1.5"><Icon name="close" size={15} /></button>
               </div>
               {/* Díly položky — definované u ní, tady se jen vyberou. */}
               {item && Array.isArray(item.portions) && item.portions.length > 0 && (

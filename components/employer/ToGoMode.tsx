@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
+import { Avatar } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import ReceiptsPanel from './ReceiptsPanel';
 
@@ -182,8 +183,8 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
                     className={`shrink-0 snap-start flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border backdrop-blur-md ${
                       live ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/55 border-black/[0.06]'
                     }`}>
-                    <span className="relative text-base h-8 w-8 flex items-center justify-center rounded-full ring-1 ring-black/10 bg-white/80">
-                      {p.avatar || '👤'}
+                    <span className="relative h-8 w-8 flex items-center justify-center">
+                      <Avatar emoji={p.avatar} size="sm" />
                       {live && <span className="absolute -bottom-0 -right-0 h-2.5 w-2.5 rounded-full bg-[#8FB811] ring-2 ring-white" />}
                     </span>
                     <span className="min-w-0">

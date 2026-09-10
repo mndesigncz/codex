@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { dayPrefLabel, prefAllowsSlot, parseTypePref } from '@/lib/dayPrefs';
 import { openSpan, uncovered, typeFitsDay, toHM } from '@/lib/coverage';
 import { Icon } from '../Icons';
+import { Button, Menu, EmptyState } from '../ui';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
 
@@ -660,7 +661,7 @@ export default function ScheduleBuilder({ user }: Props) {
         {boardError && (
           <div className="w-full rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm font-medium text-red-600 flex items-center justify-between gap-3">
             <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
-            <button onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600">✕</button>
+            <button onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600"><Icon name="close" size={15} /></button>
           </div>
         )}
 
@@ -884,7 +885,7 @@ export default function ScheduleBuilder({ user }: Props) {
                           if (!holidays.length) return null;
                           return (
                             <div className="text-black/60">
-                              🏖️ Dovolená ({holidays.length}):{' '}
+                              <Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dovolená ({holidays.length}):{' '}
                               <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
                                 {holidays.map((t: any) => (
                                   <span key={t.id} className="rounded-md bg-[#0A84FF]/12 text-[#0A6FE0] px-1.5 py-0.5 text-xs tabular-nums">
@@ -901,7 +902,7 @@ export default function ScheduleBuilder({ user }: Props) {
                         <button
                           onClick={() => setEditAvail({ id: s.employeeId, name: s.employeeName, avatar: s.employeeAvatar })}
                           className="mt-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-semibold hover:bg-black/[0.05] transition">
-                          ✏️ Upravit dostupnost
+                          <Icon name="pencil" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Upravit dostupnost
                         </button>
                       </div>
                     );
@@ -910,50 +911,37 @@ export default function ScheduleBuilder({ user }: Props) {
             )}
           </div>
 
-          {/* Toolbar — jedna hlavní akce, zbytek vedle ní tiše. Sedm stejně
-              hlasitých tlačítek vedle sebe neříká, čím začít. */}
+          {/* Lišta akcí: dvě vidět, zbytek v „···". Sedm stejně hlasitých
+              tlačítek vedle sebe neříkalo, čím začít. Postup je vygenerovat →
+              zkontrolovat → publikovat; vygenerovat je limetkové, publikovat
+              tmavé, všechno ostatní čeká v menu. */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={generate}
-              disabled={generating}
-              className="rounded-full bg-[#16181A] text-white font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-125 transition inline-flex items-center gap-2 disabled:opacity-50"
-            >
-              <Icon name="bulb" size={18} /> {generating ? 'Generuji…' : 'Vygenerovat rozvrh'}
-            </button>
-            <button
-              onClick={runAdjust}
-              disabled={adjusting || shifts.length === 0}
-              title={shifts.length === 0 ? 'Nejdřív musí existovat uložený rozvrh' : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti a navrhne přeobsazení'}
-              className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] font-semibold px-4 py-2.5 min-[380px]:whitespace-nowrap text-left transition inline-flex items-center gap-2 min-w-0 max-w-full disabled:opacity-40"
-            >
-              <Icon name="swap" size={18} /> {adjusting ? 'Kontroluji…' : 'Upravit podle nových požadavků'}
-            </button>
-            <button
-              onClick={publish}
-              disabled={publishing}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition inline-flex items-center gap-2 disabled:opacity-50"
-            >
-              <Icon name="check" size={18} /> {publishing ? 'Posílám…' : 'Publikovat rozvrh'}
-            </button>
-            <button
-              onClick={exportCsv}
+            <Button variant="accent" icon="bulb" onClick={generate} loading={generating}>
+              Vygenerovat rozvrh
+            </Button>
+            <Button variant="primary" icon="check" onClick={publish} loading={publishing}>
+              Publikovat rozvrh
+            </Button>
+            <Button
+              variant="secondary" icon="swap" onClick={runAdjust} loading={adjusting}
               disabled={shifts.length === 0}
-              className="rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 text-black/60 hover:text-black hover:bg-black/[0.05] disabled:opacity-40"
+              title={shifts.length === 0 ? 'Nejdřív musí existovat uložený rozvrh' : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti a navrhne přeobsazení'}
+              className="hidden md:inline-flex"
             >
-              <Icon name="trend" size={16} /> Export CSV
-            </button>
-            <button
-              onClick={() => { setCopyOpen(true); setCopyMsg(''); setCopySrc(''); setCopyDst(''); }}
-              className="rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 text-black/60 hover:text-black hover:bg-black/[0.05]"
-            >
-              <Icon name="swap" size={16} /> Kopírovat týden
-            </button>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 text-black/60 hover:text-black hover:bg-black/[0.05]"
-            >
-              <Icon name="plus" size={16} /> Import CSV
-            </button>
+              Upravit podle nových požadavků
+            </Button>
+            <Menu
+              label="Další akce s rozvrhem"
+              items={[
+                { label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: adjusting || shifts.length === 0,
+                  hint: 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' },
+                { label: 'Kopírovat týden', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(''); setCopySrc(''); setCopyDst(''); } },
+                { label: 'Import CSV', icon: 'upload', onClick: () => fileRef.current?.click() },
+                { label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 },
+                { label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
+                  hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' },
+              ]}
+            />
             <input
               ref={fileRef}
               type="file"
@@ -965,22 +953,17 @@ export default function ScheduleBuilder({ user }: Props) {
                 e.target.value = '';
               }}
             />
-            <button
-              onClick={() => (confirmClear ? clearMonth() : setConfirmClear(true))}
-              className={`rounded-full px-3.5 py-2 text-sm whitespace-nowrap transition inline-flex items-center gap-1.5 ${
-                confirmClear
-                  ? 'bg-red-500/15 border border-red-500/35 text-red-600 font-semibold'
-                  : 'text-red-600/60 hover:text-red-600 hover:bg-red-500/[0.07]'
-              }`}
-            >
-              <Icon name="warning" size={16} /> {confirmClear ? 'Opravdu vymazat?' : 'Vymazat měsíc'}
-            </button>
-            {confirmClear && (
-              <button onClick={() => setConfirmClear(false)} className="text-black/45 text-sm hover:text-black">
-                Zrušit
-              </button>
-            )}
           </div>
+          {confirmClear && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-red-500/[0.08] border border-red-500/30 px-4 py-3 rise-in">
+              <Icon name="warning" size={18} className="text-red-600 shrink-0" />
+              <p className="text-sm text-red-700 font-medium flex-1 min-w-[12rem]">Opravdu vymazat všechny směny za {monthLabel(month)}? Nejde to vzít zpět.</p>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button variant="ghost" size="sm" onClick={() => setConfirmClear(false)}>Zrušit</Button>
+                <Button variant="danger-solid" size="sm" icon="trash" onClick={clearMonth}>Vymazat měsíc</Button>
+              </div>
+            </div>
+          )}
 
           {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
           {copyOpen && (
@@ -1101,7 +1084,7 @@ export default function ScheduleBuilder({ user }: Props) {
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <h3 className="font-bold text-[#16181A] flex items-center gap-2">
-                    <span>✨</span> Navržený rozvrh
+                    <span><Icon name="sparkle" size={15} /></span> Navržený rozvrh
                   </h3>
                   <p className="text-sm text-black/55 mt-0.5">
                     {preview.proposed.length} navržených směn
@@ -1269,7 +1252,7 @@ export default function ScheduleBuilder({ user }: Props) {
                       {(eventsByDate[cell] ?? []).map((ev: any) => (
                         <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
                           className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/12 text-[#0A6FE0]">
-                          <span className="flex-shrink-0">📅</span>
+                          <span className="flex-shrink-0"><Icon name="calendarCheck" size={15} /></span>
                           <span className="truncate min-w-0">{ev.title}</span>
                         </span>
                       ))}
@@ -1297,7 +1280,7 @@ export default function ScheduleBuilder({ user }: Props) {
                           title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ' (část směny)' : ''}`}
                           className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
                         >
-                          <span className="flex-shrink-0">✨{p.employeeAvatar}</span>
+                          <span className="flex-shrink-0 inline-flex items-center gap-0.5"><Icon name="sparkle" size={11} />{p.employeeAvatar}</span>
                           <span className="truncate min-w-0">{p.startTime}</span>
                         </span>
                       ))}
@@ -1523,7 +1506,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
       </div>
 
       {shiftTypes.length === 0 && editing !== 'new' && (
-        <p className="text-black/45 text-sm">Zatím žádné typy směn. Přidej ranní, odpolední nebo vlastní směnu.</p>
+        <EmptyState illustration="smeny" title="Zatím žádné typy směn" hint="Ranní, odpolední, otvíračka — podle nich generátor obsazuje dny. Přidej první." compact />
       )}
 
       <div className="space-y-2">
@@ -1944,7 +1927,7 @@ function FixedAssignmentsManager({
           <Icon name="calendar" size={20} className="text-black/70" /> Pevné dny
         </h2>
         {assignments.length === 0 ? (
-          <p className="text-black/45 text-sm">Zatím žádné pevné dny.</p>
+          <EmptyState icon="calendar" title="Zatím žádné pevné dny" hint="Kdo chodí vždycky v pondělí, dostane pondělí — generátor to bere jako první." compact />
         ) : (
           <div className="space-y-3">
             {CZ_DAYS_FULL.map((label, d) => {
@@ -2089,11 +2072,11 @@ function DayModal({
     const prefBlocks = dayPref && dayPref !== 'off' && dayPref !== 'flexible'
       && !prefAllowsSlot(dayPref, { typeId: slotTypeId, start }, prefTypesForCheck);
     if (unavailable.has(emp)) {
-      if (!confirm(`⚠️ ${empName} označil/a tento den jako NEDOSTUPNÝ. Opravdu ho/ji na směnu přiřadit?`)) return;
+      if (!confirm(`${empName} označil/a tento den jako NEDOSTUPNÝ. Opravdu ho/ji na směnu přiřadit?`)) return;
     } else if (prefBlocks) {
-      if (!confirm(`⚠️ ${empName} má na tento den závaznou volbu „${dayPrefLabel(dayPref, prefTypesForCheck)}" — tahle směna jí neodpovídá. Opravdu přiřadit?`)) return;
+      if (!confirm(`${empName} má na tento den závaznou volbu „${dayPrefLabel(dayPref, prefTypesForCheck)}" — tahle směna jí neodpovídá. Opravdu přiřadit?`)) return;
     } else if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
-      if (!confirm(`⚠️ ${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny. Přesto přiřadit na tuhle?`)) return;
+      if (!confirm(`${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny. Přesto přiřadit na tuhle?`)) return;
     }
     setSaving(true);
     try {
@@ -2136,10 +2119,10 @@ function DayModal({
 
         {events.length > 0 && events.map((ev: any) => (
           <div key={ev.id} className="rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 px-4 py-3">
-            <p className="text-sm font-bold text-[#16181A]">📅 {ev.title}</p>
+            <p className="text-sm font-bold text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {ev.title}</p>
             <p className="text-xs text-black/50 mt-0.5">
               {ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : 'celý den'}
-              {ev.location ? ` · 📍 ${ev.location}` : ''}
+              {ev.location ? ` · ${ev.location}` : ''}
               {ev.crewPeople?.length ? ` · na akci: ${ev.crewPeople.map((p: any) => p.name).join(', ')}` : ' · zatím bez obsazení'}
             </p>
           </div>
@@ -2176,7 +2159,7 @@ function DayModal({
         {/* Auto-generated proposal for this day — the review the calendar icons can't give. */}
         {proposed.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#5B7A08] font-semibold">✨ Navržené směny (náhled — zatím neuloženo)</p>
+            <p className="text-xs uppercase tracking-wide text-[#5B7A08] font-semibold"><Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Navržené směny (náhled — zatím neuloženo)</p>
             {proposed.map((p, idx) => (
               <div key={`prop-${idx}`} className="flex items-center gap-3 rounded-2xl border border-dashed border-[#5B7A08]/50 bg-[#C8F542]/[0.08] px-3 py-2">
                 <span className="text-lg flex-shrink-0">{p.employeeAvatar}</span>

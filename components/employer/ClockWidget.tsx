@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../Icons';
+import { Button } from '../ui';
 
 // Lets the employer clock themselves in/out — they can work a shift too.
 export default function ClockWidget({ userId }: { userId: number }) {
@@ -52,12 +53,9 @@ export default function ClockWidget({ userId }: { userId: number }) {
             : <p className="text-sm text-black/45">Odpíchni si příchod, když jdeš pracovat.</p>}
         </div>
       </div>
-      <button onClick={punch} disabled={busy}
-        className={`rounded-full font-semibold px-5 py-2.5 text-sm transition whitespace-nowrap shrink-0 disabled:opacity-50 ${
-          on ? 'bg-red-500 text-white hover:brightness-110' : 'bg-[#16181A] text-white hover:bg-black'
-        }`}>
-        {busy ? '…' : on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
-      </button>
+      <Button onClick={punch} loading={busy} variant={on ? 'danger-solid' : 'accent'} icon={on ? 'logout' : 'clock'} className="shrink-0">
+        {on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
+      </Button>
     </div>
   );
 }

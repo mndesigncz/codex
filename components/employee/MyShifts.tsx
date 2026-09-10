@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { pragueToday } from '@/lib/pragueTime';
 import TeamSchedule from './TeamSchedule';
 
+import { Icon } from '../Icons';
 interface Shift {
   id: number;
   employeeId: number;
@@ -78,7 +79,7 @@ export default function MyShifts({ user }: Props) {
   const formatDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'short' });
 
   // Prefer the server-resolved configured type name; fall back to legacy labels.
-  const shiftLabel = (s: Shift) => s.type === 'event' ? '📅 Akce' : (s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna'));
+  const shiftLabel = (s: Shift) => s.type === 'event' ? 'Akce' : (s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna'));
 
   // Client-side iCalendar export of upcoming shifts (opens in Apple/Google Calendar).
   const exportIcs = () => {
@@ -141,7 +142,7 @@ export default function MyShifts({ user }: Props) {
 
       {timeOff.length > 0 && (
         <div className="glass-card p-5">
-          <p className="text-xs uppercase tracking-wider text-black/45 mb-2.5">🏖️ Schválené volno</p>
+          <p className="text-xs uppercase tracking-wider text-black/45 mb-2.5"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Schválené volno</p>
           <div className="flex flex-wrap gap-2">
             {timeOff.map((t, i) => {
               const one = t.fromDate === t.toDate;
@@ -162,7 +163,7 @@ export default function MyShifts({ user }: Props) {
         <>
           <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-              <h3 className="font-bold tracking-tight text-[#16181A]">📅 Nadcházející směny</h3>
+              <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nadcházející směny</h3>
               {upcoming.length > 0 && (
                 <button onClick={exportIcs}
                   className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
@@ -197,7 +198,7 @@ export default function MyShifts({ user }: Props) {
 
           {past.length > 0 && (
             <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-              <h3 className="font-bold tracking-tight text-[#16181A] mb-4">📋 Minulé směny</h3>
+              <h3 className="font-bold tracking-tight text-[#16181A] mb-4"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Minulé směny</h3>
               <div className="divide-y divide-black/[0.06]">
                 {past.slice(0, 5).map(s => (
                   <div key={s.id} className="flex items-center gap-x-3 gap-y-2 flex-wrap p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
