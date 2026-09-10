@@ -201,15 +201,15 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Tenhle měsíc</p>
         <div className="grid grid-cols-3 gap-3 stagger">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Odpracováno</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Odpracováno</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{fmtH(monthHours)}</p>
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Hodnocených směn</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Hodnocených směn</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5">{monthRatings.length}</p>
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Průměr hodnocení</p>
+            <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Průměr hodnocení</p>
             <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? <><Icon name="star" size={16} className="inline -mt-0.5 mr-1 text-[#4F6A07]" />{monthAvg.toFixed(1)}</> : '—'}</p>
           </div>
         </div>

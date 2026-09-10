@@ -12,6 +12,7 @@ import { usePlan, UpgradeModal } from '../Pro';
 import ShrinkageReport from '../inventory/ShrinkageReport';
 import LiveRevenue from './LiveRevenue';
 import FinanceAdvice from './FinanceAdvice';
+import { PageHeader, Button } from '../ui';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -122,28 +123,26 @@ export default function FinanceView() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Icon name="coins" size={22} className="text-[#16181A] shrink-0" />
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Finance</h2>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap min-w-0 basis-full sm:basis-auto sm:justify-end">
-          <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0">
-            <button onClick={() => shiftMonth(-1)} className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
+      {/* Hlavička jako všude jinde: nadpis h1, jedna hlavní akce v limetkové,
+          přepínač měsíce pod ní. Dřív si ji tahle obrazovka kreslila sama —
+          měla h2 místo h1 a hlavní akci v tmavé, takže vypadala jako z jiné
+          aplikace. */}
+      <PageHeader
+        title="Finance"
+        subtitle="Tržby, nákupy a mzdy měsíce pohromadě."
+        primary={<Button onClick={exportCsv} variant="accent" icon="download">Export pro účetní</Button>}
+        aside={
+          <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-fit">
+            <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
             <span className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold cz-sentence text-[#16181A] truncate">{monthLabel(month)}</span>
-            <button onClick={() => shiftMonth(1)} className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
+            <button onClick={() => shiftMonth(1)} aria-label="Další měsíc" className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="-rotate-90" />
             </button>
           </div>
-          <button onClick={exportCsv}
-            className="rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-bold hover:bg-black transition whitespace-nowrap">
-            Export pro účetní ↓
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {loading ? (
         <div className="flex items-center justify-center h-56">
