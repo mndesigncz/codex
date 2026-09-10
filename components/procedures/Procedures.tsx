@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState, Button, PageHeader } from '../ui';
 import { isExcused, skipReasonLabel } from '@/lib/procedureScoring';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
@@ -184,17 +185,10 @@ export default function Procedures({ user }: Props) {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 pb-5">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Postupy</h1>
-          <p className="mt-1 text-sm text-black/50">Krok za krokem — otevírání, zavírání a další rutiny.</p>
-        </div>
-        {isEmployer && procedures.length > 0 && (
-          <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition inline-flex items-center gap-1.5 flex-shrink-0">
-            <Icon name="plus" size={18} /> <span className="hidden sm:inline">Nový postup</span>
-          </button>
-        )}
-      </div>
+      <PageHeader className="pb-5" title="Postupy" subtitle="Krok za krokem — otevírání, zavírání a další rutiny."
+        primary={isEmployer && procedures.length > 0 && (
+          <Button variant="accent" icon="plus" onClick={openNew}>Nový postup</Button>
+        )} />
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -203,7 +197,7 @@ export default function Procedures({ user }: Props) {
           ))}
         </div>
       ) : procedures.length === 0 ? (
-        <EmptyState isEmployer={isEmployer} seeding={seeding} onSeed={seedExamples} onNew={openNew} />
+        <ProceduresEmpty isEmployer={isEmployer} seeding={seeding} onSeed={seedExamples} onNew={openNew} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {procedures.map(p => {
@@ -543,29 +537,19 @@ function ProcedureDetail({
   );
 }
 
-function EmptyState({ isEmployer, seeding, onSeed, onNew }: { isEmployer: boolean; seeding: boolean; onSeed: () => void; onNew: () => void }) {
+function ProceduresEmpty({ isEmployer, seeding, onSeed, onNew }: { isEmployer: boolean; seeding: boolean; onSeed: () => void; onNew: () => void }) {
   return (
-    <div className="glass-card rounded-3xl px-6 py-14 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#C8F542]/25 text-[#5B7A08]">
-        <Icon name="check" size={30} />
-      </div>
-      <h3 className="mt-4 text-xl font-bold tracking-tight text-[#16181A]">Zatím žádné postupy</h3>
-      <p className="mx-auto mt-1.5 max-w-sm text-sm text-black/50">
-        {isEmployer
-          ? 'Vytvořte první — třeba Otevírání nebo Zavírání. Zaměstnanci je pak projdou krok po kroku.'
-          : 'Zaměstnavatel zatím nevytvořil žádné postupy. Až přibudou, najdete je tady.'}
-      </p>
-      {isEmployer && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-2.5">
-          <button onClick={onSeed} disabled={seeding} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-60 inline-flex items-center gap-1.5">
-            {seeding ? 'Vytvářím…' : <><Icon name="leaf" size={17} /> Vytvořit ukázkové postupy</>}
-          </button>
-          <button onClick={onNew} className="rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 font-medium hover:bg-black/[0.05] transition inline-flex items-center gap-1.5">
-            <Icon name="plus" size={17} /> Vlastní postup
-          </button>
-        </div>
-      )}
-
+    <div className="glass-card">
+      <EmptyState illustration="postupy" title="Zatím žádné postupy"
+        hint={isEmployer
+          ? 'Otevírání, zavírání, příjem zboží — krok za krokem, s časy a tím, co je klíčové. Zaměstnanci je pak odklikají na baru.'
+          : 'Až je vedení sepíše, najdeš je tady a projdeš krok po kroku.'}
+        action={isEmployer ? (
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            <Button variant="accent" icon="leaf" onClick={onSeed} loading={seeding}>Vytvořit ukázkové postupy</Button>
+            <Button variant="secondary" icon="plus" onClick={onNew}>Vlastní postup</Button>
+          </div>
+        ) : undefined} />
     </div>
   );
 }

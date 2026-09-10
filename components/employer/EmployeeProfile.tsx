@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
 import type { RewardLevel } from '@/lib/rewardLevels';
 
@@ -226,7 +227,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Odpracované ({p.shifts.recent.length})</h3>
                     {p.shifts.recent.length === 0 ? (
-                      <p className="text-sm text-black/45">Zatím žádné odpracované směny.</p>
+                      <EmptyState illustration="smeny" title="Zatím žádná odpracovaná směna" compact />
                     ) : (
                       <div className="space-y-1.5">
                         {p.shifts.recent.map(sh => (
@@ -257,7 +258,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
               {tab === 'feedback' && (
                 <>
                   {p.reviews.length === 0 && p.items.length === 0 ? (
-                    <p className="text-sm text-black/45">Zatím žádné hodnocení. Otevři záložku Směny a ohodnoť první.</p>
+                    <EmptyState illustration="odmeny" title="Zatím žádné hodnocení" hint="Otevři záložku Směny a ohodnoť první." compact />
                   ) : (
                     <div className="space-y-2.5">
                       {p.reviews.map(r => {

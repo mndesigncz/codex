@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
+import { PageHeader } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
@@ -258,16 +259,13 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="glass-card p-5">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
-        <p className="text-black/50 text-sm mt-1">Uprav stav, když něco dochází — vedení dostane upozornění.</p>
-      </div>
+      <PageHeader title="Sklad & zásoby" subtitle="Uprav stav, když něco dochází — vedení dostane upozornění." />
 
       {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo je u regálu. */}
       {stocktakeOpen && (
         <button onClick={() => setCounting(true)}
           className="w-full rounded-2xl bg-[#C8F542] text-[#16181A] px-5 py-3.5 text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
-          📋 Probíhá inventura — pomoct spočítat sklad
+          <Icon name="clipboard" size={18} /> Probíhá inventura — pomoct spočítat sklad
         </button>
       )}
       {counting && (

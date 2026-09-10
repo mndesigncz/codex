@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState } from '../ui';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
@@ -1213,7 +1214,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
           </div>
         ) : closings.length === 0 ? (
-          <div className="glass-card p-8 text-center"><p className="text-black/45">Zatím žádná uzávěrka.</p></div>
+          <div className="glass-card"><EmptyState illustration="uzaverka" title="Zatím žádná uzávěrka" hint="Po směně spočítej kasu a vyplň ji tady — vedení ji pak schválí." compact /></div>
         ) : (
           closings.map(c => {
             const d = cashDifference(c);

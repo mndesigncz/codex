@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
+import { Avatar } from '../ui';
 import NotificationBell from '../NotificationBell';
 import ChatView from '../chat/ChatView';
 import MessengerDock from '../chat/MessengerDock';
@@ -158,7 +159,7 @@ export default function EmployeeLayout({ user }: Props) {
           )}
           <button onClick={() => setAccountOpen(v => !v)} title="Účet"
             className={`w-full flex items-center gap-3 rounded-2xl transition-colors ${accountOpen ? 'bg-black/[0.06]' : 'bg-black/[0.04] hover:bg-black/[0.05]'} ${sidebarOpen ? 'p-2' : 'p-2 justify-center'}`}>
-            <span className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{user.avatar ?? '👤'}</span>
+            <Avatar emoji={user.avatar} size="md" />
             {sidebarOpen && (
               <>
                 <div className="flex-1 min-w-0 text-left">

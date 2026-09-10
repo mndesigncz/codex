@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import { Icon } from '../Icons';
+import { Avatar } from '../ui';
 import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
@@ -169,32 +170,35 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   const blocks: Record<string, React.ReactNode> = {
     nextEvent: nextEvent ? (
       <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
-        <p className="font-bold text-[#16181A] truncate">📅 {nextEvent.title}</p>
+        <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
+          <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
+          <span className="truncate">{nextEvent.title}</span>
+        </p>
         <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
           {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-          {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · 📍 ${nextEvent.location}` : ''}
+          {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
         </p>
         {myId != null && nextEvent.crew?.includes(myId) && (
-          <p className="tap-target-sm mt-2 inline-block rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-xs font-semibold">Jsi na akci — směna je v rozvrhu ✓</p>
+          <p className="tap-target-sm mt-2 inline-block rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-xs font-semibold">Jsi na akci — směna je v rozvrhu</p>
         )}
       </div>
     ) : null,
     handover: handover ? (
       <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
-          🤝 Předávka od {handover.authorName ?? 'předchozí směny'}
+        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
+          <Icon name="handover" size={14} className="shrink-0" /> Předávka od {handover.authorName ?? 'předchozí směny'}
           <span className="normal-case font-normal text-black/35"> · {new Date(handover.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}</span>
         </p>
         <div className="space-y-1.5 text-sm text-[#16181A]">
-          {handover.handover.todo && <p>🔧 <span className="text-black/70">{handover.handover.todo}</span></p>}
-          {handover.handover.runningOut && <p>📦 <span className="text-black/70">{handover.handover.runningOut}</span></p>}
-          {handover.handover.message && <p>💬 <span className="text-black/70">{handover.handover.message}</span></p>}
+          {handover.handover.todo && <p className="flex gap-2"><Icon name="check" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.todo}</span></p>}
+          {handover.handover.runningOut && <p className="flex gap-2"><Icon name="box" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.runningOut}</span></p>}
+          {handover.handover.message && <p className="flex gap-2"><Icon name="chat" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.message}</span></p>}
         </div>
       </div>
     ) : null,
     monthly: (monthHours > 0 || monthRatings.length > 0) ? (
       <div className="glass-card p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📆 Tenhle měsíc</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Tenhle měsíc</p>
         <div className="grid grid-cols-3 gap-3 stagger">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Odpracováno</p>
@@ -206,7 +210,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           </div>
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wider text-black/40 truncate">Průměr hodnocení</p>
-            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? `★ ${monthAvg.toFixed(1)}` : '—'}</p>
+            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? <><Icon name="star" size={16} className="inline -mt-0.5 mr-1 text-[#4F6A07]" />{monthAvg.toFixed(1)}</> : '—'}</p>
           </div>
         </div>
       </div>
@@ -216,7 +220,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-bold text-[#16181A] truncate">📌 {pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</p>
+            <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
+              <Icon name="pin" size={17} className="shrink-0 text-[#4F6A07]" />
+              <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
+            </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
           </div>
           <span className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
@@ -339,10 +346,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-black/[0.05]">{user.avatar ?? '👤'}</span>
-        <div>
-          <p className="text-black/45 text-sm">{greeting},</p>
-          <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">{user.name}</h1>
+        <Avatar emoji={user.avatar} size="lg" />
+        <div className="min-w-0">
+          <p className="text-black/55 text-sm">{greeting},</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#16181A] truncate">{user.name}</h1>
         </div>
       </div>
 

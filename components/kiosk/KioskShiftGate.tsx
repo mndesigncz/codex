@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
+import { Avatar, EmptyState } from '../ui';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 
 export interface RosterMember {
@@ -223,9 +224,7 @@ function LockScreen() {
               <Icon name="play" size={20} /> Jsem na směně
             </button>
             {roster.length === 0 && (
-              <p className="mt-6 text-sm text-black/40">
-                Zatím žádní zaměstnanci. Přidej je v aplikaci vedení (Nastavení týmu).
-              </p>
+              <EmptyState illustration="tym" title="Zatím tu nikdo není" hint="Zaměstnance přidá vedení v aplikaci v Nastavení týmu — pak se tady odpíchnou." compact />
             )}
           </>
         ) : (
@@ -269,7 +268,7 @@ export function PersonPicker({ members, onPick, emptyText }: {
           onClick={() => onPick(m)}
           className="glass-card p-5 text-left min-h-[112px] hover:bg-black/[0.03] active:scale-[0.98] transition"
         >
-          <span className="text-4xl">{m.avatar || '👤'}</span>
+          <Avatar emoji={m.avatar} size="xl" ring={false} />
           <p className="font-bold text-[#16181A] mt-3 truncate">{m.name}</p>
           {m.openSince ? (
             <p className="text-sm font-semibold text-[#5B7A08] mt-0.5">Na směně</p>
@@ -316,7 +315,7 @@ export function WhoIsWorking() {
                 }`}
               >
                 <div className="flex items-center gap-2.5 sm:gap-3">
-                  <span className="text-3xl sm:text-4xl leading-none shrink-0">{m.avatar || '👤'}</span>
+                  <Avatar emoji={m.avatar} size="lg" ring={false} />
                   <span className="min-w-0 flex-1">
                     <span className="block font-bold text-[#16181A] truncate">{m.name}</span>
                     <span className="block text-sm font-semibold text-[#5B7A08] tabular-nums">
@@ -392,7 +391,7 @@ export function ActivePersonChip() {
                   m.id === active.id ? 'bg-[#C8F542]/20' : 'hover:bg-black/[0.05]'
                 }`}
               >
-                <span className="text-2xl leading-none">{m.avatar || '👤'}</span>
+                <Avatar emoji={m.avatar} size="md" ring={false} />
                 <span className="font-semibold text-[#16181A] truncate flex-1">{m.name}</span>
                 {m.id === active.id && <Icon name="check" size={16} className="text-[#5B7A08]" />}
               </button>
@@ -441,7 +440,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-        <span className="text-5xl">{member.avatar || '👤'}</span>
+        <Avatar emoji={member.avatar} size="xl" ring={false} />
         <h2 className="text-xl font-bold tracking-tight text-[#16181A] mt-2">{member.name}</h2>
         <p className="text-sm text-black/50 mt-1">
           {on

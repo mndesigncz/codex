@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { PLAN_FEATURES, PRO_PRICE, planInfoOf, planLabel, czDays, type PlanInfo } from '@/lib/plan';
 import { Icon } from './Icons';
+import { EmptyState } from './ui';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
@@ -735,7 +736,7 @@ export default function Settings({ user, initialTab }: Props) {
                   <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
                 </div>
               ) : auditEntries.length === 0 ? (
-                <p className="text-sm text-black/40">Zatím žádné záznamy.</p>
+                <EmptyState icon="clock" title="Zatím žádný záznam" hint="Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen." compact />
               ) : (
                 <div className="divide-y divide-black/[0.05]">
                   {auditEntries.map(e => (

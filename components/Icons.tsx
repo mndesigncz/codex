@@ -193,6 +193,110 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M8.5 13.5 7 21l5-2.5L17 21l-1.5-7.5" />
     </>
   ),
+  // ---- Kreslené náhrady za emoji. Emoji vypadá na každém telefonu jinak a
+  // v systému ikon s jednou tloušťkou linky působí jako cizí těleso. ----
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </>
+  ),
+  cart: (
+    <>
+      <path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.47 1.2h8.9a1.5 1.5 0 0 0 1.45-1.1L21 8H6" />
+      <circle cx="9.5" cy="20" r="1.3" /><circle cx="17" cy="20" r="1.3" />
+    </>
+  ),
+  download: <path d="M12 4v11m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />,
+  upload: <path d="M12 15V4m0 0 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />,
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </>
+  ),
+  print: (
+    <>
+      <path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+      <rect x="7" y="14" width="10" height="6" rx="1.5" />
+    </>
+  ),
+  pin: <path d="M12 21v-6m-4-4 1.3-6.5h5.4L16 11a4 4 0 0 1 2 3H6a4 4 0 0 1 2-3Z" />,
+  location: (
+    <>
+      <path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z" />
+      <circle cx="12" cy="10" r="2.3" />
+    </>
+  ),
+  gift: (
+    <>
+      <path d="M4 11h16v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20v-9ZM3 7.5h18V11H3z M12 7.5v14" />
+      <path d="M12 7.5c-1.2-2.4-3.6-3.8-5-2.5s0 2.5 5 2.5Zm0 0c1.2-2.4 3.6-3.8 5-2.5s0 2.5-5 2.5Z" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2.5" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  sparkle: <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z" />,
+  star: <path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8L12 3.5Z" />,
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="m3.5 7.5 8.5 6 8.5-6" />
+    </>
+  ),
+  card: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="3" />
+      <path d="M3 10h18M7 14.5h4" />
+    </>
+  ),
+  chart: <path d="M4 20V10m6 10V4m6 16v-7m4 7H2" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5c.9-3.6 3.8-5.5 7.5-5.5s6.6 1.9 7.5 5.5" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M3.5 12.5V5a1.5 1.5 0 0 1 1.5-1.5h7.5l8 8-9 9-8-8Z" />
+      <circle cx="8" cy="8" r="1.3" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5m0-8.5v.5" />
+    </>
+  ),
+  refresh: <path d="M20 12a8 8 0 0 1-14.4 4.8M4 12a8 8 0 0 1 14.4-4.8M18 4v4h-4M6 20v-4h4" />,
+  external: <path d="M14 4h6v6m0-6-9 9M19 14v5a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4 19V7a1.5 1.5 0 0 1 1.5-1.5H10" />,
+  inbox: <path d="M4 13V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5V13m-16 0v4.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V13m-16 0h4.5l1.5 2.5h4L16 13H20" />,
+  handover: <path d="M4 8h12l-3-3m7 11H8l3 3" />,
+  archive: (
+    <>
+      <rect x="3" y="4" width="18" height="5" rx="1.5" />
+      <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4" />
+    </>
+  ),
+  fire: <path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3 2-5.3 3.4-7 .3 1.4 1.1 2.4 2.1 2.9-.3-2.9.9-5.4 3.2-7.2-.2 2.3.7 3.6 2 5 1.5 1.6 2.3 3.4 2.3 5.5C18.5 18.4 15.9 21 12 21Z" />,
+  key: (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12.5 20 3.5m-3 3 2.5 2.5M14.5 9l2.5 2.5" />
+    </>
+  ),
+  cup: (
+    <>
+      <path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z" />
+      <path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M6 4.5c0 1 1 1 1 2s-1 1-1 2M10 4.5c0 1 1 1 1 2s-1 1-1 2" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof paths;

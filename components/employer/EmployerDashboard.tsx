@@ -13,6 +13,8 @@ import {
 } from '@/lib/dashboardWidgets';
 import { DashboardEditor, LinkTile } from '../DashboardEditor';
 import { pragueToday, dbTimeHM } from '@/lib/pragueTime';
+import { greeting } from '@/lib/greeting';
+import { Avatar } from '../ui';
 
 // Everything past `rating` is an optional enrichment of the roster response —
 // rendered only when the API sends it, so the row degrades to name + shift.
@@ -241,10 +243,13 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition-all">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <p className="font-bold text-[#16181A] truncate">📅 {nextEvent.title}</p>
+            <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
+              <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
+              <span className="truncate">{nextEvent.title}</span>
+            </p>
             <p className="text-sm text-black/50 mt-0.5 capitalize truncate">
               {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-              {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · 📍 ${nextEvent.location}` : ''}
+              {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
             </p>
           </div>
           <span className="shrink-0 text-sm text-[#0A6FE0]">Akce →</span>
@@ -263,7 +268,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-bold text-[#16181A] truncate">📌 {pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</p>
+            <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
+              <Icon name="pin" size={17} className="shrink-0 text-[#4F6A07]" />
+              <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
+            </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
           </div>
           <span className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
@@ -294,7 +302,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 <div className="flex flex-wrap gap-2 mt-3">
                   {onShift.map((r: any) => (
                     <PersonLink key={r.id} id={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/70 border border-black/[0.06] px-3 py-1.5 text-sm font-medium text-[#16181A] max-w-full">
-                      <span className="shrink-0">{r.avatar ?? '👤'}</span>
+                      <Avatar emoji={r.avatar} size="xs" ring={false} />
                       <span className="truncate">{r.name}</span>
                       <span className="text-xs text-[#5B7A08] tabular-nums shrink-0 whitespace-nowrap">
                         od {dbTimeHM(r.openSince)}
@@ -339,14 +347,14 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                     {pendingActive === 0 && (
                       <div className="flex items-center gap-2 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-3.5 py-2.5">
                         <Icon name="check" size={15} className="text-[#5B7A08] shrink-0" />
-                        <p className="text-sm font-medium text-[#5B7A08]">Vše ohodnoceno ✓</p>
+                        <p className="text-sm font-medium text-[#5B7A08]">Vše ohodnoceno</p>
                       </div>
                     )}
                     {dayRoster.map(r => {
                       const meta = rosterMeta(r);
                       return (
                         <div key={r.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${r.flagged ? 'bg-amber-500/[0.1]' : 'bg-black/[0.03]'}`}>
-                          <PersonLink id={r.id} className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{r.avatar ?? '👤'}</PersonLink>
+                          <PersonLink id={r.id} className="shrink-0"><Avatar emoji={r.avatar} size="sm" /></PersonLink>
                           <div className="flex-1 min-w-0">
                             <PersonLink id={r.id}><p className="text-sm font-medium text-[#16181A] truncate">{r.name}</p></PersonLink>
                             {meta && <p className="text-[11px] text-black/45 truncate">{meta}</p>}
@@ -354,7 +362,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                           {r.flagged && <Icon name="warning" size={14} className="text-amber-600 shrink-0" />}
                           {r.reviewed ? (
                             <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
-                              {r.rating > 0 ? `${r.rating}★` : ''} Hodnoceno
+                              {r.rating > 0 && <><Icon name="star" size={12} className="shrink-0" />{r.rating}</>} Hodnoceno
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
@@ -513,9 +521,15 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           </div>
         </div>
       )}
+      {/* Stejná hlavička jako u zaměstnance: avatar, pozdrav, jméno. Dřív tu
+          bylo „Vítejte zpět" podruhé pod nápisem „Přehled" v horní liště. */}
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-[#16181A] text-balance">Vítejte zpět, {user.name}</h1>
+        <div className="flex items-center gap-4 min-w-0">
+          <Avatar emoji={user.avatar} size="lg" />
+          <div className="min-w-0">
+            <p className="text-black/55 text-sm">{greeting()},</p>
+            <h1 className="text-2xl font-bold tracking-tight text-[#16181A] truncate">{user.name}</h1>
+          </div>
         </div>
         <button
           onClick={() => setEditing(v => !v)}

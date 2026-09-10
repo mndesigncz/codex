@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 
+import { EmptyState, Button } from '../ui';
 interface PlanningCard {
   id: number;
   title: string;
@@ -149,19 +150,10 @@ export default function PlanningBoard() {
         {cards.length === 0 && (
           /* Prázdná tabule sama o sobě neřekne, k čemu je. Než čtyři prázdné
              sloupce ve výšce obrazovky, radši jedna věta a první karta. */
-          <div className="glass-card p-8 text-center max-w-xl mx-auto space-y-3 rise-in">
-            <div className="mx-auto h-14 w-14 rounded-2xl bg-[#C8F542]/15 flex items-center justify-center text-[#5B7A08]">
-              <Icon name="kanban" size={26} />
-            </div>
-            <h3 className="font-bold text-lg text-[#16181A]">Tabule je zatím prázdná</h3>
-            <p className="text-sm text-black/55">
-              Sem patří všechno, co chcete v podniku posunout — nová položka do nabídky, oprava kávovaru,
-              nápad od někoho z týmu. Karta putuje zleva doprava, jak se na ní pracuje.
-            </p>
-            <button onClick={() => setNewCard({ column: COLUMNS[0].id, title: '', description: '' })}
-              className="rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-bold hover:bg-black transition inline-flex items-center gap-2">
-              <Icon name="plus" size={16} /> Přidat první kartu
-            </button>
+          <div className="glass-card max-w-xl mx-auto rise-in">
+            <EmptyState illustration="postupy" title="Tabule je zatím prázdná"
+              hint="Sem patří všechno, co chcete v podniku posunout — nová položka do nabídky, oprava kávovaru, nápad od někoho z týmu. Karta putuje zleva doprava, jak se na ní pracuje."
+              action={<Button variant="accent" icon="plus" onClick={() => setNewCard({ column: COLUMNS[0].id, title: '', description: '' })}>Přidat první kartu</Button>} />
           </div>
         )}
         {/* Dokud není ani jedna karta, čtyři prázdné sloupce jen zabírají

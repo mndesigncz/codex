@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
+import { EmptyState, Button, PageHeader } from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
@@ -237,26 +238,13 @@ export default function Guides({ user }: { user: User }) {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-        <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] flex items-center gap-3">
-            <span className="inline-flex items-center justify-center rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] w-11 h-11">
-              <Icon name="book" size={22} />
-            </span>
-            Návody
-          </h1>
-          <p className="text-black/45 mt-1 text-sm">Znalostní báze vašeho týmu</p>
-        </div>
-        {user.role !== 'kiosk' && (
-          <button
-            onClick={() => openEditor()}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 flex items-center gap-2 hover:brightness-110 transition-all flex-shrink-0"
-            title={isEmployer ? undefined : 'Návrh schválí vedení'}
-          >
-            <Icon name="plus" size={18} strokeWidth={2.2} />
-            <span className="hidden sm:inline">{isEmployer ? 'Nový návod' : 'Navrhnout návod'}</span>
-          </button>
-        )}
+      <div className="mb-6">
+      <PageHeader title="Návody" subtitle="Jak se co dělá — s obrázky, na baru po ruce."
+        primary={user.role !== 'kiosk' && (
+          <Button variant="accent" icon="plus" onClick={() => openEditor()} title={isEmployer ? undefined : 'Návrh schválí vedení'}>
+            {isEmployer ? 'Nový návod' : 'Navrhnout návod'}
+          </Button>
+        )} />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -346,23 +334,15 @@ export default function Guides({ user }: { user: User }) {
               <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="glass-card p-10 text-center">
-              <div className="text-4xl mb-3">📖</div>
+            <div className="glass-card">
               {search.trim() ? (
-                <p className="text-black/45">Nic nenalezeno pro „{search}“.</p>
-              ) : isEmployer ? (
-                <>
-                  <p className="text-black/60 mb-4">Zatím žádné návody. Vytvořte první 📖</p>
-                  <button
-                    onClick={() => openEditor()}
-                    className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 inline-flex items-center gap-2 hover:brightness-110 transition-all"
-                  >
-                    <Icon name="plus" size={18} strokeWidth={2.2} />
-                    Nový návod
-                  </button>
-                </>
+                <EmptyState icon="search" title={`Nic pro „${search}“`} hint="Zkus jiné slovo nebo zruš hledání." compact />
               ) : (
-                <p className="text-black/45">Zatím tu nejsou žádné návody.</p>
+                <EmptyState illustration="postupy" title="Zatím žádné návody"
+                  hint={isEmployer
+                    ? 'Jak se připravuje matcha, jak se čistí kávovar, co říct hostovi o pu-erhu — návody s obrázky, které si tým otevře na baru.'
+                    : 'Až je vedení sepíše, najdeš je tady — s obrázky a krok za krokem.'}
+                  action={isEmployer ? <Button variant="accent" icon="plus" onClick={() => openEditor()}>Nový návod</Button> : undefined} />
               )}
             </div>
           ) : (

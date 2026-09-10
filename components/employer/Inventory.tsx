@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import { Button, PageHeader, EmptyState } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
@@ -588,73 +589,36 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Sklad & zásoby</h1>
-          <p className="text-black/45 text-sm">
-            {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
-            {(() => {
-              const val = items.reduce((s, i) => s + (i.unitCost ? i.quantity * i.unitCost : 0), 0);
-              return val > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(val)}</span></> : ' · přidávejte a hlídejte limity';
-            })()}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          {toBuy.length > 0 && (
-            <button onClick={() => setShowShopping(true)} className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap">
-              🛒 Nakoupit ({toBuy.length})
-            </button>
-          )}
-          {/* Secondary actions live under one ⋯ so the header stays calm. */}
-          <div className="relative">
-            <button onClick={() => setMoreOpen(o => !o)}
-              className={`rounded-full w-11 h-11 flex items-center justify-center text-lg transition ${
-                moreOpen ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/60 hover:text-black'
-              }`}
-              title="Další akce">
-              ⋯
-              {reports.some(r => r.status !== 'done') && !moreOpen && (
-                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-orange-500 ring-2 ring-white" />
-              )}
-            </button>
-            {moreOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
-                <div className="absolute right-0 top-12 z-20 glass-strong rounded-2xl p-1.5 w-56 shadow-lg space-y-0.5">
-                  <button onClick={() => { setShowSuppliers(true); setMoreOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    🚚 Dodavatelé
-                  </button>
-                  <button onClick={() => { setShowStocktake(true); setMoreOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    📋 Inventura
-                  </button>
-                  {/* Párování s kasou má vlastní obrazovku — dvě místa na
-                      jednu věc byla hlavní důvod, proč to působilo krkolomně. */}
-                  <button onClick={() => { setMoreOpen(false); onNavigate?.('recipes'); }}
-                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
-                    💳 Receptury a prodeje z kasy
-                  </button>
-                  {reports.length > 0 && (
-                    <button onClick={() => { setShowReports(true); setMoreOpen(false); }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors flex items-center justify-between gap-2">
-                      <span>📦 Hlášení od týmu</span>
-                      {reports.some(r => r.status !== 'done') && (
-                        <span className="rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 text-xs font-bold">
-                          {reports.filter(r => r.status !== 'done').length}
-                        </span>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <button onClick={openNew} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
-            <Icon name="plus" size={16} /> Přidat položku
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Sklad & zásoby"
+        subtitle={<>
+          {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
+          {(() => {
+            const val = items.reduce((s, i) => s + (i.unitCost ? i.quantity * i.unitCost : 0), 0);
+            return val > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(val)}</span></> : ' · přidávejte a hlídejte limity';
+          })()}
+        </>}
+        secondary={toBuy.length > 0 && (
+          <Button variant="secondary" icon="cart" onClick={() => setShowShopping(true)}>Nakoupit ({toBuy.length})</Button>
+        )}
+        menu={[
+          ...(toBuy.length > 0 ? [{ label: `Nakoupit (${toBuy.length})`, icon: 'cart', onClick: () => setShowShopping(true),
+            hint: 'Nákupní seznam z položek pod limitem.' }] : []),
+          { label: 'Dodavatelé', icon: 'users', onClick: () => setShowSuppliers(true) },
+          { label: 'Inventura', icon: 'clipboard', onClick: () => setShowStocktake(true),
+            hint: 'Přepočítat sklad a zapsat rozdíly.' },
+          // Párování s kasou má vlastní obrazovku — dvě místa na jednu věc
+          // byla hlavní důvod, proč to působilo krkolomně.
+          { label: 'Receptury a prodeje z kasy', icon: 'card', onClick: () => onNavigate?.('recipes') },
+          ...(reports.length > 0 ? [{
+            label: reports.some(r => r.status !== 'done')
+              ? `Hlášení od týmu (${reports.filter(r => r.status !== 'done').length} nových)`
+              : 'Hlášení od týmu',
+            icon: 'inbox', onClick: () => setShowReports(true),
+          }] : []),
+        ]}
+        primary={<Button variant="accent" icon="plus" onClick={openNew}>Přidat položku</Button>}
+      />
 
       {notice && (
         <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm font-semibold px-4 py-3">
@@ -2314,7 +2278,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
         {categories.length === 0 ? (
           <div className="text-center space-y-3 py-4">
-            <p className="text-sm text-black/45">Zatím žádné kategorie.</p>
+            <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — čaje, sirupy, mléko, drogerie. Můžeš je nechat založit podle čajovny a upravit." compact />
             <button onClick={seedDefaults} disabled={busy} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm font-medium disabled:opacity-40">
               Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}
             </button>
@@ -2691,7 +2655,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
         </div>
 
         {suppliers.length === 0 ? (
-          <p className="text-sm text-black/40 text-center py-6">Zatím žádní dodavatelé.</p>
+          <EmptyState illustration="sklad" title="Zatím žádný dodavatel" hint="S dodavatelem u položky pošleš objednávku e-mailem rovnou z nákupního seznamu." compact />
         ) : (
           <div className="divide-y divide-black/[0.06] rounded-2xl border border-black/[0.06] overflow-hidden">
             {suppliers.map(sp => (

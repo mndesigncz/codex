@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
+import { PageHeader, Button } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
 import { pragueToday } from '@/lib/pragueTime';
@@ -112,16 +113,8 @@ export default function EventsView({ user }: { user: { id?: string } }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Akce</h1>
-          <p className="text-black/45 text-sm mt-1">Koncerty, přednášky i výjezdy čajovny — se směnami, balením a vyúčtováním.</p>
-        </div>
-        <button onClick={() => setCreating(true)}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 flex items-center gap-2 whitespace-nowrap">
-          <Icon name="plus" size={16} /> Nová akce
-        </button>
-      </div>
+      <PageHeader title="Akce" subtitle="Koncerty, přednášky i výjezdy čajovny — se směnami, balením a vyúčtováním."
+        primary={<Button variant="accent" icon="plus" onClick={() => setCreating(true)}>Nová akce</Button>} />
 
       {err && <p className="text-sm text-red-600">{err}</p>}
 

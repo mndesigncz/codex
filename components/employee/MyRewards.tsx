@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState, PageHeader } from '../ui';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { ProGate } from '../Pro';
 
@@ -189,10 +190,7 @@ function MyRewardsInner() {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-6">
-      <div className="flex items-center gap-2.5">
-        <Icon name="award" size={22} className="text-[#16181A]" />
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Moje odměny</h1>
-      </div>
+      <PageHeader title="Moje odměny" subtitle="Body za směny, úroveň a co si za ně můžeš vybrat." />
 
       {/* Unacknowledged "fix this" feedback — first thing on the page */}
       {unseenFlagged > 0 && (
@@ -366,7 +364,7 @@ function MyRewardsInner() {
         <h3 className="font-bold tracking-tight text-[#16181A] mb-3">Hodnocení směn</h3>
         {normalDays.length === 0 ? (
           <p className="text-sm text-black/45">
-            {flaggedDays.length > 0 ? 'Další hodnocení zatím nemáš.' : 'Zatím žádné hodnocení. Vedení ohodnotí tvé směny průběžně.'}
+            {flaggedDays.length > 0 ? 'Další hodnocení zatím nemáš.' : <EmptyState illustration="odmeny" title="Zatím žádné hodnocení" hint="Vedení hodnotí směny průběžně — body za úkoly, postupy a uzávěrky se přičítají samy." compact />}
           </p>
         ) : (
           <div className="space-y-2.5">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 
+import { EmptyState } from './ui';
 type Suggestion = {
   id: number;
   title: string;
@@ -201,11 +202,10 @@ export default function SuggestionsBoard() {
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : shown.length === 0 ? (
-        <div className="glass-card p-10 text-center">
-          <div className="mx-auto grid place-items-center h-14 w-14 rounded-2xl bg-black/[0.04] text-black/30 mb-3">
-            <Icon name="bulb" size={26} />
-          </div>
-          <p className="text-black/50 text-sm">{items.length === 0 ? 'Zatím žádné podněty. Buď první!' : 'V této kategorii nic není.'}</p>
+        <div className="glass-card">
+          {items.length === 0
+            ? <EmptyState illustration="napady" title="Zatím žádný nápad" hint="Cokoli, co by v podniku šlo líp — nová položka do nabídky, jiný postup, oprava. Kdo napíše první, začíná." />
+            : <EmptyState icon="bulb" title="V této kategorii nic není" compact />}
         </div>
       ) : (
         <div className="space-y-3">

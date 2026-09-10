@@ -6,6 +6,7 @@ import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
 
+import { EmptyState, PageHeader, Segmented } from '../ui';
 interface Task {
   id: number;
   title: string;
@@ -161,17 +162,9 @@ export default function Tasks({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-2xl mx-auto w-full">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Úkoly</h1>
-        <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
-          {([['list', 'Seznam'], ['week', 'Týden']] as const).map(([v, lbl]) => (
-            <button key={v} onClick={() => setView(v)}
-              className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader title="Úkoly" subtitle="Co je dnes na tobě — a co je pro kohokoli."
+        primary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
+          options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />} />
 
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
@@ -180,7 +173,7 @@ export default function Tasks({ user }: Props) {
           onComplete={(t, done) => updateStatus(t as Task, done ? 'done' : 'pending')}
           labelFor={(t) => (t.teamTask ? 'Pro kohokoliv' : '')} />
       ) : tasks.length === 0 ? (
-        <div className="glass-card p-8 text-center"><p className="text-black/45">Zatím žádné úkoly.</p></div>
+        <div className="glass-card"><EmptyState illustration="ukoly" title="Žádné úkoly" hint="Až ti vedení něco zadá, objeví se to tady i v přehledu." compact /></div>
       ) : (
         <>
           {section('Po termínu', overdue, 'text-red-600')}

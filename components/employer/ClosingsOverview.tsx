@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { usePlan, UpgradeModal, ProBadge } from '../Pro';
 import {
@@ -782,8 +783,10 @@ export default function ClosingsOverview() {
           <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
         </div>
       ) : topLevel.length === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <p className="text-black/45">{selectedDate ? 'Za tento den není žádná uzávěrka.' : 'Zatím žádné uzávěrky od zaměstnanců.'}</p>
+        <div className="glass-card">
+          {selectedDate
+            ? <EmptyState icon="receipt" title="Za tento den není uzávěrka" hint="Buď se ten den nepracovalo, nebo na ni někdo zapomněl — chybějící uzávěrky jsou nahoře." compact />
+            : <EmptyState illustration="uzaverka" title="Zatím žádné uzávěrky" hint="Zaměstnanci je vyplňují po směně v aplikaci nebo na kiosku. Tady je schválíš a uvidíš, jak vyšla kasa." />}
         </div>
       ) : (
         <div className="space-y-3">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
+import { Avatar } from '../ui';
 import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
@@ -35,7 +36,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="glass-card p-10 max-w-md text-center space-y-3">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-3xl">📟</div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={28} /></div>
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Kiosk režim</h1>
             <ProBadge />
@@ -208,10 +209,13 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
 
       {nextEvent && (
         <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
-          <p className="font-bold text-[#16181A]">📅 {nextEvent.title}</p>
+          <p className="font-bold text-[#16181A] flex items-center gap-2">
+            <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
+            <span className="min-w-0">{nextEvent.title}</span>
+          </p>
           <p className="text-sm text-black/50 mt-0.5 capitalize">
             {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-            {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · 📍 ${nextEvent.location}` : ''}
+            {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
           </p>
           {nextEvent.crewPeople?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
@@ -225,23 +229,23 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
 
       {handover && (
         <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
-            🤝 Předávka od {handover.authorName ?? 'předchozí směny'}
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
+            <Icon name="handover" size={14} className="shrink-0" /> Předávka od {handover.authorName ?? 'předchozí směny'}
           </p>
           <div className="space-y-1.5 text-sm text-[#16181A]">
-            {handover.handover.todo && <p>🔧 <span className="text-black/70">{handover.handover.todo}</span></p>}
-            {handover.handover.runningOut && <p>📦 <span className="text-black/70">{handover.handover.runningOut}</span></p>}
-            {handover.handover.message && <p>💬 <span className="text-black/70">{handover.handover.message}</span></p>}
+            {handover.handover.todo && <p className="flex gap-2"><Icon name="check" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.todo}</span></p>}
+            {handover.handover.runningOut && <p className="flex gap-2"><Icon name="box" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.runningOut}</span></p>}
+            {handover.handover.message && <p className="flex gap-2"><Icon name="chat" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.message}</span></p>}
           </div>
         </div>
       )}
       {roster.length > 0 && (
         <div className="glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📅 Dnešní směny</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Dnešní směny</p>
           <div className="space-y-2">
             {roster.map((r: any) => (
               <div key={r.id} className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0">
-                <span className="text-xl shrink-0">{r.avatar ?? '👤'}</span>
+                <Avatar emoji={r.avatar} size="sm" />
                 <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[400px]:basis-0 truncate text-sm font-medium text-[#16181A]">{r.name}</span>
                 <span className="shrink-0 ml-auto text-sm text-black/50 tabular-nums">{String(r.shiftStart).slice(0, 5)}–{String(r.shiftEnd ?? '').slice(0, 5)}</span>
                 {r.openSince && <span className="shrink-0 h-2 w-2 rounded-full bg-[#5B9E00]" title="Na směně" />}
@@ -253,13 +257,13 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
 
       {required.length > 0 && (
         <div className="glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">📋 Povinné postupy dnes</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Povinné postupy dnes</p>
           <div className="flex flex-wrap gap-2">
             {required.map(p => (
               <span key={p.id} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium ${
                 p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-amber-500/12 text-amber-700'
               }`}>
-                {p.icon ?? '📋'} {p.name} {p.done ? '✓' : '· čeká'}
+                {p.icon ? <span>{p.icon}</span> : <Icon name="clipboard" size={15} className="shrink-0" />} {p.name} {p.done ? <Icon name="check" size={15} className="shrink-0" /> : '· čeká'}
               </span>
             ))}
           </div>
@@ -274,7 +278,10 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           className="md:col-span-2 block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-bold text-[#16181A] truncate">📌 {pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</p>
+              <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
+                <Icon name="pin" size={17} className="shrink-0 text-[#4F6A07]" />
+                <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
+              </p>
               <p className="text-sm text-black/50 mt-0.5 truncate">Stránka pro zákazníky — otoč tablet a ukaž, co máme.</p>
             </div>
             <span className="shrink-0 rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-semibold whitespace-nowrap">Otevřít →</span>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { EmptyState } from '../ui';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -209,7 +210,7 @@ export default function TimeOffRequest() {
         {loading ? (
           <p className="text-sm text-black/40">Načítám…</p>
         ) : requests.length === 0 ? (
-          <p className="text-sm text-black/40">Zatím žádné žádosti.</p>
+          <EmptyState illustration="volno" title="Zatím žádná žádost o volno" hint="Dovolená, doktor, zkoušky — napiš termín a vedení to vidí v rozvrhu." compact />
         ) : (
           <ul className="space-y-2">
             {requests.map((r) => (

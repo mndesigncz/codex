@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/Icons';
+import { EmptyState } from '../ui';
 import PollsStrip from './Polls';
 import {
   Conversation,
@@ -260,9 +261,7 @@ function Thread({
           <div className="text-center text-black/45 text-sm py-6">Načítání…</div>
         )}
         {!loading && messages.length === 0 && (
-          <div className="text-center text-black/45 text-sm py-6">
-            Zatím žádné zprávy. Napište první!
-          </div>
+          <EmptyState illustration="chat" title="Zatím žádné zprávy" hint="Napiš první — tým to uvidí v aplikaci i na kiosku." compact />
         )}
         {messages.map((m, i) => (
           <MessageBubble
