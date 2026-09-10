@@ -95,10 +95,13 @@ async function api(conn: PosConnection, path: string): Promise<any> {
 }
 
 /** Dotaz na stránkovaný seznam: volá `onPage` pro každou stránku, dokud je nextPage. */
-async function paged(conn: PosConnection, firstPath: string, onPage: (data: any[]) => void | boolean, maxPages = 60): Promise<{ pages: number; complete: boolean }> {
+async function paged(conn: PosConnection, firstPath: string, onPage: (data: any[]) => void | boolean, maxPages = 60, budget?: () => boolean): Promise<{ pages: number; complete: boolean }> {
   let path: string | null = firstPath;
   let pages = 0;
   while (path && pages < maxPages) {
+    // Serverless funkce má minutu. Když čas dochází, průchod se ukončí jako
+    // neúplný — volající pak neposune kurzor a zbytek dobere příští běh.
+    if (budget && !budget()) return { pages, complete: false };
     pages++;
     const page = await api(conn, path);
     const stop = onPage(page?.data ?? []);
@@ -264,19 +267,19 @@ export function toBillHead(b: any): BillHead | null {
 const src = (conn: PosConnection) => `${conn.merchantId}-${conn.placeId}`;
 
 /** Účtenky změněné od daného okamžiku (včetně refundací a smazaných). */
-export async function billsModifiedSince(conn: PosConnection, sinceIso: string, onBill: (b: BillHead, raw: any) => void, maxPages = 40) {
+export async function billsModifiedSince(conn: PosConnection, sinceIso: string, onBill: (b: BillHead, raw: any) => void, maxPages = 40, budget?: () => boolean) {
   const q = `modifiedSince=${encodeURIComponent(sinceIso)}&includeDeleted=true&limit=100`;
   return paged(conn, `/bills/${src(conn)}?${q}`, (data) => {
     for (const raw of data) { const h = toBillHead(raw); if (h) onBill(h, raw); }
-  }, maxPages);
+  }, maxPages, budget);
 }
 
 /** Účtenky z období (kalendářní dny `from` až `tillExclusive`), včetně refundací a smazaných. */
-export async function billsInRange(conn: PosConnection, from: string, tillExclusive: string, onBill: (b: BillHead, raw: any) => void, maxPages = 80) {
+export async function billsInRange(conn: PosConnection, from: string, tillExclusive: string, onBill: (b: BillHead, raw: any) => void, maxPages = 80, budget?: () => boolean) {
   const q = `from=${from}&till=${tillExclusive}&includeDeleted=true&limit=100`;
   return paged(conn, `/bills/${src(conn)}?${q}`, (data) => {
     for (const raw of data) { const h = toBillHead(raw); if (h) onBill(h, raw); }
-  }, maxPages);
+  }, maxPages, budget);
 }
 
 export interface BillItem {
