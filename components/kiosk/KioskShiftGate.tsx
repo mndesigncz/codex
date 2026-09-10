@@ -301,7 +301,9 @@ export function WhoIsWorking() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 mt-3.5">
+      {/* Dva sloupce už od 420 px daly kartě 171 px a jménu 49 — „Eva Testová"
+          se nevešla. Na telefonu je karta jedna na řádek, od 640 px dvě. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 mt-3.5">
         {onShift.map(m => {
           const isActive = m.id === activeId;
           return (

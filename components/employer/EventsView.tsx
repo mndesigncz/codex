@@ -75,7 +75,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         className="w-full glass-card p-5 text-left hover:bg-black/[0.02] transition">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-bold tracking-tight text-[#16181A] line-clamp-2">{k.icon} {e.title}</p>
+            <p className="font-bold tracking-tight text-[#16181A] line-clamp-2"><Icon name={k.icon} size={16} className="inline -mt-0.5 mr-1.5 text-[#0A6FE0]" />{e.title}</p>
             <p className="text-sm text-black/50 mt-0.5 capitalize line-clamp-2">
               {fmtDate(e.date)}{e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
@@ -197,7 +197,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
             {EVENT_KINDS.map(k => (
               <button key={k.id} type="button" onClick={() => { setKind(k.id); if (k.id === 'outdoor') setOffsite(true); }}
                 className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${kind === k.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
-                {k.icon} {k.label}
+                <Icon name={k.icon} size={15} className="inline -mt-0.5 mr-1.5" />{k.label}
               </button>
             ))}
           </div>
@@ -252,7 +252,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
       <div className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev2 => ev2.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 mb-1">
           <div className="min-w-0">
-            <h3 className="text-xl font-bold tracking-tight text-[#16181A]">{k.icon} {e.title}</h3>
+            <h3 className="text-xl font-bold tracking-tight text-[#16181A]"><Icon name={k.icon} size={20} className="inline -mt-1 mr-2 text-[#0A6FE0]" />{e.title}</h3>
             <p className="text-sm text-black/50 capitalize mt-0.5">
               {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               {e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}

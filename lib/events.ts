@@ -4,13 +4,15 @@
 export type EventKind = 'concert' | 'lecture' | 'workshop' | 'outdoor' | 'private' | 'other';
 export type EventStatus = 'planned' | 'confirmed' | 'done' | 'cancelled';
 
-export const EVENT_KINDS: { id: EventKind; label: string; icon: string }[] = [
-  { id: 'concert', label: 'Koncert', icon: '🎵' },
-  { id: 'lecture', label: 'Přednáška', icon: '🎤' },
-  { id: 'workshop', label: 'Workshop', icon: '🫖' },
-  { id: 'outdoor', label: 'Venkovní akce', icon: '⛺' },
-  { id: 'private', label: 'Soukromá akce', icon: '🔒' },
-  { id: 'other', label: 'Jiná akce', icon: '📅' },
+// `icon` je název kreslené ikony pro rozhraní, `emoji` zůstává pro text
+// (e-mail, notifikace), kde se ikona nakreslit nedá.
+export const EVENT_KINDS: { id: EventKind; label: string; icon: string; emoji: string }[] = [
+  { id: 'concert', label: 'Koncert', icon: 'music', emoji: '🎵' },
+  { id: 'lecture', label: 'Přednáška', icon: 'mic', emoji: '🎤' },
+  { id: 'workshop', label: 'Workshop', icon: 'cup', emoji: '🫖' },
+  { id: 'outdoor', label: 'Venkovní akce', icon: 'tent', emoji: '⛺' },
+  { id: 'private', label: 'Soukromá akce', icon: 'lock', emoji: '🔒' },
+  { id: 'other', label: 'Jiná akce', icon: 'calendarCheck', emoji: '📅' },
 ];
 
 export const EVENT_STATUSES: { id: EventStatus; label: string }[] = [

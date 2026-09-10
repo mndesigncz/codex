@@ -297,6 +297,19 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M6 4.5c0 1 1 1 1 2s-1 1-1 2M10 4.5c0 1 1 1 1 2s-1 1-1 2" />
     </>
   ),
+  music: (
+    <>
+      <path d="M9 18V6l11-2v12" />
+      <circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" />
+    </>
+  ),
+  mic: (
+    <>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8" />
+    </>
+  ),
+  tent: <path d="M3 20h18M12 4 3 20M12 4l9 16M12 4v16M8.5 20 12 13l3.5 7" />,
 };
 
 export type IconName = keyof typeof paths;
