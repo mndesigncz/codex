@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { getConnection, daySummary } from '@/lib/storyous';
+import { getConnection } from '@/lib/storyous';
+import { daySummaryFor } from '@/lib/posMirror';
 import { normalizeHandover, normalizeMovements } from '@/lib/closing';
 
 export const dynamic = 'force-dynamic';
@@ -179,7 +180,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     if (!conn) {
       notes.push('Pokladna není připojená, takže není s čím tržbu porovnat.');
     } else {
-      const s = await daySummary(conn, day);
+      const s = await daySummaryFor(teamId, day);
       // Ostatní uzávěrky téhož dne — porovnávat jednu směnu proti celodenní
       // tržbě by hlásilo rozdíl, který si aplikace vyrobila sama.
       let dayCash = Number(c.cash_revenue) || 0;

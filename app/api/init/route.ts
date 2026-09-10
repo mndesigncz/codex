@@ -943,6 +943,93 @@ export async function GET(request: Request) {
         UNIQUE (team_id, product_id)
       )`;
 
+    // ---- Zrcadlo pokladny: účtenky, položky a katalog u nás ----
+    // Storyous se ptáme jen na změny (podle _lastModifiedAt); všechno čtení
+    // jde z těchto tabulek. Viz lib/posMirror.ts.
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS bills_cursor TIMESTAMP`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS synced_from TEXT`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS sync_lock_at TIMESTAMP`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error TEXT`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMP`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS menu_modified_at TEXT`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS menu_synced_at TIMESTAMP`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS webhook_secret TEXT`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_webhook_at TIMESTAMP`;
+    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS stock_id TEXT`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_bills (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        bill_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        created_at TEXT,
+        paid_at TEXT,
+        modified_at TEXT,
+        final_price NUMERIC NOT NULL DEFAULT 0,
+        without_tax NUMERIC,
+        tips NUMERIC NOT NULL DEFAULT 0,
+        discount NUMERIC NOT NULL DEFAULT 0,
+        rounding NUMERIC NOT NULL DEFAULT 0,
+        currency TEXT,
+        payment_method TEXT,
+        cash NUMERIC NOT NULL DEFAULT 0,
+        card NUMERIC NOT NULL DEFAULT 0,
+        other NUMERIC NOT NULL DEFAULT 0,
+        other_methods JSONB,
+        refunded BOOLEAN NOT NULL DEFAULT FALSE,
+        deleted BOOLEAN NOT NULL DEFAULT FALSE,
+        refunded_bill_id TEXT,
+        person_count INTEGER,
+        desk_id TEXT,
+        created_by_id TEXT,
+        created_by_name TEXT,
+        paid_by_id TEXT,
+        paid_by_name TEXT,
+        order_provider TEXT,
+        tax_summaries JSONB,
+        fiscalized BOOLEAN NOT NULL DEFAULT FALSE,
+        items_synced BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, bill_id)
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS pos_bills_team_day ON pos_bills (team_id, day)`;
+    await sql`CREATE INDEX IF NOT EXISTS pos_bills_team_pending ON pos_bills (team_id, items_synced)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_bill_items (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        bill_id TEXT NOT NULL,
+        product_id TEXT,
+        name TEXT,
+        amount NUMERIC NOT NULL DEFAULT 0,
+        price NUMERIC,
+        vat_rate NUMERIC,
+        category_id TEXT,
+        measure TEXT,
+        discounts JSONB
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS pos_bill_items_team_bill ON pos_bill_items (team_id, bill_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS pos_bill_items_team_product ON pos_bill_items (team_id, product_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS pos_products (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT,
+        price NUMERIC,
+        vat_rate NUMERIC,
+        measure TEXT,
+        ean TEXT,
+        image_url TEXT,
+        show_in_pos BOOLEAN NOT NULL DEFAULT TRUE,
+        price_variable BOOLEAN NOT NULL DEFAULT FALSE,
+        type TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, product_id)
+      )`;
+
     // ---- One closing per person per day, enforced at the database ----
     // (stub rows for covered coworkers are exempt). Guarded: teams with historic
     // duplicates keep working — the index just doesn't materialise for them.

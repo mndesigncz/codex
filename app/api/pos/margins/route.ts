@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
+import { productsFromMirror } from '@/lib/posMirror';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -94,14 +95,18 @@ export async function GET(req: NextRequest) {
   };
 
   // ---- menu prices ----
+  // Ceny ze zrcadla katalogu; když je prázdné (první běh), sáhne se živě.
   let priceById = new Map<string, { price: number | null; category: string | null; name: string }>();
   let menuError: string | null = null;
-  try {
-    const products = await menuProducts(conn);
-    priceById = new Map(products.map(p => [p.productId, {
-      price: p.price ?? null, category: p.category ?? null, name: p.name,
-    }]));
-  } catch { menuError = 'Menu z pokladny se nepodařilo načíst — ceny chybí.'; }
+  const mirrored = await productsFromMirror(teamId);
+  if (mirrored.size) {
+    priceById = new Map(Array.from(mirrored.entries()).map(([id, p]) => [id, { price: p.price, category: p.category, name: p.name }]));
+  } else {
+    try {
+      const products = await menuProducts(conn);
+      priceById = new Map(products.map(p => [p.productId, { price: p.price ?? null, category: p.category ?? null, name: p.name }]));
+    } catch { menuError = 'Menu z pokladny se nepodařilo načíst — ceny chybí.'; }
+  }
 
   const missingPrice = new Set<string>();
   const items: ProductMargin[] = (sales as any[]).map(s => {

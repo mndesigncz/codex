@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
+import { productsFromMirror } from '@/lib/posMirror';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -28,9 +29,15 @@ export async function GET() {
   const conn = await getConnection(u.team_id);
   if (!conn) return NextResponse.json({ connected: false, products: [], recipes: [], unmapped: [] });
 
+  // Katalog ze zrcadla (rychlé); živě jen když zrcadlo ještě nic nemá.
   let products: any[] = [];
-  try { products = await menuProducts(conn); }
-  catch { return NextResponse.json({ connected: true, products: [], recipes: [], unmapped: [], error: 'Menu se nepodařilo načíst.' }); }
+  const mirrored = await productsFromMirror(u.team_id);
+  if (mirrored.size) {
+    products = Array.from(mirrored.entries()).map(([productId, p]) => ({ productId, name: p.name, category: p.category ?? '', price: p.price, vatRate: p.vatRate }));
+  } else {
+    try { products = await menuProducts(conn); }
+    catch { return NextResponse.json({ connected: true, products: [], recipes: [], unmapped: [], error: 'Menu se nepodařilo načíst.' }); }
+  }
 
   // Recipes grouped per product.
   let rows: any[] = [];

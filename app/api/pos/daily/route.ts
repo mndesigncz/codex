@@ -13,7 +13,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { getConnection, menuProducts } from '@/lib/storyous';
+import { getConnection, paymentLabel } from '@/lib/storyous';
+import { billsOfDays, productsFromMirror, mirrorCovers } from '@/lib/posMirror';
 import { pragueToday, businessDayOf, dayPlus, pragueHourOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -73,67 +74,47 @@ export async function GET(req: NextRequest) {
 
   let byPerson = new Map<string, { total: number; bills: number }>();
   const hours = new Array(24).fill(0);
-  let unreadable = 0;
 
+  // Účtenky ze zrcadla — pokladna se tu už nevolá. Když zrcadlo období
+  // nepokrývá (starší než první synchronizace), řekne se to místo nul.
+  const methodsTotal: Record<string, number> = {};
+  let covered = true;
   try {
-    const { clientId, clientSecret } = conn;
-    const authRes = await fetch('https://login.storyous.com/api/auth/authorize', {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
-    });
-    const auth = await authRes.json();
-    if (!auth?.access_token) throw new Error('auth');
-    const H = { Authorization: `Bearer ${auth.access_token}` };
-
-    // O den dál, ať se zachytí i noční účtenky posledního dne období.
-    let path: string | null =
-      `/bills/${conn.merchantId}-${conn.placeId}?from=${from}&till=${dayPlus(to, 2)}&limit=100`;
-    let guard = 0;
-    while (path && guard < 60) {
-      guard++;
-      const res: Response = await fetch(`https://api.storyous.com${path}`, { headers: H });
-      if (!res.ok) throw new Error(String(res.status));
-      const page: any = await res.json();
-      for (const b of page?.data ?? []) {
-        if (b.deleted) continue;
-        const when = new Date(String(b.paidAt ?? b.createdAt ?? ''));
-        const day = businessDayOf(when);
-        if (!day) { unreadable++; continue; }
-        if (day < from || day > to) continue;
-        const row = days.get(day) ?? blank(day);
-        const price = Number(b.finalPrice) || 0;
-        if (b.refunded) {
-          row.refundCount++; row.refundTotal += price;
-          days.set(day, row);
-          continue;
-        }
-        row.bills++;
-        row.total += price;
-        const tip = Number(b.tips) || 0;
-        row.tips += tip;
-        const pm = String(b.paymentMethod ?? '').toLowerCase();
-        if (pm === 'cash') { row.cash += price; row.tipsCash += tip; }
-        else if (pm.includes('card')) { row.card += price; row.tipsCard += tip; }
-        else { row.other += price; }
-        row.discounts += Number(b.discount) || 0;
-        if (Number(b.personCount) > 0) row.persons += Number(b.personCount);
+    covered = await mirrorCovers(teamId, from);
+    for (const b of await billsOfDays(teamId, from, to)) {
+      if (b.deleted) continue;
+      const day = b.day;
+      const row = days.get(day) ?? blank(day);
+      const price = b.finalPrice;
+      if (b.refunded) {
+        row.refundCount++; row.refundTotal += price;
         days.set(day, row);
-
-        // Hodina podle pražských hodin na zdi — getHours() by na serveru dalo UTC.
-        const localH = pragueHourOf(when);
-        if (localH != null) hours[localH] += price;
-
-        const who = b.paidBy?.fullName ?? b.createdBy?.fullName;
-        if (who) {
-          const cur = byPerson.get(who) ?? { total: 0, bills: 0 };
-          cur.total += price; cur.bills++;
-          byPerson.set(who, cur);
-        }
+        continue;
       }
-      path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
+      row.bills++;
+      row.total += price;
+      row.tips += b.tips;
+      row.cash += b.buckets.cash; row.card += b.buckets.card; row.other += b.buckets.other;
+      if (b.buckets.cash >= b.buckets.card) row.tipsCash += b.tips; else row.tipsCard += b.tips;
+      for (const [m, v] of Object.entries(b.buckets.methods)) methodsTotal[m] = (methodsTotal[m] ?? 0) + v;
+      row.discounts += b.discount;
+      if (b.personCount) row.persons += b.personCount;
+      days.set(day, row);
+
+      // Hodina podle pražských hodin na zdi — getHours() by na serveru dalo UTC.
+      const when = new Date(b.paidAt ?? b.createdAt);
+      const localH = pragueHourOf(when);
+      if (localH != null) hours[localH] += price;
+
+      const who = b.paidByName ?? b.createdByName;
+      if (who) {
+        const cur = byPerson.get(who) ?? { total: 0, bills: 0 };
+        cur.total += price; cur.bills++;
+        byPerson.set(who, cur);
+      }
     }
   } catch {
-    return NextResponse.json({ connected: true, error: 'Pokladna teď neodpovídá — zkus to za chvíli.' }, { status: 502 });
+    return NextResponse.json({ connected: true, error: 'Zrcadlo pokladny není připravené — spusť migraci a synchronizaci v Nastavení → Pokladna.' }, { status: 502 });
   }
 
   // ---- co se prodalo, po produktech (z našich uložených prodejů) ----
@@ -146,12 +127,8 @@ export async function GET(req: NextRequest) {
       GROUP BY product_id`;
   } catch { /* tabulka ještě není — zůstane prázdné */ }
 
-  let priceById = new Map<string, { price: number | null; category: string | null; name: string }>();
-  let menuError: string | null = null;
-  try {
-    const products = await menuProducts(conn);
-    priceById = new Map(products.map(p => [p.productId, { price: p.price ?? null, category: p.category ?? null, name: p.name }]));
-  } catch { menuError = 'Menu z pokladny se nepodařilo načíst — u položek chybí ceny.'; }
+  const priceById = await productsFromMirror(teamId);
+  const menuError: string | null = priceById.size === 0 ? 'Katalog z pokladny se ještě nesynchronizoval — u položek zatím chybí ceny.' : null;
 
   const noPrice: string[] = [];
   const items = (sales as any[]).map(s => {
@@ -250,14 +227,14 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  if (unreadable > 0) {
+
+  if (!covered) {
     notes.push({
-      tone: 'warn',
-      title: `${unreadable} účtenek bez čitelného času`,
-      text: 'Nešly přiřadit ke dni, takže v přehledu nejsou. Pokud jich přibývá, ozvi se — je to na straně pokladny.',
+      tone: 'info',
+      title: 'Začátek období je před první synchronizací',
+      text: 'Zrcadlo pokladny nemá účtenky tak daleko zpátky. V Nastavení → Pokladna jde načíst historii (třeba 180 dní).',
     });
   }
-
   if (posTotal === 0 && sum('refundCount') === 0) {
     // Ticho není odpověď: nula může znamenat zavřeno, ještě neotevřeno, nebo
     // že se markuje jinam. Řekneme, co z toho víme.
@@ -295,6 +272,8 @@ export async function GET(req: NextRequest) {
       discounts: sum('discounts'),
       refundCount: sum('refundCount'),
       refundTotal: refunds,
+      methods: Object.entries(methodsTotal).map(([id, amount]) => ({ id, label: paymentLabel(id), amount: Math.round(amount) }))
+        .sort((a, b) => b.amount - a.amount),
       avgBill: sum('bills') > 0 ? Math.round(posTotal / sum('bills')) : 0,
       soldQty,
       productRevenue,

@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
+import { billsOfDays } from '@/lib/posMirror';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 
@@ -52,59 +53,38 @@ export async function GET(req: NextRequest) {
     type Bucket = { cash: number; card: number; total: number; bills: number };
     const posByDay = new Map<string, Bucket>();
 
-    // Raw pager (insights needs fields the lib summary drops).
-    let path: string | null = `/bills/${conn.merchantId}-${conn.placeId}?from=${from}&till=${dayPlus(till, 1)}&limit=100`;
-    let guard = 0;
+    // Účtenky ze zrcadla — o den navíc kvůli nočním účtenkám posledního dne.
+    for (const b of await billsOfDays(u.team_id, from, dayPlus(till, 1))) {
+      if (b.deleted) continue;
+      const price = b.finalPrice;
+      const when = new Date(b.paidAt ?? b.createdAt);
+      const h = pragueHourOf(when);
+      const calDay = h != null ? pragueDayOf(when) : null;
+      const bizDay = b.day;
 
-    const { clientId, clientSecret, merchantId, placeId } = conn;
-    const authRes = await fetch('https://login.storyous.com/api/auth/authorize', {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
-    });
-    const auth = await authRes.json();
-    if (!auth?.access_token) throw new Error('auth');
-    const H = { Authorization: `Bearer ${auth.access_token}` };
-
-    while (path && guard < 30) {
-      guard++;
-      const res: Response = await fetch(`https://api.storyous.com${path}`, { headers: H });
-      if (!res.ok) throw new Error(String(res.status));
-      const page: any = await res.json();
-      for (const b of page?.data ?? []) {
-        if (b.deleted) continue;
-        const price = Number(b.finalPrice) || 0;
-        const t = String(b.paidAt ?? b.createdAt ?? '');
-        const when = t ? new Date(t) : null;
-        const h = when ? pragueHourOf(when) : null;
-        const calDay = when && h != null ? pragueDayOf(when) : null;
-        const bizDay = when ? (businessDayOf(when) || null) : null;
-
-        if (!b.refunded && bizDay && bizDay >= from && bizDay < till) {
-          const cur = posByDay.get(bizDay) ?? { cash: 0, card: 0, total: 0, bills: 0 };
-          const pm = String(b.paymentMethod ?? '').toLowerCase();
-          if (pm === 'cash') cur.cash += price; else cur.card += price;
-          cur.total += price; cur.bills++;
-          posByDay.set(bizDay, cur);
-        }
-
-        // Měsíční čísla zůstávají podle kalendářního dne účtenky — aby seděla
-        // s tím, co ukazuje pokladna sama.
-        if (calDay != null && (calDay < from || calDay >= till)) continue;
-        if (b.refunded) { refundCount++; refundTotal += price; continue; }
-        bills++;
-        total += price;
-        tips += Number(b.tips) || 0;
-        discounts += Number(b.discount) || 0;
-        if (h != null) hours[h] += price;
-        const who = b.paidBy?.fullName ?? b.createdBy?.fullName;
-        if (who) {
-          const cur = byPerson.get(who) ?? { total: 0, bills: 0 };
-          cur.total += price; cur.bills++;
-          byPerson.set(who, cur);
-        }
-        if (Number(b.personCount) > 0) { persons += Number(b.personCount); personBills++; }
+      if (!b.refunded && bizDay >= from && bizDay < till) {
+        const cur = posByDay.get(bizDay) ?? { cash: 0, card: 0, total: 0, bills: 0 };
+        cur.cash += b.buckets.cash; cur.card += b.buckets.card + b.buckets.other;
+        cur.total += price; cur.bills++;
+        posByDay.set(bizDay, cur);
       }
-      path = page?.nextPage ? String(page.nextPage).replace('https://api.storyous.com', '') : null;
+
+      // Měsíční čísla zůstávají podle kalendářního dne účtenky — aby seděla
+      // s tím, co ukazuje pokladna sama.
+      if (calDay != null && (calDay < from || calDay >= till)) continue;
+      if (b.refunded) { refundCount++; refundTotal += price; continue; }
+      bills++;
+      total += price;
+      tips += b.tips;
+      discounts += b.discount;
+      if (h != null) hours[h] += price;
+      const who = b.paidByName ?? b.createdByName;
+      if (who) {
+        const cur = byPerson.get(who) ?? { total: 0, bills: 0 };
+        cur.total += price; cur.bills++;
+        byPerson.set(who, cur);
+      }
+      if (b.personCount) { persons += b.personCount; personBills++; }
     }
 
     // ---- kdo na ty hodiny byl naplánovaný ----

@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { getConnection, daySummary } from '@/lib/storyous';
+import { getConnection } from '@/lib/storyous';
+import { daySummaryFor } from '@/lib/posMirror';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,8 @@ export async function GET(req: NextRequest) {
   const date = String(new URL(req.url).searchParams.get('date') ?? '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Neplatné datum' }, { status: 400 });
   try {
-    const s = await daySummary(conn, date);
+    // Ze zrcadla, když ho máme (rychlé, bez volání pokladny); jinak živě.
+    const s = await daySummaryFor(u.team_id, date);
     return NextResponse.json({ connected: true, placeName: conn.placeName, ...s });
   } catch {
     return NextResponse.json({ connected: true, error: 'Pokladna teď neodpovídá — zkus to za chvíli.' }, { status: 502 });
