@@ -182,7 +182,7 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
                 <li key={r.id} className="py-2.5 flex items-center gap-x-3 gap-y-1 flex-wrap">
                   <span className="font-semibold tabular-nums w-12 shrink-0">{r.time}</span>
                   <Initials name={r.customer_name} size={28} />
-                  <button type="button" onClick={() => onCustomer(r.customer_name)} className="min-w-0 flex-1 basis-40 truncate text-left hover:text-[#4F6A07] transition">
+                  <button type="button" onClick={() => onCustomer(r.customer_name)} className="tap-target-sm min-w-0 flex-1 basis-40 truncate text-left hover:text-[#4F6A07] transition">
                     <span className="font-medium">{r.customer_name}</span> <span className="text-black/50">· {r.party} os.{r.table_name ? ` · ${r.table_name}` : ''}</span>
                   </button>
                   <span className={`${chip(RES_STATUS[r.status]?.tone ?? 'wait')} ml-auto`}>{RES_STATUS[r.status]?.label ?? r.status}</span>
@@ -270,7 +270,7 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
                   <li key={r.id} className="py-3 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_auto] gap-x-3 gap-y-2 items-center">
                     <span className="font-semibold tabular-nums text-lg leading-none">{r.time}</span>
                     <div className="min-w-0">
-                      <p className="font-semibold truncate flex items-center gap-2"><Initials name={r.customer_name} size={24} /><button type="button" onClick={() => onCustomer(r.customer_name)} title="Otevřít v Zákaznících" className="truncate hover:text-[#4F6A07] transition">{r.customer_name}</button> <span className="text-black/50 font-medium">· {r.party} os.</span></p>
+                      <p className="font-semibold truncate flex items-center gap-2"><Initials name={r.customer_name} size={24} /><button type="button" onClick={() => onCustomer(r.customer_name)} title="Otevřít v Zákaznících" className="tap-target-sm truncate hover:text-[#4F6A07] transition">{r.customer_name}</button> <span className="text-black/50 font-medium">· {r.party} os.</span></p>
                       <p className="text-xs text-black/55 truncate">{r.customer_email}{r.note ? ` · „${r.note}"` : ''}</p>
                       <span className={`${chip(st.tone)} mt-1`}>{st.label}</span>
                     </div>

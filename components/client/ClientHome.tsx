@@ -111,7 +111,7 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
               <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90 group-hover:scale-[1.02] transition-transform duration-500" />
             )}
             {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/85 via-[#16181A]/25 to-transparent" />}
-            {!b.coverUrl && <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-[#C8F542]/20 blur-2xl pointer-events-none" aria-hidden />}
+            {!b.coverUrl && <div className="absolute top-0 right-0 h-40 w-40 -translate-y-10 translate-x-10 rounded-full bg-[#C8F542]/20 blur-2xl pointer-events-none" aria-hidden />}
             <div className={`relative ${b.coverUrl ? 'text-white' : ''}`}>
               <div className="flex items-start gap-3">
                 {!b.coverUrl && <Initials name={b.name} size={44} />}
