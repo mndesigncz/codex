@@ -1,5 +1,5 @@
 // Moje podniky: členství s body a razítky, rezervace, objednávky, kupony.
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer, publicProfile } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 
@@ -29,9 +29,29 @@ export async function GET() {
     SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, p.slug, COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
     FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id JOIN client_profiles p ON p.team_id = cl.team_id JOIN teams t ON t.id = cl.team_id
     WHERE cl.customer_id = ${me.id} ORDER BY cl.redeemed_at NULLS FIRST, cl.claimed_at DESC LIMIT 40`;
+  const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
   return NextResponse.json({
-    me,
+    me: profile ?? me,
     memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), lastVisitAt: m.last_visit_at })),
     reservations, orders, claims, today,
   });
+}
+
+/** Profil hosta: jméno, telefon, narozeniny (jen den a měsíc stačí podniku na přání). */
+export async function PATCH(req: NextRequest) {
+  const me = await customer();
+  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const b = await req.json().catch(() => ({}));
+  const name = b.name != null ? String(b.name).trim().slice(0, 80) : null;
+  const phone = b.phone != null ? String(b.phone).replace(/[^\d+ ]/g, '').trim().slice(0, 20) : null;
+  const birthday = b.birthday != null ? (/^\d{4}-\d{2}-\d{2}$/.test(String(b.birthday)) ? String(b.birthday) : '') : null;
+  if (name !== null && !name) return NextResponse.json({ error: 'Jméno nesmí být prázdné.' }, { status: 400 });
+  // Ovladač neumí skládat úryvky SQL, proto COALESCE: null znamená „nech, jak je".
+  const setBirthday = birthday !== null;
+  await sql`UPDATE users SET
+    name = COALESCE(${name}, name), phone = COALESCE(${phone}, phone),
+    birthday = CASE WHEN ${setBirthday} THEN ${birthday || null} ELSE birthday END
+    WHERE id = ${me.id}`;
+  const [u] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
+  return NextResponse.json({ ok: true, me: u });
 }

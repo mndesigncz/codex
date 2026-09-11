@@ -1303,6 +1303,60 @@ export async function GET(request: Request) {
       )`;
     await sql`CREATE INDEX IF NOT EXISTS client_ledger_member ON client_loyalty_ledger (team_id, customer_id)`;
 
+    // ---- Managero client III: kartička, hodnocení, zprávy, promo kódy ----
+    // Kartička: jeden kód na hosta pro všechny podniky (jako Kartička nebo
+    // karta v peněžence). Obsluha ho načte u kasy a dá razítko či body.
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_cards (
+        customer_id INTEGER PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_reviews (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        ref TEXT NOT NULL,
+        rating INTEGER NOT NULL,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (customer_id, ref)
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_reviews_team ON client_reviews (team_id, created_at)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_broadcasts (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        recipients INTEGER NOT NULL DEFAULT 0,
+        sent_by INTEGER,
+        sent_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_promos (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        points INTEGER NOT NULL DEFAULT 0,
+        coupon_id INTEGER,
+        max_uses INTEGER,
+        uses INTEGER NOT NULL DEFAULT 0,
+        valid_until TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_promo_uses (
+        promo_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        used_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (promo_id, customer_id)
+      )`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday TEXT`;
+
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
     // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;

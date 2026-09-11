@@ -38,10 +38,10 @@ export default function ClientHome() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45 mb-3">Pro hosty</p>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tighter leading-[1.02] text-balance">
-            Rezervace, věrnostní karta a objednávka od stolu. Pro podniky, kam chodíš.
+            Kartička, rezervace a objednávka od stolu.
           </h1>
-          <p className="mt-4 text-base text-black/60 leading-relaxed max-w-[52ch] text-pretty">
-            Jeden účet, víc podniků. Přidej se k čajovně nebo kavárně, zarezervuj si stůl, sbírej razítka a body a vyzvedni si odměnu u kasy.
+          <p className="mt-3 text-base text-black/60 leading-relaxed max-w-[44ch] text-pretty">
+            Jeden účet pro všechny podniky, kam chodíš. Razítka a body sbíráš u kasy.
           </p>
           {!signedIn && (
             <div className="mt-6 flex flex-wrap gap-2">
@@ -93,7 +93,7 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
       <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
         {items.map((b, i) => (
           <Link key={b.slug} href={`/client/${b.slug}`}
-            className={`group relative overflow-hidden rounded-3xl border border-black/[0.06] bg-white/60 hover:bg-white/80 active:scale-[0.99] transition min-h-[11rem] flex flex-col justify-end p-5 ${i % 4 === 1 || i % 4 === 2 ? 'md:col-span-1' : ''}`}
+            className={`group relative overflow-hidden rounded-3xl border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'bg-white/60 hover:bg-white/80'} active:scale-[0.99] transition min-h-[11rem] flex flex-col justify-end p-5`}
             style={{ animationDelay: `${i * 60}ms` }}>
             {b.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element
