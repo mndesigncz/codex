@@ -5,6 +5,7 @@
 // Historie a účet jsou složené, ať stránka na mobilu nezačíná seznamem.
 
 import { useCallback, useEffect, useState } from 'react';
+import { Initials } from './ClientShell';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
@@ -59,6 +60,7 @@ export default function MyPage() {
               <li key={m.slug}>
                 <Link href={`/client/${m.slug}`} className="block rounded-3xl border border-black/[0.06] bg-white/60 hover:bg-white/80 active:scale-[0.99] transition p-5">
                   <div className="flex items-start gap-3">
+                    <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="text-lg font-bold tracking-tight leading-tight truncate">{m.name}</p>
                       <p className="text-sm text-black/55 mt-0.5">{m.visits} {plural(m.visits, 'návštěva', 'návštěvy', 'návštěv')}{m.lastVisitAt ? ` · naposledy ${new Date(m.lastVisitAt).toLocaleDateString('cs-CZ')}` : ''}</p>

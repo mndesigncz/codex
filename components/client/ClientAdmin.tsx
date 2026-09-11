@@ -28,6 +28,38 @@ const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py
 const label = 'block text-xs font-semibold text-black/55 mb-1.5';
 const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-red-500/10 text-red-700'}`;
 
+/** Dlaždice jako na přehledu podniku: štítek, ikona v tónovaném kolečku, číslo. Kliknutím do záložky. */
+function StatCard({ icon, label, value, onClick, tone = 'ok' }: { icon: string; label: string; value: number | string; onClick?: () => void; tone?: 'ok' | 'wait' | 'muted' }) {
+  const ring = tone === 'wait' ? 'bg-amber-500/15 border-amber-500/25 text-amber-800' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
+  return (
+    <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition-all duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-amber-500/25' : ''}`}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-wider text-black/50 leading-tight">{label}</p>
+        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
+      </div>
+      <p className="text-3xl font-bold tracking-tight tabular-nums text-[#16181A] mt-3">{value}</p>
+    </button>
+  );
+}
+
+/** Nadpis sekce s ikonou v kolečku a volitelnou akcí vpravo — stejný rytmus jako dashboard. */
+function SectionTitle({ icon, children, action }: { icon: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 mb-3">
+      <h2 className="text-base font-bold tracking-tight flex items-center gap-2.5">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name={icon} size={15} /></span>
+        {children}
+      </h2>
+      {action}
+    </div>
+  );
+}
+
+/** Odkaz do jiné záložky — v textu, s šipkou. */
+function GoLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} className="tap-target-sm inline-flex items-center gap-1 text-sm font-semibold text-[#16181A] hover:text-[#4F6A07] transition">{children}<Icon name="chevron" size={14} className="-rotate-90" /></button>;
+}
+
 async function j(url: string, init?: RequestInit) {
   const r = await fetch(url, init ? { headers: { 'Content-Type': 'application/json' }, ...init } : undefined);
   const d = await r.json().catch(() => ({}));
@@ -42,6 +74,9 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
   useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
   const [summary, setSummary] = useState<any | null>(null);
   const [toast, setToast] = useState('');
+  // Jméno hosta z rezervace nebo přehledu otevře Zákazníky s předvyplněným hledáním.
+  const [custQ, setCustQ] = useState('');
+  const openCustomer = useCallback((q: string) => { setCustQ(q); setTab('customers'); }, []);
   const refreshSummary = useCallback(() => { fetch('/api/client/admin/summary').then(r => r.json()).then(setSummary).catch(() => {}); }, []);
   useEffect(() => { refreshSummary(); }, [refreshSummary, tab]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 4500); return () => clearTimeout(t); } }, [toast]);
@@ -61,8 +96,8 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
       </div>
       {toast && <p role="status" className="mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
       <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-24 md:pb-8">
-        {tab === 'overview' && <Overview summary={summary} go={setTab} />}
-        {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} />}
+        {tab === 'overview' && <Overview summary={summary} go={setTab} onCustomer={openCustomer} />}
+        {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} onCustomer={openCustomer} />}
         {tab === 'orders' && (
           <div className="space-y-5 max-w-3xl">
             <PageHeader title="Objednávky" subtitle="Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body." />
@@ -70,7 +105,7 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
           </div>
         )}
         {tab === 'tables' && <Tables toast={setToast} />}
-        {tab === 'customers' && <Customers toast={setToast} />}
+        {tab === 'customers' && <Customers toast={setToast} initialQuery={custQ} />}
         {tab === 'loyalty' && <Loyalty toast={setToast} />}
         {tab === 'settings' && <SettingsTab toast={setToast} onChange={refreshSummary} />}
       </main>
@@ -80,51 +115,114 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
 
 // ---- Přehled --------------------------------------------------------------------
 
-function Overview({ summary, go }: { summary: any; go: (t: Tab) => void }) {
+function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => void; onCustomer: (q: string) => void }) {
   const [today, setToday] = useState<any[] | null>(null);
   useEffect(() => { fetch('/api/client/admin/reservations?range=today').then(r => r.json()).then(d => setToday(d.reservations ?? [])).catch(() => setToday([])); }, []);
   if (!summary) return <PageSkel />;
   if (!summary.enabled) {
     return (
       <div className="max-w-2xl">
-        <PageHeader title="Přehled" subtitle="Rezervace, členové a věrnost hostů na jednom místě." />
+        <PageHeader title="Přehled" subtitle="Rezervace, objednávky od stolu, členové a věrnost hostů na jednom místě." />
         <div className="mt-6">
           <EmptyState icon="sparkle" title="Managero client je pro hosty vypnutý"
-            hint="Nastav profil podniku a zapni ho. Hosté pak podnik najdou, přidají se a rezervují."
+            hint="Nastav profil podniku a zapni ho. Hosté pak podnik najdou, přidají se, rezervují a objednají od stolu."
             action={<Button variant="accent" icon="settings" onClick={() => go('settings')}>Nastavit a zapnout</Button>} />
         </div>
       </div>
     );
   }
+  const su = summary.setup ?? {};
+  const rv = summary.reviews ?? { count: 0, avg: null, new7: 0, low7: 0 };
+  const attention: { n: number; label: string; icon: string; tab: Tab }[] = [
+    { n: Number(summary.orders?.new ?? 0), label: 'nová objednávka od stolu', icon: 'cup', tab: 'orders' as Tab },
+    { n: Number(summary.reservations.requested), label: 'rezervace k potvrzení', icon: 'calendarCheck', tab: 'reservations' as Tab },
+    { n: Number(rv.low7), label: 'slabé hodnocení za týden', icon: 'star', tab: 'customers' as Tab },
+  ].filter(a => a.n > 0);
+  const steps: { done: boolean; label: string; tab: Tab }[] = [
+    { done: !!su.enabled, label: 'Podnik zapnutý pro hosty', tab: 'settings' },
+    { done: !!su.menu, label: 'Nabídka z Menu pro hosty', tab: 'settings' },
+    { done: (su.tables ?? 0) > 0, label: su.tables ? `${su.tables} stolů${su.tablesPaired ? `, ${su.tablesPaired} spárovaných s pokladnou` : ''}` : 'Stoly pro rezervace a objednávky', tab: 'tables' },
+    { done: !!su.pos, label: su.pos ? 'Pokladna napojená: objednávky jdou na stůl v kase' : 'Napojit pokladnu (Nastavení → Pokladna)', tab: 'tables' },
+    { done: !!su.location, label: su.location ? 'Poloha podniku nastavená, objednávky jen od stolu' : 'Nastavit polohu podniku pro ochranu objednávek', tab: 'settings' },
+    { done: !!su.loyaltyOn, label: su.loyaltyOn ? `Věrnost: ${su.pointsPer100} b. za 100 Kč, ${su.stampTarget} razítek za ${su.stampReward || 'odměnu'}` : 'Zapnout věrnost', tab: 'loyalty' },
+  ];
+  const doneN = steps.filter(x => x.done).length;
   return (
     <div className="space-y-6">
-      <PageHeader title="Přehled" subtitle={`Veřejná adresa: /client/${summary.slug}`}
-        primary={<Button variant="accent" icon="calendarCheck" onClick={() => go('reservations')}>Rezervace{summary.reservations.requested ? ` (${summary.reservations.requested})` : ''}</Button>} />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {([
-          ['Nové objednávky', summary.orders?.new ?? 0, 'wait'],
-          ['Čeká na potvrzení', summary.reservations.requested, 'wait'],
-          ['Dnes rezervací', summary.reservations.today, 'ok'],
-          ['Členů', summary.members, ''],
-        ] as const).map(([k, v, tone]) => (
-          <div key={k} className={`rounded-3xl p-4 border ${tone === 'wait' && v > 0 ? 'bg-amber-500/[0.08] border-amber-500/25' : 'glass-card border-transparent'}`}>
-            <p className="text-[11px] uppercase tracking-wider text-black/50">{k}</p>
-            <p className="text-2xl font-bold tabular-nums mt-1">{v}</p>
+      <PageHeader title="Přehled" subtitle={`Hosté tě najdou na /client/${summary.slug}. Rezervace, objednávky, členové a věrnost na jednom místě.`}
+        primary={<Button variant="accent" icon="calendarCheck" onClick={() => go('reservations')}>Rezervace{summary.reservations.requested ? ` (${summary.reservations.requested})` : ''}</Button>}
+        secondary={<Button variant="secondary" icon="cup" onClick={() => go('orders')}>Objednávky{summary.orders?.new ? ` (${summary.orders.new})` : ''}</Button>} />
+
+      {attention.length > 0 && (
+        <div className="rounded-3xl border border-orange-500/25 bg-orange-500/[0.07] p-4 sm:p-5">
+          <p className="font-bold text-[#16181A] flex items-center gap-2 mb-2"><Icon name="warning" size={17} className="text-orange-600" /> Čeká na tebe</p>
+          <div className="flex flex-wrap gap-2">
+            {attention.map(a => (
+              <button key={a.label} type="button" onClick={() => go(a.tab)} className="tap-target-sm rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+                <Icon name={a.icon} size={15} className="text-black/45" /> {a.n}× {a.label}
+              </button>
+            ))}
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon="cup" label="Nové objednávky" value={summary.orders?.new ?? 0} tone={(summary.orders?.new ?? 0) > 0 ? 'wait' : 'ok'} onClick={() => go('orders')} />
+        <StatCard icon="calendarCheck" label="Čeká na potvrzení" value={summary.reservations.requested} tone={summary.reservations.requested > 0 ? 'wait' : 'ok'} onClick={() => go('reservations')} />
+        <StatCard icon="calendar" label="Dnes rezervací" value={summary.reservations.today} onClick={() => go('reservations')} />
+        <StatCard icon="users" label="Členů" value={summary.members} tone="muted" onClick={() => go('customers')} />
       </div>
-      <section>
-        <h2 className="text-base font-bold tracking-tight mb-2">Dnešní rezervace</h2>
-        {today === null ? <Skeleton className="h-24 rounded-3xl" /> : today.length === 0
-          ? <p className="text-sm text-black/55">Dnes nikdo rezervovaný. Klid, nebo prostor pro walk-in.</p>
-          : <ul className="divide-y divide-black/[0.06]">{today.map(r => (
-              <li key={r.id} className="py-2.5 flex items-center gap-x-3 gap-y-1 flex-wrap">
-                <span className="font-semibold tabular-nums w-14 shrink-0">{r.time}</span>
-                <Initials name={r.customer_name} size={28} />
-                <span className="min-w-0 flex-1 basis-40 truncate">{r.customer_name} <span className="text-black/50">· {r.party} os.{r.table_name ? ` · ${r.table_name}` : ''}</span></span>
-                <span className={`${chip(RES_STATUS[r.status]?.tone ?? 'wait')} ml-auto`}>{RES_STATUS[r.status]?.label ?? r.status}</span>
-              </li>))}</ul>}
-      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
+        <section className="glass-card p-4 sm:p-5">
+          <SectionTitle icon="calendar" action={<GoLink onClick={() => go('reservations')}>Všechny</GoLink>}>Dnešní rezervace</SectionTitle>
+          {today === null ? <Skeleton className="h-24 rounded-2xl" /> : today.length === 0
+            ? <p className="text-sm text-black/55">Dnes nikdo rezervovaný. Klid, nebo prostor pro walk-in.</p>
+            : <ul className="divide-y divide-black/[0.06]">{today.map(r => (
+                <li key={r.id} className="py-2.5 flex items-center gap-x-3 gap-y-1 flex-wrap">
+                  <span className="font-semibold tabular-nums w-12 shrink-0">{r.time}</span>
+                  <Initials name={r.customer_name} size={28} />
+                  <button type="button" onClick={() => onCustomer(r.customer_name)} className="min-w-0 flex-1 basis-40 truncate text-left hover:text-[#4F6A07] transition">
+                    <span className="font-medium">{r.customer_name}</span> <span className="text-black/50">· {r.party} os.{r.table_name ? ` · ${r.table_name}` : ''}</span>
+                  </button>
+                  <span className={`${chip(RES_STATUS[r.status]?.tone ?? 'wait')} ml-auto`}>{RES_STATUS[r.status]?.label ?? r.status}</span>
+                </li>))}</ul>}
+        </section>
+
+        <div className="space-y-6">
+          <section className="glass-card p-4 sm:p-5">
+            <SectionTitle icon="gift" action={<GoLink onClick={() => go('customers')}>Zákazníci</GoLink>}>Členové a hodnocení</SectionTitle>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-2xl font-bold tabular-nums leading-none">{summary.members}</p>
+                <p className="text-xs text-black/55 mt-1">členů · {summary.newMembers30 ?? 0} nových za 30 dní</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold tabular-nums leading-none">{rv.avg ?? '–'}<span className="text-sm font-medium text-black/45"> / 5</span></p>
+                <p className="text-xs text-black/55 mt-1">{rv.count ? `${rv.count} hodnocení · ${rv.new7} za týden` : 'zatím bez hodnocení'}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" icon="send" onClick={() => go('customers')}>Zpráva členům</Button>
+              <Button size="sm" variant="ghost" icon="tag" onClick={() => go('loyalty')}>Promo kód</Button>
+            </div>
+          </section>
+
+          <section className="glass-card p-4 sm:p-5">
+            <SectionTitle icon="check">Propojení <span className="text-black/35 font-semibold tabular-nums ml-1">{doneN}/{steps.length}</span></SectionTitle>
+            <div className="space-y-1.5">
+              {steps.map((st, i) => (
+                <button key={i} type="button" onClick={() => go(st.tab)}
+                  className={`group w-full flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm text-left transition ${st.done ? 'bg-[#C8F542]/10 text-black/60' : 'bg-black/[0.03] text-[#16181A] hover:bg-black/[0.06]'}`}>
+                  <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${st.done ? 'bg-[#C8F542] text-[#16181A]' : 'border-2 border-black/15'}`}>{st.done && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
+                  <span className="min-w-0 flex-1 leading-snug">{st.label}</span>
+                  <Icon name="chevron" size={15} className="shrink-0 -rotate-90 text-black/25 group-hover:text-black/50 transition-colors" />
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
@@ -133,7 +231,7 @@ function PageSkel() { return <div className="space-y-4"><Skeleton className="h-1
 
 // ---- Rezervace ------------------------------------------------------------------
 
-function Reservations({ toast, onChange }: { toast: (m: string) => void; onChange: () => void }) {
+function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => void; onChange: () => void; onCustomer: (q: string) => void }) {
   const [range, setRange] = useState<'today' | 'upcoming' | 'past'>('upcoming');
   const [d, setD] = useState<any | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
@@ -162,8 +260,8 @@ function Reservations({ toast, onChange }: { toast: (m: string) => void; onChang
       {d === null ? <PageSkel /> : groups.length === 0
         ? <EmptyState icon="calendarCheck" title={range === 'past' ? 'Žádné minulé rezervace' : 'Zatím žádné rezervace'} hint={range === 'past' ? '' : 'Objeví se tu, jakmile si host zarezervuje stůl na tvé stránce.'} compact />
         : groups.map(([date, rows]) => (
-          <section key={date}>
-            <h2 className="text-sm font-bold tracking-tight cz-sentence mb-1.5">{czDay(date, true)}</h2>
+          <section key={date} className="glass-card p-4 sm:p-5">
+            <h2 className="text-sm font-bold tracking-tight cz-sentence mb-1 flex items-center gap-2"><Icon name="calendar" size={15} className="text-[#4F6A07]" />{czDay(date, true)} <span className="text-black/40 font-medium">· {rows.length}</span></h2>
             <ul className="divide-y divide-black/[0.06]">
               {rows.map((r: any) => {
                 const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
@@ -172,7 +270,7 @@ function Reservations({ toast, onChange }: { toast: (m: string) => void; onChang
                   <li key={r.id} className="py-3 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_auto] gap-x-3 gap-y-2 items-center">
                     <span className="font-semibold tabular-nums text-lg leading-none">{r.time}</span>
                     <div className="min-w-0">
-                      <p className="font-semibold truncate flex items-center gap-2"><Initials name={r.customer_name} size={24} />{r.customer_name} <span className="text-black/50 font-medium">· {r.party} os.</span></p>
+                      <p className="font-semibold truncate flex items-center gap-2"><Initials name={r.customer_name} size={24} /><button type="button" onClick={() => onCustomer(r.customer_name)} title="Otevřít v Zákaznících" className="truncate hover:text-[#4F6A07] transition">{r.customer_name}</button> <span className="text-black/50 font-medium">· {r.party} os.</span></p>
                       <p className="text-xs text-black/55 truncate">{r.customer_email}{r.note ? ` · „${r.note}"` : ''}</p>
                       <span className={`${chip(st.tone)} mt-1`}>{st.label}</span>
                     </div>
@@ -229,12 +327,12 @@ function Tables({ toast }: { toast: (m: string) => void }) {
       </form>
       {d === null ? <PageSkel /> : d.tables.length === 0
         ? <EmptyState icon="location" title="Zatím žádné stoly" hint={d.posConnected ? 'Načti je z pokladny, nebo přidej ručně.' : 'Přidej první stůl výš.'} compact />
-        : <ul className="divide-y divide-black/[0.06] max-w-2xl">
+        : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06] max-w-2xl">
             {d.tables.map((t: any) => (
               <li key={t.id} className={`py-2.5 flex items-center gap-3 ${t.active ? '' : 'opacity-50'}`}>
                 <input aria-label={`Název stolu ${t.name}`} defaultValue={t.name} onBlur={e => e.target.value !== t.name && patch(t.id, { name: e.target.value })} className={`${input} py-1.5 flex-1 min-w-0`} />
                 <input aria-label="Počet míst" type="number" min={1} max={40} defaultValue={t.seats} onBlur={e => Number(e.target.value) !== t.seats && patch(t.id, { seats: Number(e.target.value) })} className={`${input} py-1.5 !w-16 text-center`} />
-                <span className="text-xs text-black/45 hidden sm:inline w-24 truncate">{t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}</span>
+                <span className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium w-24 truncate ${t.storyous_desk_id ? 'bg-[#C8F542]/15 text-[#4F6A07]' : 'bg-black/[0.05] text-black/50'}`}><Icon name={t.storyous_desk_id ? 'receipt' : 'location'} size={11} />{t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}</span>
                 <button onClick={() => window.open(`/api/client/admin/tables/qr?tableId=${t.id}`, '_blank')} aria-label={`Vytisknout QR stolu ${t.name}`} title="QR na stůl k tisku" className="tap-target-sm rounded-full p-2 text-black/55 hover:text-black hover:bg-black/[0.05] transition"><Icon name="print" size={16} /></button>
                 <button onClick={() => { if (confirm(`Vygenerovat nový QR kód pro stůl ${t.name}? Starý vytištěný kód přestane platit.`)) patch(t.id, { rotate_token: true }); }} aria-label={`Nový QR kód stolu ${t.name}`} title="Nový QR kód (starý přestane platit)" className="tap-target-sm rounded-full p-2 text-black/40 hover:text-black hover:bg-black/[0.05] transition hidden sm:inline-grid"><Icon name="refresh" size={16} /></button>
                 <button onClick={() => patch(t.id, { active: !t.active })} aria-pressed={!!t.active} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${t.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{t.active ? 'Aktivní' : 'Skrytý'}</button>
@@ -248,7 +346,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
 
 // ---- Zákazníci ------------------------------------------------------------------
 
-function Customers({ toast }: { toast: (m: string) => void }) {
+function Customers({ toast, initialQuery = '' }: { toast: (m: string) => void; initialQuery?: string }) {
   const [sub, setSub] = useState<'members' | 'reviews' | 'messages'>('members');
   const sub_title: Record<string, string> = {
     members: 'Kdo se k podniku přidal, kolik má bodů a razítek, deník změn.',
@@ -259,15 +357,16 @@ function Customers({ toast }: { toast: (m: string) => void }) {
     <div className="space-y-5">
       <PageHeader title="Zákazníci" subtitle={sub_title[sub]} />
       <Segmented options={[{ id: 'members', label: 'Členové' }, { id: 'reviews', label: 'Hodnocení' }, { id: 'messages', label: 'Zprávy členům' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části zákazníků" wrap />
-      {sub === 'members' && <Members toast={toast} />}
+      {sub === 'members' && <Members toast={toast} initialQuery={initialQuery} />}
       {sub === 'reviews' && <Reviews />}
       {sub === 'messages' && <Broadcast toast={toast} />}
     </div>
   );
 }
 
-function Members({ toast }: { toast: (m: string) => void }) {
-  const [q, setQ] = useState(''); const [d, setD] = useState<any | null>(null);
+function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; initialQuery?: string }) {
+  const [q, setQ] = useState(initialQuery); const [d, setD] = useState<any | null>(null);
+  useEffect(() => { setQ(initialQuery); }, [initialQuery]);
   const [openId, setOpenId] = useState<number | null>(null); const [ledger, setLedger] = useState<any[] | null>(null);
   const load = useCallback(() => fetch(`/api/client/admin/customers?q=${encodeURIComponent(q)}`).then(r => r.json()).then(setD).catch(() => setD({ customers: [], total: 0 })), [q]);
   useEffect(() => { const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q]);
@@ -291,7 +390,7 @@ function Members({ toast }: { toast: (m: string) => void }) {
       </div>
       {d === null ? <PageSkel /> : d.customers.length === 0
         ? <EmptyState icon="users" title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? '' : 'Přidají se sami na tvé stránce pro hosty.'} compact />
-        : <ul className="divide-y divide-black/[0.06]">
+        : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">
             {d.customers.map((c: any) => (
               <li key={c.id} className="py-3">
                 <div className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center">
@@ -539,7 +638,7 @@ function Reviews() {
               ))}
             </ul>
           </div>
-          <ul className="divide-y divide-black/[0.06]">
+          <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">
             {d.reviews.map((v: any) => (
               <li key={v.id} className="py-3 flex items-start gap-3">
                 <Initials name={v.customer_name} size={32} />
@@ -581,9 +680,9 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
           <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!d.members}>Poslat {d.members} {d.members === 1 ? 'členovi' : 'členům'}</Button>
         </form>
         <section>
-          <h2 className="font-bold tracking-tight mb-2">Odeslané</h2>
-          {d.history.length === 0 ? <EmptyState icon="mail" title="Zatím nic odeslaného" hint="První zpráva pojde všem, kdo se k podniku přidali." compact />
-            : <ul className="divide-y divide-black/[0.06]">{d.history.map((h: any) => (
+          <SectionTitle icon="mail">Odeslané</SectionTitle>
+          {d.history.length === 0 ? <EmptyState icon="mail" title="Zatím nic odeslaného" hint="První zpráva půjde všem, kdo se k podniku přidali." compact />
+            : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">{d.history.map((h: any) => (
                 <li key={h.id} className="py-3">
                   <p className="font-semibold leading-tight">{h.title}</p>
                   {h.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{h.body}</p>}
@@ -629,9 +728,9 @@ function Promos({ toast }: { toast: (m: string) => void }) {
           <Button type="submit" variant="accent" icon="plus" loading={busy}>Vytvořit kód</Button>
         </form>
         <section>
-          <h2 className="font-bold tracking-tight mb-2">Kódy</h2>
+          <SectionTitle icon="tag">Kódy</SectionTitle>
           {d.promos.length === 0 ? <EmptyState icon="tag" title="Zatím žádný promo kód" hint="Vytvoř první vlevo. Krátký a snadno opsatelný funguje nejlíp." compact />
-            : <ul className="divide-y divide-black/[0.06]">{d.promos.map((p: any) => (
+            : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">{d.promos.map((p: any) => (
                 <li key={p.id} className={`py-3 flex items-center gap-3 ${p.active ? '' : 'opacity-50'}`}>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold truncate"><span className="font-mono tracking-widest">{p.code}</span> <span className="text-black/50 font-medium">· {p.title}</span></p>

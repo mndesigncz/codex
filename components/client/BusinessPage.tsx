@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Segmented, Skeleton, EmptyState } from '../ui';
+import { Initials } from './ClientShell';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 
@@ -35,11 +36,11 @@ export default function BusinessPage({ slug }: { slug: string }) {
   if (!d) return <div className="space-y-4"><Skeleton className="h-48 rounded-3xl" /><Skeleton className="h-10 w-72 rounded-full" /><Skeleton className="h-64 rounded-3xl" /></div>;
 
   const b = d.business; const me = d.me; const today: string = d.today;
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'menu', label: 'Nabídka' },
-    ...(b.reservationsOn ? [{ id: 'reserve' as Tab, label: 'Rezervace' }] : []),
-    ...(b.orderingOn && (d.tables?.length ?? 0) > 0 ? [{ id: 'order' as Tab, label: 'Objednat' }] : []),
-    ...(b.loyaltyOn ? [{ id: 'loyalty' as Tab, label: 'Věrnost' }] : []),
+  const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'menu', label: 'Nabídka', icon: 'leaf' },
+    ...(b.reservationsOn ? [{ id: 'reserve' as Tab, label: 'Rezervace', icon: 'calendarCheck' }] : []),
+    ...(b.orderingOn && (d.tables?.length ?? 0) > 0 ? [{ id: 'order' as Tab, label: 'Objednat', icon: 'cup' }] : []),
+    ...(b.loyaltyOn ? [{ id: 'loyalty' as Tab, label: 'Věrnost', icon: 'gift' }] : []),
   ];
   const join = async () => {
     const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST' });
@@ -49,16 +50,33 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'bg-white/60'} min-h-[10rem] sm:min-h-[12rem] flex flex-col justify-end p-5 sm:p-7`}>
+      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[10rem] sm:min-h-[12rem] flex flex-col justify-end p-5 sm:p-7`}>
         {b.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         )}
         {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/85 via-[#16181A]/30 to-transparent" />}
+        {!b.coverUrl && <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl pointer-events-none" aria-hidden />}
+        {!b.coverUrl && <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#0A84FF]/10 blur-3xl pointer-events-none" aria-hidden />}
         <div className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end ${b.coverUrl ? 'text-white' : ''}`}>
-          <div className="min-w-0">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
-            <p className={`mt-2 text-sm inline-flex items-center gap-1.5 ${b.coverUrl ? 'text-white/80' : 'text-black/55'}`}><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</p>
+          <div className="min-w-0 flex items-end gap-4">
+            {!b.coverUrl && <span className="hidden sm:block"><Initials name={b.name} size={64} /></span>}
+            <div className="min-w-0">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
+              <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/80' : 'text-black/55'}`}>
+                <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</span>
+                {b.address && <span className="inline-flex items-center gap-1.5"><Icon name="location" size={15} />{b.address}</span>}
+              </p>
+              {tabs.length > 1 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {tabs.filter(t => t.id !== 'menu' && t.id !== tab).map(t => (
+                    <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${b.coverUrl ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-white/70 border border-black/[0.07] text-[#16181A] hover:bg-white'}`}>
+                      <Icon name={t.icon} size={13} />{t.id === 'reserve' ? 'Rezervovat' : t.id === 'order' ? 'Objednat od stolu' : 'Kartička a kupony'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="shrink-0">
             {me?.member ? (
