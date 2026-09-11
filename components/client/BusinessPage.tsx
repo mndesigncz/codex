@@ -10,7 +10,7 @@ import { Segmented, Skeleton, EmptyState } from '../ui';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 
-type Tab = 'menu' | 'reserve' | 'loyalty';
+type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
 const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 rounded-full bg-[#C8F542] text-[#16181A] px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
 const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
@@ -20,7 +20,12 @@ const label = 'block text-xs font-semibold text-black/55 mb-1.5';
 export default function BusinessPage({ slug }: { slug: string }) {
   const [d, setD] = useState<any | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [tab, setTab] = useState<Tab>('menu');
+  const [tab, setTab] = useState<Tab>(() => {
+    // Odkaz nebo QR na stole může vést rovnou na objednávku: /client/<podnik>?tab=order
+    if (typeof window === 'undefined') return 'menu';
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return (['menu', 'reserve', 'order', 'loyalty'] as string[]).includes(t ?? '') ? (t as Tab) : 'menu';
+  });
   const [flash, setFlash] = useState('');
   const load = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}`).then(r => r.status === 404 ? (setNotFound(true), null) : r.json()).then(x => x && setD(x)).catch(() => setNotFound(true)), [slug]);
   useEffect(() => { load(); }, [load]);
@@ -33,6 +38,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'menu', label: 'Nabídka' },
     ...(b.reservationsOn ? [{ id: 'reserve' as Tab, label: 'Rezervace' }] : []),
+    ...(b.orderingOn && (d.tables?.length ?? 0) > 0 ? [{ id: 'order' as Tab, label: 'Objednat' }] : []),
     ...(b.loyaltyOn ? [{ id: 'loyalty' as Tab, label: 'Věrnost' }] : []),
   ];
   const join = async () => {
@@ -77,6 +83,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {tab === 'menu' && <MenuTab menu={d.menu} description={b.description} hours={b.hours} currency={b.currency} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
+      {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
       {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
     </div>
   );
@@ -295,6 +302,138 @@ function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; 
           </ul>
         ) : <EmptyState icon="gift" title="Zatím žádné kupony" hint="Podnik je přidá, jakmile bude mít co nabídnout." compact />}
       </section>
+    </div>
+  );
+}
+
+// ---- Objednávka od stolu ---------------------------------------------------------
+
+const ORDER_LABEL: Record<string, string> = { new: 'Čeká na obsluhu', confirmed: 'Připravuje se', done: 'Hotovo', declined: 'Nepřijato' };
+
+function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b: any; menu: any; tables: any[]; signedIn: boolean; onDone: (m: string) => void }) {
+  const [tableId, setTableId] = useState<number | ''>(() => {
+    if (typeof window === 'undefined') return '';
+    const t = parseInt(new URLSearchParams(window.location.search).get('table') ?? '', 10);
+    return t && tables.some(x => x.id === t) ? t : '';
+  });
+  const [cart, setCart] = useState<Record<number, number>>({});
+  const [note, setNote] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [orders, setOrders] = useState<any[] | null>(null);
+  const cur = b.currency === 'CZK' ? 'Kč' : b.currency;
+
+  const loadOrders = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`).then(r => r.json()).then(x => setOrders(x.orders ?? [])).catch(() => setOrders([])), [slug]);
+  useEffect(() => { if (signedIn) loadOrders(); else setOrders([]); }, [signedIn, loadOrders]);
+  // Dokud objednávka čeká nebo se připravuje, ptáme se každých deset vteřin.
+  useEffect(() => {
+    if (!orders?.some(o => o.status === 'new' || o.status === 'confirmed')) return;
+    const t = setInterval(() => { if (document.visibilityState === 'visible') loadOrders(); }, 10000);
+    return () => clearInterval(t);
+  }, [orders, loadOrders]);
+
+  const items: any[] = (menu?.sections ?? []).flatMap((s: any) => s.items.map((it: any) => ({ ...it, section: s.title }))).filter((it: any) => !it.soldOut && it.price > 0);
+  const lines = items.filter(it => cart[it.id] > 0).map(it => ({ ...it, count: cart[it.id] }));
+  const total = lines.reduce((a, l) => a + l.price * l.count, 0);
+  const setCount = (id: number, n: number) => setCart(c => { const next = { ...c }; if (n <= 0) delete next[id]; else next[id] = Math.min(20, n); return next; });
+
+  const submit = async () => {
+    setErr('');
+    if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug + '?tab=order')}`; return; }
+    if (!tableId) { setErr('Vyber stůl, u kterého sedíš.'); return; }
+    if (!lines.length) { setErr('Přidej aspoň jednu položku.'); return; }
+    setBusy(true);
+    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId, items: lines.map(l => ({ id: l.id, count: l.count })), note }) });
+    const x = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) { setErr(x.error || 'Objednávka se nepovedla.'); return; }
+    setCart({}); setNote(''); onDone('Objednávka odeslána. Obsluha ji za chvíli potvrdí.'); loadOrders();
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 md:gap-10 items-start">
+      <div className="space-y-5">
+        <div className="glass-card p-5 grid gap-2">
+          <label htmlFor="o-table" className={label}>Kde sedíš</label>
+          <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input}>
+            <option value="">Vyber stůl</option>
+            {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <p className="text-xs text-black/45">Číslo stolu bývá na cedulce na stole.</p>
+        </div>
+        {items.length === 0 ? <EmptyState icon="leaf" title="Zatím není z čeho objednat" hint="Podnik nabídku doplní v aplikaci." compact /> : (
+          <div className="space-y-5">
+            {(menu?.sections ?? []).map((s: any) => {
+              const list = s.items.filter((it: any) => !it.soldOut && it.price > 0);
+              if (!list.length) return null;
+              return (
+                <section key={s.id}>
+                  <h2 className="text-base font-bold tracking-tight mb-1">{s.title}</h2>
+                  <ul className="divide-y divide-black/[0.06]">
+                    {list.map((it: any) => {
+                      const n = cart[it.id] ?? 0;
+                      return (
+                        <li key={it.id} className="py-2.5 flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium leading-tight">{it.name}</p>
+                            <p className="text-sm text-black/55">{it.price} {cur}{it.description ? ` · ${it.description}` : ''}</p>
+                          </div>
+                          {n === 0 ? (
+                            <button onClick={() => setCount(it.id, 1)} aria-label={`Přidat ${it.name}`} className="tap-target-sm rounded-full bg-[#16181A] text-white h-9 w-9 grid place-items-center hover:bg-black active:scale-95 transition"><Icon name="plus" size={16} /></button>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => setCount(it.id, n - 1)} aria-label="Méně" className="tap-target-sm h-9 w-9 rounded-full glass border border-black/10 grid place-items-center active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
+                              <span className="w-6 text-center font-semibold tabular-nums" aria-live="polite">{n}</span>
+                              <button onClick={() => setCount(it.id, n + 1)} aria-label="Více" className="tap-target-sm h-9 w-9 rounded-full bg-[#16181A] text-white grid place-items-center active:scale-95 transition"><Icon name="plus" size={16} /></button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <aside className="space-y-4 md:sticky md:top-24">
+        <div className="glass-card p-5 space-y-3">
+          <h2 className="text-lg font-bold tracking-tight">Objednávka</h2>
+          {lines.length === 0 ? <p className="text-sm text-black/55">Zatím prázdná. Přidej něco z nabídky.</p> : (
+            <ul className="divide-y divide-black/[0.06] text-sm">
+              {lines.map(l => <li key={l.id} className="py-1.5 flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums">{l.price * l.count} {cur}</span></li>)}
+            </ul>
+          )}
+          <div className="flex items-baseline justify-between border-t border-black/[0.06] pt-3">
+            <span className="text-sm text-black/60">Celkem</span>
+            <span className="text-xl font-bold tabular-nums">{total} {cur}</span>
+          </div>
+          <div className="grid gap-2">
+            <label htmlFor="o-note" className={label}>Poznámka pro obsluhu</label>
+            <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Bez cukru, vyšší konvička…" className={input} maxLength={300} />
+          </div>
+          {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+          <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Objednat' : 'Přihlásit se a objednat'}</button>
+          <p className="text-xs text-black/45">Platí se u obsluhy jako obvykle. Za každých 100 {cur} dostaneš {b.pointsPer100} bodů.</p>
+        </div>
+        {orders && orders.length > 0 && (
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní objednávky</h3>
+            <ul className="space-y-2">
+              {orders.map(o => (
+                <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-amber-500/[0.08] border-amber-500/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ?? o.status}</span>
+                    <span className="text-sm tabular-nums">{o.total} {cur}{o.table_name ? ` · ${o.table_name}` : ''}</span>
+                  </div>
+                  <p className="text-xs text-black/55 truncate">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </aside>
     </div>
   );
 }

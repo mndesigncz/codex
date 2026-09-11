@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { Avatar } from '../ui';
 import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
+import StaffInbox from '../client/StaffInbox';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
 import { pragueToday, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
@@ -352,6 +353,10 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           <h1 className="text-2xl font-bold tracking-tight text-[#16181A] truncate">{user.name}</h1>
         </div>
       </div>
+
+      {/* Objednávky od stolu a dnešní rezervace: kdo je na směně, vidí je
+          hned pod pozdravem. Když nic není, pruh se nevykreslí. */}
+      <StaffInbox compact />
 
       {layout.map((e, i) =>
         e.type === 'link'

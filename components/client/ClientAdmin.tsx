@@ -8,13 +8,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
 import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu } from '../ui';
 import { Initials } from './ClientShell';
+import StaffInbox from './StaffInbox';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 
-type Tab = 'overview' | 'reservations' | 'tables' | 'customers' | 'loyalty' | 'settings';
+type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'customers' | 'loyalty' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'overview', label: 'Přehled', icon: 'overview' },
   { id: 'reservations', label: 'Rezervace', icon: 'calendarCheck' },
+  { id: 'orders', label: 'Objednávky', icon: 'cup' },
   { id: 'tables', label: 'Stoly', icon: 'location' },
   { id: 'customers', label: 'Zákazníci', icon: 'users' },
   { id: 'loyalty', label: 'Věrnost', icon: 'gift' },
@@ -57,6 +59,12 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
       <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-24 md:pb-8">
         {tab === 'overview' && <Overview summary={summary} go={setTab} />}
         {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} />}
+        {tab === 'orders' && (
+          <div className="space-y-5 max-w-3xl">
+            <PageHeader title="Objednávky" subtitle="Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body." />
+            <StaffInbox onToast={setToast} />
+          </div>
+        )}
         {tab === 'tables' && <Tables toast={setToast} />}
         {tab === 'customers' && <Customers toast={setToast} />}
         {tab === 'loyalty' && <Loyalty toast={setToast} />}
@@ -90,10 +98,10 @@ function Overview({ summary, go }: { summary: any; go: (t: Tab) => void }) {
         primary={<Button variant="accent" icon="calendarCheck" onClick={() => go('reservations')}>Rezervace{summary.reservations.requested ? ` (${summary.reservations.requested})` : ''}</Button>} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
+          ['Nové objednávky', summary.orders?.new ?? 0, 'wait'],
           ['Čeká na potvrzení', summary.reservations.requested, 'wait'],
           ['Dnes rezervací', summary.reservations.today, 'ok'],
           ['Členů', summary.members, ''],
-          ['Nových za 30 dní', summary.newMembers30, ''],
         ] as const).map(([k, v, tone]) => (
           <div key={k} className={`rounded-3xl p-4 border ${tone === 'wait' && v > 0 ? 'bg-amber-500/[0.08] border-amber-500/25' : 'glass-card border-transparent'}`}>
             <p className="text-[11px] uppercase tracking-wider text-black/50">{k}</p>
@@ -378,7 +386,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);
     try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, tagline: p.tagline, description: p.description, address: p.address, cover_url: p.cover_url, reservations_on: p.reservations_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null }) });
+      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, tagline: p.tagline, description: p.description, address: p.address, cover_url: p.cover_url, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null }) });
       setP(r.profile); setD({ ...d, url: r.url }); toast(r.profile.enabled ? 'Uloženo. Podnik je pro hosty zapnutý.' : 'Uloženo. Podnik je zatím vypnutý.'); onChange();
     } catch (e: any) { toast(e.message); }
     setBusy(false);
@@ -421,6 +429,8 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
       <section className="glass-card p-5 grid gap-4">
         <h2 className="font-bold tracking-tight">Rezervace</h2>
         <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={!!p.reservations_on} onChange={e => setP({ ...p, reservations_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou rezervovat</label>
+        <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={!!p.ordering_on} onChange={e => setP({ ...p, ordering_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou objednávat od stolu</label>
+        <p className="text-xs text-black/50 -mt-2">Objednávky potřebují stoly (záložka Stoly) a nabídku z Menu. S napojenou pokladnou jdou přijaté objednávky rovnou na stůl v kase.</p>
         <div className="grid grid-cols-3 gap-3">
           <div><label htmlFor="s-party" className={label}>Nejvíc osob</label><input id="s-party" type="number" min={1} max={40} value={p.max_party} onChange={e => setP({ ...p, max_party: e.target.value })} className={input} /></div>
           <div><label htmlFor="s-lead" className={label}>Dní dopředu</label><input id="s-lead" type="number" min={1} max={180} value={p.lead_days} onChange={e => setP({ ...p, lead_days: e.target.value })} className={input} /></div>
