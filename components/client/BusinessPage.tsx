@@ -49,7 +49,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section className="relative overflow-hidden rounded-[28px] border border-black/[0.06] bg-white/60 min-h-[13rem] flex flex-col justify-end p-5 sm:p-7">
+      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'bg-white/60'} min-h-[10rem] sm:min-h-[12rem] flex flex-col justify-end p-5 sm:p-7`}>
         {b.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -58,11 +58,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
         <div className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end ${b.coverUrl ? 'text-white' : ''}`}>
           <div className="min-w-0">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
-            {b.tagline && <p className={`mt-1.5 text-base ${b.coverUrl ? 'text-white/80' : 'text-black/60'} text-pretty`}>{b.tagline}</p>}
-            <div className={`mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm ${b.coverUrl ? 'text-white/80' : 'text-black/55'}`}>
-              <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</span>
-              {b.address && <span className="inline-flex items-center gap-1.5"><Icon name="location" size={15} />{b.address}</span>}
-            </div>
+            <p className={`mt-2 text-sm inline-flex items-center gap-1.5 ${b.coverUrl ? 'text-white/80' : 'text-black/55'}`}><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</p>
           </div>
           <div className="shrink-0">
             {me?.member ? (
@@ -81,7 +77,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel="Části stránky podniku" />}
 
-      {tab === 'menu' && <MenuTab menu={d.menu} description={b.description} hours={b.hours} currency={b.currency} />}
+      {tab === 'menu' && <MenuTab menu={d.menu} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
       {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
       {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
@@ -89,7 +85,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
   );
 }
 
-function MenuTab({ menu, description, hours, currency }: { menu: any; description: string; hours: any; currency: string }) {
+function MenuTab({ menu, tagline, address, description, hours, currency }: { menu: any; tagline: string; address: string; description: string; hours: any; currency: string }) {
   const cur = currency === 'CZK' ? 'Kč' : currency;
   return (
     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 md:gap-10 items-start">
@@ -112,7 +108,9 @@ function MenuTab({ menu, description, hours, currency }: { menu: any; descriptio
         )) : <EmptyState icon="leaf" title="Nabídka zatím není zveřejněná" hint="Podnik ji doplní v aplikaci." compact />}
       </div>
       <aside className="space-y-5 md:sticky md:top-24">
+        {tagline && <p className="text-base font-semibold tracking-tight text-pretty">{tagline}</p>}
         {description && <p className="text-sm text-black/65 leading-relaxed text-pretty">{description}</p>}
+        {address && <p className="text-sm text-black/65 inline-flex items-center gap-1.5"><Icon name="location" size={15} className="text-black/45" />{address}</p>}
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Otevírací doba</p>
           <ul className="text-sm divide-y divide-black/[0.06]">
@@ -221,6 +219,21 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
 function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; b: any; me: any; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [err, setErr] = useState('');
+  const [promo, setPromo] = useState('');
+  const [promoErr, setPromoErr] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+  const usePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug + '?tab=loyalty')}`; return; }
+    if (!promo.trim()) return;
+    setPromoBusy(true); setPromoErr('');
+    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/promo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: promo }) });
+    const d = await r.json().catch(() => ({}));
+    setPromoBusy(false);
+    if (!r.ok) { setPromoErr(d.error || 'Kód nešel uplatnit.'); return; }
+    setPromo('');
+    onDone(`${d.title}: ${[d.points ? `+${d.points} bodů` : '', d.coupon ? `kupon ${d.coupon}` : ''].filter(Boolean).join(' a ')}.`);
+  };
   const claim = async (id: number) => {
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
     setBusy(id); setErr('');
@@ -272,8 +285,16 @@ function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; 
             )}
           </>
         ) : (
-          <p className="mt-2 text-sm text-black/60">Staň se členem a začni sbírat razítka za návštěvy a body za útratu.</p>
+          <p className="mt-2 text-sm text-black/60">Staň se členem a začni sbírat razítka za návštěvy a body za útratu. Kartičku s QR máš v Moje.</p>
         )}
+        <form onSubmit={usePromo} className="mt-5 border-t border-black/[0.06] pt-4">
+          <label htmlFor="promo-code" className={label}>Máš promo kód?</label>
+          <div className="flex gap-2">
+            <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder="Z letáku nebo účtenky" autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
+            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
+          </div>
+          {promoErr && <p role="alert" className="mt-2 text-sm text-red-700">{promoErr}</p>}
+        </form>
       </section>
       <section>
         <h2 className="text-lg font-bold tracking-tight mb-3">Kupony za body</h2>

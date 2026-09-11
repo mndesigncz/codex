@@ -16,7 +16,7 @@ export function Initials({ name, size = 36 }: { name: string; size?: number }) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   const txt = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '·';
   return (
-    <span className="inline-grid place-items-center rounded-full bg-[#16181A] text-[#C8F542] font-bold shrink-0" style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden>
+    <span className="inline-grid place-items-center rounded-full bg-[#16181A] text-[#C8F542] font-bold shrink-0" style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.38)) }} aria-hidden>
       {txt}
     </span>
   );

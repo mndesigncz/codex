@@ -216,7 +216,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
   const del = async (id: number) => { if (!confirm('Smazat stůl?')) return; await fetch(`/api/client/admin/tables?id=${id}`, { method: 'DELETE' }); load(); };
   return (
     <div className="space-y-5">
-      <PageHeader title="Stoly" subtitle="Ke stolům se vážou rezervace i objednávky. S napojenou pokladnou je vezmi odtamtud, ať sedí čísla."
+      <PageHeader title="Stoly" subtitle="Ke stolům se vážou rezervace i objednávky. S napojenou pokladnou je vezmi odtamtud, ať sedí čísla. Ikona tiskárny vytiskne QR na stůl, ze kterého host objedná."
         primary={d?.posConnected ? <Button variant="accent" icon="download" loading={busy} onClick={imp}>Načíst z pokladny</Button> : undefined} />
       <form onSubmit={add} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end max-w-md">
         <div><label htmlFor="t-name" className={label}>Název stolu</label><input id="t-name" value={name} onChange={e => setName(e.target.value)} placeholder="U okna" className={input} /></div>
@@ -231,6 +231,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
                 <input aria-label={`Název stolu ${t.name}`} defaultValue={t.name} onBlur={e => e.target.value !== t.name && patch(t.id, { name: e.target.value })} className={`${input} py-1.5 flex-1 min-w-0`} />
                 <input aria-label="Počet míst" type="number" min={1} max={40} defaultValue={t.seats} onBlur={e => Number(e.target.value) !== t.seats && patch(t.id, { seats: Number(e.target.value) })} className={`${input} py-1.5 !w-16 text-center`} />
                 <span className="text-xs text-black/45 hidden sm:inline w-24 truncate">{t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}</span>
+                <button onClick={() => window.open(`/api/client/admin/tables/qr?tableId=${t.id}`, '_blank')} aria-label={`Vytisknout QR stolu ${t.name}`} title="QR na stůl k tisku" className="tap-target-sm rounded-full p-2 text-black/55 hover:text-black hover:bg-black/[0.05] transition"><Icon name="print" size={16} /></button>
                 <button onClick={() => patch(t.id, { active: !t.active })} aria-pressed={!!t.active} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${t.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{t.active ? 'Aktivní' : 'Skrytý'}</button>
                 <button onClick={() => del(t.id)} aria-label="Smazat stůl" className="tap-target-sm rounded-full p-2 text-black/40 hover:text-red-700 hover:bg-red-500/10 transition"><Icon name="trash" size={16} /></button>
               </li>
@@ -243,6 +244,24 @@ function Tables({ toast }: { toast: (m: string) => void }) {
 // ---- Zákazníci ------------------------------------------------------------------
 
 function Customers({ toast }: { toast: (m: string) => void }) {
+  const [sub, setSub] = useState<'members' | 'reviews' | 'messages'>('members');
+  const sub_title: Record<string, string> = {
+    members: 'Kdo se k podniku přidal, kolik má bodů a razítek, deník změn.',
+    reviews: 'Host dostane po hotové rezervaci nebo objednávce výzvu k hodnocení. Slabé hodnocení (1 až 2 hvězdy) ti přijde jako oznámení.',
+    messages: 'Novinka, akce nebo sezónní nabídka pro všechny členy. Přijde jako oznámení v aplikaci a push na telefon. Nejvýš pět za den.',
+  };
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Zákazníci" subtitle={sub_title[sub]} />
+      <Segmented options={[{ id: 'members', label: 'Členové' }, { id: 'reviews', label: 'Hodnocení' }, { id: 'messages', label: 'Zprávy členům' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části zákazníků" wrap />
+      {sub === 'members' && <Members toast={toast} />}
+      {sub === 'reviews' && <Reviews />}
+      {sub === 'messages' && <Broadcast toast={toast} />}
+    </div>
+  );
+}
+
+function Members({ toast }: { toast: (m: string) => void }) {
   const [q, setQ] = useState(''); const [d, setD] = useState<any | null>(null);
   const [openId, setOpenId] = useState<number | null>(null); const [ledger, setLedger] = useState<any[] | null>(null);
   const load = useCallback(() => fetch(`/api/client/admin/customers?q=${encodeURIComponent(q)}`).then(r => r.json()).then(setD).catch(() => setD({ customers: [], total: 0 })), [q]);
@@ -261,8 +280,10 @@ function Customers({ toast }: { toast: (m: string) => void }) {
   };
   return (
     <div className="space-y-5">
-      <PageHeader title="Zákazníci" subtitle={d ? `${d.total} ${d.total === 1 ? 'člen' : d.total < 5 ? 'členové' : 'členů'} podniku.` : ' '}
-        aside={<div className="relative max-w-sm"><Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40" /><input aria-label="Hledat zákazníka" value={q} onChange={e => setQ(e.target.value)} placeholder="Jméno nebo e-mail" className={`${input} pl-10 rounded-full`} /></div>} />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-full max-w-sm"><Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40" /><input aria-label="Hledat zákazníka" value={q} onChange={e => setQ(e.target.value)} placeholder="Jméno nebo e-mail" className={`${input} pl-10 rounded-full`} /></div>
+        {d && <p className="text-sm text-black/55 tabular-nums">{d.total} {d.total === 1 ? 'člen' : d.total < 5 ? 'členové' : 'členů'}</p>}
+      </div>
       {d === null ? <PageSkel /> : d.customers.length === 0
         ? <EmptyState icon="users" title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? '' : 'Přidají se sami na tvé stránce pro hosty.'} compact />
         : <ul className="divide-y divide-black/[0.06]">
@@ -301,6 +322,20 @@ function Customers({ toast }: { toast: (m: string) => void }) {
 // ---- Věrnost --------------------------------------------------------------------
 
 function Loyalty({ toast }: { toast: (m: string) => void }) {
+  const [sub, setSub] = useState<'rules' | 'promos'>('rules');
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Věrnost" subtitle={sub === 'rules'
+        ? 'Razítka za návštěvy, body za útratu, kupony za body. Host ukáže kartičku nebo kód kuponu u kasy; obsluha ho načte v Objednávkách nebo v kiosku.'
+        : 'Na leták, do příspěvku, na účtenku. Host kód zadá na tvé stránce ve Věrnosti a dostane body, kupon, nebo obojí. Každý host jednou.'} />
+      <Segmented options={[{ id: 'rules', label: 'Pravidla a kupony' }, { id: 'promos', label: 'Promo kódy' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části věrnosti" wrap />
+      {sub === 'rules' && <LoyaltyRules toast={toast} />}
+      {sub === 'promos' && <Promos toast={toast} />}
+    </div>
+  );
+}
+
+function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
   const [p, setP] = useState<any | null>(null); const [coupons, setCoupons] = useState<any[] | null>(null);
   const [form, setForm] = useState({ title: '', description: '', cost_points: 100, valid_until: '' });
   const [code, setCode] = useState(''); const [busy, setBusy] = useState(false);
@@ -327,7 +362,6 @@ function Loyalty({ toast }: { toast: (m: string) => void }) {
   if (!p || coupons === null) return <PageSkel />;
   return (
     <div className="space-y-6">
-      <PageHeader title="Věrnost" subtitle="Razítka za návštěvy, body za útratu, kupony za body. Kód kuponu host ukáže u kasy." />
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
         <div className="space-y-5">
           <section className="glass-card p-5 space-y-3">
@@ -438,5 +472,132 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
         </div>
       </section>
     </form>
+  );
+}
+
+// ---- Hodnocení ------------------------------------------------------------------
+
+function Reviews() {
+  const [d, setD] = useState<any | null>(null);
+  useEffect(() => { fetch('/api/client/admin/reviews').then(r => r.json()).then(setD).catch(() => setD({ reviews: [], count: 0, avg: null, dist: [0, 0, 0, 0, 0] })); }, []);
+  if (!d) return <PageSkel />;
+  const max = Math.max(1, ...(d.dist ?? []));
+  return (
+    <div className="space-y-5">
+      {d.count === 0 ? <EmptyState icon="star" title="Zatím žádné hodnocení" hint="Objeví se, jakmile host ohodnotí hotovou návštěvu." compact /> : (
+        <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-start">
+          <div className="glass-card p-5 min-w-[14rem]">
+            <p className="text-4xl font-bold tabular-nums leading-none">{d.avg ?? '–'}<span className="text-base font-medium text-black/45"> / 5</span></p>
+            <p className="text-xs text-black/55 mt-1">{d.count} {d.count === 1 ? 'hodnocení' : 'hodnocení'}</p>
+            <ul className="mt-4 space-y-1">
+              {[5, 4, 3, 2, 1].map(n => (
+                <li key={n} className="flex items-center gap-2 text-xs tabular-nums"><span className="w-3 text-black/55">{n}</span><span className="text-[#16181A]">★</span><span className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full bg-[#C8F542]" style={{ width: `${(d.dist[n - 1] / max) * 100}%` }} /></span><span className="w-6 text-right text-black/55">{d.dist[n - 1]}</span></li>
+              ))}
+            </ul>
+          </div>
+          <ul className="divide-y divide-black/[0.06]">
+            {d.reviews.map((v: any) => (
+              <li key={v.id} className="py-3 flex items-start gap-3">
+                <Initials name={v.customer_name} size={32} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold leading-tight flex items-center gap-2 flex-wrap"><span className="truncate">{v.customer_name}</span><span className="text-[#16181A] tracking-tight" aria-label={`${v.rating} z 5`}>{'★'.repeat(Number(v.rating))}<span className="text-black/20">{'★'.repeat(5 - Number(v.rating))}</span></span></p>
+                  {v.note ? <p className="text-sm text-black/70 mt-0.5 text-pretty">„{v.note}"</p> : <p className="text-sm text-black/45 mt-0.5">Bez komentáře.</p>}
+                  <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(v.created_at)} · {String(v.ref).startsWith('ord:') ? 'objednávka od stolu' : 'rezervace'}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Zprávy členům --------------------------------------------------------------
+
+function Broadcast({ toast }: { toast: (m: string) => void }) {
+  const [d, setD] = useState<any | null>(null);
+  const [f, setF] = useState({ title: '', body: '' }); const [busy, setBusy] = useState(false);
+  const load = useCallback(() => fetch('/api/client/admin/broadcast').then(r => r.json()).then(setD).catch(() => setD({ history: [], members: 0 })), []);
+  useEffect(() => { load(); }, [load]);
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!f.title.trim()) return;
+    if (!confirm(`Poslat zprávu všem členům (${d?.members ?? 0})?`)) return;
+    setBusy(true);
+    try { const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) }); toast(`Odesláno ${r.broadcast.recipients} členům.`); setF({ title: '', body: '' }); load(); } catch (e: any) { toast(e.message); }
+    setBusy(false);
+  };
+  if (!d) return <PageSkel />;
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
+        <form onSubmit={send} className="glass-card p-5 grid gap-3">
+          <div><label htmlFor="bc-title" className={label}>Nadpis</label><input id="bc-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Nový čaj z jarní sklizně" maxLength={80} className={input} /></div>
+          <div><label htmlFor="bc-body" className={label}>Text</label><textarea id="bc-body" value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="Tento týden ochutnávka zdarma ke každé konvici." maxLength={300} rows={3} className={`${input} resize-none`} /></div>
+          <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!d.members}>Poslat {d.members} {d.members === 1 ? 'členovi' : 'členům'}</Button>
+        </form>
+        <section>
+          <h2 className="font-bold tracking-tight mb-2">Odeslané</h2>
+          {d.history.length === 0 ? <EmptyState icon="mail" title="Zatím nic odeslaného" hint="První zpráva pojde všem, kdo se k podniku přidali." compact />
+            : <ul className="divide-y divide-black/[0.06]">{d.history.map((h: any) => (
+                <li key={h.id} className="py-3">
+                  <p className="font-semibold leading-tight">{h.title}</p>
+                  {h.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{h.body}</p>}
+                  <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(h.sent_at)} · {h.recipients} {h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}</p>
+                </li>))}</ul>}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ---- Promo kódy -----------------------------------------------------------------
+
+function Promos({ toast }: { toast: (m: string) => void }) {
+  const [d, setD] = useState<any | null>(null); const [coupons, setCoupons] = useState<any[]>([]);
+  const [f, setF] = useState({ code: '', title: '', points: 50, coupon_id: '', max_uses: '', valid_until: '' }); const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    fetch('/api/client/admin/promos').then(r => r.json()).then(x => setD({ promos: x.promos ?? [] })).catch(() => setD({ promos: [] }));
+    fetch('/api/client/admin/coupons').then(r => r.json()).then(x => setCoupons((x.coupons ?? []).filter((c: any) => c.active))).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true);
+    try { await j('/api/client/admin/promos', { method: 'POST', body: JSON.stringify(f) }); toast(`Kód ${f.code.toUpperCase()} je aktivní.`); setF({ code: '', title: '', points: 50, coupon_id: '', max_uses: '', valid_until: '' }); load(); } catch (e: any) { toast(e.message); }
+    setBusy(false);
+  };
+  if (!d) return <PageSkel />;
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
+        <form onSubmit={add} className="glass-card p-5 grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label htmlFor="pr-code" className={label}>Kód</label><input id="pr-code" value={f.code} onChange={e => setF({ ...f, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16) })} placeholder="JARO26" className={`${input} font-mono tracking-widest`} /></div>
+            <div><label htmlFor="pr-pts" className={label}>Bodů</label><input id="pr-pts" type="number" min={0} max={10000} value={f.points} onChange={e => setF({ ...f, points: parseInt(e.target.value || '0', 10) })} className={input} /></div>
+          </div>
+          <div><label htmlFor="pr-title" className={label}>Název</label><input id="pr-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Jarní leták" maxLength={80} className={input} /></div>
+          <div><label htmlFor="pr-coupon" className={label}>Kupon navíc</label>
+            <select id="pr-coupon" value={f.coupon_id} onChange={e => setF({ ...f, coupon_id: e.target.value })} className={input}><option value="">Žádný</option>{coupons.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label htmlFor="pr-max" className={label}>Nejvýš použití</label><input id="pr-max" type="number" min={1} value={f.max_uses} onChange={e => setF({ ...f, max_uses: e.target.value })} placeholder="bez limitu" className={input} /></div>
+            <div><label htmlFor="pr-until" className={label}>Platí do</label><input id="pr-until" type="date" value={f.valid_until} onChange={e => setF({ ...f, valid_until: e.target.value })} className={input} /></div>
+          </div>
+          <Button type="submit" variant="accent" icon="plus" loading={busy}>Vytvořit kód</Button>
+        </form>
+        <section>
+          <h2 className="font-bold tracking-tight mb-2">Kódy</h2>
+          {d.promos.length === 0 ? <EmptyState icon="tag" title="Zatím žádný promo kód" hint="Vytvoř první vlevo. Krátký a snadno opsatelný funguje nejlíp." compact />
+            : <ul className="divide-y divide-black/[0.06]">{d.promos.map((p: any) => (
+                <li key={p.id} className={`py-3 flex items-center gap-3 ${p.active ? '' : 'opacity-50'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold truncate"><span className="font-mono tracking-widest">{p.code}</span> <span className="text-black/50 font-medium">· {p.title}</span></p>
+                    <p className="text-xs text-black/55 truncate">{Number(p.points) > 0 ? `${p.points} b.` : ''}{Number(p.points) > 0 && p.coupon_title ? ' + ' : ''}{p.coupon_title ? `kupon ${p.coupon_title}` : ''} · použito {p.uses}×{p.max_uses ? ` z ${p.max_uses}` : ''}{p.valid_until ? ` · do ${czDay(p.valid_until)}` : ''}</p>
+                  </div>
+                  <button onClick={async () => { try { await j('/api/client/admin/promos', { method: 'PATCH', body: JSON.stringify({ id: p.id, active: !p.active }) }); load(); } catch (e: any) { toast(e.message); } }} aria-pressed={!!p.active}
+                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${p.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{p.active ? 'Aktivní' : 'Vypnutý'}</button>
+                </li>))}</ul>}
+        </section>
+      </div>
+    </div>
   );
 }

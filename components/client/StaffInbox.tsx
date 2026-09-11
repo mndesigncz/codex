@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, EmptyState, Skeleton } from '../ui';
 import { Initials } from './ClientShell';
+import CardScan from './CardScan';
 import { RES_STATUS } from '@/lib/clientSlots';
 
 const EVERY_MS = 20 * 1000;
@@ -83,11 +84,15 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
   const recent = orders.filter(o => ['done', 'declined'].includes(o.status));
   const reservations: any[] = d.reservations ?? [];
 
-  if (compact && orders.length === 0 && reservations.length === 0) return null;
-
   return (
     <div className="space-y-5">
       {flash && <p role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
+      {compact ? (
+        <details className="group">
+          <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none"><Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" /></summary>
+          <div className="mt-2"><CardScan onToast={toast} /></div>
+        </details>
+      ) : <CardScan onToast={toast} onChange={reload} />}
       {news.length > 0 && (
         <section className="rounded-3xl bg-amber-500/[0.10] border border-amber-500/40 p-4 space-y-3">
           <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-amber-800" />{news.length === 1 ? 'Nová objednávka od stolu' : `${news.length} nové objednávky od stolu`}</h2>

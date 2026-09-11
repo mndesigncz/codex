@@ -223,3 +223,42 @@ export async function notifyTeamEmployers(teamId: number, payload: { title: stri
 
 // ---- Rezervace: sloty (sdílené s prohlížečem) --------------------------------
 export { slotsFor } from './clientSlots';
+
+// ---- Kartička hosta -----------------------------------------------------------
+
+/** Kód kartičky: osm znaků bez zaměnitelných písmen, zapsaný jako ABCD-EFGH. */
+export function cardCode(): string {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const b = randomBytes(8);
+  let s = '';
+  for (let i = 0; i < 8; i++) s += abc[b[i] % abc.length];
+  return s.slice(0, 4) + '-' + s.slice(4);
+}
+
+/** Kartička hosta; když ještě není, vznikne. Jeden kód pro všechny podniky. */
+export async function ensureCard(customerId: number): Promise<string> {
+  const [c] = await sql`SELECT code FROM client_cards WHERE customer_id = ${customerId}`;
+  if (c) return String(c.code);
+  for (let i = 0; i < 5; i++) {
+    const code = cardCode();
+    try {
+      await sql`INSERT INTO client_cards (customer_id, code) VALUES (${customerId}, ${code})`;
+      return code;
+    } catch { /* kolize kódu — zkusit jiný */ }
+  }
+  throw new Error('Kartičku se nepodařilo vytvořit.');
+}
+
+/** Normalizace kódu z klávesnice nebo skeneru: velká písmena, bez mezer, s pomlčkou. */
+export function normalizeCardCode(raw: string): string {
+  const s = String(raw ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (s.length !== 8) return '';
+  return s.slice(0, 4) + '-' + s.slice(4);
+}
+
+export async function customerByCard(code: string): Promise<{ id: number; name: string } | null> {
+  const norm = normalizeCardCode(code);
+  if (!norm) return null;
+  const [row] = await sql`SELECT u.id, u.name FROM client_cards c JOIN users u ON u.id = c.customer_id WHERE c.code = ${norm}`;
+  return row ? { id: Number(row.id), name: String(row.name) } : null;
+}
