@@ -1183,6 +1183,126 @@ export async function GET(request: Request) {
     // Staré řádky se nehromadí; okno je krátké, záznam po dni nemá smysl držet.
     try { await sql`DELETE FROM auth_attempts WHERE window_start < NOW() - INTERVAL '1 day'`; } catch { /* nevadí */ }
 
+    // ---- Managero client: host, členství, rezervace, objednávky, věrnost ----
+    // Poprvé do aplikace vstupuje zákazník. Má roli „customer" v users (bez
+    // týmu) a k podnikům se váže členstvím. Viz lib/client.ts.
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_profiles (
+        team_id INTEGER PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        tagline TEXT DEFAULT '',
+        description TEXT DEFAULT '',
+        address TEXT DEFAULT '',
+        cover_url TEXT DEFAULT '',
+        reservations_on BOOLEAN NOT NULL DEFAULT TRUE,
+        ordering_on BOOLEAN NOT NULL DEFAULT FALSE,
+        loyalty_on BOOLEAN NOT NULL DEFAULT TRUE,
+        points_per_100 INTEGER NOT NULL DEFAULT 5,
+        stamp_target INTEGER NOT NULL DEFAULT 10,
+        stamp_reward TEXT DEFAULT 'Nápoj zdarma',
+        max_party INTEGER NOT NULL DEFAULT 8,
+        lead_days INTEGER NOT NULL DEFAULT 30,
+        slot_minutes INTEGER NOT NULL DEFAULT 30,
+        menu_slug TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_tables (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        seats INTEGER NOT NULL DEFAULT 2,
+        storyous_desk_id TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        position INTEGER NOT NULL DEFAULT 0
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_tables_team ON client_tables (team_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_memberships (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        points INTEGER NOT NULL DEFAULT 0,
+        stamps INTEGER NOT NULL DEFAULT 0,
+        visits INTEGER NOT NULL DEFAULT 0,
+        joined_at TIMESTAMP DEFAULT NOW(),
+        last_visit_at TIMESTAMP,
+        UNIQUE (customer_id, team_id)
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_memberships_team ON client_memberships (team_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_reservations (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        party INTEGER NOT NULL DEFAULT 2,
+        note TEXT,
+        status TEXT NOT NULL DEFAULT 'requested',
+        table_id INTEGER,
+        storyous_reservation_id TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_reservations_team_date ON client_reservations (team_id, date)`;
+    await sql`CREATE INDEX IF NOT EXISTS client_reservations_customer ON client_reservations (customer_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_orders (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        table_id INTEGER,
+        items JSONB NOT NULL DEFAULT '[]',
+        total INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        status TEXT NOT NULL DEFAULT 'new',
+        storyous_order_id TEXT,
+        external_id TEXT,
+        pos_state TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_orders_team_status ON client_orders (team_id, status)`;
+    await sql`CREATE INDEX IF NOT EXISTS client_orders_customer ON client_orders (customer_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_coupons (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        cost_points INTEGER NOT NULL DEFAULT 0,
+        kind TEXT NOT NULL DEFAULT 'offer',
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        valid_until TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_coupons_team ON client_coupons (team_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_coupon_claims (
+        id SERIAL PRIMARY KEY,
+        coupon_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        claimed_at TIMESTAMP DEFAULT NOW(),
+        redeemed_at TIMESTAMP
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_coupon_claims_customer ON client_coupon_claims (customer_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_loyalty_ledger (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        delta INTEGER NOT NULL DEFAULT 0,
+        kind TEXT NOT NULL,
+        ref TEXT,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`;
+    await sql`CREATE INDEX IF NOT EXISTS client_ledger_member ON client_loyalty_ledger (team_id, customer_id)`;
+
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
     // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;

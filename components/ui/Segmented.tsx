@@ -15,18 +15,21 @@ export interface SegmentedOption<T extends string = string> {
   count?: number;
 }
 
-export function Segmented<T extends string>({ options, value, onChange, size = 'md', className = '', ariaLabel }: {
+export function Segmented<T extends string>({ options, value, onChange, size = 'md', className = '', ariaLabel, wrap = false }: {
   options: SegmentedOption<T>[];
   value: T;
   onChange: (id: T) => void;
   size?: 'sm' | 'md';
   className?: string;
   ariaLabel?: string;
+  /** Šest a víc položek na telefonu: raději zalomit na dva řádky než
+      schovat poslední za okraj, kde je nikdo nehledá. */
+  wrap?: boolean;
 }) {
   const pad = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm';
   return (
     <div role="tablist" aria-label={ariaLabel}
-      className={`inline-flex max-w-full gap-1 rounded-full glass border border-black/[0.07] p-1 overflow-x-auto scrollbar-thin ${className}`}>
+      className={`inline-flex max-w-full gap-1 rounded-[22px] glass border border-black/[0.07] p-1 ${wrap ? 'flex-wrap' : 'overflow-x-auto scrollbar-thin rounded-full'} ${className}`}>
       {options.map(o => {
         const on = o.id === value;
         return (

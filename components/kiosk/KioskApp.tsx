@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
+import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
 import { Avatar } from '../ui';
 import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
@@ -24,6 +25,7 @@ const TABS = [
   { id: 'tasks',      label: 'Úkoly',    icon: 'check' },
   { id: 'procedures', label: 'Postupy',  icon: 'clipboard' },
   { id: 'inventory',  label: 'Sklad',    icon: 'box' },
+  { id: 'orders',     label: 'Objednávky', icon: 'cup' },
   { id: 'closing',    label: 'Uzávěrka', icon: 'trend' },
   { id: 'guides',     label: 'Návody',   icon: 'book' },
 ] as const;
@@ -59,6 +61,9 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 function KioskShell({ user }: { user: KioskUser }) {
   const { active } = useKioskShift();
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('shift');
+  // Počet nových objednávek od stolu do záložky — tablet na baru je první, kdo je má vidět.
+  const inbox = useStaffInbox(true);
+  const newOrders = Number(inbox.d?.newCount ?? 0);
   // Home-screen shortcut: jump to the stock tab with the entry form already open.
   const [wantStockEntry, setWantStockEntry] = useState(false);
   const now = useNow();
@@ -108,6 +113,9 @@ function KioskShell({ user }: { user: KioskUser }) {
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
+            {t.id === 'orders' && newOrders > 0 && (
+              <span className={`ml-0.5 rounded-full px-2 min-w-[1.5rem] text-center text-xs font-bold tabular-nums ${tab === t.id ? 'bg-[#C8F542] text-[#16181A]' : 'bg-amber-500 text-white'}`}>{newOrders}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -132,6 +140,7 @@ function KioskShell({ user }: { user: KioskUser }) {
               <KioskInventory autoOpenEntry={wantStockEntry} onEntryOpened={() => setWantStockEntry(false)} />
             </main>
           )}
+          {tab === 'orders' && <main className="flex-1 mt-5"><StaffInbox /></main>}
           {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
           {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} /></main>}
         </KioskShiftGate>

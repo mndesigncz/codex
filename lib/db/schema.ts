@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, integer, boolean, serial, pgEnum, jsonb } from 'drizzle-orm/pg-core';
 
-export const roleEnum = pgEnum('role', ['employer', 'employee']);
+export const roleEnum = pgEnum('role', ['employer', 'employee', 'kiosk', 'customer']);
 export const shiftTypeEnum = pgEnum('shift_type', ['morning', 'afternoon', 'flexible']);
 export const priorityEnum = pgEnum('priority', ['high', 'medium', 'low']);
 
