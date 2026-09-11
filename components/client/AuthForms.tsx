@@ -48,7 +48,7 @@ export function RegisterForm() {
         <button type="submit" disabled={busy} className="tap-target rounded-full bg-[#C8F542] text-[#16181A] px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
           {busy ? 'Zakládám…' : <><Icon name="plus" size={16} /> Založit účet</>}
         </button>
-        <p className="text-sm text-black/55 text-center">Už účet máš? <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="font-semibold text-[#16181A] underline-offset-2 hover:underline">Přihlas se</Link></p>
+        <p className="text-sm text-black/55 text-center">Už účet máš? <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Přihlas se</Link></p>
       </form>
     </AuthCard>
   );
@@ -75,7 +75,7 @@ export function LoginForm() {
         <button type="submit" disabled={busy} className="tap-target rounded-full bg-[#C8F542] text-[#16181A] px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition">
           {busy ? 'Přihlašuji…' : 'Přihlásit se'}
         </button>
-        <p className="text-sm text-black/55 text-center">Ještě účet nemáš? <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="font-semibold text-[#16181A] underline-offset-2 hover:underline">Založ si ho</Link></p>
+        <p className="text-sm text-black/55 text-center">Ještě účet nemáš? <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Založ si ho</Link></p>
       </form>
     </AuthCard>
   );

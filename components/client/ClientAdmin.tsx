@@ -272,7 +272,7 @@ function Customers({ toast }: { toast: (m: string) => void }) {
                   <Initials name={c.name} size={36} />
                   <div className="min-w-0">
                     <p className="font-semibold truncate">{c.name}</p>
-                    <p className="text-xs text-black/55 truncate">{c.email} · člen od {new Date(c.joined_at).toLocaleDateString('cs-CZ')}{c.last_visit_at ? ` · naposledy ${new Date(c.last_visit_at).toLocaleDateString('cs-CZ')}` : ''}</p>
+                    <p className="text-xs text-black/55 break-words md:truncate">{c.email} · člen od {new Date(c.joined_at).toLocaleDateString('cs-CZ')}{c.last_visit_at ? ` · naposledy ${new Date(c.last_visit_at).toLocaleDateString('cs-CZ')}` : ''}</p>
                   </div>
                   <div className="text-right tabular-nums">
                     <p className="font-bold">{c.points} <span className="text-xs font-medium text-black/50">b.</span></p>
@@ -332,7 +332,7 @@ function Loyalty({ toast }: { toast: (m: string) => void }) {
         <div className="space-y-5">
           <section className="glass-card p-5 space-y-3">
             <h2 className="font-bold tracking-tight">Pravidla</h2>
-            <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={!!p.loyalty_on} onChange={e => setP({ ...p, loyalty_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Věrnost pro hosty zapnutá</label>
+            <label className="flex items-center min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={!!p.loyalty_on} onChange={e => setP({ ...p, loyalty_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Věrnost pro hosty zapnutá</label>
             <div className="grid grid-cols-2 gap-3">
               <div><label htmlFor="l-pts" className={label}>Bodů za 100 Kč</label><input id="l-pts" type="number" min={0} max={100} value={p.points_per_100} onChange={e => setP({ ...p, points_per_100: e.target.value })} className={input} /></div>
               <div><label htmlFor="l-stamps" className={label}>Razítek do odměny</label><input id="l-stamps" type="number" min={0} max={50} value={p.stamp_target} onChange={e => setP({ ...p, stamp_target: e.target.value })} className={input} /></div>
@@ -397,7 +397,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
     <form onSubmit={save} className="space-y-6 max-w-3xl">
       <PageHeader title="Nastavení" subtitle="Jak podnik vidí hosté a co u něj můžou dělat." primary={<Button type="submit" variant="accent" loading={busy}>Uložit</Button>} />
       <section className="glass-card p-5 space-y-4">
-        <label className="flex items-center gap-3"><input type="checkbox" checked={!!p.enabled} onChange={e => setP({ ...p, enabled: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /><span className="font-semibold">Zapnout pro hosty</span></label>
+        <label className="flex items-center min-h-9 py-1 gap-3"><input type="checkbox" checked={!!p.enabled} onChange={e => setP({ ...p, enabled: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /><span className="font-semibold">Zapnout pro hosty</span></label>
         <div>
           <label htmlFor="s-slug" className={label}>Veřejná adresa</label>
           <div className="flex gap-2 items-center flex-wrap">
@@ -428,8 +428,8 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
       </section>
       <section className="glass-card p-5 grid gap-4">
         <h2 className="font-bold tracking-tight">Rezervace</h2>
-        <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={!!p.reservations_on} onChange={e => setP({ ...p, reservations_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou rezervovat</label>
-        <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={!!p.ordering_on} onChange={e => setP({ ...p, ordering_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou objednávat od stolu</label>
+        <label className="flex items-center min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={!!p.reservations_on} onChange={e => setP({ ...p, reservations_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou rezervovat</label>
+        <label className="flex items-center min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={!!p.ordering_on} onChange={e => setP({ ...p, ordering_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou objednávat od stolu</label>
         <p className="text-xs text-black/50 -mt-2">Objednávky potřebují stoly (záložka Stoly) a nabídku z Menu. S napojenou pokladnou jdou přijaté objednávky rovnou na stůl v kase.</p>
         <div className="grid grid-cols-3 gap-3">
           <div><label htmlFor="s-party" className={label}>Nejvíc osob</label><input id="s-party" type="number" min={1} max={40} value={p.max_party} onChange={e => setP({ ...p, max_party: e.target.value })} className={input} /></div>
