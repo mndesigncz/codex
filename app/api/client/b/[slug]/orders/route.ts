@@ -29,7 +29,11 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   const geo = checkGeo(p, parseGeo(b.geo));
   if (geoMode(p) === 'block') {
     if (geo.status === 'none') return NextResponse.json({ error: 'Bez polohy objednat nejde. Povol polohu v prohlížeči a zkus to znovu.' }, { status: 403 });
-    if (geo.status === 'far') return NextResponse.json({ error: `Podle polohy jsi ${geo.distance} m od podniku. Objednat jde jen u stolu.` }, { status: 403 });
+    if (geo.status === 'far') {
+      const d = Number(geo.distance);
+      const txt = d >= 1000 ? `${(d / 1000).toFixed(d >= 10000 ? 0 : 1).replace('.', ',')} km` : `${d} m`;
+      return NextResponse.json({ error: `Podle polohy jsi ${txt} od podniku. Objednat jde jen u stolu.` }, { status: 403 });
+    }
   }
   const verified = viaQr && (geo.status === 'ok' || geo.status === 'off');
   const built = await buildLines(teamId, p.menu_slug ?? null, Array.isArray(b.items) ? b.items : []);
