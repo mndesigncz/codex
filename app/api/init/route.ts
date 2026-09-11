@@ -1356,6 +1356,19 @@ export async function GET(request: Request) {
         PRIMARY KEY (promo_id, customer_id)
       )`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday TEXT`;
+    // Ochrana objednávek od stolu: QR na stole nese tajný kód stolu, host
+    // posílá polohu, ověřené objednávky můžou jít rovnou do pokladny.
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_qr_required BOOLEAN NOT NULL DEFAULT TRUE`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_geo TEXT NOT NULL DEFAULT 'block'`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS geo_radius_m INTEGER NOT NULL DEFAULT 100`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_auto_pos BOOLEAN NOT NULL DEFAULT TRUE`;
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS token TEXT`;
+    await sql`UPDATE client_tables SET token = upper(substr(md5(random()::text || id::text), 1, 10)) WHERE token IS NULL`;
+    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS via_qr BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_status TEXT`;
+    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`;
 
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu

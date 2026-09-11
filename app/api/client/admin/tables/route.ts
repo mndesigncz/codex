@@ -3,6 +3,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, employer } from '@/lib/client';
 import { getConnection, listDesks } from '@/lib/storyous';
+import { randomBytes } from 'crypto';
+
+/** Tajný kód stolu do QR: bez něj odkaz z domova objednat nedovolí. */
+const tableToken = () => randomBytes(8).toString('base64url').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10).padEnd(10, 'X');
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -29,7 +33,7 @@ export async function POST(req: NextRequest) {
       const d = desks[i];
       const [exists] = await sql`SELECT id FROM client_tables WHERE team_id = ${u.team_id} AND storyous_desk_id = ${d.deskId}`;
       if (exists) { await sql`UPDATE client_tables SET name = ${d.name} WHERE id = ${exists.id}`; continue; }
-      await sql`INSERT INTO client_tables (team_id, name, seats, storyous_desk_id, position) VALUES (${u.team_id}, ${d.name}, 2, ${d.deskId}, ${i})`;
+      await sql`INSERT INTO client_tables (team_id, name, seats, storyous_desk_id, position, token) VALUES (${u.team_id}, ${d.name}, 2, ${d.deskId}, ${i}, ${tableToken()})`;
       added++;
     }
     const tables = await sql`SELECT * FROM client_tables WHERE team_id = ${u.team_id} ORDER BY position, id`;
@@ -39,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!name) return NextResponse.json({ error: 'Stůl potřebuje jméno.' }, { status: 400 });
   const seats = Math.max(1, Math.min(40, parseInt(String(b.seats ?? '2'), 10) || 2));
   const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM client_tables WHERE team_id = ${u.team_id}` as any[];
-  const [t] = await sql`INSERT INTO client_tables (team_id, name, seats, position) VALUES (${u.team_id}, ${name}, ${seats}, ${Number(n)}) RETURNING *`;
+  const [t] = await sql`INSERT INTO client_tables (team_id, name, seats, position, token) VALUES (${u.team_id}, ${name}, ${seats}, ${Number(n)}, ${tableToken()}) RETURNING *`;
   return NextResponse.json({ ok: true, table: t });
 }
 
@@ -55,7 +59,8 @@ export async function PATCH(req: NextRequest) {
       name = ${b.name != null ? String(b.name).trim().slice(0, 40) || cur.name : cur.name},
       seats = ${b.seats != null ? Math.max(1, Math.min(40, parseInt(String(b.seats), 10) || cur.seats)) : cur.seats},
       active = ${b.active != null ? !!b.active : cur.active},
-      storyous_desk_id = ${b.storyous_desk_id !== undefined ? (b.storyous_desk_id ? String(b.storyous_desk_id) : null) : cur.storyous_desk_id}
+      storyous_desk_id = ${b.storyous_desk_id !== undefined ? (b.storyous_desk_id ? String(b.storyous_desk_id) : null) : cur.storyous_desk_id},
+      token = ${b.rotate_token ? tableToken() : (cur.token ?? tableToken())}
     WHERE id = ${id} RETURNING *`;
   return NextResponse.json({ ok: true, table: t });
 }

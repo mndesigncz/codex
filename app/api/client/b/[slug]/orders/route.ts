@@ -1,7 +1,8 @@
 // Host objednává od stolu. Ceny se berou z nabídky v databázi, ne z prohlížeče.
 import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, join } from '@/lib/client';
-import { buildLines, notifyNewOrder } from '@/lib/clientOrders';
+import { buildLines, notifyNewOrder, parseGeo, checkGeo, geoMode, setOrderStatus } from '@/lib/clientOrders';
+import { getConnection } from '@/lib/storyous';
 import { hit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -18,8 +19,19 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   const b = await req.json().catch(() => ({}));
   const teamId = Number(p.team_id);
   const tableId = parseInt(String(b.tableId ?? ''), 10);
-  const [table] = tableId ? await sql`SELECT id, name FROM client_tables WHERE id = ${tableId} AND team_id = ${teamId} AND active = TRUE` : [null as any];
+  const [table] = tableId ? await sql`SELECT id, name, token FROM client_tables WHERE id = ${tableId} AND team_id = ${teamId} AND active = TRUE` : [null as any];
   if (!table) return NextResponse.json({ error: 'Vyber stůl, u kterého sedíš.' }, { status: 400 });
+
+  // Ochrana: kód z QR na stole a poloha telefonu. Viz lib/clientOrders.
+  const token = String(b.token ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const viaQr = !!table.token && token === String(table.token);
+  if (p.order_qr_required !== false && !viaQr) return NextResponse.json({ error: 'Objednat jde jen přes QR kód na stole. Naskenuj ho telefonem.' }, { status: 403 });
+  const geo = checkGeo(p, parseGeo(b.geo));
+  if (geoMode(p) === 'block') {
+    if (geo.status === 'none') return NextResponse.json({ error: 'Bez polohy objednat nejde. Povol polohu v prohlížeči a zkus to znovu.' }, { status: 403 });
+    if (geo.status === 'far') return NextResponse.json({ error: `Podle polohy jsi ${geo.distance} m od podniku. Objednat jde jen u stolu.` }, { status: 403 });
+  }
+  const verified = viaQr && (geo.status === 'ok' || geo.status === 'off');
   const built = await buildLines(teamId, p.menu_slug ?? null, Array.isArray(b.items) ? b.items : []);
   if (built.error) return NextResponse.json({ error: built.error }, { status: 400 });
   const [open] = await sql`SELECT id FROM client_orders WHERE team_id = ${teamId} AND customer_id = ${me.id} AND status = 'new'`;
@@ -27,12 +39,20 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   await join(me.id, teamId);
   const note = String(b.note ?? '').trim().slice(0, 300) || null;
   const [o] = await sql`
-    INSERT INTO client_orders (team_id, customer_id, table_id, items, total, note, status)
-    VALUES (${teamId}, ${me.id}, ${table.id}, ${JSON.stringify(built.lines)}, ${built.total}, ${note}, 'new')
+    INSERT INTO client_orders (team_id, customer_id, table_id, items, total, note, status, via_qr, geo_status, geo_distance_m)
+    VALUES (${teamId}, ${me.id}, ${table.id}, ${JSON.stringify(built.lines)}, ${built.total}, ${note}, 'new', ${viaQr}, ${geo.status}, ${geo.distance})
     RETURNING id, items, total, status, created_at`;
   await sql`UPDATE client_orders SET external_id = ${'mgr-ord-' + o.id} WHERE id = ${o.id}`;
-  await notifyNewOrder(teamId, me.name, table.name, built.total, Number(o.id));
-  return NextResponse.json({ ok: true, order: { ...o, tableName: table.name } });
+
+  // Ověřená objednávka s napojenou pokladnou jde rovnou do kasy a na terminál;
+  // obsluha ji vidí tady i tam. Neověřená čeká na obsluhu.
+  let auto: { posNote: string | null } | null = null;
+  if (verified && p.order_auto_pos !== false && await getConnection(teamId)) {
+    try { auto = await setOrderStatus(teamId, Number(o.id), 'confirmed'); } catch { auto = null; }
+  }
+  const straight = !!auto && !auto.posNote?.startsWith('Pokladna') && !auto.posNote?.includes('zůstává jen tady');
+  if (!straight) await notifyNewOrder(teamId, me.name, table.name, built.total, Number(o.id));
+  return NextResponse.json({ ok: true, straight, order: { ...o, status: auto ? 'confirmed' : o.status, tableName: table.name } });
 }
 
 export async function GET(_req: Request, { params }: { params: { slug: string } }) {

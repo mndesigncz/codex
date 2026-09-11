@@ -150,7 +150,7 @@ export interface OrderLine { itemId: string; count: number; unitPriceWithVat: nu
  * pokladně do pěti minut potvrdit, jinak ji pokladna sama zamítne — proto se
  * posílá až ve chvíli, kdy ji u nás obsluha potvrdí, a `autoConfirm: true`.
  */
-export async function createTableOrder(conn: PosConnection, o: { externalId: string; deskId: string; items: OrderLine[]; note?: string | null; customerName?: string | null }): Promise<{ orderId: string; state: string }> {
+export async function createTableOrder(conn: PosConnection, o: { externalId: string; deskId: string; items: OrderLine[]; note?: string | null; customerName?: string | null; notification?: { confirm: string; dispatch: string; decline: string } }): Promise<{ orderId: string; state: string }> {
   const d = await apiPost(conn, `/delivery/orders/${src(conn)}`, {
     externalId: o.externalId,
     deliveryType: 'orderToTable',
@@ -161,6 +161,9 @@ export async function createTableOrder(conn: PosConnection, o: { externalId: str
     deskId: o.deskId,
     alreadyPaid: false,
     autoConfirm: true,
+    // Pokladna zavolá GET, když objednávku potvrdí, vydá nebo odmítne. Bez
+    // opakování, takže stav se navíc dotahuje i dotazem.
+    notification: o.notification,
   });
   return { orderId: String(d?.orderId ?? d?.id ?? o.externalId), state: String(d?.state ?? 'NEW') };
 }
