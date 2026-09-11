@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
+import { Initials } from './ClientShell';
 import { hoursLabel } from '@/lib/clientSlots';
 import { pragueToday } from '@/lib/pragueTime';
 
@@ -54,13 +55,23 @@ export default function ClientHome() {
             </div>
           )}
         </div>
-        <div className="md:justify-self-end w-full md:max-w-xs">
-          <label htmlFor="biz-q" className="block text-xs font-semibold text-black/55 mb-1.5">Najít podnik</label>
-          <div className="relative">
-            <Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40" />
-            <input id="biz-q" value={q} onChange={e => setQ(e.target.value)} placeholder="Název nebo ulice"
-              className="w-full rounded-full bg-white/70 border border-black/[0.08] pl-10 pr-4 py-3 text-sm placeholder-black/35 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition" />
+        <div className="md:justify-self-end w-full md:max-w-xs space-y-5">
+          <div>
+            <label htmlFor="biz-q" className="block text-xs font-semibold text-black/55 mb-1.5">Najít podnik</label>
+            <div className="relative">
+              <Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40" />
+              <input id="biz-q" value={q} onChange={e => setQ(e.target.value)} placeholder="Název nebo ulice"
+                className="w-full rounded-full bg-white/70 border border-black/[0.08] pl-10 pr-4 py-3 text-sm placeholder-black/35 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition" />
+            </div>
           </div>
+          <ul className="glass-card p-4 space-y-2.5 text-sm">
+            {([['card', 'Kartička s QR', 'ukážeš u kasy, obsluha přidá razítko nebo body'], ['calendarCheck', 'Rezervace', 'stůl na den a hodinu, potvrzení přijde do telefonu'], ['cup', 'Objednávka od stolu', 'naskenuješ QR na stole, jde rovnou do kasy']] as const).map(([ic, t, h]) => (
+              <li key={t} className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name={ic} size={15} /></span>
+                <span><span className="font-semibold">{t}</span><span className="block text-xs text-black/55 leading-snug">{h}</span></span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -100,18 +111,25 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
               <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90 group-hover:scale-[1.02] transition-transform duration-500" />
             )}
             {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/85 via-[#16181A]/25 to-transparent" />}
+            {!b.coverUrl && <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none" aria-hidden><div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-[#C8F542]/20 blur-2xl" /></div>}
             <div className={`relative ${b.coverUrl ? 'text-white' : ''}`}>
-              <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                {b.member && <span className="rounded-full bg-[#C8F542] text-[#16181A] px-2.5 py-0.5 text-[11px] font-semibold">Člen</span>}
-                <span className={`text-[11px] ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}>Dnes {hoursLabel(b.hours, today)}</span>
+              <div className="flex items-start gap-3">
+                {!b.coverUrl && <Initials name={b.name} size={44} />}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    {b.member && <span className="rounded-full bg-[#C8F542] text-[#16181A] px-2.5 py-0.5 text-[11px] font-semibold">Člen</span>}
+                    <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="clock" size={12} />Dnes {hoursLabel(b.hours, today)}</span>
+                    {b.members > 0 && <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="users" size={12} />{b.members}</span>}
+                  </div>
+                  <p className="text-xl font-bold tracking-tight leading-tight">{b.name}</p>
+                  {b.tagline && <p className={`text-sm mt-1 line-clamp-2 ${b.coverUrl ? 'text-white/80' : 'text-black/60'}`}>{b.tagline}</p>}
+                </div>
               </div>
-              <p className="text-xl font-bold tracking-tight leading-tight">{b.name}</p>
-              {b.tagline && <p className={`text-sm mt-1 line-clamp-2 ${b.coverUrl ? 'text-white/80' : 'text-black/60'}`}>{b.tagline}</p>}
-              <div className={`mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs ${b.coverUrl ? 'text-white/75' : 'text-black/50'}`}>
-                {b.address && <span className="inline-flex items-center gap-1"><Icon name="location" size={13} />{b.address}</span>}
-                {b.reservationsOn && <span className="inline-flex items-center gap-1"><Icon name="calendarCheck" size={13} />Rezervace</span>}
-                {b.loyaltyOn && <span className="inline-flex items-center gap-1"><Icon name="gift" size={13} />Věrnost</span>}
-                {b.orderingOn && <span className="inline-flex items-center gap-1"><Icon name="cup" size={13} />Od stolu</span>}
+              <div className={`mt-3 flex flex-wrap gap-1.5 text-xs`}>
+                {b.address && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-black/[0.05] text-black/60'}`}><Icon name="location" size={12} />{b.address}</span>}
+                {b.reservationsOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#4F6A07]'}`}><Icon name="calendarCheck" size={12} />Rezervace</span>}
+                {b.loyaltyOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#4F6A07]'}`}><Icon name="gift" size={12} />Věrnost</span>}
+                {b.orderingOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#4F6A07]'}`}><Icon name="cup" size={12} />Od stolu</span>}
               </div>
             </div>
           </Link>
