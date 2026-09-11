@@ -56,8 +56,12 @@ export default function BusinessPage({ slug }: { slug: string }) {
           <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         )}
         {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/85 via-[#16181A]/30 to-transparent" />}
-        {!b.coverUrl && <div className="absolute top-0 right-0 h-56 w-56 -translate-y-16 translate-x-16 rounded-full bg-[#C8F542]/25 blur-3xl pointer-events-none" aria-hidden />}
-        {!b.coverUrl && <div className="absolute bottom-0 left-1/3 h-48 w-48 translate-y-20 rounded-full bg-[#0A84FF]/10 blur-3xl pointer-events-none" aria-hidden />}
+        {!b.coverUrl && (
+          <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none" aria-hidden>
+            <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl" />
+            <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#0A84FF]/10 blur-3xl" />
+          </div>
+        )}
         <div className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end ${b.coverUrl ? 'text-white' : ''}`}>
           <div className="min-w-0 flex items-end gap-4">
             {!b.coverUrl && <span className="hidden sm:block"><Initials name={b.name} size={64} /></span>}
