@@ -15,7 +15,12 @@ import { authOptions } from './auth';
 import { notifyUsers } from './push';
 import { slotsFor as _slotsFor } from './clientSlots';
 
-export const sql = neon(process.env.DATABASE_URL!);
+// Veřejné routy hosta (podnik podle adresy, seznam podniků) sahají do
+// databáze dřív, než se dotknou session. Next.js na Vercelu takové volání
+// Neonu i přes `force-dynamic` cachoval, takže host viděl profil podniku ve
+// stavu, v jakém byl při prvním zobrazení — zapnuté objednávky nebo nové
+// motto se mu neukázaly. Odpověď databáze se cachovat nesmí nikdy.
+export const sql = neon(process.env.DATABASE_URL!, { fetchOptions: { cache: 'no-store' } });
 
 // ---- Kdo je kdo ------------------------------------------------------------
 

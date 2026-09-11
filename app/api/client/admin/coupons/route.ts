@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, employer } from '@/lib/client';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET() {
   const u = await employer();

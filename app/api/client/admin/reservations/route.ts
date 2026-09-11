@@ -9,6 +9,7 @@ import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 const FLOW: Record<string, string[]> = {
   requested: ['confirmed', 'declined'],

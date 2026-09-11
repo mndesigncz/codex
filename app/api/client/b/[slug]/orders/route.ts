@@ -5,6 +5,7 @@ import { buildLines, notifyNewOrder } from '@/lib/clientOrders';
 import { hit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(req: Request, { params }: { params: { slug: string } }) {
   const me = await customer();
