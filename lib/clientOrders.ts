@@ -10,7 +10,7 @@
 import { sql, award, stampVisit, notifyTeamEmployers, ensureProfile } from './client';
 import { getConnection, createTableOrder, tableOrderState, StoryousError } from './storyous';
 import { notifyUser } from './push';
-import { pragueToday } from './pragueTime';
+import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
 
 export interface OrderLineIn { id: number; count: number }
 export interface OrderLine { itemId: number; name: string; price: number; count: number; posProductId: string | null }
@@ -83,7 +83,10 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
       const pts = Math.floor(Number(o.total) / 100) * (Number(profile.points_per_100) || 0);
       const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${o.total} Kč`) : null;
       const [m] = await sql`SELECT last_visit_at FROM client_memberships WHERE customer_id = ${o.customer_id} AND team_id = ${teamId}`;
-      const visitedToday = m?.last_visit_at && String(m.last_visit_at).slice(0, 10) === pragueToday();
+      // Ovladač vrací TIMESTAMP jako Date, ne text — porovnává se pražský den,
+      // ne prvních deset znaků řetězce.
+      const last = parseDbTime(m?.last_visit_at);
+      const visitedToday = !!last && pragueDayOf(last) === pragueToday();
       const stamp = visitedToday ? null : await stampVisit(teamId, Number(o.customer_id), profile, `ord:${o.id}`);
       loyalty = { points, pts, stamp };
     }
