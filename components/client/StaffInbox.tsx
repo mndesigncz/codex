@@ -32,6 +32,18 @@ export function useStaffInbox(enabled = true) {
 const ORDER_STATUS: Record<string, { label: string; tone: string }> = {
   new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'done' }, declined: { label: 'Nepřijato', tone: 'off' },
 };
+const POS_STATE: Record<string, string> = { NEW: 'v kase čeká na přijetí', CONFIRMED: 'v kase, připravuje se', DISPATCHED: 'v kase vydáno', DECLINED: 'kasa odmítla', SCHEDULING_DELIVERY: 'v kase' };
+/** Jak víme, že host sedí u stolu: QR ze stolu a poloha telefonu. */
+function Verified({ o }: { o: any }) {
+  const parts: { txt: string; tone: 'ok' | 'wait' | 'off' }[] = [];
+  if (o.via_qr) parts.push({ txt: 'QR ze stolu', tone: 'ok' });
+  else if (o.via_qr === false) parts.push({ txt: 'bez QR', tone: 'wait' });
+  if (o.geo_status === 'ok') parts.push({ txt: `u podniku${o.geo_distance_m != null ? ` · ${o.geo_distance_m} m` : ''}`, tone: 'ok' });
+  else if (o.geo_status === 'far') parts.push({ txt: `daleko · ${o.geo_distance_m} m`, tone: 'off' });
+  else if (o.geo_status === 'none') parts.push({ txt: 'bez polohy', tone: 'wait' });
+  if (!parts.length) return null;
+  return <>{parts.map(p => <span key={p.txt} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${p.tone === 'ok' ? 'bg-[#C8F542]/20 text-[#3E5406]' : p.tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : 'bg-red-500/10 text-red-700'}`}><Icon name={p.txt.startsWith('QR') || p.txt === 'bez QR' ? 'tag' : 'location'} size={11} />{p.txt}</span>)}</>;
+}
 const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-red-500/10 text-red-700'}`;
 
 function ago(iso: string) {
@@ -147,7 +159,7 @@ function OrderRow({ o, busy, act }: { o: any; busy: boolean; act: (id: number, s
             {(o.items ?? []).map((l: any, i: number) => <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{l.price * l.count} Kč</span></li>)}
           </ul>
           {o.note && <p className="text-xs text-black/60 mt-1">„{o.note}"</p>}
-          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{o.total} Kč</span><span className={chip(st.tone)}>{st.label}</span>{o.pos_state && <span className="text-[11px] text-black/45">kasa: {o.pos_state}</span>}</p>
+          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{o.total} Kč</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}</p>
         </div>
         <div className="flex gap-1.5 flex-wrap justify-end ml-auto">
           {o.status === 'new' && <><Button size="sm" variant="accent" icon="check" loading={busy} onClick={() => act(o.id, 'confirmed')}>Přijmout</Button><Button size="sm" variant="ghost" loading={busy} onClick={() => { if (confirm('Objednávku odmítnout? Host dostane zprávu.')) act(o.id, 'declined'); }}>Odmítnout</Button></>}

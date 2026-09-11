@@ -11,6 +11,60 @@ import { sql, award, stampVisit, notifyTeamEmployers, ensureProfile } from './cl
 import { getConnection, createTableOrder, tableOrderState, StoryousError } from './storyous';
 import { notifyUser } from './push';
 import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
+import { createHmac } from 'crypto';
+
+// ---- Ochrana: sedí host opravdu u stolu? ------------------------------------
+//
+// Dvě nezávislé stopy. QR na stole nese tajný kód stolu, který odkaz z domova
+// nemá. Poloha z telefonu se porovná s polohou podniku; přesnost bývá 10 až
+// 50 m, venku míň, v suterénu hůř — proto se k poloměru přičítá přesnost
+// (nejvýš 50 m), ať poctivý host v zadní místnosti neprojde jako podvodník.
+// Obě stopy jdou obejít jen s úsilím; proti běžnému „objednám ze zastávky"
+// stačí. Ověřená objednávka může jít rovnou do pokladny, neověřenou musí
+// potvrdit obsluha.
+
+export interface GeoIn { lat: number; lng: number; accuracy: number }
+export type GeoStatus = 'ok' | 'far' | 'none' | 'off';
+
+export function distanceM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000, toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(a)));
+}
+
+/** Účinný režim polohy: bez souřadnic podniku se poloha neověřuje. */
+export function geoMode(profile: any): 'off' | 'warn' | 'block' {
+  const m = String(profile?.order_geo ?? 'off');
+  if (m === 'off' || profile?.lat == null || profile?.lng == null) return 'off';
+  return m === 'block' ? 'block' : 'warn';
+}
+
+export function checkGeo(profile: any, geo: GeoIn | null): { status: GeoStatus; distance: number | null } {
+  if (geoMode(profile) === 'off') return { status: 'off', distance: null };
+  if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lng)) return { status: 'none', distance: null };
+  const d = distanceM(Number(profile.lat), Number(profile.lng), geo.lat, geo.lng);
+  const slack = Math.min(50, Math.max(0, Number(geo.accuracy) || 0));
+  return { status: d <= (Number(profile.geo_radius_m) || 100) + slack ? 'ok' : 'far', distance: d };
+}
+
+export function parseGeo(raw: any): GeoIn | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const lat = Number(raw.lat), lng = Number(raw.lng), accuracy = Number(raw.accuracy);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng, accuracy: Number.isFinite(accuracy) ? accuracy : 9999 };
+}
+
+/** Podpis adresy, na kterou pokladna hlásí stav objednávky. */
+export function callbackSig(orderId: number, event: string): string {
+  return createHmac('sha256', process.env.NEXTAUTH_SECRET || 'managero').update(`${orderId}:${event}`).digest('hex').slice(0, 24);
+}
+function callbackUrls(orderId: number): { confirm: string; dispatch: string; decline: string } | undefined {
+  const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '');
+  if (!origin) return undefined;
+  const u = (e: string) => `${origin}/api/client/pos/callback?o=${orderId}&e=${e}&k=${callbackSig(orderId, e)}`;
+  return { confirm: u('confirm'), dispatch: u('dispatch'), decline: u('decline') };
+}
 
 export interface OrderLineIn { id: number; count: number }
 export interface OrderLine { itemId: number; name: string; price: number; count: number; posProductId: string | null }
@@ -63,6 +117,7 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
         const r = await createTableOrder(conn, {
           externalId: o.external_id || `mgr-ord-${o.id}`, deskId: String(o.storyous_desk_id), customerName: String(o.customer_name),
           note: o.note ?? null, items: lines.map(l => ({ itemId: String(l.posProductId), count: Number(l.count), unitPriceWithVat: Number(l.price) })),
+          notification: callbackUrls(Number(o.id)),
         });
         storyousId = r.orderId; posState = r.state; posNote = 'Objednávka je v pokladně na stole.';
       } catch (e) {
@@ -103,11 +158,21 @@ export async function refreshPosState(teamId: number, order: any): Promise<strin
     const conn = await getConnection(teamId);
     if (!conn) return order.pos_state ?? null;
     const st = await tableOrderState(conn, String(order.storyous_order_id));
-    if (st && st !== order.pos_state) {
-      await sql`UPDATE client_orders SET pos_state = ${st}${st === 'DECLINED' ? sql`, status = 'declined'` : sql``} WHERE id = ${order.id}`;
-    }
+    if (st && st !== order.pos_state) await applyPosState(teamId, order, st);
     return st ?? order.pos_state ?? null;
   } catch { return order.pos_state ?? null; }
+}
+
+/**
+ * Stav z pokladny → stav u nás. Odmítnutí v kase odmítne objednávku i tady,
+ * vydání (DISPATCHED) ji uzavře a připíše body — obsluha pak nemusí sahat do
+ * Managera vůbec. (Ovladač neumí skládat úryvky SQL, proto dva dotazy.)
+ */
+export async function applyPosState(teamId: number, order: any, st: string): Promise<void> {
+  await sql`UPDATE client_orders SET pos_state = ${st} WHERE id = ${order.id}`;
+  const cur = String(order.status);
+  if (st === 'DECLINED' && cur === 'confirmed') await setOrderStatus(teamId, Number(order.id), 'declined').catch(() => {});
+  if (st === 'DISPATCHED' && cur === 'confirmed') await setOrderStatus(teamId, Number(order.id), 'done').catch(() => {});
 }
 
 export async function notifyNewOrder(teamId: number, customerName: string, tableName: string | null, total: number, id: number) {

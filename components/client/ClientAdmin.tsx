@@ -232,6 +232,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
                 <input aria-label="Počet míst" type="number" min={1} max={40} defaultValue={t.seats} onBlur={e => Number(e.target.value) !== t.seats && patch(t.id, { seats: Number(e.target.value) })} className={`${input} py-1.5 !w-16 text-center`} />
                 <span className="text-xs text-black/45 hidden sm:inline w-24 truncate">{t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}</span>
                 <button onClick={() => window.open(`/api/client/admin/tables/qr?tableId=${t.id}`, '_blank')} aria-label={`Vytisknout QR stolu ${t.name}`} title="QR na stůl k tisku" className="tap-target-sm rounded-full p-2 text-black/55 hover:text-black hover:bg-black/[0.05] transition"><Icon name="print" size={16} /></button>
+                <button onClick={() => { if (confirm(`Vygenerovat nový QR kód pro stůl ${t.name}? Starý vytištěný kód přestane platit.`)) patch(t.id, { rotate_token: true }); }} aria-label={`Nový QR kód stolu ${t.name}`} title="Nový QR kód (starý přestane platit)" className="tap-target-sm rounded-full p-2 text-black/40 hover:text-black hover:bg-black/[0.05] transition hidden sm:inline-grid"><Icon name="refresh" size={16} /></button>
                 <button onClick={() => patch(t.id, { active: !t.active })} aria-pressed={!!t.active} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${t.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{t.active ? 'Aktivní' : 'Skrytý'}</button>
                 <button onClick={() => del(t.id)} aria-label="Smazat stůl" className="tap-target-sm rounded-full p-2 text-black/40 hover:text-red-700 hover:bg-red-500/10 transition"><Icon name="trash" size={16} /></button>
               </li>
@@ -415,17 +416,28 @@ function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
 
 function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange: () => void }) {
   const [d, setD] = useState<any | null>(null); const [p, setP] = useState<any | null>(null); const [busy, setBusy] = useState(false);
+  const [locating, setLocating] = useState(false);
   useEffect(() => { fetch('/api/client/admin/profile').then(r => r.json()).then(x => { setD(x); setP(x.profile); }).catch(() => {}); }, []);
   if (!d || !p) return <PageSkel />;
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);
     try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, tagline: p.tagline, description: p.description, address: p.address, cover_url: p.cover_url, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null }) });
+      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, tagline: p.tagline, description: p.description, address: p.address, cover_url: p.cover_url, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null,
+        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos }) });
       setP(r.profile); setD({ ...d, url: r.url }); toast(r.profile.enabled ? 'Uloženo. Podnik je pro hosty zapnutý.' : 'Uloženo. Podnik je zatím vypnutý.'); onChange();
     } catch (e: any) { toast(e.message); }
     setBusy(false);
   };
   const copy = () => { navigator.clipboard?.writeText(d.url).then(() => toast('Adresa zkopírována.')).catch(() => {}); };
+  const useMyPosition = () => {
+    if (!navigator.geolocation) { toast('Prohlížeč neumí polohu.'); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => { setP((x: any) => ({ ...x, lat: Number(pos.coords.latitude.toFixed(6)), lng: Number(pos.coords.longitude.toFixed(6)) })); setLocating(false); toast(`Poloha načtena s přesností ${Math.round(pos.coords.accuracy)} m. Nezapomeň uložit.`); },
+      () => { setLocating(false); toast('Polohu se nepodařilo zjistit. Povol ji v prohlížeči.'); },
+      { enableHighAccuracy: true, timeout: 12000 });
+  };
+  const hasCoords = p.lat != null && p.lat !== '' && p.lng != null && p.lng !== '';
   const hoursOk = Object.values(p.opening_hours ?? {}).some((h: any) => h && !h.closed && h.open);
   return (
     <form onSubmit={save} className="space-y-6 max-w-3xl">
@@ -470,6 +482,34 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
           <div><label htmlFor="s-lead" className={label}>Dní dopředu</label><input id="s-lead" type="number" min={1} max={180} value={p.lead_days} onChange={e => setP({ ...p, lead_days: e.target.value })} className={input} /></div>
           <div><label htmlFor="s-slot" className={label}>Krok (min)</label><input id="s-slot" type="number" min={15} max={120} step={15} value={p.slot_minutes} onChange={e => setP({ ...p, slot_minutes: e.target.value })} className={input} /></div>
         </div>
+      </section>
+      <section className="glass-card p-5 grid gap-4">
+        <div>
+          <h2 className="font-bold tracking-tight">Ochrana objednávek od stolu</h2>
+          <p className="text-xs text-black/50 mt-0.5">Aby objednával jen ten, kdo u stolu opravdu sedí. Dvě nezávislé stopy: QR kód na stole a poloha telefonu.</p>
+        </div>
+        <label className="flex items-start min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={p.order_qr_required !== false} onChange={e => setP({ ...p, order_qr_required: e.target.checked })} className="h-4 w-4 mt-0.5 accent-[#16181A]" />
+          <span>Objednat jde jen přes QR kód na stole<span className="block text-xs text-black/50">Každý stůl má v QR svůj tajný kód (Stoly → ikona tiskárny). Odkaz z domova nebo ručně vybraný stůl neprojde.</span></span></label>
+        <div>
+          <label htmlFor="s-geo" className={label}>Poloha hosta</label>
+          <select id="s-geo" value={p.order_geo ?? 'block'} onChange={e => setP({ ...p, order_geo: e.target.value })} className={input}>
+            <option value="block">Blokovat objednávky mimo podnik</option>
+            <option value="warn">Jen upozornit obsluhu, objednávku nechat čekat</option>
+            <option value="off">Neověřovat</option>
+          </select>
+          {p.order_geo !== 'off' && !hasCoords && <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 px-3 py-2 mt-2">Poloha podniku není nastavená, ověření polohy zatím neběží. Stoupni si v podniku s telefonem a klepni na „Použít moji polohu".</p>}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <div><label htmlFor="s-lat" className={label}>Zeměpisná šířka</label><input id="s-lat" inputMode="decimal" value={p.lat ?? ''} onChange={e => setP({ ...p, lat: e.target.value })} placeholder="49.1951" className={input} /></div>
+          <div><label htmlFor="s-lng" className={label}>Zeměpisná délka</label><input id="s-lng" inputMode="decimal" value={p.lng ?? ''} onChange={e => setP({ ...p, lng: e.target.value })} placeholder="16.6068" className={input} /></div>
+          <Button type="button" variant="secondary" icon="location" loading={locating} onClick={useMyPosition}>Použít moji polohu</Button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label htmlFor="s-radius" className={label}>Poloměr (m)</label><input id="s-radius" type="number" min={30} max={1000} step={10} value={p.geo_radius_m ?? 100} onChange={e => setP({ ...p, geo_radius_m: e.target.value })} className={input} /></div>
+          <p className="text-xs text-black/50 self-end pb-2">K poloměru se přičítá přesnost telefonu (nejvýš 50 m). Sto metrů pokryje podnik i zahrádku.</p>
+        </div>
+        <label className="flex items-start min-h-9 py-1 gap-3 text-sm border-t border-black/[0.06] pt-4"><input type="checkbox" checked={p.order_auto_pos !== false} onChange={e => setP({ ...p, order_auto_pos: e.target.checked })} className="h-4 w-4 mt-0.5 accent-[#16181A]" />
+          <span>Ověřené objednávky posílat rovnou do pokladny<span className="block text-xs text-black/50">S QR i polohou v pořádku jde objednávka bez čekání na stůl v kase a terminál Storyous ji vytiskne podle svého nastavení tiskáren. Neověřené čekají na přijetí obsluhou. Odmítnutí nebo vydání v kase se propíše zpátky sem.</span></span></label>
       </section>
     </form>
   );

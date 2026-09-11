@@ -9,11 +9,11 @@ export async function GET(req: NextRequest) {
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const url = new URL(req.url);
   const tableId = parseInt(String(url.searchParams.get('tableId')), 10);
-  const [t] = await sql`SELECT id, name FROM client_tables WHERE id = ${tableId} AND team_id = ${u.team_id}`;
+  const [t] = await sql`SELECT id, name, token FROM client_tables WHERE id = ${tableId} AND team_id = ${u.team_id}`;
   if (!t) return NextResponse.json({ error: 'Stůl nenalezen' }, { status: 404 });
   const p = await ensureProfile(u.team_id);
   const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '') || url.origin;
-  const target = `${origin}/client/${p.slug}?tab=order&table=${t.id}`;
+  const target = `${origin}/client/${p.slug}?tab=order&table=${t.id}${t.token ? `&t=${t.token}` : ''}`;
   const svg = await QRCode.toString(target, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#16181A', light: '#FFFFFF' } });
   if (url.searchParams.get('format') === 'svg') return new NextResponse(svg, { headers: { 'Content-Type': 'image/svg+xml' } });
   const [team] = await sql`SELECT name FROM teams WHERE id = ${u.team_id}`;

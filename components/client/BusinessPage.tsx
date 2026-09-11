@@ -337,6 +337,23 @@ function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b
     const t = parseInt(new URLSearchParams(window.location.search).get('table') ?? '', 10);
     return t && tables.some(x => x.id === t) ? t : '';
   });
+  // Kód z QR na stole. Odkaz z domova ho nemá, a podnik ho může vyžadovat.
+  const [token] = useState<string>(() => typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('t') ?? '').toUpperCase());
+  const qrOnly = !!b.orderQrRequired;
+  const qrTable = token && tableId ? tables.find(x => x.id === tableId) : null;
+  // Poloha telefonu: podnik ji porovná se svou. Ptáme se hned, ať host
+  // u tlačítka nečeká; když nepřijde, zkusí se to ještě při odeslání.
+  const geoMode: 'off' | 'warn' | 'block' = b.orderGeo ?? 'off';
+  const [geo, setGeo] = useState<{ status: 'idle' | 'asking' | 'ok' | 'denied'; lat?: number; lng?: number; accuracy?: number }>({ status: 'idle' });
+  const askGeo = useCallback((): Promise<{ lat: number; lng: number; accuracy: number } | null> => new Promise(resolve => {
+    if (geoMode === 'off' || typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
+    setGeo(g => g.status === 'ok' ? g : { status: 'asking' });
+    navigator.geolocation.getCurrentPosition(
+      pos => { const g = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) }; setGeo({ status: 'ok', ...g }); resolve(g); },
+      () => { setGeo({ status: 'denied' }); resolve(null); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  }), [geoMode]);
+  useEffect(() => { if (geoMode !== 'off' && (!qrOnly || token)) askGeo(); }, [geoMode, qrOnly, token, askGeo]);
   const [cart, setCart] = useState<Record<number, number>>({});
   const [note, setNote] = useState('');
   const [err, setErr] = useState('');
@@ -361,26 +378,51 @@ function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b
   const submit = async () => {
     setErr('');
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug + '?tab=order')}`; return; }
-    if (!tableId) { setErr('Vyber stůl, u kterého sedíš.'); return; }
+    if (!tableId) { setErr(qrOnly ? 'Naskenuj QR kód na stole.' : 'Vyber stůl, u kterého sedíš.'); return; }
     if (!lines.length) { setErr('Přidej aspoň jednu položku.'); return; }
     setBusy(true);
-    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId, items: lines.map(l => ({ id: l.id, count: l.count })), note }) });
+    const pos = geo.status === 'ok' ? { lat: geo.lat, lng: geo.lng, accuracy: geo.accuracy } : await askGeo();
+    if (geoMode === 'block' && !pos) { setBusy(false); setErr('Bez polohy objednat nejde. Povol polohu v prohlížeči a zkus to znovu.'); return; }
+    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId, token, geo: pos, items: lines.map(l => ({ id: l.id, count: l.count })), note }) });
     const x = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) { setErr(x.error || 'Objednávka se nepovedla.'); return; }
-    setCart({}); setNote(''); onDone('Objednávka odeslána. Obsluha ji za chvíli potvrdí.'); loadOrders();
+    setCart({}); setNote(''); onDone(x.straight ? 'Objednávka je v pokladně. Obsluha ji už připravuje.' : 'Objednávka odeslána. Obsluha ji za chvíli potvrdí.'); loadOrders();
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 md:gap-10 items-start">
       <div className="space-y-5">
         <div className="glass-card p-5 grid gap-2">
-          <label htmlFor="o-table" className={label}>Kde sedíš</label>
-          <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input}>
-            <option value="">Vyber stůl</option>
-            {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <p className="text-xs text-black/45">Číslo stolu bývá na cedulce na stole.</p>
+          {qrTable ? (
+            <>
+              <p className={label}>Kde sedíš</p>
+              <p className="text-lg font-bold tracking-tight flex items-center gap-2"><span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm">{qrTable.name}</span><span className="text-sm font-medium text-black/50">podle QR na stole</span></p>
+            </>
+          ) : qrOnly ? (
+            <>
+              <p className={label}>Kde sedíš</p>
+              <p className="font-semibold leading-tight">Naskenuj QR kód na stole</p>
+              <p className="text-xs text-black/55">Objednat jde jen od stolu, kde sedíš. Otevři kameru v telefonu a namiř ji na kód na stole; otevře se tahle stránka s vybraným stolem.</p>
+            </>
+          ) : (
+            <>
+              <label htmlFor="o-table" className={label}>Kde sedíš</label>
+              <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input}>
+                <option value="">Vyber stůl</option>
+                {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <p className="text-xs text-black/45">Číslo stolu bývá na cedulce na stole.</p>
+            </>
+          )}
+          {geoMode !== 'off' && (!qrOnly || token) && (
+            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-[#3E5406]' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-red-700' : 'text-amber-800') : 'text-black/50'}`}>
+              <Icon name="location" size={13} />
+              {geo.status === 'ok' ? 'Poloha ověřena.' : geo.status === 'asking' || geo.status === 'idle' ? 'Ověřujeme, že sedíš u stolu…'
+                : geoMode === 'block' ? 'Bez polohy objednat nejde. Povol ji v prohlížeči.' : 'Bez polohy objednávku nejdřív potvrdí obsluha.'}
+              {geo.status === 'denied' && <button type="button" onClick={() => askGeo()} className="tap-target-sm underline font-medium">Zkusit znovu</button>}
+            </p>
+          )}
         </div>
         {items.length === 0 ? <EmptyState icon="leaf" title="Zatím není z čeho objednat" hint="Podnik nabídku doplní v aplikaci." compact /> : (
           <div className="space-y-5">

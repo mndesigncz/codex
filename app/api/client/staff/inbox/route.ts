@@ -16,7 +16,7 @@ export async function GET() {
   let orders: any[] = [];
   try {
     orders = await sql`
-      SELECT o.id, o.items, o.total, o.note, o.status, o.pos_state, o.storyous_order_id, o.created_at, us.name AS customer_name, t.name AS table_name
+      SELECT o.id, o.items, o.total, o.note, o.status, o.pos_state, o.storyous_order_id, o.created_at, o.via_qr, o.geo_status, o.geo_distance_m, us.name AS customer_name, t.name AS table_name
       FROM client_orders o JOIN users us ON us.id = o.customer_id LEFT JOIN client_tables t ON t.id = o.table_id
       WHERE o.team_id = ${u.team_id} AND (o.status IN ('new','confirmed') OR (o.status IN ('done','declined') AND o.updated_at > NOW() - INTERVAL '3 hours'))
       ORDER BY CASE o.status WHEN 'new' THEN 0 WHEN 'confirmed' THEN 1 ELSE 2 END, o.created_at ASC` as any[];
