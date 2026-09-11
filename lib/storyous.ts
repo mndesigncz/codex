@@ -111,6 +111,86 @@ async function paged(conn: PosConnection, firstPath: string, onPage: (data: any[
   return { pages, complete: !path };
 }
 
+/** POST na Storyous — Delivery API a Reservations API zapisují do pokladny. */
+async function apiPost(conn: PosConnection, path: string, body: any): Promise<any> {
+  const token = await getToken(conn);
+  const call = (t: string) => fetch(`https://api.storyous.com${path}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  let res = await call(token);
+  if (res.status === 401) { tokenCache.delete(conn.clientId); res = await call(await getToken(conn)); }
+  if (res.status === 429) throw new StoryousError('Storyous omezuje počet požadavků — zkusí se znovu za chvíli.', 429);
+  const text = await res.text();
+  let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+  if (!res.ok) throw new StoryousError(`Storyous API ${res.status}: ${String(data?.message ?? data?.error ?? text).slice(0, 160)}`, res.status);
+  return data;
+}
+
+// ---- Stoly, objednávky od stolu, rezervace (Managero client) ------------------
+
+export interface Desk { deskId: string; name: string; code: string | null; type: string; section: string | null; virtual: boolean }
+
+/** Stoly provozovny, jak je má pokladna. Virtuální (rozvoz, e-shop) se přeskakují. */
+export async function listDesks(conn: PosConnection): Promise<Desk[]> {
+  const d = await api(conn, `/deskViews/${src(conn)}`);
+  const out: Desk[] = [];
+  for (const sec of d?.sections ?? []) {
+    for (const k of sec.desks ?? []) {
+      if (k._removed || k._virtual) continue;
+      out.push({ deskId: String(k.deskId), name: String(k.name ?? k.code ?? k.deskId), code: k.code ?? null, type: String(k.type ?? 'desk'), section: sec.name ?? null, virtual: !!k._virtual });
+    }
+  }
+  return out;
+}
+
+export interface OrderLine { itemId: string; count: number; unitPriceWithVat: number; note?: string | null }
+
+/**
+ * Objednávka od stolu přes Delivery API. Bez `autoConfirm` ji musí obsluha na
+ * pokladně do pěti minut potvrdit, jinak ji pokladna sama zamítne — proto se
+ * posílá až ve chvíli, kdy ji u nás obsluha potvrdí, a `autoConfirm: true`.
+ */
+export async function createTableOrder(conn: PosConnection, o: { externalId: string; deskId: string; items: OrderLine[]; note?: string | null; customerName?: string | null }): Promise<{ orderId: string; state: string }> {
+  const d = await apiPost(conn, `/delivery/orders/${src(conn)}`, {
+    externalId: o.externalId,
+    deliveryType: 'orderToTable',
+    timing: { asSoonAsPossible: true },
+    customer: { name: o.customerName || 'Host' },
+    items: o.items.map(l => ({ itemId: l.itemId, count: l.count, unitPriceWithVat: l.unitPriceWithVat, note: l.note ?? undefined })),
+    note: o.note ?? undefined,
+    deskId: o.deskId,
+    alreadyPaid: false,
+    autoConfirm: true,
+  });
+  return { orderId: String(d?.orderId ?? d?.id ?? o.externalId), state: String(d?.state ?? 'NEW') };
+}
+
+/** Stav objednávky v pokladně: NEW, CONFIRMED, DECLINED, DISPATCHED… */
+export async function tableOrderState(conn: PosConnection, orderId: string): Promise<string | null> {
+  try {
+    const d = await api(conn, `/delivery/orders/${src(conn)}/${encodeURIComponent(orderId)}`);
+    return d?.state ? String(d.state) : null;
+  } catch (e) {
+    if (e instanceof StoryousError && e.status === 404) return null;
+    throw e;
+  }
+}
+
+/**
+ * Usazení rezervace: pokladna otevře na stole účet s údaji z rezervace.
+ * Volá se, když hosté dorazí — ne při vytvoření rezervace.
+ */
+export async function seatReservation(conn: PosConnection, r: { externalReservationId: string; name: string; deskId: string; deposit?: number }): Promise<{ reservationId: string | null }> {
+  const d = await apiPost(conn, `/reservations/${src(conn)}/reservations`, {
+    externalReservationId: r.externalReservationId,
+    name: r.name,
+    reservationDeposit: r.deposit ?? 0,
+    deskId: r.deskId,
+    autoConfirm: true,
+  });
+  return { reservationId: d?.reservationId ? String(d.reservationId) : null };
+}
+
 // ---- Provozovna ---------------------------------------------------------------
 
 export interface MerchantInfo {

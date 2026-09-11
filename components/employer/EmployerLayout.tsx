@@ -28,6 +28,7 @@ import TimeOffRequest from '../scheduling/TimeOffRequest';
 import TimeOffApprovals from '../scheduling/TimeOffApprovals';
 import Procedures from '../procedures/Procedures';
 import ToGoMode from './ToGoMode';
+import ClientAdmin from '../client/ClientAdmin';
 import RecipesView from '../inventory/RecipesView';
 import ReceiptsPanel from './ReceiptsPanel';
 import ShiftSwap from '../scheduling/ShiftSwap';
@@ -79,25 +80,29 @@ export default function EmployerLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('overview');
   // TO GO vs. full administration. Phones default to TO GO (the pocket view);
   // the choice is remembered and the switch is always one tap away.
-  const [appMode, setAppMode] = useState<'togo' | 'full' | null>(null);
+  const [appMode, setAppMode] = useState<'togo' | 'full' | 'client' | null>(null);
+  // Odkaz z oznámení o nové rezervaci otevře rovnou správnou záložku Clientu.
+  const [clientTab, setClientTab] = useState<string | undefined>();
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   useEffect(() => {
     // Odkaz na konkrétní obrazovku má přednost před kapesním režimem. Bez
     // toho notifikace „schvaluje se ti uzávěrka" otevřela na telefonu TO GO
     // a člověk nepochopil, kam se dostal.
-    const asked = new URLSearchParams(window.location.search).get('view');
-    if (asked && asked !== 'overview') { setAppMode('full'); }
+    const qs = new URLSearchParams(window.location.search);
+    const asked = qs.get('view');
+    if (qs.get('mode') === 'client') { setClientTab(qs.get('tab') ?? undefined); setAppMode('client'); }
+    else if (asked && asked !== 'overview') { setAppMode('full'); }
     else {
       let stored: string | null = null;
       try { stored = localStorage.getItem('managero-app-mode'); } catch { /* ignore */ }
-      if (stored === 'togo' || stored === 'full') setAppMode(stored);
+      if (stored === 'togo' || stored === 'full' || stored === 'client') setAppMode(stored);
       else setAppMode(window.innerWidth < 768 ? 'togo' : 'full');
     }
     // Na tabletu sebere rozbalený rail třetinu šířky a obsah se zmáčkne —
     // do 1024 px startuje zúžený.
     if (window.innerWidth < 1024) setSidebarOpen(false);
   }, []);
-  const switchMode = (m: 'togo' | 'full') => {
+  const switchMode = (m: 'togo' | 'full' | 'client') => {
     setAppMode(m);
     try { localStorage.setItem('managero-app-mode', m); } catch { /* ignore */ }
   };
@@ -183,11 +188,22 @@ export default function EmployerLayout({ user }: Props) {
         <Icon name="users" size={18} /> Nastavení týmu
       </button>
       <div className="h-px bg-black/[0.06] my-1" />
+      <button onClick={() => { setAccountOpen(false); switchMode('client'); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.05] transition-colors">
+        <Icon name="gift" size={18} /> Managero client
+      </button>
       <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-600 hover:bg-red-500/[0.06] transition-colors">
         <Icon name="logout" size={18} /> Odhlásit se
       </button>
     </div>
   );
+
+  if (appMode === 'client') {
+    return (
+      <ProfileLinkProvider>
+        <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} />
+      </ProfileLinkProvider>
+    );
+  }
 
   if (appMode === 'togo') {
     return (
@@ -289,6 +305,10 @@ export default function EmployerLayout({ user }: Props) {
             className="tap-target-sm shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="receipt" size={20} />
           </button>
+          <button onClick={() => switchMode('client')} title="Managero client: hosté, rezervace, věrnost" aria-label="Přepnout do Managero client"
+            className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#16181A]/[0.06] border border-black/10 text-[#16181A] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#16181A]/[0.1] transition whitespace-nowrap">
+            <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">Client</span>
+          </button>
           <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu" aria-label="Přepnout do TO GO režimu"
             className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#4F6A07] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
             <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">TO GO</span>
@@ -356,6 +376,7 @@ export default function EmployerLayout({ user }: Props) {
         actions={[
           { label: 'Nastavení', icon: 'settings', onClick: openSettings },
           { label: 'Nastavení týmu', icon: 'users', onClick: openTeam },
+          { label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } },
           { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
         ]}
       />
