@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState } from '../ui';
+import { EmptyState, PageHeader } from '../ui';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
@@ -606,6 +606,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
   return (
     <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
+      <PageHeader title="Uzávěrka" subtitle="Spočítej kasu na konci směny — tržby se předvyplní z pokladny." />
       {msg && (
         <div className="p-3.5 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={17} /> {msg}

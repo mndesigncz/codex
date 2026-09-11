@@ -12,6 +12,7 @@ import { Icon } from '../Icons';
 import {
   type MenuTheme, VYCHOZI_THEME, PREDLOHY, PISMA, normalizeMenuTheme,
 } from '@/lib/menuTheme';
+import { PageHeader } from '../ui';
 
 interface Item {
   id?: number;
@@ -305,15 +306,11 @@ export default function MenuEditor() {
 
   return (
     <div className="space-y-4">
+      {/* Nadpis obrazovky. Uvnitř karty byl h2 „Menu pro hosty" — vypadal
+          jako nadpis sekce, ne obrazovky, takže Menu jako jediná položka
+          navigace neřeklo, kde jsi. */}
+      <PageHeader title="Menu" subtitle="Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky." />
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h2 className="font-bold tracking-tight text-[#16181A]">Menu pro hosty</h2>
-            <p className="text-sm text-black/45">
-              Změny se projeví na iPadu i v mobilech hostů po obnovení stránky.
-            </p>
-          </div>
-        </div>
 
         {/* Všechna menu jako dlaždice — na první pohled je vidět, co existuje,
             co je zapnuté a co se právě edituje. */}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 
-import { EmptyState } from './ui';
+import { EmptyState, PageHeader, Button } from './ui';
 type Suggestion = {
   id: number;
   title: string;
@@ -158,26 +158,16 @@ export default function SuggestionsBoard() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-6">
-      {/* Intro */}
-      <div className="glass-card p-5 sm:p-6 flex items-start gap-4">
-        <div className="grid place-items-center h-12 w-12 shrink-0 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
-          <Icon name="bulb" size={24} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-bold tracking-tight text-[#16181A]">Nápady na vylepšení</h3>
-          <p className="text-black/50 text-sm mt-0.5">
-            {isEmployer
-              ? 'Podněty od týmu — co by lidem usnadnilo práci. Přidej se hlasem nebo posuň nápad dál.'
-              : 'Máš nápad, co by šlo zlepšit? Přidej podnět a vedení ho uvidí. Palcem podpoříš nápady ostatních.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Add button */}
-      <button onClick={() => { setComposing(true); setErr(''); }}
-        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-[#16181A] text-white font-semibold px-6 py-3 text-sm hover:bg-black transition">
-        <Icon name="plus" size={18} /> Přidat podnět
-      </button>
+      {/* Hlavička jako u ostatních obrazovek. Dřív tu byla uvítací karta s
+          h3 a pod ní tmavé tlačítko: obrazovka neměla hlavní nadpis a hlavní
+          akce se barvou lišila od zbytku aplikace. */}
+      <PageHeader
+        title="Nápady"
+        subtitle={isEmployer
+          ? 'Podněty od týmu — co by lidem usnadnilo práci. Přidej se hlasem nebo posuň nápad dál.'
+          : 'Máš nápad, co by šlo zlepšit? Přidej podnět a vedení ho uvidí. Palcem podpoříš nápady ostatních.'}
+        primary={<Button onClick={() => { setComposing(true); setErr(''); }} variant="accent" icon="plus">Přidat podnět</Button>}
+      />
 
       {/* Filters */}
       {items.length > 0 && (
