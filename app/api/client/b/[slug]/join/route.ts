@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { customer, profileBySlug, join, membership, award } from '@/lib/client';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(_req: Request, { params }: { params: { slug: string } }) {
   const me = await customer();

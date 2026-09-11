@@ -5,6 +5,7 @@ import { sql, employer } from '@/lib/client';
 import { getConnection, listDesks } from '@/lib/storyous';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET() {
   const u = await employer();

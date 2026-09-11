@@ -7,6 +7,7 @@ import { sql } from '@/lib/client';
 import { hit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(request: Request) {
   const b = await request.json().catch(() => ({}));

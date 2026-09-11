@@ -5,6 +5,7 @@ import { sql, employer, ensureProfile, slugify, publicProfile } from '@/lib/clie
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 function origin(req: NextRequest) { return (process.env.NEXTAUTH_URL?.replace(/\/$/, '') || new URL(req.url).origin); }
 

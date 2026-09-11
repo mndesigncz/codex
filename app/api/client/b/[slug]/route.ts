@@ -7,6 +7,7 @@ import { buildBoard, publicShape } from '@/lib/menu';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 async function menuFor(teamId: number, menuSlug: string | null) {
   try {

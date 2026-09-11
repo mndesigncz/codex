@@ -4,6 +4,7 @@ import { sql, customer, profileBySlug, membership, award, couponCode } from '@/l
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(_req: Request, { params }: { params: { slug: string; id: string } }) {
   const me = await customer();

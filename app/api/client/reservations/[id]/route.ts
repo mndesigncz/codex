@@ -4,6 +4,7 @@ import { sql, customer, notifyTeamEmployers } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const me = await customer();

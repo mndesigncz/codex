@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer, publicProfile } from '@/lib/client';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(req: NextRequest) {
   const q = String(new URL(req.url).searchParams.get('q') ?? '').trim().toLowerCase().slice(0, 60);

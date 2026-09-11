@@ -6,6 +6,7 @@ import { sql, customer, profileBySlug, join, slotsFor, notifyTeamEmployers } fro
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(req: Request, { params }: { params: { slug: string } }) {
   const me = await customer();

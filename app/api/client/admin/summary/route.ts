@@ -4,6 +4,7 @@ import { sql, employer, ensureProfile } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET() {
   const u = await employer();

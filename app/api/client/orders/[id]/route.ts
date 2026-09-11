@@ -4,6 +4,7 @@ import { sql, customer } from '@/lib/client';
 import { refreshPosState } from '@/lib/clientOrders';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const me = await customer();
