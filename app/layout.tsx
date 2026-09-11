@@ -26,7 +26,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme');var c=/^\/client(\/|$)/.test(location.pathname)||/[?&]mode=client(&|$)/.test(location.search);if(t==='dark'&&!c)document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
           }}
         />
       </head>

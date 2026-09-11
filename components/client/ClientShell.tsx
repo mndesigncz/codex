@@ -7,8 +7,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
+import { useTheme } from '../ThemeProvider';
 
 export interface ClientUser { id: number; name: string; email: string }
 
@@ -23,6 +24,9 @@ export function Initials({ name, size = 36 }: { name: string; size?: number }) {
 }
 
 export default function ClientShell({ me, children }: { me: ClientUser | null; children: React.ReactNode }) {
+  // Hostovská část je světlá i při tmavém motivu účtu (viz ThemeProvider).
+  const { setForcedLight } = useTheme();
+  useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const active = (p: string) => path === p || (p !== '/client' && path?.startsWith(p));

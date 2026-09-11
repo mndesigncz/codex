@@ -5,6 +5,7 @@
 // designový systém jako zbytek administrace; jen jiná sada obrazovek.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu } from '../ui';
 import { Initials } from './ClientShell';
@@ -36,6 +37,9 @@ async function j(url: string, init?: RequestInit) {
 
 export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void; initialTab?: string }) {
   const [tab, setTab] = useState<Tab>((TABS.some(t => t.id === initialTab) ? initialTab : 'overview') as Tab);
+  // Správa Managero client je světlá i při tmavém motivu účtu (viz ThemeProvider).
+  const { setForcedLight } = useTheme();
+  useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
   const [summary, setSummary] = useState<any | null>(null);
   const [toast, setToast] = useState('');
   const refreshSummary = useCallback(() => { fetch('/api/client/admin/summary').then(r => r.json()).then(setSummary).catch(() => {}); }, []);
