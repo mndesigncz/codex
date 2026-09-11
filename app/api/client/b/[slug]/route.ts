@@ -3,24 +3,37 @@
 
 import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
-import { buildBoard, publicShape } from '@/lib/menu';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+/**
+ * Nabídka pro hosta: sekce a položky s tím, co host smí vidět (bez PINu,
+ * bez id produktu z pokladny — to si objednávka dohledá podle id položky).
+ * Tvar drží stránka hosta i objednávka: sections[].items[].
+ */
 async function menuFor(teamId: number, menuSlug: string | null) {
   try {
     const [board] = menuSlug
-      ? await sql`SELECT * FROM menu_boards WHERE team_id = ${teamId} AND slug = ${menuSlug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`
-      : await sql`SELECT * FROM menu_boards WHERE team_id = ${teamId} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+      ? await sql`SELECT id, slug, name, currency FROM menu_boards WHERE team_id = ${teamId} AND slug = ${menuSlug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`
+      : await sql`SELECT id, slug, name, currency FROM menu_boards WHERE team_id = ${teamId} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
     if (!board) return null;
-    const sections = await sql`SELECT id, title, column_no, position FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id`;
-    const items = sections.length
-      ? await sql`SELECT id, section_id, name, price, description, sold_out, pos_product_id, position
-                  FROM menu_items WHERE section_id = ANY(${(sections as any[]).map(s => Number(s.id))}) ORDER BY position, id`
-      : [];
-    return publicShape(buildBoard(board, sections as any[], items as any[]));
+    const sections = await sql`SELECT id, title, position FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id` as any[];
+    const items = await sql`
+      SELECT i.id, i.section_id, i.name, i.price, i.description, i.sold_out, i.position
+      FROM menu_items i JOIN menu_sections s ON s.id = i.section_id
+      WHERE s.board_id = ${board.id} ORDER BY i.position, i.id` as any[];
+    return {
+      slug: board.slug, name: board.name, currency: board.currency ?? 'Kč',
+      sections: sections.map(sec => ({
+        id: Number(sec.id), title: String(sec.title),
+        items: items.filter(i => Number(i.section_id) === Number(sec.id)).map(i => ({
+          id: Number(i.id), name: String(i.name), price: Number(i.price) || 0,
+          description: i.description ?? '', soldOut: !!i.sold_out,
+        })),
+      })),
+    };
   } catch { return null; }
 }
 
