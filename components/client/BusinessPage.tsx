@@ -9,10 +9,14 @@ import { Icon } from '../Icons';
 import { Segmented, Skeleton, EmptyState } from '../ui';
 import { Initials } from './ClientShell';
 import TableMap, { placedTables } from './TableMap';
+import { onAccent } from '@/lib/floorplan';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
+
+/** Zkratky měsíců pro dlaždici akce — celý název by se tam nevešel. */
+const MONTHS = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
 
 const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 rounded-full bg-[#C8F542] text-[#16181A] px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
 const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
@@ -37,6 +41,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
   if (!d) return <div className="space-y-4"><Skeleton className="h-48 rounded-3xl" /><Skeleton className="h-10 w-72 rounded-full" /><Skeleton className="h-64 rounded-3xl" /></div>;
 
   const b = d.business; const me = d.me; const today: string = d.today;
+  // Barva značky podniku; bez vlastní volby zůstává limetková jako ve zbytku aplikace.
+  const accent: string = b.accent || '#C8F542';
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'menu', label: 'Nabídka', icon: 'leaf' },
     ...(b.reservationsOn ? [{ id: 'reserve' as Tab, label: 'Rezervace', icon: 'calendarCheck' }] : []),
@@ -51,31 +57,38 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[10rem] sm:min-h-[12rem] flex flex-col justify-end p-5 sm:p-7`}>
+      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[13rem] sm:min-h-[16rem] flex flex-col justify-end p-5 sm:p-7`}>
         {b.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         )}
-        {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/85 via-[#16181A]/30 to-transparent" />}
+        {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/35 to-[#16181A]/5" />}
         {!b.coverUrl && (
           <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none" aria-hidden>
-            <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl" />
+            <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full blur-3xl" style={{ background: accent, opacity: 0.22 }} />
             <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#0A84FF]/10 blur-3xl" />
           </div>
         )}
         <div className={`relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-end ${b.coverUrl ? 'text-white' : ''}`}>
-          <div className="min-w-0 flex items-end gap-4">
-            {!b.coverUrl && <span className="hidden sm:block"><Initials name={b.name} size={64} /></span>}
+          <div className="min-w-0 flex items-start gap-4">
+            {b.logoUrl ? (
+              <span className="hidden sm:grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white shadow-lg overflow-hidden mt-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={b.logoUrl} alt="" className="h-full w-full object-contain p-2" />
+              </span>
+            ) : !b.coverUrl ? <span className="hidden sm:block mt-1"><Initials name={b.name} size={64} /></span> : null}
             <div className="min-w-0">
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
-              <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/80' : 'text-black/55'}`}>
+              <h1 className="text-3xl sm:text-[2.6rem] font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
+              {b.tagline && <p className={`mt-1.5 text-base sm:text-lg leading-snug text-pretty max-w-[40ch] ${b.coverUrl ? 'text-white/85' : 'text-black/65'}`}>{b.tagline}</p>}
+              <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/75' : 'text-black/55'}`}>
                 <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</span>
                 {b.address && <span className="inline-flex items-center gap-1.5"><Icon name="location" size={15} />{b.address}</span>}
               </p>
               {tabs.length > 1 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {tabs.filter(t => t.id !== 'menu' && t.id !== tab).map(t => (
-                    <button key={t.id} type="button" onClick={() => setTab(t.id)} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${b.coverUrl ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-white/70 border border-black/[0.07] text-[#16181A] hover:bg-white'}`}>
+                    <button key={t.id} type="button" onClick={() => setTab(t.id)}
+                      className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition active:scale-[0.98] ${b.coverUrl ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur' : 'bg-white/70 border border-black/[0.07] text-[#16181A] hover:bg-white'}`}>
                       <Icon name={t.icon} size={13} />{t.id === 'reserve' ? 'Rezervovat' : t.id === 'order' ? 'Objednat od stolu' : 'Kartička a kupony'}
                     </button>
                   ))}
@@ -85,12 +98,14 @@ export default function BusinessPage({ slug }: { slug: string }) {
           </div>
           <div className="shrink-0">
             {me?.member ? (
-              <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : 'bg-[#C8F542]/20 border border-[#C8F542]/40'}`}>
+              <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
+                style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
                 <p className="text-[11px] uppercase tracking-wider opacity-70">{me.levelLabel ?? 'Člen'}</p>
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} b. <span className="opacity-60 font-medium text-sm">· {me.stamps}/{b.stampTarget || '–'} razítek</span></p>
               </div>
             ) : (
-              <button onClick={join} className={btnPrimary}><Icon name="plus" size={16} /> Stát se členem</button>
+              <button onClick={join} className="tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition"
+                style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> Stát se členem</button>
             )}
           </div>
         </div>
@@ -100,7 +115,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel="Části stránky podniku" />}
 
-      {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
+      {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} events={d.events} gallery={b.gallery} accent={accent} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
       {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} plan={d.plan} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
       {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
@@ -108,9 +123,47 @@ export default function BusinessPage({ slug }: { slug: string }) {
   );
 }
 
-function MenuTab({ menu, news, tagline, address, description, hours, currency }: { menu: any; news?: any[]; tagline: string; address: string; description: string; hours: any; currency: string }) {
+function MenuTab({ menu, news, events, gallery, accent, tagline, address, description, hours, currency }: { menu: any; news?: any[]; events?: any[]; gallery?: string[]; accent?: string; tagline: string; address: string; description: string; hours: any; currency: string }) {
   const cur = currency === 'CZK' ? 'Kč' : currency;
+  const ac = accent || '#C8F542';
   return (
+    <div className="space-y-8">
+      {(gallery?.length ?? 0) > 0 && (
+        <section aria-label="Fotky z podniku" className="-mx-4 sm:mx-0">
+          {/* Pás fotek: na telefonu se posouvá prstem, na monitoru se zarovná
+              do mřížky. První fotka je větší — podnik má čím začít. */}
+          <ul className="flex gap-2.5 overflow-x-auto px-4 sm:px-0 sm:grid sm:grid-cols-4 scrollbar-thin snap-x">
+            {gallery!.slice(0, 8).map((g, i) => (
+              <li key={g} className={`shrink-0 snap-start rounded-2xl overflow-hidden border border-black/[0.06] ${i === 0 ? 'w-64 sm:w-auto sm:col-span-2 sm:row-span-2 aspect-[4/3]' : 'w-40 sm:w-auto aspect-square'}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g} alt="" loading="lazy" className="h-full w-full object-cover hover:scale-[1.03] transition-transform duration-500" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(events?.length ?? 0) > 0 && (
+        <section aria-labelledby="h-events">
+          <h2 id="h-events" className="text-lg font-bold tracking-tight mb-3">Co se u nás chystá</h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {events!.map((e: any) => (
+              <li key={e.id} className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 flex gap-3.5">
+                <span className="shrink-0 grid place-items-center rounded-2xl h-14 w-14 text-center leading-none" style={{ background: `${ac}26` }}>
+                  <span className="block text-lg font-bold tabular-nums">{Number(String(e.date).slice(8, 10))}</span>
+                  <span className="block text-[11px] uppercase tracking-wider text-black/50 mt-0.5">{MONTHS[Number(String(e.date).slice(5, 7)) - 1]}</span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold leading-tight">{e.title}</p>
+                  <p className="text-xs text-black/55 mt-0.5 cz-sentence">{czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}` : ''}{e.location ? ` · ${e.location}` : ''}</p>
+                  {e.description && <p className="text-sm text-black/65 mt-1 line-clamp-2 text-pretty">{e.description}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 md:gap-10 items-start">
       <div className="space-y-6">
         {menu?.sections?.length ? menu.sections.map((s: any) => (
@@ -159,6 +212,7 @@ function MenuTab({ menu, news, tagline, address, description, hours, currency }:
           </ul>
         </div>
       </aside>
+    </div>
     </div>
   );
 }

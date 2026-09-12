@@ -139,6 +139,9 @@ export function publicProfile(p: any) {
     maxParty: Number(p.max_party) || 8,
     leadDays: Number(p.lead_days) || 30,
     slotMinutes: Number(p.slot_minutes) || 30,
+    logoUrl: p.logo_url || '',
+    gallery: Array.isArray(p.gallery) ? p.gallery : [],
+    accent: p.accent || '',
     orderQrRequired: p.order_qr_required !== false,
     orderGeo: (p.order_geo === 'off' || p.lat == null || p.lng == null) ? 'off' : (p.order_geo === 'block' ? 'block' : 'warn'),
   };

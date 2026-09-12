@@ -71,3 +71,15 @@ export function tableBox(t: MapTable): { w: number; h: number; shape: string; ro
     rot: Number(t.map_rot) || 0,
   };
 }
+
+/**
+ * Barva značky podniku: jas rozhodne, jestli na ní bude text tmavý, nebo
+ * bílý. Bez toho by si podnik mohl vybrat žlutou a popisky by zmizely.
+ */
+export function onAccent(hex?: string | null): string {
+  const c = String(hex ?? '').trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(c)) return '#16181A';
+  const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+  // Vnímaný jas (ITU-R BT.601) — na světlé barvě tmavý inkoust, na tmavé bílá.
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#16181A' : '#FFFFFF';
+}

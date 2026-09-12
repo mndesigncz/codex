@@ -1382,6 +1382,11 @@ export async function GET(request: Request) {
     // Půdorys podniku: podklad (očištěné SVG nebo obrázek), nakreslené zdi
     // a plochy. Stoly mají navíc tvar, velikost a natočení.
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS floorplan JSONB`;
+    // Vlastní tvář podniku: logo, fotky a barva značky. Odkazy míří na
+    // /api/client/img/<id>, které je veřejné jen pro zapnuté podniky.
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS logo_url TEXT`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gallery JSONB NOT NULL DEFAULT '[]'`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS accent TEXT`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_w DOUBLE PRECISION`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_h DOUBLE PRECISION`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`;
