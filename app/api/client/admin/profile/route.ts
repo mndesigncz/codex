@@ -29,7 +29,9 @@ export async function PUT(req: NextRequest) {
     const [clash] = await sql`SELECT team_id FROM client_profiles WHERE slug = ${slug} AND team_id <> ${u.team_id}`;
     if (clash) return NextResponse.json({ error: 'Tuhle adresu už používá jiný podnik.' }, { status: 409 });
   }
-  const num = (v: any, d: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, parseInt(String(v ?? d), 10) || d));
+  // „|| d" bralo nulu jako nevyplněno — narozeninové body (0 = nedávat),
+  // body za útratu i cíl razítek pak nešly vypnout.
+  const num = (v: any, d: number, lo: number, hi: number) => { const n = parseInt(String(v ?? d), 10); return Math.max(lo, Math.min(hi, Number.isFinite(n) ? n : d)); };
   // Souřadnice: undefined nechá, prázdný řetězec nebo null smaže, číslo uloží.
   const coord = (v: any, cur: any, lim: number) => {
     if (v === undefined) return cur ?? null;
