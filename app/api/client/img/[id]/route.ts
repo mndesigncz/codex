@@ -30,7 +30,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const headers: Record<string, string> = {
     'Content-Type': declared,
-    'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+    'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; img-src 'self'; object-src 'none'; sandbox",
   };

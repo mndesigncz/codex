@@ -74,12 +74,12 @@ export async function POST(req: NextRequest) {
   const endTime = TIME_RE.test(String(b.endTime)) ? b.endTime : null;
   try {
     const [row] = await sql`
-      INSERT INTO events (team_id, title, description, kind, date, start_time, end_time, location, offsite, capacity, notes, created_by)
+      INSERT INTO events (team_id, title, description, kind, date, start_time, end_time, location, offsite, capacity, notes, created_by, public)
       VALUES (${u.team_id}, ${title}, ${b.description ? String(b.description).trim().slice(0, 2000) : null},
               ${String(b.kind ?? 'other').slice(0, 20)}, ${date}, ${startTime}, ${endTime},
               ${b.location ? String(b.location).trim().slice(0, 300) : null}, ${b.offsite === true},
               ${Number.isFinite(parseInt(b.capacity)) ? parseInt(b.capacity) : null},
-              ${b.notes ? String(b.notes).trim().slice(0, 1000) : null}, ${u.id})
+              ${b.notes ? String(b.notes).trim().slice(0, 1000) : null}, ${u.id}, ${b.public === true})
       RETURNING *`;
     audit(u.team_id, u.id, 'event.create', 'event', row.id, `${title} · ${date}`);
     const people = await teamPeople(u.team_id);
