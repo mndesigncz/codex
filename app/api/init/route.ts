@@ -1379,6 +1379,13 @@ export async function GET(request: Request) {
     // Pozvi kamaráda: kdo hosta přivedl, a kolik bodů za to podnik dává.
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`;
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS referral_points INTEGER NOT NULL DEFAULT 0`;
+    // Půdorys podniku: podklad (očištěné SVG nebo obrázek), nakreslené zdi
+    // a plochy. Stoly mají navíc tvar, velikost a natočení.
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS floorplan JSONB`;
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_w DOUBLE PRECISION`;
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_h DOUBLE PRECISION`;
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`;
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`;
 
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
