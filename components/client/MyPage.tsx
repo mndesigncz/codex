@@ -113,6 +113,8 @@ export default function MyPage() {
         </div>
       )}
 
+      {card?.code && <InviteCard code={card.code} onFlash={setFlash} />}
+
       {(past.length > 0 || orders.length > 0) && (
         <details className="group">
           <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
@@ -147,8 +149,6 @@ export default function MyPage() {
           </div>
         </details>
       )}
-
-      {card?.code && <InviteCard code={card.code} onFlash={setFlash} />}
 
       <ProfileForm me={d.me} onSaved={(me: any) => { setD({ ...d, me }); setFlash('Uloženo.'); }} />
     </div>
