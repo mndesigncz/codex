@@ -54,6 +54,7 @@ export async function PUT(req: NextRequest) {
       stamp_target = ${num(b.stamp_target, Number(cur.stamp_target), 0, 50)},
       stamp_reward = ${String(b.stamp_reward ?? cur.stamp_reward ?? '').slice(0, 80)},
       birthday_points = ${num(b.birthday_points, Number(cur.birthday_points) || 0, 0, 1000)},
+      referral_points = ${num(b.referral_points, Number(cur.referral_points) || 0, 0, 1000)},
       max_party = ${num(b.max_party, Number(cur.max_party), 1, 40)},
       lead_days = ${num(b.lead_days, Number(cur.lead_days), 1, 180)},
       slot_minutes = ${num(b.slot_minutes, Number(cur.slot_minutes), 15, 120)},

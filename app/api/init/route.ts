@@ -1376,6 +1376,9 @@ export async function GET(request: Request) {
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_y DOUBLE PRECISION`;
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS birthday_points INTEGER NOT NULL DEFAULT 0`;
     await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all'`;
+    // Pozvi kamaráda: kdo hosta přivedl, a kolik bodů za to podnik dává.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS referral_points INTEGER NOT NULL DEFAULT 0`;
 
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu

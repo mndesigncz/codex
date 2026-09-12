@@ -563,7 +563,7 @@ function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
   useEffect(() => { load(); }, [load]);
   const saveRules = async () => {
     setBusy(true);
-    try { await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: p.loyalty_on, points_per_100: p.points_per_100, stamp_target: p.stamp_target, stamp_reward: p.stamp_reward, birthday_points: p.birthday_points }) }); toast('Pravidla věrnosti uložena.'); } catch (e: any) { toast(e.message); }
+    try { await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: p.loyalty_on, points_per_100: p.points_per_100, stamp_target: p.stamp_target, stamp_reward: p.stamp_reward, birthday_points: p.birthday_points, referral_points: p.referral_points }) }); toast('Pravidla věrnosti uložena.'); } catch (e: any) { toast(e.message); }
     setBusy(false);
   };
   const addCoupon = async (e: React.FormEvent) => {
@@ -592,6 +592,10 @@ function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
             <div className="grid grid-cols-[7rem_1fr] gap-3 items-end">
               <div><label htmlFor="l-bday" className={label}>Narozeniny</label><input id="l-bday" type="number" min={0} max={1000} value={p.birthday_points ?? 0} onChange={e => setP({ ...p, birthday_points: e.target.value })} className={input} /></div>
               <p className="text-xs text-black/50 pb-2.5">bodů jako dárek v den narozenin. 0 = nedávat. Datum si host vyplní ve svém účtu.</p>
+            </div>
+            <div className="grid grid-cols-[7rem_1fr] gap-3 items-end">
+              <div><label htmlFor="l-ref" className={label}>Pozvání</label><input id="l-ref" type="number" min={0} max={1000} value={p.referral_points ?? 0} onChange={e => setP({ ...p, referral_points: e.target.value })} className={input} /></div>
+              <p className="text-xs text-black/50 pb-2.5">bodů pro oba, když pozvaný kamarád poprvé vstoupí do tvého podniku. 0 = vypnuto.</p>
             </div>
             <p className="text-xs text-black/50">Razítko přibude, když rezervaci nebo objednávku označíš jako hotovou. Body za útratu přijdou s objednávkami od stolu.</p>
             <Button variant="accent" loading={busy} onClick={saveRules}>Uložit pravidla</Button>

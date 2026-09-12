@@ -3,7 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { sql } from '@/lib/client';
+import { sql, customerByCard } from '@/lib/client';
 import { hit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +23,13 @@ export async function POST(request: Request) {
   const [existing] = await sql`SELECT id FROM users WHERE email = ${email}`;
   if (existing) return NextResponse.json({ error: 'Tenhle e-mail už je zaregistrovaný. Přihlas se.' }, { status: 409 });
   const hash = await bcrypt.hash(password, 12);
+  // Kód od kamaráda (kód jeho kartičky). Špatný kód registraci neshodí —
+  // jen se nezapíše; odměna padá až při prvním členství ve společném podniku.
+  let referredBy: number | null = null;
+  if (b.ref) { try { referredBy = (await customerByCard(String(b.ref)))?.id ?? null; } catch { referredBy = null; } }
   const [u] = await sql`
-    INSERT INTO users (name, email, password_hash, role, avatar, job_title)
-    VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host')
+    INSERT INTO users (name, email, password_hash, role, avatar, job_title, referred_by)
+    VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host', ${referredBy})
     RETURNING id, name, email`;
-  return NextResponse.json({ ok: true, user: u });
+  return NextResponse.json({ ok: true, user: u, referred: !!referredBy });
 }
