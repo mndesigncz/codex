@@ -48,3 +48,15 @@ export const RES_STATUS: Record<string, { label: string; tone: 'wait' | 'ok' | '
   declined:  { label: 'Nepřijato', tone: 'off' },
   cancelled: { label: 'Zrušeno', tone: 'off' },
 };
+
+
+// ---- Úrovně hosta podle návštěv -------------------------------------------
+//
+// Jako v Kartičce: věrnost je vidět. Prahy jsou schválně pevné a nízké —
+// u malého podniku je 25 návštěv opravdový štamgast.
+export function levelFor(visits: number): { id: 'bronze' | 'silver' | 'gold'; label: string } {
+  const v = Number(visits) || 0;
+  if (v >= 25) return { id: 'gold', label: 'Zlatý host' };
+  if (v >= 10) return { id: 'silver', label: 'Stříbrný host' };
+  return { id: 'bronze', label: 'Člen' };
+}

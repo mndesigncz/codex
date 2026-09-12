@@ -4,12 +4,14 @@
 // dělá: rezervace, stoly, členové, věrnost a profil podniku. Stejný
 // designový systém jako zbytek administrace; jen jiná sada obrazovek.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu } from '../ui';
 import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
+import MobileMoreSheet from '../MobileMoreSheet';
+import { levelFor } from '@/lib/clientSlots';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 
@@ -77,6 +79,9 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
   // Jméno hosta z rezervace nebo přehledu otevře Zákazníky s předvyplněným hledáním.
   const [custQ, setCustQ] = useState('');
   const openCustomer = useCallback((q: string) => { setCustQ(q); setTab('customers'); }, []);
+  // Mobil: spodní dock jako ve zbytku aplikace; horní záložky jen na počítači.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const dockIds: Tab[] = ['overview', 'reservations', 'orders'];
   const refreshSummary = useCallback(() => { fetch('/api/client/admin/summary').then(r => r.json()).then(setSummary).catch(() => {}); }, []);
   useEffect(() => { refreshSummary(); }, [refreshSummary, tab]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 4500); return () => clearTimeout(t); } }, [toast]);
@@ -91,11 +96,11 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
         {summary?.attention > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-1 text-[11px] font-bold tabular-nums">{summary.attention} k vyřízení</span>}
         <div className="ml-auto hidden sm:block"><Button variant="secondary" size="sm" icon="external" onClick={() => summary?.slug && window.open(`/client/${summary.slug}`, '_blank')} disabled={!summary?.slug}>Stránka pro hosty</Button></div>
       </header>
-      <div className="px-4 sm:px-6 pb-2">
+      <div className="hidden md:block px-4 sm:px-6 pb-2">
         <Segmented options={TABS.map(t => ({ id: t.id, label: t.label }))} value={tab} onChange={setTab} size="sm" ariaLabel="Části režimu Client" wrap />
       </div>
       {toast && <p role="status" className="mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
-      <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-24 md:pb-8">
+      <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-36 md:pb-8">
         {tab === 'overview' && <Overview summary={summary} go={setTab} onCustomer={openCustomer} />}
         {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} onCustomer={openCustomer} />}
         {tab === 'orders' && (
@@ -109,6 +114,40 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
         {tab === 'loyalty' && <Loyalty toast={setToast} />}
         {tab === 'settings' && <SettingsTab toast={setToast} onChange={refreshSummary} />}
       </main>
+
+      {/* Mobilní spodní dock — stejný jazyk jako administrace a zaměstnanec. */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
+        <nav className="dock-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace klienta">
+          {TABS.filter(t => dockIds.includes(t.id)).map(item => (
+            <button key={item.id} onClick={() => { setTab(item.id); setMoreOpen(false); }} title={item.label}
+              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${tab === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
+              <Icon key={tab === item.id ? 'on' : 'off'} name={item.icon} size={22} strokeWidth={tab === item.id ? 2 : 1.7} className="i-lead" motion={tab === item.id ? 'pop' : undefined} />
+              <span className={`text-[11px] leading-none font-medium ${tab === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{item.label}</span>
+            </button>
+          ))}
+          <button onClick={() => setMoreOpen(v => !v)} title="Více"
+            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${moreOpen || !dockIds.includes(tab) ? 'text-[#16181A]' : 'text-black/40'}`}>
+            <Icon name="menu" size={22} />
+            <span className="text-[11px] leading-none font-medium">Více</span>
+          </button>
+        </nav>
+      </div>
+      <MobileMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        title="Managero client"
+        groups={[
+          { title: 'Provoz', items: TABS.filter(t => t.id === 'tables') },
+          { title: 'Hosté', items: TABS.filter(t => t.id === 'customers' || t.id === 'loyalty') },
+          { title: 'Podnik', items: TABS.filter(t => t.id === 'settings') },
+        ]}
+        activeId={tab}
+        onSelect={id => { setTab(id as Tab); setMoreOpen(false); }}
+        actions={[
+          { label: 'Stránka pro hosty', icon: 'external', onClick: () => { setMoreOpen(false); if (summary?.slug) window.open(`/client/${summary.slug}`, '_blank'); } },
+          { label: 'Zpět do administrace', icon: 'swap', onClick: onExit },
+        ]}
+      />
     </div>
   );
 }
@@ -340,7 +379,81 @@ function Tables({ toast }: { toast: (m: string) => void }) {
               </li>
             ))}
           </ul>}
+      {d !== null && d.tables.length > 0 && <MapEditor tables={d.tables} toast={toast} onSaved={load} />}
     </div>
+  );
+}
+
+/**
+ * Editor plánku stolů: přetažením se stůl posadí tam, kde v podniku stojí.
+ * Souřadnice jsou v procentech, takže plánek sedí na telefonu i na monitoru.
+ * Hosté pak při objednávce klepnou na stůl místo hádání názvů.
+ */
+function MapEditor({ tables, toast, onSaved }: { tables: any[]; toast: (m: string) => void; onSaved: () => void }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const act = useMemo(() => tables.filter((t: any) => t.active), [tables]);
+  const orig = useMemo(() => Object.fromEntries(act.map((t: any) => [t.id, t.map_x != null && t.map_y != null ? { x: Number(t.map_x), y: Number(t.map_y) } : null])) as Record<number, { x: number; y: number } | null>, [act]);
+  const [pos, setPos] = useState(orig);
+  useEffect(() => { setPos(orig); }, [orig]);
+  const [busy, setBusy] = useState(false);
+  const placed = act.filter((t: any) => pos[t.id]);
+  const unplaced = act.filter((t: any) => !pos[t.id]);
+  const same = (a: any, b: any) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const dirty = act.some((t: any) => !same(pos[t.id], orig[t.id]));
+  const move = (id: number, e: React.PointerEvent) => {
+    const el = boxRef.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = Math.max(4, Math.min(96, ((e.clientX - r.left) / r.width) * 100));
+    const y = Math.max(8, Math.min(92, ((e.clientY - r.top) / r.height) * 100));
+    setPos(p => ({ ...p, [id]: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } }));
+  };
+  const save = async () => {
+    setBusy(true);
+    try {
+      for (const t of act) {
+        if (same(pos[t.id], orig[t.id])) continue;
+        const v = pos[t.id];
+        await j('/api/client/admin/tables', { method: 'PATCH', body: JSON.stringify({ id: t.id, map_x: v?.x ?? null, map_y: v?.y ?? null }) });
+      }
+      toast('Plánek stolů uložen. Hosté ho uvidí při objednávce.'); onSaved();
+    } catch (e: any) { toast(e.message); }
+    setBusy(false);
+  };
+  if (!act.length) return null;
+  return (
+    <section className="glass-card p-4 sm:p-5 max-w-2xl">
+      <SectionTitle icon="location" action={dirty ? <Button size="sm" variant="accent" loading={busy} onClick={save}>Uložit plánek</Button> : undefined}>Plánek stolů</SectionTitle>
+      <p className="text-xs text-black/50 -mt-1 mb-3">Přetáhni stoly tak, jak stojí v podniku. Hosté pak při objednávce klepnou na svůj stůl na plánku. Křížkem stůl z plánku sundáš.</p>
+      {unplaced.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-black/50">Mimo plánek:</span>
+          {unplaced.map((t: any) => (
+            <button key={t.id} type="button" onClick={() => setPos(p => ({ ...p, [t.id]: { x: 20 + (t.id % 4) * 18, y: 30 + (t.id % 3) * 18 } }))}
+              className="tap-target-sm rounded-full bg-black/[0.05] hover:bg-black/[0.09] px-3 py-1.5 text-xs font-semibold transition">+ {t.name}</button>
+          ))}
+        </div>
+      )}
+      <div ref={boxRef} className="relative w-full aspect-[3/2] rounded-3xl border border-black/[0.08] bg-white/60 overflow-hidden touch-none select-none"
+        style={{ backgroundImage: 'radial-gradient(rgba(22,24,26,0.07) 1px, transparent 1px)', backgroundSize: '18px 18px' }}>
+        {placed.map((t: any) => {
+          const v = pos[t.id]!;
+          const shape = t.seats >= 5 ? 'rounded-2xl px-3 py-2.5 text-xs' : 'rounded-full px-3 py-2 text-[11px]';
+          return (
+            <div key={t.id} style={{ left: `${v.x}%`, top: `${v.y}%` }} className="absolute -translate-x-1/2 -translate-y-1/2">
+              <button type="button" aria-label={`Stůl ${t.name} — přetáhni na místo`}
+                onPointerDown={e => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
+                onPointerMove={e => { if (e.buttons === 1) move(t.id, e); }}
+                className={`tap-target-sm inline-flex items-center whitespace-nowrap font-bold leading-none border bg-white text-[#16181A] border-black/[0.12] shadow-sm cursor-grab active:cursor-grabbing active:shadow-lg transition-shadow ${shape}`}>
+                {t.name}
+              </button>
+              <button type="button" onClick={() => setPos(p => ({ ...p, [t.id]: null }))} aria-label={`Sundat stůl ${t.name} z plánku`}
+                className="tap-target-sm absolute -top-1.5 -right-1.5 h-5 w-5 grid place-items-center rounded-full bg-[#16181A] text-white text-[11px] leading-none shadow"><Icon name="close" size={9} /></button>
+            </div>
+          );
+        })}
+        {placed.length === 0 && <p className="absolute inset-0 grid place-items-center text-sm text-black/40 px-6 text-center">Klepni nahoře na stůl a pak ho přetáhni na místo.</p>}
+      </div>
+    </section>
   );
 }
 
@@ -396,7 +509,7 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
                 <div className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center">
                   <Initials name={c.name} size={36} />
                   <div className="min-w-0">
-                    <p className="font-semibold truncate">{c.name}</p>
+                    <p className="font-semibold truncate flex items-center gap-2">{c.name}{levelFor(Number(c.visits)).id !== 'bronze' && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${levelFor(Number(c.visits)).id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{levelFor(Number(c.visits)).label}</span>}</p>
                     <p className="text-xs text-black/55 break-words md:truncate">{c.email} · člen od {new Date(c.joined_at).toLocaleDateString('cs-CZ')}{c.last_visit_at ? ` · naposledy ${new Date(c.last_visit_at).toLocaleDateString('cs-CZ')}` : ''}</p>
                   </div>
                   <div className="text-right tabular-nums">
@@ -450,7 +563,7 @@ function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
   useEffect(() => { load(); }, [load]);
   const saveRules = async () => {
     setBusy(true);
-    try { await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: p.loyalty_on, points_per_100: p.points_per_100, stamp_target: p.stamp_target, stamp_reward: p.stamp_reward }) }); toast('Pravidla věrnosti uložena.'); } catch (e: any) { toast(e.message); }
+    try { await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: p.loyalty_on, points_per_100: p.points_per_100, stamp_target: p.stamp_target, stamp_reward: p.stamp_reward, birthday_points: p.birthday_points }) }); toast('Pravidla věrnosti uložena.'); } catch (e: any) { toast(e.message); }
     setBusy(false);
   };
   const addCoupon = async (e: React.FormEvent) => {
@@ -476,6 +589,10 @@ function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
               <div><label htmlFor="l-stamps" className={label}>Razítek do odměny</label><input id="l-stamps" type="number" min={0} max={50} value={p.stamp_target} onChange={e => setP({ ...p, stamp_target: e.target.value })} className={input} /></div>
             </div>
             <div><label htmlFor="l-reward" className={label}>Odměna za razítka</label><input id="l-reward" value={p.stamp_reward ?? ''} onChange={e => setP({ ...p, stamp_reward: e.target.value })} placeholder="Nápoj zdarma" className={input} /></div>
+            <div className="grid grid-cols-[7rem_1fr] gap-3 items-end">
+              <div><label htmlFor="l-bday" className={label}>Narozeniny</label><input id="l-bday" type="number" min={0} max={1000} value={p.birthday_points ?? 0} onChange={e => setP({ ...p, birthday_points: e.target.value })} className={input} /></div>
+              <p className="text-xs text-black/50 pb-2.5">bodů jako dárek v den narozenin. 0 = nedávat. Datum si host vyplní ve svém účtu.</p>
+            </div>
             <p className="text-xs text-black/50">Razítko přibude, když rezervaci nebo objednávku označíš jako hotovou. Body za útratu přijdou s objednávkami od stolu.</p>
             <Button variant="accent" loading={busy} onClick={saveRules}>Uložit pravidla</Button>
           </section>
@@ -660,14 +777,15 @@ function Reviews() {
 
 function Broadcast({ toast }: { toast: (m: string) => void }) {
   const [d, setD] = useState<any | null>(null);
-  const [f, setF] = useState({ title: '', body: '' }); const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ title: '', body: '', audience: 'all' }); const [busy, setBusy] = useState(false);
   const load = useCallback(() => fetch('/api/client/admin/broadcast').then(r => r.json()).then(setD).catch(() => setD({ history: [], members: 0 })), []);
   useEffect(() => { load(); }, [load]);
+  const target = f.audience === 'quiet' ? (d?.quiet ?? 0) : f.audience === 'gold' ? (d?.gold ?? 0) : (d?.members ?? 0);
   const send = async (e: React.FormEvent) => {
     e.preventDefault(); if (!f.title.trim()) return;
-    if (!confirm(`Poslat zprávu všem členům (${d?.members ?? 0})?`)) return;
+    if (!confirm(`Poslat zprávu ${target} členům?`)) return;
     setBusy(true);
-    try { const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) }); toast(`Odesláno ${r.broadcast.recipients} členům.`); setF({ title: '', body: '' }); load(); } catch (e: any) { toast(e.message); }
+    try { const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) }); toast(`Odesláno ${r.broadcast.recipients} členům.`); setF({ title: '', body: '', audience: 'all' }); load(); } catch (e: any) { toast(e.message); }
     setBusy(false);
   };
   if (!d) return <PageSkel />;
@@ -677,7 +795,14 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
         <form onSubmit={send} className="glass-card p-5 grid gap-3">
           <div><label htmlFor="bc-title" className={label}>Nadpis</label><input id="bc-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Nový čaj z jarní sklizně" maxLength={80} className={input} /></div>
           <div><label htmlFor="bc-body" className={label}>Text</label><textarea id="bc-body" value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="Tento týden ochutnávka zdarma ke každé konvici." maxLength={300} rows={3} className={`${input} resize-none`} /></div>
-          <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!d.members}>Poslat {d.members} {d.members === 1 ? 'členovi' : 'členům'}</Button>
+          <div><label htmlFor="bc-aud" className={label}>Komu</label>
+            <select id="bc-aud" value={f.audience} onChange={e => setF({ ...f, audience: e.target.value })} className={input}>
+              <option value="all">Všem členům ({d.members})</option>
+              <option value="quiet">Kdo dlouho nebyl — 30 a víc dní ({d.quiet ?? 0})</option>
+              <option value="gold">Zlatým hostům — 25+ návštěv ({d.gold ?? 0})</option>
+            </select>
+            <p className="text-xs text-black/50 mt-1">Zpráva se objeví i v Novinkách na tvé stránce pro hosty.</p></div>
+          <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!target}>Poslat {target} {target === 1 ? 'členovi' : 'členům'}</Button>
         </form>
         <section>
           <SectionTitle icon="mail">Odeslané</SectionTitle>
@@ -686,7 +811,7 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
                 <li key={h.id} className="py-3">
                   <p className="font-semibold leading-tight">{h.title}</p>
                   {h.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{h.body}</p>}
-                  <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(h.sent_at)} · {h.recipients} {h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}</p>
+                  <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(h.sent_at)} · {h.recipients} {h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}{h.audience === 'quiet' ? ' · kdo dlouho nebyl' : h.audience === 'gold' ? ' · zlatí hosté' : ''}</p>
                 </li>))}</ul>}
         </section>
       </div>

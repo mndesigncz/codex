@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Segmented, Skeleton, EmptyState } from '../ui';
 import { Initials } from './ClientShell';
+import TableMap, { placedTables } from './TableMap';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 
@@ -85,7 +86,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
           <div className="shrink-0">
             {me?.member ? (
               <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : 'bg-[#C8F542]/20 border border-[#C8F542]/40'}`}>
-                <p className="text-[11px] uppercase tracking-wider opacity-70">Člen</p>
+                <p className="text-[11px] uppercase tracking-wider opacity-70">{me.levelLabel ?? 'Člen'}</p>
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} b. <span className="opacity-60 font-medium text-sm">· {me.stamps}/{b.stampTarget || '–'} razítek</span></p>
               </div>
             ) : (
@@ -99,7 +100,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel="Části stránky podniku" />}
 
-      {tab === 'menu' && <MenuTab menu={d.menu} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
+      {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
       {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
       {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
@@ -107,7 +108,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
   );
 }
 
-function MenuTab({ menu, tagline, address, description, hours, currency }: { menu: any; tagline: string; address: string; description: string; hours: any; currency: string }) {
+function MenuTab({ menu, news, tagline, address, description, hours, currency }: { menu: any; news?: any[]; tagline: string; address: string; description: string; hours: any; currency: string }) {
   const cur = currency === 'CZK' ? 'Kč' : currency;
   return (
     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 md:gap-10 items-start">
@@ -134,6 +135,20 @@ function MenuTab({ menu, tagline, address, description, hours, currency }: { men
         {description && <p className="text-sm text-black/65 leading-relaxed text-pretty">{description}</p>}
         {address && <p className="text-sm text-black/65 inline-flex items-center gap-1.5"><Icon name="location" size={15} className="text-black/45" />{address}</p>}
         <div>
+          {(news?.length ?? 0) > 0 && (
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Novinky</p>
+              <ul className="space-y-3">
+                {news!.map((n: any) => (
+                  <li key={n.id}>
+                    <p className="font-semibold text-sm leading-tight">{n.title}</p>
+                    {n.body && <p className="text-sm text-black/60 text-pretty">{n.body}</p>}
+                    <p className="text-xs text-black/40 mt-0.5"><span className="cz-sentence">{czDay(String(n.sent_at).slice(0, 10), true)}</span></p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Otevírací doba</p>
           <ul className="text-sm divide-y divide-black/[0.06]">
             {DAY_NAMES.map((n, i) => {
@@ -420,6 +435,7 @@ function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b
             <>
               <p className={label}>Kde sedíš</p>
               <p className="text-lg font-bold tracking-tight flex items-center gap-2"><span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm">{qrTable.name}</span><span className="text-sm font-medium text-black/50">podle QR na stole</span></p>
+              <TableMap tables={tables} selectedId={qrTable.id} caption="Tvůj stůl na plánku podniku." />
             </>
           ) : qrOnly ? (
             <>
@@ -430,11 +446,15 @@ function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b
           ) : (
             <>
               <label htmlFor="o-table" className={label}>Kde sedíš</label>
-              <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input}>
-                <option value="">Vyber stůl</option>
+              {placedTables(tables).length > 0 && (
+                <TableMap tables={tables} selectedId={tableId || null} onPick={id => setTableId(id)}
+                  caption="Klepni na stůl, u kterého sedíš." />
+              )}
+              <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input} aria-label="Stůl ze seznamu">
+                <option value="">{placedTables(tables).length ? 'Nebo vyber ze seznamu' : 'Vyber stůl'}</option>
                 {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
-              <p className="text-xs text-black/45">Číslo stolu bývá na cedulce na stole.</p>
+              {placedTables(tables).length === 0 && <p className="text-xs text-black/45">Číslo stolu bývá na cedulce na stole.</p>}
             </>
           )}
           {geoMode !== 'off' && (!qrOnly || token) && (

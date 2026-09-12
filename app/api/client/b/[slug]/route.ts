@@ -2,6 +2,7 @@
 // objednává), moje členství, moje nadcházející rezervace a kupony k vyzvednutí.
 
 import { NextResponse } from 'next/server';
+import { levelFor } from '@/lib/clientSlots';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 
@@ -46,7 +47,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
 
   const [menu, tables, coupons] = await Promise.all([
     menuFor(teamId, p.menu_slug ?? null),
-    p.ordering_on ? sql`SELECT id, name, seats FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
+    p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
     p.loyalty_on ? sql`SELECT id, title, description, cost_points, kind, valid_until FROM client_coupons
                        WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND (valid_until IS NULL OR valid_until >= ${today})
                        ORDER BY cost_points, id` : Promise.resolve([]),
@@ -62,10 +63,16 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
     const claims = await sql`
       SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;
+    const lvl = levelFor(Number(m?.visits ?? 0));
     mine = {
       member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
+      level: lvl.id, levelLabel: lvl.label,
       reservations, claims,
     };
   }
-  return NextResponse.json({ business: publicProfile(p), menu, tables, coupons, me: mine, signedIn: !!me, today });
+  // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
+  // ať mají co číst i hosté bez zapnutých oznámení.
+  let news: any[] = [];
+  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
+  return NextResponse.json({ business: publicProfile(p), menu, tables, coupons, news, me: mine, signedIn: !!me, today });
 }
