@@ -74,7 +74,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
             <Initials name={hit.customer.name} size={40} />
             <div className="min-w-0 flex-1">
               <p className="font-bold leading-tight truncate">{hit.customer.name}</p>
-              <p className="text-sm text-black/55 tabular-nums">{hit.member ? `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv` : 'Ještě není členem. Prvním razítkem se stane.'}</p>
+              <p className="text-sm text-black/55 tabular-nums">{hit.member ? `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv${hit.levelLabel && hit.levelLabel !== 'Člen' ? ` · ${hit.levelLabel}` : ''}` : 'Ještě není členem. Prvním razítkem se stane.'}</p>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

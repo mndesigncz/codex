@@ -9,7 +9,7 @@ import { Initials } from './ClientShell';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
-import { czDay, RES_STATUS } from '@/lib/clientSlots';
+import { czDay, RES_STATUS, levelFor } from '@/lib/clientSlots';
 
 const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
 const label = 'block text-xs font-semibold text-black/55 mb-1.5';
@@ -63,7 +63,7 @@ export default function MyPage() {
                     <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="text-lg font-bold tracking-tight leading-tight truncate">{m.name}</p>
-                      <p className="text-sm text-black/55 mt-0.5">{m.visits} {plural(m.visits, 'návštěva', 'návštěvy', 'návštěv')}{m.lastVisitAt ? ` · naposledy ${new Date(m.lastVisitAt).toLocaleDateString('cs-CZ')}` : ''}</p>
+                      <p className="text-sm text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">{levelFor(Number(m.visits)).id !== 'bronze' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${levelFor(Number(m.visits)).id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{levelFor(Number(m.visits)).label}</span>}<span>{m.visits} {plural(m.visits, 'návštěva', 'návštěvy', 'návštěv')}{m.lastVisitAt ? ` · naposledy ${new Date(m.lastVisitAt).toLocaleDateString('cs-CZ')}` : ''}</span></p>
                     </div>
                     <p className="text-xl font-bold tabular-nums leading-tight shrink-0">{m.points} <span className="text-sm font-medium text-black/50">b.</span></p>
                   </div>

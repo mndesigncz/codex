@@ -11,8 +11,12 @@ export async function GET() {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const history = await sql`SELECT * FROM client_broadcasts WHERE team_id = ${u.team_id} ORDER BY sent_at DESC LIMIT 50`;
-  const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
-  return NextResponse.json({ history, members: Number(n) || 0 });
+  const [c] = await sql`
+    SELECT COUNT(*)::int AS members,
+           COUNT(*) FILTER (WHERE last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')::int AS quiet,
+           COUNT(*) FILTER (WHERE visits >= 25)::int AS gold
+    FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
+  return NextResponse.json({ history, members: Number(c?.members) || 0, quiet: Number(c?.quiet) || 0, gold: Number(c?.gold) || 0 });
 }
 export async function POST(req: NextRequest) {
   const u = await employer();
@@ -24,9 +28,16 @@ export async function POST(req: NextRequest) {
   const body = String(b.body ?? '').trim().slice(0, 300);
   if (!title) return NextResponse.json({ error: 'Zpráva potřebuje nadpis.' }, { status: 400 });
   const [p] = await sql`SELECT slug FROM client_profiles WHERE team_id = ${u.team_id}`;
-  const ids = (await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${u.team_id}` as any[]).map(r => Number(r.customer_id));
+  // Publikum: všem, těm, kdo dlouho nebyli (probuzení), nebo zlatým hostům.
+  const audience = ['all', 'quiet', 'gold'].includes(String(b.audience)) ? String(b.audience) : 'all';
+  const rows = audience === 'quiet'
+    ? await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${u.team_id} AND (last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')`
+    : audience === 'gold'
+      ? await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${u.team_id} AND visits >= 25`
+      : await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${u.team_id}`;
+  const ids = (rows as any[]).map(r => Number(r.customer_id));
   if (ids.length) await notifyUsers(ids, { title, body: body || undefined, link: p ? `/client/${p.slug}` : '/client', type: 'info', category: 'general' });
-  const [row] = await sql`INSERT INTO client_broadcasts (team_id, title, body, recipients, sent_by) VALUES (${u.team_id}, ${title}, ${body || null}, ${ids.length}, ${u.id}) RETURNING *`;
-  audit(u.team_id, u.id, 'client.broadcast', 'client', null, `${title} · ${ids.length} členů`);
+  const [row] = await sql`INSERT INTO client_broadcasts (team_id, title, body, recipients, sent_by, audience) VALUES (${u.team_id}, ${title}, ${body || null}, ${ids.length}, ${u.id}, ${audience}) RETURNING *`;
+  audit(u.team_id, u.id, 'client.broadcast', 'client', null, `${title} · ${ids.length} členů (${audience})`);
   return NextResponse.json({ ok: true, broadcast: row });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { awardBirthdays } from '@/lib/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -1369,12 +1370,24 @@ export async function GET(request: Request) {
     await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS via_qr BOOLEAN NOT NULL DEFAULT FALSE`;
     await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_status TEXT`;
     await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`;
+    // Mapa stolů (souřadnice v procentech plánku), narozeninová odměna a
+    // publikum zpráv členům (všichni / dlouho nebyli / zlatí hosté).
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_x DOUBLE PRECISION`;
+    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_y DOUBLE PRECISION`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS birthday_points INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all'`;
 
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
     // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;
     // starý se po prvním úspěšném přihlášení sám přepíše a vyprázdní.
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT`;
+
+    // Narozeninové odměny: init běží denně jako cron, tak se tu po migracích
+    // připíšou dárky členům, kteří mají dnes narozeniny. Jednou za rok na
+    // člena a podnik (hlídá deník), takže opakované volání nic nerozdá dvakrát.
+    let birthdays = 0;
+    try { birthdays = await awardBirthdays(); } catch { /* nesmí shodit migrace */ }
 
     // Which build actually ran the migrations. `ok: true` alone is ambiguous —
     // an older deployment still answering during a rollout returns it too, and
@@ -1390,6 +1403,7 @@ export async function GET(request: Request) {
       closingIndex,
       closingIndexes,
       closingConstraints,
+      birthdays,
     });
   } catch (error) {
     console.error('Init error:', error);

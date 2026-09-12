@@ -6,6 +6,8 @@ import { getConnection, listDesks } from '@/lib/storyous';
 import { randomBytes } from 'crypto';
 
 /** Tajný kód stolu do QR: bez něj odkaz z domova objednat nedovolí. */
+/** Souřadnice na plánku: procenta 0–100, null = stůl na plánku není. */
+const coordPct = (v: any) => { if (v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.max(2, Math.min(98, Math.round(n * 10) / 10)) : null; };
 const tableToken = () => randomBytes(8).toString('base64url').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10).padEnd(10, 'X');
 
 export const dynamic = 'force-dynamic';
@@ -60,7 +62,9 @@ export async function PATCH(req: NextRequest) {
       seats = ${b.seats != null ? Math.max(1, Math.min(40, parseInt(String(b.seats), 10) || cur.seats)) : cur.seats},
       active = ${b.active != null ? !!b.active : cur.active},
       storyous_desk_id = ${b.storyous_desk_id !== undefined ? (b.storyous_desk_id ? String(b.storyous_desk_id) : null) : cur.storyous_desk_id},
-      token = ${b.rotate_token ? tableToken() : (cur.token ?? tableToken())}
+      token = ${b.rotate_token ? tableToken() : (cur.token ?? tableToken())},
+      map_x = ${b.map_x !== undefined ? coordPct(b.map_x) : cur.map_x},
+      map_y = ${b.map_y !== undefined ? coordPct(b.map_y) : cur.map_y}
     WHERE id = ${id} RETURNING *`;
   return NextResponse.json({ ok: true, table: t });
 }

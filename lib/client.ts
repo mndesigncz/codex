@@ -12,7 +12,8 @@ import { neon } from '@neondatabase/serverless';
 import { getServerSession } from 'next-auth';
 import { randomBytes } from 'crypto';
 import { authOptions } from './auth';
-import { notifyUsers } from './push';
+import { notifyUser, notifyUsers } from './push';
+import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
 
 // Veřejné routy hosta (podnik podle adresy, seznam podniků) sahají do
@@ -158,7 +159,7 @@ export async function join(customerId: number, teamId: number): Promise<any> {
   return m;
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome';
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday';
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod
@@ -263,4 +264,38 @@ export async function customerByCard(code: string): Promise<{ id: number; name: 
   if (!norm) return null;
   const [row] = await sql`SELECT u.id, u.name FROM client_cards c JOIN users u ON u.id = c.customer_id WHERE c.code = ${norm}`;
   return row ? { id: Number(row.id), name: String(row.name) } : null;
+}
+
+
+/**
+ * Dárek k narozeninám: členům, kteří mají dnes narozeniny, se připíšou body
+ * podniku (birthday_points > 0). Volá se z denního cronu; deník hlídá, že
+ * každý dostane nejvýš jednou za rok na podnik.
+ */
+export async function awardBirthdays(): Promise<number> {
+  const today = pragueToday();
+  const md = today.slice(5); const year = today.slice(0, 4);
+  const rows = await sql`
+    SELECT m.customer_id, m.team_id, p.birthday_points, p.slug, COALESCE(t.name, 'podniku') AS team_name
+    FROM client_memberships m
+    JOIN client_profiles p ON p.team_id = m.team_id AND p.enabled = TRUE AND p.loyalty_on = TRUE AND p.birthday_points > 0
+    LEFT JOIN teams t ON t.id = m.team_id
+    JOIN users us ON us.id = m.customer_id
+    WHERE us.birthday IS NOT NULL AND substr(us.birthday, 6, 5) = ${md}
+      AND NOT EXISTS (
+        SELECT 1 FROM client_loyalty_ledger l
+        WHERE l.team_id = m.team_id AND l.customer_id = m.customer_id AND l.kind = 'birthday' AND l.ref = ${'bday:' + year})` as any[];
+  let n = 0;
+  for (const r of rows) {
+    try {
+      await award(Number(r.team_id), Number(r.customer_id), Number(r.birthday_points), 'birthday', `bday:${year}`, 'Dárek k narozeninám');
+      notifyUser(Number(r.customer_id), {
+        title: `Všechno nejlepší! ${r.birthday_points} bodů od ${r.team_name}`,
+        body: 'Dárek k narozeninám máš na kartičce.',
+        link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'success',
+      }).catch(() => {});
+      n++;
+    } catch { /* další člen; nepovedené připsání nesmí zastavit ostatní */ }
+  }
+  return n;
 }

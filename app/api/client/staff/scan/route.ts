@@ -2,6 +2,7 @@
 // a jedním klepnutím dá razítko za návštěvu nebo body za útratu. Razítko
 // nejvýš jedno denně; body podle pravidel podniku (bodů za 100 Kč).
 import { NextRequest, NextResponse } from 'next/server';
+import { levelFor } from '@/lib/clientSlots';
 import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, stampVisit, normalizeCardCode } from '@/lib/client';
 import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
@@ -14,6 +15,7 @@ async function summary(teamId: number, customerId: number) {
   const last = parseDbTime(m?.last_visit_at);
   return {
     member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
+    levelLabel: levelFor(Number(m?.visits ?? 0)).label,
     stampedToday: !!last && pragueDayOf(last) === pragueToday(), openCoupons: claims,
   };
 }

@@ -43,11 +43,14 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               <span className="hidden min-[360px]:inline font-bold tracking-tight leading-none">Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>
             <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label="Zákaznická navigace">
+              {/* Na mobilu žijí záložky ve spodním docku jako ve zbytku
+                  aplikace; nahoře zůstává jen značka a účet. Nepřihlášený
+                  dock nemá, tak mu odkaz Podniky zůstává i na telefonu. */}
               <Link href="/client" aria-current={active('/client') && path === '/client' ? 'page' : undefined}
-                className={`tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>Podniky</Link>
+                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>Podniky</Link>
               {me && (
                 <Link href="/client/me" aria-current={active('/client/me') ? 'page' : undefined}
-                  className={`tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>Moje</Link>
+                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>Moje</Link>
               )}
               {me ? (
                 <div className="relative ml-1">
@@ -76,12 +79,30 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">{children}</main>
-      <footer className="mx-auto max-w-5xl w-full px-4 sm:px-6 py-8 text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1">
+      <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-10">{children}</main>
+      <footer className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
         <span>Managero client</span>
         <span>Rezervace, věrnost a objednávky pro podniky, kam chodíš.</span>
         <Link href="/" className="tap-target-sm ml-auto inline-flex items-center hover:text-black">Jsem podnik</Link>
       </footer>
+
+      {/* Mobilní spodní dock — stejný jazyk jako administrace. */}
+      {me && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
+          <nav className="dock-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace">
+            {([
+              { href: '/client', label: 'Podniky', icon: 'location', on: path === '/client' || (!!path?.startsWith('/client/') && !path.startsWith('/client/me')) },
+              { href: '/client/me', label: 'Moje', icon: 'card', on: !!path?.startsWith('/client/me') },
+            ] as const).map(i => (
+              <Link key={i.href} href={i.href} title={i.label}
+                className={`flex flex-col items-center gap-1 rounded-2xl px-6 py-1.5 transition-all duration-200 ${i.on ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
+                <Icon key={i.on ? 'on' : 'off'} name={i.icon} size={22} strokeWidth={i.on ? 2 : 1.7} className="i-lead" motion={i.on ? 'pop' : undefined} />
+                <span className={`text-[11px] leading-none font-medium ${i.on ? 'text-[#16181A]' : 'text-black/40'}`}>{i.label}</span>
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
     </div>
   );
 }
