@@ -31,6 +31,13 @@ export async function PUT(req: NextRequest) {
   }
   // „|| d" bralo nulu jako nevyplněno — narozeninové body (0 = nedávat),
   // body za útratu i cíl razítek pak nešly vypnout.
+  // Adresa obrázku: buď naše vlastní (/api/client/img/<id>), nebo https.
+  // Cokoli jiného (data:, javascript:, relativní cesta jinam) se zahodí.
+  const imgUrl = (v: any) => { const u = String(v || '').trim().slice(0, 300); return /^\/api\/client\/img\/\d+$/.test(u) || /^https:\/\/[^\s"'<>]+$/.test(u) ? u : ''; };
+  // Galerie: nejvýš osm obrázků, jen naše vlastní adresy.
+  const gallery = (v: any) => (Array.isArray(v) ? v : []).map(x => String(x || '')).filter(x => /^\/api\/client\/img\/\d+$/.test(x)).slice(0, 8);
+  // Barva značky: jen šestimístný zápis, ať se do stylu nedostane nic jiného.
+  const accent = (v: any) => { const c = String(v || '').trim(); return /^#[0-9a-fA-F]{6}$/.test(c) ? c.toUpperCase() : null; };
   const num = (v: any, d: number, lo: number, hi: number) => { const n = parseInt(String(v ?? d), 10); return Math.max(lo, Math.min(hi, Number.isFinite(n) ? n : d)); };
   // Souřadnice: undefined nechá, prázdný řetězec nebo null smaže, číslo uloží.
   const coord = (v: any, cur: any, lim: number) => {
@@ -46,7 +53,7 @@ export async function PUT(req: NextRequest) {
       tagline = ${String(b.tagline ?? cur.tagline ?? '').slice(0, 120)},
       description = ${String(b.description ?? cur.description ?? '').slice(0, 1200)},
       address = ${String(b.address ?? cur.address ?? '').slice(0, 200)},
-      cover_url = ${String(b.cover_url ?? cur.cover_url ?? '').slice(0, 500)},
+      cover_url = ${b.cover_url !== undefined ? imgUrl(b.cover_url) : String(cur.cover_url ?? '')},
       reservations_on = ${b.reservations_on != null ? !!b.reservations_on : cur.reservations_on},
       ordering_on = ${b.ordering_on != null ? !!b.ordering_on : cur.ordering_on},
       loyalty_on = ${b.loyalty_on != null ? !!b.loyalty_on : cur.loyalty_on},
@@ -55,6 +62,9 @@ export async function PUT(req: NextRequest) {
       stamp_reward = ${String(b.stamp_reward ?? cur.stamp_reward ?? '').slice(0, 80)},
       birthday_points = ${num(b.birthday_points, Number(cur.birthday_points) || 0, 0, 1000)},
       referral_points = ${num(b.referral_points, Number(cur.referral_points) || 0, 0, 1000)},
+      logo_url = ${b.logo_url !== undefined ? (imgUrl(b.logo_url) || null) : cur.logo_url},
+      gallery = ${b.gallery !== undefined ? JSON.stringify(gallery(b.gallery)) : JSON.stringify(cur.gallery ?? [])},
+      accent = ${b.accent !== undefined ? (accent(b.accent) ?? null) : cur.accent},
       max_party = ${num(b.max_party, Number(cur.max_party), 1, 40)},
       lead_days = ${num(b.lead_days, Number(cur.lead_days), 1, 180)},
       slot_minutes = ${num(b.slot_minutes, Number(cur.slot_minutes), 15, 120)},

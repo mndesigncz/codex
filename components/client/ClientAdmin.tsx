@@ -12,18 +12,24 @@ import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
+import BrandTab from './BrandTab';
+import MenuEditor from '../employer/MenuEditor';
+import EventsView from '../employer/EventsView';
 import { levelFor } from '@/lib/clientSlots';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 
-type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'customers' | 'loyalty' | 'settings';
+type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'overview', label: 'Přehled', icon: 'overview' },
   { id: 'reservations', label: 'Rezervace', icon: 'calendarCheck' },
   { id: 'orders', label: 'Objednávky', icon: 'cup' },
   { id: 'tables', label: 'Stoly', icon: 'location' },
+  { id: 'menu', label: 'Menu', icon: 'leaf' },
+  { id: 'events', label: 'Akce', icon: 'calendarCheck' },
   { id: 'customers', label: 'Zákazníci', icon: 'users' },
   { id: 'loyalty', label: 'Věrnost', icon: 'gift' },
+  { id: 'brand', label: 'Vzhled', icon: 'sparkle' },
   { id: 'settings', label: 'Nastavení', icon: 'settings' },
 ];
 
@@ -70,7 +76,7 @@ async function j(url: string, init?: RequestInit) {
   return d;
 }
 
-export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void; initialTab?: string }) {
+export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () => void; initialTab?: string; user?: { id?: string } }) {
   const [tab, setTab] = useState<Tab>((TABS.some(t => t.id === initialTab) ? initialTab : 'overview') as Tab);
   // Správa Managero client je světlá i při tmavém motivu účtu (viz ThemeProvider).
   const { setForcedLight } = useTheme();
@@ -111,8 +117,23 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
           </div>
         )}
         {tab === 'tables' && <Tables toast={setToast} />}
+        {/* Menu i Akce si nesou vlastní nadpis, tak jim tu druhý nepřidáváme —
+            jen jednou větou řekneme, co to v Client znamená. */}
+        {tab === 'menu' && (
+          <div className="space-y-3">
+            <p className="text-sm text-black/55 max-w-[70ch]">Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek.</p>
+            <MenuEditor />
+          </div>
+        )}
+        {tab === 'events' && (
+          <div className="space-y-3">
+            <p className="text-sm text-black/55 max-w-[70ch]">Co se v podniku koná. Akce označená jako veřejná se ukáže hostům na stránce podniku.</p>
+            <EventsView user={(user ?? {}) as any} />
+          </div>
+        )}
         {tab === 'customers' && <Customers toast={setToast} initialQuery={custQ} />}
         {tab === 'loyalty' && <Loyalty toast={setToast} />}
+        {tab === 'brand' && <BrandTab toast={setToast} onChange={refreshSummary} />}
         {tab === 'settings' && <SettingsTab toast={setToast} onChange={refreshSummary} />}
       </main>
 
@@ -138,9 +159,9 @@ export default function ClientAdmin({ onExit, initialTab }: { onExit: () => void
         onClose={() => setMoreOpen(false)}
         title="Managero client"
         groups={[
-          { title: 'Provoz', items: TABS.filter(t => t.id === 'tables') },
+          { title: 'Provoz', items: TABS.filter(t => t.id === 'tables' || t.id === 'menu' || t.id === 'events') },
           { title: 'Hosté', items: TABS.filter(t => t.id === 'customers' || t.id === 'loyalty') },
-          { title: 'Podnik', items: TABS.filter(t => t.id === 'settings') },
+          { title: 'Podnik', items: TABS.filter(t => t.id === 'brand' || t.id === 'settings') },
         ]}
         activeId={tab}
         onSelect={id => { setTab(id as Tab); setMoreOpen(false); }}
@@ -574,7 +595,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);
     try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, tagline: p.tagline, description: p.description, address: p.address, cover_url: p.cover_url, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null,
+      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null,
         order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos }) });
       setP(r.profile); setD({ ...d, url: r.url }); toast(r.profile.enabled ? 'Uloženo. Podnik je pro hosty zapnutý.' : 'Uloženo. Podnik je zatím vypnutý.'); onChange();
     } catch (e: any) { toast(e.message); }
@@ -608,20 +629,14 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
         {!hoursOk && <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 px-3 py-2">Podnik nemá vyplněnou otevírací dobu (Rozvrh → Otevírací doba). Bez ní hosté nemůžou rezervovat.</p>}
       </section>
       <section className="glass-card p-5 grid gap-4">
-        <h2 className="font-bold tracking-tight">Profil</h2>
-        <div><label htmlFor="s-tag" className={label}>Motto</label><input id="s-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." className={input} maxLength={120} /></div>
-        <div><label htmlFor="s-desc" className={label}>O podniku</label><textarea id="s-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} className={input} maxLength={1200} /></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label htmlFor="s-addr" className={label}>Adresa</label><input id="s-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} className={input} /></div>
-          <div><label htmlFor="s-cover" className={label}>Fotka (adresa obrázku)</label><input id="s-cover" value={p.cover_url ?? ''} onChange={e => setP({ ...p, cover_url: e.target.value })} placeholder="https://…" className={input} /></div>
-        </div>
+        <h2 className="font-bold tracking-tight">Nabídka pro hosty</h2>
         <div>
-          <label htmlFor="s-menu" className={label}>Nabídka pro hosty</label>
+          <label htmlFor="s-menu" className={label}>Které menu se hostům ukáže</label>
           <select id="s-menu" value={p.menu_slug ?? ''} onChange={e => setP({ ...p, menu_slug: e.target.value })} className={input}>
             <option value="">První zapnuté menu</option>
             {(d.boards ?? []).map((b: any) => <option key={b.slug} value={b.slug}>{b.name}</option>)}
           </select>
-          <p className="text-xs text-black/50 mt-1">Bere se z obrazovky Menu. Bez menu se hostům ukáže jen profil.</p>
+          <p className="text-xs text-black/50 mt-1">Nabídku spravuješ v záložce Menu. Logo, fotky a text o podniku najdeš ve Vzhledu.</p>
         </div>
       </section>
       <section className="glass-card p-5 grid gap-4">

@@ -73,8 +73,18 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   }
   // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
   // ať mají co číst i hosté bez zapnutých oznámení.
+  // Veřejné akce podniku: co se tam koná a na co host může přijít.
+  let events: any[] = [];
+  try {
+    events = await sql`
+      SELECT id, title, description, kind, date, start_time, end_time, location, capacity
+      FROM events
+      WHERE team_id = ${teamId} AND public = TRUE AND status <> 'cancelled' AND date >= ${today}
+      ORDER BY date, start_time NULLS LAST LIMIT 6` as any[];
+  } catch { events = []; }
+
   let news: any[] = [];
   try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
   const plan = p.floorplan && p.ordering_on ? normalizePlan(p.floorplan) : null;
-  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons, news, me: mine, signedIn: !!me, today });
+  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons, news, events, me: mine, signedIn: !!me, today });
 }

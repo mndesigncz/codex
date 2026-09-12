@@ -42,14 +42,12 @@ const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
   { id: 'shifts',     label: 'Rozvrh',     icon: 'calendar' },
   { id: 'inventory',  label: 'Sklad',      icon: 'box' },
-  { id: 'menu',       label: 'Menu',       icon: 'leaf' },
   { id: 'recipes',    label: 'Receptury',  icon: 'clipboard' },
   { id: 'procedures', label: 'Postupy',    icon: 'clipboard' },
   { id: 'tasks',      label: 'Úkoly',      icon: 'check' },
   { id: 'chat',       label: 'Chat',       icon: 'chat' }, // mobile dock only
   { id: 'guides',     label: 'Návody',     icon: 'book' },
   { id: 'planning',   label: 'Plánování',  icon: 'kanban' },
-  { id: 'events',     label: 'Akce',       icon: 'calendarCheck' },
   { id: 'reports',    label: 'Uzávěrky',   icon: 'trend' },
   { id: 'finance',    label: 'Finance',    icon: 'coins' },
   { id: 'suggestions',label: 'Nápady',     icon: 'bulb' },
@@ -63,8 +61,8 @@ const navItems = [
 const navSections: { title: string | null; ids: string[] }[] = [
   { title: null,           ids: ['overview'] },
   { title: 'Směny',        ids: ['shifts', 'my-shifts', 'attendance'] },
-  { title: 'Kasa & sklad', ids: ['reports', 'finance', 'inventory', 'recipes', 'menu'] },
-  { title: 'Práce',        ids: ['tasks', 'procedures', 'planning', 'events'] },
+  { title: 'Kasa & sklad', ids: ['reports', 'finance', 'inventory', 'recipes'] },
+  { title: 'Práce',        ids: ['tasks', 'procedures', 'planning'] },
   { title: 'Tým',          ids: ['rewards', 'chat', 'guides', 'suggestions'] },
 ];
 const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
@@ -90,7 +88,12 @@ export default function EmployerLayout({ user }: Props) {
     // a člověk nepochopil, kam se dostal.
     const qs = new URLSearchParams(window.location.search);
     const asked = qs.get('view');
+    // Menu a Akce se přestěhovaly do Managero client. Starý odkaz (z oznámení,
+    // z checklistu prvních kroků) proto nepadá na Přehled, ale otevře je tam,
+    // kde teď bydlí.
+    const MOVED: Record<string, string> = { menu: 'menu', events: 'events' };
     if (qs.get('mode') === 'client') { setClientTab(qs.get('tab') ?? undefined); setAppMode('client'); }
+    else if (asked && MOVED[asked]) { setClientTab(MOVED[asked]); setAppMode('client'); }
     else if (asked && asked !== 'overview') { setAppMode('full'); }
     else {
       let stored: string | null = null;
@@ -200,7 +203,7 @@ export default function EmployerLayout({ user }: Props) {
   if (appMode === 'client') {
     return (
       <ProfileLinkProvider>
-        <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} />
+        <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} user={user as any} />
       </ProfileLinkProvider>
     );
   }
