@@ -102,7 +102,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
-      {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
+      {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} plan={d.plan} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
       {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
     </div>
   );
@@ -368,7 +368,7 @@ function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; 
 
 const ORDER_LABEL: Record<string, string> = { new: 'Čeká na obsluhu', confirmed: 'Připravuje se', done: 'Hotovo', declined: 'Nepřijato' };
 
-function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b: any; menu: any; tables: any[]; signedIn: boolean; onDone: (m: string) => void }) {
+function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: string; b: any; menu: any; tables: any[]; plan?: any; signedIn: boolean; onDone: (m: string) => void }) {
   const [tableId, setTableId] = useState<number | ''>(() => {
     if (typeof window === 'undefined') return '';
     const t = parseInt(new URLSearchParams(window.location.search).get('table') ?? '', 10);
@@ -435,7 +435,7 @@ function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b
             <>
               <p className={label}>Kde sedíš</p>
               <p className="text-lg font-bold tracking-tight flex items-center gap-2"><span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm">{qrTable.name}</span><span className="text-sm font-medium text-black/50">podle QR na stole</span></p>
-              <TableMap tables={tables} selectedId={qrTable.id} caption="Tvůj stůl na plánku podniku." />
+              <TableMap tables={tables} plan={plan} selectedId={qrTable.id} caption="Tvůj stůl na plánku podniku." />
             </>
           ) : qrOnly ? (
             <>
@@ -447,7 +447,7 @@ function OrderTab({ slug, b, menu, tables, signedIn, onDone }: { slug: string; b
             <>
               <label htmlFor="o-table" className={label}>Kde sedíš</label>
               {placedTables(tables).length > 0 && (
-                <TableMap tables={tables} selectedId={tableId || null} onPick={id => setTableId(id)}
+                <TableMap tables={tables} plan={plan} selectedId={tableId || null} onPick={id => setTableId(id)}
                   caption="Klepni na stůl, u kterého sedíš." />
               )}
               <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input} aria-label="Stůl ze seznamu">

@@ -11,6 +11,7 @@ import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu } from '../ui
 import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
+import FloorPlanEditor from './FloorPlanEditor';
 import { levelFor } from '@/lib/clientSlots';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
@@ -379,81 +380,8 @@ function Tables({ toast }: { toast: (m: string) => void }) {
               </li>
             ))}
           </ul>}
-      {d !== null && d.tables.length > 0 && <MapEditor tables={d.tables} toast={toast} onSaved={load} />}
+      {d !== null && d.tables.length > 0 && <FloorPlanEditor toast={toast} onSaved={load} />}
     </div>
-  );
-}
-
-/**
- * Editor plánku stolů: přetažením se stůl posadí tam, kde v podniku stojí.
- * Souřadnice jsou v procentech, takže plánek sedí na telefonu i na monitoru.
- * Hosté pak při objednávce klepnou na stůl místo hádání názvů.
- */
-function MapEditor({ tables, toast, onSaved }: { tables: any[]; toast: (m: string) => void; onSaved: () => void }) {
-  const boxRef = useRef<HTMLDivElement>(null);
-  const act = useMemo(() => tables.filter((t: any) => t.active), [tables]);
-  const orig = useMemo(() => Object.fromEntries(act.map((t: any) => [t.id, t.map_x != null && t.map_y != null ? { x: Number(t.map_x), y: Number(t.map_y) } : null])) as Record<number, { x: number; y: number } | null>, [act]);
-  const [pos, setPos] = useState(orig);
-  useEffect(() => { setPos(orig); }, [orig]);
-  const [busy, setBusy] = useState(false);
-  const placed = act.filter((t: any) => pos[t.id]);
-  const unplaced = act.filter((t: any) => !pos[t.id]);
-  const same = (a: any, b: any) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-  const dirty = act.some((t: any) => !same(pos[t.id], orig[t.id]));
-  const move = (id: number, e: React.PointerEvent) => {
-    const el = boxRef.current; if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = Math.max(4, Math.min(96, ((e.clientX - r.left) / r.width) * 100));
-    const y = Math.max(8, Math.min(92, ((e.clientY - r.top) / r.height) * 100));
-    setPos(p => ({ ...p, [id]: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } }));
-  };
-  const save = async () => {
-    setBusy(true);
-    try {
-      for (const t of act) {
-        if (same(pos[t.id], orig[t.id])) continue;
-        const v = pos[t.id];
-        await j('/api/client/admin/tables', { method: 'PATCH', body: JSON.stringify({ id: t.id, map_x: v?.x ?? null, map_y: v?.y ?? null }) });
-      }
-      toast('Plánek stolů uložen. Hosté ho uvidí při objednávce.'); onSaved();
-    } catch (e: any) { toast(e.message); }
-    setBusy(false);
-  };
-  if (!act.length) return null;
-  return (
-    <section className="glass-card p-4 sm:p-5 max-w-2xl">
-      <SectionTitle icon="location" action={dirty ? <Button size="sm" variant="accent" loading={busy} onClick={save}>Uložit plánek</Button> : undefined}>Plánek stolů</SectionTitle>
-      <p className="text-xs text-black/50 -mt-1 mb-3">Přetáhni stoly tak, jak stojí v podniku. Hosté pak při objednávce klepnou na svůj stůl na plánku. Křížkem stůl z plánku sundáš.</p>
-      {unplaced.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-black/50">Mimo plánek:</span>
-          {unplaced.map((t: any) => (
-            <button key={t.id} type="button" onClick={() => setPos(p => ({ ...p, [t.id]: { x: 20 + (t.id % 4) * 18, y: 30 + (t.id % 3) * 18 } }))}
-              className="tap-target-sm rounded-full bg-black/[0.05] hover:bg-black/[0.09] px-3 py-1.5 text-xs font-semibold transition">+ {t.name}</button>
-          ))}
-        </div>
-      )}
-      <div ref={boxRef} className="relative w-full aspect-[3/2] rounded-3xl border border-black/[0.08] bg-white/60 overflow-hidden touch-none select-none"
-        style={{ backgroundImage: 'radial-gradient(rgba(22,24,26,0.07) 1px, transparent 1px)', backgroundSize: '18px 18px' }}>
-        {placed.map((t: any) => {
-          const v = pos[t.id]!;
-          const shape = t.seats >= 5 ? 'rounded-2xl px-3 py-2.5 text-xs' : 'rounded-full px-3 py-2 text-[11px]';
-          return (
-            <div key={t.id} style={{ left: `${v.x}%`, top: `${v.y}%` }} className="absolute -translate-x-1/2 -translate-y-1/2">
-              <button type="button" aria-label={`Stůl ${t.name} — přetáhni na místo`}
-                onPointerDown={e => { e.preventDefault(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
-                onPointerMove={e => { if (e.buttons === 1) move(t.id, e); }}
-                className={`tap-target-sm inline-flex items-center whitespace-nowrap font-bold leading-none border bg-white text-[#16181A] border-black/[0.12] shadow-sm cursor-grab active:cursor-grabbing active:shadow-lg transition-shadow ${shape}`}>
-                {t.name}
-              </button>
-              <button type="button" onClick={() => setPos(p => ({ ...p, [t.id]: null }))} aria-label={`Sundat stůl ${t.name} z plánku`}
-                className="tap-target-sm absolute -top-1.5 -right-1.5 h-5 w-5 grid place-items-center rounded-full bg-[#16181A] text-white text-[11px] leading-none shadow"><Icon name="close" size={9} /></button>
-            </div>
-          );
-        })}
-        {placed.length === 0 && <p className="absolute inset-0 grid place-items-center text-sm text-black/40 px-6 text-center">Klepni nahoře na stůl a pak ho přetáhni na místo.</p>}
-      </div>
-    </section>
   );
 }
 
