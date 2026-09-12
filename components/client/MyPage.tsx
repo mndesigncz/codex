@@ -148,8 +148,35 @@ export default function MyPage() {
         </details>
       )}
 
+      {card?.code && <InviteCard code={card.code} onFlash={setFlash} />}
+
       <ProfileForm me={d.me} onSaved={(me: any) => { setD({ ...d, me }); setFlash('Uloženo.'); }} />
     </div>
+  );
+}
+
+/**
+ * Pozvi kamaráda: odkaz s kódem kartičky. Kamarád se zaregistruje přes odkaz
+ * a při prvním členství ve společném podniku dostanete oba body — pokud to
+ * podnik ve věrnosti zapnul.
+ */
+function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => void }) {
+  const link = typeof window === 'undefined' ? '' : `${window.location.origin}/client/register?ref=${encodeURIComponent(code)}`;
+  const copy = () => { navigator.clipboard?.writeText(link).then(() => onFlash('Odkaz s pozvánkou zkopírován.')).catch(() => {}); };
+  const share = () => {
+    if (navigator.share) navigator.share({ title: 'Managero client', text: 'Přidej se přes můj kód, dostaneme oba body.', url: link }).catch(() => {});
+    else copy();
+  };
+  return (
+    <section aria-labelledby="h-invite" className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 sm:p-5">
+      <h2 id="h-invite" className="text-lg font-bold tracking-tight">Pozvi kamaráda</h2>
+      <p className="mt-1 text-sm text-black/60 max-w-[52ch] text-pretty">Pošli mu odkaz. Když se přidá do podniku, kde jsi členem, dostanete oba body — pokud to podnik ve věrnosti zapnul.</p>
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
+        <span className="font-mono tracking-[0.2em] font-bold text-sm rounded-xl bg-black/[0.05] px-3 py-2">{code}</span>
+        <button type="button" onClick={copy} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-3.5 py-2 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] transition"><Icon name="copy" size={15} /> Kopírovat odkaz</button>
+        <button type="button" onClick={share} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-3.5 py-2 text-sm font-semibold hover:bg-black active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
+      </div>
+    </section>
   );
 }
 

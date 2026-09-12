@@ -152,14 +152,44 @@ export async function membership(customerId: number, teamId: number): Promise<an
 }
 
 export async function join(customerId: number, teamId: number): Promise<any> {
+  const [existing] = await sql`SELECT id FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
   const [m] = await sql`
     INSERT INTO client_memberships (customer_id, team_id) VALUES (${customerId}, ${teamId})
     ON CONFLICT (customer_id, team_id) DO UPDATE SET customer_id = EXCLUDED.customer_id
     RETURNING *`;
+  // Pozvi kamaráda: odměna padá při PRVNÍM členství ve společném podniku.
+  // award() volá join() taky, ale to už členství existuje, takže se nezacyklí.
+  if (!existing) await maybeReferralReward(customerId, teamId).catch(() => {});
   return m;
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday';
+/**
+ * Odměna za pozvání: nový člen byl pozvaný (users.referred_by), podnik má
+ * odměnu zapnutou a pozvatel je tu taky členem — oba dostanou body. Deník
+ * hlídá nejvýš jednou na pozvaného a podnik.
+ */
+async function maybeReferralReward(customerId: number, teamId: number): Promise<void> {
+  const [u] = await sql`SELECT referred_by, name FROM users WHERE id = ${customerId}`;
+  const inviter = Number(u?.referred_by);
+  if (!inviter || inviter === customerId) return;
+  const [p] = await sql`SELECT referral_points, enabled, loyalty_on, slug FROM client_profiles WHERE team_id = ${teamId}`;
+  const pts = Number(p?.referral_points) || 0;
+  if (!p?.enabled || !p?.loyalty_on || pts <= 0) return;
+  const [im] = await sql`SELECT id FROM client_memberships WHERE customer_id = ${inviter} AND team_id = ${teamId}`;
+  if (!im) return;
+  const [done] = await sql`SELECT id FROM client_loyalty_ledger WHERE team_id = ${teamId} AND customer_id = ${customerId} AND kind = 'referral'`;
+  if (done) return;
+  const [iv] = await sql`SELECT name FROM users WHERE id = ${inviter}`;
+  await award(teamId, customerId, pts, 'referral', `ref:${inviter}`, `Pozvání od ${iv?.name ?? 'kamaráda'}`);
+  await award(teamId, inviter, pts, 'referral', `invited:${customerId}`, `Pozval(a) ${u?.name ?? 'kamaráda'}`);
+  notifyUser(inviter, {
+    title: `+${pts} bodů za pozvání`,
+    body: `${u?.name ?? 'Kamarád'} se přes tvůj kód přidal k podniku.`,
+    link: p.slug ? `/client/${p.slug}` : '/client/me', type: 'success',
+  }).catch(() => {});
+}
+
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral';
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod
