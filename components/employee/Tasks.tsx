@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TaskChecklist, recurrenceLabel, ChecklistItem } from '../TaskChecklist';
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
@@ -85,17 +85,20 @@ export default function Tasks({ user }: Props) {
   const priorityColor = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
   const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 
-  // Group by day: overdue, today (incl. no-date), upcoming (future), done.
-  const byDate = (a: Task, b: Task) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
-  const undone = tasks.filter(t => t.status !== 'done');
-  const overdue = undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate);
-  const todayTasks = undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate);
-  const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
-  // Week-ahead by default: tasks due within the next 7 days show up front (greyed as inactive);
-  // anything further out sits behind a "show later" toggle so the list stays focused.
-  const upcomingSoon = upcoming.filter(t => t.dueDate! <= weekAhead);
-  const upcomingLater = upcoming.filter(t => t.dueDate! > weekAhead);
-  const done = tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 20);
+  // Rozdělení podle dne. Šest filtrů a tři řazení se přepočítávají jen když se
+  // změní úkoly (ne při každém překreslení kvůli jinému stavu komponenty).
+  const { overdue, todayTasks, upcomingSoon, upcomingLater, done } = useMemo(() => {
+    const byDate = (a: Task, b: Task) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
+    const undone = tasks.filter(t => t.status !== 'done');
+    const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
+    return {
+      overdue: undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate),
+      todayTasks: undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate),
+      upcomingSoon: upcoming.filter(t => t.dueDate! <= weekAhead),
+      upcomingLater: upcoming.filter(t => t.dueDate! > weekAhead),
+      done: tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 20),
+    };
+  }, [tasks, today, weekAhead]);
 
   const card = (task: Task) => {
     const statusOpt = getStatusOption(task.status);
@@ -193,7 +196,7 @@ export default function Tasks({ user }: Props) {
             )
           )}
           {section('Hotové', done)}
-          {overdue.length + todayTasks.length + upcoming.length === 0 && (
+          {overdue.length + todayTasks.length + upcomingSoon.length + upcomingLater.length === 0 && (
             <div className="glass-card p-8 text-center"><p className="text-black/45">Vše hotovo. 🎉</p></div>
           )}
         </>
