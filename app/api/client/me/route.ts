@@ -11,7 +11,7 @@ export async function GET() {
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const today = pragueToday();
   const memberships = await sql`
-    SELECT m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at, p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
+    SELECT m.points, m.stamps, m.visits, m.credit, m.joined_at, m.last_visit_at, p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
     FROM client_memberships m JOIN client_profiles p ON p.team_id = m.team_id JOIN teams t ON t.id = m.team_id
     WHERE m.customer_id = ${me.id} ORDER BY m.last_visit_at DESC NULLS LAST, m.joined_at DESC` as any[];
   const reservations = await sql`
@@ -32,7 +32,7 @@ export async function GET() {
   const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
   return NextResponse.json({
     me: profile ?? me,
-    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), lastVisitAt: m.last_visit_at })),
+    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at })),
     reservations, orders, claims, today,
   });
 }

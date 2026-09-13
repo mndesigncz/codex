@@ -100,8 +100,10 @@ export default function BusinessPage({ slug }: { slug: string }) {
             {me?.member ? (
               <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
-                <p className="text-[11px] uppercase tracking-wider opacity-70">{me.levelLabel ?? 'Člen'}</p>
+                <p className="text-[11px] uppercase tracking-wider opacity-70">{me.levelLabel ?? 'Člen'}{me.discount > 0 ? ` · sleva ${me.discount} %` : ''}</p>
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} b. <span className="opacity-60 font-medium text-sm">· {me.stamps}/{b.stampTarget || '–'} razítek</span></p>
+                {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{me.credit} Kč kreditu</p>}
+                {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">do „{me.nextTierLabel}" ještě {Math.max(0, me.nextTierAt - me.visits)} návštěv</p>}
               </div>
             ) : (
               <button onClick={join} className="tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition"
@@ -360,6 +362,20 @@ function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; 
               <p className="text-2xl font-bold tabular-nums">{me.points}</p>
             </div>
             <p className="text-xs text-black/55 mt-1">{b.pointsPer100} bodů za každých 100 Kč útraty od stolu. Body jsou na kupony vpravo.</p>
+            {b.cashbackPct > 0 && (
+              <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-black/[0.06] pt-4">
+                <div className="min-w-0">
+                  <p className="text-sm text-black/60">Kredit</p>
+                  <p className="text-xs text-black/55 mt-0.5">{b.cashbackPct} % z každé útraty se vrací jako kredit. Obsluha ho odečte u kasy.</p>
+                </div>
+                <p className="text-2xl font-bold tabular-nums shrink-0">{me.credit ?? 0} <span className="text-sm font-medium text-black/50">Kč</span></p>
+              </div>
+            )}
+            {me.discount > 0 && (
+              <p className="mt-4 rounded-2xl bg-[#16181A] text-[#C8F542] px-3.5 py-2.5 text-sm font-semibold">
+                Jako „{me.levelLabel}" máš u nás slevu {me.discount} %.{me.nextTierAt ? ` Do „${me.nextTierLabel}" ti zbývá ${Math.max(0, me.nextTierAt - me.visits)} návštěv.` : ''}
+              </p>
+            )}
             {me.claims?.length > 0 && (
               <div className="mt-5 border-t border-black/[0.06] pt-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Kupony k uplatnění</p>

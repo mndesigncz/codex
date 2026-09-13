@@ -3,7 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import { normalizePlan } from '@/lib/floorplan';
-import { levelFor } from '@/lib/clientSlots';
+import { tierFor } from '@/lib/clientSlots';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 
@@ -64,10 +64,15 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
     const claims = await sql`
       SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;
-    const lvl = levelFor(Number(m?.visits ?? 0));
+    const tier = tierFor(Number(m?.visits ?? 0), {
+      silverAt: Number(p.silver_at), goldAt: Number(p.gold_at),
+      memberDiscount: Number(p.member_discount), silverDiscount: Number(p.silver_discount), goldDiscount: Number(p.gold_discount),
+    });
     mine = {
       member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
-      level: lvl.id, levelLabel: lvl.label,
+      credit: Number(m?.credit ?? 0),
+      level: tier.id, levelLabel: tier.label, discount: tier.discount,
+      nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel,
       reservations, claims,
     };
   }
