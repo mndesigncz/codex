@@ -134,7 +134,23 @@ export async function sendToPos(teamId: number, id: number): Promise<{ posOk: bo
     await save(note, null, null);
     return { posOk: false, posNote: note };
   }
-  const lines = (o.items as any[]) ?? [];
+  let lines = (o.items as any[]) ?? [];
+  const chybi = lines.filter(l => !l.posProductId && Number(l.itemId) > 0).map(l => Number(l.itemId));
+  if (chybi.length) {
+    try {
+      const rows = await sql`SELECT id, pos_product_id FROM menu_items WHERE id = ANY(${chybi})` as any[];
+      const podle = new Map(rows.map(r => [Number(r.id), r.pos_product_id ? String(r.pos_product_id) : null]));
+      let doplneno = false;
+      lines = lines.map(l => {
+        if (l.posProductId || !podle.get(Number(l.itemId))) return l;
+        doplneno = true;
+        return { ...l, posProductId: podle.get(Number(l.itemId)) };
+      });
+      // Doplněné vazby se uloží zpátky k objednávce, ať sedí to, co se
+      // posílá, s tím, co je vidět v příjmu.
+      if (doplneno) await sql`UPDATE client_orders SET items = ${JSON.stringify(lines)}::jsonb WHERE id = ${id}`;
+    } catch { /* bez menu se jede s tím, co objednávka drží */ }
+  }
   const bez = lines.filter(l => !l.posProductId).map(l => String(l.name));
   if (bez.length) {
     const note = `${bez.slice(0, 4).join(', ')}${bez.length > 4 ? ` a ${bez.length - 4} další` : ''} ${bez.length === 1 ? 'nemá' : 'nemají'} produkt v pokladně, takže kasa neví, co tisknout. Spáruj ${bez.length === 1 ? 'ji' : 'je'} v Menu → Tisk na terminálu a dej „Poslat do kasy".`;
