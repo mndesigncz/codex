@@ -52,11 +52,34 @@ export const RES_STATUS: Record<string, { label: string; tone: 'wait' | 'ok' | '
 
 // ---- Úrovně hosta podle návštěv -------------------------------------------
 //
-// Jako v Kartičce: věrnost je vidět. Prahy jsou schválně pevné a nízké —
-// u malého podniku je 25 návštěv opravdový štamgast.
-export function levelFor(visits: number): { id: 'bronze' | 'silver' | 'gold'; label: string } {
-  const v = Number(visits) || 0;
-  if (v >= 25) return { id: 'gold', label: 'Zlatý host' };
-  if (v >= 10) return { id: 'silver', label: 'Stříbrný host' };
-  return { id: 'bronze', label: 'Člen' };
+// Jako v Kartičce: věrnost je vidět a něco přináší. Prahy i sleva si drží
+// každý podnik vlastní; výchozí hodnoty odpovídají malému podniku, kde je
+// pětadvacet návštěv opravdový štamgast.
+
+export interface TierRules {
+  silverAt?: number; goldAt?: number;
+  memberDiscount?: number; silverDiscount?: number; goldDiscount?: number;
+}
+
+export type TierId = 'bronze' | 'silver' | 'gold';
+
+export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null }
+
+/** Úroveň hosta i s tím, co z ní plyne — sleva a kolik chybí do další. */
+export function tierFor(visits: number, r?: TierRules | null): Tier {
+  const v = Math.max(0, Number(visits) || 0);
+  const silverAt = Math.max(1, Number(r?.silverAt) || 10);
+  const goldAt = Math.max(silverAt + 1, Number(r?.goldAt) || 25);
+  const base = Math.max(0, Math.min(90, Number(r?.memberDiscount) || 0));
+  const sd = Math.max(base, Math.min(90, Number(r?.silverDiscount) || 0));
+  const gd = Math.max(sd, Math.min(90, Number(r?.goldDiscount) || 0));
+  if (v >= goldAt) return { id: 'gold', label: 'Zlatý host', discount: gd, nextAt: null, nextLabel: null };
+  if (v >= silverAt) return { id: 'silver', label: 'Stříbrný host', discount: sd, nextAt: goldAt, nextLabel: 'Zlatý host' };
+  return { id: 'bronze', label: 'Člen', discount: base, nextAt: silverAt, nextLabel: 'Stříbrný host' };
+}
+
+/** Zpětně kompatibilní zkratka pro místa, kde stačí jméno úrovně. */
+export function levelFor(visits: number): { id: TierId; label: string } {
+  const t = tierFor(visits);
+  return { id: t.id, label: t.label };
 }

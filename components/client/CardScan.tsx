@@ -33,7 +33,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     } catch (e: any) { setErr(e.message); setHit(null); }
     setBusy('');
   };
-  const act = async (action: 'stamp' | 'points') => {
+  const act = async (action: 'stamp' | 'points' | 'credit') => {
     setBusy(action); setErr('');
     try {
       const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, action, amount: Number(amount) || 0 }) });
@@ -74,9 +74,25 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
             <Initials name={hit.customer.name} size={40} />
             <div className="min-w-0 flex-1">
               <p className="font-bold leading-tight truncate">{hit.customer.name}</p>
-              <p className="text-sm text-black/55 tabular-nums">{hit.member ? `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv${hit.levelLabel && hit.levelLabel !== 'Člen' ? ` · ${hit.levelLabel}` : ''}` : 'Ještě není členem. Prvním razítkem se stane.'}</p>
+              <p className="text-sm text-black/55 tabular-nums">{hit.member ? `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv` : 'Ještě není členem. Prvním razítkem se stane.'}</p>
             </div>
           </div>
+          {hit.member && (hit.discount > 0 || hit.credit > 0 || hit.levelLabel !== 'Člen') && (
+            <div className="flex flex-wrap items-center gap-2">
+              {hit.levelLabel && hit.levelLabel !== 'Člen' && (
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${hit.tier === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/70'}`}>{hit.levelLabel}</span>
+              )}
+              {hit.discount > 0 && (
+                <span className="rounded-full bg-[#16181A] text-[#C8F542] px-3 py-1 text-xs font-bold">Sleva {hit.discount} %</span>
+              )}
+              {hit.credit > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#3E5406] px-3 py-1 text-xs font-semibold"><Icon name="card" size={12} />Kredit {hit.credit} Kč</span>
+              )}
+              {hit.nextTierAt && (
+                <span className="text-xs text-black/45">do „{hit.nextTierLabel}" ještě {Math.max(0, hit.nextTierAt - hit.visits)} návštěv</span>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Button variant="accent" icon="check" loading={busy === 'stamp'} disabled={hit.stampedToday || !hit.rules?.stampTarget} onClick={() => act('stamp')}>
               {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
@@ -86,7 +102,27 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               <Button type="submit" variant="primary" loading={busy === 'points'} disabled={!hit.rules?.pointsPer100 || !amount}>Body</Button>
             </form>
           </div>
-          {hit.rules?.pointsPer100 > 0 && <p className="text-xs text-black/50">{hit.rules.pointsPer100} b. za každých 100 Kč. Razítko nejvýš jedno denně.</p>}
+          {hit.bills?.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-1.5">Dnešní účty z pokladny</p>
+              <div className="flex flex-wrap gap-1.5">
+                {hit.bills.map((bl: any) => (
+                  <button key={bl.bill_id} type="button" onClick={() => setAmount(String(Math.round(Number(bl.final_price))))}
+                    className="tap-target-sm rounded-full bg-black/[0.05] hover:bg-black/[0.09] px-3 py-1.5 text-xs font-semibold tabular-nums transition">{Math.round(Number(bl.final_price))} Kč</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {hit.credit > 0 && (
+            <form onSubmit={e => { e.preventDefault(); act('credit'); }} className="flex gap-2 items-center">
+              <input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={hit.credit} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Max ${hit.credit}`} className={`${input} !w-28 text-center`} />
+              <Button type="submit" variant="secondary" icon="card" loading={busy === 'credit'} disabled={!amount}>Uplatnit kredit</Button>
+            </form>
+          )}
+          {(hit.affordable?.length ?? 0) > 0 && (
+            <p className="text-xs text-black/55">Za body teď dosáhne na: {hit.affordable.map((a: any) => `${a.title} (${a.cost_points} b.)`).join(', ')}. Kupon si vezme sám na své stránce.</p>
+          )}
+          {hit.rules?.pointsPer100 > 0 && <p className="text-xs text-black/50">{hit.rules.pointsPer100} b. za každých 100 Kč{hit.rules.cashbackPct > 0 ? ` a ${hit.rules.cashbackPct} % zpět jako kredit` : ''}. Razítko nejvýš jedno denně.</p>}
           {hit.openCoupons?.length > 0 && (
             <ul className="space-y-1.5">
               {hit.openCoupons.map((c: any) => (
