@@ -9,7 +9,7 @@
 
 import { sql, award, stampVisit, notifyTeamEmployers, ensureProfile } from './client';
 import { normName } from './menuPos';
-import { getConnection, createTableOrder, tableOrderState, StoryousError } from './storyous';
+import { getConnection, createTableOrder, confirmTableOrder, tableOrderState, StoryousError } from './storyous';
 import { notifyUser } from './push';
 import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
 import { createHmac } from 'crypto';
@@ -194,8 +194,18 @@ export async function sendToPos(teamId: number, id: number): Promise<{ posOk: bo
       note: o.note ?? null, items: lines.map(l => ({ itemId: String(l.posProductId), count: Number(l.count), unitPriceWithVat: Number(l.price) })),
       notification: callbackUrls(Number(o.id)),
     });
-    const note = 'Objednávka je v pokladně na stole.';
-    await save(note, String(r.orderId), String(r.state));
+    let stav = String(r.state);
+    let jak: string | null = null;
+    if (!/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(stav)) {
+      const c = await confirmTableOrder(conn, String(r.orderId));
+      if (c.ok) { stav = c.state || 'CONFIRMED'; jak = c.via; }
+      else jak = c.error;
+    }
+    const prijato = /^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(stav);
+    const note = prijato
+      ? 'Objednávka je v pokladně přijatá — terminál ji tiskne podle nastavení tiskáren.'
+      : `Objednávka je v pokladně, ale čeká na přijetí — dokud ji na terminálu nikdo nepřijme, nevytiskne se a pokladna ji po pár minutách sama odmítne.${jak ? ` (potvrzení odmítnuto: ${jak})` : ''}`;
+    await save(note, String(r.orderId), stav);
     return { posOk: true, posNote: note };
   } catch (e) {
     // I neznámou chybu je potřeba pojmenovat: „nepovedlo se" se nedá opravit.

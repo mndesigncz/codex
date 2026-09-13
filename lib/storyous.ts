@@ -168,6 +168,50 @@ export async function createTableOrder(conn: PosConnection, o: { externalId: str
   return { orderId: String(d?.orderId ?? d?.id ?? o.externalId), state: String(d?.state ?? 'NEW') };
 }
 
+/**
+ * Potvrzení objednávky v pokladně.
+ *
+ * `autoConfirm` v těle objednávky se ukázalo jako nespolehlivé: objednávka
+ * dorazí, ale zůstane ve stavu NEW („čeká na přijetí") a pokladna ji po pár
+ * minutách sama odmítne — na terminálu se proto nic nevytiskne, protože tiskne
+ * se až přijatá objednávka.
+ *
+ * Storyous nemá pro tenhle krok jedno jméno napříč verzemi rozhraní, proto se
+ * zkusí známé podoby a použije se ta, na kterou pokladna odpoví. Který tvar
+ * zabral, se vrací ve `via` — ať je v provozu vidět, co se opravdu stalo,
+ * a nehádá se to podruhé.
+ */
+export async function confirmTableOrder(conn: PosConnection, orderId: string): Promise<{ ok: boolean; via: string | null; state: string | null; error: string | null }> {
+  const id = encodeURIComponent(orderId);
+  const varianty: { via: string; method: 'POST' | 'PUT'; path: string; body: any }[] = [
+    { via: 'confirm', method: 'POST', path: `/delivery/orders/${src(conn)}/${id}/confirm`, body: {} },
+    { via: 'state', method: 'PUT', path: `/delivery/orders/${src(conn)}/${id}/state`, body: { state: 'CONFIRMED' } },
+    { via: 'order', method: 'PUT', path: `/delivery/orders/${src(conn)}/${id}`, body: { state: 'CONFIRMED' } },
+  ];
+  let posledni: string | null = null;
+  for (const v of varianty) {
+    try {
+      const token = await getToken(conn);
+      const res = await fetch(`https://api.storyous.com${v.path}`, {
+        method: v.method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(v.body),
+      });
+      if (res.ok) {
+        const text = await res.text();
+        let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { /* prázdná odpověď je taky odpověď */ }
+        return { ok: true, via: v.via, state: data?.state ? String(data.state) : null, error: null };
+      }
+      // 404 i 405 znamenají „tenhle tvar tady není" — zkusí se další.
+      posledni = `${v.via}: ${res.status}`;
+      if (res.status === 401 || res.status === 403) break;
+    } catch (e) {
+      posledni = `${v.via}: ${String((e as any)?.message ?? e).slice(0, 80)}`;
+    }
+  }
+  return { ok: false, via: null, state: null, error: posledni };
+}
+
 /** Stav objednávky v pokladně: NEW, CONFIRMED, DECLINED, DISPATCHED… */
 export async function tableOrderState(conn: PosConnection, orderId: string): Promise<string | null> {
   try {
