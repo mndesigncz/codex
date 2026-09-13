@@ -1,6 +1,6 @@
 // Host si vezme kupon za body. Vznikne kód, který ukáže u kasy.
 import { NextResponse } from 'next/server';
-import { sql, customer, profileBySlug, membership, award, couponCode } from '@/lib/client';
+import { sql, customer, profileBySlug, membership, spendPoints, couponCode } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +21,15 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
   const [open] = await sql`SELECT id FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ${me.id} AND redeemed_at IS NULL`;
   if (open) return NextResponse.json({ error: 'Tenhle kupon už máš vyzvednutý — ukaž ho u kasy.' }, { status: 409 });
   const code = couponCode();
+  // Nejdřív atomicky odečíst body — až když se to povede, vznikne kupon.
+  // Dřív se body odečítaly zvlášť po vložení kuponu, takže dvojklik mohl
+  // utratit stejné body dvakrát a přidělit dva kupony.
+  let points = Number(m.points);
+  if (cost > 0) {
+    const after = await spendPoints(teamId, me.id, cost, 'coupon', code, c.title);
+    if (after == null) return NextResponse.json({ error: 'Body ti mezitím nevyšly. Zkus to znovu.' }, { status: 409 });
+    points = after;
+  }
   await sql`INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code) VALUES (${c.id}, ${me.id}, ${teamId}, ${code})`;
-  const points = cost > 0 ? await award(teamId, me.id, -cost, 'coupon', code, c.title) : Number(m.points);
   return NextResponse.json({ ok: true, code, points });
 }

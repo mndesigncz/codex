@@ -34,8 +34,16 @@ export async function POST(request: Request) {
       column: card.column,
     });
     const taskId = String(task?.id ?? task?.taskId ?? '');
+    // Vazba se MUSÍ uložit: bez ní se karta příště publikuje znovu a v Noisiu
+    // vznikne duplicitní úkol. Když uložení selže, řekne se to, ať se to dá
+    // zkusit znovu, místo tichého nevědomí.
     if (taskId) {
-      try { await sql`UPDATE planning_cards SET noisium_task_id = ${taskId} WHERE id = ${card.id}`; } catch {}
+      try {
+        await sql`UPDATE planning_cards SET noisium_task_id = ${taskId} WHERE id = ${card.id}`;
+      } catch (e) {
+        console.error('noisium: task created but link not saved', card.id, taskId, e);
+        return NextResponse.json({ ok: true, taskId, warning: 'Úkol v Noisiu vznikl, ale nepodařilo se ho spárovat s kartou. Nepublikuj ji znovu — vznikl by duplikát.' });
+      }
     }
     return NextResponse.json({ ok: true, taskId });
   } catch (e: any) {

@@ -31,6 +31,10 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Kiosk stojí u baru bez očí na konzoli — když načtení nebo uložení selže,
+  // musí to být vidět na obrazovce, ne zmizet do prázdného seznamu.
+  const [loadErr, setLoadErr] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
   const [cat, setCat] = useState('Vše');
   const [search, setSearch] = useState('');
   // Debounced quantity saves so rapid taps don't spam the server.
@@ -48,14 +52,16 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
 
   const reload = () =>
     Promise.all([
-      fetch('/api/inventory').then(r => r.json()).catch(() => []),
-      fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
+      fetch('/api/inventory').then(r => r.json()).catch(() => null),
+      fetch('/api/inventory/categories').then(r => r.json()).catch(() => null),
     ]).then(([d, c]) => {
-      // Things the crew just wrote in stay in the list — badged, not hidden.
-      if (Array.isArray(d)) setItems(d);
+      // Pole = data (klidně prázdný sklad). Cokoli jiného (null, {error}, 500)
+      // je selhání načtení — to se nesmí tvářit jako „nic ve skladu".
+      if (Array.isArray(d)) { setItems(d); setLoadErr(false); }
+      else setLoadErr(true);
       if (Array.isArray(c)) setCategories(c);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { setLoadErr(true); setLoading(false); });
 
   useEffect(() => { reload(); }, []);
 
@@ -89,14 +95,24 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   };
 
   const step = (item: Item, delta: number) => {
+    const before = item.quantity;
     const next = Math.max(0, item.quantity + delta);
     setItems(list => list.map(x => x.id === item.id ? { ...x, quantity: next } : x));
     clearTimeout(timers.current[item.id]);
-    timers.current[item.id] = setTimeout(() => {
-      fetch(`/api/inventory/${item.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: next }),
-      }).catch(() => { /* best-effort */ });
+    timers.current[item.id] = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/inventory/${item.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: next }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        setSaveErr('');
+      } catch {
+        // Uložení neprošlo: vrátit číslo zpět, ať tablet neukazuje stav, který
+        // v databázi není, a říct to nahlas.
+        setItems(list => list.map(x => x.id === item.id ? { ...x, quantity: before } : x));
+        setSaveErr(`Změnu u „${item.name}" se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.`);
+      }
     }, 500);
   };
 
@@ -172,8 +188,19 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             ))}
           </div>
 
+          {saveErr && (
+            <div role="alert" className="rounded-2xl bg-red-500/10 border border-red-500/25 text-red-700 px-5 py-3.5 text-base font-semibold flex items-center gap-2">
+              <Icon name="warning" size={18} className="shrink-0" />{saveErr}
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+          ) : loadErr ? (
+            <div className="glass-card p-8 text-center space-y-3">
+              <p className="text-base font-semibold text-red-700">Sklad se nepodařilo načíst.</p>
+              <p className="text-sm text-black/50">Nejspíš vypadlo připojení. Data můžou být neúplná — nespoléhej na tenhle seznam, dokud se nenačte.</p>
+              <button onClick={() => { setLoading(true); reload(); }} className="rounded-2xl bg-[#16181A] text-white px-5 py-3 text-sm font-bold min-h-[48px] active:scale-[0.99] transition">Zkusit znovu</button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="glass-card p-8 text-center text-black/45">Žádné položky.</div>
           ) : (

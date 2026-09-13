@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
   if (isKiosk && (empPinHash || emp.pin)) {
     // Čtyřmístný PIN má deset tisíc kombinací. Bez omezení pokusů se dá projít
     // za pár minut přímo z tabletu na baru, proto pět pokusů za deset minut.
-    const gate = await hit(`pin:${employeeId}`, 5, 10 * 60);
+    const gate = await hit(`pin:${employeeId}`, 5, 10 * 60, { failClosed: true });
     if (!gate.ok) {
       return NextResponse.json(
         { error: `Moc pokusů. Zkus to za ${Math.ceil(gate.retryAfter / 60)} min.` },
