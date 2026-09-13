@@ -28,7 +28,7 @@ export const maxDuration = 60;
 const sql = neon(process.env.DATABASE_URL!);
 
 /** Do jakého okna doporučení patří. Podle toho se skládají podokna ve Financích. */
-export type AdviceGroup = 'revenue' | 'products' | 'people' | 'stock';
+export type AdviceGroup = 'revenue' | 'products' | 'people' | 'stock' | 'guests';
 
 interface Advice {
   group: AdviceGroup;
@@ -536,6 +536,130 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* nepodstatné */ }
 
+  // ------------------------------------------------------ hosté a věrnost --
+  // Věrnost, objednávky od stolu a hodnocení jsou taky peníze: kupon je
+  // sleva na útratě, objednávka mimo pokladnu chybí v tržbách a špatné
+  // hodnocení je tržba, která příště nepřijde.
+  try {
+    const [gm] = await sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM client_memberships WHERE team_id = ${teamId}) AS members,
+        (SELECT COUNT(*)::int FROM client_memberships
+          WHERE team_id = ${teamId} AND to_char(joined_at, 'YYYY-MM') = ${month}) AS new_members,
+        (SELECT COUNT(*)::int FROM client_memberships
+          WHERE team_id = ${teamId} AND last_visit_at IS NOT NULL
+            AND last_visit_at < NOW() - INTERVAL '60 days') AS sleeping,
+        (SELECT COUNT(*)::int FROM client_coupon_claims
+          WHERE team_id = ${teamId} AND redeemed_at IS NOT NULL
+            AND to_char(redeemed_at, 'YYYY-MM') = ${month}) AS redeemed,
+        (SELECT COUNT(*)::int FROM client_coupon_claims
+          WHERE team_id = ${teamId} AND redeemed_at IS NULL
+            AND claimed_at < NOW() - INTERVAL '30 days') AS stale`;
+    const members = num(gm?.members), newMembers = num(gm?.new_members);
+    const sleeping = num(gm?.sleeping), redeemed = num(gm?.redeemed), stale = num(gm?.stale);
+
+    if (members > 0) {
+      const growth = members > newMembers ? pct(newMembers, members - newMembers) : 100;
+      add({
+        group: 'guests', tone: newMembers > 0 ? 'good' : 'info', icon: 'users',
+        title: newMembers > 0
+          ? `${plural(newMembers, 'nový člen', 'noví členové', 'nových členů')} věrnosti (+${growth} %)`
+          : `Věrnost má ${plural(members, 'člena', 'členy', 'členů')}, tenhle měsíc nepřibyl nikdo`,
+        text: newMembers > 0
+          ? `Celkem ${members.toLocaleString('cs-CZ')} členů. Člen se vrací sám a útrata na návštěvu bývá vyšší než u náhodného hosta.`
+          : 'Kartička roste jen tam, kde ji obsluha nabídne. Bez nabídnutí se o ní host nedozví.',
+        action: newMembers > 0
+          ? 'Podívej se, kolik z nich přišlo přes QR na stole a kolik u kasy — to slabší místo se dá zesílit.'
+          : 'Dej QR kartičky na stoly a připomeň obsluze, ať ji nabízí při placení. Je to jedna věta u účtu.',
+        evidence: `${members} členů, ${newMembers} nových`,
+      });
+    }
+
+    if (sleeping >= 5) {
+      add({
+        group: 'guests', tone: 'warn', icon: 'users',
+        title: `${plural(sleeping, 'člen nepřišel', 'členové nepřišli', 'členů nepřišlo')} přes dva měsíce`,
+        text: 'Získat zpátky hosta, který už jednou přišel, je levnější než přivést nového.',
+        action: 'Pošli jim cílenou zprávu v Klientu — třeba kupon na druhý nálev. Zabere to pět minut a máš je adresně.',
+        evidence: `${sleeping} spících členů`,
+      });
+    }
+
+    if (redeemed > 0) {
+      add({
+        group: 'guests', tone: 'info', icon: 'award',
+        title: `Uplatněno ${plural(redeemed, 'kupon', 'kupony', 'kuponů')}`,
+        text: 'Každý uplatněný kupon je sleva na útratě. Vyplatí se tehdy, když host přišel právě kvůli němu.',
+        action: 'Porovnej měsíce s kupony a bez nich: když tržba s kupony nerostla, odměna je moc velká, nebo chodí na hosty, kteří by přišli tak jako tak.',
+      });
+    }
+
+    if (stale >= 3) {
+      add({
+        group: 'guests', tone: 'info', icon: 'clock',
+        title: `${plural(stale, 'kupon leží', 'kupony leží', 'kuponů leží')} přes měsíc nevyužitých`,
+        text: 'Nevyužitý kupon není úspora — je to host, který kvůli němu nepřišel.',
+        action: 'Připomeň je zprávou, nebo jim dej platnost. Odměna bez termínu se odkládá donekonečna.',
+      });
+    }
+  } catch { /* klientské tabulky ještě nejsou */ }
+
+  try {
+    const [rv] = await sql`
+      SELECT COUNT(*)::int AS n, COALESCE(AVG(rating), 0)::float AS avg,
+             COUNT(*) FILTER (WHERE rating <= 3)::int AS low
+      FROM client_reviews
+      WHERE team_id = ${teamId} AND to_char(created_at, 'YYYY-MM') = ${month}`;
+    const n = num(rv?.n), avg = num(rv?.avg), low = num(rv?.low);
+    if (n > 0) {
+      const stars = avg.toFixed(1).replace('.', ',');
+      add({
+        group: 'guests', tone: low > 0 ? 'warn' : 'good', icon: 'award',
+        title: `Hodnocení ${stars}/5 z ${plural(n, 'odpovědi', 'odpovědí', 'odpovědí')}`,
+        text: low > 0
+          ? `${plural(low, 'host dal', 'hosté dali', 'hostů dalo')} tři hvězdy a míň. Tohle je jediné místo, kde se dozvíš důvod dřív, než host přestane chodit.`
+          : 'Žádné hodnocení pod čtyři hvězdy — obsluha i nabídka sedí.',
+        action: low > 0
+          ? 'Projdi si komentáře v Klientu → Hodnocení a odpověz. Host, kterému se odpoví, se vrací častěji než ten, kdo si jen postěžoval.'
+          : undefined,
+        evidence: `${n} hodnocení, ${low} pod 4 hvězdy`,
+      });
+    }
+  } catch { /* nepodstatné */ }
+
+  try {
+    const [co] = await sql`
+      SELECT COUNT(*)::int AS n, COALESCE(SUM(total), 0)::int AS total,
+             COUNT(*) FILTER (WHERE storyous_order_id IS NULL)::int AS off_pos,
+             COALESCE(SUM(total) FILTER (WHERE storyous_order_id IS NULL), 0)::int AS off_total
+      FROM client_orders
+      WHERE team_id = ${teamId} AND status = 'done'
+        AND to_char(created_at, 'YYYY-MM') = ${month}`;
+    const n = num(co?.n), total = num(co?.total), offPos = num(co?.off_pos), offTotal = num(co?.off_total);
+    if (n > 0) {
+      add({
+        group: 'guests', tone: offPos > 0 ? 'warn' : 'good', icon: 'clipboard',
+        title: `${plural(n, 'objednávka', 'objednávky', 'objednávek')} od stolu za ${czk(total)}`,
+        text: offPos > 0
+          ? `Z toho ${offPos}× (${czk(offTotal)}) se nepropsalo do pokladny, takže v tržbách výš to není.`
+          : 'Všechny dorazily do pokladny, takže sedí s uzávěrkou i s tržbou.',
+        action: offPos > 0
+          ? 'Zapni v Klientu → Objednávky automatické odeslání do pokladny, nebo je doúčtuj u kasy. Jinak se rozejde tržba s tím, co se opravdu prodalo.'
+          : undefined,
+        impact: offPos > 0 ? offTotal : undefined,
+        evidence: `${n} objednávek, ${offPos} mimo pokladnu`,
+      });
+      if (revenue > 0 && total > 0) {
+        add({
+          group: 'guests', tone: 'info', icon: 'coins',
+          title: `Objednávky od stolu jsou ${pct(total, revenue)} % tržby`,
+          text: `${czk(total)} z ${czk(revenue)}. Objednávka z telefonu nezabírá čas obsluze a bývá o něco vyšší, protože si host prohlédne celé menu.`,
+          action: 'Dej QR na každý stůl, ne jen na některé — podíl obvykle vyskočí během dvou týdnů.',
+        });
+      }
+    }
+  } catch { /* nepodstatné */ }
+
   // Seřazeno tak, aby nahoře bylo to, co stojí nejvíc peněz.
   const order = { warn: 0, info: 1, good: 2 } as const;
   out.sort((a, b) => (order[a.tone] - order[b.tone]) || ((b.impact ?? 0) - (a.impact ?? 0)));
@@ -549,6 +673,7 @@ export async function GET(req: NextRequest) {
       products: out.filter(a => a.group === 'products').length,
       people: out.filter(a => a.group === 'people').length,
       stock: out.filter(a => a.group === 'stock').length,
+      guests: out.filter(a => a.group === 'guests').length,
     },
   });
 }

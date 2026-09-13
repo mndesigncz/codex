@@ -145,6 +145,49 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* ignore */ }
 
+  // ---- Akce: ruční náklady do výdajů ----------------------------------------
+  // events.costs se dosud počítaly jen uvnitř Akcí. Nákup na akci je ale
+  // výdaj jako každý jiný, takže patří do přehledu peněz.
+  let eventsRevenue = 0, eventsWithClosing = 0;
+  try {
+    const evs = await sql`
+      SELECT id, title, date, revenue, costs, (SELECT COUNT(*)::int FROM cash_closings cc WHERE cc.event_id = events.id) AS closings
+      FROM events
+      WHERE team_id = ${u.team_id} AND date >= ${month + '-01'} AND date < to_char((${month + '-01'}::date + INTERVAL '1 month'), 'YYYY-MM-DD')
+        AND status <> 'cancelled'`;
+    for (const e of evs as any[]) {
+      if (num(e.costs) > 0) ledger.push({ date: String(e.date), kind: 'expense', label: `Náklady akce — ${e.title}`, amount: num(e.costs) });
+      if (num(e.revenue) > 0) { eventsRevenue += num(e.revenue); if (Number(e.closings) > 0) eventsWithClosing++; }
+    }
+  } catch { /* akce nemusí existovat */ }
+
+  // ---- Hostovská strana: objednávky od stolu ---------------------------------
+  // Objednávka, která nedotekla do pokladny (nespárovaný stůl nebo položka bez
+  // produktu), není v tržbě z uzávěrek. Vedení to má vidět, ne hádat.
+  let guest = { orders: 0, total: 0, offPos: 0, offPosTotal: 0, members: 0, newMembers: 0, couponsRedeemed: 0 };
+  try {
+    const [go] = await sql`
+      SELECT COUNT(*)::int AS n, COALESCE(SUM(total), 0)::int AS total,
+             COUNT(*) FILTER (WHERE storyous_order_id IS NULL)::int AS off_n,
+             COALESCE(SUM(total) FILTER (WHERE storyous_order_id IS NULL), 0)::int AS off_total
+      FROM client_orders
+      WHERE team_id = ${u.team_id} AND status = 'done'
+        AND created_at >= ${month + '-01'}::timestamp AND created_at < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
+    const [gm] = await sql`
+      SELECT COUNT(*)::int AS members,
+             COUNT(*) FILTER (WHERE joined_at >= ${month + '-01'}::timestamp AND joined_at < (${month + '-01'}::timestamp + INTERVAL '1 month'))::int AS new_members
+      FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
+    const [gc] = await sql`
+      SELECT COUNT(*)::int AS n FROM client_coupon_claims
+      WHERE team_id = ${u.team_id} AND redeemed_at >= ${month + '-01'}::timestamp AND redeemed_at < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
+    guest = {
+      orders: Number(go?.n) || 0, total: Number(go?.total) || 0,
+      offPos: Number(go?.off_n) || 0, offPosTotal: Number(go?.off_total) || 0,
+      members: Number(gm?.members) || 0, newMembers: Number(gm?.new_members) || 0,
+      couponsRedeemed: Number(gc?.n) || 0,
+    };
+  } catch { /* hostovská část nemusí být zapnutá */ }
+
   ledger.sort((a, b) => b.date.localeCompare(a.date));
 
   // ---- Wages from attendance × hourly rates (the payroll view of labour). ----
@@ -276,6 +319,28 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  if (guest.offPos > 0) {
+    insights.push({
+      tone: 'warn', icon: 'warning',
+      title: `${guest.offPos}× objednávka od stolu nedotekla do pokladny (${guest.offPosTotal.toLocaleString('cs-CZ')} Kč)`,
+      text: 'Tyhle tržby nejsou v uzávěrce ani v pokladně. Spáruj stoly s pokladnou a doplň produktům položky z kasy, jinak čísla nesedí.',
+    });
+  }
+  if (eventsWithClosing > 0) {
+    insights.push({
+      tone: 'info', icon: 'calendarCheck',
+      title: `${eventsWithClosing}× akce má vyplněnou tržbu i uzávěrku`,
+      text: 'Tržba z uzávěrky je v přehledu; ruční výsledek u akce je jen pro ni. Ať nepočítáš totéž dvakrát, drž se jednoho zdroje.',
+    });
+  }
+  if (guest.couponsRedeemed > 0) {
+    insights.push({
+      tone: 'info', icon: 'gift',
+      title: `Uplatněno ${guest.couponsRedeemed} věrnostních kuponů`,
+      text: 'Odměny se vydávají ze skladu, ale nemají vlastní náklad. Počítej s nimi při marži, nebo jim dej cenu v Menu.',
+    });
+  }
+
   return NextResponse.json({
     month, prevMonth,
     summary: {
@@ -286,7 +351,9 @@ export async function GET(req: NextRequest) {
       prevRevenue,
       closingsCount: real.length,
       diffSum, diffAbs,
+      eventsRevenue,
     },
+    guest,
     ledger,
     insights,
   });

@@ -85,6 +85,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [nextEvent, setNextEvent] = useState<any | null>(null);
   const [posToday, setPosToday] = useState<any | null>(null);
+  const [guests, setGuests] = useState<any | null>(null);
   // First-steps checklist for a fresh team; goes away once done or dismissed.
   const [onboardingDismissed, setOnboardingDismissed] = useState(true);
   useEffect(() => {
@@ -140,6 +141,10 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         setPinnedShare(team?.pinnedShare ?? null);
         fetch(`/api/pos/summary?date=${pragueToday()}`).then(r => r.json())
           .then(d => setPosToday(d?.connected && d.bills != null ? d : null)).catch(() => {});
+        // Managero client běží vedle appky; dashboard z něj ukáže jen to,
+        // co po vedení něco chce — objednávky, rezervace, nová hodnocení.
+        fetch('/api/client/admin/summary').then(r => r.json())
+          .then(d => setGuests(d?.enabled ? d : null)).catch(() => {});
         fetch('/api/events').then(r => r.json()).then(d => {
           const today0 = pragueToday();
           const up = (Array.isArray(d.events) ? d.events : [])
@@ -239,6 +244,54 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         </p>
       </div>
     ) : null,
+    guests: guests ? (() => {
+      const go = (tab: string) => { window.location.href = `/employer/overview?mode=client&tab=${tab}`; };
+      const waiting = (guests.orders?.new ?? 0) + (guests.reservations?.requested ?? 0);
+      return (
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="font-bold text-[#16181A] min-w-0 flex items-center gap-2">
+              <Icon name="gift" size={17} className="shrink-0 text-black/40" />
+              <span className="truncate">Hosté a věrnost</span>
+            </p>
+            <button onClick={() => go('overview')} className="tap-target-sm shrink-0 text-sm text-[#5B7A08] font-semibold">Managero client →</button>
+          </div>
+          {waiting > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              {(guests.orders?.new ?? 0) > 0 && (
+                <button onClick={() => go('orders')} className="tap-target-sm rounded-full bg-[#C8F542]/25 border border-[#C8F542]/50 px-3 py-1.5 text-xs font-bold text-[#3E5406]">
+                  {guests.orders.new}× objednávka od stolu čeká
+                </button>
+              )}
+              {(guests.reservations?.requested ?? 0) > 0 && (
+                <button onClick={() => go('reservations')} className="tap-target-sm rounded-full bg-amber-500/15 border border-amber-500/35 px-3 py-1.5 text-xs font-bold text-amber-900">
+                  {guests.reservations.requested}× rezervace ke schválení
+                </button>
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2 mt-2.5">
+            <button onClick={() => go('customers')} className="text-left rounded-2xl bg-black/[0.035] px-3 py-2.5 hover:bg-black/[0.06] transition">
+              <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">Členů</p>
+              <p className="text-lg font-bold tabular-nums text-[#16181A] leading-tight">{guests.members ?? 0}</p>
+              <p className="text-[11px] text-black/40 leading-snug">+{guests.newMembers30 ?? 0} za 30 dní</p>
+            </button>
+            <button onClick={() => go('orders')} className="text-left rounded-2xl bg-black/[0.035] px-3 py-2.5 hover:bg-black/[0.06] transition">
+              <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">Dnes od stolu</p>
+              <p className="text-lg font-bold tabular-nums text-[#16181A] leading-tight">{guests.orders?.today ?? 0}</p>
+              <p className="text-[11px] text-black/40 leading-snug">{guests.reservations?.today ?? 0} rezervací</p>
+            </button>
+            <button onClick={() => go('customers')} className="text-left rounded-2xl bg-black/[0.035] px-3 py-2.5 hover:bg-black/[0.06] transition">
+              <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">Hodnocení</p>
+              <p className="text-lg font-bold tabular-nums text-[#16181A] leading-tight">{guests.reviews?.avg != null ? String(guests.reviews.avg).replace('.', ',') : '–'}</p>
+              <p className={`text-[11px] leading-snug ${(guests.reviews?.low7 ?? 0) > 0 ? 'text-amber-700 font-semibold' : 'text-black/40'}`}>
+                {(guests.reviews?.low7 ?? 0) > 0 ? `${guests.reviews.low7} nízkých za týden` : `${guests.reviews?.new7 ?? 0} nových za týden`}
+              </p>
+            </button>
+          </div>
+        </div>
+      );
+    })() : null,
     nextEvent: nextEvent ? (
       <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition-all">
         <div className="flex items-center justify-between gap-3 flex-wrap">
