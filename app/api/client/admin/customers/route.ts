@@ -9,13 +9,22 @@ export async function GET(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const q = String(new URL(req.url).searchParams.get('q') ?? '').trim().toLowerCase();
+  // Hledání patří do SQL: filtr v JS až po LIMIT 500 znamenal, že člena za
+  // pětistou hranicí nešlo najít a „total" byl zavádějícím způsobem uříznutý.
+  // Speciální znaky LIKE (% _ \) escapujeme, ať se text bere doslovně.
+  const like = '%' + q.replace(/[\\%_]/g, c => '\\' + c) + '%';
   const rows = await sql`
     SELECT m.customer_id AS id, us.name, us.email, m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at,
            (SELECT COUNT(*)::int FROM client_reservations r WHERE r.customer_id = m.customer_id AND r.team_id = m.team_id) AS reservations,
            (SELECT COUNT(*)::int FROM client_coupon_claims c WHERE c.customer_id = m.customer_id AND c.team_id = m.team_id AND c.redeemed_at IS NULL) AS open_coupons
     FROM client_memberships m JOIN users us ON us.id = m.customer_id
     WHERE m.team_id = ${u.team_id}
+      AND (${q} = '' OR LOWER(us.name) LIKE ${like} ESCAPE '\\' OR LOWER(us.email) LIKE ${like} ESCAPE '\\')
     ORDER BY m.last_visit_at DESC NULLS LAST, m.joined_at DESC LIMIT 500` as any[];
-  const customers = rows.filter(r => !q || String(r.name).toLowerCase().includes(q) || String(r.email).toLowerCase().includes(q));
-  return NextResponse.json({ customers, total: rows.length });
+  const [cnt] = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM client_memberships m JOIN users us ON us.id = m.customer_id
+    WHERE m.team_id = ${u.team_id}
+      AND (${q} = '' OR LOWER(us.name) LIKE ${like} ESCAPE '\\' OR LOWER(us.email) LIKE ${like} ESCAPE '\\')` as any[];
+  return NextResponse.json({ customers: rows, total: cnt?.total ?? rows.length });
 }
