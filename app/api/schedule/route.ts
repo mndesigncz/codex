@@ -104,10 +104,18 @@ export async function POST(req: Request) {
   const list: any[] = Array.isArray(body.shifts) ? body.shifts : [];
   if (list.length === 0) return NextResponse.json({ inserted: 0 });
 
+  // Kdo z týmu smí dostat směnu — načteno jednou. Bez téhle kontroly by šlo
+  // uhádnutým employeeId založit směnu cizímu uživateli (jeho jméno pak uniká
+  // do rozvrhu týmu A a oběti se objeví fantomová směna v jejím rozvrhu/docházce).
+  const memberIds = new Set(
+    ((await sql`SELECT id FROM users WHERE team_id = ${ctx.teamId}`) as any[]).map(u => u.id),
+  );
+
   let inserted = 0;
   for (const s of list) {
     const employeeId = parseInt(s.employeeId);
     if (!employeeId || !s.date || !s.startTime || !s.endTime) continue;
+    if (!memberIds.has(employeeId)) continue; // cizí zaměstnanec — přeskoč
     await sql`
       INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
       VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${s.startTime}, ${s.endTime}, ${s.type ?? 'flexible'})`;
