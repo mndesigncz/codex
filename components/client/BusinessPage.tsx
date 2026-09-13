@@ -33,6 +33,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
     return (['menu', 'reserve', 'order', 'loyalty'] as string[]).includes(t ?? '') ? (t as Tab) : 'menu';
   });
   const [flash, setFlash] = useState('');
+  const [joining, setJoining] = useState(false);
   const load = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}`).then(r => r.status === 404 ? (setNotFound(true), null) : r.json()).then(x => x && setD(x)).catch(() => setNotFound(true)), [slug]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
@@ -50,11 +51,15 @@ export default function BusinessPage({ slug }: { slug: string }) {
     ...(b.loyaltyOn ? [{ id: 'loyalty' as Tab, label: 'Věrnost', icon: 'gift' }] : []),
   ];
   const join = async () => {
-    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST' });
-    if (r.status === 401) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
-    if (r.ok) { setFlash('Jsi členem. Vítej.'); load(); return; }
-    const d = await r.json().catch(() => ({}));
-    setFlash(d.error || 'Přidat se teď nepovedlo. Zkus to prosím znovu.');
+    if (joining) return;
+    setJoining(true);
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST' });
+      if (r.status === 401) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
+      if (r.ok) { setFlash('Jsi členem. Vítej.'); load(); return; }
+      const d = await r.json().catch(() => ({}));
+      setFlash(d.error || 'Přidat se teď nepovedlo. Zkus to prosím znovu.');
+    } finally { setJoining(false); }
   };
 
   return (
@@ -108,7 +113,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">do „{me.nextTierLabel}" ještě {Math.max(0, me.nextTierAt - me.visits)} návštěv</p>}
               </div>
             ) : (
-              <button onClick={join} className="tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition"
+              <button onClick={join} disabled={joining} className="tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
                 style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> Stát se členem</button>
             )}
           </div>

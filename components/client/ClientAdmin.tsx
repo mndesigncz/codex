@@ -298,7 +298,14 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
   const [range, setRange] = useState<'today' | 'upcoming' | 'past'>('upcoming');
   const [d, setD] = useState<any | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
-  const load = useCallback(() => fetch(`/api/client/admin/reservations?range=${range}`).then(r => r.json()).then(setD).catch(() => setD({ reservations: [], tables: [] })), [range]);
+  const seq = useRef(0);
+  // Přepnutí období (Dnes/Nadcházející/Minulé) nesmí nechat starou odpověď
+  // přepsat novou; tvar odpovědi normalizujeme proti { error } (200).
+  const load = useCallback(() => {
+    const my = ++seq.current;
+    const safe = (x: any) => (my === seq.current ? setD(x && Array.isArray(x.reservations) ? x : { reservations: [], tables: [] }) : undefined);
+    return fetch(`/api/client/admin/reservations?range=${range}`).then(r => r.json()).then(safe).catch(() => safe(null));
+  }, [range]);
   useEffect(() => { setD(null); load(); }, [load]);
   const act = async (id: number, body: any) => {
     setBusy(id);
@@ -433,7 +440,15 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
   const [q, setQ] = useState(initialQuery); const [d, setD] = useState<any | null>(null);
   useEffect(() => { setQ(initialQuery); }, [initialQuery]);
   const [openId, setOpenId] = useState<number | null>(null); const [ledger, setLedger] = useState<any[] | null>(null);
-  const load = useCallback(() => fetch(`/api/client/admin/customers?q=${encodeURIComponent(q)}`).then(r => r.json()).then(setD).catch(() => setD({ customers: [], total: 0 })), [q]);
+  const seq = useRef(0);
+  // Sekvenční čítač: pomalejší odpověď na starší dotaz nesmí přepsat novější
+  // výsledek. A tvar odpovědi normalizujeme, ať { error } (200) nespadne na
+  // d.customers.length při renderu.
+  const load = useCallback(() => {
+    const my = ++seq.current;
+    const safe = (x: any) => (my === seq.current ? setD(x && Array.isArray(x.customers) ? x : { customers: [], total: 0 }) : undefined);
+    return fetch(`/api/client/admin/customers?q=${encodeURIComponent(q)}`).then(r => r.json()).then(safe).catch(() => safe(null));
+  }, [q]);
   useEffect(() => { const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q]);
   const adjust = async (id: number, name: string) => {
     const v = prompt(`Body pro ${name} (kladné přičtou, záporné odečtou):`); if (!v) return;

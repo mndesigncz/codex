@@ -36,6 +36,7 @@ export default function Tasks({ user }: Props) {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'week'>('list');
   const [showLater, setShowLater] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
   const { weekStart } = useCurrency();
 
   const userId = parseInt(user.id ?? '0');
@@ -64,8 +65,10 @@ export default function Tasks({ user }: Props) {
         body: JSON.stringify({ id: task.id, status: newStatus }),
       });
       if (res.ok) setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+      else { setSaveErr('Změnu stavu se nepodařilo uložit.'); setTimeout(() => setSaveErr(''), 4000); }
     } catch (e) {
       console.error(e);
+      setSaveErr('Změnu stavu se nepodařilo uložit.'); setTimeout(() => setSaveErr(''), 4000);
     }
   };
 
@@ -169,6 +172,8 @@ export default function Tasks({ user }: Props) {
       <PageHeader title="Úkoly" subtitle="Co je dnes na tobě — a co je pro kohokoli."
         primary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
           options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />} />
+
+      {saveErr && <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-600">{saveErr}</div>}
 
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>

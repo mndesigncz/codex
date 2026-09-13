@@ -111,6 +111,7 @@ function MyRewardsInner() {
   const [catalog, setCatalog] = useState<any[]>([]);
   const [myRedemptions, setMyRedemptions] = useState<any[]>([]);
   const [shopMsg, setShopMsg] = useState('');
+  const [redeemingId, setRedeemingId] = useState<number | null>(null);
   const loadShop = () =>
     fetch('/api/rewards/catalog').then(r => r.json()).then(d => {
       setCatalog(Array.isArray(d.catalog) ? d.catalog : []);
@@ -118,13 +119,17 @@ function MyRewardsInner() {
     }).catch(() => {});
   useEffect(() => { loadShop(); }, []);
   const redeem = async (rw: any) => {
+    if (redeemingId !== null) return;
     if (!confirm(`Vyměnit ${rw.cost} bodů za „${rw.title}"? Vedení žádost schválí.`)) return;
-    const res = await fetch('/api/rewards/catalog', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rewardId: rw.id }),
-    }).catch(() => null);
-    if (res?.ok) { setShopMsg('Žádost odeslána — počká na schválení vedením. ✓'); loadShop(); setTimeout(() => setShopMsg(''), 4000); }
-    else setShopMsg('Žádost se nepodařilo odeslat.');
+    setRedeemingId(rw.id);
+    try {
+      const res = await fetch('/api/rewards/catalog', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rewardId: rw.id }),
+      }).catch(() => null);
+      if (res?.ok) { setShopMsg('Žádost odeslána — počká na schválení vedením. ✓'); loadShop(); setTimeout(() => setShopMsg(''), 4000); }
+      else setShopMsg('Žádost se nepodařilo odeslat.');
+    } finally { setRedeemingId(null); }
   };
   const [reviews, setReviews] = useState<Review[]>([]);
   const [items, setItems] = useState<FeedbackItem[]>([]);
@@ -271,7 +276,7 @@ function MyRewardsInner() {
                     <p className="text-sm font-semibold text-[#16181A]">{rw.title}</p>
                     <p className="text-xs text-black/45 tabular-nums">{rw.cost} bodů</p>
                   </div>
-                  <button onClick={() => redeem(rw)} disabled={!afford || pending}
+                  <button onClick={() => redeem(rw)} disabled={!afford || pending || redeemingId !== null}
                     className={`tap-target-sm shrink-0 ml-auto rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition ${
                       pending ? 'bg-amber-500/12 text-amber-700 cursor-default'
                       : afford ? 'bg-[#16181A] text-white hover:bg-black'

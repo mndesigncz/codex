@@ -137,9 +137,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   const status = action === 'approve' ? 'approved' : 'declined';
-  await sql`
+  // Atomicky přes status='pending': dva souběžné požadavky (dvojklik) tak
+  // nevyřídí tutéž žádost dvakrát a nepošlou dvojí oznámení/audit. Body jsou
+  // navíc chráněné idempotentním ledgerem níž (ON CONFLICT DO NOTHING).
+  const done = await sql`
     UPDATE reward_redemptions SET status = ${status}, decided_by = ${u.id}, decided_at = NOW()
-    WHERE id = ${id}`;
+    WHERE id = ${id} AND status = 'pending' RETURNING id`;
+  if (!done.length) return NextResponse.json({ error: 'Žádost už je vyřízená' }, { status: 409 });
 
   if (action === 'approve') {
     // Deduct through the standard points ledger — standings update themselves.

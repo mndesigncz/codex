@@ -120,8 +120,16 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
 
   const remove = async (r: Receipt) => {
     if (!confirm('Smazat účtenku?')) return;
-    setReceipts(list => list.filter(x => x.id !== r.id));
-    try { await fetch(`/api/receipts?id=${r.id}`, { method: 'DELETE' }); } catch { /* optimistic */ }
+    let snapshot: Receipt[] = [];
+    setReceipts(list => { snapshot = list; return list.filter(x => x.id !== r.id); });
+    try {
+      const res = await fetch(`/api/receipts?id=${r.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Selhalo mazání (403/500/síť) — vrať účtenku zpět, ať nezmizí naoko.
+      setReceipts(snapshot);
+      setErr('Účtenku se nepodařilo smazat.');
+    }
   };
 
   return (
