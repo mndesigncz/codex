@@ -14,7 +14,15 @@ export async function GET(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const p = await ensureProfile(u.team_id);
-  const boards = await sql`SELECT slug, name FROM menu_boards WHERE team_id = ${u.team_id} AND enabled IS NOT FALSE ORDER BY id`;
+  const boards = await sql`
+    SELECT b.slug, b.name,
+           COUNT(i.id)::int AS items,
+           COUNT(i.id) FILTER (WHERE i.pos_product_id IS NOT NULL AND i.pos_product_id <> '')::int AS linked
+    FROM menu_boards b
+    LEFT JOIN menu_sections s ON s.board_id = b.id
+    LEFT JOIN menu_items i ON i.section_id = s.id
+    WHERE b.team_id = ${u.team_id} AND b.enabled IS NOT FALSE
+    GROUP BY b.id, b.slug, b.name ORDER BY b.id`;
   const [team] = await sql`SELECT name, opening_hours FROM teams WHERE id = ${u.team_id}`;
   return NextResponse.json({ profile: { ...p, team_name: team?.name, opening_hours: team?.opening_hours ?? {} }, boards, url: `${origin(req)}/client/${p.slug}` });
 }
