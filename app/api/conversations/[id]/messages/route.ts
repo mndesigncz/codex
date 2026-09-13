@@ -31,15 +31,22 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Přístup odepřen' }, { status: 403 });
   }
 
+  // Chat roste bez omezení — nenačítáme celou historii (velký payload i sken),
+  // ale posledních 200 zpráv chronologicky. Vnitřní DESC + LIMIT trefí index
+  // chat_messages(conversation_id, created_at DESC); vnější ASC vrátí pořadí,
+  // které UI čeká (nejnovější dole).
   const messages = await sql`
-    SELECT
-      m.id, m.conversation_id, m.sender_id, m.content,
-      m.attachment_url, m.attachment_type, m.attachment_name, m.created_at,
-      u.name AS sender_name, u.avatar AS sender_avatar
-    FROM chat_messages m
-    JOIN users u ON u.id = m.sender_id
-    WHERE m.conversation_id = ${conversationId}
-    ORDER BY m.created_at ASC`;
+    SELECT * FROM (
+      SELECT
+        m.id, m.conversation_id, m.sender_id, m.content,
+        m.attachment_url, m.attachment_type, m.attachment_name, m.created_at,
+        u.name AS sender_name, u.avatar AS sender_avatar
+      FROM chat_messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.conversation_id = ${conversationId}
+      ORDER BY m.created_at DESC
+      LIMIT 200
+    ) t ORDER BY t.created_at ASC`;
 
   const out = messages.map((m: any) => ({
     id: m.id,
