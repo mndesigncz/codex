@@ -48,15 +48,20 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
     RETURNING id, items, total, status, created_at`;
   await sql`UPDATE client_orders SET external_id = ${'mgr-ord-' + o.id} WHERE id = ${o.id}`;
 
-  // Ověřená objednávka s napojenou pokladnou jde rovnou do kasy a na terminál;
-  // obsluha ji vidí tady i tam. Neověřená čeká na obsluhu.
+  // Do kasy hned, jakmile objednávka projde ochranou výš. O tom, kdo smí
+  // objednat, rozhoduje QR a poloha; jakmile je objednávka přijatá, patří na
+  // terminál. Dřív se čekalo ještě na „ověřenou" objednávku, takže podnik
+  // s vypnutým QR neposlal do kasy nikdy nic a nikde to nebylo vidět.
   let auto: { posNote: string | null; posOk: boolean } | null = null;
-  if (verified && p.order_auto_pos !== false && await getConnection(teamId)) {
-    try { auto = await setOrderStatus(teamId, Number(o.id), 'confirmed'); } catch { auto = null; }
+  if (p.order_auto_pos !== false) {
+    try { auto = await setOrderStatus(teamId, Number(o.id), 'confirmed'); }
+    catch (e) { auto = { posOk: false, posNote: `Objednávku se nepodařilo poslat do kasy: ${String((e as any)?.message ?? e).slice(0, 120)}` }; }
   }
   const straight = !!auto?.posOk;
-  if (!straight) await notifyNewOrder(teamId, me.name, table.name, built.total, Number(o.id));
-  return NextResponse.json({ ok: true, straight, order: { ...o, status: auto ? 'confirmed' : o.status, tableName: table.name } });
+  // Obsluze se dá vědět vždycky, když objednávka není v kase — ať už proto,
+  // že se posílat nemá, nebo proto, že se poslat nepovedlo.
+  if (!straight) await notifyNewOrder(teamId, me.name, table.name, built.total, Number(o.id), auto?.posNote ?? null);
+  return NextResponse.json({ ok: true, straight, posNote: straight ? null : auto?.posNote ?? null, order: { ...o, status: auto?.posOk ? 'confirmed' : o.status, tableName: table.name } });
 }
 
 export async function GET(_req: Request, { params }: { params: { slug: string } }) {

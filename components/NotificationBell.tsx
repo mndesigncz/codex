@@ -17,6 +17,7 @@ interface Notif {
 
 const typeIcon: Record<string, string> = {
   chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
+  warning: 'warning', success: 'check',
 };
 
 export default function NotificationBell() {

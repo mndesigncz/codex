@@ -74,6 +74,19 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
     }
   }, [d]);
 
+  /* Zopakovat odeslání do kasy. Objednávka, kterou pokladna zrovna nevzala,
+     se jinak už na terminál nikdy nedostane. */
+  const toPos = async (id: number) => {
+    setBusy(id);
+    try {
+      const r = await fetch('/api/client/staff/inbox', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'pos' }) });
+      const x = await r.json().catch(() => ({}));
+      toast(x.posNote || x.error || (x.ok ? 'Objednávka je v pokladně.' : 'Do pokladny to nešlo.'));
+      await reload();
+    } catch { toast('Spojení se serverem selhalo.'); }
+    setBusy(null);
+  };
+
   const act = async (id: number, status: string) => {
     setBusy(id);
     try {
@@ -96,8 +109,31 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
   const recent = orders.filter(o => ['done', 'declined'].includes(o.status));
   const reservations: any[] = d.reservations ?? [];
 
+  // Řetězec k terminálu. Vypnutá pokladna, nespárovaný stůl a nenavázané
+  // položky vypadají v příjmu úplně stejně jako všechno v pořádku — proto
+  // se to říká nahoře a jmenovitě.
+  const pos = d.pos ?? {};
+  const vady: string[] = [];
+  if (pos.connected === false) vady.push('Pokladna Storyous není připojená (Nastavení → Pokladna).');
+  else {
+    if (pos.autoPos === false) vady.push('Automatické odesílání do kasy je vypnuté (Klient → Nastavení).');
+    if (pos.tables > 0 && pos.tablesPaired === 0) vady.push(`Žádný z ${pos.tables} stolů není spárovaný s pokladnou (Klient → Stoly → Načíst z pokladny).`);
+    else if (pos.tablesPaired < pos.tables) vady.push(`${pos.tables - pos.tablesPaired} z ${pos.tables} stolů není spárovaných s pokladnou.`);
+    if (pos.items > 0 && pos.itemsLinked < pos.items) vady.push(`${pos.items - pos.itemsLinked} z ${pos.items} položek menu nemá produkt v kase (Klient → Menu → Tisk na terminálu).`);
+  }
+
   return (
     <div className="space-y-5">
+      {!compact && vady.length > 0 && (
+        <section aria-labelledby="h-pos" className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.07] p-4">
+          <p id="h-pos" className="text-sm font-bold text-amber-900 flex items-center gap-2">
+            <Icon name="warning" size={16} className="shrink-0" />Objednávky se nevytisknou na terminálu
+          </p>
+          <ul className="mt-1.5 space-y-1 text-[13px] text-amber-900/90">
+            {vady.map((v, i) => <li key={i} className="flex gap-2"><span aria-hidden>·</span><span>{v}</span></li>)}
+          </ul>
+        </section>
+      )}
       {flash && <p role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
       {compact ? (
         <details className="group">
@@ -108,13 +144,13 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       {news.length > 0 && (
         <section className="rounded-3xl bg-amber-500/[0.10] border border-amber-500/40 p-4 space-y-3">
           <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-amber-800" />{news.length === 1 ? 'Nová objednávka od stolu' : `${news.length} nové objednávky od stolu`}</h2>
-          <ul className="space-y-3">{news.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} />)}</ul>
+          <ul className="space-y-3">{news.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
         </section>
       )}
       {inProgress.length > 0 && (
         <section>
           <h2 className="text-sm font-bold tracking-tight mb-2">Připravuje se</h2>
-          <ul className="space-y-3">{inProgress.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} />)}</ul>
+          <ul className="space-y-3">{inProgress.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
         </section>
       )}
       {!compact && reservations.length > 0 && (
@@ -144,7 +180,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
   );
 }
 
-function OrderRow({ o, busy, act }: { o: any; busy: boolean; act: (id: number, s: string) => void }) {
+function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: number, s: string) => void; toPos?: (id: number) => void }) {
   const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new;
   return (
     <li className="rounded-2xl bg-white/70 border border-black/[0.06] p-3.5">
@@ -159,11 +195,21 @@ function OrderRow({ o, busy, act }: { o: any; busy: boolean; act: (id: number, s
             {(o.items ?? []).map((l: any, i: number) => <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{l.price * l.count} Kč</span></li>)}
           </ul>
           {o.note && <p className="text-xs text-black/60 mt-1">„{o.note}"</p>}
-          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{o.total} Kč</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}</p>
+          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{o.total} Kč</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
+            {o.storyous_order_id
+              ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]"><span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />V kase</span>
+              : o.status !== 'declined' && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Není v kase</span>}
+          </p>
+          {!o.storyous_order_id && o.status !== 'declined' && o.pos_note && (
+            <p className="mt-1 text-[11px] text-amber-900 leading-snug">{o.pos_note}</p>
+          )}
         </div>
         <div className="flex gap-1.5 flex-wrap justify-end ml-auto">
           {o.status === 'new' && <><Button size="sm" variant="accent" icon="check" loading={busy} onClick={() => act(o.id, 'confirmed')}>Přijmout</Button><Button size="sm" variant="ghost" loading={busy} onClick={() => { if (confirm('Objednávku odmítnout? Host dostane zprávu.')) act(o.id, 'declined'); }}>Odmítnout</Button></>}
           {o.status === 'confirmed' && <Button size="sm" variant="primary" loading={busy} onClick={() => act(o.id, 'done')}>Hotovo</Button>}
+          {toPos && !o.storyous_order_id && o.status !== 'declined' && (
+            <Button size="sm" variant="secondary" icon="receipt" loading={busy} onClick={() => toPos(o.id)}>Poslat do kasy</Button>
+          )}
         </div>
       </div>
     </li>
