@@ -105,7 +105,7 @@ export const ORDER_FLOW: Record<string, string[]> = { new: ['confirmed', 'declin
  * viděla obsluha objednávku, která nikdy nedojela na kasu, a neměla jak
  * zjistit proč — a to je přesně ta chvíle, kdy appka ztratí důvěru.
  */
-export async function sendToPos(teamId: number, id: number): Promise<{ posOk: boolean; posNote: string | null }> {
+export async function sendToPos(teamId: number, id: number): Promise<{ posOk: boolean; posNote: string | null; posDetail?: string }> {
   const [o] = await sql`
     SELECT o.*, us.name AS customer_name, t.storyous_desk_id
     FROM client_orders o JOIN users us ON us.id = o.customer_id
@@ -206,7 +206,9 @@ export async function sendToPos(teamId: number, id: number): Promise<{ posOk: bo
       ? 'Objednávka je v pokladně přijatá — terminál ji tiskne podle nastavení tiskáren.'
       : `Objednávka je v pokladně, ale čeká na přijetí — dokud ji na terminálu nikdo nepřijme, nevytiskne se a pokladna ji po pár minutách sama odmítne.${jak ? ` (potvrzení odmítnuto: ${jak})` : ''}`;
     await save(note, String(r.orderId), stav);
-    return { posOk: true, posNote: note };
+    // Odpověď pokladny jen pro obsluhu, která na tlačítko klikla — v seznamu
+    // by z ní byl nečitelný blok, ale při hledání příčiny je k nezaplacení.
+    return { posOk: true, posNote: note, posDetail: prijato ? undefined : `${JSON.stringify(r.raw ?? {}).slice(0, 400)}${jak ? ` | potvrzení: ${jak}` : ''}` };
   } catch (e) {
     // I neznámou chybu je potřeba pojmenovat: „nepovedlo se" se nedá opravit.
     const note = e instanceof StoryousError
