@@ -24,7 +24,12 @@ export async function POST(request: Request) {
   }
 
   const { cardId } = await request.json();
-  const [card] = await sql`SELECT id, title, description, "column" FROM planning_cards WHERE id = ${cardId}`;
+  // Karta musí patřit tomuhle týmu (vlastnictví přes created_by → users.team_id).
+  // Bez téhle podmínky by šlo publikovat cizí kartu a přepsat jí vazbu na úkol.
+  const [card] = await sql`
+    SELECT p.id, p.title, p.description, p."column" FROM planning_cards p
+    JOIN users u ON u.id = p.created_by
+    WHERE p.id = ${cardId} AND u.team_id = ${teamId}`;
   if (!card) return NextResponse.json({ error: 'Karta nenalezena' }, { status: 404 });
 
   try {

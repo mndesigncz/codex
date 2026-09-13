@@ -463,7 +463,7 @@ export async function GET(req: NextRequest) {
     for (const r of await sql`
       SELECT supplier, total_cost FROM orders
       WHERE team_id = ${teamId} AND status = 'received'
-        AND to_char(COALESCE(received_at, created_at), 'YYYY-MM') = ${month}` as any[]) {
+        AND to_char((COALESCE(received_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}` as any[]) {
       const amt = num(r.total_cost);
       purchases += amt;
       const s = String(r.supplier ?? 'Bez dodavatele');
@@ -471,7 +471,7 @@ export async function GET(req: NextRequest) {
     }
     for (const r of await sql`
       SELECT supplier, amount FROM receipts
-      WHERE team_id = ${teamId} AND to_char(created_at, 'YYYY-MM') = ${month}` as any[]) {
+      WHERE team_id = ${teamId} AND to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}` as any[]) {
       const amt = num(r.amount);
       purchases += amt;
       const s = String(r.supplier ?? 'Bez dodavatele');
@@ -545,13 +545,13 @@ export async function GET(req: NextRequest) {
       SELECT
         (SELECT COUNT(*)::int FROM client_memberships WHERE team_id = ${teamId}) AS members,
         (SELECT COUNT(*)::int FROM client_memberships
-          WHERE team_id = ${teamId} AND to_char(joined_at, 'YYYY-MM') = ${month}) AS new_members,
+          WHERE team_id = ${teamId} AND to_char((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}) AS new_members,
         (SELECT COUNT(*)::int FROM client_memberships
           WHERE team_id = ${teamId} AND last_visit_at IS NOT NULL
             AND last_visit_at < NOW() - INTERVAL '60 days') AS sleeping,
         (SELECT COUNT(*)::int FROM client_coupon_claims
           WHERE team_id = ${teamId} AND redeemed_at IS NOT NULL
-            AND to_char(redeemed_at, 'YYYY-MM') = ${month}) AS redeemed,
+            AND to_char((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}) AS redeemed,
         (SELECT COUNT(*)::int FROM client_coupon_claims
           WHERE team_id = ${teamId} AND redeemed_at IS NULL
             AND claimed_at < NOW() - INTERVAL '30 days') AS stale`;
@@ -609,7 +609,7 @@ export async function GET(req: NextRequest) {
       SELECT COUNT(*)::int AS n, COALESCE(AVG(rating), 0)::float AS avg,
              COUNT(*) FILTER (WHERE rating <= 3)::int AS low
       FROM client_reviews
-      WHERE team_id = ${teamId} AND to_char(created_at, 'YYYY-MM') = ${month}`;
+      WHERE team_id = ${teamId} AND to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}`;
     const n = num(rv?.n), avg = num(rv?.avg), low = num(rv?.low);
     if (n > 0) {
       const stars = avg.toFixed(1).replace('.', ',');
@@ -634,7 +634,7 @@ export async function GET(req: NextRequest) {
              COALESCE(SUM(total) FILTER (WHERE storyous_order_id IS NULL), 0)::int AS off_total
       FROM client_orders
       WHERE team_id = ${teamId} AND status = 'done'
-        AND to_char(created_at, 'YYYY-MM') = ${month}`;
+        AND to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}`;
     const n = num(co?.n), total = num(co?.total), offPos = num(co?.off_pos), offTotal = num(co?.off_total);
     if (n > 0) {
       add({

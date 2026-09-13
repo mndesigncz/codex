@@ -25,6 +25,13 @@ const num = (v: any) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// Peněžní pole uzávěrky ořízneme na [0, strop]. Záporná ani absurdně velká
+// částka není data — je to překlep, který by jinak tekl do měsíčních součtů,
+// doporučení i porovnání s kasou (např. „closing_cash = miliarda").
+const CASH_CAP = 100_000_000; // 100 mil. Kč na jednu uzávěrku je strop
+const money = (v: any) => Math.min(Math.max(0, num(v)), CASH_CAP);
+const count = (v: any) => Math.min(Math.max(0, num(v)), 1_000_000);
+
 // cash_closings.shift_employees holds raw user ids; normalise whatever the
 // column gives us (missing column ⇒ undefined, older rows ⇒ empty array).
 const idsOf = (v: any): number[] => {
@@ -458,12 +465,12 @@ export async function POST(request: Request) {
   // The card half of the tips: never in the drawer, so the expected cash must
   // not count it. Clamped to the total — a card half larger than the whole is
   // a typo, not data.
-  const tipsCard = Math.min(Math.max(0, Math.round(Number(b.tipsCard) || 0)), Math.max(0, num(b.tips)));
+  const tipsCard = Math.min(Math.max(0, Math.round(Number(b.tipsCard) || 0)), Math.max(0, money(b.tips)));
   // End-of-shift removal happens AFTER the count, so it can never exceed what
   // was counted — clamp instead of trusting the client.
   const finalRemoval = Math.min(
     Math.max(0, Math.round(Number(b.finalRemoval) || 0)),
-    Math.max(0, num(b.closingCash)),
+    Math.max(0, money(b.closingCash)),
   );
 
   let row: any;
@@ -480,8 +487,8 @@ export async function POST(request: Request) {
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb, ${finalRemoval}, ${eventId},
-        ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
-        ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+        ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
+        ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
   } catch {
    try {
@@ -497,8 +504,8 @@ export async function POST(request: Request) {
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb,
-        ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
-        ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+        ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
+        ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
    } catch {
     try {
@@ -510,8 +517,8 @@ export async function POST(request: Request) {
           cash_removed, self_payout, closing_cash, customers, notes
         ) VALUES (
           ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
-          ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
-          ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+          ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
+          ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
         ) RETURNING *`;
     } catch {
       // approval/shift columns not migrated yet — insert the core row so closings still work.
@@ -522,8 +529,8 @@ export async function POST(request: Request) {
           cash_removed, self_payout, closing_cash, customers, notes
         ) VALUES (
           ${c.teamId}, ${actorId}, ${date}, ${shiftLabel},
-          ${num(b.openingCash)}, ${num(b.cashRevenue)}, ${num(b.cardRevenue)}, ${num(b.tips)}, ${num(b.expenses)},
-          ${num(b.cashRemoved)}, ${num(b.selfPayout)}, ${num(b.closingCash)}, ${num(b.customers)}, ${b.notes || null}
+          ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
+          ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
         ) RETURNING *`;
     }
    }
@@ -633,7 +640,7 @@ export async function POST(request: Request) {
           } catch { cwShift = null; }
         }
 
-        const cwPayout = payDailyCash ? num(cw?.payout) : 0;
+        const cwPayout = payDailyCash ? money(cw?.payout) : 0;
         try {
           await sql`
             INSERT INTO cash_closings (team_id, created_by, date, shift_date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout)

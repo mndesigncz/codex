@@ -284,7 +284,9 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   if (!row) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
 
   const isOwnerOfTeam = role === 'employer' && row.team_id === teamId;
-  const isAuthor = row.created_by === meId;
+  // I autor musí být ve stejném týmu jako řádek — jinak by po přesunu uživatele
+  // mezi týmy zůstala cesta smazat cizí uzávěrku podle created_by.
+  const isAuthor = row.created_by === meId && row.team_id === teamId;
   if (!isOwnerOfTeam && !isAuthor) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   await sql`DELETE FROM cash_closings WHERE id = ${id}`;
