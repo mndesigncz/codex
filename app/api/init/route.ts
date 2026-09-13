@@ -1281,6 +1281,18 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS procedure_runs_team ON procedure_runs (team_id, procedure_id, status)`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, is_read, created_at)`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS inventory_items_team ON inventory_items (team_id)`);
+    // Chat a nástěnka rostou bez omezení; bez indexu na conversation_id/channel
+    // dělá každé načtení konverzací plný sken (4 korelované subselecty na zprávu).
+    await ddl(sql`CREATE INDEX IF NOT EXISTS chat_messages_conv ON chat_messages (conversation_id, created_at DESC)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS conversation_members_conv_user ON conversation_members (conversation_id, user_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS messages_channel ON messages (channel, created_at DESC)`);
+    // inventory_log přibývá řádek na každou odepsanou surovinu — nejrychleji rostoucí log.
+    await ddl(sql`CREATE INDEX IF NOT EXISTS inventory_log_item ON inventory_log (item_id, created_at DESC)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS orders_team ON orders (team_id, created_at DESC)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS receipts_team ON receipts (team_id, created_at DESC)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS reward_redemptions_team_emp ON reward_redemptions (team_id, employee_id)`);
+    // Hlídač zapomenutých odchodů skenuje otevřené záznamy — částečný index je drží levné.
+    await ddl(sql`CREATE INDEX IF NOT EXISTS time_entries_open ON time_entries (clock_in) WHERE clock_out IS NULL`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_orders (
         id SERIAL PRIMARY KEY,

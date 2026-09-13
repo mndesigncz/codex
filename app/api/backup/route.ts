@@ -5,6 +5,8 @@ import { sendBackupEmail } from '@/lib/email';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+// Záloha stahuje obsah mnoha tabulek přes všechny týmy — default 10 s nestačí.
+export const maxDuration = 60;
 
 /**
  * How each table is narrowed to ONE team. A backup e-mail must only ever
