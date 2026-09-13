@@ -96,6 +96,71 @@ export async function buildLines(teamId: number, menuSlug: string | null, lines:
 export const ORDER_FLOW: Record<string, string[]> = { new: ['confirmed', 'declined'], confirmed: ['done', 'declined'] };
 
 /**
+ * Odeslání objednávky do pokladny. Vlastní funkce, ne krok uvnitř změny
+ * stavu, protože se musí dát zopakovat: když pokladna zrovna neodpoví nebo
+ * chybí spárovaný stůl, objednávka nesmí zůstat navždy mimo terminál.
+ *
+ * Výsledek se VŽDY ukládá k objednávce (`pos_note`). Dokud se zahazoval,
+ * viděla obsluha objednávku, která nikdy nedojela na kasu, a neměla jak
+ * zjistit proč — a to je přesně ta chvíle, kdy appka ztratí důvěru.
+ */
+export async function sendToPos(teamId: number, id: number): Promise<{ posOk: boolean; posNote: string | null }> {
+  const [o] = await sql`
+    SELECT o.*, us.name AS customer_name, t.storyous_desk_id
+    FROM client_orders o JOIN users us ON us.id = o.customer_id
+    LEFT JOIN client_tables t ON t.id = o.table_id
+    WHERE o.id = ${id} AND o.team_id = ${teamId}`;
+  if (!o) throw new Error('Objednávka nenalezena');
+  if (o.storyous_order_id) return { posOk: true, posNote: o.pos_note ?? 'Objednávka už v pokladně je.' };
+  if (o.status === 'declined') return { posOk: false, posNote: 'Zamítnutá objednávka se do pokladny neposílá.' };
+
+  const save = async (note: string | null, storyousId: string | null, state: string | null) => {
+    await sql`
+      UPDATE client_orders
+      SET pos_note = ${note}, pos_tried_at = NOW(),
+          storyous_order_id = COALESCE(${storyousId}, storyous_order_id),
+          pos_state = COALESCE(${state}, pos_state), updated_at = NOW()
+      WHERE id = ${id}`;
+  };
+
+  const conn = await getConnection(teamId);
+  if (!conn) {
+    const note = 'Pokladna Storyous není připojená. Připoj ji v Nastavení → Pokladna.';
+    await save(note, null, null);
+    return { posOk: false, posNote: note };
+  }
+  if (!o.storyous_desk_id) {
+    const note = 'Stůl není spárovaný s pokladnou. V Klientu → Stoly dej „Načíst z pokladny", ať se stoly spárují.';
+    await save(note, null, null);
+    return { posOk: false, posNote: note };
+  }
+  const lines = (o.items as any[]) ?? [];
+  const bez = lines.filter(l => !l.posProductId).map(l => String(l.name));
+  if (bez.length) {
+    const note = `${bez.slice(0, 4).join(', ')}${bez.length > 4 ? ` a ${bez.length - 4} další` : ''} ${bez.length === 1 ? 'nemá' : 'nemají'} produkt v pokladně, takže kasa neví, co tisknout. Spáruj ${bez.length === 1 ? 'ji' : 'je'} v Menu → Tisk na terminálu a dej „Poslat do kasy".`;
+    await save(note, null, null);
+    return { posOk: false, posNote: note };
+  }
+  try {
+    const r = await createTableOrder(conn, {
+      externalId: o.external_id || `mgr-ord-${o.id}`, deskId: String(o.storyous_desk_id), customerName: String(o.customer_name),
+      note: o.note ?? null, items: lines.map(l => ({ itemId: String(l.posProductId), count: Number(l.count), unitPriceWithVat: Number(l.price) })),
+      notification: callbackUrls(Number(o.id)),
+    });
+    const note = 'Objednávka je v pokladně na stole.';
+    await save(note, String(r.orderId), String(r.state));
+    return { posOk: true, posNote: note };
+  } catch (e) {
+    // I neznámou chybu je potřeba pojmenovat: „nepovedlo se" se nedá opravit.
+    const note = e instanceof StoryousError
+      ? `Pokladna objednávku nepřijala: ${e.message}`
+      : `Pokladna neodpověděla: ${String((e as any)?.message ?? e).slice(0, 120)}`;
+    await save(note, null, null);
+    return { posOk: false, posNote: note };
+  }
+}
+
+/**
  * Změna stavu objednávky obsluhou. Potvrzení pošle objednávku do pokladny,
  * hotovo připíše věrnost. Vrací poznámku o pokladně pro obrazovku.
  */
@@ -105,36 +170,13 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
   const cur = String(o.status);
   if (!(ORDER_FLOW[cur] ?? []).includes(next)) throw new Error(`Z „${cur}" nejde na „${next}".`);
 
-  let posNote: string | null = null;
-  // Doletěla objednávka do kasy? Volající se to doteď dozvídal tak, že hledal
-  // slova v poznámce — stačilo ji přeformulovat a host dostal „je u obsluhy",
-  // i když nebyla nikde.
+  let posNote: string | null = o.pos_note ?? null;
   let posOk = !!o.storyous_order_id;
-  let storyousId: string | null = o.storyous_order_id ?? null;
-  let posState: string | null = o.pos_state ?? null;
-  if (next === 'confirmed' && !storyousId) {
-    const conn = await getConnection(teamId);
-    const lines = (o.items as any[]) ?? [];
-    const posLines = lines.filter(l => l.posProductId);
-    if (conn && o.storyous_desk_id && posLines.length === lines.length) {
-      try {
-        const r = await createTableOrder(conn, {
-          externalId: o.external_id || `mgr-ord-${o.id}`, deskId: String(o.storyous_desk_id), customerName: String(o.customer_name),
-          note: o.note ?? null, items: lines.map(l => ({ itemId: String(l.posProductId), count: Number(l.count), unitPriceWithVat: Number(l.price) })),
-          notification: callbackUrls(Number(o.id)),
-        });
-        storyousId = r.orderId; posState = r.state; posOk = true; posNote = 'Objednávka je v pokladně na stole.';
-      } catch (e) {
-        posNote = e instanceof StoryousError ? `Pokladna objednávku nepřijala: ${e.message}` : 'Pokladna objednávku nepřijala.';
-      }
-    } else if (conn && !o.storyous_desk_id) {
-      posNote = 'Stůl není spárovaný s pokladnou, objednávka zůstává jen tady.';
-    } else if (conn && posLines.length !== lines.length) {
-      const bez = lines.filter(l => !l.posProductId).map(l => String(l.name));
-      posNote = `Objednávka zůstává jen tady: ${bez.slice(0, 4).join(', ')}${bez.length > 4 ? ` a ${bez.length - 4} další` : ''} ${bez.length === 1 ? 'nemá' : 'nemají'} produkt v pokladně. Spáruj ${bez.length === 1 ? 'ji' : 'je'} v Menu → Tisk na terminálu.`;
-    }
+  if (next === 'confirmed' && !posOk) {
+    const r = await sendToPos(teamId, id);
+    posOk = r.posOk; posNote = r.posNote;
   }
-  await sql`UPDATE client_orders SET status = ${next}, storyous_order_id = ${storyousId}, pos_state = ${posState}, updated_at = NOW() WHERE id = ${id}`;
+  await sql`UPDATE client_orders SET status = ${next}, updated_at = NOW() WHERE id = ${id}`;
 
   let loyalty: any = null;
   if (next === 'done') {
@@ -180,11 +222,12 @@ export async function applyPosState(teamId: number, order: any, st: string): Pro
   if (st === 'DISPATCHED' && cur === 'confirmed') await setOrderStatus(teamId, Number(order.id), 'done').catch(() => {});
 }
 
-export async function notifyNewOrder(teamId: number, customerName: string, tableName: string | null, total: number, id: number) {
+export async function notifyNewOrder(teamId: number, customerName: string, tableName: string | null, total: number, id: number, posNote?: string | null) {
+  const kdo = `${customerName}${tableName ? ` · ${tableName}` : ''} · ${total} Kč`;
   await notifyTeamEmployers(teamId, {
-    title: 'Nová objednávka od stolu',
-    body: `${customerName}${tableName ? ` · ${tableName}` : ''} · ${total} Kč`,
-    link: '/employer/overview?mode=client&tab=orders', type: 'info',
+    title: posNote ? 'Objednávka není v pokladně' : 'Nová objednávka od stolu',
+    body: posNote ? `${kdo} — ${posNote}` : kdo,
+    link: '/employer/overview?mode=client&tab=orders', type: posNote ? 'warning' : 'info',
   });
   void id;
 }

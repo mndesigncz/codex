@@ -1370,6 +1370,11 @@ export async function GET(request: Request) {
     await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS via_qr BOOLEAN NOT NULL DEFAULT FALSE`;
     await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_status TEXT`;
     await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`;
+    // Co řekla pokladna, když se objednávka posílala. Doteď se ta věta vracela
+    // jen do prohlížeče hosta a zahodila — obsluha pak viděla objednávku,
+    // která nikdy nedojela na terminál, a neměla jak zjistit proč.
+    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_note TEXT`;
+    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_tried_at TIMESTAMP`;
     // Mapa stolů (souřadnice v procentech plánku), narozeninová odměna a
     // publikum zpráv členům (všichni / dlouho nebyli / zlatí hosté).
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_x DOUBLE PRECISION`;
