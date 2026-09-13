@@ -4,6 +4,7 @@
 import { tierFor } from '../lib/clientSlots.ts';
 import { normName, matchByName, sectionTitles } from '../lib/menuPos.ts';
 import { contrast, normalizeQrDesign } from '../lib/qrDesign.ts';
+import { sanitizeSvg } from '../lib/svgSanitize.ts';
 
 let failed = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -57,6 +58,18 @@ ok('qr: černá na bílé je čitelná', contrast('#16181A', '#FFFFFF') > 3);
 eq('qr: nečitelná barva kódu se vrátí na černou', normalizeQrDesign({ dark: '#EEEEEE', light: '#FFFFFF' }).dark, '#16181A');
 eq('qr: nesmyslný formát → výchozí', normalizeQrDesign({ sheet: 'hack', style: 'x' }).sheet, 'card');
 eq('qr: velikost se ořízne do rozsahu', normalizeQrDesign({ size: 999 }).size, 120);
+
+// --- Sanitizace nahraného SVG (bezpečnost: podklad plánku stolů) ---
+ok('svg: skript se odstraní', !/script/i.test(sanitizeSvg('<svg viewBox="0 0 100 100"><script>alert(1)</script><rect/></svg>').svg));
+ok('svg: onload atribut se odstraní', !/onload/i.test(sanitizeSvg('<svg viewBox="0 0 10 10"><rect onload="x()" width="5" height="5"/></svg>').svg));
+ok('svg: href/xlink se odstraní', !/href/i.test(sanitizeSvg('<svg viewBox="0 0 10 10"><a href="javascript:1"><rect width="5" height="5"/></a></svg>').svg));
+ok('svg: foreignObject padá i s obsahem', !/foreignobject|<div/i.test(sanitizeSvg('<svg viewBox="0 0 10 10"><foreignObject><div>x</div></foreignObject><rect width="5" height="5"/></svg>').svg));
+ok('svg: image se odstraní', !/<image/i.test(sanitizeSvg('<svg viewBox="0 0 10 10"><image href="x.png"/><rect width="5" height="5"/></svg>').svg));
+eq('svg: poměr stran z viewBoxu', Math.round(sanitizeSvg('<svg viewBox="0 0 200 100"><rect width="10" height="10"/></svg>').ratio * 100) / 100, 2);
+let threw = false; try { sanitizeSvg('tohle není svg'); } catch { threw = true; }
+ok('svg: co není SVG, vyhodí chybu', threw);
+let threwBig = false; try { sanitizeSvg('<svg>' + 'a'.repeat(500000) + '</svg>'); } catch { threwBig = true; }
+ok('svg: příliš velký soubor vyhodí chybu', threwBig);
 
 if (failed) { console.error(`\n${failed} test(ů) selhalo.`); process.exit(1); }
 console.log('\nVšechny testy prošly.');
