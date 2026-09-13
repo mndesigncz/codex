@@ -158,8 +158,34 @@ export async function GET(request: Request) {
           WHERE team_id = ${team.id} AND date = ${tomorrow} AND status <> 'cancelled'`;
       } catch { /* ignore */ }
 
+      // ---- hostovská strana: co dnes udělali hosté ----
+      // Objednávky od stolu, hodnocení a noví členové končily dosud jen
+      // v Managero client. Vedení je má vidět ve stejném souhrnu jako kasu.
+      let guestLine: string | null = null;
+      let reviewLine: string | null = null;
+      let offPos = 0;
+      try {
+        const [go] = await sql`
+          SELECT COUNT(*)::int AS n, COALESCE(SUM(total), 0)::int AS total,
+                 COUNT(*) FILTER (WHERE storyous_order_id IS NULL)::int AS off_pos
+          FROM client_orders WHERE team_id = ${team.id} AND status = 'done' AND created_at::date = ${today}::date` as any[];
+        const [gm] = await sql`SELECT COUNT(*)::int AS n FROM client_memberships WHERE team_id = ${team.id} AND joined_at::date = ${today}::date` as any[];
+        const parts: string[] = [];
+        if (Number(go?.n) > 0) parts.push(`${go.n}× objednávka od stolu (${czk(Number(go.total))})`);
+        if (Number(gm?.n) > 0) parts.push(`${gm.n} nových členů`);
+        offPos = Number(go?.off_pos) || 0;
+        if (offPos > 0) parts.push(`⚠️ ${offPos} objednávek nedoteklo do pokladny`);
+        if (parts.length) guestLine = parts.join(', ');
+      } catch { /* hostovská část nemusí být zapnutá */ }
+      try {
+        const [rv] = await sql`
+          SELECT COUNT(*)::int AS n, ROUND(AVG(rating)::numeric, 1)::float AS avg, COUNT(*) FILTER (WHERE rating <= 2)::int AS low
+          FROM client_reviews WHERE team_id = ${team.id} AND created_at::date = ${today}::date` as any[];
+        if (Number(rv?.n) > 0) reviewLine = `${rv.n}× hodnocení, průměr ${rv.avg}${Number(rv.low) > 0 ? ` ⚠️ ${rv.low} slabé` : ''}`;
+      } catch { /* hodnocení nemusí existovat */ }
+
       // Nothing at all happened and nothing needs eyes — stay silent.
-      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0) continue;
+      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0 && !guestLine && !reviewLine) continue;
 
       const verdict = real.length === 0
         ? 'uzávěrka chybí'
@@ -171,6 +197,8 @@ export async function GET(request: Request) {
         lowCount ? `${lowCount} položek dochází` : null,
         tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
         posLine,
+        guestLine,
+        reviewLine,
       ].filter(Boolean).join(' · ');
 
       const emailHtml = `
@@ -181,6 +209,8 @@ export async function GET(request: Request) {
           <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + procsMissing.join(', ') : 'hotové ✓'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' : 'nic ✓'}</td></tr>
           ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${posLine.replace('Pokladna: ', '')}</td></tr>` : ''}
+          ${guestLine ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${guestLine}</td></tr>` : ''}
+          ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${reviewLine}</td></tr>` : ''}
           ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', ')}</td></tr>` : ''}
         </table>`;
 

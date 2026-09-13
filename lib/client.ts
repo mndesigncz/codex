@@ -134,6 +134,13 @@ export function publicProfile(p: any) {
     orderingOn: !!p.ordering_on,
     loyaltyOn: !!p.loyalty_on,
     pointsPer100: Number(p.points_per_100) || 0,
+    tiers: {
+      silverAt: Number(p.silver_at) || 10, goldAt: Number(p.gold_at) || 25,
+      memberDiscount: Number(p.member_discount) || 0,
+      silverDiscount: Number(p.silver_discount) || 0,
+      goldDiscount: Number(p.gold_discount) || 0,
+    },
+    cashbackPct: Number(p.cashback_pct) || 0,
     stampTarget: Number(p.stamp_target) || 0,
     stampReward: p.stamp_reward ?? '',
     maxParty: Number(p.max_party) || 8,
@@ -192,7 +199,7 @@ async function maybeReferralReward(customerId: number, teamId: number): Promise<
   }).catch(() => {});
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral';
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit';
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod
@@ -331,4 +338,44 @@ export async function awardBirthdays(): Promise<number> {
     } catch { /* další člen; nepovedené připsání nesmí zastavit ostatní */ }
   }
   return n;
+}
+
+
+/**
+ * Kredit z útraty (cashback). Na rozdíl od bodů se utrácí přímo v korunách
+ * u kasy, takže se drží v členství zvlášť a v deníku má vlastní sloupec.
+ */
+export async function awardCredit(teamId: number, customerId: number, deltaCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number> {
+  await join(customerId, teamId);
+  const [m] = await sql`
+    UPDATE client_memberships SET credit = GREATEST(0, credit + ${Math.round(deltaCzk)})
+    WHERE customer_id = ${customerId} AND team_id = ${teamId} RETURNING credit`;
+  await sql`
+    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
+    VALUES (${teamId}, ${customerId}, 0, ${Math.round(deltaCzk)}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  return Number(m?.credit ?? 0);
+}
+
+/** Souhrnná čísla věrnosti pro přehled: co je v oběhu a co čeká na vyzvednutí. */
+export async function loyaltySummary(teamId: number) {
+  const [m] = await sql`
+    SELECT COUNT(*)::int AS members, COALESCE(SUM(points), 0)::int AS points, COALESCE(SUM(credit), 0)::int AS credit,
+           COALESCE(SUM(stamps), 0)::int AS stamps, COALESCE(SUM(visits), 0)::int AS visits,
+           COUNT(*) FILTER (WHERE joined_at >= NOW() - INTERVAL '30 days')::int AS new30
+    FROM client_memberships WHERE team_id = ${teamId}` as any[];
+  const [c] = await sql`
+    SELECT COUNT(*) FILTER (WHERE redeemed_at IS NULL)::int AS open,
+           COUNT(*) FILTER (WHERE redeemed_at IS NOT NULL)::int AS redeemed
+    FROM client_coupon_claims WHERE team_id = ${teamId}` as any[];
+  const [l] = await sql`
+    SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS given30,
+           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
+    FROM client_loyalty_ledger WHERE team_id = ${teamId}` as any[];
+  return {
+    members: Number(m?.members) || 0, newMembers30: Number(m?.new30) || 0,
+    points: Number(m?.points) || 0, credit: Number(m?.credit) || 0,
+    stamps: Number(m?.stamps) || 0, visits: Number(m?.visits) || 0,
+    couponsOpen: Number(c?.open) || 0, couponsRedeemed: Number(c?.redeemed) || 0,
+    pointsGiven30: Number(l?.given30) || 0, pointsSpent30: Number(l?.spent30) || 0,
+  };
 }

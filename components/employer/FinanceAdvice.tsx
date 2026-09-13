@@ -1,6 +1,6 @@
 'use client';
 
-// Doporučení ve Financích — čtyři podokna podle toho, čeho se rada týká.
+// Doporučení ve Financích — podokna podle toho, čeho se rada týká.
 //
 // Přehled výš říká, kolik se vydělalo. Tohle říká, co s tím. Každá karta má
 // tři patra: co se stalo, co to znamená, a co udělat. Kde jde spočítat cena
@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 
-type Group = 'revenue' | 'products' | 'people' | 'stock';
+type Group = 'revenue' | 'products' | 'people' | 'stock' | 'guests';
 
 interface Advice {
   group: Group;
@@ -32,6 +32,7 @@ const GROUPS: { id: Group; label: string; icon: string; hint: string }[] = [
   { id: 'products', label: 'Co se prodává', icon: 'box', hint: 'Co roste, co padá, co jen zabírá místo v menu.' },
   { id: 'people', label: 'Provoz a lidé', icon: 'users', hint: 'Mzdy proti tržbě, hodiny, kasa.' },
   { id: 'stock', label: 'Nákup a sklad', icon: 'clipboard', hint: 'Dodavatelé, zásoby, peníze, které leží.' },
+  { id: 'guests', label: 'Hosté a věrnost', icon: 'card', hint: 'Členové, kupony, hodnocení, objednávky od stolu.' },
 ];
 
 const TONES = {

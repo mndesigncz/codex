@@ -1387,6 +1387,18 @@ export async function GET(request: Request) {
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS logo_url TEXT`;
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gallery JSONB NOT NULL DEFAULT '[]'`;
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS accent TEXT`;
+    // Věrnost jako v Kartičce: úrovně s vlastními prahy a slevou, kredit
+    // z útraty (cashback). Kredit je v korunách; utratí se u kasy.
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_at INTEGER NOT NULL DEFAULT 10`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_at INTEGER NOT NULL DEFAULT 25`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS member_discount INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_discount INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_discount INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS cashback_pct INTEGER NOT NULL DEFAULT 0`;
+    // Vzhled QR na stůl: barvy, texty, logo uprostřed, formát archu.
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS qr_design JSONB NOT NULL DEFAULT '{}'::jsonb`;
+    await sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS credit_delta INTEGER NOT NULL DEFAULT 0`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_w DOUBLE PRECISION`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_h DOUBLE PRECISION`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`;

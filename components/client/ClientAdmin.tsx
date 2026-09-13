@@ -12,7 +12,9 @@ import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
+import QrDesigner from './QrDesigner';
 import BrandTab from './BrandTab';
+import LoyaltyTabs from './LoyaltyTabs';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import { levelFor } from '@/lib/clientSlots';
@@ -401,6 +403,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
               </li>
             ))}
           </ul>}
+      {d !== null && d.tables.length > 0 && <QrDesigner toast={toast} tables={d.tables} />}
       {d !== null && d.tables.length > 0 && <FloorPlanEditor toast={toast} onSaved={load} />}
     </div>
   );
@@ -488,104 +491,8 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
 // ---- Věrnost --------------------------------------------------------------------
 
 function Loyalty({ toast }: { toast: (m: string) => void }) {
-  const [sub, setSub] = useState<'rules' | 'promos'>('rules');
-  return (
-    <div className="space-y-5">
-      <PageHeader title="Věrnost" subtitle={sub === 'rules'
-        ? 'Razítka za návštěvy, body za útratu, kupony za body. Host ukáže kartičku nebo kód kuponu u kasy; obsluha ho načte v Objednávkách nebo v kiosku.'
-        : 'Na leták, do příspěvku, na účtenku. Host kód zadá na tvé stránce ve Věrnosti a dostane body, kupon, nebo obojí. Každý host jednou.'} />
-      <Segmented options={[{ id: 'rules', label: 'Pravidla a kupony' }, { id: 'promos', label: 'Promo kódy' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části věrnosti" wrap />
-      {sub === 'rules' && <LoyaltyRules toast={toast} />}
-      {sub === 'promos' && <Promos toast={toast} />}
-    </div>
-  );
+  return <LoyaltyTabs toast={toast} promos={<Promos toast={toast} />} />;
 }
-
-function LoyaltyRules({ toast }: { toast: (m: string) => void }) {
-  const [p, setP] = useState<any | null>(null); const [coupons, setCoupons] = useState<any[] | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', cost_points: 100, valid_until: '' });
-  const [code, setCode] = useState(''); const [busy, setBusy] = useState(false);
-  const load = useCallback(() => {
-    fetch('/api/client/admin/profile').then(r => r.json()).then(d => setP(d.profile)).catch(() => {});
-    fetch('/api/client/admin/coupons').then(r => r.json()).then(d => setCoupons(d.coupons ?? [])).catch(() => setCoupons([]));
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  const saveRules = async () => {
-    setBusy(true);
-    try { await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: p.loyalty_on, points_per_100: p.points_per_100, stamp_target: p.stamp_target, stamp_reward: p.stamp_reward, birthday_points: p.birthday_points, referral_points: p.referral_points }) }); toast('Pravidla věrnosti uložena.'); } catch (e: any) { toast(e.message); }
-    setBusy(false);
-  };
-  const addCoupon = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!form.title.trim()) return; setBusy(true);
-    try { await j('/api/client/admin/coupons', { method: 'POST', body: JSON.stringify(form) }); setForm({ title: '', description: '', cost_points: 100, valid_until: '' }); load(); } catch (e: any) { toast(e.message); }
-    setBusy(false);
-  };
-  const redeem = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!code.trim()) return; setBusy(true);
-    try { const r = await j('/api/client/admin/redeem', { method: 'POST', body: JSON.stringify({ code }) }); toast(`Uplatněno: ${r.title} · ${r.customer}.`); setCode(''); load(); } catch (e: any) { toast(e.message); }
-    setBusy(false);
-  };
-  if (!p || coupons === null) return <PageSkel />;
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
-        <div className="space-y-5">
-          <section className="glass-card p-5 space-y-3">
-            <h2 className="font-bold tracking-tight">Pravidla</h2>
-            <label className="flex items-center min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={!!p.loyalty_on} onChange={e => setP({ ...p, loyalty_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Věrnost pro hosty zapnutá</label>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label htmlFor="l-pts" className={label}>Bodů za 100 Kč</label><input id="l-pts" type="number" min={0} max={100} value={p.points_per_100} onChange={e => setP({ ...p, points_per_100: e.target.value })} className={input} /></div>
-              <div><label htmlFor="l-stamps" className={label}>Razítek do odměny</label><input id="l-stamps" type="number" min={0} max={50} value={p.stamp_target} onChange={e => setP({ ...p, stamp_target: e.target.value })} className={input} /></div>
-            </div>
-            <div><label htmlFor="l-reward" className={label}>Odměna za razítka</label><input id="l-reward" value={p.stamp_reward ?? ''} onChange={e => setP({ ...p, stamp_reward: e.target.value })} placeholder="Nápoj zdarma" className={input} /></div>
-            <div className="grid grid-cols-[7rem_1fr] gap-3 items-end">
-              <div><label htmlFor="l-bday" className={label}>Narozeniny</label><input id="l-bday" type="number" min={0} max={1000} value={p.birthday_points ?? 0} onChange={e => setP({ ...p, birthday_points: e.target.value })} className={input} /></div>
-              <p className="text-xs text-black/50 pb-2.5">bodů jako dárek v den narozenin. 0 = nedávat. Datum si host vyplní ve svém účtu.</p>
-            </div>
-            <div className="grid grid-cols-[7rem_1fr] gap-3 items-end">
-              <div><label htmlFor="l-ref" className={label}>Pozvání</label><input id="l-ref" type="number" min={0} max={1000} value={p.referral_points ?? 0} onChange={e => setP({ ...p, referral_points: e.target.value })} className={input} /></div>
-              <p className="text-xs text-black/50 pb-2.5">bodů pro oba, když pozvaný kamarád poprvé vstoupí do tvého podniku. 0 = vypnuto.</p>
-            </div>
-            <p className="text-xs text-black/50">Razítko přibude, když rezervaci nebo objednávku označíš jako hotovou. Body za útratu přijdou s objednávkami od stolu.</p>
-            <Button variant="accent" loading={busy} onClick={saveRules}>Uložit pravidla</Button>
-          </section>
-          <form onSubmit={redeem} className="glass-card p-5 space-y-3">
-            <h2 className="font-bold tracking-tight">Uplatnit kupon</h2>
-            <div><label htmlFor="l-code" className={label}>Kód od hosta</label><input id="l-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" className={`${input} font-mono tracking-widest`} /></div>
-            <Button type="submit" variant="primary" icon="check" loading={busy}>Uplatnit</Button>
-          </form>
-        </div>
-        <div className="space-y-5">
-          <form onSubmit={addCoupon} className="glass-card p-5 grid gap-3">
-            <h2 className="font-bold tracking-tight">Nový kupon za body</h2>
-            <div><label htmlFor="c-title" className={label}>Název</label><input id="c-title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Dezert k čaji zdarma" className={input} /></div>
-            <div><label htmlFor="c-desc" className={label}>Popis</label><input id="c-desc" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Jeden dezert z vitríny podle výběru." className={input} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label htmlFor="c-cost" className={label}>Cena v bodech</label><input id="c-cost" type="number" min={0} value={form.cost_points} onChange={e => setForm({ ...form, cost_points: parseInt(e.target.value || '0', 10) })} className={input} /></div>
-              <div><label htmlFor="c-until" className={label}>Platí do</label><input id="c-until" type="date" value={form.valid_until} onChange={e => setForm({ ...form, valid_until: e.target.value })} className={input} /></div>
-            </div>
-            <Button type="submit" variant="primary" icon="plus" loading={busy}>Přidat kupon</Button>
-          </form>
-          <section>
-            <h2 className="font-bold tracking-tight mb-2">Kupony</h2>
-            {coupons.length === 0 ? <EmptyState icon="gift" title="Zatím žádný kupon" hint="Přidej první výš. Sto bodů je asi dva tisíce korun útraty." compact />
-              : <ul className="divide-y divide-black/[0.06]">{coupons.map(c => (
-                  <li key={c.id} className={`py-3 flex items-center gap-3 ${c.active ? '' : 'opacity-50'}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">{c.title} <span className="text-black/50 font-medium tabular-nums">· {Number(c.cost_points) === 0 ? 'zdarma' : `${c.cost_points} b.`}</span></p>
-                      <p className="text-xs text-black/55 truncate">{c.description || '—'}{c.valid_until ? ` · do ${czDay(c.valid_until)}` : ''} · vzato {c.claimed}×, uplatněno {c.redeemed}×</p>
-                    </div>
-                    <button onClick={async () => { await j('/api/client/admin/coupons', { method: 'PATCH', body: JSON.stringify({ id: c.id, active: !c.active }) }); load(); }} aria-pressed={!!c.active}
-                      className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${c.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{c.active ? 'Aktivní' : 'Vypnutý'}</button>
-                  </li>))}</ul>}
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---- Nastavení ------------------------------------------------------------------
 
 function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange: () => void }) {
   const [d, setD] = useState<any | null>(null); const [p, setP] = useState<any | null>(null); const [busy, setBusy] = useState(false);
@@ -710,6 +617,11 @@ function Reviews() {
                   <p className="font-semibold leading-tight flex items-center gap-2 flex-wrap"><span className="truncate">{v.customer_name}</span><span className="text-[#16181A] tracking-tight" aria-label={`${v.rating} z 5`}>{'★'.repeat(Number(v.rating))}<span className="text-black/20">{'★'.repeat(5 - Number(v.rating))}</span></span></p>
                   {v.note ? <p className="text-sm text-black/70 mt-0.5 text-pretty">„{v.note}"</p> : <p className="text-sm text-black/45 mt-0.5">Bez komentáře.</p>}
                   <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(v.created_at)} · {String(v.ref).startsWith('ord:') ? 'objednávka od stolu' : 'rezervace'}</p>
+                  {v.crew?.length > 0 && (
+                    <p className={`text-xs mt-1 ${Number(v.rating) <= 2 ? 'text-amber-800' : 'text-black/45'}`}>
+                      Ten den měli směnu: {v.crew.map((c: any) => `${c.avatar} ${c.name}`).join(', ')}
+                    </p>
+                  )}
                 </div>
               </li>
             ))}
@@ -759,7 +671,20 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
                   <p className="font-semibold leading-tight">{h.title}</p>
                   {h.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{h.body}</p>}
                   <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(h.sent_at)} · {h.recipients} {h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}{h.audience === 'quiet' ? ' · kdo dlouho nebyl' : h.audience === 'gold' ? ' · zlatí hosté' : ''}</p>
+                  {(Number(h.visits_after) > 0 || Number(h.visits_before) > 0) && (() => {
+                    const a = Number(h.visits_after) || 0, bft = Number(h.visits_before) || 0;
+                    const diff = a - bft;
+                    return (
+                      <p className={`text-xs mt-1 ${diff > 0 ? 'text-[#5B7A08]' : 'text-black/45'}`}>
+                        {h.still_running ? 'Zatím ' : ''}{a} {a === 1 ? 'člen' : a < 5 ? 'členové' : 'členů'} u kasy do sedmi dní po odeslání
+                        {bft > 0 ? `, sedm dní předtím ${bft}` : ''}
+                        {diff !== 0 ? ` (${diff > 0 ? '+' : ''}${diff})` : ''}
+                        {h.still_running ? ' · ještě běží' : ''}
+                      </p>
+                    );
+                  })()}
                 </li>))}</ul>}
+          {d.history.length > 0 && <p className="text-[11px] text-black/40 mt-2 px-1">Srovnání sedmi dní po a před odesláním je nejpoctivější, co z našich dat jde. Neříká, že za návštěvu může zpráva — říká, jestli se po ní něco pohnulo.</p>}
         </section>
       </div>
     </div>

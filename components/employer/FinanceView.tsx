@@ -45,6 +45,10 @@ export default function FinanceView() {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  // Hledání v položkách: účetní se ptá „kolik jsme loni dali Moninu",
+  // a klikat se přes celý měsíc je zdlouhavé.
+  const [q, setQ] = useState('');
+  const [exportOpen, setExportOpen] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
 
   const [pos, setPos] = useState<any | null>(null);
@@ -66,8 +70,13 @@ export default function FinanceView() {
   }, [month]);
 
   const s = data?.summary;
+  const g = data?.guest as { orders: number; total: number; offPos: number; offPosTotal: number; members: number; newMembers: number; couponsRedeemed: number } | undefined;
   const ledger: Row[] = data?.ledger ?? [];
-  const filtered = filter === 'all' ? ledger : ledger.filter(r => r.kind === filter);
+  const needle = q.trim().toLowerCase();
+  const filtered = ledger
+    .filter(r => filter === 'all' || r.kind === filter)
+    .filter(r => !needle || `${r.label} ${r.note ?? ''}`.toLowerCase().includes(needle));
+  const filteredSum = filtered.reduce((a, r) => a + r.amount, 0);
   const trendPct = s && s.prevRevenue > 0
     ? Math.round(((s.revenue - s.prevRevenue) / s.prevRevenue) * 100) : null;
 
@@ -87,6 +96,58 @@ export default function FinanceView() {
   const shiftMonth = (delta: number) => {
     const [y, m] = month.split('-').map(Number);
     setMonth(ym(new Date(y, m - 1 + delta, 1)));
+  };
+
+  /**
+   * Vlastní export pro účetní: rozsah měsíců a co do souboru patří.
+   * Data za jiné měsíce se dotáhnou stejným koncovým bodem jako přehled,
+   * takže v souboru sedí čísla s tím, co vedení vidí na obrazovce.
+   */
+  const exportCustom = async (opts: { from: string; to: string; items: boolean; summary: boolean; guest: boolean; sep: string }) => {
+    if (!pro) { setUpgradeFor('Export pro účetní'); return; }
+    const months: string[] = [];
+    const [fy, fm] = opts.from.split('-').map(Number);
+    const [ty, tm] = opts.to.split('-').map(Number);
+    for (let d = new Date(fy, fm - 1, 1); d <= new Date(ty, tm - 1, 1); d.setMonth(d.getMonth() + 1)) months.push(ym(new Date(d)));
+    if (!months.length) return;
+    const rows: string[][] = [];
+    for (const mo of months) {
+      const d = mo === month ? data : await fetch(`/api/finance?month=${mo}`).then(r => r.json()).catch(() => null);
+      if (!d || d.error) continue;
+      if (opts.items) {
+        rows.push([`Položky ${mo}`, '', '', '', '']);
+        rows.push(['Datum', 'Typ', 'Popis', `Částka (${symbol})`, 'Poznámka']);
+        for (const r of (d.ledger ?? []) as Row[]) rows.push([r.date, KIND_META[r.kind]?.label ?? r.kind, r.label, String(r.amount), r.note ?? '']);
+        rows.push([]);
+      }
+      if (opts.summary) {
+        const q = d.summary ?? {};
+        rows.push([`Souhrn ${mo}`, '', '', '', '']);
+        for (const [lb, v] of [['Tržby celkem', q.revenue], ['— hotovost', q.cash], ['— karty', q.card], ['Spropitné', q.tips],
+          ['Nákupy a výdaje', q.purchases], ['Mzdy (odpracováno × sazba)', q.wagesWorked], ['Výplaty hotově z kasy', q.wagesCash],
+          ['Hodnota skladu', q.stockValue], ['Rozdíly v kase', q.diffSum], ['Hrubý výsledek', q.gross]] as [string, any][]) {
+          rows.push(['', lb, '', String(Math.round(Number(v) || 0)), '']);
+        }
+        rows.push([]);
+      }
+      if (opts.guest && d.guest) {
+        rows.push([`Hosté ${mo}`, '', '', '', '']);
+        for (const [lb, v] of [['Objednávek od stolu', d.guest.orders], ['Tržba z objednávek', d.guest.total],
+          ['Z toho mimo pokladnu', d.guest.offPosTotal], ['Členů věrnosti', d.guest.members],
+          ['Nových členů', d.guest.newMembers], ['Uplatněných kuponů', d.guest.couponsRedeemed]] as [string, any][]) {
+          rows.push(['', lb, '', String(Math.round(Number(v) || 0)), '']);
+        }
+        rows.push([]);
+      }
+    }
+    const csv = rows.map(r => (r as string[]).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(opts.sep)).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = months.length === 1 ? `finance-${months[0]}.csv` : `finance-${months[0]}-az-${months[months.length - 1]}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setExportOpen(false);
   };
 
   const exportCsv = () => {
@@ -130,7 +191,7 @@ export default function FinanceView() {
       <PageHeader
         title="Finance"
         subtitle="Tržby, nákupy a mzdy měsíce pohromadě."
-        primary={<Button onClick={exportCsv} variant="accent" icon="download">Export pro účetní</Button>}
+        primary={<Button onClick={() => (pro ? setExportOpen(true) : setUpgradeFor('Export pro účetní'))} variant="accent" icon="download">Export pro účetní</Button>}
         aside={
           <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-fit">
             <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
@@ -199,6 +260,36 @@ export default function FinanceView() {
               {s.stockValue > 0 && (
                 <p className="text-[11px] text-black/40 pt-1">
                   Navíc ve skladu aktuálně leží zboží za {money(s.stockValue)}.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Hosté a věrnost — peníze, které přišly přes stůl a kartičku.
+              Patří k financím: objednávka mimo pokladnu v tržbách chybí. */}
+          {g && (g.orders > 0 || g.members > 0) && (
+            <div className="glass-card rounded-[26px] p-5 space-y-3">
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Hosté a věrnost</h3>
+                <span className="text-xs text-black/45">z objednávek od stolu a kartiček</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {([
+                  ['Objednávek od stolu', String(g.orders), `${money(g.total)} celkem`],
+                  ['Mimo pokladnu', String(g.offPos), g.offPos > 0 ? `${money(g.offPosTotal)} chybí v tržbách` : 'vše dorazilo do kasy'],
+                  ['Členů věrnosti', String(g.members), `${g.newMembers} nových tento měsíc`],
+                  ['Uplatněných kuponů', String(g.couponsRedeemed), 'sleva na útratě'],
+                ] as [string, string, string][]).map(([lb, val, sub]) => (
+                  <div key={lb} className="rounded-2xl bg-black/[0.035] px-3.5 py-3">
+                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">{lb}</p>
+                    <p className="mt-1 text-lg font-bold tabular-nums text-[#16181A]">{val}</p>
+                    <p className="text-[11px] text-black/40 leading-snug">{sub}</p>
+                  </div>
+                ))}
+              </div>
+              {g.offPos > 0 && (
+                <p className="text-[11px] text-black/45">
+                  Objednávky mimo pokladnu se nepropsaly do Storyous. Buď je doúčtuj u kasy, nebo v Klientu zapni automatické odesílání.
                 </p>
               )}
             </div>
@@ -284,7 +375,13 @@ export default function FinanceView() {
           {/* Ledger */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výdaje ({filtered.length})</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výdaje ({filtered.length}{filtered.length !== ledger.length ? ` z ${ledger.length}` : ''}) · {money(filteredSum)}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Icon name="search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/35" />
+                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat v popisu" aria-label="Hledat ve výdajích"
+                  className="w-44 rounded-full bg-white/70 border border-black/[0.08] pl-9 pr-3 py-2 text-xs placeholder-black/35 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition" />
+              </div>
               <div className="flex gap-1 glass rounded-full p-1 overflow-x-auto">
                 {[['all', 'Vše'], ['receipt', 'Účtenky'], ['order', 'Objednávky'], ['expense', 'Z kasy'], ['wage', 'Výplaty']].map(([id, label]) => (
                   <button key={id} onClick={() => setFilter(id)}
@@ -292,6 +389,7 @@ export default function FinanceView() {
                       filter === id ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
                     }`}>{label}</button>
                 ))}
+              </div>
               </div>
             </div>
             {filtered.length === 0 ? (
@@ -358,7 +456,59 @@ export default function FinanceView() {
         </div>
       )}
 
+      {exportOpen && <ExportDialog month={month} onClose={() => setExportOpen(false)} onExport={exportCustom} />}
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
+    </div>
+  );
+}
+
+/** Sestavitelný export: od kdy do kdy a co v souboru bude. */
+function ExportDialog({ month, onClose, onExport }: {
+  month: string; onClose: () => void;
+  onExport: (o: { from: string; to: string; items: boolean; summary: boolean; guest: boolean; sep: string }) => Promise<void>;
+}) {
+  const [from, setFrom] = useState(month);
+  const [to, setTo] = useState(month);
+  const [items, setItems] = useState(true);
+  const [summary, setSummary] = useState(true);
+  const [guest, setGuest] = useState(false);
+  const [sep, setSep] = useState(';');
+  const [busy, setBusy] = useState(false);
+  const run = async () => { setBusy(true); await onExport({ from, to: to < from ? from : to, items, summary, guest, sep }); setBusy(false); };
+  const box = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-sm focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition';
+  const lb = 'block text-xs font-semibold text-black/55 mb-1.5';
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
+      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-bold tracking-tight">Export pro účetní</h3>
+          <button onClick={onClose} aria-label="Zavřít" className="tap-target rounded-full w-9 h-9 grid place-items-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+        </div>
+        <p className="text-sm text-black/55">Vyber období a co má být v souboru. Stáhne se jeden soubor CSV, který otevře Excel i účetní program.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label htmlFor="ex-from" className={lb}>Od měsíce</label><input id="ex-from" type="month" value={from} onChange={e => setFrom(e.target.value)} className={box} /></div>
+          <div><label htmlFor="ex-to" className={lb}>Do měsíce</label><input id="ex-to" type="month" value={to} onChange={e => setTo(e.target.value)} className={box} /></div>
+        </div>
+        <fieldset className="space-y-1">
+          <legend className={lb}>Co zahrnout</legend>
+          {([['items', 'Jednotlivé výdaje', items, setItems], ['summary', 'Souhrn měsíce', summary, setSummary], ['guest', 'Hosté a věrnost', guest, setGuest]] as const).map(([id, label, val, set]) => (
+            <label key={id} className="flex items-center min-h-9 py-1 gap-3 text-sm">
+              <input type="checkbox" checked={val} onChange={e => (set as any)(e.target.checked)} className="h-4 w-4 accent-[#16181A]" />{label}
+            </label>
+          ))}
+        </fieldset>
+        <div>
+          <label htmlFor="ex-sep" className={lb}>Oddělovač</label>
+          <select id="ex-sep" value={sep} onChange={e => setSep(e.target.value)} className={box}>
+            <option value=";">Středník — pro český Excel</option>
+            <option value=",">Čárka — pro účetní programy a Google Tabulky</option>
+          </select>
+        </div>
+        <div className="flex gap-2 justify-end pt-1">
+          <Button variant="ghost" onClick={onClose}>Zrušit</Button>
+          <Button variant="accent" icon="download" loading={busy} disabled={!items && !summary && !guest} onClick={run}>Stáhnout</Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,21 +2,35 @@
 // a jedním klepnutím dá razítko za návštěvu nebo body za útratu. Razítko
 // nejvýš jedno denně; body podle pravidel podniku (bodů za 100 Kč).
 import { NextRequest, NextResponse } from 'next/server';
-import { levelFor } from '@/lib/clientSlots';
-import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, stampVisit, normalizeCardCode } from '@/lib/client';
+import { tierFor } from '@/lib/clientSlots';
+import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, awardCredit, stampVisit, normalizeCardCode } from '@/lib/client';
 import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-async function summary(teamId: number, customerId: number) {
+/** Co obsluha u kasy potřebuje vidět: kdo to je, co má a na co má nárok. */
+async function summary(teamId: number, customerId: number, p?: any) {
   const m = await membership(customerId, teamId);
   const claims = await sql`SELECT cl.code, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id WHERE cl.team_id = ${teamId} AND cl.customer_id = ${customerId} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at`;
+  // Kupony za body, na které host právě teď dosáhne — obsluha je nabídne.
+  const points = Number(m?.points ?? 0);
+  const affordable = await sql`
+    SELECT id, title, cost_points FROM client_coupons
+    WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND cost_points > 0 AND cost_points <= ${points}
+    ORDER BY cost_points DESC LIMIT 5`;
   const last = parseDbTime(m?.last_visit_at);
+  const visits = Number(m?.visits ?? 0);
+  const tier = tierFor(visits, p ? {
+    silverAt: Number(p.silver_at), goldAt: Number(p.gold_at),
+    memberDiscount: Number(p.member_discount), silverDiscount: Number(p.silver_discount), goldDiscount: Number(p.gold_discount),
+  } : null);
   return {
-    member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
-    levelLabel: levelFor(Number(m?.visits ?? 0)).label,
-    stampedToday: !!last && pragueDayOf(last) === pragueToday(), openCoupons: claims,
+    member: !!m, points, credit: Number(m?.credit ?? 0), stamps: Number(m?.stamps ?? 0), visits,
+    levelLabel: tier.label, tier: tier.id, discount: tier.discount,
+    nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel,
+    stampedToday: !!last && pragueDayOf(last) === pragueToday(),
+    openCoupons: claims, affordable,
   };
 }
 
@@ -28,7 +42,22 @@ export async function GET(req: NextRequest) {
   const c = await customerByCard(code);
   if (!c) return NextResponse.json({ error: 'Takovou kartičku neznáme.' }, { status: 404 });
   const p = await ensureProfile(u.team_id);
-  return NextResponse.json({ customer: c, ...(await summary(u.team_id, c.id)), rules: { pointsPer100: Number(p.points_per_100) || 0, stampTarget: Number(p.stamp_target) || 0, stampReward: p.stamp_reward } });
+  // Poslední dnešní účtenky z pokladny: obsluha částku vybere, nemusí ji
+  // opisovat. Body a kredit pak sedí s tím, co host opravdu zaplatil.
+  let bills: any[] = [];
+  try {
+    bills = await sql`
+      SELECT bill_id, final_price, paid_at FROM pos_bills
+      WHERE team_id = ${u.team_id} AND day = ${pragueToday()} AND final_price > 0
+      ORDER BY COALESCE(paid_at, created_at) DESC LIMIT 5` as any[];
+  } catch { bills = []; }
+  return NextResponse.json({
+    customer: c, ...(await summary(u.team_id, c.id, p)), bills,
+    rules: {
+      pointsPer100: Number(p.points_per_100) || 0, stampTarget: Number(p.stamp_target) || 0,
+      stampReward: p.stamp_reward, cashbackPct: Number(p.cashback_pct) || 0,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -50,12 +79,23 @@ export async function POST(req: NextRequest) {
   } else if (action === 'points') {
     const amount = Math.max(0, Math.min(100000, Math.round(Number(b.amount) || 0)));
     const pts = Math.floor(amount / 100) * (Number(p.points_per_100) || 0);
-    if (pts <= 0) return NextResponse.json({ error: 'Z této částky nevychází žádný bod.' }, { status: 400 });
-    const points = await award(u.team_id, c.id, pts, 'manual', 'card', `Útrata ${amount} Kč u kasy`);
-    msg = `${c.name}: +${pts} bodů za ${amount} Kč, celkem ${points}.`;
+    const back = Math.floor(amount * (Number(p.cashback_pct) || 0) / 100);
+    if (pts <= 0 && back <= 0) return NextResponse.json({ error: 'Z této částky nevychází žádný bod ani kredit.' }, { status: 400 });
+    const parts: string[] = [];
+    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', 'card', `Útrata ${amount} Kč u kasy`); parts.push(`+${pts} bodů (celkem ${points})`); }
+    if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', 'card', `${p.cashback_pct} % z útraty ${amount} Kč`); parts.push(`+${back} Kč kreditu (celkem ${credit})`); }
+    msg = `${c.name}: ${parts.join(', ')} za ${amount} Kč.`;
+  } else if (action === 'credit') {
+    // Host platí kreditem: částka se odečte z jeho peněženky u podniku.
+    const amount = Math.max(1, Math.min(100000, Math.round(Number(b.amount) || 0)));
+    const m = await membership(c.id, u.team_id);
+    const have = Number(m?.credit ?? 0);
+    if (have < amount) return NextResponse.json({ error: `${c.name} má kredit jen ${have} Kč.` }, { status: 409 });
+    const credit = await awardCredit(u.team_id, c.id, -amount, 'credit', 'card', `Uplatněno u kasy`);
+    msg = `${c.name}: uplatněno ${amount} Kč kreditu, zbývá ${credit} Kč.`;
   } else {
     return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
   }
   audit(u.team_id, u.id, 'client.card', 'client', c.id, msg);
-  return NextResponse.json({ ok: true, message: msg, customer: c, ...(await summary(u.team_id, c.id)) });
+  return NextResponse.json({ ok: true, message: msg, customer: c, ...(await summary(u.team_id, c.id, p)) });
 }

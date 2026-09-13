@@ -2,6 +2,7 @@
 // nastaví, co host smí (rezervace, objednávky, věrnost) a pravidla věrnosti.
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, employer, ensureProfile, slugify, publicProfile } from '@/lib/client';
+import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,12 @@ export async function PUT(req: NextRequest) {
       stamp_reward = ${String(b.stamp_reward ?? cur.stamp_reward ?? '').slice(0, 80)},
       birthday_points = ${num(b.birthday_points, Number(cur.birthday_points) || 0, 0, 1000)},
       referral_points = ${num(b.referral_points, Number(cur.referral_points) || 0, 0, 1000)},
+      silver_at = ${num(b.silver_at, Number(cur.silver_at) || 10, 1, 500)},
+      gold_at = ${num(b.gold_at, Number(cur.gold_at) || 25, 2, 1000)},
+      member_discount = ${num(b.member_discount, Number(cur.member_discount) || 0, 0, 90)},
+      silver_discount = ${num(b.silver_discount, Number(cur.silver_discount) || 0, 0, 90)},
+      gold_discount = ${num(b.gold_discount, Number(cur.gold_discount) || 0, 0, 90)},
+      cashback_pct = ${num(b.cashback_pct, Number(cur.cashback_pct) || 0, 0, 50)},
       logo_url = ${b.logo_url !== undefined ? (imgUrl(b.logo_url) || null) : cur.logo_url},
       gallery = ${b.gallery !== undefined ? JSON.stringify(gallery(b.gallery)) : JSON.stringify(cur.gallery ?? [])},
       accent = ${b.accent !== undefined ? (accent(b.accent) ?? null) : cur.accent},
@@ -75,6 +82,7 @@ export async function PUT(req: NextRequest) {
       lng = ${coord(b.lng, cur.lng, 180)},
       geo_radius_m = ${num(b.geo_radius_m, Number(cur.geo_radius_m) || 100, 30, 1000)},
       order_auto_pos = ${b.order_auto_pos != null ? !!b.order_auto_pos : cur.order_auto_pos},
+      qr_design = ${b.qr_design !== undefined ? JSON.stringify(normalizeQrDesign(b.qr_design)) : JSON.stringify(normalizeQrDesign(cur.qr_design))}::jsonb,
       updated_at = NOW()
     WHERE team_id = ${u.team_id} RETURNING *`;
   audit(u.team_id, u.id, 'client.profile', 'client', null, p.enabled ? `zapnuto · /client/${p.slug}` : 'vypnuto');
