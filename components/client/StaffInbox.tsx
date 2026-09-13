@@ -240,11 +240,19 @@ function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: nu
           </ul>
           {o.note && <p className="text-xs text-black/60 mt-1">„{o.note}"</p>}
           <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{o.total} Kč</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
-            {o.storyous_order_id
-              ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]"><span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />V kase</span>
-              : o.status !== 'declined' && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Není v kase</span>}
+            {(() => {
+              const st = String(o.pos_state ?? '');
+              if (!o.storyous_order_id) {
+                return o.status !== 'declined'
+                  ? <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Není v kase</span>
+                  : null;
+              }
+              if (st === 'DECLINED') return <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/12 px-2.5 py-1 text-[11px] font-semibold text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-600" />Kasa odmítla</span>;
+              if (/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(st)) return <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]"><span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />Přijato v kase · tiskne se</span>;
+              return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-amber-600" />V kase čeká na přijetí</span>;
+            })()}
           </p>
-          {!o.storyous_order_id && o.status !== 'declined' && o.pos_note && (
+          {o.pos_note && o.status !== 'declined' && !/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(String(o.pos_state ?? '')) && (
             <p className="mt-1 text-[11px] text-amber-900 leading-snug">{o.pos_note}</p>
           )}
         </div>
