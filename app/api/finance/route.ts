@@ -92,8 +92,8 @@ export async function GET(req: NextRequest) {
     receiptRows = await sql`
       SELECT id, photo_url, supplier, amount, note, created_at FROM receipts
       WHERE team_id = ${u.team_id}
-        AND created_at >= ${month + '-01'}::timestamp
-        AND created_at < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
+        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
   } catch { /* not migrated */ }
   for (const r of receiptRows) {
     ledger.push({
@@ -135,8 +135,8 @@ export async function GET(req: NextRequest) {
     const orders = await sql`
       SELECT id, supplier, total_cost, received_at, created_at FROM orders
       WHERE team_id = ${u.team_id} AND total_cost IS NOT NULL AND total_cost > 0
-        AND COALESCE(received_at, created_at) >= ${month + '-01'}::timestamp
-        AND COALESCE(received_at, created_at) < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+        AND ((COALESCE(received_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
+        AND ((COALESCE(received_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
     for (const o of orders as any[]) {
       ledger.push({
         date: String(o.received_at ?? o.created_at).slice(0, 10), kind: 'order',
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
   // ---- Akce: ruční náklady do výdajů ----------------------------------------
   // events.costs se dosud počítaly jen uvnitř Akcí. Nákup na akci je ale
   // výdaj jako každý jiný, takže patří do přehledu peněz.
-  let eventsRevenue = 0, eventsWithClosing = 0;
+  let eventsRevenue = 0, eventsWithClosing = 0, eventsRevenueNoClosing = 0;
   try {
     const evs = await sql`
       SELECT id, title, date, revenue, costs, (SELECT COUNT(*)::int FROM cash_closings cc WHERE cc.event_id = events.id) AS closings
@@ -157,7 +157,14 @@ export async function GET(req: NextRequest) {
         AND status <> 'cancelled'`;
     for (const e of evs as any[]) {
       if (num(e.costs) > 0) ledger.push({ date: String(e.date), kind: 'expense', label: `Náklady akce — ${e.title}`, amount: num(e.costs) });
-      if (num(e.revenue) > 0) { eventsRevenue += num(e.revenue); if (Number(e.closings) > 0) eventsWithClosing++; }
+      if (num(e.revenue) > 0) {
+        eventsRevenue += num(e.revenue);
+        // Akce s uzávěrkou už má tržbu v `revenue` (přes uzávěrku). Akce bez
+        // uzávěrky ji má jen tady — a její náklady se výš odečítají z hrubého
+        // zisku, takže bez připočtení tržby by zisk trestal náklady bez výnosu.
+        if (Number(e.closings) > 0) eventsWithClosing++;
+        else eventsRevenueNoClosing += num(e.revenue);
+      }
     }
   } catch { /* akce nemusí existovat */ }
 
@@ -172,14 +179,14 @@ export async function GET(req: NextRequest) {
              COALESCE(SUM(total) FILTER (WHERE storyous_order_id IS NULL), 0)::int AS off_total
       FROM client_orders
       WHERE team_id = ${u.team_id} AND status = 'done'
-        AND created_at >= ${month + '-01'}::timestamp AND created_at < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
+        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
     const [gm] = await sql`
       SELECT COUNT(*)::int AS members,
-             COUNT(*) FILTER (WHERE joined_at >= ${month + '-01'}::timestamp AND joined_at < (${month + '-01'}::timestamp + INTERVAL '1 month'))::int AS new_members
+             COUNT(*) FILTER (WHERE ((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month'))::int AS new_members
       FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
     const [gc] = await sql`
       SELECT COUNT(*)::int AS n FROM client_coupon_claims
-      WHERE team_id = ${u.team_id} AND redeemed_at >= ${month + '-01'}::timestamp AND redeemed_at < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
+      WHERE team_id = ${u.team_id} AND ((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
     guest = {
       orders: Number(go?.n) || 0, total: Number(go?.total) || 0,
       offPos: Number(go?.off_n) || 0, offPosTotal: Number(go?.off_total) || 0,
@@ -346,7 +353,7 @@ export async function GET(req: NextRequest) {
     summary: {
       revenue, cash, card, tips,
       purchases, wagesCash, wagesWorked, totalOut,
-      gross: revenue - purchases - Math.max(wagesCash, wagesWorked),
+      gross: revenue + eventsRevenueNoClosing - purchases - Math.max(wagesCash, wagesWorked),
       stockValue,
       prevRevenue,
       closingsCount: real.length,
