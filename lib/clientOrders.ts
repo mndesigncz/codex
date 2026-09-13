@@ -8,6 +8,7 @@
 // jedno denně, ať tři čaje nejsou tři návštěvy).
 
 import { sql, award, stampVisit, notifyTeamEmployers, ensureProfile } from './client';
+import { normName } from './menuPos';
 import { getConnection, createTableOrder, tableOrderState, StoryousError } from './storyous';
 import { notifyUser } from './push';
 import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
@@ -135,16 +136,46 @@ export async function sendToPos(teamId: number, id: number): Promise<{ posOk: bo
     return { posOk: false, posNote: note };
   }
   let lines = (o.items as any[]) ?? [];
-  const chybi = lines.filter(l => !l.posProductId && Number(l.itemId) > 0).map(l => Number(l.itemId));
-  if (chybi.length) {
+  if (lines.some(l => !l.posProductId)) {
+    // Nejdřív podle id položky. Když se ale položka v menu mezitím smazala
+    // a napsala znovu (běžný způsob, jak si ji člověk „opraví"), má nové id
+    // a podle něj by se nenašla — proto se pak hledá i podle názvu, stejným
+    // srovnáním jako párování v editoru menu.
     try {
-      const rows = await sql`SELECT id, pos_product_id FROM menu_items WHERE id = ANY(${chybi})` as any[];
-      const podle = new Map(rows.map(r => [Number(r.id), r.pos_product_id ? String(r.pos_product_id) : null]));
+      // Ze stejné nabídky, ze které host objednával — jinak by se vazba
+      // dotáhla z menu, které s objednávkou nemá nic společného.
+      const [prof] = await sql`SELECT menu_slug FROM client_profiles WHERE team_id = ${teamId}` as any[];
+      const slug = prof?.menu_slug ? String(prof.menu_slug) : null;
+      const [board] = slug
+        ? await sql`SELECT id FROM menu_boards WHERE team_id = ${teamId} AND slug = ${slug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`
+        : await sql`SELECT id FROM menu_boards WHERE team_id = ${teamId} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+      const rows = board
+        ? await sql`
+            SELECT i.id, i.name, i.pos_product_id FROM menu_items i
+            JOIN menu_sections s ON s.id = i.section_id
+            WHERE s.board_id = ${board.id} AND i.pos_product_id IS NOT NULL AND i.pos_product_id <> ''` as any[]
+        : [];
+      const podleId = new Map<number, string>();
+      const podleNazvu = new Map<string, string[]>();
+      for (const r of rows) {
+        const pid = String(r.pos_product_id);
+        podleId.set(Number(r.id), pid);
+        const k = normName(r.name);
+        if (k) (podleNazvu.get(k) ?? podleNazvu.set(k, []).get(k)!).push(pid);
+      }
       let doplneno = false;
       lines = lines.map(l => {
-        if (l.posProductId || !podle.get(Number(l.itemId))) return l;
+        if (l.posProductId) return l;
+        let pid = podleId.get(Number(l.itemId));
+        if (!pid) {
+          // Dva různé produkty stejného jména radši nechat být: špatný pár
+          // znamená, že na terminálu vyjede něco jiného, než si host objednal.
+          const hits = Array.from(new Set(podleNazvu.get(normName(l.name)) ?? []));
+          if (hits.length === 1) pid = hits[0];
+        }
+        if (!pid) return l;
         doplneno = true;
-        return { ...l, posProductId: podle.get(Number(l.itemId)) };
+        return { ...l, posProductId: pid };
       });
       // Doplněné vazby se uloží zpátky k objednávce, ať sedí to, co se
       // posílá, s tím, co je vidět v příjmu.
