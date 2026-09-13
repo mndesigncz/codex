@@ -320,7 +320,11 @@ export async function mirrorCovers(teamId: number, date: string): Promise<boolea
   try {
     const [c] = await sql`SELECT synced_from, bills_cursor FROM pos_connections WHERE team_id = ${teamId}`;
     if (!c?.bills_cursor) return false;
-    return !c.synced_from || String(c.synced_from) <= date;
+    // Dokud první backfill okno nedoběhlo, synced_from je ještě NULL. Tvrdit
+    // „pokrývám" pro libovolné datum by vrátilo prázdný den (0 Kč) místo aby se
+    // sáhlo na živé API — takže dokud nevíme odkdy, nepokrýváme nic.
+    if (!c.synced_from) return false;
+    return String(c.synced_from) <= date;
   } catch { return false; }
 }
 
