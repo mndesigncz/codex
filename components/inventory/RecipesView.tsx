@@ -384,7 +384,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
                   <span className={`w-2 h-2 rounded-full shrink-0 ${r ? 'bg-[#C8F542]' : 'bg-amber-500'}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[#16181A] line-clamp-2 sm:truncate">{p.name}</p>
-                    <p className="text-[11px] text-black/45 truncate">
+                    <p className="text-[11px] text-black/45 line-clamp-2 sm:truncate">
                       {r
                         ? r.ingredients.map((ing: any) =>
                           `${Number(ing.amount).toLocaleString('cs-CZ', { maximumFractionDigits: 3 })} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.trim()).join(' + ')
