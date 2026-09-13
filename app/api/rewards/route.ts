@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
-import { breakdownFor, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
+import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -22,20 +22,24 @@ async function ctx() {
 
 // Worked days in the recent past that still have no review — the employer's
 // "to rate" backlog. Older shifts are ignored so the number stays actionable.
-async function pendingFor(userId: number): Promise<{ n: number; oldest: string | null }> {
+// Nehodnocené směnodny za posledních 60 dní, per zaměstnanec — jeden dotaz
+// pro celý tým (dřív jeden na člena).
+async function pendingForTeam(userIds: number[]): Promise<Map<number, { n: number; oldest: string | null }>> {
+  const map = new Map<number, { n: number; oldest: string | null }>();
+  for (const id of userIds) map.set(id, { n: 0, oldest: null });
+  if (userIds.length === 0) return map;
   const from = pragueToday(-60);
   const to = pragueToday();
   try {
-    const [r] = await sql`
-      SELECT COUNT(*)::int AS n, MIN(x.date) AS oldest FROM (
-        SELECT DISTINCT s.date FROM shifts s
-        WHERE s.employee_id = ${userId} AND s.date >= ${from} AND s.date <= ${to}
-          AND NOT EXISTS (SELECT 1 FROM shift_reviews r WHERE r.employee_id = ${userId} AND r.work_date = s.date)
-      ) x`;
-    return { n: r?.n ?? 0, oldest: r?.oldest ?? null };
-  } catch {
-    return { n: 0, oldest: null };
-  }
+    const rows = await sql`
+      SELECT uid, COUNT(*)::int AS n, MIN(d) AS oldest FROM (
+        SELECT DISTINCT s.employee_id AS uid, s.date AS d FROM shifts s
+        WHERE s.employee_id = ANY(${userIds}) AND s.date >= ${from} AND s.date <= ${to}
+          AND NOT EXISTS (SELECT 1 FROM shift_reviews r WHERE r.employee_id = s.employee_id AND r.work_date = s.date)
+      ) x GROUP BY uid`;
+    for (const r of rows as any[]) map.set(r.uid, { n: r.n ?? 0, oldest: r.oldest ?? null });
+  } catch { /* table missing — leave zeros */ }
+  return map;
 }
 
 // Per-item feedback with a human label, one query per kind (neon has no
@@ -96,19 +100,23 @@ export async function GET() {
   if (c.role === 'employer' || c.role === 'kiosk') {
     const members = await sql`
       SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
-    const standings = [];
-    for (const m of members) {
-      const b = await breakdownFor(c.teamId, m.id);
+    // Dřív 6 dotazů na každého člena (N+1). Teď dvě dávkové sady GROUP BY.
+    const memberIds = (members as any[]).map(m => m.id);
+    const breakdowns = await breakdownForTeam(c.teamId, memberIds);
+    const pendings = await pendingForTeam(memberIds);
+    const standings = (members as any[]).map(m => {
+      const b = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
       const total = totalPoints(b, points);
       const st = standingForPoints(levels, total);
-      standings.push({
+      const p = pendings.get(m.id) ?? { n: 0, oldest: null };
+      return {
         id: m.id, name: m.name, avatar: m.avatar,
         points: total, breakdown: b,
-        flagged: b.flagged, ...await (async () => { const p = await pendingFor(m.id); return { pending: p.n, oldestPending: p.oldest }; })(),
+        flagged: b.flagged, pending: p.n, oldestPending: p.oldest,
         levelName: st.level.name, levelIndex: st.levelIndex,
         next: st.next, pctToNext: st.pctToNext, pointsIntoLevel: st.pointsIntoLevel, pointsForNext: st.pointsForNext,
-      });
-    }
+      };
+    });
     standings.sort((a, b) => b.points - a.points);
     return NextResponse.json({ role: 'employer', levels, points, standings });
   }
