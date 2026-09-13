@@ -109,6 +109,24 @@ export default function MenuEditor() {
     return () => { platne = false; };
   }, [ulozenySlug, ulozeneZapnuto]);
 
+  /** Založí menu rovnou z katalogu kasy — sekce podle kategorií ve Storyous. */
+  const zalozitZPokladny = async () => {
+    setImportuji('new'); setChyba(null); setHlaska(null);
+    try {
+      const r = await fetch('/api/menu/pos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'new', name: 'Nabídka z pokladny', slug: 'menu' }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setChyba(d?.error ?? 'Menu z pokladny se nepodařilo založit.'); return; }
+      await load();
+      if (d?.board?.id) setAktivni(d.board.id);
+      setHlaska(`Menu je založené z kasy: ${d?.summary?.added ?? 0} položek v ${d?.summary?.newSections ?? 0} sekcích. Všechny se z objednávky vytisknou na terminálu.`);
+    } catch {
+      setChyba('Spojení se serverem selhalo, menu se nezaložilo.');
+    } finally { setImportuji(''); }
+  };
+
   /** Založí menu. Prvni = z dnešní nabídky, další = prázdné, ať se nekopírují ceny. */
   const zalozit = async (prvni: boolean) => {
     const nazev = prvni ? 'Venkovní akce' : (prompt('Název nového menu (třeba Stálá nabídka):') || '').trim();
@@ -237,34 +255,111 @@ export default function MenuEditor() {
     [pole[od], pole[kam]] = [pole[kam], pole[od]];
   };
 
-  // ---- import z pokladny ----
-  const [posOtevreno, setPosOtevreno] = useState<number | null>(null);
+  // ---- vazba na pokladnu --------------------------------------------------
+  //
+  // Položka, která nemá produkt v kase, je pro pokladnu jen text: objednávka
+  // od stolu se do Storyous nepošle a na terminálu se nevytiskne. Proto je
+  // vazba vidět u každé položky, ne schovaná v nastavení.
+  const [posOtevreno, setPosOtevreno] = useState<{ si: number; ii: number | null } | null>(null);
   const [posProdukty, setPosProdukty] = useState<PosProduct[] | null>(null);
   const [posStav, setPosStav] = useState<string | null>(null);
   const [posHledat, setPosHledat] = useState('');
+  const [posPripojena, setPosPripojena] = useState<boolean | null>(null);
+  const [importuji, setImportuji] = useState('');
 
-  const nacistPos = async (si: number) => {
-    setPosOtevreno(si); setPosStav('Načítám katalog kasy…'); setPosHledat('');
+  /* Katalog se tahá jednou a drží — při psaní menu se do něj sahá často. */
+  const nacistKatalog = useCallback(async (znovu = false) => {
+    if (posProdukty && !znovu) return posProdukty;
+    setPosStav('Načítám katalog kasy…');
     try {
       const r = await fetch('/api/pos/products');
       const d = await r.json().catch(() => ({}));
-      if (!d?.connected) { setPosProdukty([]); setPosStav('Pokladna Storyous není připojená. Položky se dají psát ručně.'); return; }
+      setPosPripojena(!!d?.connected);
+      if (!d?.connected) { setPosProdukty([]); setPosStav('Pokladna Storyous není připojená. Položky se dají psát ručně, ale z objednávky se pak nevytisknou.'); return []; }
       const p: PosProduct[] = Array.isArray(d?.products) ? d.products : [];
       setPosProdukty(p);
       setPosStav(p.length ? null : 'Katalog kasy je prázdný.');
+      return p;
     } catch {
       setPosProdukty([]); setPosStav('Katalog kasy se nepodařilo načíst.');
+      return [];
+    }
+  }, [posProdukty]);
+
+  /* Jestli je kasa vůbec připojená, ať se nabídka párování nikomu neplete
+     do cesty, když ji nemá k čemu použít. Zároveň se ptáme, ze kterého menu
+     host objednává — párovat se dá i v menu, ze kterého si nikdo neobjedná,
+     a pak by se pořád nic netisklo a nebylo by proč. */
+  const [objednavaciSlug, setObjednavaciSlug] = useState<string | null>(null);
+  useEffect(() => {
+    let platne = true;
+    fetch('/api/pos/status').then(r => r.json()).then(d => { if (platne) setPosPripojena(!!d?.connected); }).catch(() => {});
+    fetch('/api/client/admin/profile').then(r => r.json()).then(d => {
+      if (platne && d?.profile?.ordering_on) setObjednavaciSlug(d.profile.menu_slug ? String(d.profile.menu_slug) : '');
+    }).catch(() => {});
+    return () => { platne = false; };
+  }, []);
+
+  const otevritVyber = async (si: number, ii: number | null) => {
+    setPosOtevreno({ si, ii }); setPosHledat('');
+    await nacistKatalog();
+  };
+
+  /* Výběr z katalogu: buď přidá novou položku do sekce, nebo doplní vazbu
+     (a chybějící cenu) k položce, která už je napsaná. */
+  const vybratZPos = (p: PosProduct) => {
+    const cil = posOtevreno;
+    if (!cil) return;
+    if (cil.ii == null) {
+      upravit((b) => { b.sections[cil.si].items.push({ name: p.name, price: p.price ?? 0, soldOut: false, posProductId: p.productId }); });
+      if (p.price == null) setHlaska(`„${p.name}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.`);
+    } else {
+      upravit((b) => {
+        const it = b.sections[cil.si].items[cil.ii as number];
+        it.posProductId = p.productId;
+        if (!it.price && p.price != null) it.price = p.price;
+      });
+      setHlaska(`Položka je navázaná na „${p.name}“ z kasy — od teď se z objednávky vytiskne.`);
+      setPosOtevreno(null);
     }
   };
 
-  const pridatZPos = (si: number, p: PosProduct) => {
-    upravit((b) => {
-      b.sections[si].items.push({
-        name: p.name, price: p.price ?? 0, soldOut: false, posProductId: p.productId,
+  /* Import celého katalogu a hromadné párování. Obojí zapisuje rovnou do
+     databáze, takže rozdělaná editace se musí nejdřív uložit. */
+  const zPokladny = async (mode: 'fill' | 'match', refresh = false) => {
+    if (!board) return;
+    if (neulozeno) { setChyba('Nejdřív ulož rozdělané změny, ať se import nepotká s nimi.'); return; }
+    setImportuji(mode); setChyba(null); setHlaska(null);
+    try {
+      const r = await fetch('/api/menu/pos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, boardId: board.id, refresh }),
       });
-    });
-    if (p.price == null) setHlaska(`„${p.name}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.`);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setChyba(d?.error ?? 'Z pokladny se to nepovedlo.'); return; }
+      await load();
+      setPosProdukty(null);
+      const su = d?.summary ?? {};
+      if (mode === 'match') {
+        setHlaska(su.matched
+          ? `Spárováno ${su.matched} ${su.matched === 1 ? 'položka' : su.matched < 5 ? 'položky' : 'položek'}${su.left ? `, bez páru zůstává ${su.left}` : ', všechno sedí'}.${su.ambiguous?.length ? ` Nejednoznačné (v kase je víc produktů stejného jména): ${su.ambiguous.slice(0, 5).join(', ')}.` : ''}`
+          : `Podle názvu se nepovedlo spárovat nic. ${su.left ? `Bez páru zůstává ${su.left} položek — dopáruj je tlačítkem u položky.` : ''}`);
+      } else {
+        setHlaska(su.added
+          ? `Z kasy přibylo ${su.added} položek${su.newSections ? ` v ${su.newSections} nových sekcích` : ''}. Přeskládej si je, jak chceš — vazba na kasu drží u položky.`
+          : 'Z kasy už je v menu všechno, co tam patří.');
+      }
+    } catch {
+      setChyba('Spojení se serverem selhalo, z pokladny se nic nenačetlo.');
+    } finally { setImportuji(''); }
   };
+
+  /* Kolik položek doletí do pokladny. Tohle číslo je celý smysl párování. */
+  const vazby = (() => {
+    let celkem = 0, spojene = 0;
+    for (const s of board?.sections ?? []) for (const it of s.items) { celkem++; if (it.posProductId) spojene++; }
+    return { celkem, spojene, chybi: celkem - spojene };
+  })();
 
   // -------------------------------------------------------------------------
 
@@ -290,11 +385,25 @@ export default function MenuEditor() {
             To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód.
           </p>
         </div>
-        <button type="button" onClick={() => zalozit(true)} disabled={ukladam}
-          className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
-          {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {posPripojena && (
+            <button type="button" onClick={zalozitZPokladny} disabled={!!importuji || ukladam}
+              className="rounded-full bg-[#C8F542] text-[#16181A] font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
+              {importuji === 'new' ? 'Načítám z kasy…' : 'Založit menu z pokladny'}
+            </button>
+          )}
+          <button type="button" onClick={() => zalozit(true)} disabled={ukladam || !!importuji}
+            className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${posPripojena ? 'border border-black/10 text-black/70' : 'bg-[#16181A] text-white'}`}>
+            {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
+          </button>
+        </div>
+        {posPripojena && (
+          <p className="text-xs text-black/45">
+            Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.
+          </p>
+        )}
         {chyba && <p className="text-red-600 text-sm">{chyba}</p>}
+        {hlaska && <p className="text-sm text-[#3E5406]">{hlaska}</p>}
       </div>
     );
   }
@@ -608,6 +717,65 @@ export default function MenuEditor() {
         })()}
       </div>
 
+      {/* Vazba na pokladnu. Bez ní je položka pro kasu jen text: objednávka
+          od stolu se do Storyous nepošle a na terminálu se nic nevytiskne.
+          Proto je tohle nad sekcemi, ne schované v nastavení. */}
+      {posPripojena && (
+        <div className="glass-card p-5 space-y-3">
+          <div className="flex items-start gap-3 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+                <Icon name="receipt" size={18} className="text-black/40 shrink-0" />Tisk na terminálu
+              </h3>
+              {vazby.celkem === 0 ? (
+                <p className="text-sm text-black/55 mt-1">
+                  Menu je zatím prázdné. Nejrychlejší je natáhnout ho z pokladny — přijde i s cenami a rozdělením do sekcí, jak to máte ve Storyous.
+                </p>
+              ) : vazby.chybi === 0 ? (
+                <p className="text-sm text-[#3E5406] mt-1">
+                  Všech {vazby.celkem} položek má produkt v kase. Co si host objedná, vyjede na terminálu.
+                </p>
+              ) : (
+                <p className="text-sm text-black/60 mt-1">
+                  <strong className="text-[#16181A] tabular-nums">{vazby.spojene} z {vazby.celkem}</strong> položek se z objednávky vytiskne na terminálu.
+                  Zbylých {vazby.chybi} je pro pokladnu jen text — objednávka s nimi zůstane jen tady u nás.
+                </p>
+              )}
+            </div>
+            <span className="shrink-0 text-sm font-bold tabular-nums text-black/45">{vazby.celkem ? Math.round((vazby.spojene / vazby.celkem) * 100) : 0} %</span>
+          </div>
+          {vazby.celkem > 0 && (
+            <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden" aria-hidden>
+              <div className="h-full rounded-full bg-[#C8F542] transition-all" style={{ width: `${vazby.celkem ? (vazby.spojene / vazby.celkem) * 100 : 0}%` }} />
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!!importuji} onClick={() => zPokladny('fill')}
+              className="rounded-full bg-[#16181A] text-white font-semibold px-4 py-2 text-sm disabled:opacity-50">
+              {importuji === 'fill' ? 'Načítám z kasy…' : vazby.celkem === 0 ? 'Natáhnout menu z pokladny' : 'Doplnit, co v menu chybí'}
+            </button>
+            {vazby.chybi > 0 && (
+              <button type="button" disabled={!!importuji} onClick={() => zPokladny('match')}
+                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-black/70 disabled:opacity-50">
+                {importuji === 'match' ? 'Páruji…' : 'Spárovat podle názvu'}
+              </button>
+            )}
+            <button type="button" disabled={!!importuji} onClick={() => zPokladny('fill', true)}
+              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/55 disabled:opacity-50">
+              Načíst katalog kasy znovu
+            </button>
+          </div>
+          {objednavaciSlug != null && objednavaciSlug !== '' && board.slug !== objednavaciSlug && (
+            <p className="text-sm text-amber-900 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-3.5 py-2.5">
+              Pozor: hosté objednávají z menu s adresou <strong>{objednavaciSlug}</strong>, ne z tohohle. Párování tady se do objednávek nepropíše — přepni na to správné menu, nebo ho podniku nastav v Klientu → Nastavení.
+            </p>
+          )}
+          <p className="text-[11px] text-black/40">
+            Sekce si pak přeskládej, jak chceš — vazba na kasu drží u položky, ne u sekce. Položka s vazbou má v seznamu zelené lemování a tečku.
+          </p>
+        </div>
+      )}
+
       {board.sections.map((s, si) => (
         <div key={s.id ?? `nova-${si}`} className="glass-card p-6 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -629,7 +797,11 @@ export default function MenuEditor() {
 
           <div className="space-y-2">
             {s.items.map((it, ii) => (
-              <div key={it.id ?? `nova-${ii}`} className="rounded-2xl border border-black/[0.06] p-3 space-y-2">
+              <div key={it.id ?? `nova-${ii}`}
+                className={`rounded-2xl border p-3 space-y-2 ${
+                  !posPripojena ? 'border-black/[0.06]'
+                    : it.posProductId ? 'border-[#C8F542]/60 bg-[#C8F542]/[0.06]'
+                      : 'border-amber-500/35 bg-amber-500/[0.04]'}`}>
                 <div className="flex gap-2 flex-wrap">
                   <input className={`${vstup} flex-1 min-w-[10rem]`} value={it.name} maxLength={80} placeholder="Název položky"
                     onChange={(e) => upravit((b) => { b.sections[si].items[ii].name = e.target.value; })} />
@@ -644,7 +816,22 @@ export default function MenuEditor() {
                       it.soldOut ? 'bg-red-500 text-white' : 'border border-black/10 text-black/60'}`}>
                     {it.soldOut ? 'Vyprodáno' : 'Na skladě'}
                   </button>
-                  {it.posProductId && <span className="text-[11px] text-black/35">z kasy</span>}
+                  {posPripojena && (it.posProductId ? (
+                    <span title="Položka má produkt v pokladně, takže se z objednávky vytiskne na terminálu."
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />Tiskne se na kase
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => otevritVyber(si, ii)}
+                      title="Bez produktu z pokladny objednávka na terminál nedoletí."
+                      className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-500/20 transition">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Netiskne se · spárovat
+                    </button>
+                  ))}
+                  {posPripojena && it.posProductId && (
+                    <button type="button" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}
+                      className="text-[11px] text-black/35 hover:text-black/60 underline underline-offset-2">zrušit vazbu</button>
+                  )}
                   <span className="flex-1" />
                   <button type="button" title="Nahoru" onClick={() => upravit((b) => posun(b.sections[si].items, ii, -1))}
                     className="rounded-full border border-black/10 w-9 h-9 text-black/50">↑</button>
@@ -664,16 +851,17 @@ export default function MenuEditor() {
               className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
               + Položka
             </button>
-            <button type="button" onClick={() => nacistPos(si)}
+            <button type="button" onClick={() => otevritVyber(si, null)}
               className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
               + Z pokladny
             </button>
           </div>
 
-          {posOtevreno === si && (
+          {posOtevreno?.si === si && (
             <div className="rounded-2xl border border-black/[0.08] p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <input className={`${vstup} flex-1`} value={posHledat} placeholder="Hledat v katalogu kasy…"
+                <input className={`${vstup} flex-1`} value={posHledat} autoFocus
+                  placeholder={posOtevreno?.ii == null ? 'Hledat v katalogu kasy…' : `Ke které položce v kase patří „${s.items[posOtevreno.ii]?.name || '…'}“?`}
                   onChange={(e) => setPosHledat(e.target.value)} />
                 <button type="button" onClick={() => setPosOtevreno(null)}
                   className="rounded-full border border-black/10 px-3 py-2 text-sm text-black/50">Zavřít</button>
@@ -684,7 +872,7 @@ export default function MenuEditor() {
                   .filter((p) => !posHledat || (p.name + ' ' + p.category).toLowerCase().includes(posHledat.toLowerCase()))
                   .slice(0, 80)
                   .map((p) => (
-                    <button key={p.productId} type="button" onClick={() => pridatZPos(si, p)}
+                    <button key={p.productId} type="button" onClick={() => vybratZPos(p)}
                       className="w-full text-left rounded-xl px-3 py-2 hover:bg-black/[0.04] flex items-center gap-2">
                       <span className="flex-1 min-w-0">
                         <span className="block text-sm truncate">{p.name}</span>
