@@ -363,7 +363,7 @@ export default function EmployerLayout({ user }: Props) {
               <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky
               </h3>
-              <button onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             <ReceiptsPanel />
           </div>

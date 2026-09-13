@@ -1232,7 +1232,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   {pending && (
                     <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
-                  <button
+                  <button aria-label="Smazat uzávěrku"
                     type="button"
                     title="Smazat uzávěrku"
                     onClick={async () => {

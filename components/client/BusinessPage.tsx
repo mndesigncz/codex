@@ -52,7 +52,9 @@ export default function BusinessPage({ slug }: { slug: string }) {
   const join = async () => {
     const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST' });
     if (r.status === 401) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
-    if (r.ok) { setFlash('Jsi členem. Vítej.'); load(); }
+    if (r.ok) { setFlash('Jsi členem. Vítej.'); load(); return; }
+    const d = await r.json().catch(() => ({}));
+    setFlash(d.error || 'Přidat se teď nepovedlo. Zkus to prosím znovu.');
   };
 
   return (
@@ -244,7 +246,9 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   const cancel = async (id: number) => {
     if (!confirm('Zrušit rezervaci?')) return;
     const r = await fetch(`/api/client/reservations/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) });
-    if (r.ok) onDone('Rezervace zrušena.');
+    if (r.ok) { onDone('Rezervace zrušena.'); return; }
+    const d = await r.json().catch(() => ({}));
+    setErr(d.error || 'Zrušení se nepovedlo. Zkus to prosím znovu.');
   };
 
   return (

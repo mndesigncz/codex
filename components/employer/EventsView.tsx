@@ -259,7 +259,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
               {e.location ? ` · ${e.location}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         {/* status + publicity row */}
@@ -361,7 +361,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
                      : <span className="text-black/35">čeká</span>}
                   </span>
                   {!p2.packed && (
-                    <button onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
+                    <button aria-label="Zavřít" onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
                       className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
                   )}
                 </div>

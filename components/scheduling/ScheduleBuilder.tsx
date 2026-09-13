@@ -665,7 +665,7 @@ export default function ScheduleBuilder({ user }: Props) {
         {boardError && (
           <div className="w-full rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm font-medium text-red-600 flex items-center justify-between gap-3">
             <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
-            <button onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600"><Icon name="close" size={15} /></button>
+            <button aria-label="Zavřít" onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600"><Icon name="close" size={15} /></button>
           </div>
         )}
 
@@ -2645,7 +2645,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
             <p className="text-xs text-black/45 cz-sentence">{monthLabel(month)}</p>
           </div>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <p className="text-xs text-black/45">

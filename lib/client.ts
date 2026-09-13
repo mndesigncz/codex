@@ -236,14 +236,45 @@ export async function spendPoints(teamId: number, customerId: number, cost: numb
   return Number(m.points);
 }
 
+/**
+ * Uplatnění kreditu u kasy. Atomicky jako spendPoints: odečte se jen tehdy,
+ * když kredit stačí, takže dvojklik / dvě zařízení nepřečerpají zůstatek.
+ * awardCredit(+/-) zůstává na přičítání; na odečet je tohle, protože
+ * GREATEST(0, ...) tam přečerpání jen skrývalo. Vrací nový zůstatek, nebo null.
+ */
+export async function spendCredit(teamId: number, customerId: number, amountCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number | null> {
+  await join(customerId, teamId);
+  const amt = Math.round(amountCzk);
+  const [m] = await sql`
+    UPDATE client_memberships SET credit = credit - ${amt}
+    WHERE customer_id = ${customerId} AND team_id = ${teamId} AND credit >= ${amt}
+    RETURNING credit`;
+  if (!m) return null;
+  await sql`
+    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
+    VALUES (${teamId}, ${customerId}, 0, ${-amt}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  return Number(m.credit);
+}
+
 /** Návštěva: +1 razítko, +1 návštěva; po dosažení cíle se razítka vynulují a vznikne kupon na odměnu. */
-export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string): Promise<{ stamps: number; rewarded: boolean }> {
+export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string): Promise<{ stamps: number; rewarded: boolean; already?: boolean }> {
   await join(customerId, teamId);
   const target = Number(profile?.stamp_target) || 0;
+  // Razítko nejvýš jedno za pražský den. Podmínka je přímo v UPDATE, takže dva
+  // rychlé pokusy neprojdou oba — dřív se „už dnes byl" kontrolovalo zvlášť a
+  // dalo se to dvojklikem obejít (dvě razítka, dvě návštěvy, dvakrát odměna).
   const [m] = await sql`
     UPDATE client_memberships SET stamps = stamps + 1, visits = visits + 1, last_visit_at = NOW()
     WHERE customer_id = ${customerId} AND team_id = ${teamId}
+      AND (last_visit_at IS NULL OR
+           (last_visit_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date
+             < (NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date)
     RETURNING stamps`;
+  if (!m) {
+    // Dnes už razítko má — vrátí se aktuální stav beze změny.
+    const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
+    return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
+  }
   let stamps = Number(m?.stamps ?? 0);
   let rewarded = false;
   if (target > 0 && stamps >= target) {
