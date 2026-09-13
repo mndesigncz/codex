@@ -74,6 +74,21 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
     }
   }, [d]);
 
+  /* Zkouška spojení s kasou. Nic neposílá — jen projde řetězec článek po
+     článku a řekne, kde vázne. Bez toho je jediná odpověď „nevím". */
+  const [test, setTest] = useState<any[] | null>(null);
+  const [testuji, setTestuji] = useState(false);
+  const zkouska = async () => {
+    setTestuji(true); setTest(null);
+    try {
+      const r = await fetch('/api/client/admin/pos-check');
+      const x = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(x.error || 'Zkouška se nepovedla.');
+      setTest(Array.isArray(x.kroky) ? x.kroky : []);
+    } catch (e: any) { toast(e.message); }
+    setTestuji(false);
+  };
+
   /* Zopakovat odeslání do kasy. Objednávka, kterou pokladna zrovna nevzala,
      se jinak už na terminál nikdy nedostane. */
   const toPos = async (id: number) => {
@@ -124,15 +139,44 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
 
   return (
     <div className="space-y-5">
-      {!compact && vady.length > 0 && (
-        <section aria-labelledby="h-pos" className="rounded-2xl border border-amber-500/35 bg-amber-500/[0.07] p-4">
-          <p id="h-pos" className="text-sm font-bold text-amber-900 flex items-center gap-2">
-            <Icon name="warning" size={16} className="shrink-0" />Objednávky se nevytisknou na terminálu
+      {!compact && (vady.length > 0 || test) && (
+        <section aria-labelledby="h-pos" className={`rounded-2xl border p-4 ${vady.length ? 'border-amber-500/35 bg-amber-500/[0.07]' : 'border-black/[0.08] bg-white/60'}`}>
+          <p id="h-pos" className={`text-sm font-bold flex items-center gap-2 ${vady.length ? 'text-amber-900' : 'text-[#16181A]'}`}>
+            <Icon name={vady.length ? 'warning' : 'receipt'} size={16} className="shrink-0" />
+            {vady.length ? 'Objednávky se nevytisknou na terminálu' : 'Spojení s pokladnou'}
           </p>
-          <ul className="mt-1.5 space-y-1 text-[13px] text-amber-900/90">
-            {vady.map((v, i) => <li key={i} className="flex gap-2"><span aria-hidden>·</span><span>{v}</span></li>)}
-          </ul>
+          {vady.length > 0 && (
+            <ul className="mt-1.5 space-y-1 text-[13px] text-amber-900/90">
+              {vady.map((v, i) => <li key={i} className="flex gap-2"><span aria-hidden>·</span><span>{v}</span></li>)}
+            </ul>
+          )}
+          {test && (
+            <ul className="mt-2.5 space-y-1.5">
+              {test.map((k, i) => (
+                <li key={i} className="flex gap-2 text-[13px]">
+                  <span className={`shrink-0 mt-0.5 ${k.ok ? 'text-[#5B7A08]' : 'text-red-600'}`} aria-hidden>{k.ok ? '✓' : '✕'}</span>
+                  <span className="min-w-0">
+                    <span className="font-semibold text-[#16181A]">{k.krok}:</span> <span className="text-black/70">{k.detail}</span>
+                    {k.kde && <span className="block text-[11px] text-black/45 mt-0.5">→ {k.kde}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-2.5">
+            <Button size="sm" variant="secondary" icon="refresh" loading={testuji} onClick={zkouska}>
+              {test ? 'Zkusit znovu' : 'Vyzkoušet spojení s kasou'}
+            </Button>
+          </div>
         </section>
+      )}
+      {!compact && vady.length === 0 && !test && (
+        <p className="px-1">
+          <button type="button" onClick={zkouska} disabled={testuji}
+            className="tap-target-sm text-xs font-semibold text-black/50 hover:text-black underline underline-offset-2 disabled:opacity-50">
+            {testuji ? 'Zkouším spojení s kasou…' : 'Vyzkoušet spojení s kasou'}
+          </button>
+        </p>
       )}
       {flash && <p role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
       {compact ? (
