@@ -3,7 +3,7 @@
 // nejvýš jedno denně; body podle pravidel podniku (bodů za 100 Kč).
 import { NextRequest, NextResponse } from 'next/server';
 import { tierFor } from '@/lib/clientSlots';
-import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, awardCredit, stampVisit, normalizeCardCode } from '@/lib/client';
+import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, normalizeCardCode } from '@/lib/client';
 import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 export const dynamic = 'force-dynamic';
@@ -88,10 +88,13 @@ export async function POST(req: NextRequest) {
   } else if (action === 'credit') {
     // Host platí kreditem: částka se odečte z jeho peněženky u podniku.
     const amount = Math.max(1, Math.min(100000, Math.round(Number(b.amount) || 0)));
-    const m = await membership(c.id, u.team_id);
-    const have = Number(m?.credit ?? 0);
-    if (have < amount) return NextResponse.json({ error: `${c.name} má kredit jen ${have} Kč.` }, { status: 409 });
-    const credit = await awardCredit(u.team_id, c.id, -amount, 'credit', 'card', `Uplatněno u kasy`);
+    // Atomicky: odečte se jen když kredit stačí. Dvojklik u kasy tak
+    // nepřečerpá zůstatek (dřív GREATEST(0,…) přečerpání jen skrylo).
+    const credit = await spendCredit(u.team_id, c.id, amount, 'credit', 'card', `Uplatněno u kasy`);
+    if (credit == null) {
+      const m = await membership(c.id, u.team_id);
+      return NextResponse.json({ error: `${c.name} má kredit jen ${Number(m?.credit ?? 0)} Kč.` }, { status: 409 });
+    }
     msg = `${c.name}: uplatněno ${amount} Kč kreditu, zbývá ${credit} Kč.`;
   } else {
     return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });

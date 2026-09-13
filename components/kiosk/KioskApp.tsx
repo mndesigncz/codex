@@ -165,6 +165,8 @@ function WhoIsWorkingOrLock() {
 function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
   const [roster, setRoster] = useState<any[]>([]);
   const [required, setRequired] = useState<{ id: number; name: string; icon?: string; done: boolean }[]>([]);
+  // Když se povinné postupy nenačtou, nesmí to vypadat jako „dnes žádné nejsou".
+  const [procErr, setProcErr] = useState(false);
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [handover, setHandover] = useState<any | null>(null);
   const [nextEvent, setNextEvent] = useState<any | null>(null);
@@ -187,8 +189,8 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
       setNextEvent(up[0] ?? null);
     }).catch(() => {});
     Promise.all([
-      fetch('/api/procedures').then(r => r.json()).catch(() => ({})),
-      fetch('/api/procedures/runs?today=team').then(r => r.json()).catch(() => ({})),
+      fetch('/api/procedures').then(r => r.json()),
+      fetch('/api/procedures/runs?today=team').then(r => r.json()),
     ]).then(([pd, rd]) => {
       const runs = Array.isArray(rd?.runs) ? rd.runs : [];
       const req = (Array.isArray(pd?.procedures) ? pd.procedures : [])
@@ -197,8 +199,8 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           id: p.id, name: p.name, icon: p.icon,
           done: runs.some((r: any) => r.procedure_id === p.id && r.status === 'completed'),
         }));
-      setRequired(req);
-    }).catch(() => {});
+      setRequired(req); setProcErr(false);
+    }).catch(() => setProcErr(true));
   }, []);
 
   return (
@@ -266,6 +268,11 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
         </div>
       )}
 
+      {procErr && (
+        <div role="alert" className="glass-card p-4 border border-amber-500/30 bg-amber-500/[0.06] text-sm text-amber-800">
+          Povinné postupy se nepodařilo načíst — nespoléhej, že dnes žádné nejsou. Otevři záložku Postupy.
+        </div>
+      )}
       {required.length > 0 && (
         <div className="glass-card p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Povinné postupy dnes</p>

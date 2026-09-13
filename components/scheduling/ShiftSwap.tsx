@@ -24,16 +24,22 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
   const [busy, setBusy] = useState<number | null>(null);
   const [offerNote, setOfferNote] = useState<Record<number, string>>({});
   const [msg, setMsg] = useState('');
+  const [loadErr, setLoadErr] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const [o, s] = await Promise.all([
-        fetch('/api/shifts/offers').then(r => r.json()).catch(() => ({ offers: [] })),
-        fetch(`/api/shifts?employeeId=${userId}`).then(r => r.json()).catch(() => []),
+        fetch('/api/shifts/offers').then(r => r.json()),
+        fetch(`/api/shifts?employeeId=${userId}`).then(r => r.json()),
       ]);
-      setOffers(Array.isArray(o.offers) ? o.offers : []);
+      setOffers(Array.isArray(o?.offers) ? o.offers : []);
       setShifts(Array.isArray(s) ? s : []);
-    } catch { /* ignore */ }
+      setLoadErr(false);
+    } catch {
+      // Prázdná burza z chyby vypadá jako prázdná burza z klidu — zaměstnanec
+      // by mohl přijít o směnu, protože si myslí, že žádná není. Rozlišíme to.
+      setLoadErr(true);
+    }
     setLoading(false);
   }, [userId]);
   useEffect(() => { load(); }, [load]);
@@ -74,6 +80,12 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
       {msg && (
         <div className="p-3 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={16} /> {msg}
+        </div>
+      )}
+      {loadErr && (
+        <div role="alert" className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm flex items-center gap-2 flex-wrap">
+          <Icon name="warning" size={16} /> Burzu se nepodařilo načíst — tohle nemusí být všechny volné směny.
+          <button onClick={() => { setLoading(true); load(); }} className="ml-auto font-semibold underline underline-offset-2">Zkusit znovu</button>
         </div>
       )}
 

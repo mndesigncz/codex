@@ -525,6 +525,10 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   // have been cracked open) — merge it in place instead of refetching the list.
   const onConsumed = (updated: any) =>
     setItems(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x));
+  // Selhání odpisu se u vedení dřív spolklo (na rozdíl od kiosku a zaměstnance):
+  // tlačítko se odemklo, číslo se nezměnilo a nikdo nevěděl, jestli je odepsáno.
+  const [consumeErr, setConsumeErr] = useState('');
+  const onConsumeFail = () => { setConsumeErr('Odpis se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.'); setTimeout(() => setConsumeErr(''), 4000); };
 
   const toggleSelected = (id: number) =>
     setSelected(prev => {
@@ -791,6 +795,9 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         )}
       </div>
 
+      {consumeErr && (
+        <div role="alert" className="rounded-2xl bg-red-500/10 border border-red-500/25 text-red-700 px-4 py-3 text-sm font-semibold">{consumeErr}</div>
+      )}
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
       ) : filtered.length === 0 ? (
@@ -807,9 +814,9 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
         />
       ) : view === 'list' ? (
-        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} />
+        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} onConsumeFail={onConsumeFail} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} />
+        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} onConsumeFail={onConsumeFail} />
       )}
 
       {/* Item form modal */}
@@ -827,7 +834,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   <p className="text-xs text-black/45 truncate">{editing ? editing.name : 'Přidejte novou zásobu do skladu'}</p>
                 </div>
               </div>
-              <button type="button" onClick={() => setShowForm(false)} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" type="button" onClick={() => setShowForm(false)} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
 
             <div className="p-6 space-y-4">
@@ -988,7 +995,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                           onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
                           className={`${inputClass} !w-24 text-center`} />
                         <span className="text-xs text-black/40 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
-                        <button type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
+                        <button aria-label="Zavřít" type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
                           className="text-black/30 hover:text-red-600 transition px-1"><Icon name="close" size={15} /></button>
                       </div>
                     ))}
@@ -1228,7 +1235,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
-              <button onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             {reports.length === 0 ? (
               <p className="text-black/45 text-sm text-center py-8">Žádná hlášení od zaměstnanců.</p>
@@ -1373,7 +1380,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
             <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Hromadná úprava</h3>
             <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="space-y-2">
@@ -1569,11 +1576,11 @@ function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => v
 }
 
 /* ---------- List view (dense rows) ---------- */
-function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle, onConsumed }: {
+function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle, onConsumed, onConsumeFail }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
   pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
-  onConsumed: (updated: any) => void;
+  onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
   return (
     <div className="glass-card overflow-hidden">
@@ -1625,7 +1632,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
               </div>
               <div className={`flex items-center gap-1 justify-end flex-wrap ${selecting ? 'hidden' : ''}`}>
                 {Number(i.packageSize) > 0 && (
-                  <ConsumeControl itemId={i.id} unit={itemContentUnit(i, pk(i))} onDone={onConsumed} />
+                  <ConsumeControl itemId={i.id} unit={itemContentUnit(i, pk(i))} onDone={onConsumed} onFail={onConsumeFail} />
                 )}
                 <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
@@ -1650,11 +1657,11 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
 }
 
 /* ---------- Grid view (glass cards) ---------- */
-function GridView({ items, step, openEdit, remove, money, pk, setArchived, selecting, selected, onToggle, onConsumed }: {
+function GridView({ items, step, openEdit, remove, money, pk, setArchived, selecting, selected, onToggle, onConsumed, onConsumeFail }: {
   items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
   money: (n: number) => string; pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
-  onConsumed: (updated: any) => void;
+  onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1692,7 +1699,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                     <Icon name="box" size={13} className="inline-block -mt-0.5 mr-1 text-black/35" />{formatStock(i, cu, i.unit)}
                     {cu ? <span className="text-black/35"> · celkem {fmtAmount(totalContent(i))} {cu}</span> : null}
                   </span>
-                  <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} />
+                  <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />
                 </div>
               );
             })()}
@@ -2028,7 +2035,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
 
@@ -2254,7 +2261,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
       <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Kategorie</h3>
-          <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="flex gap-2">
@@ -2362,7 +2369,7 @@ function CategoryRow({
           <Icon name="box" size={15} />
         </button>
         <button onClick={startEdit} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
-        <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
+        <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm" aria-label="Zavřít"><Icon name="close" size={15} /></button>
       </div>
 
       {moveOpen && (
@@ -2579,7 +2586,7 @@ function PackagingEditor({ category, onSaved }: {
                       className="w-16 rounded-xl bg-white border border-black/[0.08] px-2 py-1.5 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
                     <span className="text-xs text-black/40">%</span>
                   </div>
-                  <button onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))}
+                  <button aria-label="Zavřít" onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))}
                     className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600"><Icon name="close" size={15} /></button>
                 </div>
               ))}
@@ -2638,7 +2645,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
       <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
@@ -2678,7 +2685,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                     <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-amber-700'}`}>{sp.email ?? 'bez e-mailu'}</span>
                     <button onClick={() => { setEditId(sp.id); setEditEmail(sp.email ?? ''); }}
                       className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-black text-xs"><Icon name="pencil" size={15} /></button>
-                    <button onClick={async () => {
+                    <button aria-label="Odebrat" onClick={async () => {
                       if (!confirm(`Smazat dodavatele „${sp.name}"?`)) return;
                       const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
                       if (res?.ok) await onChanged();

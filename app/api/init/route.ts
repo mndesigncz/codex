@@ -1249,6 +1249,30 @@ export async function GET(request: Request) {
       )`;
     await sql`CREATE INDEX IF NOT EXISTS client_reservations_team_date ON client_reservations (team_id, date)`;
     await sql`CREATE INDEX IF NOT EXISTS client_reservations_customer ON client_reservations (customer_id)`;
+    // Pojistka proti dvojité rezervaci na stejný termín. Nejdřív sloučit
+    // existující duplikáty (nechat nejnižší id), jinak by index nešel založit.
+    await sql`
+      DELETE FROM client_reservations a USING client_reservations b
+      WHERE a.id > b.id AND a.team_id = b.team_id AND a.customer_id = b.customer_id
+        AND a.date = b.date AND a.time = b.time
+        AND a.status NOT IN ('cancelled','declined') AND b.status NOT IN ('cancelled','declined')`;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS client_reservations_no_dup
+      ON client_reservations (team_id, customer_id, date, time)
+      WHERE status NOT IN ('cancelled','declined')`;
+
+    // --- Výkonové indexy na provozních tabulkách ---------------------------
+    // Uzávěrky, docházka a rozvrh filtrují tyhle tabulky podle team_id/date
+    // a rostou každou směnou; bez indexu je to po roce provozu plný sken.
+    await sql`CREATE INDEX IF NOT EXISTS shifts_team_date ON shifts (team_id, date)`;
+    await sql`CREATE INDEX IF NOT EXISTS shifts_employee_date ON shifts (employee_id, date)`;
+    await sql`CREATE INDEX IF NOT EXISTS time_entries_employee_in ON time_entries (employee_id, clock_in)`;
+    await sql`CREATE INDEX IF NOT EXISTS time_entries_team ON time_entries (team_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS cash_closings_team_date ON cash_closings (team_id, date)`;
+    await sql`CREATE INDEX IF NOT EXISTS tasks_team_status ON tasks (team_id, status)`;
+    await sql`CREATE INDEX IF NOT EXISTS procedure_runs_team ON procedure_runs (team_id, procedure_id, status)`;
+    await sql`CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, is_read, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS inventory_items_team ON inventory_items (team_id)`;
     await sql`
       CREATE TABLE IF NOT EXISTS client_orders (
         id SERIAL PRIMARY KEY,

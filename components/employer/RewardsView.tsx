@@ -152,7 +152,7 @@ function RewardsViewInner() {
                   }} className="tap-target-sm shrink-0 rounded-full glass px-3 py-1 text-[11px] font-semibold text-black/50 hover:text-black transition">
                     {rw.active === false ? 'Zapnout' : 'Vypnout'}
                   </button>
-                  <button onClick={async () => {
+                  <button aria-label="Odebrat" onClick={async () => {
                     if (!confirm(`Smazat odměnu „${rw.title}"?`)) return;
                     await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
                     await loadShop();

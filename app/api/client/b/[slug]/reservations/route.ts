@@ -30,10 +30,20 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   const [dup] = await sql`
     SELECT id FROM client_reservations WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date = ${date} AND time = ${time} AND status NOT IN ('cancelled','declined')`;
   if (dup) return NextResponse.json({ error: 'Na tenhle termín už rezervaci máš.' }, { status: 409 });
-  const [r] = await sql`
-    INSERT INTO client_reservations (team_id, customer_id, date, time, party, note)
-    VALUES (${teamId}, ${me.id}, ${date}, ${time}, ${party}, ${note})
-    RETURNING id, date, time, party, note, status`;
+  // Dedup výš je rychlá cesta; skutečnou pojistku proti dvojkliku dělá
+  // unikátní index (viz /api/init). Kolizi překládáme na klidné 409.
+  let r: any;
+  try {
+    [r] = await sql`
+      INSERT INTO client_reservations (team_id, customer_id, date, time, party, note)
+      VALUES (${teamId}, ${me.id}, ${date}, ${time}, ${party}, ${note})
+      RETURNING id, date, time, party, note, status`;
+  } catch (e: any) {
+    if (String(e?.message ?? '').toLowerCase().includes('unique') || e?.code === '23505') {
+      return NextResponse.json({ error: 'Na tenhle termín už rezervaci máš.' }, { status: 409 });
+    }
+    throw e;
+  }
   await notifyTeamEmployers(teamId, {
     title: 'Nová rezervace',
     body: `${me.name} · ${date.split('-').reverse().join('. ')} ${time} · ${party} ${party === 1 ? 'osoba' : party < 5 ? 'osoby' : 'osob'}`,

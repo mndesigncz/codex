@@ -68,7 +68,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
         className="rounded-full bg-[#16181A] text-white px-3.5 h-8 text-xs font-bold hover:bg-black transition disabled:opacity-40">
         {saving ? '…' : 'Odepsat'}
       </button>
-      <button onClick={() => { setOpen(false); setAmount(''); }}
+      <button aria-label="Zavřít" onClick={() => { setOpen(false); setAmount(''); }}
         className="rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-black text-sm"><Icon name="close" size={15} /></button>
     </div>
   );
