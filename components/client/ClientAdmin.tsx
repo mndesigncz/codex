@@ -12,6 +12,7 @@ import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
+import QrDesigner from './QrDesigner';
 import BrandTab from './BrandTab';
 import LoyaltyTabs from './LoyaltyTabs';
 import MenuEditor from '../employer/MenuEditor';
@@ -402,6 +403,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
               </li>
             ))}
           </ul>}
+      {d !== null && d.tables.length > 0 && <QrDesigner toast={toast} tables={d.tables} />}
       {d !== null && d.tables.length > 0 && <FloorPlanEditor toast={toast} onSaved={load} />}
     </div>
   );

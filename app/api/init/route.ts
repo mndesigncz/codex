@@ -1395,6 +1395,8 @@ export async function GET(request: Request) {
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_discount INTEGER NOT NULL DEFAULT 0`;
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_discount INTEGER NOT NULL DEFAULT 0`;
     await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS cashback_pct INTEGER NOT NULL DEFAULT 0`;
+    // Vzhled QR na stůl: barvy, texty, logo uprostřed, formát archu.
+    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS qr_design JSONB NOT NULL DEFAULT '{}'::jsonb`;
     await sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`;
     await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS credit_delta INTEGER NOT NULL DEFAULT 0`;
     await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_w DOUBLE PRECISION`;

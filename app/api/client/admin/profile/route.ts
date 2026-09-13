@@ -2,6 +2,7 @@
 // nastaví, co host smí (rezervace, objednávky, věrnost) a pravidla věrnosti.
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, employer, ensureProfile, slugify, publicProfile } from '@/lib/client';
+import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -81,6 +82,7 @@ export async function PUT(req: NextRequest) {
       lng = ${coord(b.lng, cur.lng, 180)},
       geo_radius_m = ${num(b.geo_radius_m, Number(cur.geo_radius_m) || 100, 30, 1000)},
       order_auto_pos = ${b.order_auto_pos != null ? !!b.order_auto_pos : cur.order_auto_pos},
+      qr_design = ${b.qr_design !== undefined ? JSON.stringify(normalizeQrDesign(b.qr_design)) : JSON.stringify(normalizeQrDesign(cur.qr_design))}::jsonb,
       updated_at = NOW()
     WHERE team_id = ${u.team_id} RETURNING *`;
   audit(u.team_id, u.id, 'client.profile', 'client', null, p.enabled ? `zapnuto · /client/${p.slug}` : 'vypnuto');
