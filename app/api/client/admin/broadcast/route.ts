@@ -10,7 +10,21 @@ export const fetchCache = 'force-no-store';
 export async function GET() {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  const history = await sql`SELECT * FROM client_broadcasts WHERE team_id = ${u.team_id} ORDER BY sent_at DESC LIMIT 50`;
+  // Ke každé zprávě i to, co po ní přišlo: kolik různých členů se v sedmi
+  // dnech po odeslání objevilo u kasy, a kolik jich přišlo sedm dní předtím.
+  // Není to důkaz, že za to může zpráva — je to jediné poctivé srovnání,
+  // které z našich dat jde udělat, a bez něj se posílá naslepo.
+  const history = await sql`
+    SELECT b.*,
+      (SELECT COUNT(DISTINCT l.customer_id)::int FROM client_loyalty_ledger l
+        WHERE l.team_id = b.team_id AND l.created_at >= b.sent_at
+          AND l.created_at < b.sent_at + INTERVAL '7 days') AS visits_after,
+      (SELECT COUNT(DISTINCT l.customer_id)::int FROM client_loyalty_ledger l
+        WHERE l.team_id = b.team_id AND l.created_at >= b.sent_at - INTERVAL '7 days'
+          AND l.created_at < b.sent_at) AS visits_before,
+      (b.sent_at > NOW() - INTERVAL '7 days') AS still_running
+    FROM client_broadcasts b
+    WHERE b.team_id = ${u.team_id} ORDER BY b.sent_at DESC LIMIT 50`;
   const [c] = await sql`
     SELECT COUNT(*)::int AS members,
            COUNT(*) FILTER (WHERE last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')::int AS quiet,

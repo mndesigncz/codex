@@ -282,6 +282,9 @@ export default function ScheduleBuilder({ user }: Props) {
   // hlásí stejně jako návrh, protože vzniknou i ruční úpravou.
   const [gaps, setGaps] = useState<Gap[]>([]);
   const [understaffed, setUnderstaffed] = useState<MissingSlot[]>([]);
+  // Kolik hostů na ten den čeká — z rezervací v Managero client. Rozvrh se
+  // jinak plánuje naslepo, přestože podnik to číslo už má.
+  const [demand, setDemand] = useState<Record<string, { reservations: number; guests: number }>>({});
 
   // generate preview state
   const [generating, setGenerating] = useState(false);
@@ -361,6 +364,7 @@ export default function ScheduleBuilder({ user }: Props) {
       setShifts(sData.shifts ?? []);
       setGaps(Array.isArray(sData.gaps) ? sData.gaps : []);
       setUnderstaffed(Array.isArray(sData.understaffed) ? sData.understaffed : []);
+      setDemand(sData.demand && typeof sData.demand === 'object' ? sData.demand : {});
       setShiftTypes(stData.shiftTypes ?? []);
       setFixed(faData.assignments ?? []);
       setOpeningHours(ohData.openingHours ?? {});
@@ -1204,6 +1208,11 @@ export default function ScheduleBuilder({ user }: Props) {
                     <span className="h-3 w-3 rounded-md bg-red-500/25 border border-red-500/60" /> Díra v obsazení
                   </span>
                 )}
+                {Object.keys(demand).length > 0 && (
+                  <span className="flex items-center gap-1.5 text-[#3E5406]">
+                    <span className="h-3 w-3 rounded-md bg-[#C8F542]/40 border border-[#C8F542]" /> Rezervovaní hosté
+                  </span>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
@@ -1249,6 +1258,13 @@ export default function ScheduleBuilder({ user }: Props) {
                       )}
                     </span>
                     <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
+                      {demand[cell]?.guests > 0 && (
+                        <span title={`${demand[cell].reservations} rezervací na ${demand[cell].guests} hostů`}
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#C8F542]/25 text-[#3E5406]">
+                          <span className="flex-shrink-0"><Icon name="users" size={13} /></span>
+                          <span className="truncate min-w-0 tabular-nums">{demand[cell].guests} hostů</span>
+                        </span>
+                      )}
                       {(eventsByDate[cell] ?? []).map((ev: any) => (
                         <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
                           className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/12 text-[#0A6FE0]">

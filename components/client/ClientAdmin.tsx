@@ -617,6 +617,11 @@ function Reviews() {
                   <p className="font-semibold leading-tight flex items-center gap-2 flex-wrap"><span className="truncate">{v.customer_name}</span><span className="text-[#16181A] tracking-tight" aria-label={`${v.rating} z 5`}>{'★'.repeat(Number(v.rating))}<span className="text-black/20">{'★'.repeat(5 - Number(v.rating))}</span></span></p>
                   {v.note ? <p className="text-sm text-black/70 mt-0.5 text-pretty">„{v.note}"</p> : <p className="text-sm text-black/45 mt-0.5">Bez komentáře.</p>}
                   <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(v.created_at)} · {String(v.ref).startsWith('ord:') ? 'objednávka od stolu' : 'rezervace'}</p>
+                  {v.crew?.length > 0 && (
+                    <p className={`text-xs mt-1 ${Number(v.rating) <= 2 ? 'text-amber-800' : 'text-black/45'}`}>
+                      Ten den měli směnu: {v.crew.map((c: any) => `${c.avatar} ${c.name}`).join(', ')}
+                    </p>
+                  )}
                 </div>
               </li>
             ))}
@@ -666,7 +671,20 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
                   <p className="font-semibold leading-tight">{h.title}</p>
                   {h.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{h.body}</p>}
                   <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(h.sent_at)} · {h.recipients} {h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}{h.audience === 'quiet' ? ' · kdo dlouho nebyl' : h.audience === 'gold' ? ' · zlatí hosté' : ''}</p>
+                  {(Number(h.visits_after) > 0 || Number(h.visits_before) > 0) && (() => {
+                    const a = Number(h.visits_after) || 0, bft = Number(h.visits_before) || 0;
+                    const diff = a - bft;
+                    return (
+                      <p className={`text-xs mt-1 ${diff > 0 ? 'text-[#5B7A08]' : 'text-black/45'}`}>
+                        {h.still_running ? 'Zatím ' : ''}{a} {a === 1 ? 'člen' : a < 5 ? 'členové' : 'členů'} u kasy do sedmi dní po odeslání
+                        {bft > 0 ? `, sedm dní předtím ${bft}` : ''}
+                        {diff !== 0 ? ` (${diff > 0 ? '+' : ''}${diff})` : ''}
+                        {h.still_running ? ' · ještě běží' : ''}
+                      </p>
+                    );
+                  })()}
                 </li>))}</ul>}
+          {d.history.length > 0 && <p className="text-[11px] text-black/40 mt-2 px-1">Srovnání sedmi dní po a před odesláním je nejpoctivější, co z našich dat jde. Neříká, že za návštěvu může zpráva — říká, jestli se po ní něco pohnulo.</p>}
         </section>
       </div>
     </div>

@@ -73,7 +73,24 @@ export async function GET(req: Request) {
     }
   } catch { /* bez otevírací doby se pokrytí neřeší */ }
 
-  return NextResponse.json({ shifts, gaps, understaffed });
+  // Poptávka na den z Managero client: potvrzené rezervace a kolik lidí
+  // v nich je. Rozvrh se jinak plánuje naslepo, přestože podnik už ví, kolik
+  // hostů na ten den čeká.
+  let demand: Record<string, { reservations: number; guests: number }> = {};
+  try {
+    const rows = await sql`
+      SELECT date, COUNT(*)::int AS n, COALESCE(SUM(party), 0)::int AS guests
+      FROM client_reservations
+      WHERE team_id = ${ctx.teamId} AND status IN ('confirmed', 'seated')
+        AND to_char(date::date, 'YYYY-MM') = ${month}
+      GROUP BY date` as any[];
+    for (const r of rows) {
+      const day = typeof r.date === 'string' ? r.date : new Date(r.date).toISOString().split('T')[0];
+      demand[day] = { reservations: Number(r.n) || 0, guests: Number(r.guests) || 0 };
+    }
+  } catch { /* Managero client nemusí být zapnutý */ }
+
+  return NextResponse.json({ shifts, gaps, understaffed, demand });
 }
 
 // POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type}] } bulk append
