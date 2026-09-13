@@ -39,22 +39,30 @@ export async function GET(request: Request) {
 
   try {
     const sql = neon(process.env.DATABASE_URL!);
+    // Každý samostatný krok migrace v vlastním chytu: jeden neúspěch (třeba
+    // transientní chyba Neonu) dřív přeskočil celý zbytek schématu. Takhle
+    // ostatní kroky doběhnou a co selhalo, je v logu. Přiřazené dotazy (čtení)
+    // tímhle neprocházejí — ty se řeší vlastními try tam, kde jsou.
+    const migFails: string[] = [];
+    const ddl = async (q: Promise<any>) => {
+      try { await q; } catch (e) { migFails.push(String((e as any)?.message ?? e).slice(0, 120)); }
+    };
     let closingIndex = 'not reached';
     let closingIndexes: string[] = [];
     let closingConstraints: string[] = [];
 
     // ---- Teams ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS teams (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         owner_id INTEGER,
         join_code TEXT UNIQUE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Users ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -68,12 +76,12 @@ export async function GET(request: Request) {
         employer_id INTEGER,
         team_id INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light'`;
+      )`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light'`);
 
     // ---- Invitations ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -83,10 +91,10 @@ export async function GET(request: Request) {
         invited_by INTEGER NOT NULL,
         status TEXT DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Shifts ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS shifts (
         id SERIAL PRIMARY KEY,
         team_id INTEGER,
@@ -96,12 +104,12 @@ export async function GET(request: Request) {
         end_time TEXT NOT NULL,
         type TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS team_id INTEGER`;
+      )`);
+    await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS team_id INTEGER`);
     // shift created automatically from a clock-in / added via a closing (not planned)
-    await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT FALSE`);
 
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_requests (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER NOT NULL,
@@ -110,10 +118,10 @@ export async function GET(request: Request) {
         note TEXT,
         status TEXT DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Monthly availability ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS availability_requests (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -125,10 +133,10 @@ export async function GET(request: Request) {
         note TEXT,
         status TEXT DEFAULT 'submitted',
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Inventory ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS inventory_items (
         id SERIAL PRIMARY KEY,
         team_id INTEGER,
@@ -143,14 +151,14 @@ export async function GET(request: Request) {
         created_by INTEGER,
         updated_by INTEGER,
         updated_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS team_id INTEGER`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS critical_quantity INTEGER NOT NULL DEFAULT 2`;
+      )`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS critical_quantity INTEGER NOT NULL DEFAULT 2`);
     // unit cost → stock valuation (quantity × unit_cost)
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS unit_cost INTEGER`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS unit_cost INTEGER`);
 
     // ---- Shift swap marketplace ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_offers (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -160,12 +168,12 @@ export async function GET(request: Request) {
         status TEXT DEFAULT 'open',   -- open | claimed | approved | cancelled
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS created_by INTEGER`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_by INTEGER`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`;
+      )`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS created_by INTEGER`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_by INTEGER`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`);
 
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS inventory_log (
         id SERIAL PRIMARY KEY,
         item_id INTEGER NOT NULL,
@@ -174,9 +182,9 @@ export async function GET(request: Request) {
         new_quantity INTEGER NOT NULL,
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS inventory_reports (
         id SERIAL PRIMARY KEY,
         reported_by INTEGER NOT NULL,
@@ -184,25 +192,25 @@ export async function GET(request: Request) {
         note TEXT,
         status TEXT DEFAULT 'new',
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Chat ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS conversations (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
         type TEXT NOT NULL DEFAULT 'direct',
         name TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS conversation_members (
         id SERIAL PRIMARY KEY,
         conversation_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         last_read_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id SERIAL PRIMARY KEY,
         conversation_id INTEGER NOT NULL,
@@ -212,18 +220,18 @@ export async function GET(request: Request) {
         attachment_type TEXT,
         attachment_name TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
         sender_id INTEGER NOT NULL,
         channel TEXT NOT NULL DEFAULT 'general',
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Guides ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS guide_categories (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -231,8 +239,8 @@ export async function GET(request: Request) {
         icon TEXT DEFAULT 'book',
         position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS guides (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -243,11 +251,11 @@ export async function GET(request: Request) {
         created_by INTEGER NOT NULL,
         updated_at TIMESTAMP DEFAULT NOW(),
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`;
+      )`);
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`);
 
     // ---- Procedures / checklists ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS procedures (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -258,8 +266,8 @@ export async function GET(request: Request) {
         items JSONB DEFAULT '[]',
         created_by INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS procedure_runs (
         id SERIAL PRIMARY KEY,
         procedure_id INTEGER NOT NULL,
@@ -271,20 +279,20 @@ export async function GET(request: Request) {
         started_at TIMESTAMP DEFAULT NOW(),
         completed_at TIMESTAMP,
         duration_seconds INTEGER
-      )`;
+      )`);
 
     // ---- Inventory categories ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS inventory_categories (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
         name TEXT NOT NULL,
         position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Tasks / planning / reports / recipes ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -295,8 +303,8 @@ export async function GET(request: Request) {
         status TEXT DEFAULT 'pending',
         due_date TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS planning_cards (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -305,8 +313,8 @@ export async function GET(request: Request) {
         position INTEGER DEFAULT 0,
         created_by INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS daily_reports (
         id SERIAL PRIMARY KEY,
         date TEXT NOT NULL,
@@ -315,8 +323,8 @@ export async function GET(request: Request) {
         notes TEXT,
         created_by INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS recipes (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -326,10 +334,10 @@ export async function GET(request: Request) {
         prep_time INTEGER DEFAULT 5,
         created_by INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Notifications & push ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
@@ -339,8 +347,8 @@ export async function GET(request: Request) {
         link TEXT,
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
@@ -348,10 +356,10 @@ export async function GET(request: Request) {
         p256dh TEXT NOT NULL,
         auth TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- v2: shift types, opening hours, scheduling prefs, supplier links, procedure reminders ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_types (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -361,8 +369,8 @@ export async function GET(request: Request) {
         color TEXT DEFAULT 'lime',
         position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS fixed_assignments (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -370,20 +378,20 @@ export async function GET(request: Request) {
         weekday INTEGER NOT NULL,
         shift_type_id INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS opening_hours JSONB DEFAULT '{}'`;
+      )`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS opening_hours JSONB DEFAULT '{}'`);
     // shift types can follow opening hours: start at open / end at close (per day)
-    await sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS starts_at_open BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS ends_at_close BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_at TEXT`;
-    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_days JSONB DEFAULT '[]'`;
+    await ddl(sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS starts_at_open BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS ends_at_close BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_at TEXT`);
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_days JSONB DEFAULT '[]'`);
     // reminder can be anchored to opening / closing time instead of a fixed time
-    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_anchor TEXT DEFAULT 'time'`; // 'time' | 'open' | 'close'
-    await sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_url TEXT`;
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS remind_anchor TEXT DEFAULT 'time'`); // 'time' | 'open' | 'close'
+    await ddl(sql`ALTER TABLE availability_requests ADD COLUMN IF NOT EXISTS day_preferences JSONB DEFAULT '{}'`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_url TEXT`);
 
     // ---- Cash closings (uzávěrky) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS cash_closings (
         id SERIAL PRIMARY KEY,
         team_id INTEGER,
@@ -402,19 +410,19 @@ export async function GET(request: Request) {
         notes TEXT,
         shift_id INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
     // team payout mode: whether staff are paid daily in cash (enables self_payout field)
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_daily_cash BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_daily_cash BOOLEAN DEFAULT FALSE`);
     // link a closing to the shift it belongs to
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_id INTEGER`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_id INTEGER`);
     // approval flow for closings submitted by someone who wasn't on shift
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS approved_by INTEGER`);
     // a closing filled by one colleague on behalf of another points to the main one
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS covered_by INTEGER`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS covered_by INTEGER`);
 
     // ---- Attendance / time tracking (kiosk / tablet) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS time_entries (
         id SERIAL PRIMARY KEY,
         team_id INTEGER,
@@ -424,21 +432,21 @@ export async function GET(request: Request) {
         source TEXT DEFAULT 'kiosk',
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
     // wages: hourly rate per member (Kc/h)
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`;
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`);
     // Scheduling rule: how many days in a row a person may be rostered.
     // Team-wide default on teams, optional per-person override on users;
     // NULL on both means no limit.
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_consecutive_days INTEGER`);
     // Fair rotation (NULL = on) + monthly hour caps (team default, per-person override).
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS balance_shifts BOOLEAN`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS balance_shifts BOOLEAN`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS max_month_hours INTEGER`);
     // Uploaded files stored in Postgres when Vercel Blob is unavailable —
     // photos must never silently stop working because a token expired.
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS uploads (
         id SERIAL PRIMARY KEY,
         team_id INTEGER,
@@ -448,21 +456,21 @@ export async function GET(request: Request) {
         data TEXT,
         blob_path TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS blob_path TEXT`;
-    await sql`ALTER TABLE uploads ALTER COLUMN data DROP NOT NULL`;
+      )`);
+    await ddl(sql`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS blob_path TEXT`);
+    await ddl(sql`ALTER TABLE uploads ALTER COLUMN data DROP NOT NULL`);
     // Desired drawer float: the closing computes the end-of-shift removal so
     // exactly this amount stays for the next shift.
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS drawer_float INTEGER`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS drawer_float INTEGER`);
     // A closing can belong to an off-site event (venkovní akce) — it lives
     // beside the shop's own closing for that day, never instead of it.
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS event_id INTEGER`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS event_id INTEGER`);
     // Tips split by how they were paid. Only the cash half ever reaches the
     // drawer; counting card tips towards the expected cash invented a manko.
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_card INTEGER DEFAULT 0`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_card INTEGER DEFAULT 0`);
     // Receipts snapped on the go (TO GO mode) — photo + amounts, optionally
     // pushed into the stock later.
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS receipts (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -472,16 +480,16 @@ export async function GET(request: Request) {
         amount INTEGER,
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
     // Scheduling: may the generator split one shift between two people?
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS allow_split_shifts BOOLEAN`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS allow_split_shifts BOOLEAN`);
     // Per-person opt-out from split shifts (NULL = allowed when the team allows).
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS split_shifts_ok BOOLEAN`;
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS split_shifts_ok BOOLEAN`);
     // watchdog for forgotten clock-outs: when the person was already reminded
-    await sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`;
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`);
 
     // ---- Announcements (pinned team board) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS announcements (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -489,10 +497,10 @@ export async function GET(request: Request) {
         content TEXT NOT NULL,
         pinned BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Time off (vacation / sick day) requests ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS time_off_requests (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -504,10 +512,10 @@ export async function GET(request: Request) {
         status TEXT DEFAULT 'pending',
         decided_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
 
     // ---- Supplier orders (from the shopping list) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -519,10 +527,10 @@ export async function GET(request: Request) {
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         received_at TIMESTAMP
-      )`;
+      )`);
 
     // ---- Improvement suggestions (team idea board) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS suggestions (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -531,61 +539,61 @@ export async function GET(request: Request) {
         content TEXT,
         status TEXT DEFAULT 'new',
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS suggestion_votes (
         suggestion_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         PRIMARY KEY (suggestion_id, user_id)
-      )`;
+      )`);
 
     // invited members may come in with an elevated role
-    await sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`;
+    await ddl(sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`);
     // optional per-employee PIN for the shared kiosk device
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`;
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`);
     // per-user notification category preferences (server-side, synced across devices)
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_prefs JSONB DEFAULT '{}'`;
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_prefs JSONB DEFAULT '{}'`);
     // recurring tasks + per-task checklists
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence TEXT`;          // null | 'daily' | 'weekdays' | 'weekly'
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`;
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence TEXT`);          // null | 'daily' | 'weekdays' | 'weekly'
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]'`);
     // day-bound tasks (assigned_to NULL = anyone on the team can do it), team
     // scoping, recurring-series grouping, and who actually completed it.
-    await sql`ALTER TABLE tasks ALTER COLUMN assigned_to DROP NOT NULL`;
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS team_id INTEGER`;
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS series_id TEXT`;
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_by INTEGER`;
+    await ddl(sql`ALTER TABLE tasks ALTER COLUMN assigned_to DROP NOT NULL`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS series_id TEXT`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_by INTEGER`);
     // whether closings are locked to shifts (default on)
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS closing_requires_shift BOOLEAN DEFAULT TRUE`);
     // whether the daily cash payout is taken FROM the register (true) or from
     // money set aside (false). Drives whether the expected-cash math deducts it.
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS payout_from_register BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS payout_from_register BOOLEAN`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS payout_from_register BOOLEAN DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS payout_from_register BOOLEAN`);
 
     // ---- Business/localization settings (make the app fit ANY team) ----
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'CZK'`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS locale TEXT DEFAULT 'cs-CZ'`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS week_start INTEGER DEFAULT 1`; // 1 = Monday, 0 = Sunday
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`;      // target labor cost as % of revenue
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'CZK'`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS locale TEXT DEFAULT 'cs-CZ'`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS week_start INTEGER DEFAULT 1`); // 1 = Monday, 0 = Sunday
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`);      // target labor cost as % of revenue
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`);
     // per-team dashboard customization: { employer: {widgetId:false}, employee: {...} }
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dashboard_config JSONB DEFAULT '{}'`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dashboard_config JSONB DEFAULT '{}'`);
 
     // ---- Noisium integration (per-team) ----
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_project_id TEXT`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_base_url TEXT`;
-    await sql`ALTER TABLE planning_cards ADD COLUMN IF NOT EXISTS noisium_task_id TEXT`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_token TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_project_id TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS noisium_base_url TEXT`);
+    await ddl(sql`ALTER TABLE planning_cards ADD COLUMN IF NOT EXISTS noisium_task_id TEXT`);
 
     // ---- Procedure runs: allow skipping steps ----
-    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skipped_items JSONB DEFAULT '[]'`;
+    await ddl(sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skipped_items JSONB DEFAULT '[]'`);
 
     // ---- Employee rewards / leveling ----
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS levels_config JSONB DEFAULT '[]'`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS points_config JSONB DEFAULT '{}'`;
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`;
-    await sql`
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS levels_config JSONB DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS points_config JSONB DEFAULT '{}'`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_reviews (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -598,45 +606,45 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (employee_id, work_date)
-      )`;
+      )`);
     // Employer review notes attached directly to individual items.
-    await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_note TEXT`;
-    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS review_note TEXT`;
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS review_note TEXT`;
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_note TEXT`);
+    await ddl(sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS review_note TEXT`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS review_note TEXT`);
 
     // ---- Cash tips: do they physically stay in the drawer? ----
     // Team default + per-closing override (mirrors payout_from_register).
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN DEFAULT FALSE`);
     // Vidí zaměstnanci rozvrh celého týmu, nebo jen svoje směny? Většina
     // podniků chce první — kdo ví, s kým bude ve službě, se domluví sám.
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS show_team_schedule BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS show_team_schedule BOOLEAN DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS tips_in_drawer BOOLEAN`);
     // Itemised cash movements behind the aggregate columns, plus why the drawer
     // didn't match when it didn't.
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS movements JSONB`;
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_reason TEXT`;
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_note TEXT`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS movements JSONB`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_reason TEXT`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS diff_note TEXT`);
     // How the drawer was counted, by denomination — {"500": 3, "100": 7}.
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS denominations JSONB`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS denominations JSONB`);
     // Plans & billing prep: stored plan + trial end. Existing teams are
     // grandfathered to Pro (the UPDATE touches only NULL rows, so it's
     // idempotent and never downgrades anyone).
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS plan TEXT`;
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS plan TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP`);
     // who clicked "Mám zájem o Pro" — demand signal until real billing exists
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS billing_interest (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`;
+      )`);
+    await ddl(sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`);
     // end-of-shift removal: cash carried out AFTER the drawer was counted
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`);
 
     // ---- Public share links (customer-facing menu) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS share_links (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -649,12 +657,12 @@ export async function GET(request: Request) {
         enabled BOOLEAN DEFAULT TRUE,
         created_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
     // Colours and logo for every share page of the team.
-    await sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS share_theme JSONB`;
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS share_theme JSONB`);
 
     // ---- Zákaznické menu (iPad před podnikem + QR do mobilu hosta) ----
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS menu_boards (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -671,21 +679,21 @@ export async function GET(request: Request) {
         created_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
-      )`;
+      )`);
     // Slug je celá veřejná adresa menu (/api/menu/public/<slug>), takže musí
     // být jedinečný napříč všemi týmy — ne jen uvnitř jednoho. Kdyby si ho
     // dva podniky zabraly, veřejné čtení by nevědělo, čí menu vydat.
-    await sql`CREATE UNIQUE INDEX IF NOT EXISTS menu_boards_slug ON menu_boards (slug)`;
-    await sql`
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS menu_boards_slug ON menu_boards (slug)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS menu_sections (
         id SERIAL PRIMARY KEY,
         board_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         column_no INTEGER DEFAULT 1,
         position INTEGER DEFAULT 0
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS menu_sections_board ON menu_sections (board_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS menu_sections_board ON menu_sections (board_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS menu_items (
         id SERIAL PRIMARY KEY,
         section_id INTEGER NOT NULL,
@@ -695,26 +703,26 @@ export async function GET(request: Request) {
         sold_out BOOLEAN DEFAULT FALSE,
         pos_product_id TEXT,
         position INTEGER DEFAULT 0
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS menu_items_section ON menu_items (section_id)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS menu_items_section ON menu_items (section_id)`);
     // Vzhled menu (barvy, logo, písma, prvky na pozadí). Prázdné = vzhled
     // zapečený ve stránce, takže staré menu vypadá dál stejně.
-    await sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS theme JSONB`;
+    await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS theme JSONB`);
     // A closing belongs to the whole shift, not just its author.
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`);
     // Business day the closing belongs to. A night shift ending at 02:00 files
     // its closing on the NEXT calendar date — shift_date keeps it attached to
     // the shift that earned it. Older rows simply mirror `date`.
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_date TEXT`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_date TEXT`);
     try { await sql`UPDATE cash_closings SET shift_date = date WHERE shift_date IS NULL`; } catch { /* best-effort */ }
 
     // ---- Shift reviews: whole-shift scope, flags, per-item scoring ----
-    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'individual'`;
-    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS auto_points INTEGER DEFAULT 0`;
-    await sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS seen_at TIMESTAMP`;
+    await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'individual'`);
+    await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS flagged BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS auto_points INTEGER DEFAULT 0`);
+    await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS seen_at TIMESTAMP`);
     // Points/notes/flags attached to one concrete item of a shift.
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_review_items (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -729,29 +737,29 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (employee_id, work_date, kind, ref_id)
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`);
     // per-step skip reasons on a run + which procedures are mandatory before the closing
-    await sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`;
-    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`);
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`);
     // items/categories that only show inside their category, not on the "Vše" overview
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`);
     // employee submissions await employer approval; NULL/TRUE = approved (legacy rows)
-    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
-    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS submitted_by INTEGER`;
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS submitted_by INTEGER`);
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS submitted_by INTEGER`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS submitted_by INTEGER`);
     // one share link can be pinned to every dashboard (including the kiosk)
-    await sql`ALTER TABLE share_links ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE share_links ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`);
     // customer-facing "novinka / tip" badge on share pages
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS highlight TEXT`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS highlight TEXT`);
     // structured shift handover, stored with the closing that ends the shift
-    await sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS handover JSONB`;
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS handover JSONB`);
     // stocktakes: one row per counted inventory session
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS stocktakes (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -760,9 +768,9 @@ export async function GET(request: Request) {
         data JSONB NOT NULL DEFAULT '[]',
         created_at TIMESTAMP DEFAULT NOW(),
         completed_at TIMESTAMP
-      )`;
+      )`);
     // suppliers as first-class entities; items/orders point at them
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS suppliers (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -771,12 +779,12 @@ export async function GET(request: Request) {
         phone TEXT,
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_id INTEGER`;
-    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_id INTEGER`;
-    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`;
+      )`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
+    await ddl(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
+    await ddl(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`);
     // rewards catalog: what points can buy, and who asked for what
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS rewards_catalog (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -785,8 +793,8 @@ export async function GET(request: Request) {
         cost INTEGER NOT NULL,
         active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS reward_redemptions (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -798,24 +806,24 @@ export async function GET(request: Request) {
         decided_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW(),
         decided_at TIMESTAMP
-      )`;
+      )`);
     // guides that every employee must read, with read receipts
-    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS require_read BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS require_read BOOLEAN DEFAULT FALSE`);
     // Návod patří k položce v kase: „takhle se dělá Blue Lagoon". Díky tomu
     // se z jeho kroků dá rovnou složit receptura a naopak z receptury odkázat
     // na postup.
-    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_id TEXT`;
-    await sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_name TEXT`;
-    await sql`
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_id TEXT`);
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_name TEXT`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS guide_reads (
         id SERIAL PRIMARY KEY,
         guide_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         read_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (guide_id, user_id)
-      )`;
+      )`);
     // quick polls inside the team chat
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS polls (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -825,8 +833,8 @@ export async function GET(request: Request) {
         created_by INTEGER NOT NULL,
         closed BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS poll_votes (
         id SERIAL PRIMARY KEY,
         poll_id INTEGER NOT NULL,
@@ -834,9 +842,9 @@ export async function GET(request: Request) {
         option_idx INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (poll_id, user_id)
-      )`;
+      )`);
     // audit trail of the important writes, for the employer's eyes
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS audit_log (
         id SERIAL PRIMARY KEY,
         team_id INTEGER,
@@ -846,11 +854,11 @@ export async function GET(request: Request) {
         entity_id INTEGER,
         detail TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS audit_log_team ON audit_log (team_id, created_at DESC)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS audit_log_team ON audit_log (team_id, created_at DESC)`);
     // events: concerts, lectures, offsite tea-house trips — with crew,
     // checklist, packing list and a simple money outcome
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -873,12 +881,12 @@ export async function GET(request: Request) {
         notes TEXT,
         created_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS events_team_date ON events (team_id, date)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS events_team_date ON events (team_id, date)`);
     // a shift can belong to an event (created from its crew assignment)
-    await sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS event_id INTEGER`;
+    await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS event_id INTEGER`);
     // POS connection (Storyous): one per team, credentials live server-side only
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_connections (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL UNIQUE,
@@ -889,10 +897,10 @@ export async function GET(request: Request) {
         place_id TEXT NOT NULL,
         place_name TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP`;
+      )`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP`);
     // which POS product consumes which stock item (and how much per sale)
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_product_map (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -902,11 +910,11 @@ export async function GET(request: Request) {
         amount_per_sale NUMERIC NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, product_id)
-      )`;
+      )`);
     // What sold, per day and product. Kept on our side so the monthly margin
     // analysis reads one table instead of re-downloading a month of bill items
     // from the POS (that would be a request per receipt).
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_sales (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -915,25 +923,25 @@ export async function GET(request: Request) {
         product_name TEXT,
         qty NUMERIC NOT NULL DEFAULT 0,
         UNIQUE (team_id, date, product_id)
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS pos_sales_team_date ON pos_sales (team_id, date)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_sales_team_date ON pos_sales (team_id, date)`);
 
     // bills already deducted — a receipt must never be written off twice
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_processed_bills (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
         bill_id TEXT NOT NULL,
         processed_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, bill_id)
-      )`;
+      )`);
     // recipes: one POS product may consume SEVERAL stock items (wine + spice…)
-    await sql`ALTER TABLE pos_product_map DROP CONSTRAINT IF EXISTS pos_product_map_team_id_product_id_key`;
-    await sql`
+    await ddl(sql`ALTER TABLE pos_product_map DROP CONSTRAINT IF EXISTS pos_product_map_team_id_product_id_key`);
+    await ddl(sql`
       CREATE UNIQUE INDEX IF NOT EXISTS pos_product_map_ingredient
-      ON pos_product_map (team_id, product_id, item_id)`;
+      ON pos_product_map (team_id, product_id, item_id)`);
     // what sold recently without a recipe — the "map me" queue
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_unmapped (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -942,30 +950,30 @@ export async function GET(request: Request) {
         sold_count NUMERIC NOT NULL DEFAULT 0,
         last_seen TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, product_id)
-      )`;
+      )`);
 
     // ---- Zrcadlo pokladny: účtenky, položky a katalog u nás ----
     // Storyous se ptáme jen na změny (podle _lastModifiedAt); všechno čtení
     // jde z těchto tabulek. Viz lib/posMirror.ts.
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS bills_cursor TIMESTAMP`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS synced_from TEXT`;
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS bills_cursor TIMESTAMP`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS synced_from TEXT`);
     // Kam až má historie sahat. Bez toho by běh, který se do minuty nevejde,
     // nevěděl, kde příště navázat, a začínal by pořád od začátku.
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS backfill_until TEXT`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS sync_lock_at TIMESTAMP`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error TEXT`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMP`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS menu_modified_at TEXT`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS menu_synced_at TIMESTAMP`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS webhook_secret TEXT`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_webhook_at TIMESTAMP`;
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS stock_id TEXT`;
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS backfill_until TEXT`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS sync_lock_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error TEXT`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS menu_modified_at TEXT`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS menu_synced_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS webhook_secret TEXT`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS last_webhook_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS stock_id TEXT`);
     // Verze zrcadla: když se změní, jak se účtenky rozkládají (v2 = storno
     // se zápornou platbou se počítá do hotovosti/karty), stáhne se historie
     // znovu od původního začátku — kurzor pryč, synced_from zůstává.
-    await sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS mirror_version INTEGER NOT NULL DEFAULT 0`;
-    await sql`UPDATE pos_connections SET bills_cursor = NULL, mirror_version = 2 WHERE mirror_version < 2`;
-    await sql`
+    await ddl(sql`ALTER TABLE pos_connections ADD COLUMN IF NOT EXISTS mirror_version INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`UPDATE pos_connections SET bills_cursor = NULL, mirror_version = 2 WHERE mirror_version < 2`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_bills (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1000,10 +1008,10 @@ export async function GET(request: Request) {
         items_synced BOOLEAN NOT NULL DEFAULT FALSE,
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, bill_id)
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS pos_bills_team_day ON pos_bills (team_id, day)`;
-    await sql`CREATE INDEX IF NOT EXISTS pos_bills_team_pending ON pos_bills (team_id, items_synced)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_bills_team_day ON pos_bills (team_id, day)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_bills_team_pending ON pos_bills (team_id, items_synced)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_bill_items (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1016,10 +1024,10 @@ export async function GET(request: Request) {
         category_id TEXT,
         measure TEXT,
         discounts JSONB
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS pos_bill_items_team_bill ON pos_bill_items (team_id, bill_id)`;
-    await sql`CREATE INDEX IF NOT EXISTS pos_bill_items_team_product ON pos_bill_items (team_id, product_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_bill_items_team_bill ON pos_bill_items (team_id, bill_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_bill_items_team_product ON pos_bill_items (team_id, product_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_products (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1037,7 +1045,7 @@ export async function GET(request: Request) {
         active BOOLEAN NOT NULL DEFAULT TRUE,
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (team_id, product_id)
-      )`;
+      )`);
 
     // ---- One closing per person per day, enforced at the database ----
     // (stub rows for covered coworkers are exempt). Guarded: teams with historic
@@ -1069,7 +1077,7 @@ export async function GET(request: Request) {
       //      no index behind, while the same statement inside a DO block took
       //      effect. Creation therefore goes through a DO block too, and the
       //      outcome is read back from the catalogue instead of trusted.
-      await sql`
+      await ddl(sql`
         DO $do$
         DECLARE r record;
         BEGIN
@@ -1091,7 +1099,7 @@ export async function GET(request: Request) {
             WHERE covered_by IS NULL AND event_id IS NULL;
           END IF;
         END
-        $do$;`;
+        $do$;`);
       // One statement, one snapshot: asking to_regclass and pg_indexes in two
       // separate round trips gave contradictory answers, and a contradiction
       // between two connections tells you nothing. This asks both at once.
@@ -1124,70 +1132,70 @@ export async function GET(request: Request) {
 
     // ---- Open-package tracking (tobacco tins, bottles, sacks…) ----
     // The category carries the settings; items inherit and only override size.
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS tracks_open BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS content_unit TEXT`;
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS default_package_size NUMERIC`;
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS scale JSONB`;
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS tracks_open BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS content_unit TEXT`);
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS default_package_size NUMERIC`);
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS scale JSONB`);
     // Subcategories: a category may sit under another one (one level deep).
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS parent_id INTEGER`;
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS parent_id INTEGER`);
     // Whether min/critical are counted in packages or in the content unit.
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS threshold_unit TEXT`;
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS threshold_unit TEXT`);
     // What a new item in this category starts with, so the repeated fields are
     // filled in once on the category instead of on every product.
-    await sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS defaults JSONB`;
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS defaults JSONB`);
     // Shown on the item preview without opening it.
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS brand TEXT`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS description TEXT`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS brand TEXT`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS description TEXT`);
     // Parked items: kept in the catalogue but out of the way until restocked.
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE`);
 
     // Items point at their category by id, so two subcategories under different
     // parents may share a name. `category` stays as the display label and as the
     // fallback for rows created before this ran.
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS category_id INTEGER`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS category_id INTEGER`);
     try {
-      await sql`
+      await ddl(sql`
         UPDATE inventory_items i
         SET category_id = c.id
         FROM inventory_categories c
         WHERE i.category_id IS NULL
           AND c.name = i.category
-          AND c.team_id = i.team_id`;
+          AND c.team_id = i.team_id`);
     } catch { /* nothing to backfill */ }
     // Per item: how big its package is and how much is left in the open one.
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`;
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS content_unit TEXT`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS package_size NUMERIC`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS open_amount NUMERIC`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS content_unit TEXT`);
     // Audit trail covers the open remainder too, so consumption is derivable.
-    await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`;
-    await sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`;
+    await ddl(sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS old_open NUMERIC`);
+    await ddl(sql`ALTER TABLE inventory_log ADD COLUMN IF NOT EXISTS new_open NUMERIC`);
     // Noční synchronizace pokladny běží bez přihlášeného člověka. Dokud sloupec
     // vyžadoval uživatele, celý zápis odpisů spadl a sklad se automaticky
     // neodepisoval vůbec — ručně spuštěná synchronizace to maskovala.
     try { await sql`ALTER TABLE inventory_log ALTER COLUMN user_id DROP NOT NULL`; } catch { /* už je */ }
     // A photo of the thing itself — the crew writes new stock in from the floor
     // and the picture is what makes „Sirup Mango" recognizable to the employer.
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS photo_url TEXT`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS photo_url TEXT`);
     // Pojmenované porce položky: „panák 0,04 l", „do drinku 0,02 l". Definují
     // se jednou u položky a receptury je pak jen vybírají — místo aby se 0,02
     // přepisovalo u každého koktejlu znovu (a někde se spletl řád).
-    await sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS portions JSONB DEFAULT '[]'`;
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS portions JSONB DEFAULT '[]'`);
 
     // ---- Počítadlo neúspěšných pokusů (heslo, PIN, join kód) ----
     // Bez něj šlo čtyřmístný PIN uhodnout za pár minut a heslo hádat donekonečna.
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS auth_attempts (
         key TEXT PRIMARY KEY,
         count INTEGER NOT NULL DEFAULT 0,
         window_start TIMESTAMP NOT NULL DEFAULT NOW()
-      )`;
+      )`);
     // Staré řádky se nehromadí; okno je krátké, záznam po dni nemá smysl držet.
     try { await sql`DELETE FROM auth_attempts WHERE window_start < NOW() - INTERVAL '1 day'`; } catch { /* nevadí */ }
 
     // ---- Managero client: host, členství, rezervace, objednávky, věrnost ----
     // Poprvé do aplikace vstupuje zákazník. Má roli „customer" v users (bez
     // týmu) a k podnikům se váže členstvím. Viz lib/client.ts.
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_profiles (
         team_id INTEGER PRIMARY KEY,
         slug TEXT NOT NULL UNIQUE,
@@ -1207,8 +1215,8 @@ export async function GET(request: Request) {
         slot_minutes INTEGER NOT NULL DEFAULT 30,
         menu_slug TEXT,
         updated_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_tables (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1217,9 +1225,9 @@ export async function GET(request: Request) {
         storyous_desk_id TEXT,
         active BOOLEAN NOT NULL DEFAULT TRUE,
         position INTEGER NOT NULL DEFAULT 0
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_tables_team ON client_tables (team_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_tables_team ON client_tables (team_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_memberships (
         id SERIAL PRIMARY KEY,
         customer_id INTEGER NOT NULL,
@@ -1230,9 +1238,9 @@ export async function GET(request: Request) {
         joined_at TIMESTAMP DEFAULT NOW(),
         last_visit_at TIMESTAMP,
         UNIQUE (customer_id, team_id)
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_memberships_team ON client_memberships (team_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_memberships_team ON client_memberships (team_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_reservations (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1246,34 +1254,34 @@ export async function GET(request: Request) {
         storyous_reservation_id TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_reservations_team_date ON client_reservations (team_id, date)`;
-    await sql`CREATE INDEX IF NOT EXISTS client_reservations_customer ON client_reservations (customer_id)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_reservations_team_date ON client_reservations (team_id, date)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_reservations_customer ON client_reservations (customer_id)`);
     // Pojistka proti dvojité rezervaci na stejný termín. Nejdřív sloučit
     // existující duplikáty (nechat nejnižší id), jinak by index nešel založit.
-    await sql`
+    await ddl(sql`
       DELETE FROM client_reservations a USING client_reservations b
       WHERE a.id > b.id AND a.team_id = b.team_id AND a.customer_id = b.customer_id
         AND a.date = b.date AND a.time = b.time
-        AND a.status NOT IN ('cancelled','declined') AND b.status NOT IN ('cancelled','declined')`;
-    await sql`
+        AND a.status NOT IN ('cancelled','declined') AND b.status NOT IN ('cancelled','declined')`);
+    await ddl(sql`
       CREATE UNIQUE INDEX IF NOT EXISTS client_reservations_no_dup
       ON client_reservations (team_id, customer_id, date, time)
-      WHERE status NOT IN ('cancelled','declined')`;
+      WHERE status NOT IN ('cancelled','declined')`);
 
     // --- Výkonové indexy na provozních tabulkách ---------------------------
     // Uzávěrky, docházka a rozvrh filtrují tyhle tabulky podle team_id/date
     // a rostou každou směnou; bez indexu je to po roce provozu plný sken.
-    await sql`CREATE INDEX IF NOT EXISTS shifts_team_date ON shifts (team_id, date)`;
-    await sql`CREATE INDEX IF NOT EXISTS shifts_employee_date ON shifts (employee_id, date)`;
-    await sql`CREATE INDEX IF NOT EXISTS time_entries_employee_in ON time_entries (employee_id, clock_in)`;
-    await sql`CREATE INDEX IF NOT EXISTS time_entries_team ON time_entries (team_id)`;
-    await sql`CREATE INDEX IF NOT EXISTS cash_closings_team_date ON cash_closings (team_id, date)`;
-    await sql`CREATE INDEX IF NOT EXISTS tasks_team_status ON tasks (team_id, status)`;
-    await sql`CREATE INDEX IF NOT EXISTS procedure_runs_team ON procedure_runs (team_id, procedure_id, status)`;
-    await sql`CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, is_read, created_at)`;
-    await sql`CREATE INDEX IF NOT EXISTS inventory_items_team ON inventory_items (team_id)`;
-    await sql`
+    await ddl(sql`CREATE INDEX IF NOT EXISTS shifts_team_date ON shifts (team_id, date)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS shifts_employee_date ON shifts (employee_id, date)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS time_entries_employee_in ON time_entries (employee_id, clock_in)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS time_entries_team ON time_entries (team_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS cash_closings_team_date ON cash_closings (team_id, date)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS tasks_team_status ON tasks (team_id, status)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS procedure_runs_team ON procedure_runs (team_id, procedure_id, status)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, is_read, created_at)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS inventory_items_team ON inventory_items (team_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_orders (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1288,10 +1296,10 @@ export async function GET(request: Request) {
         pos_state TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_orders_team_status ON client_orders (team_id, status)`;
-    await sql`CREATE INDEX IF NOT EXISTS client_orders_customer ON client_orders (customer_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_orders_team_status ON client_orders (team_id, status)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_orders_customer ON client_orders (customer_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_coupons (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1302,9 +1310,9 @@ export async function GET(request: Request) {
         active BOOLEAN NOT NULL DEFAULT TRUE,
         valid_until TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_coupons_team ON client_coupons (team_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_coupons_team ON client_coupons (team_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_coupon_claims (
         id SERIAL PRIMARY KEY,
         coupon_id INTEGER NOT NULL,
@@ -1313,9 +1321,9 @@ export async function GET(request: Request) {
         code TEXT NOT NULL UNIQUE,
         claimed_at TIMESTAMP DEFAULT NOW(),
         redeemed_at TIMESTAMP
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_coupon_claims_customer ON client_coupon_claims (customer_id)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_coupon_claims_customer ON client_coupon_claims (customer_id)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_loyalty_ledger (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1325,19 +1333,19 @@ export async function GET(request: Request) {
         ref TEXT,
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_ledger_member ON client_loyalty_ledger (team_id, customer_id)`;
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_ledger_member ON client_loyalty_ledger (team_id, customer_id)`);
 
     // ---- Managero client III: kartička, hodnocení, zprávy, promo kódy ----
     // Kartička: jeden kód na hosta pro všechny podniky (jako Kartička nebo
     // karta v peněžence). Obsluha ho načte u kasy a dá razítko či body.
-    await sql`
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_cards (
         customer_id INTEGER PRIMARY KEY,
         code TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_reviews (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1347,9 +1355,9 @@ export async function GET(request: Request) {
         note TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (customer_id, ref)
-      )`;
-    await sql`CREATE INDEX IF NOT EXISTS client_reviews_team ON client_reviews (team_id, created_at)`;
-    await sql`
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_reviews_team ON client_reviews (team_id, created_at)`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_broadcasts (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1358,8 +1366,8 @@ export async function GET(request: Request) {
         recipients INTEGER NOT NULL DEFAULT 0,
         sent_by INTEGER,
         sent_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_promos (
         id SERIAL PRIMARY KEY,
         team_id INTEGER NOT NULL,
@@ -1372,78 +1380,82 @@ export async function GET(request: Request) {
         valid_until TEXT,
         active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT NOW()
-      )`;
-    await sql`
+      )`);
+    await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_promo_uses (
         promo_id INTEGER NOT NULL,
         customer_id INTEGER NOT NULL,
         used_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (promo_id, customer_id)
-      )`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday TEXT`;
+      )`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday TEXT`);
     // Ochrana objednávek od stolu: QR na stole nese tajný kód stolu, host
     // posílá polohu, ověřené objednávky můžou jít rovnou do pokladny.
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_qr_required BOOLEAN NOT NULL DEFAULT TRUE`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_geo TEXT NOT NULL DEFAULT 'block'`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS geo_radius_m INTEGER NOT NULL DEFAULT 100`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_auto_pos BOOLEAN NOT NULL DEFAULT TRUE`;
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS token TEXT`;
-    await sql`UPDATE client_tables SET token = upper(substr(md5(random()::text || id::text), 1, 10)) WHERE token IS NULL`;
-    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS via_qr BOOLEAN NOT NULL DEFAULT FALSE`;
-    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_status TEXT`;
-    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`;
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_qr_required BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_geo TEXT NOT NULL DEFAULT 'block'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS geo_radius_m INTEGER NOT NULL DEFAULT 100`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS order_auto_pos BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS token TEXT`);
+    await ddl(sql`UPDATE client_tables SET token = upper(substr(md5(random()::text || id::text), 1, 10)) WHERE token IS NULL`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS via_qr BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_status TEXT`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`);
     // Co řekla pokladna, když se objednávka posílala. Doteď se ta věta vracela
     // jen do prohlížeče hosta a zahodila — obsluha pak viděla objednávku,
     // která nikdy nedojela na terminál, a neměla jak zjistit proč.
-    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_note TEXT`;
-    await sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_tried_at TIMESTAMP`;
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_note TEXT`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_tried_at TIMESTAMP`);
     // Mapa stolů (souřadnice v procentech plánku), narozeninová odměna a
     // publikum zpráv členům (všichni / dlouho nebyli / zlatí hosté).
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_x DOUBLE PRECISION`;
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_y DOUBLE PRECISION`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS birthday_points INTEGER NOT NULL DEFAULT 0`;
-    await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all'`;
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_x DOUBLE PRECISION`);
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_y DOUBLE PRECISION`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS birthday_points INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all'`);
     // Pozvi kamaráda: kdo hosta přivedl, a kolik bodů za to podnik dává.
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS referral_points INTEGER NOT NULL DEFAULT 0`;
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS referral_points INTEGER NOT NULL DEFAULT 0`);
     // Půdorys podniku: podklad (očištěné SVG nebo obrázek), nakreslené zdi
     // a plochy. Stoly mají navíc tvar, velikost a natočení.
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS floorplan JSONB`;
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS floorplan JSONB`);
     // Vlastní tvář podniku: logo, fotky a barva značky. Odkazy míří na
     // /api/client/img/<id>, které je veřejné jen pro zapnuté podniky.
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS logo_url TEXT`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gallery JSONB NOT NULL DEFAULT '[]'`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS accent TEXT`;
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS logo_url TEXT`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gallery JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS accent TEXT`);
     // Věrnost jako v Kartičce: úrovně s vlastními prahy a slevou, kredit
     // z útraty (cashback). Kredit je v korunách; utratí se u kasy.
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_at INTEGER NOT NULL DEFAULT 10`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_at INTEGER NOT NULL DEFAULT 25`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS member_discount INTEGER NOT NULL DEFAULT 0`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_discount INTEGER NOT NULL DEFAULT 0`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_discount INTEGER NOT NULL DEFAULT 0`;
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS cashback_pct INTEGER NOT NULL DEFAULT 0`;
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_at INTEGER NOT NULL DEFAULT 10`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_at INTEGER NOT NULL DEFAULT 25`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS member_discount INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_discount INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_discount INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS cashback_pct INTEGER NOT NULL DEFAULT 0`);
     // Vzhled QR na stůl: barvy, texty, logo uprostřed, formát archu.
-    await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS qr_design JSONB NOT NULL DEFAULT '{}'::jsonb`;
-    await sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`;
-    await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS credit_delta INTEGER NOT NULL DEFAULT 0`;
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_w DOUBLE PRECISION`;
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_h DOUBLE PRECISION`;
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`;
-    await sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`;
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS qr_design JSONB NOT NULL DEFAULT '{}'::jsonb`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS credit_delta INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_w DOUBLE PRECISION`);
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_h DOUBLE PRECISION`);
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`);
+    await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`);
 
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
     // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;
     // starý se po prvním úspěšném přihlášení sám přepíše a vyprázdní.
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT`;
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT`);
 
     // Narozeninové odměny: init běží denně jako cron, tak se tu po migracích
     // připíšou dárky členům, kteří mají dnes narozeniny. Jednou za rok na
     // člena a podnik (hlídá deník), takže opakované volání nic nerozdá dvakrát.
     let birthdays = 0;
     try { birthdays = await awardBirthdays(); } catch { /* nesmí shodit migrace */ }
+
+    // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
+    // místo tichého „ok". Prázdné pole = celé schéma prošlo.
+    if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);
 
     // Which build actually ran the migrations. `ok: true` alone is ambiguous —
     // an older deployment still answering during a rollout returns it too, and
@@ -1460,6 +1472,8 @@ export async function GET(request: Request) {
       closingIndexes,
       closingConstraints,
       birthdays,
+      migFails: migFails.length,
+      migFailDetail: migFails.slice(0, 10),
     });
   } catch (error) {
     console.error('Init error:', error);
