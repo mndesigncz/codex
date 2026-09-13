@@ -27,8 +27,11 @@ export interface LimitResult {
  * @param key    co se hlídá — např. `login:jan@example.cz` nebo `pin:15`
  * @param max    kolik neúspěchů se toleruje v okně
  * @param windowSec délka okna v sekundách
+ * @param opts.failClosed u přihlašování (heslo, PIN) se při chybě databáze
+ *        pokus NEpustí. Jinde (throttling proti spamu) se pouští dál, ať
+ *        výpadek počítadla nezablokuje běžný provoz.
  */
-export async function hit(key: string, max: number, windowSec: number): Promise<LimitResult> {
+export async function hit(key: string, max: number, windowSec: number, opts?: { failClosed?: boolean }): Promise<LimitResult> {
   const now = Date.now();
   try {
     const [row] = await sql`
@@ -49,9 +52,13 @@ export async function hit(key: string, max: number, windowSec: number): Promise<
       return { ok: false, remaining: 0, retryAfter: Math.max(1, windowSec - age) };
     }
     return { ok: true, remaining: Math.max(0, max - count), retryAfter: 0 };
-  } catch {
-    // Tabulka ještě neexistuje (chybí migrace) nebo databáze zlobí. Přihlášení
-    // kvůli tomu blokovat nebudeme — jen se ten pokus nepočítá.
+  } catch (e) {
+    // Ať je v logu vidět, že ochrana právě nepočítá — dřív to mizelo beze stopy.
+    console.error('rateLimit hit failed for', key, e);
+    // U hesla a PINu je bezpečnější pokus nepustit: fungující login potřebuje
+    // databázi tak jako tak, takže se tím o dostupnost nepřijde, ale zavře se
+    // okno na hádání při výpadku počítadla. Jinde se pouští dál.
+    if (opts?.failClosed) return { ok: false, remaining: 0, retryAfter: windowSec };
     return { ok: true, remaining: max, retryAfter: 0 };
   }
 }

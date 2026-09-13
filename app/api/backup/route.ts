@@ -112,28 +112,41 @@ export async function GET(request: Request) {
     const teams = await sql`SELECT id, name FROM teams ORDER BY id`;
     const stamp = pragueToday(); // název souboru podle dne v Praze, ne v UTC
 
-    let sent = 0, totalRows = 0, teamsBackedUp = 0;
+    let sent = 0, failed = 0, totalRows = 0, teamsBackedUp = 0;
+    // Selhání u jednoho týmu nesmí shodit zálohu ostatních — proto per-tým try.
+    const problems: string[] = [];
     for (const team of teams as any[]) {
-      const employers = await sql`
-        SELECT DISTINCT email FROM users
-        WHERE role = 'employer' AND team_id = ${team.id} AND email IS NOT NULL`;
-      if (!employers.length) continue; // nobody to receive it — skip the work
+      try {
+        const employers = await sql`
+          SELECT DISTINCT email FROM users
+          WHERE role = 'employer' AND team_id = ${team.id} AND email IS NOT NULL`;
+        if (!employers.length) continue; // nobody to receive it — skip the work
 
-      const { dump, rowCount } = await dumpTeam(sql, Number(team.id));
-      totalRows += rowCount;
-      teamsBackedUp++;
+        const { dump, rowCount } = await dumpTeam(sql, Number(team.id));
+        totalRows += rowCount;
+        teamsBackedUp++;
 
-      const filename = `managero-backup-${stamp}.json`;
-      const json = JSON.stringify(
-        { exportedAt: new Date().toISOString(), team: team.name, rowCount, data: dump },
-        null, 2,
-      );
-      for (const e of employers) {
-        try { await sendBackupEmail(e.email as string, filename, json); sent++; } catch {}
+        const filename = `managero-backup-${stamp}.json`;
+        const json = JSON.stringify(
+          { exportedAt: new Date().toISOString(), team: team.name, rowCount, data: dump },
+          null, 2,
+        );
+        for (const e of employers) {
+          try { await sendBackupEmail(e.email as string, filename, json); sent++; }
+          catch (err) { failed++; problems.push(`${team.name}: ${String((err as any)?.message ?? err).slice(0, 80)}`); }
+        }
+      } catch (err) {
+        failed++;
+        problems.push(`${team.name}: záloha se nevytvořila — ${String((err as any)?.message ?? err).slice(0, 80)}`);
       }
     }
 
-    return NextResponse.json({ ok: true, teams: teamsBackedUp, rowCount: totalRows, emailedTo: sent });
+    // „ok" jen když se něco opravdu odeslalo a nic neselhalo. Dřív se vracelo
+    // ok:true i když nedorazil jediný mail — provozovatel se spolehl na zálohu,
+    // kterou nikdy nedostal.
+    const ok = failed === 0 && (sent > 0 || teamsBackedUp === 0);
+    if (!ok) console.error('backup: part failed', { sent, failed, problems });
+    return NextResponse.json({ ok, teams: teamsBackedUp, rowCount: totalRows, emailedTo: sent, failed, problems }, { status: ok ? 200 : 500 });
   } catch (error) {
     console.error('backup failed', error);
     // Ven jde jen to, že se nepovedlo. Hlášky Postgresu prozrazují schéma.

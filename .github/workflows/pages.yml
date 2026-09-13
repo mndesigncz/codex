@@ -23,7 +23,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
+      - name: Instalace závislostí
+        run: npm ci
+      # Typová kontrola: dřív se rozbitý typ chytil až při nasazení na produkci.
+      - name: Typy
+        run: npm run typecheck
+      # Regresní síť na logiku kolem peněz a napojení na pokladnu.
+      - name: Testy
+        run: npm test
+      # Že se to opravdu sestaví. Dummy proměnné stačí, build nevolá databázi.
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://u:p@localhost/db
+          NEXTAUTH_SECRET: ci-build-secret
       # Obchodní den se počítá v Praze — UTC odvození vrací mezi půlnocí
       # a druhou ranní včerejšek a rozbíjí uzávěrky po noční směně.
       - name: Datum obchodního dne

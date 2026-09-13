@@ -52,7 +52,7 @@ export const authOptions: NextAuthOptions = {
         // Deset neúspěchů na e-mail za čtvrt hodiny. Bez tohohle šlo heslo
         // hádat donekonečna — bcrypt sice zdržuje, ale útočníka neodradí.
         const email = String(credentials.email).trim().toLowerCase();
-        const gate = await hit(`login:${email}`, 10, 15 * 60);
+        const gate = await hit(`login:${email}`, 10, 15 * 60, { failClosed: true });
         if (!gate.ok) {
           // Stejná odpověď jako u špatného hesla: ať se nedá zjistit, které
           // e-maily v aplikaci existují.

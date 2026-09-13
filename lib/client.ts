@@ -217,6 +217,25 @@ export async function award(teamId: number, customerId: number, delta: number, k
   return Number(m?.points ?? 0);
 }
 
+/**
+ * Utracení bodů za odměnu. Na rozdíl od award(-cost) je odečet atomický:
+ * `points = points - cost WHERE points >= cost` proběhne v jednom kroku,
+ * takže dva souběžné požadavky nemůžou utratit stejné body dvakrát (dvojklik,
+ * dvě zařízení). Vrací nový zůstatek, nebo null, když body nestačí.
+ */
+export async function spendPoints(teamId: number, customerId: number, cost: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number | null> {
+  await join(customerId, teamId);
+  const [m] = await sql`
+    UPDATE client_memberships SET points = points - ${cost}
+    WHERE customer_id = ${customerId} AND team_id = ${teamId} AND points >= ${cost}
+    RETURNING points`;
+  if (!m) return null;
+  await sql`
+    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
+    VALUES (${teamId}, ${customerId}, ${-cost}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  return Number(m.points);
+}
+
 /** Návštěva: +1 razítko, +1 návštěva; po dosažení cíle se razítka vynulují a vznikne kupon na odměnu. */
 export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string): Promise<{ stamps: number; rewarded: boolean }> {
   await join(customerId, teamId);
