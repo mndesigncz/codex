@@ -514,11 +514,16 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const setArchived = async (i: Item, archived: boolean) => {
     setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived } : x));
     try {
-      await fetch(`/api/inventory/${i.id}`, {
+      const res = await fetch(`/api/inventory/${i.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ archived }),
       });
-    } catch { setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x)); }
+      if (!res.ok) throw new Error();
+    } catch {
+      // I HTTP chyba (ne jen síť): vrať stav zpět, ať UI neukazuje odmítnutou změnu.
+      setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x));
+      showNotice(archived ? 'Zaparkování se nepodařilo.' : 'Odparkování se nepodařilo.');
+    }
   };
 
   // A write-off returns the item's fresh state from the server (packages may

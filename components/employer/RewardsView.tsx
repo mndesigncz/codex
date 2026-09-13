@@ -46,6 +46,10 @@ function RewardsViewInner() {
   const [newTitle, setNewTitle] = useState('');
   const [newCost, setNewCost] = useState('');
   const [newIcon, setNewIcon] = useState('🎁');
+  // Zabrání dvojímu odeslání: schválení odměny odečítá body, dvojklik by je
+  // odečetl dvakrát. A „Přidat" by dvojklikem založil dvě stejné odměny.
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
   const loadShop = useCallback(() =>
     fetch('/api/rewards/catalog').then(r => r.json()).then(d => {
       setCatalog(Array.isArray(d.catalog) ? d.catalog : []);
@@ -53,11 +57,15 @@ function RewardsViewInner() {
     }).catch(() => {}), []);
   useEffect(() => { loadShop(); }, [loadShop]);
   const decide = async (id: number, action: 'approve' | 'decline') => {
-    const res = await fetch('/api/rewards/catalog', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, action }),
-    }).catch(() => null);
-    if (res?.ok) { await loadShop(); load(); }
+    if (busyId !== null) return;
+    setBusyId(id);
+    try {
+      const res = await fetch('/api/rewards/catalog', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action }),
+      }).catch(() => null);
+      if (res?.ok) { await loadShop(); load(); }
+    } finally { setBusyId(null); }
   };
 
   const load = useCallback(() => {
@@ -94,10 +102,10 @@ function RewardsViewInner() {
                     {r.employee_avatar ?? '👤'} <strong>{r.employee_name}</strong> · {r.title}
                     <span className="text-black/40"> · {r.cost} b.</span>
                   </span>
-                  <button onClick={() => decide(r.id, 'approve')}
-                    className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">Schválit ✓</button>
-                  <button onClick={() => decide(r.id, 'decline')}
-                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">Zamítnout</button>
+                  <button onClick={() => decide(r.id, 'approve')} disabled={busyId !== null}
+                    className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black disabled:opacity-50 transition">Schválit ✓</button>
+                  <button onClick={() => decide(r.id, 'decline')} disabled={busyId !== null}
+                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition">Zamítnout</button>
                 </div>
               ))}
             </div>
@@ -119,14 +127,17 @@ function RewardsViewInner() {
               className="col-span-2 sm:col-span-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
             <button
               onClick={async () => {
-                if (!newTitle.trim() || !Number(newCost)) return;
-                const res = await fetch('/api/rewards/catalog', {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ manage: true, title: newTitle.trim(), cost: Number(newCost), icon: newIcon.trim() || null }),
-                }).catch(() => null);
-                if (res?.ok) { setNewTitle(''); setNewCost(''); await loadShop(); }
+                if (!newTitle.trim() || !Number(newCost) || adding) return;
+                setAdding(true);
+                try {
+                  const res = await fetch('/api/rewards/catalog', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ manage: true, title: newTitle.trim(), cost: Number(newCost), icon: newIcon.trim() || null }),
+                  }).catch(() => null);
+                  if (res?.ok) { setNewTitle(''); setNewCost(''); await loadShop(); }
+                } finally { setAdding(false); }
               }}
-              disabled={!newTitle.trim() || !Number(newCost)}
+              disabled={!newTitle.trim() || !Number(newCost) || adding}
               className="col-span-2 sm:col-span-1 rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
               Přidat
             </button>

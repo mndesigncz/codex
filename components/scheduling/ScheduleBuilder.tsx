@@ -277,6 +277,8 @@ export default function ScheduleBuilder({ user }: Props) {
   const [boardError, setBoardError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const seededRef = useRef(false);
+  // Hlídá závod při přepnutí měsíce: odpověď starého měsíce nesmí přepsat nový.
+  const reqRef = useRef(0);
 
   // Díry v pokrytí otevírací doby a neobsazená místa — uložený rozvrh je
   // hlásí stejně jako návrh, protože vzniknou i ruční úpravou.
@@ -339,6 +341,7 @@ export default function ScheduleBuilder({ user }: Props) {
   const grid = useMemo(() => buildGrid(month), [month]);
 
   const load = async () => {
+    const req = ++reqRef.current;
     setLoading(true);
     try {
       const [tRes, aRes, sRes, stRes, faRes, ohRes, toRes] = await Promise.all([
@@ -359,6 +362,8 @@ export default function ScheduleBuilder({ user }: Props) {
         ohRes.json(),
         toRes.json(),
       ]);
+      // Přišla-li mezitím novější odpověď (jiný měsíc), tuhle zahoď.
+      if (req !== reqRef.current) return;
       setMembers(tData.members ?? []);
       setSubmissions(aData.submissions ?? []);
       setShifts(sData.shifts ?? []);
