@@ -18,6 +18,9 @@ export async function POST(req: NextRequest) {
     WHERE cl.code = ${norm} AND cl.team_id = ${u.team_id}`;
   if (!cl) return NextResponse.json({ error: 'Takový kupon tu není.' }, { status: 404 });
   if (cl.redeemed_at) return NextResponse.json({ error: `Už uplatněno ${new Date(cl.redeemed_at).toLocaleDateString('cs-CZ')}.`, title: cl.title }, { status: 409 });
-  await sql`UPDATE client_coupon_claims SET redeemed_at = NOW() WHERE id = ${cl.id}`;
+  // Atomicky: dvojklik nebo dvě zařízení najednou uplatní kupon jen jednou.
+  // Kdo prohraje závod, dostane 409, ne tiché druhé uplatnění.
+  const done = await sql`UPDATE client_coupon_claims SET redeemed_at = NOW() WHERE id = ${cl.id} AND redeemed_at IS NULL RETURNING id`;
+  if (!done.length) return NextResponse.json({ error: 'Kupon byl právě uplatněn.', title: cl.title }, { status: 409 });
   return NextResponse.json({ ok: true, title: cl.title, customer: cl.customer_name });
 }

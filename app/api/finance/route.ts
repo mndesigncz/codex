@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       expenses: num(c.expenses), cash_removed: num(c.cash_removed),
       self_payout: num(c.self_payout), closing_cash: num(c.closing_cash),
       tips: num(c.tips), payout_from_register: c.payout_from_register ?? null,
-      tips_in_drawer: c.tips_in_drawer ?? null,
+      tips_in_drawer: c.tips_in_drawer ?? null, tips_card: num(c.tips_card),
     });
     diffSum += diff; diffAbs += Math.abs(diff);
     const day = String(c.shift_date ?? c.date);
