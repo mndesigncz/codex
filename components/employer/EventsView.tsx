@@ -309,16 +309,20 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
           <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Přípravy</p>
           <div className="space-y-1.5">
             {e.checklist.map((c: any, i: number) => (
-              <button key={i}
-                onClick={() => patch(e.id, { checklist: e.checklist.map((x: any, j: number) => j === i ? { ...x, done: !x.done } : x) })}
-                className={`w-full flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-left text-sm transition ${
-                  c.done ? 'border-[#C8F542]/30 bg-[#C8F542]/[0.08] text-black/45 line-through' : 'border-black/[0.07] bg-white/50 text-[#16181A] hover:bg-white/80'
+              <div key={i}
+                className={`w-full flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 text-sm transition ${
+                  c.done ? 'border-[#C8F542]/30 bg-[#C8F542]/[0.08] text-black/45 line-through' : 'border-black/[0.07] bg-white/50 text-[#16181A]'
                 }`}>
-                <span className={c.done ? 'text-[#4F6A07]' : 'text-black/30'}><Icon name={c.done ? 'check' : 'box'} size={16} /></span>
-                <span className="min-w-0 flex-1">{c.text}</span>
-                <span onClick={(ev3) => { ev3.stopPropagation(); patch(e.id, { checklist: e.checklist.filter((_: any, j: number) => j !== i) }); }}
-                  className="shrink-0 text-black/25 hover:text-red-600 px-1"><Icon name="close" size={15} /></span>
-              </button>
+                <button type="button" aria-pressed={c.done}
+                  onClick={() => patch(e.id, { checklist: e.checklist.map((x: any, j: number) => j === i ? { ...x, done: !x.done } : x) })}
+                  className="flex items-center gap-2.5 text-left min-w-0 flex-1">
+                  <span className={c.done ? 'text-[#4F6A07]' : 'text-black/30'}><Icon name={c.done ? 'check' : 'box'} size={16} /></span>
+                  <span className="min-w-0 flex-1">{c.text}</span>
+                </button>
+                <button type="button" aria-label="Odebrat úkol"
+                  onClick={() => patch(e.id, { checklist: e.checklist.filter((_: any, j: number) => j !== i) })}
+                  className="shrink-0 text-black/25 hover:text-red-600 px-1"><Icon name="close" size={15} /></button>
+              </div>
             ))}
           </div>
           <div className="flex gap-2 mt-2">
