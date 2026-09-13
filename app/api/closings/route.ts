@@ -403,7 +403,7 @@ export async function POST(request: Request) {
   const wantShiftId = parseInt(b.shiftId);
   if (Number.isFinite(wantShiftId)) {
     try {
-      const [s] = await sql`SELECT id, start_time, end_time FROM shifts WHERE id = ${wantShiftId} AND date = ${shiftDate}`;
+      const [s] = await sql`SELECT id, start_time, end_time FROM shifts WHERE id = ${wantShiftId} AND date = ${shiftDate} AND team_id = ${c.teamId}`;
       if (s) windowShift = s;
     } catch { /* ignore — keep the author's own shift */ }
   }
