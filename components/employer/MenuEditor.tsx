@@ -122,6 +122,8 @@ export default function MenuEditor() {
       await load();
       if (d?.board?.id) setAktivni(d.board.id);
       setHlaska(`Menu je založené z kasy: ${d?.summary?.added ?? 0} položek v ${d?.summary?.newSections ?? 0} sekcích. Všechny se z objednávky vytisknou na terminálu.`);
+      const zbylo = Number(d?.summary?.skippedFull) || 0;
+      if (zbylo > 0) setChyba(`${zbylo} položek se nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci. Zbytek přidej ručně, nebo si na něj založ druhé menu.`);
     } catch {
       setChyba('Spojení se serverem selhalo, menu se nezaložilo.');
     } finally { setImportuji(''); }
@@ -345,9 +347,14 @@ export default function MenuEditor() {
           ? `Spárováno ${su.matched} ${su.matched === 1 ? 'položka' : su.matched < 5 ? 'položky' : 'položek'}${su.left ? `, bez páru zůstává ${su.left}` : ', všechno sedí'}.${su.ambiguous?.length ? ` Nejednoznačné (v kase je víc produktů stejného jména): ${su.ambiguous.slice(0, 5).join(', ')}.` : ''}`
           : `Podle názvu se nepovedlo spárovat nic. ${su.left ? `Bez páru zůstává ${su.left} položek — dopáruj je tlačítkem u položky.` : ''}`);
       } else {
-        setHlaska(su.added
+        const zbylo = Number(su.skippedFull) || 0;
+        const hlavni = su.added
           ? `Z kasy přibylo ${su.added} položek${su.newSections ? ` v ${su.newSections} nových sekcích` : ''}. Přeskládej si je, jak chceš — vazba na kasu drží u položky.`
-          : 'Z kasy už je v menu všechno, co tam patří.');
+          : 'Z kasy už je v menu všechno, co tam patří.';
+        setHlaska(hlavni);
+        if (zbylo > 0) {
+          setChyba(`${zbylo} položek se do tohohle menu nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci, a kasa má kategorií víc. Zbytek přidej do sekcí ručně tlačítkem „+ Z pokladny“, nebo si na něj založ druhé menu.`);
+        }
       }
     } catch {
       setChyba('Spojení se serverem selhalo, z pokladny se nic nenačetlo.');
@@ -824,13 +831,13 @@ export default function MenuEditor() {
                   ) : (
                     <button type="button" onClick={() => otevritVyber(si, ii)}
                       title="Bez produktu z pokladny objednávka na terminál nedoletí."
-                      className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-500/20 transition">
+                      className="tap-target-sm inline-flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-900 hover:bg-amber-500/20 transition">
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Netiskne se · spárovat
                     </button>
                   ))}
                   {posPripojena && it.posProductId && (
                     <button type="button" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}
-                      className="text-[11px] text-black/35 hover:text-black/60 underline underline-offset-2">zrušit vazbu</button>
+                      className="tap-target-sm px-1 py-1 text-[11px] text-black/35 hover:text-black/60 underline underline-offset-2">zrušit vazbu</button>
                   )}
                   <span className="flex-1" />
                   <button type="button" title="Nahoru" onClick={() => upravit((b) => posun(b.sections[si].items, ii, -1))}
