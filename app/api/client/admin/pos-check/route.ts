@@ -40,6 +40,16 @@ export async function GET() {
     return NextResponse.json({ kroky, hotovo: false });
   }
 
+  // 2b. Na kterou provozovnu a na které stoly to vlastně letí ---------------
+  // Podnik s víc provozovnami může mít připojenou jinou, než u které stojí
+  // terminál. Zvenku to vypadá úplně stejně jako když všechno funguje, takže
+  // se to musí dát přečíst.
+  kroky.push({
+    krok: 'Kam objednávky míří', ok: true,
+    detail: `Do provozovny „${conn.placeName ?? conn.placeId}". Stoly v této pokladně: ${desks.slice(0, 8).map(d => d.name).join(', ')}${desks.length > 8 ? ` a ${desks.length - 8} dalších` : ''}.`,
+    kde: 'Pokud tohle není provozovna, u které stojí váš terminál, přepoj pokladnu v Nastavení → Pokladna.',
+  });
+
   // 3. Objednávky od stolu: umí je tahle provozovna vůbec přijmout? ---------
   // Dotaz na objednávku, která neexistuje. Když je rozhraní pro provozovnu
   // zapnuté, pokladna odpoví „neznám" (404) a to je v pořádku. Když odpoví
@@ -91,7 +101,30 @@ export async function GET() {
       : { krok: 'Položky menu', ok: true, detail: `Všech ${items.length} položek menu „${board.name}" má produkt v pokladně.` });
   }
 
-  // 6. Nastavení, které odesílání vypíná -----------------------------------
+  // 6. Visí objednávky v pokladně nepřijaté? --------------------------------
+  // Stav NEW podle jejich dokumentace znamená „čeká na přijetí obsluhou".
+  // Posíláme `autoConfirm: true`, které se podle dokumentace uplatní ve chvíli,
+  // kdy objednávka dorazí do pokladny. Když tedy zůstává NEW, objednávka se
+  // k pokladně nedostala — a to je věc, kterou appka nespraví.
+  try {
+    const [vise] = await sql`
+      SELECT COUNT(*)::int AS n FROM client_orders
+      WHERE team_id = ${u.team_id} AND storyous_order_id IS NOT NULL
+        AND pos_state = 'NEW' AND created_at > NOW() - INTERVAL '7 days'` as any[];
+    const [zamit] = await sql`
+      SELECT COUNT(*)::int AS n FROM client_orders
+      WHERE team_id = ${u.team_id} AND pos_state = 'DECLINED' AND created_at > NOW() - INTERVAL '7 days'` as any[];
+    const n = Number(vise?.n) || 0, z = Number(zamit?.n) || 0;
+    if (n > 0 || z > 0) {
+      kroky.push({
+        krok: 'Objednávky v pokladně', ok: false,
+        detail: `Za posledních sedm dní ${n ? `${n} ${n === 1 ? 'objednávka visí' : 'objednávek visí'} v pokladně nepřijatých` : ''}${n && z ? ' a ' : ''}${z ? `${z} ${z === 1 ? 'objednávku' : 'objednávek'} pokladna sama odmítla` : ''}. Posíláme je s příznakem „potvrdit automaticky", který se podle dokumentace Storyous uplatní ve chvíli, kdy objednávka dorazí do pokladny. Že zůstávají nepřijaté, znamená, že se k terminálu nedostaly.`,
+        kde: 'Tohle appka nespraví. Napiš podpoře Storyous, ať pro provozovnu zapne příjem objednávek přes Delivery API do pokladny.',
+      });
+    }
+  } catch { /* nezmigrované tabulky */ }
+
+  // 7. Nastavení, které odesílání vypíná -----------------------------------
   kroky.push(p.order_auto_pos === false
     ? { krok: 'Automatické odesílání', ok: false, detail: 'Je vypnuté, takže objednávka čeká, až ji obsluha pošle ručně.', kde: 'Klient → Nastavení' }
     : { krok: 'Automatické odesílání', ok: true, detail: 'Zapnuté — objednávka jde do kasy hned.' });

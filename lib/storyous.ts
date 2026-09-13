@@ -146,15 +146,30 @@ export async function listDesks(conn: PosConnection): Promise<Desk[]> {
 export interface OrderLine { itemId: string; count: number; unitPriceWithVat: number; note?: string | null }
 
 /**
- * Objednávka od stolu přes Delivery API. Bez `autoConfirm` ji musí obsluha na
- * pokladně do pěti minut potvrdit, jinak ji pokladna sama zamítne — proto se
- * posílá až ve chvíli, kdy ji u nás obsluha potvrdí, a `autoConfirm: true`.
+ * Objednávka od stolu přes Delivery API.
+ *
+ * Dvě věci z jejich dokumentace, na kterých tady všechno stojí:
+ *
+ *   `autoConfirm: true` — „staff don't need to confirm the order. The order is
+ *   confirmed automatically **once it arrives into the ePOS**." Potvrzení tedy
+ *   nedělá cloud, ale až samotná pokladna ve chvíli, kdy si objednávku vyzvedne.
+ *   Dokud u ní stav zůstává NEW („waits for acceptance or declination by
+ *   staff"), znamená to, že se k pokladně vůbec nedostala.
+ *
+ *   `timing.autoDeclineAfter` — „by default, the order is declined
+ *   automatically if the staff does not confirm it in 5 minutes". Pět minut je
+ *   na čajovnu málo: než si toho někdo všimne, objednávka je po smrti. Proto
+ *   se posílá delší lhůta.
  */
 export async function createTableOrder(conn: PosConnection, o: { externalId: string; deskId: string; items: OrderLine[]; note?: string | null; customerName?: string | null; notification?: { confirm: string; dispatch: string; decline: string } }): Promise<{ orderId: string; state: string; raw: any }> {
   const d = await apiPost(conn, `/delivery/orders/${src(conn)}`, {
     externalId: o.externalId,
     deliveryType: 'orderToTable',
-    timing: { asSoonAsPossible: true },
+    timing: {
+      asSoonAsPossible: true,
+      // Výchozích pět minut objednávku zabije dřív, než k terminálu někdo dojde.
+      autoDeclineAfter: new Date(Date.now() + 20 * 60_000).toISOString(),
+    },
     customer: { name: o.customerName || 'Host' },
     items: o.items.map(l => ({ itemId: l.itemId, count: l.count, unitPriceWithVat: l.unitPriceWithVat, note: l.note ?? undefined })),
     note: o.note ?? undefined,
