@@ -12,6 +12,9 @@ import { cashDifference, czk } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
+// Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
+// by nestačilo a souhrn by nedošel nikomu za prvním týmem.
+export const maxDuration = 60;
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -83,9 +86,12 @@ export async function GET(request: Request) {
       } catch { /* ignore */ }
 
       // Write off today's sales first, so the low-stock count below is honest.
+      // Bez force: pokud /api/pos/cron synchronizoval nedávno (5min throttle),
+      // digest jen čte zrcadlo a nevynucuje drahý plný re-sync na každý tým —
+      // to jinak přetáhne časový limit funkce už u prvního týmu.
       try {
         const { runFullSync } = await import('@/lib/posMirror');
-        await runFullSync(Number(team.id), null, { force: true });
+        await runFullSync(Number(team.id), null, { force: false });
       } catch { /* sync is best-effort */ }
 
       // --- stock running low: same effective measure the stock screens use,
