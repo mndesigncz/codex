@@ -125,12 +125,22 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   // označenou jako odepsanou, když se sklad nepohnul (ani naopak).
   const deducted: { name: string; amount: number }[] = [];
   const writes: any[] = [];
+  // Suroviny načteme jedním dotazem místo jednoho na položku (N+1). Rušný den
+  // odepisuje desítky surovin a tohle běží i z tick/cronu/digestu.
+  const itemIds = Array.from(totals.keys()).filter(id => Number.isFinite(id));
+  const itemById = new Map<number, any>();
+  if (itemIds.length) {
+    try {
+      const rows = await sql`
+        SELECT id, name, quantity, open_amount, package_size
+        FROM inventory_items WHERE id = ANY(${itemIds}) AND team_id = ${teamId}`;
+      for (const it of rows as any[]) itemById.set(Number(it.id), it);
+    } catch { /* tabulka chybí — odpisy se přeskočí */ }
+  }
   for (const [itemId, rawAmount] of Array.from(totals.entries())) {
     const amount = Math.round(rawAmount * 1000) / 1000;
     if (!(amount > 0)) continue;
-    const [it] = await sql`
-      SELECT id, name, quantity, open_amount, package_size
-      FROM inventory_items WHERE id = ${itemId} AND team_id = ${teamId}`;
+    const it = itemById.get(itemId);
     if (!it) continue;
     const pkg = Number(it.package_size) || 0;
     const oldQty = Number(it.quantity) || 0;
@@ -164,25 +174,28 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     audit(teamId, actor, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
   }
-  for (const v of Array.from(sales.values())) {
-    try {
-      await sql`
-        INSERT INTO pos_sales (team_id, date, product_id, product_name, qty)
-        VALUES (${teamId}, ${v.day}, ${v.productId}, ${v.name}, ${v.qty})
-        ON CONFLICT (team_id, date, product_id) DO UPDATE SET
-          qty = pos_sales.qty + ${v.qty},
-          product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`;
-    } catch { /* tabulka ještě není */ }
+  // Prodeje a nenamapované položky zapíšeme dávkově v transakci místo jednoho
+  // round-tripu na řádek (rušné okno = stovky produktů). Skupina se přeskočí
+  // celá, když tabulka ještě není — stejný čistý efekt jako dřív po jednom.
+  const salesWrites = Array.from(sales.values()).map(v => sql`
+    INSERT INTO pos_sales (team_id, date, product_id, product_name, qty)
+    VALUES (${teamId}, ${v.day}, ${v.productId}, ${v.name}, ${v.qty})
+    ON CONFLICT (team_id, date, product_id) DO UPDATE SET
+      qty = pos_sales.qty + ${v.qty},
+      product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`);
+  if (salesWrites.length) {
+    try { for (let i = 0; i < salesWrites.length; i += 150) await sql.transaction(salesWrites.slice(i, i + 150)); }
+    catch { /* tabulka ještě není */ }
   }
-  for (const [productId, v] of Array.from(unmapped.entries())) {
-    try {
-      await sql`
-        INSERT INTO pos_unmapped (team_id, product_id, product_name, sold_count, last_seen)
-        VALUES (${teamId}, ${productId}, ${v.name}, ${v.count}, NOW())
-        ON CONFLICT (team_id, product_id) DO UPDATE SET
-          sold_count = pos_unmapped.sold_count + ${v.count},
-          product_name = ${v.name}, last_seen = NOW()`;
-    } catch { /* tabulka ještě není */ }
+  const unmappedWrites = Array.from(unmapped.entries()).map(([productId, v]) => sql`
+    INSERT INTO pos_unmapped (team_id, product_id, product_name, sold_count, last_seen)
+    VALUES (${teamId}, ${productId}, ${v.name}, ${v.count}, NOW())
+    ON CONFLICT (team_id, product_id) DO UPDATE SET
+      sold_count = pos_unmapped.sold_count + ${v.count},
+      product_name = ${v.name}, last_seen = NOW()`);
+  if (unmappedWrites.length) {
+    try { for (let i = 0; i < unmappedWrites.length; i += 150) await sql.transaction(unmappedWrites.slice(i, i + 150)); }
+    catch { /* tabulka ještě není */ }
   }
 
   return {
