@@ -50,11 +50,11 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
 
   // Ověřená objednávka s napojenou pokladnou jde rovnou do kasy a na terminál;
   // obsluha ji vidí tady i tam. Neověřená čeká na obsluhu.
-  let auto: { posNote: string | null } | null = null;
+  let auto: { posNote: string | null; posOk: boolean } | null = null;
   if (verified && p.order_auto_pos !== false && await getConnection(teamId)) {
     try { auto = await setOrderStatus(teamId, Number(o.id), 'confirmed'); } catch { auto = null; }
   }
-  const straight = !!auto && !auto.posNote?.startsWith('Pokladna') && !auto.posNote?.includes('zůstává jen tady');
+  const straight = !!auto?.posOk;
   if (!straight) await notifyNewOrder(teamId, me.name, table.name, built.total, Number(o.id));
   return NextResponse.json({ ok: true, straight, order: { ...o, status: auto ? 'confirmed' : o.status, tableName: table.name } });
 }
