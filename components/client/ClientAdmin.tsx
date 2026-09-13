@@ -541,8 +541,23 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
           <label htmlFor="s-menu" className={label}>Které menu se hostům ukáže</label>
           <select id="s-menu" value={p.menu_slug ?? ''} onChange={e => setP({ ...p, menu_slug: e.target.value })} className={input}>
             <option value="">První zapnuté menu</option>
-            {(d.boards ?? []).map((b: any) => <option key={b.slug} value={b.slug}>{b.name}</option>)}
+            {(d.boards ?? []).map((b: any) => (
+              <option key={b.slug} value={b.slug}>
+                {b.name}{b.items > 0 ? ` — ${b.linked} z ${b.items} položek se tiskne na kase` : ' — zatím prázdné'}
+              </option>
+            ))}
           </select>
+          {(() => {
+            const boards = d.boards ?? [];
+            const vybrane = p.menu_slug ? boards.find((b: any) => b.slug === p.menu_slug) : boards[0];
+            const chybi = vybrane ? Number(vybrane.items) - Number(vybrane.linked) : 0;
+            if (!p.ordering_on || !vybrane || chybi <= 0) return null;
+            return (
+              <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 px-3 py-2 mt-1.5">
+                V menu „{vybrane.name}" nemá {chybi} {chybi === 1 ? 'položka produkt' : chybi < 5 ? 'položky produkt' : 'položek produkt'} v pokladně. Objednávka, ve které taková položka bude, se do Storyous nepošle a na terminálu se nevytiskne — spáruj je v záložce Menu.
+              </p>
+            );
+          })()}
           <p className="text-xs text-black/50 mt-1">Nabídku spravuješ v záložce Menu. Logo, fotky a text o podniku najdeš ve Vzhledu.</p>
         </div>
       </section>
