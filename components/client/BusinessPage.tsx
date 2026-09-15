@@ -12,6 +12,7 @@ import TableMap, { placedTables } from './TableMap';
 import { onAccent } from '@/lib/floorplan';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -124,7 +125,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel="Části stránky podniku" />}
 
-      {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} events={d.events} gallery={b.gallery} accent={accent} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} />}
+      {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} events={d.events} gallery={b.gallery} accent={accent} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} slug={slug} signedIn={d.signedIn} businessName={b.name} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
       {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} plan={d.plan} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
       {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
@@ -132,8 +133,9 @@ export default function BusinessPage({ slug }: { slug: string }) {
   );
 }
 
-function MenuTab({ menu, news, events, gallery, accent, tagline, address, description, hours, currency }: { menu: any; news?: any[]; events?: any[]; gallery?: string[]; accent?: string; tagline: string; address: string; description: string; hours: any; currency: string }) {
+function MenuTab({ menu, news, events, gallery, accent, tagline, address, description, hours, currency, slug, signedIn, businessName }: { menu: any; news?: any[]; events?: any[]; gallery?: string[]; accent?: string; tagline: string; address: string; description: string; hours: any; currency: string; slug: string; signedIn: boolean; businessName: string }) {
   const cur = currency === 'CZK' ? 'Kč' : currency;
+  const [evDetail, setEvDetail] = useState<any | null>(null);
   const ac = accent || '#C8F542';
   return (
     <div className="space-y-8">
@@ -157,21 +159,34 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
           <h2 id="h-events" className="text-lg font-bold tracking-tight mb-3">Co se u nás chystá</h2>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {events!.map((e: any) => (
-              <li key={e.id} className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 flex gap-3.5">
-                <span className="shrink-0 grid place-items-center rounded-2xl h-14 w-14 text-center leading-none" style={{ background: `${ac}26` }}>
-                  <span className="block text-lg font-bold tabular-nums">{Number(String(e.date).slice(8, 10))}</span>
-                  <span className="block text-[11px] uppercase tracking-wider text-black/50 mt-0.5">{MONTHS[Number(String(e.date).slice(5, 7)) - 1]}</span>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold leading-tight">{e.title}</p>
-                  <p className="text-xs text-black/55 mt-0.5 cz-sentence">{czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}` : ''}{e.location ? ` · ${e.location}` : ''}</p>
-                  {e.description && <p className="text-sm text-black/65 mt-1 line-clamp-2 text-pretty">{e.description}</p>}
-                </div>
+              <li key={e.id}>
+                <button type="button" onClick={() => setEvDetail(e)}
+                  className="w-full text-left rounded-3xl border border-black/[0.06] bg-white/60 p-4 flex gap-3.5 hover:bg-white/80 active:scale-[0.99] transition">
+                  {e.photos?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={e.photos[0]} alt="" className="shrink-0 h-14 w-14 rounded-2xl object-cover" />
+                  ) : (
+                    <span className="shrink-0 grid place-items-center rounded-2xl h-14 w-14 text-center leading-none" style={{ background: `${ac}26` }}>
+                      <span className="block text-lg font-bold tabular-nums">{Number(String(e.date).slice(8, 10))}</span>
+                      <span className="block text-[11px] uppercase tracking-wider text-black/50 mt-0.5">{MONTHS[Number(String(e.date).slice(5, 7)) - 1]}</span>
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold leading-tight">{e.title}</p>
+                    <p className="text-xs text-black/55 mt-0.5 cz-sentence">{czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}` : ''}{e.location ? ` · ${e.location}` : ''}</p>
+                    {e.description && <p className="text-sm text-black/65 mt-1 line-clamp-2 text-pretty">{e.description}</p>}
+                    {(e.going > 0 || e.capacity) && (
+                      <p className="text-[11px] text-black/45 mt-1">{e.going > 0 ? `✋ ${e.going} ${e.going === 1 ? 'člověk jde' : e.going < 5 ? 'lidi jdou' : 'lidí jde'}` : ''}{e.going > 0 && e.capacity ? ' · ' : ''}{e.capacity ? `kapacita ${e.capacity}` : ''}</p>
+                    )}
+                  </div>
+                  <Icon name="chevron" size={16} className="shrink-0 self-center -rotate-90 text-black/30" />
+                </button>
               </li>
             ))}
           </ul>
         </section>
       )}
+      {evDetail && <EventSheet e={evDetail} cur={cur} ac={ac} slug={slug} signedIn={signedIn} businessName={businessName} address={address} onClose={() => setEvDetail(null)} />}
 
     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 md:gap-10 items-start">
       <div className="space-y-6">
@@ -618,6 +633,142 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
           </section>
         )}
       </aside>
+    </div>
+  );
+}
+
+
+// ---- Detail akce pro hosta: fotky, menu, mapa, kalendář, sledování -------
+function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose }: {
+  e: any; cur: string; ac: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
+}) {
+  const m = useModal(true, onClose, `Akce ${e.title}`);
+  // Sledování se drží lokálně, ať tlačítka reagují hned a bez načítání celé stránky.
+  const [follow, setFollow] = useState<boolean>(e.myFollow === true);
+  const [going, setGoing] = useState<boolean>(e.myGoing === true);
+  const [goingCount, setGoingCount] = useState<number>(Number(e.going) || 0);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const photos: string[] = Array.isArray(e.photos) ? e.photos : [];
+  const menu: any[] = Array.isArray(e.menu) ? e.menu : [];
+  const place = e.offsite ? (e.location || '') : (e.location ? `${businessName} — ${e.location}` : businessName);
+  const mapQuery = e.offsite ? e.location : address || businessName;
+
+  const setState = async (next: { follow: boolean; going: boolean }) => {
+    if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
+    setBusy(true); setMsg('');
+    const res = next.follow
+      ? await fetch(`/api/client/events/${e.id}/follow`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ going: next.going }) }).catch(() => null)
+      : await fetch(`/api/client/events/${e.id}/follow`, { method: 'DELETE' }).catch(() => null);
+    setBusy(false);
+    const d = res?.ok ? await res.json().catch(() => null) : null;
+    if (!d) { setMsg('Nepovedlo se — zkus to za chvíli.'); return; }
+    setFollow(d.myFollow === true); setGoing(d.myGoing === true); setGoingCount(Number(d.going) || 0);
+    setMsg(next.follow ? (next.going ? 'Počítáme s tebou! Den předem ti to připomeneme.' : 'Hlídáme ti to — den předem přijde připomínka.') : 'Už nehlídáme.');
+  };
+
+  // .ics ke stažení — bez času je to celodenní událost.
+  const downloadIcs = () => {
+    const esc = (t: string) => String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    const d8 = String(e.date).replace(/-/g, '');
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Managero//Akce//CS', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT', `UID:managero-event-${e.id}@managero`];
+    if (e.start_time) {
+      lines.push(`DTSTART;TZID=Europe/Prague:${d8}T${String(e.start_time).replace(':', '')}00`);
+      const end = e.end_time || null;
+      if (end) lines.push(`DTEND;TZID=Europe/Prague:${d8}T${String(end).replace(':', '')}00`);
+    } else {
+      const next = new Date(e.date + 'T12:00:00'); next.setDate(next.getDate() + 1);
+      lines.push(`DTSTART;VALUE=DATE:${d8}`, `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, '')}`);
+    }
+    lines.push(`SUMMARY:${esc(`${e.title} — ${businessName}`)}`);
+    if (place) lines.push(`LOCATION:${esc(place)}`);
+    if (e.description) lines.push(`DESCRIPTION:${esc(e.description)}`);
+    lines.push('END:VEVENT', 'END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `akce-${e.id}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev => ev.stopPropagation()}>
+        {photos.length > 0 && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photos[0]} alt="" className="w-full h-44 sm:h-52 object-cover rounded-t-3xl" />
+        )}
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-xl font-bold tracking-tight text-[#16181A]">{e.title}</h3>
+              <p className="text-sm text-black/55 cz-sentence mt-0.5">
+                {czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}${e.end_time ? `–${e.end_time}` : ''}` : ''}
+              </p>
+            </div>
+            <button onClick={onClose} className="tap-target-sm shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          </div>
+
+          {place && (
+            <p className="text-sm text-black/60 mt-2">
+              <Icon name="location" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />{place}
+              {mapQuery && (
+                <a href={`https://mapy.cz/zakladni?q=${encodeURIComponent(mapQuery)}`} target="_blank" rel="noopener noreferrer"
+                  className="ml-2 text-[#0A6FE0] underline decoration-[#0A6FE0]/30 hover:decoration-[#0A6FE0]">mapa ↗</a>
+              )}
+            </p>
+          )}
+          {(goingCount > 0 || e.capacity) && (
+            <p className="text-xs text-black/45 mt-1.5">{goingCount > 0 ? `✋ ${goingCount} ${goingCount === 1 ? 'člověk jde' : goingCount < 5 ? 'lidi jdou' : 'lidí jde'}` : ''}{goingCount > 0 && e.capacity ? ' · ' : ''}{e.capacity ? `kapacita ${e.capacity}` : ''}</p>
+          )}
+
+          {e.description && <p className="text-sm text-black/70 mt-3 whitespace-pre-wrap text-pretty">{e.description}</p>}
+
+          {photos.length > 1 && (
+            <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-thin pb-1 -mx-1 px-1">
+              {photos.slice(1).map((url, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={url} src={url} alt={`Fotka ${i + 2}`} className="h-24 w-24 shrink-0 rounded-2xl object-cover border border-black/[0.06]" />
+              ))}
+            </div>
+          )}
+
+          {menu.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-black/[0.06] bg-white/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Co se bude podávat</p>
+              <ul className="divide-y divide-black/[0.06]">
+                {menu.map((l: any, i: number) => (
+                  <li key={i} className="py-1.5 flex items-baseline gap-3">
+                    <span className="min-w-0 flex-1">{l.name}</span>
+                    {l.price != null && <span className="shrink-0 text-sm text-black/60 tabular-nums">{l.price} {cur}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* akční řádka: přijdu / hlídat / do kalendáře */}
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button disabled={busy} onClick={() => setState(going ? { follow, going: false } : { follow: true, going: true })}
+              className={going
+                ? 'tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition text-[#16181A]'
+                : btnPrimary}
+              style={going ? { background: `${ac}40` } : undefined}>
+              {going ? '✋ Jdu — zrušit účast' : '✋ Přijdu'}
+            </button>
+            <button disabled={busy} onClick={() => (follow ? setState({ follow: false, going: false }) : setState({ follow: true, going }))}
+              className={btnQuiet} aria-pressed={follow}>
+              <Icon name="bell" size={15} className="shrink-0" />{follow ? 'Hlídám · zrušit' : 'Hlídat akci'}
+            </button>
+          </div>
+          <button onClick={downloadIcs} className={`${btnQuiet} w-full mt-2`}>
+            <Icon name="calendarCheck" size={15} className="shrink-0" />Přidat do kalendáře (.ics)
+          </button>
+          {!signedIn && <p className="text-xs text-black/45 mt-2 text-center">Na „Přijdu" a hlídání se přihlas — připomínku pošleme den předem.</p>}
+          {msg && <p role="status" className="text-xs text-[#3E5406] bg-[#C8F542]/15 border border-[#C8F542]/35 rounded-xl px-3 py-2 mt-2 text-center">{msg}</p>}
+        </div>
+      </div>
     </div>
   );
 }

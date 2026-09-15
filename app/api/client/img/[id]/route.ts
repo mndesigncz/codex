@@ -3,6 +3,8 @@
 // JEN když na něj opravdu ukazuje profil zapnutého podniku: id se hledá
 // v logu, fotce a galerii, ne v celé tabulce nahraných souborů.
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { get } from '@vercel/blob';
 import { sql } from '@/lib/client';
 
@@ -17,10 +19,31 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
   const url = `/api/client/img/${id}`;
-  const [ref] = await sql`
+  let [ref] = await sql`
     SELECT team_id FROM client_profiles
     WHERE enabled = TRUE AND (logo_url = ${url} OR cover_url = ${url} OR gallery @> ${JSON.stringify([url])}::jsonb)
     LIMIT 1`;
+  if (!ref) {
+    // Fotka veřejné akce zapnutého podniku se hostům vydat smí.
+    try {
+      [ref] = await sql`
+        SELECT e.team_id FROM events e
+        JOIN client_profiles p ON p.team_id = e.team_id AND p.enabled = TRUE
+        WHERE e.public = TRUE AND e.status <> 'cancelled' AND e.photos @> ${JSON.stringify([url])}::jsonb
+        LIMIT 1`;
+    } catch { /* photos bez migrace */ }
+  }
+  if (!ref) {
+    // Vedení si potřebuje prohlédnout fotky i u akce, která ještě veřejná
+    // není — vlastnímu týmu se soubor vydá po přihlášení.
+    const session = await getServerSession(authOptions);
+    const meId = session?.user ? parseInt((session.user as any).id) : NaN;
+    if (Number.isFinite(meId)) {
+      [ref] = await sql`
+        SELECT up.team_id FROM uploads up JOIN users us ON us.team_id = up.team_id
+        WHERE up.id = ${id} AND us.id = ${meId} LIMIT 1`;
+    }
+  }
   if (!ref) return NextResponse.json({ error: 'Obrázek nenalezen' }, { status: 404 });
 
   const [row] = await sql`SELECT mime, data, blob_path FROM uploads WHERE id = ${id} AND team_id = ${ref.team_id}`;

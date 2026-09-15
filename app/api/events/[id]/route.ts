@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
-import { normalizeChecklist, normalizePacking, normalizeCrew } from '@/lib/events';
+import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +22,19 @@ async function me() {
 }
 
 const TIME_RE = /^\d{2}:\d{2}$/;
+
+/** Hosté, kteří akci sledují nebo jdou — dozví se o změně termínu i zrušení. */
+async function notifyFollowers(eventId: number, teamId: number, payload: { title: string; body: string }) {
+  try {
+    const rows = await sql`SELECT customer_id FROM client_event_follows WHERE event_id = ${eventId}`;
+    const ids = (rows as any[]).map(r => Number(r.customer_id));
+    if (!ids.length) return;
+    const [prof] = await sql`SELECT slug FROM client_profiles WHERE team_id = ${teamId}`;
+    await notifyUsers(ids, { ...payload, type: 'info', category: 'general', link: prof?.slug ? `/client/${prof.slug}` : '/client' });
+  } catch { /* sledující bez migrace — nevadí */ }
+}
+
+const czDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const u = await me();
@@ -45,6 +58,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (b.date !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(String(b.date))) {
     await sql`UPDATE events SET date = ${b.date} WHERE id = ${id}`;
     await sql`UPDATE shifts SET date = ${b.date} WHERE event_id = ${id} AND team_id = ${u.team_id}`;
+    if (ev.public === true && String(b.date) !== String(ev.date)) {
+      await notifyFollowers(id, u.team_id, { title: `📅 ${ev.title} — nový termín`, body: `Akce se přesouvá na ${czDate(String(b.date))}.` });
+    }
   }
   if (b.startTime !== undefined) await sql`UPDATE events SET start_time = ${TIME_RE.test(String(b.startTime)) ? b.startTime : null} WHERE id = ${id}`;
   if (b.endTime !== undefined) await sql`UPDATE events SET end_time = ${TIME_RE.test(String(b.endTime)) ? b.endTime : null} WHERE id = ${id}`;
@@ -57,6 +73,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (b.status === 'cancelled') {
       // A cancelled event takes its shifts with it.
       await sql`DELETE FROM shifts WHERE event_id = ${id} AND team_id = ${u.team_id}`;
+      if (ev.public === true) {
+        await notifyFollowers(id, u.team_id, { title: `❌ ${ev.title} se ruší`, body: `Akce plánovaná na ${czDate(String(ev.date))} se konat nebude. Omlouváme se.` });
+      }
       const crew = normalizeCrew(ev.crew);
       if (crew.length) {
         await notifyUsers(crew, {
@@ -152,6 +171,48 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     await sql`UPDATE events SET packing = ${JSON.stringify(updated)}::jsonb WHERE id = ${id}`;
     audit(u.team_id, u.id, b.packAction === 'checkout' ? 'event.checkout' : 'event.return', 'event', id, ev.title);
+  }
+
+  // ---- obsah pro hosty: fotky a menu akce ----
+  if (b.photos !== undefined) {
+    // Uložit se smí jen vlastní nahrané soubory — id se ověřuje proti uploads
+    // týmu, ať do galerie nejde podstrčit cizí obrázek.
+    const want = normalizePhotos(b.photos);
+    const wantIds = want.map(x => parseInt(x.split('/').pop()!)).filter(n => Number.isFinite(n));
+    const owned = wantIds.length
+      ? await sql`SELECT id FROM uploads WHERE team_id = ${u.team_id} AND id = ANY(${wantIds})`
+      : [] as any[];
+    const ownedSet = new Set((owned as any[]).map(r => Number(r.id)));
+    const photos = want.filter(x => ownedSet.has(parseInt(x.split('/').pop()!)));
+    await sql`UPDATE events SET photos = ${JSON.stringify(photos)}::jsonb WHERE id = ${id}`;
+  }
+  if (b.menu !== undefined) {
+    await sql`UPDATE events SET menu = ${JSON.stringify(normalizeEventMenu(b.menu))}::jsonb WHERE id = ${id}`;
+  }
+
+  // ---- vyúčtování: převzít tržbu z uzávěrek k akci ----
+  if (b.adoptRevenue === true) {
+    const [sum] = await sql`
+      SELECT COALESCE(SUM(cash_revenue + card_revenue), 0)::int AS total, COUNT(*)::int AS n
+      FROM cash_closings WHERE team_id = ${u.team_id} AND event_id = ${id}`;
+    if (Number(sum?.n) > 0) {
+      await sql`UPDATE events SET revenue = ${Number(sum.total) || 0} WHERE id = ${id}`;
+    }
+  }
+
+  // ---- rozkřiknout členům: novinka na stránce podniku + push všem členům ----
+  if (b.announceMembers === true && ev.public === true) {
+    const [prof] = await sql`SELECT slug FROM client_profiles WHERE team_id = ${u.team_id} AND enabled = TRUE`;
+    if (!prof?.slug) return NextResponse.json({ error: 'Nejdřív zapni stránku pro hosty (Vzhled).' }, { status: 400 });
+    const when = `${czDate(String(ev.date))}${ev.start_time ? ` od ${ev.start_time}` : ''}${ev.location ? ` · ${ev.location}` : ''}`;
+    const title = `📅 ${ev.title}`;
+    const members = await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${u.team_id}`;
+    const ids = (members as any[]).map(r => Number(r.customer_id));
+    try {
+      await sql`INSERT INTO client_broadcasts (team_id, title, body, recipients, sent_by) VALUES (${u.team_id}, ${title}, ${when}, ${ids.length}, ${u.id})`;
+    } catch { /* novinky bez migrace — push stačí */ }
+    if (ids.length) await notifyUsers(ids, { title, body: when, type: 'info', category: 'general', link: `/client/${prof.slug}` }).catch(() => {});
+    audit(u.team_id, u.id, 'event.announce', 'event', id, `${ev.title} → ${ids.length} členům`);
   }
 
   // ---- publish: tell the whole team ----
