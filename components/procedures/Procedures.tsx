@@ -9,6 +9,7 @@ import { useProcedures, type ProcedureLite } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, timeRange, STEP_WEIGHTS, weightSpec, stepPenalty, stepPlus, type Step } from '@/lib/steps';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -111,12 +112,14 @@ export default function Procedures({ user }: Props) {
   const [runs, setRuns] = useState<RunRow[]>([]);
   // Clicking a finished run opens the exact ✓/✗/skip breakdown.
   const [runDetail, setRunDetail] = useState<any | null>(null);
+  const runModal = useModal(!!runDetail, () => setRunDetail(null), 'Detail běhu postupu');
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Procedure | null>(null);
   const [detail, setDetail] = useState<Procedure | null>(null);
   const [confirmDel, setConfirmDel] = useState<Procedure | null>(null);
+  const delModal = useModal(!!confirmDel, () => setConfirmDel(null), 'Smazat postup');
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -354,7 +357,7 @@ export default function Procedures({ user }: Props) {
 
       {confirmDel && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => !deleting && setConfirmDel(null)}>
-          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+          <div ref={delModal.ref} {...delModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-600">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -412,7 +415,7 @@ export default function Procedures({ user }: Props) {
         const reasons = runDetail.skip_reasons && typeof runDetail.skip_reasons === 'object' ? runDetail.skip_reasons : {};
         return (
           <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setRunDetail(null)}>
-            <div className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <div ref={runModal.ref} {...runModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between gap-3 mb-1">
                 <h3 className="text-lg font-bold tracking-tight text-[#16181A] min-w-0">{runDetail.procedure_name}</h3>
                 <button aria-label="Zavřít" onClick={() => setRunDetail(null)} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
@@ -480,12 +483,13 @@ function ProcedureDetail({
   onEdit: () => void;
   onClose: () => void;
 }) {
+  const dm = useModal(true, onClose, 'Detail postupu');
   const steps = parseSteps(procedure.items);
   const mins = totalMinutes(steps);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-start justify-between gap-3">
@@ -563,6 +567,7 @@ function ProcedureEditor({
   onClose: () => void;
   onSaved: (p: Procedure) => void;
 }) {
+  const em = useModal(true, onClose, 'Postup — úpravy');
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [icon, setIcon] = useState(initial?.icon ?? 'check');
@@ -640,6 +645,7 @@ function ProcedureEditor({
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div
+        ref={em.ref} {...em.dialogProps}
         className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >

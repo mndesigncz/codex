@@ -8,6 +8,7 @@ import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
+import { useModal } from '@/lib/useModal';
 
 interface User {
   id: number;
@@ -130,6 +131,7 @@ export default function Guides({ user }: { user: User }) {
 
   // Reader / editor modals
   const [reader, setReader] = useState<GuideFull | null>(null);
+  const readerModal = useModal(!!reader, () => setReader(null), 'Návod');
   const [readerLoading, setReaderLoading] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<GuideFull | null>(null);
@@ -447,6 +449,7 @@ export default function Guides({ user }: { user: User }) {
           onClick={() => setReader(null)}
         >
           <div
+            ref={readerModal.ref} {...readerModal.dialogProps}
             className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
             onClick={(e) => e.stopPropagation()}
           >
@@ -698,6 +701,7 @@ function GuideEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const em = useModal(true, onClose, 'Návod — úpravy');
   const [title, setTitle] = useState(editing?.title || '');
   const [content, setContent] = useState(editing?.content || '');
   const [categoryId, setCategoryId] = useState<number | null>(
@@ -784,6 +788,7 @@ function GuideEditor({
   return (
     <div className="fixed inset-0 modal-overlay z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
       <div
+        ref={em.ref} {...em.dialogProps}
         className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
@@ -979,6 +984,7 @@ function ManageCategories({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
+  const cm = useModal(true, onClose, 'Správa kategorií');
   const [items, setItems] = useState<Category[]>(categories);
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('book');
@@ -1020,6 +1026,7 @@ function ManageCategories({
   return (
     <div className="fixed inset-0 modal-overlay z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
       <div
+        ref={cm.ref} {...cm.dialogProps}
         className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 
 import { EmptyState, PageHeader, Button } from './ui';
+import { useModal } from '@/lib/useModal';
 type Suggestion = {
   id: number;
   title: string;
@@ -62,6 +63,7 @@ export default function SuggestionsBoard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [composing, setComposing] = useState(false);
+  const composeModal = useModal(composing, () => setComposing(false), 'Nový podnět');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -128,6 +130,7 @@ export default function SuggestionsBoard() {
 
   // Author edits their own idea in place.
   const [editing, setEditing] = useState<Suggestion | null>(null);
+  const editModal = useModal(!!editing, () => setEditing(null), 'Upravit podnět');
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -283,7 +286,7 @@ export default function SuggestionsBoard() {
       {/* Compose modal */}
       {composing && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setComposing(false)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={composeModal.ref} {...composeModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="grid place-items-center h-10 w-10 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="bulb" size={20} /></div>
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nový podnět</h3>
@@ -320,7 +323,7 @@ export default function SuggestionsBoard() {
       )}
       {editing && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditing(null)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+          <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit podnět</h3>
             <div className="space-y-3">
               <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200}

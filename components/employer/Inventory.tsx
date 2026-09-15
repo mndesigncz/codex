@@ -19,6 +19,7 @@ import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@
 import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import { useMoney, useSymbol } from '../CurrencyProvider';
+import { useModal } from '@/lib/useModal';
 
 interface Item {
   id: number;
@@ -161,6 +162,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const [sort, setSort] = useState<SortKey>('name');
   const [view, setView] = useState<View>('grid');
   const [showForm, setShowForm] = useState(false);
+  const formModal = useModal<HTMLFormElement>(showForm, () => setShowForm(false), 'Položka skladu');
   const [showCats, setShowCats] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -176,6 +178,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   // Reports employees filed via "Nahlásit chybějící" on the tablet/phone.
   const [reports, setReports] = useState<any[]>([]);
   const [showReports, setShowReports] = useState(false);
+  const reportsModal = useModal(showReports, () => setShowReports(false), 'Hlášení ze skladu');
   const [showStocktake, setShowStocktake] = useState(false);
   // Supplier entities — the address an order can actually be sent to.
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -827,7 +830,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       {/* Item form modal */}
       {showForm && (
         <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={() => setShowForm(false)}>
-          <form onClick={e => e.stopPropagation()} onSubmit={save} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin">
+          <form ref={formModal.ref} {...formModal.dialogProps} onClick={e => e.stopPropagation()} onSubmit={save} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin">
             {/* Sticky header */}
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-6 py-4 bg-white/70 backdrop-blur-xl chrome-edge">
               <div className="flex items-center gap-3 min-w-0">
@@ -1237,7 +1240,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
       {showReports && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={reportsModal.ref} {...reportsModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
               <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
@@ -1358,6 +1361,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
   onClose: () => void;
   onApply: (patch: Record<string, any>) => Promise<boolean>;
 }) {
+  const bm = useModal(true, onClose, 'Hromadná úprava položek');
   const [on, setOn] = useState<Record<string, boolean>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -1379,7 +1383,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
 
   return (
     <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin p-6 space-y-4">
+      <div ref={bm.ref} {...bm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Hromadná úprava</h3>
@@ -1946,6 +1950,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
   pk: PackagingLookup;
   suppliers?: any[];
 }) {
+  const sm = useModal(true, onClose, 'Nákupní seznam');
   const supplierByName = (name: string) => suppliers.find(sp => sp.name === name) ?? null;
   const [emailing, setEmailing] = useState<string | null>(null);
   const [emailMsg, setEmailMsg] = useState('');
@@ -2037,7 +2042,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
 
   return (
     <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
+      <div ref={sm.ref} {...sm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
           <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
@@ -2109,6 +2114,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   onChanged: () => Promise<void> | void;
   createCategory: (name: string, parentId?: number | null) => Promise<boolean>;
 }) {
+  const cm = useModal(true, onClose, 'Správa kategorií skladu');
   const [newName, setNewName] = useState('');
   const [newParent, setNewParent] = useState('');
   const [busy, setBusy] = useState(false);
@@ -2263,7 +2269,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
   return (
     <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
+      <div ref={cm.ref} {...cm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Kategorie</h3>
           <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
@@ -2625,6 +2631,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
   onClose: () => void;
   onChanged: () => Promise<void> | void;
 }) {
+  const pm = useModal(true, onClose, 'Dodavatelé');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -2647,7 +2654,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+      <div ref={pm.ref} {...pm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
           <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
