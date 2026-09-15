@@ -81,11 +81,34 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   // Veřejné akce podniku: co se tam koná a na co host může přijít.
   let events: any[] = [];
   try {
-    events = await sql`
-      SELECT id, title, description, kind, date, start_time, end_time, location, capacity
+    const rows = await sql`
+      SELECT id, title, description, kind, date, start_time, end_time, location, offsite, capacity, photos, menu, status
       FROM events
       WHERE team_id = ${teamId} AND public = TRUE AND status <> 'cancelled' AND date >= ${today}
-      ORDER BY date, start_time NULLS LAST LIMIT 6` as any[];
+      ORDER BY date, start_time NULLS LAST LIMIT 8` as any[];
+    const ids = rows.map((r: any) => Number(r.id));
+    // Kolik lidí jde a co sleduju já — dvě skupinové otázky, ne po akci.
+    let counts: any[] = []; let mine: any[] = [];
+    if (ids.length) {
+      try {
+        [counts, mine] = await Promise.all([
+          sql`SELECT event_id, COUNT(*) FILTER (WHERE going)::int AS going FROM client_event_follows WHERE event_id = ANY(${ids}) GROUP BY event_id` as any,
+          me ? sql`SELECT event_id, going FROM client_event_follows WHERE customer_id = ${me.id} AND event_id = ANY(${ids})` as any : Promise.resolve([]),
+        ]);
+      } catch { /* sledování bez migrace */ }
+    }
+    const goingBy = new Map(counts.map((r: any) => [Number(r.event_id), Number(r.going) || 0]));
+    const myBy = new Map(mine.map((r: any) => [Number(r.event_id), r]));
+    events = rows.map((r: any) => ({
+      id: r.id, title: r.title, description: r.description, kind: r.kind,
+      date: r.date, start_time: r.start_time, end_time: r.end_time,
+      location: r.location, offsite: r.offsite === true, capacity: r.capacity,
+      photos: Array.isArray(r.photos) ? r.photos.filter((x: any) => /^\/api\/client\/img\/\d+$/.test(String(x))).slice(0, 8) : [],
+      menu: Array.isArray(r.menu) ? r.menu.slice(0, 30) : [],
+      going: goingBy.get(Number(r.id)) ?? 0,
+      myFollow: myBy.has(Number(r.id)),
+      myGoing: myBy.get(Number(r.id))?.going === true,
+    }));
   } catch { events = []; }
 
   let news: any[] = [];

@@ -8,7 +8,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
-import { normalizeChecklist, normalizePacking, normalizeCrew } from '@/lib/events';
+import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ async function me() {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
-function shape(r: any, people: Map<number, any>) {
+function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number }) {
   const crew = normalizeCrew(r.crew);
   return {
     id: r.id, title: r.title, description: r.description ?? null,
@@ -36,8 +36,16 @@ function shape(r: any, people: Map<number, any>) {
     capacity: r.capacity ?? null,
     checklist: normalizeChecklist(r.checklist),
     packing: normalizePacking(r.packing),
+    photos: normalizePhotos(r.photos),
+    menu: normalizeEventMenu(r.menu),
     crew,
     crewPeople: crew.map(id => people.get(id) ?? { id, name: 'Neznámý', avatar: '👤' }),
+    // U akce v podniku je základ obsluhy ten, kdo má ten den běžnou směnu.
+    onShift: extra?.onShift ?? [],
+    closingsCount: extra?.closings?.n ?? 0,
+    closingsTotal: extra?.closings?.total ?? 0,
+    followers: extra?.followers ?? 0,
+    going: extra?.going ?? 0,
     revenue: r.revenue ?? null, costs: r.costs ?? null,
     notes: r.notes ?? null, createdBy: r.created_by ?? null,
   };
@@ -55,8 +63,45 @@ export async function GET() {
     const rows = await sql`
       SELECT * FROM events WHERE team_id = ${u.team_id}
       ORDER BY date DESC, start_time ASC NULLS LAST LIMIT 100`;
-    const people = await teamPeople(u.team_id);
-    return NextResponse.json({ events: (rows as any[]).map(r => shape(r, people)), isEmployer: u.role === 'employer' });
+    const ids = (rows as any[]).map(r => Number(r.id));
+    const dates = Array.from(new Set((rows as any[]).map(r => String(r.date))));
+    // Tři skupinové dotazy vedle sebe — kdo je ty dny na běžné směně (základ
+    // obsluhy akce v podniku), kolik uzávěrek se k akcím váže a kolik hostů
+    // akce sleduje / přijde. Po jednom na akci by to bylo 3×100 dotazů.
+    const [people, shiftRows, closingRows, followRows] = await Promise.all([
+      teamPeople(u.team_id),
+      dates.length ? sql`
+        SELECT s.date, s.start_time, s.end_time, us.id, us.name, us.avatar
+        FROM shifts s JOIN users us ON us.id = s.employee_id
+        WHERE s.team_id = ${u.team_id} AND s.date = ANY(${dates}) AND s.event_id IS NULL
+        ORDER BY s.start_time` : Promise.resolve([] as any[]),
+      ids.length ? sql`
+        SELECT event_id, COUNT(*)::int AS n, COALESCE(SUM(cash_revenue + card_revenue), 0)::int AS total
+        FROM cash_closings WHERE team_id = ${u.team_id} AND event_id = ANY(${ids})
+        GROUP BY event_id` : Promise.resolve([] as any[]),
+      ids.length ? sql`
+        SELECT event_id, COUNT(*)::int AS followers, COUNT(*) FILTER (WHERE going)::int AS going
+        FROM client_event_follows WHERE event_id = ANY(${ids})
+        GROUP BY event_id`.catch(() => [] as any[]) : Promise.resolve([] as any[]),
+    ]);
+    const byDate = new Map<string, any[]>();
+    for (const r of shiftRows as any[]) {
+      const k = String(r.date);
+      if (!byDate.has(k)) byDate.set(k, []);
+      const arr = byDate.get(k)!;
+      if (!arr.some(x => x.id === Number(r.id))) arr.push({ id: Number(r.id), name: r.name, avatar: r.avatar ?? '👤', start: r.start_time, end: r.end_time });
+    }
+    const closingsBy = new Map((closingRows as any[]).map(r => [Number(r.event_id), { n: Number(r.n) || 0, total: Number(r.total) || 0 }]));
+    const followsBy = new Map((followRows as any[]).map(r => [Number(r.event_id), { followers: Number(r.followers) || 0, going: Number(r.going) || 0 }]));
+    return NextResponse.json({
+      events: (rows as any[]).map(r => shape(r, people, {
+        onShift: byDate.get(String(r.date)) ?? [],
+        closings: closingsBy.get(Number(r.id)),
+        followers: followsBy.get(Number(r.id))?.followers,
+        going: followsBy.get(Number(r.id))?.going,
+      })),
+      isEmployer: u.role === 'employer',
+    });
   } catch {
     return NextResponse.json({ events: [], notMigrated: true });
   }

@@ -885,6 +885,19 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS events_team_date ON events (team_id, date)`);
     // a shift can belong to an event (created from its crew assignment)
     await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS event_id INTEGER`);
+    // event content for guests: photo gallery and the menu served there
+    await ddl(sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS photos JSONB DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS menu JSONB DEFAULT '[]'`);
+    // customers watching a public event: 🔔 follow (reminder push) and ✋ going
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_event_follows (
+        event_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        going BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (event_id, customer_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_event_follows_customer ON client_event_follows (customer_id)`);
     // POS connection (Storyous): one per team, credentials live server-side only
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_connections (

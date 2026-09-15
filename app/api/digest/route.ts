@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
-import { notifyUser } from '@/lib/push';
+import { notifyUser, notifyUsers } from '@/lib/push';
 import { sendDigestEmail } from '@/lib/email';
 import { cashDifference, czk } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
@@ -160,8 +160,26 @@ export async function GET(request: Request) {
         const t = new Date(today + 'T12:00:00'); t.setDate(t.getDate() + 1);
         const tomorrow = t.toISOString().slice(0, 10);
         tomorrowEvents = await sql`
-          SELECT title, start_time, location FROM events
+          SELECT id, title, start_time, location, public FROM events
           WHERE team_id = ${team.id} AND date = ${tomorrow} AND status <> 'cancelled'`;
+        // Hosté, kteří si veřejnou zítřejší akci hlídají, dostanou připomínku
+        // — večerní digest je jediný denní budík, žádný nový cron netřeba.
+        const pubIds = (tomorrowEvents as any[]).filter(e => e.public === true).map(e => Number(e.id));
+        if (pubIds.length) {
+          const [prof] = await sql`SELECT slug FROM client_profiles WHERE team_id = ${team.id} AND enabled = TRUE`;
+          for (const ev of (tomorrowEvents as any[]).filter(e => e.public === true)) {
+            const rows = await sql`SELECT customer_id FROM client_event_follows WHERE event_id = ${ev.id}`;
+            const ids = (rows as any[]).map(r => Number(r.customer_id));
+            if (!ids.length) continue;
+            await notifyUsers(ids, {
+              title: `🔔 Zítra: ${ev.title}`,
+              body: `${ev.start_time ? `Od ${ev.start_time}` : 'Zítra'}${ev.location ? ` · ${ev.location}` : ''}. Těšíme se na tebe!`,
+              type: 'info', category: 'general',
+              link: prof?.slug ? `/client/${prof.slug}` : '/client',
+              tag: `event-remind-${ev.id}`,
+            }).catch(() => {});
+          }
+        }
       } catch { /* ignore */ }
 
       // ---- hostovská strana: co dnes udělali hosté ----

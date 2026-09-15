@@ -28,16 +28,20 @@ export default function EventsView({ user }: { user: { id?: string } }) {
   const [err, setErr] = useState('');
   const [showPast, setShowPast] = useState(false);
 
+  const [menuItems, setMenuItems] = useState<any[]>([]);
   const load = async () => {
     try {
-      const [ed, td, iv] = await Promise.all([
+      const [ed, td, iv, mb] = await Promise.all([
         fetch('/api/events').then(r => r.json()).catch(() => ({})),
         fetch('/api/teams').then(r => r.json()).catch(() => ({})),
         fetch('/api/inventory').then(r => r.json()).catch(() => []),
+        fetch('/api/menu').then(r => r.json()).catch(() => null),
       ]);
       setEvents(Array.isArray(ed.events) ? ed.events : []);
       setMembers((td.members ?? []).filter((m: any) => m.role !== 'kiosk'));
       setItems(Array.isArray(iv) ? iv.filter((i: any) => i.archived !== true && i.approved !== false) : []);
+      // Nabídka podniku jako našeptávač pro menu akce — jméno i cena.
+      setMenuItems(Array.isArray(mb?.sections) ? mb.sections.flatMap((sec: any) => sec.items ?? []) : []);
       if (ed.notMigrated) setErr('Akce budou dostupné po migraci (/api/init).');
     } catch { setErr('Akce se nepodařilo načíst.'); }
     setLoading(false);
@@ -91,7 +95,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
               : e.status === 'cancelled' ? 'bg-red-500/10 text-red-600'
               : 'bg-[#0A84FF]/10 text-[#0A6FE0]'
             }`}>{statusLabel(e.status)}</span>
-            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná</span>}
+            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná{e.going > 0 ? ` · ✋ ${e.going}` : ''}</span>}
             {result != null && (
               <span className={`text-xs font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
                 {result >= 0 ? '+' : ''}{money(result)}
@@ -156,7 +160,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         <EventEditor onClose={() => setCreating(false)} onSaved={async (ev) => { setCreating(false); await load(); setDetail(ev); }} />
       )}
       {detail && (
-        <EventDetail event={detail} members={members} items={items} money={money} patch={patch}
+        <EventDetail event={detail} members={members} items={items} menuItems={menuItems} money={money} patch={patch}
           onClose={() => setDetail(null)}
           onDeleted={async () => { setDetail(null); await load(); }} />
       )}
@@ -194,6 +198,18 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Nová akce</h3>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
         <div className="space-y-3">
+          {/* Základní rozcestí: akce u nás (obsluha = kdo je na směně), nebo
+              výjezd ven (vlastní směna k akci, balení skladu, uzávěrka za akci). */}
+          <div className="grid grid-cols-2 gap-1.5 rounded-2xl glass border border-black/[0.07] p-1" role="radiogroup" aria-label="Kde se akce koná">
+            <button type="button" role="radio" aria-checked={!offsite} onClick={() => setOffsite(false)}
+              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${!offsite ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              <Icon name="overview" size={15} className="inline -mt-0.5 mr-1.5" />U nás v podniku
+            </button>
+            <button type="button" role="radio" aria-checked={offsite} onClick={() => setOffsite(true)}
+              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${offsite ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              <Icon name="tent" size={15} className="inline -mt-0.5 mr-1.5" />Výjezd ven
+            </button>
+          </div>
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Název akce" maxLength={160} className={inputClass} />
           <div className="flex flex-wrap gap-1.5">
             {EVENT_KINDS.map(k => (
@@ -208,11 +224,14 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
             <input type="time" aria-label="Začátek akce" value={startTime} onChange={e => setStartTime(e.target.value)} className={inputClass} />
             <input type="time" aria-label="Konec akce" value={endTime} onChange={e => setEndTime(e.target.value)} className={inputClass} />
           </div>
-          <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Místo (u venkovní akce adresa)" maxLength={300} className={inputClass} />
-          <label className="flex items-center gap-2.5 cursor-pointer text-sm text-black/60">
-            <input type="checkbox" checked={offsite} onChange={e => setOffsite(e.target.checked)} className="h-4 w-4 accent-[#5B9E00]" />
-            Venkovní akce — čajovna se veze jinam (odemkne balicí seznam)
-          </label>
+          <input value={location} onChange={e => setLocation(e.target.value)}
+            placeholder={offsite ? 'Kam se jede — název místa a adresa' : 'Místo v podniku (nepovinné, třeba „zahrádka")'}
+            maxLength={300} className={inputClass} />
+          <p className="text-xs text-black/45">
+            {offsite
+              ? 'Výjezd: lidem vytvoříš směnu jen k akci, sbalíš sklad a večer uděláte uzávěrku za akci.'
+              : 'Akce u nás: obsluha je ten den ze směny, další lidi můžeš přidat navíc.'}
+          </p>
         </div>
         <div className="flex gap-2 mt-5">
           <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
@@ -227,14 +246,18 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
 }
 
 // ---- Detail sheet: crew, checklist, packing, publicity, money ----
-function EventDetail({ event: e, members, items, money, patch, onClose, onDeleted }: {
-  event: any; members: any[]; items: any[]; money: (n: number) => string;
+function EventDetail({ event: e, members, items, menuItems, money, patch, onClose, onDeleted }: {
+  event: any; members: any[]; items: any[]; menuItems: any[]; money: (n: number) => string;
   patch: (id: number, body: any) => Promise<boolean>;
   onClose: () => void; onDeleted: () => void;
 }) {
   const dm = useModal(true, onClose, 'Detail akce');
   const [checkTxt, setCheckTxt] = useState('');
   const [packSearch, setPackSearch] = useState('');
+  const [dishName, setDishName] = useState('');
+  const [dishPrice, setDishPrice] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [announcing, setAnnouncing] = useState(false);
   const [revenue, setRevenue] = useState(e.revenue != null ? String(e.revenue) : '');
   const [costs, setCosts] = useState(e.costs != null ? String(e.costs) : '');
   const k = kindSpec(e.kind);
@@ -287,11 +310,49 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
             className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
             📣 Oznámit týmu
           </button>
+          {e.public && (
+            <button disabled={announcing}
+              onClick={async () => {
+                if (!confirm('Rozeslat akci všem členům podniku? Přijde jim push a objeví se v novinkách na stránce podniku.')) return;
+                setAnnouncing(true);
+                const ok = await patch(e.id, { announceMembers: true });
+                setAnnouncing(false);
+                if (ok) alert('Členové dostali pozvánku. ✓');
+              }}
+              className="tap-target-sm rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold hover:bg-[#C8F542]/30 transition disabled:opacity-50">
+              {announcing ? 'Rozesílám…' : '📣 Rozeslat členům'}
+            </button>
+          )}
         </div>
+        {e.public && (e.followers > 0 || e.going > 0) && (
+          <p className="mt-2 text-xs text-black/50">
+            <Icon name="bell" size={13} className="inline -mt-0.5 mr-1" />{e.followers} {e.followers === 1 ? 'host sleduje' : e.followers < 5 ? 'hosté sledují' : 'hostů sleduje'}
+            {e.going > 0 && <> · ✋ {e.going} {e.going === 1 ? 'přijde' : e.going < 5 ? 'přijdou' : 'přijde'}{e.capacity ? ` z ${e.capacity} míst` : ''}</>}
+          </p>
+        )}
 
+        {/* obsluha akce: u nás začíná tím, kdo ten den stejně je na směně */}
+        {!e.offsite && (
+          <div className="mt-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Ze směny ten den ({(e.onShift ?? []).length})</p>
+            {(e.onShift ?? []).length === 0 ? (
+              <p className="text-sm text-black/45">Na {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })} zatím v rozvrhu nikdo není — obsluhu přidej níž, nebo naplánuj směny v Rozvrhu.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {(e.onShift ?? []).map((m2: any) => (
+                  <span key={m2.id} className="rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] border border-[#0A84FF]/20 px-3 py-1.5 text-sm">
+                    {m2.avatar} {m2.name}<span className="text-[#0A6FE0]/70 tabular-nums">{m2.start ? ` · ${String(m2.start).slice(0, 5)}` : ''}{m2.end ? `–${String(m2.end).slice(0, 5)}` : ''}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {/* crew */}
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Na akci ({e.crew.length}) — vytvoří směnu v rozvrhu</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
+            {e.offsite ? `Směna k akci (${e.crew.length}) — vytvoří směnu jen na tenhle výjezd` : `Navíc na akci (${e.crew.length}) — vytvoří směnu v rozvrhu`}
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {members.map(m => {
               const on = e.crew.includes(m.id);
@@ -304,6 +365,78 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* fotky akce — hosté je uvidí na stránce podniku */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-black/45">Fotky ({(e.photos ?? []).length}/8)</p>
+            <label className={`tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-black transition cursor-pointer ${uploading || (e.photos ?? []).length >= 8 ? 'opacity-50 pointer-events-none' : ''}`}>
+              <Icon name="camera" size={15} className="inline -mt-0.5 mr-1.5" />{uploading ? 'Nahrávám…' : 'Přidat fotku'}
+              <input type="file" accept="image/*" className="sr-only" onChange={async ev3 => {
+                const f = ev3.target.files?.[0]; ev3.target.value = '';
+                if (!f) return;
+                setUploading(true);
+                const fd = new FormData(); fd.append('file', f);
+                const r = await fetch('/api/upload', { method: 'POST', body: fd }).catch(() => null);
+                const d = r?.ok ? await r.json().catch(() => null) : null;
+                setUploading(false);
+                const upId = d?.url ? parseInt(String(d.url).split('/').pop()!) : NaN;
+                if (!Number.isFinite(upId)) { alert('Fotku se nepodařilo nahrát.'); return; }
+                await patch(e.id, { photos: [...(e.photos ?? []), `/api/client/img/${upId}`] });
+              }} />
+            </label>
+          </div>
+          {(e.photos ?? []).length === 0 ? (
+            <p className="text-sm text-black/40">Zatím žádná fotka. První nahraná je i náhledovka pro hosty.</p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+              {(e.photos ?? []).map((url: string, i: number) => (
+                <div key={url} className="relative group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Fotka akce ${i + 1}`} className="aspect-square w-full rounded-2xl object-cover border border-black/[0.06]" />
+                  <button type="button" aria-label={`Odebrat fotku ${i + 1}`}
+                    onClick={() => patch(e.id, { photos: (e.photos ?? []).filter((_: string, j: number) => j !== i) })}
+                    className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-[#16181A] text-white grid place-items-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"><Icon name="close" size={11} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* menu akce — co se tam bude podávat; hosté ho uvidí v detailu */}
+        <div className="mt-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Menu akce ({(e.menu ?? []).length})</p>
+          {(e.menu ?? []).length > 0 && (
+            <ul className="space-y-1.5 mb-2">
+              {(e.menu ?? []).map((l: any, i: number) => (
+                <li key={i} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name}</span>
+                  {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
+                  <button type="button" aria-label={`Odebrat ${l.name} z menu akce`}
+                    onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })}
+                    className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <input value={dishName} list="event-menu-dl" placeholder="Položka — vyber z nabídky, nebo napiš vlastní…" maxLength={120}
+              onChange={ev3 => {
+                setDishName(ev3.target.value);
+                const hit = menuItems.find((mi: any) => mi.name === ev3.target.value);
+                if (hit && hit.price != null) setDishPrice(String(hit.price));
+              }}
+              onKeyDown={ev3 => { if (ev3.key === 'Enter' && dishName.trim()) { patch(e.id, { menu: [...(e.menu ?? []), { name: dishName.trim(), price: dishPrice === '' ? null : Number(dishPrice) }] }); setDishName(''); setDishPrice(''); } }}
+              className={inputClass} />
+            <datalist id="event-menu-dl">
+              {menuItems.map((mi: any) => <option key={mi.id} value={mi.name} />)}
+            </datalist>
+            <input value={dishPrice} onChange={ev3 => setDishPrice(ev3.target.value)} type="number" inputMode="numeric" placeholder="Kč" aria-label="Cena položky"
+              className={`${inputClass} !w-24 text-center`} />
+            <button onClick={() => { if (dishName.trim()) { patch(e.id, { menu: [...(e.menu ?? []), { name: dishName.trim(), price: dishPrice === '' ? null : Number(dishPrice) }] }); setDishName(''); setDishPrice(''); } }}
+              className="shrink-0 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-4 text-sm hover:bg-black/[0.08] transition">+</button>
           </div>
         </div>
 
@@ -416,6 +549,22 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
             <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
               Výsledek: {result >= 0 ? '+' : ''}{money(result)}
             </p>
+          )}
+          {e.closingsCount > 0 && (
+            <div className="mt-2.5 flex items-center justify-between gap-2 flex-wrap rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2">
+              <p className="text-sm text-black/60"><Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5" />
+                {e.closingsCount === 1 ? 'Uzávěrka za akci' : `Uzávěrky za akci: ${e.closingsCount}`} · <span className="font-semibold tabular-nums text-[#16181A]">{money(e.closingsTotal)}</span>
+              </p>
+              {e.closingsTotal !== (e.revenue ?? 0) && (
+                <button onClick={() => patch(e.id, { adoptRevenue: true })}
+                  className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
+                  Převzít do tržby
+                </button>
+              )}
+            </div>
+          )}
+          {e.offsite && e.closingsCount === 0 && (
+            <p className="mt-2.5 text-xs text-black/45">Na místě uděláte uzávěrku za akci: Uzávěrka → „Uzávěrka za akci?" — tržba se pak dá převzít sem jedním klikem.</p>
           )}
         </div>
 

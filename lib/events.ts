@@ -72,3 +72,23 @@ export function normalizeCrew(raw: any): number[] {
   if (!Array.isArray(raw)) return [];
   return Array.from(new Set(raw.map((v: any) => Number(v)).filter(n => Number.isFinite(n) && n > 0))).slice(0, 50);
 }
+
+/** Co se na akci podává — řádek menu akce (volný text, cena nepovinná). */
+export interface EventMenuLine { name: string; price: number | null; }
+
+export function normalizeEventMenu(raw: any): EventMenuLine[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((l: any) => {
+      const price = l?.price == null || l?.price === '' ? null : Math.max(0, Math.round(Number(l.price) || 0));
+      return { name: String(l?.name ?? '').trim().slice(0, 120), price };
+    })
+    .filter(l => l.name)
+    .slice(0, 30);
+}
+
+/** Fotky akce — jen adresy z vlastního veřejného výdeje obrázků. */
+export function normalizePhotos(raw: any): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((x: any) => String(x || '')).filter(x => /^\/api\/client\/img\/\d+$/.test(x)).slice(0, 8);
+}
