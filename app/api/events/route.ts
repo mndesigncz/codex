@@ -84,9 +84,9 @@ export async function GET() {
         SELECT event_id, COUNT(*)::int AS followers, COUNT(*) FILTER (WHERE going)::int AS going
         FROM client_event_follows WHERE event_id = ANY(${ids})
         GROUP BY event_id`.catch(() => [] as any[]) : Promise.resolve([] as any[]),
-      menuIds.length ? sql`SELECT id, name, price FROM menu_items WHERE id = ANY(${menuIds})` : Promise.resolve([] as any[]),
+      menuIds.length ? sql`SELECT id, name, price, pos_product_id FROM menu_items WHERE id = ANY(${menuIds})` : Promise.resolve([] as any[]),
     ]);
-    const menuById = new Map((menuRows as any[]).map(r => [Number(r.id), { name: String(r.name), price: r.price == null ? null : Number(r.price) }]));
+    const menuById = new Map((menuRows as any[]).map(r => [Number(r.id), { name: String(r.name), price: r.price == null ? null : Number(r.price), pos: !!r.pos_product_id }]));
     const byDate = new Map<string, any[]>();
     for (const r of shiftRows as any[]) {
       const k = String(r.date);
