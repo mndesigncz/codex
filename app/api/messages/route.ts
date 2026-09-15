@@ -30,11 +30,17 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const channel = (searchParams.get('channel') ?? 'general').slice(0, 40);
 
+    // Posledních 200 zpráv kanálu chronologicky (trefí index messages(channel,
+    // created_at DESC)) — kanál roste bez omezení, celá historie by byla velký
+    // sken i payload.
     const rows = await sql`
-      SELECT m.* FROM messages m
-      JOIN users u ON u.id = m.sender_id
-      WHERE m.channel = ${channel} AND u.team_id = ${me.teamId}
-      ORDER BY m.created_at ASC`;
+      SELECT * FROM (
+        SELECT m.* FROM messages m
+        JOIN users u ON u.id = m.sender_id
+        WHERE m.channel = ${channel} AND u.team_id = ${me.teamId}
+        ORDER BY m.created_at DESC
+        LIMIT 200
+      ) t ORDER BY t.created_at ASC`;
     return NextResponse.json(rows);
   } catch {
     return NextResponse.json({ error: 'Zprávy se nepodařilo načíst' }, { status: 500 });
