@@ -8,7 +8,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
-import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos } from '@/lib/events';
+import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos, resolveEventMenu } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ async function me() {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
-function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number }) {
+function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number; menuById?: Map<number, { name: string; price: number | null }> }) {
   const crew = normalizeCrew(r.crew);
   return {
     id: r.id, title: r.title, description: r.description ?? null,
@@ -37,7 +37,7 @@ function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; clos
     checklist: normalizeChecklist(r.checklist),
     packing: normalizePacking(r.packing),
     photos: normalizePhotos(r.photos),
-    menu: normalizeEventMenu(r.menu),
+    menu: resolveEventMenu(normalizeEventMenu(r.menu), extra?.menuById ?? new Map()),
     crew,
     crewPeople: crew.map(id => people.get(id) ?? { id, name: 'Neznámý', avatar: '👤' }),
     // U akce v podniku je základ obsluhy ten, kdo má ten den běžnou směnu.
@@ -68,7 +68,8 @@ export async function GET() {
     // Tři skupinové dotazy vedle sebe — kdo je ty dny na běžné směně (základ
     // obsluhy akce v podniku), kolik uzávěrek se k akcím váže a kolik hostů
     // akce sleduje / přijde. Po jednom na akci by to bylo 3×100 dotazů.
-    const [people, shiftRows, closingRows, followRows] = await Promise.all([
+    const menuIds = Array.from(new Set((rows as any[]).flatMap(r => normalizeEventMenu(r.menu).map(l => l.itemId).filter((x): x is number => x != null))));
+    const [people, shiftRows, closingRows, followRows, menuRows] = await Promise.all([
       teamPeople(u.team_id),
       dates.length ? sql`
         SELECT s.date, s.start_time, s.end_time, us.id, us.name, us.avatar
@@ -83,7 +84,9 @@ export async function GET() {
         SELECT event_id, COUNT(*)::int AS followers, COUNT(*) FILTER (WHERE going)::int AS going
         FROM client_event_follows WHERE event_id = ANY(${ids})
         GROUP BY event_id`.catch(() => [] as any[]) : Promise.resolve([] as any[]),
+      menuIds.length ? sql`SELECT id, name, price FROM menu_items WHERE id = ANY(${menuIds})` : Promise.resolve([] as any[]),
     ]);
+    const menuById = new Map((menuRows as any[]).map(r => [Number(r.id), { name: String(r.name), price: r.price == null ? null : Number(r.price) }]));
     const byDate = new Map<string, any[]>();
     for (const r of shiftRows as any[]) {
       const k = String(r.date);
@@ -99,6 +102,7 @@ export async function GET() {
         closings: closingsBy.get(Number(r.id)),
         followers: followsBy.get(Number(r.id))?.followers,
         going: followsBy.get(Number(r.id))?.going,
+        menuById,
       })),
       isEmployer: u.role === 'employer',
     });

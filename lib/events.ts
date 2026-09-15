@@ -73,18 +73,37 @@ export function normalizeCrew(raw: any): number[] {
   return Array.from(new Set(raw.map((v: any) => Number(v)).filter(n => Number.isFinite(n) && n > 0))).slice(0, 50);
 }
 
-/** Co se na akci podává — řádek menu akce (volný text, cena nepovinná). */
-export interface EventMenuLine { name: string; price: number | null; }
+/** Menu akce = odkazy do nabídky podniku. Jméno a cena se dočítají z Menu
+    při čtení, takže když se cena změní v Menu, akce ji ukáže taky. Starší
+    volné řádky (bez itemId) se dál zobrazí, nové se zakládají jen odkazem. */
+export interface EventMenuLine { itemId: number | null; name: string; price: number | null; }
 
 export function normalizeEventMenu(raw: any): EventMenuLine[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((l: any) => {
+      const itemId = Number(l?.itemId);
       const price = l?.price == null || l?.price === '' ? null : Math.max(0, Math.round(Number(l.price) || 0));
-      return { name: String(l?.name ?? '').trim().slice(0, 120), price };
+      return {
+        itemId: Number.isFinite(itemId) && itemId > 0 ? itemId : null,
+        name: String(l?.name ?? '').trim().slice(0, 120),
+        price,
+      };
     })
-    .filter(l => l.name)
+    .filter(l => l.itemId != null || l.name)
     .slice(0, 30);
+}
+
+/** Doplní odkazovaným řádkům menu akce aktuální jméno a cenu z nabídky.
+    `byId` je mapa menu_items id → {name, price}; smazané položky vypadnou. */
+export function resolveEventMenu(lines: EventMenuLine[], byId: Map<number, { name: string; price: number | null }>): EventMenuLine[] {
+  return lines
+    .map(l => {
+      if (l.itemId == null) return l;
+      const hit = byId.get(l.itemId);
+      return hit ? { itemId: l.itemId, name: hit.name, price: hit.price } : null;
+    })
+    .filter((l): l is EventMenuLine => l != null);
 }
 
 /** Fotky akce — jen adresy z vlastního veřejného výdeje obrázků. */

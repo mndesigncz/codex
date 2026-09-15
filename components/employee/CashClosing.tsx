@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
 import { EmptyState, PageHeader } from '../ui';
 import {
@@ -319,7 +319,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // Team's desired float — the removal is computed so exactly this stays.
   const [drawerFloat, setDrawerFloat] = useState<number | null>(null);
   // Off-site event closings: filed BESIDE the shop's closing for the day.
-  const [dayEvents, setDayEvents] = useState<{ id: number; title: string }[]>([]);
+  const [dayEvents, setDayEvents] = useState<{ id: number; title: string; date: string }[]>([]);
   const [eventId, setEventId] = useState<number | ''>('');
   // Structured handover for the next shift.
   const [hoTodo, setHoTodo] = useState('');
@@ -425,6 +425,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const isSelf = !isEmployer && !isKiosk;
   // Employee submitting for a day they weren't scheduled ⇒ goes to approval.
   const onShift = eligible.some(s => s.date === form.date);
+  // Akce dne uzávěrky — a když se datum přepne jinam, vybraná akce se pustí,
+  // ať se uzávěrka omylem nepřipíše k akci z jiného dne.
+  const evsToday = useMemo(() => dayEvents.filter(ev => ev.date === form.date), [dayEvents, form.date]);
+  useEffect(() => { if (eventId !== '' && !evsToday.some(ev => ev.id === eventId)) setEventId(''); }, [evsToday, eventId]);
 
   // Who is this closing FOR? Employee ⇒ themselves; employer/kiosk ⇒ the picked
   // member (null on employer means "me").
@@ -705,20 +709,28 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
 
         {/* Step 1 — opening cash + when/which shift */}
-        {dayEvents.length > 0 && (
-          <div className="rounded-2xl border border-[#0A84FF]/25 bg-[#0A84FF]/[0.06] p-4 space-y-2">
-            <p className="text-sm font-semibold text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Uzávěrka za akci?</p>
-            <p className="text-[12px] text-black/45">
-              Venkovní akce má vlastní kasu — její uzávěrka se ukládá zvlášť a nemíchá se
-              s kasou podniku. Denní uzávěrku podniku pak uděláš normálně vedle.
-            </p>
-            <select value={eventId} aria-label="Uzávěrka za akci"
-              onChange={e => setEventId(e.target.value === '' ? '' : parseInt(e.target.value))}
-              className={inputClass}>
-              <option value="">Ne — běžná uzávěrka podniku</option>
-              {dayEvents.map(ev => <option key={ev.id} value={ev.id}>Akce: {ev.title}</option>)}
-            </select>
-          </div>
+        {/* Nabízí se jen akce dne, za který se uzávěrka dělá — dřív tu visel
+            seznam všech akcí historie a „ten den je akce" nešlo poznat. */}
+        {evsToday.length > 0 && (
+            <div className="rounded-2xl border border-[#0A84FF]/25 bg-[#0A84FF]/[0.06] p-4 space-y-2.5" role="radiogroup" aria-label="Za co je tahle uzávěrka">
+              <p className="text-sm font-semibold text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {evsToday.length === 1 ? `Ten den se koná akce: ${evsToday[0].title}` : 'Ten den se konají akce'}</p>
+              <p className="text-[12px] text-black/45">
+                Akce má vlastní kasu — její uzávěrka se ukládá zvlášť a nemíchá se s kasou
+                podniku. Denní uzávěrku podniku uděláš normálně vedle.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" role="radio" aria-checked={eventId === ''} onClick={() => setEventId('')}
+                  className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === '' ? 'bg-[#16181A] text-white' : 'bg-white/70 border border-black/10 text-black/60 hover:text-black'}`}>
+                  Uzávěrka podniku
+                </button>
+                {evsToday.map(ev => (
+                  <button key={ev.id} type="button" role="radio" aria-checked={eventId === ev.id} onClick={() => setEventId(ev.id)}
+                    className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === ev.id ? 'bg-[#0A84FF] text-white' : 'bg-white/70 border border-[#0A84FF]/25 text-[#0A6FE0] hover:bg-[#0A84FF]/10'}`}>
+                    Za akci: {ev.title}
+                  </button>
+                ))}
+              </div>
+            </div>
         )}
 
         <Step refCb={el => { stepRefs.current[0] = el; }} num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
