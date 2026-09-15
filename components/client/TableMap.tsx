@@ -65,7 +65,7 @@ export function TableShape({ t, selected, hit, label }: {
         aria-hidden={live ? undefined : true}
         className={`absolute border transition ${b.shape === 'circle' ? 'rounded-full' : 'rounded-lg'} ${
           selected ? 'bg-[#16181A] border-[#16181A] shadow-lg z-10' : 'bg-white border-black/[0.16] shadow-sm'
-        } ${live ? 'cursor-pointer' : ''}`}
+        } ${live ? 'cursor-pointer' : ''} ${live && selected ? 'touch-none' : ''}`}
         style={{
           left: `${t.map_x}%`, top: `${t.map_y}%`, width: `${b.w}%`, height: `${b.h}%`,
           transform: `translate(-50%, -50%) rotate(${b.rot}deg)${selected ? ' scale(1.06)' : ''}`,
@@ -75,7 +75,7 @@ export function TableShape({ t, selected, hit, label }: {
         onPointerDown={hit?.onPointerDown} onClick={hit?.onClick} aria-hidden
         className={`absolute text-[11px] font-semibold leading-none whitespace-nowrap px-1.5 py-0.5 rounded-md transition ${
           selected ? 'bg-[#16181A] text-[#C8F542] z-10' : 'bg-white/85 text-[#16181A]'
-        } ${hit ? 'cursor-pointer' : ''}`}
+        } ${hit ? 'cursor-pointer' : ''} ${hit && selected ? 'touch-none' : ''}`}
         style={{ left: `${t.map_x}%`, top: `calc(${t.map_y}% + ${b.h / 2}%)`, transform: 'translate(-50%, 2px)' }}>
         {label ?? t.name}
       </span>

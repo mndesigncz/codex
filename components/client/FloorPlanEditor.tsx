@@ -240,7 +240,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
       )}
 
       <div ref={box} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        className={`relative w-full rounded-3xl border border-black/[0.08] bg-white/60 overflow-hidden touch-none select-none ${tool === 'select' ? '' : 'cursor-crosshair'}`}
+        className={`relative w-full rounded-3xl border border-black/[0.08] bg-white/60 overflow-hidden select-none ${tool === 'select' ? 'touch-pan-y' : 'touch-none cursor-crosshair'}`}
         style={{ aspectRatio: String(plan.ratio), backgroundImage: grid ? 'radial-gradient(rgba(22,24,26,0.07) 1px, transparent 1px)' : undefined, backgroundSize: '18px 18px' }}>
         <PlanCanvasContent plan={plan} />
 
@@ -263,10 +263,10 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
             return (
               <span key={s.id}>
                 <button type="button" aria-label="Zeď — posunout" onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'move')}
-                  className={`tap-target-sm absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full transition ${on ? 'bg-[#16181A]/90 ring-2 ring-[#C8F542]' : 'bg-transparent hover:bg-black/10'}`}
+                  className={`${on ? 'touch-none' : ''} tap-target-sm absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full transition ${on ? 'bg-[#16181A]/90 ring-2 ring-[#C8F542]' : 'bg-transparent hover:bg-black/10'}`}
                   style={{ left: `${mx}%`, top: `${my}%` }} />
                 {on && <button type="button" aria-label="Zeď — konec" onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'resize')}
-                  className="tap-target-sm absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#16181A] shadow" style={{ left: `${s.x2}%`, top: `${s.y2}%` }} />}
+                  className="touch-none tap-target-sm absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#16181A] shadow" style={{ left: `${s.x2}%`, top: `${s.y2}%` }} />}
               </span>
             );
           }
@@ -274,15 +274,15 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
             <span key={s.id}>
               <button type="button" aria-label={`Plocha ${s.label ?? ''} — posunout`} onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'move')}
                 onDoubleClick={() => { const v = prompt('Název plochy', s.label ?? '')?.trim(); patchShape(s.id, x => ({ ...x, label: v ? v.slice(0, 40) : undefined })); }}
-                className={`absolute transition ${on ? 'ring-2 ring-[#C8F542] bg-[#C8F542]/10' : 'hover:bg-black/[0.04]'}`}
+                className={`${on ? 'touch-none ring-2 ring-[#C8F542] bg-[#C8F542]/10' : 'hover:bg-black/[0.04]'} absolute transition`}
                 style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%` }} />
               {on && <button type="button" aria-label="Plocha — velikost" onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'resize')}
-                className="tap-target-sm absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#16181A] shadow" style={{ left: `${s.x + s.w}%`, top: `${s.y + s.h}%` }} />}
+                className="touch-none tap-target-sm absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#16181A] shadow" style={{ left: `${s.x + s.w}%`, top: `${s.y + s.h}%` }} />}
             </span>
           );
           return (
             <button key={s.id} type="button" aria-label={`Popisek ${s.text}`} onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'move')}
-              className={`tap-target-sm absolute h-7 -translate-x-1/2 -translate-y-1/2 rounded-lg px-2 transition ${on ? 'ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.05]'}`}
+              className={`${on ? 'touch-none ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.05]'} tap-target-sm absolute h-7 -translate-x-1/2 -translate-y-1/2 rounded-lg px-2 transition`}
               style={{ left: `${s.x}%`, top: `${s.y}%`, minWidth: '2rem' }} />
           );
         })}
@@ -298,7 +298,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
               {on && (
                 <>
                   <button type="button" aria-label={`Stůl ${t.name} — velikost`} onPointerDown={e => grab(e, { kind: 'table', id: t.id }, 'resize')}
-                    className="tap-target-sm absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#16181A] shadow z-20"
+                    className="touch-none tap-target-sm absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#16181A] shadow z-20"
                     style={{ left: `${Number(t.map_x) + b.w / 2}%`, top: `${Number(t.map_y) + b.h / 2}%` }} />
                   <button type="button" aria-label={`Stůl ${t.name} — otočit`} onClick={() => patchTable(t.id, x => ({ ...x, map_rot: ((Number(x.map_rot) || 0) + 45) % 360 }))}
                     className="tap-target-sm absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 grid place-items-center rounded-full bg-[#16181A] text-white shadow z-20"
