@@ -6,6 +6,7 @@ import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 type RosterMember = {
   id: number | string;
@@ -101,6 +102,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [savingEdit, setSavingEdit] = useState(false);
   // Manual entry — someone forgot to punch entirely.
   const [addOpen, setAddOpen] = useState(false);
+  const addModal = useModal(addOpen, () => setAddOpen(false), 'Přidat záznam docházky');
+  const editModal = useModal(!!editEntry, () => setEditEntry(null), 'Upravit záznam docházky');
   const [addEmp, setAddEmp] = useState<number | ''>('');
   const [addIn, setAddIn] = useState('');
   const [addOut, setAddOut] = useState('');
@@ -544,7 +547,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       {/* Edit time modal */}
       {addOpen && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setAddOpen(false)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={addModal.ref} {...addModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Přidat záznam docházky</h3>
@@ -585,7 +588,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
       {editEntry && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditEntry(null)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
               <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Upravit čas na směně</h3>

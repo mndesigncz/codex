@@ -10,6 +10,7 @@ import { PageHeader, Button } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
 import { pragueToday } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 type Ev = any;
 
@@ -165,6 +166,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
 
 // ---- Create form (short — details come after in the detail sheet) ----
 function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: any) => void }) {
+  const m = useModal(true, onClose, 'Nová akce');
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState('concert');
   const [date, setDate] = useState('');
@@ -188,7 +190,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Nová akce</h3>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
         <div className="space-y-3">
@@ -230,6 +232,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
   patch: (id: number, body: any) => Promise<boolean>;
   onClose: () => void; onDeleted: () => void;
 }) {
+  const dm = useModal(true, onClose, 'Detail akce');
   const [checkTxt, setCheckTxt] = useState('');
   const [packSearch, setPackSearch] = useState('');
   const [revenue, setRevenue] = useState(e.revenue != null ? String(e.revenue) : '');
@@ -249,7 +252,7 @@ function EventDetail({ event: e, members, items, money, patch, onClose, onDelete
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev2 => ev2.stopPropagation()}>
+      <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev2 => ev2.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 mb-1">
           <div className="min-w-0">
             <h3 className="text-xl font-bold tracking-tight text-[#16181A]"><Icon name={k.icon} size={20} className="inline -mt-1 mr-2 text-[#0A6FE0]" />{e.title}</h3>
