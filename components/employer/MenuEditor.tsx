@@ -395,7 +395,7 @@ export default function MenuEditor() {
         <div className="flex flex-wrap gap-2">
           {posPripojena && (
             <button type="button" onClick={zalozitZPokladny} disabled={!!importuji || ukladam}
-              className="rounded-full bg-[#C8F542] text-[#16181A] font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
+              className="rounded-full bg-[#C8F542] on-accent font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
               {importuji === 'new' ? 'Načítám z kasy…' : 'Založit menu z pokladny'}
             </button>
           )}

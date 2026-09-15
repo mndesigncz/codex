@@ -279,6 +279,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .text-\[\#16181A\]{ color:#EDF2E4 !important; }
 :root[data-theme="dark"] .text-black\/70{ color:rgba(237,242,228,0.78) !important; }
 :root[data-theme="dark"] .text-black\/60{ color:rgba(237,242,228,0.66) !important; }
+/* /65 v řadě chybělo — a právě ho nosí štítky směn, takže na tmavém skle
+   zůstávaly černé na černém (naměřeno 1,05:1, prakticky neviditelné). */
+:root[data-theme="dark"] .text-black\/65{ color:rgba(237,242,228,0.70) !important; }
 :root[data-theme="dark"] .text-black\/55{ color:rgba(237,242,228,0.60) !important; }
 :root[data-theme="dark"] .text-black\/50{ color:rgba(237,242,228,0.55) !important; }
 :root[data-theme="dark"] .text-black\/45{ color:rgba(237,242,228,0.50) !important; }
@@ -289,6 +292,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .text-black\/25{ color:rgba(237,242,228,0.30) !important; }
 :root[data-theme="dark"] .text-black\/20{ color:rgba(237,242,228,0.26) !important; }
 :root[data-theme="dark"] .text-\[\#5B7A08\]{ color:#C8F542 !important; }
+/* Tmavý motiv přebarvoval jen tenhle jeden zelený odstín. Ty ostatní zůstávaly
+   tmavě zelené na tmavém skle — naměřeno 2,2:1 a 2,3:1, tedy prakticky
+   nečitelné. Na plné limetce se ani jeden z nich nepoužívá (ověřeno), takže je
+   bezpečné je zesvětlit všechny. */
+:root[data-theme="dark"] .text-\[\#3E5406\]{ color:#C8F542 !important; }
+:root[data-theme="dark"] .text-\[\#4F6A07\]{ color:#C8F542 !important; }
+:root[data-theme="dark"] .text-\[\#5B7A08\]\/80{ color:rgba(200,245,66,0.88) !important; }
+:root[data-theme="dark"] .text-\[\#5B7A08\]\/70{ color:rgba(200,245,66,0.80) !important; }
 /* Ink-on-accent: text that sits on a lime (#C8F542) surface must stay dark in
    BOTH themes — these two are deliberately never overridden. */
 .on-accent{ color:#16181A; }

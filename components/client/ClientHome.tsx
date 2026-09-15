@@ -46,7 +46,7 @@ export default function ClientHome() {
           </p>
           {!signedIn && (
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link href="/client/register" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] text-[#16181A] px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition">
+              <Link href="/client/register" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition">
                 <Icon name="plus" size={16} /> Založit účet
               </Link>
               <Link href="/client/login" className="tap-target inline-flex items-center gap-2 rounded-full glass border border-black/10 px-5 py-3 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] transition">
@@ -117,7 +117,7 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
                 {!b.coverUrl && <Initials name={b.name} size={44} />}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    {b.member && <span className="rounded-full bg-[#C8F542] text-[#16181A] px-2.5 py-0.5 text-[11px] font-semibold">Člen</span>}
+                    {b.member && <span className="rounded-full bg-[#C8F542] on-accent px-2.5 py-0.5 text-[11px] font-semibold">Člen</span>}
                     <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="clock" size={12} />Dnes {hoursLabel(b.hours, today)}</span>
                     {b.members > 0 && <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="users" size={12} />{b.members}</span>}
                   </div>

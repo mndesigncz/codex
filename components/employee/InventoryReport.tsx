@@ -264,7 +264,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo je u regálu. */}
       {stocktakeOpen && (
         <button onClick={() => setCounting(true)}
-          className="w-full rounded-2xl bg-[#C8F542] text-[#16181A] px-5 py-3.5 text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
+          className="w-full rounded-2xl bg-[#C8F542] on-accent px-5 py-3.5 text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
           <Icon name="clipboard" size={18} /> Probíhá inventura — pomoct spočítat sklad
         </button>
       )}

@@ -285,7 +285,7 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
               {steps.map((st, i) => (
                 <button key={i} type="button" onClick={() => go(st.tab)}
                   className={`group w-full flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm text-left transition ${st.done ? 'bg-[#C8F542]/10 text-black/60' : 'bg-black/[0.03] text-[#16181A] hover:bg-black/[0.06]'}`}>
-                  <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${st.done ? 'bg-[#C8F542] text-[#16181A]' : 'border-2 border-black/15'}`}>{st.done && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
+                  <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${st.done ? 'bg-[#C8F542] on-accent' : 'border-2 border-black/15'}`}>{st.done && <Icon name="check" size={12} strokeWidth={2.6} />}</span>
                   <span className="min-w-0 flex-1 leading-snug">{st.label}</span>
                   <Icon name="chevron" size={15} className="shrink-0 -rotate-90 text-black/25 group-hover:text-black/50 transition-colors" />
                 </button>
@@ -643,7 +643,7 @@ function Reviews() {
             <p className="text-xs text-black/55 mt-1">{d.count} {d.count === 1 ? 'hodnocení' : 'hodnocení'}</p>
             <ul className="mt-4 space-y-1">
               {[5, 4, 3, 2, 1].map(n => (
-                <li key={n} className="flex items-center gap-2 text-xs tabular-nums"><span className="w-3 text-black/55">{n}</span><span className="text-[#16181A]">★</span><span className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full bg-[#C8F542]" style={{ width: `${(d.dist[n - 1] / max) * 100}%` }} /></span><span className="w-6 text-right text-black/55">{d.dist[n - 1]}</span></li>
+                <li key={n} className="flex items-center gap-2 text-xs tabular-nums"><span className="w-3 text-black/55">{n}</span><span className="on-accent">★</span><span className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full bg-[#C8F542]" style={{ width: `${(d.dist[n - 1] / max) * 100}%` }} /></span><span className="w-6 text-right text-black/55">{d.dist[n - 1]}</span></li>
               ))}
             </ul>
           </div>

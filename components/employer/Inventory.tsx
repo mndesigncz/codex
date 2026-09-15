@@ -2387,13 +2387,13 @@ function CategoryRow({
         <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
           <span className="text-[11px] text-black/45">Zařadit:</span>
           <button onClick={() => setParent(null)} disabled={busy || c.parentId == null}
-            className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId == null ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'}`}>
+            className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId == null ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] on-accent hover:border-[#C8F542]'}`}>
             Hlavní úroveň
           </button>
           {parentOptions.map(p => (
             <button key={p.id} onClick={() => setParent(p.id)} disabled={busy || c.parentId === p.id}
               title={pathLabel(p.id)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId === p.id ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'}`}>
+              className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId === p.id ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] on-accent hover:border-[#C8F542]'}`}>
               pod {pathLabel(p.id)}
             </button>
           ))}

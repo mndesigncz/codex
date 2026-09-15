@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar } from '../ui';
 import { useMoney } from '../CurrencyProvider';
+import { useTheme } from '../ThemeProvider';
 import ReceiptsPanel from './ReceiptsPanel';
 
 function pragueToday(offset = 0): string {
@@ -23,6 +24,15 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   onOpenView: (view: string) => void;
 }) {
   const money = useMoney();
+  // TO GO je nakreslené natvrdo ve světlých barvách (bg-[#F1F4EC], text-[#16181A]).
+  // Tmavý motiv ale přebarvuje text globálním pravidlem
+  // `:root[data-theme="dark"] .text-[#16181A] { color:#EDF2E4 }` — a pozadí,
+  // které svůj tmavý protějšek nemá, zůstalo světlé. Výsledek: světlý text na
+  // světlém panelu, prakticky nečitelná obrazovka. A protože se na telefonu
+  // TO GO spouští jako výchozí režim, potkal to každý, kdo má zapnutý tmavý
+  // motiv. Drží se tu tedy světlý motiv, stejně jako v Managero client.
+  const { setForcedLight } = useTheme();
+  useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
   const [pos, setPos] = useState<any | null>(null);
   const [closings, setClosings] = useState<any[]>([]);
   const [roster, setRoster] = useState<any[]>([]);

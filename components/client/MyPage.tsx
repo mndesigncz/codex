@@ -90,7 +90,7 @@ export default function MyPage() {
           </ul>
         ) : (
           <EmptyState icon="location" title="Zatím nejsi členem žádného podniku" hint="Vyber si podnik a přidej se. První body dostaneš hned."
-            action={<Link href="/client" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] text-[#16181A] px-5 py-3 text-sm font-semibold hover:brightness-105 transition">Vybrat podnik</Link>} />
+            action={<Link href="/client" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 transition">Vybrat podnik</Link>} />
         )}
       </section>
 

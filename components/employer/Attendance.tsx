@@ -337,7 +337,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             ))}
           </div>
           <button onClick={() => { setAddOpen(true); setAddErr(''); }}
-            className="rounded-full bg-[#C8F542] text-[#16181A] px-4 py-2 text-sm font-semibold hover:brightness-105 transition whitespace-nowrap">
+            className="rounded-full bg-[#C8F542] on-accent px-4 py-2 text-sm font-semibold hover:brightness-105 transition whitespace-nowrap">
             + Přidat záznam
           </button>
           {entries.length > 0 && (

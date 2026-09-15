@@ -157,7 +157,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
               tedy zpravidla někdo s tímhle tabletem v ruce. */}
           {stocktakeOpen && (
             <button onClick={() => setCounting(true)}
-              className="w-full rounded-2xl bg-[#C8F542] text-[#16181A] px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
+              className="w-full rounded-2xl bg-[#C8F542] on-accent px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
               <Icon name="clipboard" size={20} strokeWidth={2.2} /> Probíhá inventura — spočítat sklad
             </button>
           )}

@@ -540,7 +540,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   {opts.map(u => (
                     <button key={u.label} type="button" onClick={() => setIng(idx, { unit: u.label })}
                       className={`rounded-full px-3 py-2 text-xs font-bold transition active:scale-95 ${
-                        ing.unit === u.label ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/50'
+                        ing.unit === u.label ? 'bg-[#C8F542] on-accent' : 'glass text-black/50'
                       }`}>
                       {u.label}
                     </button>
@@ -567,7 +567,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                           setIng(idx, { amount: String(+(b / pick.toBase).toFixed(4)), unit: pick.label });
                         }}
                         className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition active:scale-95 ${
-                          active ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/55 hover:text-black'
+                          active ? 'bg-[#C8F542] on-accent' : 'glass text-black/55 hover:text-black'
                         }`}>
                         {pt.name}
                       </button>

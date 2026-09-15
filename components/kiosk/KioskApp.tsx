@@ -114,7 +114,7 @@ function KioskShell({ user }: { user: KioskUser }) {
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
             {t.id === 'orders' && newOrders > 0 && (
-              <span className={`ml-0.5 rounded-full px-2 min-w-[1.5rem] text-center text-xs font-bold tabular-nums ${tab === t.id ? 'bg-[#C8F542] text-[#16181A]' : 'bg-amber-500 text-white'}`}>{newOrders}</span>
+              <span className={`ml-0.5 rounded-full px-2 min-w-[1.5rem] text-center text-xs font-bold tabular-nums ${tab === t.id ? 'bg-[#C8F542] on-accent' : 'bg-amber-500 text-white'}`}>{newOrders}</span>
             )}
           </button>
         ))}
@@ -210,7 +210,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
       {onWriteStock && (
         <button onClick={onWriteStock}
           className="md:col-span-2 rounded-3xl bg-[#16181A] text-white p-5 flex items-center gap-4 text-left active:scale-[0.99] transition">
-          <span className="h-12 w-12 rounded-2xl bg-[#C8F542] text-[#16181A] flex items-center justify-center shrink-0">
+          <span className="h-12 w-12 rounded-2xl bg-[#C8F542] on-accent flex items-center justify-center shrink-0">
             <Icon name="plus" size={24} strokeWidth={2.2} />
           </span>
           <span className="min-w-0">
