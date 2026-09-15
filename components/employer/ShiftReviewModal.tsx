@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { normalizePoints } from '@/lib/rewardLevels';
 import { pragueToday } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -69,6 +70,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
     /** Opened from "ohodnotit celou směnu" — rate everyone who worked it. */
     initialWholeShift?: boolean;
     onClose: () => void; onSaved: () => void }) {
+  const m = useModal(true, onClose, 'Hodnocení směny');
   const money = useMoney();
   const [date, setDate] = useState(initialDate || todayStr());
   const [shiftDates, setShiftDates] = useState<string[]>([]);
@@ -244,7 +246,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 glass-strong chrome-edge">
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{employee.avatar || '👤'}</span>
           <div className="min-w-0 flex-1">

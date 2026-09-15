@@ -37,6 +37,7 @@ import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
 import { usePlan } from '../Pro';
 import { czDays } from '@/lib/plan';
+import { useModal } from '@/lib/useModal';
 
 const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
@@ -82,6 +83,7 @@ export default function EmployerLayout({ user }: Props) {
   // Odkaz z oznámení o nové rezervaci otevře rovnou správnou záložku Clientu.
   const [clientTab, setClientTab] = useState<string | undefined>();
   const [receiptsOpen, setReceiptsOpen] = useState(false);
+  const receiptsModal = useModal(receiptsOpen, () => setReceiptsOpen(false), 'Účtenky');
   useEffect(() => {
     // Odkaz na konkrétní obrazovku má přednost před kapesním režimem. Bez
     // toho notifikace „schvaluje se ti uzávěrka" otevřela na telefonu TO GO
@@ -358,7 +360,7 @@ export default function EmployerLayout({ user }: Props) {
 
       {receiptsOpen && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setReceiptsOpen(false)}>
-          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={receiptsModal.ref} {...receiptsModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-3">
               <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky

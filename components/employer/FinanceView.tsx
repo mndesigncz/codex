@@ -13,6 +13,7 @@ import ShrinkageReport from '../inventory/ShrinkageReport';
 import LiveRevenue from './LiveRevenue';
 import FinanceAdvice from './FinanceAdvice';
 import { PageHeader, Button } from '../ui';
+import { useModal } from '@/lib/useModal';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -50,6 +51,7 @@ export default function FinanceView() {
   const [q, setQ] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
+  const detailModal = useModal(!!detail, () => setDetail(null), 'Detail položky');
 
   const [pos, setPos] = useState<any | null>(null);
 
@@ -428,7 +430,7 @@ export default function FinanceView() {
       {/* Receipt detail */}
       {detail && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setDetail(null)}>
-          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-3 scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={detailModal.ref} {...detailModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-3 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> {detail.label}
@@ -468,6 +470,7 @@ function ExportDialog({ month, onClose, onExport }: {
   onExport: (o: { from: string; to: string; items: boolean; summary: boolean; guest: boolean; sep: string }) => Promise<void>;
 }) {
   const [from, setFrom] = useState(month);
+  const em = useModal(true, onClose, 'Export pro účetní');
   const [to, setTo] = useState(month);
   const [items, setItems] = useState(true);
   const [summary, setSummary] = useState(true);
@@ -479,7 +482,7 @@ function ExportDialog({ month, onClose, onExport }: {
   const lb = 'block text-xs font-semibold text-black/55 mb-1.5';
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg p-5 space-y-4" onClick={e => e.stopPropagation()}>
+      <div ref={em.ref} {...em.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg p-5 space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-bold tracking-tight">Export pro účetní</h3>
           <button onClick={onClose} aria-label="Zavřít" className="tap-target rounded-full w-9 h-9 grid place-items-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>

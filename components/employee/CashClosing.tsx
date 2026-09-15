@@ -12,6 +12,7 @@ import {
 } from '@/lib/closing';
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 const inputClass =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
@@ -289,6 +290,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [form, setForm] = useState<FormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const confirmModal = useModal(showConfirm, () => setShowConfirm(false), 'Odeslat uzávěrku');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [coworkers, setCoworkers] = useState<Coworker[]>([]);
@@ -1312,7 +1314,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           goes to management for approval. */}
       {showConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowConfirm(false)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={confirmModal.ref} {...confirmModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/15 text-2xl"><Icon name="warning" size={15} /></div>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-3">Nejsi na směně v tento den</h3>
             <p className="text-sm text-black/55 mt-1.5">

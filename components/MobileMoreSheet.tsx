@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Icon } from './Icons';
+import { useModal } from '@/lib/useModal';
 
 export interface MoreItem { id: string; label: string; icon: string }
 export interface MoreGroup { title?: string | null; items: MoreItem[] }
@@ -21,6 +22,7 @@ interface Props {
 // A premium bottom sheet for the mobile "Více" menu — large tap targets,
 // icon tiles, grouped into labelled categories, slides up over a dimmed scrim.
 export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, groups, activeId, onSelect, actions = [] }: Props) {
+  const m = useModal(open, onClose, title);
   // Lock body scroll while open.
   useEffect(() => {
     if (!open) return;
@@ -56,8 +58,8 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
       <div className="absolute inset-0 modal-overlay animate-[fade_0.2s_ease-out]" onClick={onClose} />
 
       <div
+        ref={m.ref} {...m.dialogProps}
         className="absolute inset-x-0 bottom-0 modal-sheet rounded-t-[24px] px-3.5 pt-2.5 pb-[max(env(safe-area-inset-bottom),16px)] shadow-[0_-14px_40px_rgba(15,20,25,0.2)] animate-[sheetUp_0.26s_cubic-bezier(0.16,1,0.3,1)]"
-        role="dialog" aria-modal="true"
       >
         {/* Grabber */}
         <div className="mx-auto mb-2 h-1.5 w-9 rounded-full bg-black/15" />

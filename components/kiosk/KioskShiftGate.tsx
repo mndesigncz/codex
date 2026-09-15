@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { Icon } from '../Icons';
 import { Avatar, EmptyState } from '../ui';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 export interface RosterMember {
   id: number;
@@ -412,6 +413,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   onClose: () => void;
   onDone: (action: 'in' | 'out', member: RosterMember, flashMsg?: string) => void;
 }) {
+  const m = useModal(true, onClose, 'Příchod a odchod');
   const on = !!member.openSince;
   const needPin = member.hasPin && !on; // PIN only required to clock in
   const [pin, setPin] = useState('');
@@ -442,7 +444,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <Avatar emoji={member.avatar} size="xl" ring={false} />
         <h2 className="text-xl font-bold tracking-tight text-[#16181A] mt-2">{member.name}</h2>
         <p className="text-sm text-black/50 mt-1">

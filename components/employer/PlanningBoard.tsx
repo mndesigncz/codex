@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 
 import { EmptyState, Button, PageHeader } from '../ui';
+import { useModal } from '@/lib/useModal';
 interface PlanningCard {
   id: number;
   title: string;
@@ -25,6 +26,7 @@ export default function PlanningBoard() {
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
   // Inline edit of an existing card — a typo shouldn't mean delete + retype.
   const [editCard, setEditCard] = useState<{ id: number; title: string; description: string } | null>(null);
+  const cardModal = useModal(!!editCard, () => setEditCard(null), 'Upravit kartu');
   const [savingEdit, setSavingEdit] = useState(false);
   const saveEdit = async () => {
     if (!editCard || !editCard.title.trim()) return;
@@ -288,7 +290,7 @@ export default function PlanningBoard() {
       )}
       {editCard && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditCard(null)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+          <div ref={cardModal.ref} {...cardModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Upravit kartu</h3>
             <div className="space-y-3">
               <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
