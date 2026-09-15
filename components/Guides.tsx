@@ -813,6 +813,7 @@ function GuideEditor({
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
             <select
+              aria-label="Kategorie"
               value={categoryId ?? ''}
               onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
               className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all appearance-none"

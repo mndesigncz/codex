@@ -60,11 +60,11 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
     <div className="glass-card p-4 sm:p-5">
       {/* Header + month nav */}
       <div className="flex items-center justify-between gap-2 mb-4">
-        <button onClick={() => step(-1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
+        <button onClick={() => step(-1)} aria-label="Předchozí měsíc" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
         <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence">{MONTHS[m - 1]} {y}</h3>
-        <button onClick={() => step(1)} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
+        <button onClick={() => step(1)} aria-label="Další měsíc" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
           <Icon name="chevron" size={16} className="-rotate-90" />
         </button>
       </div>
