@@ -28,7 +28,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
   const [err, setErr] = useState('');
   const [showPast, setShowPast] = useState(false);
 
-  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [menuSections, setMenuSections] = useState<any[]>([]);
   const load = async () => {
     try {
       const [ed, td, iv, mb] = await Promise.all([
@@ -40,8 +40,11 @@ export default function EventsView({ user }: { user: { id?: string } }) {
       setEvents(Array.isArray(ed.events) ? ed.events : []);
       setMembers((td.members ?? []).filter((m: any) => m.role !== 'kiosk'));
       setItems(Array.isArray(iv) ? iv.filter((i: any) => i.archived !== true && i.approved !== false) : []);
-      // Nabídka podniku jako našeptávač pro menu akce — jméno i cena.
-      setMenuItems(Array.isArray(mb?.sections) ? mb.sections.flatMap((sec: any) => sec.items ?? []) : []);
+      // Nabídka podniku po sekcích (přes všechny tabule) — menu akce se z ní jen odkazuje.
+      setMenuSections(Array.isArray(mb?.boards)
+        ? mb.boards.flatMap((bd: any) => (bd.sections ?? []).map((sec: any) => ({ ...sec, id: `${bd.id}-${sec.id}` })))
+            .filter((sec: any) => (sec.items ?? []).length > 0)
+        : []);
       if (ed.notMigrated) setErr('Akce budou dostupné po migraci (/api/init).');
     } catch { setErr('Akce se nepodařilo načíst.'); }
     setLoading(false);
@@ -160,7 +163,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         <EventEditor onClose={() => setCreating(false)} onSaved={async (ev) => { setCreating(false); await load(); setDetail(ev); }} />
       )}
       {detail && (
-        <EventDetail event={detail} members={members} items={items} menuItems={menuItems} money={money} patch={patch}
+        <EventDetail event={detail} members={members} items={items} menuSections={menuSections} money={money} patch={patch}
           onClose={() => setDetail(null)}
           onDeleted={async () => { setDetail(null); await load(); }} />
       )}
@@ -245,27 +248,55 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
   );
 }
 
-// ---- Detail sheet: crew, checklist, packing, publicity, money ----
-function EventDetail({ event: e, members, items, menuItems, money, patch, onClose, onDeleted }: {
-  event: any; members: any[]; items: any[]; menuItems: any[]; money: (n: number) => string;
+// ---- Detail akce: Kdy a kde · Lidé · Pro hosty · Přípravy · Peníze ----
+// Jedna vizuální řeč: kreslené ikony jen na tlačítkách, nadpisy sekcí bez
+// ozdob, obsah pro hosty pohromadě v jedné kartě. Menu akce se neopisuje —
+// odkazuje se z nabídky podniku a ceny se dočítají odtamtud.
+
+function Sec({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-black/45">{title}</p>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EventDetail({ event: e, members, items, menuSections, money, patch, onClose, onDeleted }: {
+  event: any; members: any[]; items: any[]; menuSections: any[]; money: (n: number) => string;
   patch: (id: number, body: any) => Promise<boolean>;
   onClose: () => void; onDeleted: () => void;
 }) {
   const dm = useModal(true, onClose, 'Detail akce');
   const [checkTxt, setCheckTxt] = useState('');
   const [packSearch, setPackSearch] = useState('');
-  const [dishName, setDishName] = useState('');
-  const [dishPrice, setDishPrice] = useState('');
+  const [menuPickOpen, setMenuPickOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [announcing, setAnnouncing] = useState(false);
+  // Základ a peníze se editují v místě — ukládá se při opuštění pole.
+  const [base, setBase] = useState({ date: e.date ?? '', start: e.startTime ?? '', end: e.endTime ?? '', location: e.location ?? '', capacity: e.capacity != null ? String(e.capacity) : '' });
+  const [desc, setDesc] = useState(e.description ?? '');
   const [revenue, setRevenue] = useState(e.revenue != null ? String(e.revenue) : '');
   const [costs, setCosts] = useState(e.costs != null ? String(e.costs) : '');
   const k = kindSpec(e.kind);
-  const result = e.revenue != null || e.costs != null ? (e.revenue ?? 0) - (e.costs ?? 0) : null;
+
+  // Tržbu akce s uzávěrkami nese uzávěrka; ruční pole je jen pro akce bez ní.
+  const shownRevenue = e.closingsCount > 0 ? e.closingsTotal : (e.revenue ?? null);
+  const result = shownRevenue != null || e.costs != null ? (shownRevenue ?? 0) - (e.costs ?? 0) : null;
 
   const toggleCrew = (id: number) => {
     const next = e.crew.includes(id) ? e.crew.filter((x: number) => x !== id) : [...e.crew, id];
     patch(e.id, { crew: next });
+  };
+  const menuHas = (itemId: number) => (e.menu ?? []).some((l: any) => l.itemId === itemId);
+  const toggleMenuItem = (itemId: number) => {
+    const next = menuHas(itemId)
+      ? (e.menu ?? []).filter((l: any) => l.itemId !== itemId)
+      : [...(e.menu ?? []), { itemId }];
+    patch(e.id, { menu: next });
   };
 
   const packCandidates = packSearch.trim()
@@ -276,19 +307,20 @@ function EventDetail({ event: e, members, items, menuItems, money, patch, onClos
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev2 => ev2.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3 mb-1">
+        {/* hlavička */}
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-xl font-bold tracking-tight text-[#16181A]"><Icon name={k.icon} size={20} className="inline -mt-1 mr-2 text-[#0A6FE0]" />{e.title}</h3>
             <p className="text-sm text-black/50 cz-sentence mt-0.5">
-              {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {e.offsite ? 'Výjezd ven' : 'U nás v podniku'}
+              {' · '}{new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
               {e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
-              {e.location ? ` · ${e.location}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="tap-target-sm shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
-        {/* status + publicity row */}
+        {/* stav + oznámení týmu */}
         <div className="flex flex-wrap items-center gap-1.5 mt-3">
           {EVENT_STATUSES.map(st => (
             <button key={st.id} onClick={() => patch(e.id, { status: st.id })}
@@ -299,44 +331,42 @@ function EventDetail({ event: e, members, items, menuItems, money, patch, onClos
             </button>
           ))}
           <span className="flex-1" />
-          <button onClick={() => patch(e.id, { public: !e.public })}
-            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-              e.public ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'glass text-black/50 hover:text-black'
-            }`}
-            title="Veřejná akce se ukáže zákazníkům na sdílené stránce">
-            {e.public ? 'Veřejná' : 'Zveřejnit zákazníkům'}
-          </button>
           <button onClick={() => patch(e.id, { publishToTeam: true }).then(ok => ok && alert('Tým dostal notifikaci o akci. ✓'))}
             className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
-            📣 Oznámit týmu
+            <Icon name="bell" size={13} className="inline -mt-0.5 mr-1.5" />Oznámit týmu
           </button>
-          {e.public && (
-            <button disabled={announcing}
-              onClick={async () => {
-                if (!confirm('Rozeslat akci všem členům podniku? Přijde jim push a objeví se v novinkách na stránce podniku.')) return;
-                setAnnouncing(true);
-                const ok = await patch(e.id, { announceMembers: true });
-                setAnnouncing(false);
-                if (ok) alert('Členové dostali pozvánku. ✓');
-              }}
-              className="tap-target-sm rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold hover:bg-[#C8F542]/30 transition disabled:opacity-50">
-              {announcing ? 'Rozesílám…' : '📣 Rozeslat členům'}
-            </button>
-          )}
         </div>
-        {e.public && (e.followers > 0 || e.going > 0) && (
-          <p className="mt-2 text-xs text-black/50">
-            <Icon name="bell" size={13} className="inline -mt-0.5 mr-1" />{e.followers} {e.followers === 1 ? 'host sleduje' : e.followers < 5 ? 'hosté sledují' : 'hostů sleduje'}
-            {e.going > 0 && <> · ✋ {e.going} {e.going === 1 ? 'přijde' : e.going < 5 ? 'přijdou' : 'přijde'}{e.capacity ? ` z ${e.capacity} míst` : ''}</>}
-          </p>
-        )}
 
-        {/* obsluha akce: u nás začíná tím, kdo ten den stejně je na směně */}
+        {/* kdy a kde — edituje se rovnou tady, uloží se při opuštění pole */}
+        <Sec title="Kdy a kde">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <input type="date" aria-label="Datum akce" value={base.date}
+              onChange={ev3 => setBase(b => ({ ...b, date: ev3.target.value }))}
+              onBlur={() => { if (base.date && base.date !== e.date) patch(e.id, { date: base.date }); }}
+              className={`${inputClass} col-span-2 sm:col-span-1`} />
+            <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-2">
+              <input type="time" aria-label="Začátek" value={base.start}
+                onChange={ev3 => setBase(b => ({ ...b, start: ev3.target.value }))}
+                onBlur={() => { if (base.start !== (e.startTime ?? '')) patch(e.id, { startTime: base.start }); }}
+                className={inputClass} />
+              <input type="time" aria-label="Konec" value={base.end}
+                onChange={ev3 => setBase(b => ({ ...b, end: ev3.target.value }))}
+                onBlur={() => { if (base.end !== (e.endTime ?? '')) patch(e.id, { endTime: base.end }); }}
+                className={inputClass} />
+            </div>
+            <input aria-label="Místo" placeholder={e.offsite ? 'Kam se jede — místo a adresa' : 'Místo v podniku'} value={base.location} maxLength={300}
+              onChange={ev3 => setBase(b => ({ ...b, location: ev3.target.value }))}
+              onBlur={() => { if (base.location !== (e.location ?? '')) patch(e.id, { location: base.location }); }}
+              className={`${inputClass} col-span-2`} />
+          </div>
+          {e.public && <p className="text-[11px] text-black/40 mt-1.5">Změnu termínu veřejné akce pošleme hostům, kteří ji sledují.</p>}
+        </Sec>
+
+        {/* lidé */}
         {!e.offsite && (
-          <div className="mt-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Ze směny ten den ({(e.onShift ?? []).length})</p>
+          <Sec title={`Ze směny ten den (${(e.onShift ?? []).length})`}>
             {(e.onShift ?? []).length === 0 ? (
-              <p className="text-sm text-black/45">Na {new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })} zatím v rozvrhu nikdo není — obsluhu přidej níž, nebo naplánuj směny v Rozvrhu.</p>
+              <p className="text-sm text-black/45">V rozvrhu na ten den zatím nikdo není — obsluhu přidej níž, nebo naplánuj směny v Rozvrhu.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {(e.onShift ?? []).map((m2: any) => (
@@ -346,13 +376,9 @@ function EventDetail({ event: e, members, items, menuItems, money, patch, onClos
                 ))}
               </div>
             )}
-          </div>
+          </Sec>
         )}
-        {/* crew */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">
-            {e.offsite ? `Směna k akci (${e.crew.length}) — vytvoří směnu jen na tenhle výjezd` : `Navíc na akci (${e.crew.length}) — vytvoří směnu v rozvrhu`}
-          </p>
+        <Sec title={e.offsite ? `Směna k akci (${e.crew.length}) — jen na tenhle výjezd` : `Navíc na akci (${e.crew.length}) — vytvoří směnu v rozvrhu`}>
           <div className="flex flex-wrap gap-1.5">
             {members.map(m => {
               const on = e.crew.includes(m.id);
@@ -366,83 +392,138 @@ function EventDetail({ event: e, members, items, menuItems, money, patch, onClos
               );
             })}
           </div>
-        </div>
+        </Sec>
 
-        {/* fotky akce — hosté je uvidí na stránce podniku */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-black/45">Fotky ({(e.photos ?? []).length}/8)</p>
-            <label className={`tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-black transition cursor-pointer ${uploading || (e.photos ?? []).length >= 8 ? 'opacity-50 pointer-events-none' : ''}`}>
-              <Icon name="camera" size={15} className="inline -mt-0.5 mr-1.5" />{uploading ? 'Nahrávám…' : 'Přidat fotku'}
-              <input type="file" accept="image/*" className="sr-only" onChange={async ev3 => {
-                const f = ev3.target.files?.[0]; ev3.target.value = '';
-                if (!f) return;
-                setUploading(true);
-                const fd = new FormData(); fd.append('file', f);
-                const r = await fetch('/api/upload', { method: 'POST', body: fd }).catch(() => null);
-                const d = r?.ok ? await r.json().catch(() => null) : null;
-                setUploading(false);
-                const upId = d?.url ? parseInt(String(d.url).split('/').pop()!) : NaN;
-                if (!Number.isFinite(upId)) { alert('Fotku se nepodařilo nahrát.'); return; }
-                await patch(e.id, { photos: [...(e.photos ?? []), `/api/client/img/${upId}`] });
-              }} />
-            </label>
-          </div>
-          {(e.photos ?? []).length === 0 ? (
-            <p className="text-sm text-black/40">Zatím žádná fotka. První nahraná je i náhledovka pro hosty.</p>
-          ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-              {(e.photos ?? []).map((url: string, i: number) => (
-                <div key={url} className="relative group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`Fotka akce ${i + 1}`} className="aspect-square w-full rounded-2xl object-cover border border-black/[0.06]" />
-                  <button type="button" aria-label={`Odebrat fotku ${i + 1}`}
-                    onClick={() => patch(e.id, { photos: (e.photos ?? []).filter((_: string, j: number) => j !== i) })}
-                    className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-[#16181A] text-white grid place-items-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"><Icon name="close" size={11} /></button>
-                </div>
-              ))}
+        {/* pro hosty — všechno, co uvidí zákazník, v jedné kartě */}
+        <Sec title="Pro hosty">
+          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => patch(e.id, { public: !e.public })} aria-pressed={e.public}
+                className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-bold transition ${
+                  e.public ? 'bg-[#C8F542] on-accent' : 'bg-white/70 border border-black/10 text-black/55 hover:text-black'
+                }`}>
+                {e.public ? 'Veřejná — hosté ji vidí' : 'Zveřejnit hostům'}
+              </button>
+              {e.public && (
+                <button disabled={announcing}
+                  onClick={async () => {
+                    if (!confirm('Rozeslat akci všem členům podniku? Přijde jim push a objeví se v novinkách na stránce podniku.')) return;
+                    setAnnouncing(true);
+                    const ok = await patch(e.id, { announceMembers: true });
+                    setAnnouncing(false);
+                    if (ok) alert('Členové dostali pozvánku. ✓');
+                  }}
+                  className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
+                  <Icon name="send" size={13} className="inline -mt-0.5 mr-1.5" />{announcing ? 'Rozesílám…' : 'Rozeslat členům'}
+                </button>
+              )}
+              {e.public && (e.followers > 0 || e.going > 0) && (
+                <span className="text-xs text-black/50 ml-auto">sleduje {e.followers} · přijde {e.going}{e.capacity ? ` z ${e.capacity}` : ''}</span>
+              )}
             </div>
-          )}
-        </div>
+            {e.public && (
+              <p className="text-[11px] text-black/40 -mt-2">Na stránce podniku uvidí detail s fotkami a menu, přidají si akci do kalendáře a den předem jim přijde připomínka.</p>
+            )}
 
-        {/* menu akce — co se tam bude podávat; hosté ho uvidí v detailu */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Menu akce ({(e.menu ?? []).length})</p>
-          {(e.menu ?? []).length > 0 && (
-            <ul className="space-y-1.5 mb-2">
-              {(e.menu ?? []).map((l: any, i: number) => (
-                <li key={i} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name}</span>
-                  {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
-                  <button type="button" aria-label={`Odebrat ${l.name} z menu akce`}
-                    onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })}
-                    className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex gap-2">
-            <input value={dishName} list="event-menu-dl" placeholder="Položka — vyber z nabídky, nebo napiš vlastní…" maxLength={120}
-              onChange={ev3 => {
-                setDishName(ev3.target.value);
-                const hit = menuItems.find((mi: any) => mi.name === ev3.target.value);
-                if (hit && hit.price != null) setDishPrice(String(hit.price));
-              }}
-              onKeyDown={ev3 => { if (ev3.key === 'Enter' && dishName.trim()) { patch(e.id, { menu: [...(e.menu ?? []), { name: dishName.trim(), price: dishPrice === '' ? null : Number(dishPrice) }] }); setDishName(''); setDishPrice(''); } }}
-              className={inputClass} />
-            <datalist id="event-menu-dl">
-              {menuItems.map((mi: any) => <option key={mi.id} value={mi.name} />)}
-            </datalist>
-            <input value={dishPrice} onChange={ev3 => setDishPrice(ev3.target.value)} type="number" inputMode="numeric" placeholder="Kč" aria-label="Cena položky"
-              className={`${inputClass} !w-24 text-center`} />
-            <button onClick={() => { if (dishName.trim()) { patch(e.id, { menu: [...(e.menu ?? []), { name: dishName.trim(), price: dishPrice === '' ? null : Number(dishPrice) }] }); setDishName(''); setDishPrice(''); } }}
-              className="shrink-0 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-4 text-sm hover:bg-black/[0.08] transition">+</button>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-black/40 mb-1">Popis</p>
+              <textarea value={desc} rows={3} maxLength={2000} placeholder="Co hosty čeká — program, vstupné, na co se těšit…"
+                onChange={ev3 => setDesc(ev3.target.value)}
+                onBlur={() => { if (desc !== (e.description ?? '')) patch(e.id, { description: desc }); }}
+                className={`${inputClass} resize-y`} />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[11px] uppercase tracking-wider text-black/40">Fotky ({(e.photos ?? []).length}/8)</p>
+                <label className={`tap-target-sm rounded-full bg-white/70 border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-black transition cursor-pointer ${uploading || (e.photos ?? []).length >= 8 ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <Icon name="camera" size={13} className="inline -mt-0.5 mr-1.5" />{uploading ? 'Nahrávám…' : 'Přidat'}
+                  <input type="file" accept="image/*" className="sr-only" onChange={async ev3 => {
+                    const f = ev3.target.files?.[0]; ev3.target.value = '';
+                    if (!f) return;
+                    setUploading(true);
+                    const fd = new FormData(); fd.append('file', f);
+                    const r = await fetch('/api/upload', { method: 'POST', body: fd }).catch(() => null);
+                    const d = r?.ok ? await r.json().catch(() => null) : null;
+                    setUploading(false);
+                    const upId = d?.url ? parseInt(String(d.url).split('/').pop()!) : NaN;
+                    if (!Number.isFinite(upId)) { alert('Fotku se nepodařilo nahrát.'); return; }
+                    await patch(e.id, { photos: [...(e.photos ?? []), `/api/client/img/${upId}`] });
+                  }} />
+                </label>
+              </div>
+              {(e.photos ?? []).length === 0 ? (
+                <p className="text-sm text-black/40">První nahraná fotka je náhledovka akce.</p>
+              ) : (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {(e.photos ?? []).map((url: string, i: number) => (
+                    <div key={url} className="relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Fotka akce ${i + 1}`} className="aspect-square w-full rounded-2xl object-cover border border-black/[0.06]" />
+                      <button type="button" aria-label={`Odebrat fotku ${i + 1}`}
+                        onClick={() => patch(e.id, { photos: (e.photos ?? []).filter((_: string, j: number) => j !== i) })}
+                        className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-[#16181A] text-white grid place-items-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"><Icon name="close" size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[11px] uppercase tracking-wider text-black/40">Menu akce ({(e.menu ?? []).length}) — z nabídky podniku</p>
+                <button type="button" onClick={() => setMenuPickOpen(o => !o)} aria-expanded={menuPickOpen}
+                  className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-black transition">
+                  <Icon name="leaf" size={13} className="inline -mt-0.5 mr-1.5" />{menuPickOpen ? 'Hotovo' : 'Vybrat z nabídky'}
+                </button>
+              </div>
+              {(e.menu ?? []).length > 0 && (
+                <ul className="space-y-1.5">
+                  {(e.menu ?? []).map((l: any, i: number) => (
+                    <li key={`${l.itemId ?? 'x'}-${i}`} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
+                      <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name}</span>
+                      {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
+                      <button type="button" aria-label={`Vyřadit ${l.name} z menu akce`}
+                        onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })}
+                        className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {menuPickOpen && (
+                <div className="mt-2 rounded-2xl bg-white/70 border border-black/[0.08] p-3 max-h-64 overflow-y-auto scrollbar-thin space-y-3">
+                  {menuSections.length === 0 ? (
+                    <p className="text-sm text-black/45">Nabídka je prázdná — nejdřív ji naplň v sekci Menu.</p>
+                  ) : menuSections.map((sec: any) => (
+                    <div key={sec.id}>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">{sec.title}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(sec.items ?? []).map((mi: any) => {
+                          const on = menuHas(mi.id);
+                          return (
+                            <button key={mi.id} type="button" onClick={() => toggleMenuItem(mi.id)} aria-pressed={on}
+                              className={`rounded-full px-3 py-1.5 text-xs transition ${
+                                on ? 'bg-[#C8F542]/25 text-[#3E5406] border border-[#C8F542]/45 font-semibold' : 'bg-black/[0.04] text-black/55 hover:text-black border border-transparent'
+                              }`}>
+                              {mi.name}{mi.price != null ? ` · ${mi.price}` : ''}{on ? <Icon name="check" size={11} className="inline ml-1 -mt-0.5" /> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <a href="/employer/overview?mode=client&tab=menu" className="inline-block text-xs font-semibold text-[#0A6FE0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
+                </div>
+              )}
+              {!menuPickOpen && (e.menu ?? []).length === 0 && (
+                <p className="text-sm text-black/40">Vyber, co se na akci bude podávat — ceny se berou z nabídky a drží s ní krok.</p>
+              )}
+            </div>
           </div>
-        </div>
+        </Sec>
 
-        {/* checklist */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Přípravy</p>
+        {/* přípravy */}
+        <Sec title="Přípravy">
           <div className="space-y-1.5">
             {e.checklist.map((c: any, i: number) => (
               <div key={i}
@@ -468,107 +549,101 @@ function EventDetail({ event: e, members, items, menuItems, money, patch, onClos
             <button onClick={() => { if (checkTxt.trim()) { patch(e.id, { checklist: [...e.checklist, { text: checkTxt.trim(), done: false }] }); setCheckTxt(''); } }}
               className="shrink-0 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-4 text-sm hover:bg-black/[0.08] transition">+</button>
           </div>
-        </div>
 
-        {/* packing — offsite only */}
-        {e.offsite && (
-          <div className="mt-5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-black/45">⛺ Balicí seznam (ze skladu)</p>
-              <div className="flex gap-1.5">
-                {e.packing.some((p: any) => p.itemId && !p.packed) && (
-                  <button onClick={() => { if (confirm('Vyskladnit vše nesbalené? Množství se odečte ze skladu (s poznámkou u položek).')) patch(e.id, { packAction: 'checkout' }); }}
-                    className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
-                    <Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Vyskladnit
-                  </button>
-                )}
-                {e.packing.some((p: any) => p.itemId && p.packed && p.returned == null) && (
-                  <button onClick={() => { if (confirm('Vrátit sbalené položky zpět do skladu? (Vrací se plné množství — spotřebu pak uprav ve skladu.)')) patch(e.id, { packAction: 'return' }); }}
-                    className="tap-target-sm rounded-full bg-[#C8F542] text-black px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">
-                    ↩️ Vrátit do skladu
-                  </button>
+          {e.offsite && (
+            <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45"><Icon name="tent" size={13} className="inline -mt-0.5 mr-1.5" />Balicí seznam (ze skladu)</p>
+                <div className="flex gap-1.5">
+                  {e.packing.some((p: any) => p.itemId && !p.packed) && (
+                    <button onClick={() => { if (confirm('Vyskladnit vše nesbalené? Množství se odečte ze skladu (s poznámkou u položek).')) patch(e.id, { packAction: 'checkout' }); }}
+                      className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
+                      <Icon name="box" size={13} className="inline -mt-0.5 mr-1.5 shrink-0" />Vyskladnit
+                    </button>
+                  )}
+                  {e.packing.some((p: any) => p.itemId && p.packed && p.returned == null) && (
+                    <button onClick={() => { if (confirm('Vrátit sbalené položky zpět do skladu? (Vrací se plné množství — spotřebu pak uprav ve skladu.)')) patch(e.id, { packAction: 'return' }); }}
+                      className="tap-target-sm rounded-full bg-[#C8F542] on-accent px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">
+                      <Icon name="swap" size={13} className="inline -mt-0.5 mr-1.5 shrink-0" />Vrátit do skladu
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {e.packing.map((p2: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-[#16181A]">{p2.name}</span>
+                    <span className="shrink-0 text-xs text-black/45 tabular-nums">{p2.qty}×</span>
+                    <span className="shrink-0 text-xs">
+                      {p2.returned != null ? <span className="text-[#5B7A08]">vráceno {p2.returned} ✓</span>
+                       : p2.packed ? <span className="text-amber-700">vyskladněno</span>
+                       : <span className="text-black/35">čeká</span>}
+                    </span>
+                    {!p2.packed && (
+                      <button aria-label={`Odebrat ${p2.name} z balení`} onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
+                        className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="relative mt-2">
+                <input value={packSearch} onChange={ev3 => setPackSearch(ev3.target.value)} placeholder="Přidat ze skladu — začni psát název…" className={inputClass} />
+                {packCandidates.length > 0 && (
+                  <div className="absolute inset-x-0 top-full mt-1 z-10 glass-strong rounded-2xl p-1.5 space-y-0.5 shadow-lg">
+                    {packCandidates.map(i2 => (
+                      <button key={i2.id}
+                        onClick={() => {
+                          const qty = parseInt(prompt(`Kolik kusů „${i2.name}" vzít? (skladem ${i2.quantity} ${i2.unit})`, '1') ?? '');
+                          if (!Number.isFinite(qty) || qty <= 0) return;
+                          patch(e.id, { packing: [...e.packing, { itemId: i2.id, name: i2.name, qty, packed: false, returned: null }] });
+                          setPackSearch('');
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors flex justify-between gap-2">
+                        <span className="min-w-0 truncate">{i2.name}</span>
+                        <span className="shrink-0 text-xs text-black/40">{i2.quantity} {i2.unit}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
-            <div className="space-y-1.5">
-              {e.packing.map((p2: any, i: number) => (
-                <div key={i} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-[#16181A]">{p2.name}</span>
-                  <span className="shrink-0 text-xs text-black/45 tabular-nums">{p2.qty}×</span>
-                  <span className="shrink-0 text-xs">
-                    {p2.returned != null ? <span className="text-[#5B7A08]">vráceno {p2.returned} ✓</span>
-                     : p2.packed ? <span className="text-amber-700">vyskladněno</span>
-                     : <span className="text-black/35">čeká</span>}
-                  </span>
-                  {!p2.packed && (
-                    <button aria-label="Zavřít" onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
-                      className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="relative mt-2">
-              <input value={packSearch} onChange={ev3 => setPackSearch(ev3.target.value)} placeholder="Přidat ze skladu — začni psát název…" className={inputClass} />
-              {packCandidates.length > 0 && (
-                <div className="absolute inset-x-0 top-full mt-1 z-10 glass-strong rounded-2xl p-1.5 space-y-0.5 shadow-lg">
-                  {packCandidates.map(i2 => (
-                    <button key={i2.id}
-                      onClick={() => {
-                        const qty = parseInt(prompt(`Kolik kusů „${i2.name}" vzít? (skladem ${i2.quantity} ${i2.unit})`, '1') ?? '');
-                        if (!Number.isFinite(qty) || qty <= 0) return;
-                        patch(e.id, { packing: [...e.packing, { itemId: i2.id, name: i2.name, qty, packed: false, returned: null }] });
-                        setPackSearch('');
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors flex justify-between gap-2">
-                      <span className="min-w-0 truncate">{i2.name}</span>
-                      <span className="shrink-0 text-xs text-black/40">{i2.quantity} {i2.unit}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          )}
+        </Sec>
 
-        {/* money */}
-        <div className="mt-5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Vyúčtování akce</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Tržba z akce</label>
-              <input type="number" inputMode="numeric" value={revenue} onChange={ev3 => setRevenue(ev3.target.value)}
-                onBlur={() => patch(e.id, { revenue: revenue === '' ? null : Number(revenue) })} placeholder="0" className={inputClass} />
-            </div>
-            <div>
+        {/* peníze — tržbu nese uzávěrka za akci; ručně jen když žádná není */}
+        <Sec title="Peníze">
+          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+            {e.closingsCount > 0 ? (
+              <div className="flex items-center justify-between gap-2 flex-wrap rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2.5">
+                <p className="text-sm text-black/60"><Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5" />Tržba z {e.closingsCount === 1 ? 'uzávěrky za akci' : `${e.closingsCount} uzávěrek za akci`}</p>
+                <p className="text-sm font-bold tabular-nums text-[#16181A]">{money(e.closingsTotal)}</p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Tržba z akce</label>
+                <input type="number" inputMode="numeric" value={revenue} onChange={ev3 => setRevenue(ev3.target.value)}
+                  onBlur={() => patch(e.id, { revenue: revenue === '' ? null : Number(revenue) })} placeholder="0" className={inputClass} />
+                <p className="text-[11px] text-black/40 mt-1.5">
+                  {e.offsite
+                    ? 'Nebo na místě udělejte Uzávěrku → „Za akci" — pozná, že ten den akce je, a tržba se sem propíše sama.'
+                    : 'Když obsluha udělá uzávěrku „Za akci", tržba se sem propíše sama.'}
+                </p>
+              </div>
+            )}
+            <div className="mt-2.5">
               <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Náklady</label>
               <input type="number" inputMode="numeric" value={costs} onChange={ev3 => setCosts(ev3.target.value)}
                 onBlur={() => patch(e.id, { costs: costs === '' ? null : Number(costs) })} placeholder="0" className={inputClass} />
             </div>
-          </div>
-          {result != null && (
-            <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
-              Výsledek: {result >= 0 ? '+' : ''}{money(result)}
-            </p>
-          )}
-          {e.closingsCount > 0 && (
-            <div className="mt-2.5 flex items-center justify-between gap-2 flex-wrap rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2">
-              <p className="text-sm text-black/60"><Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5" />
-                {e.closingsCount === 1 ? 'Uzávěrka za akci' : `Uzávěrky za akci: ${e.closingsCount}`} · <span className="font-semibold tabular-nums text-[#16181A]">{money(e.closingsTotal)}</span>
+            {result != null && (
+              <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+                Výsledek: {result >= 0 ? '+' : ''}{money(result)}
               </p>
-              {e.closingsTotal !== (e.revenue ?? 0) && (
-                <button onClick={() => patch(e.id, { adoptRevenue: true })}
-                  className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
-                  Převzít do tržby
-                </button>
-              )}
-            </div>
-          )}
-          {e.offsite && e.closingsCount === 0 && (
-            <p className="mt-2.5 text-xs text-black/45">Na místě uděláte uzávěrku za akci: Uzávěrka → „Uzávěrka za akci?" — tržba se pak dá převzít sem jedním klikem.</p>
-          )}
-        </div>
+            )}
+          </div>
+        </Sec>
 
-        <div className="mt-5 flex justify-between gap-2">
+        <div className="mt-6 flex justify-between gap-2">
           <button onClick={async () => {
             if (!confirm(`Smazat akci „${e.title}"? Odeberou se i směny z akce.`)) return;
             const res = await fetch(`/api/events/${e.id}`, { method: 'DELETE' }).catch(() => null);

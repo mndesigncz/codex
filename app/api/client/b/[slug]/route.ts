@@ -87,6 +87,14 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
       WHERE team_id = ${teamId} AND public = TRUE AND status <> 'cancelled' AND date >= ${today}
       ORDER BY date, start_time NULLS LAST LIMIT 8` as any[];
     const ids = rows.map((r: any) => Number(r.id));
+    // Menu akce jsou odkazy do nabídky — host má vidět aktuální jména a ceny.
+    const menuIds = Array.from(new Set(rows.flatMap((r: any) => (Array.isArray(r.menu) ? r.menu : [])
+      .map((l: any) => Number(l?.itemId)).filter((n: number) => Number.isFinite(n) && n > 0))));
+    let menuRows: any[] = [];
+    if (menuIds.length) {
+      try { menuRows = await sql`SELECT id, name, price FROM menu_items WHERE id = ANY(${menuIds})` as any[]; } catch { menuRows = []; }
+    }
+    const menuById = new Map(menuRows.map((r: any) => [Number(r.id), { name: String(r.name), price: r.price == null ? null : Number(r.price) }]));
     // Kolik lidí jde a co sleduju já — dvě skupinové otázky, ne po akci.
     let counts: any[] = []; let mine: any[] = [];
     if (ids.length) {
@@ -104,7 +112,16 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
       date: r.date, start_time: r.start_time, end_time: r.end_time,
       location: r.location, offsite: r.offsite === true, capacity: r.capacity,
       photos: Array.isArray(r.photos) ? r.photos.filter((x: any) => /^\/api\/client\/img\/\d+$/.test(String(x))).slice(0, 8) : [],
-      menu: Array.isArray(r.menu) ? r.menu.slice(0, 30) : [],
+      menu: (Array.isArray(r.menu) ? r.menu.slice(0, 30) : [])
+        .map((l: any) => {
+          const itemId = Number(l?.itemId);
+          if (Number.isFinite(itemId) && itemId > 0) {
+            const hit = menuById.get(itemId);
+            return hit ? { name: hit.name, price: hit.price } : null;
+          }
+          return l?.name ? { name: String(l.name).slice(0, 120), price: l.price ?? null } : null;
+        })
+        .filter((l: any) => l != null),
       going: goingBy.get(Number(r.id)) ?? 0,
       myFollow: myBy.has(Number(r.id)),
       myGoing: myBy.get(Number(r.id))?.going === true,

@@ -187,17 +187,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await sql`UPDATE events SET photos = ${JSON.stringify(photos)}::jsonb WHERE id = ${id}`;
   }
   if (b.menu !== undefined) {
-    await sql`UPDATE events SET menu = ${JSON.stringify(normalizeEventMenu(b.menu))}::jsonb WHERE id = ${id}`;
-  }
-
-  // ---- vyúčtování: převzít tržbu z uzávěrek k akci ----
-  if (b.adoptRevenue === true) {
-    const [sum] = await sql`
-      SELECT COALESCE(SUM(cash_revenue + card_revenue), 0)::int AS total, COUNT(*)::int AS n
-      FROM cash_closings WHERE team_id = ${u.team_id} AND event_id = ${id}`;
-    if (Number(sum?.n) > 0) {
-      await sql`UPDATE events SET revenue = ${Number(sum.total) || 0} WHERE id = ${id}`;
-    }
+    // Menu akce jsou odkazy do nabídky podniku — cizí ani smazané položky se
+    // neuloží (ověřuje se řetěz items → sections → boards vlastního týmu).
+    const want = normalizeEventMenu(b.menu);
+    const wantIds = want.map(l => l.itemId).filter((x): x is number => x != null);
+    const owned = wantIds.length
+      ? await sql`
+          SELECT mi.id FROM menu_items mi
+          JOIN menu_sections ms ON ms.id = mi.section_id
+          JOIN menu_boards mb ON mb.id = ms.board_id
+          WHERE mb.team_id = ${u.team_id} AND mi.id = ANY(${wantIds})`
+      : [] as any[];
+    const ownedSet = new Set((owned as any[]).map(r => Number(r.id)));
+    const menu = want.filter(l => l.itemId == null ? true : ownedSet.has(l.itemId))
+      .map(l => l.itemId != null ? { itemId: l.itemId } : l);
+    await sql`UPDATE events SET menu = ${JSON.stringify(menu)}::jsonb WHERE id = ${id}`;
   }
 
   // ---- rozkřiknout členům: novinka na stránce podniku + push všem členům ----
