@@ -10,6 +10,7 @@ import { CURRENCIES, LOCALES } from '@/lib/money';
 import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn } from '@/lib/dashboardWidgets';
 import { useSymbol } from './CurrencyProvider';
 import ShareSettings from './employer/ShareSettings';
+import { useModal } from '@/lib/useModal';
 
 interface Member {
   id: number;
@@ -108,6 +109,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [editRate, setEditRate] = useState<string>('');
   const [savingMember, setSavingMember] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
+  const removeModal = useModal(!!removeTarget, () => setRemoveTarget(null), 'Odebrat člena týmu');
   const [removing, setRemoving] = useState(false);
 
   // Labor-target input mirrors the saved value but stays editable while typing.
@@ -910,7 +912,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4"
           onClick={() => !removing && setRemoveTarget(null)}>
-          <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin"
+          <div ref={removeModal.ref} {...removeModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">

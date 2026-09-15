@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { EmptyState } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
 import type { RewardLevel } from '@/lib/rewardLevels';
+import { useModal } from '@/lib/useModal';
 
 interface ShiftRow {
   id: number; date: string; startTime: string | null; endTime: string | null; type: string | null;
@@ -49,6 +50,7 @@ const PointsBadge = ({ n }: { n: number }) => n === 0 ? null : (
 );
 
 export default function EmployeeProfile({ employeeId, onClose }: { employeeId: number; onClose: () => void }) {
+  const m = useModal(true, onClose, 'Profil zaměstnance');
   const [p, setP] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'overview' | 'shifts' | 'feedback'>('overview');
@@ -67,7 +69,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {loading || !p ? (
           <div className="p-10 flex items-center justify-center">
             <div className="h-9 w-9 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />

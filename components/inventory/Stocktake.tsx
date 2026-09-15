@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import ShrinkageReport from './ShrinkageReport';
+import { useModal } from '@/lib/useModal';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const fmt = (n: number) => round3(n).toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
@@ -25,6 +26,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
   onClose: () => void;
   onApplied: () => void;
 }) {
+  const m = useModal(true, onClose, 'Inventura skladu');
   const [open, setOpen] = useState<Take | null>(null);
   const [history, setHistory] = useState<Take[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,7 +145,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Inventura skladu</h3>
           <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>

@@ -12,6 +12,7 @@ import {
   type ShareLink, type ShareTheme, DEFAULT_THEME, THEME_PRESETS, normalizeTheme,
 } from '@/lib/share';
 import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
+import { useModal } from '@/lib/useModal';
 
 const inputClass =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
@@ -25,6 +26,7 @@ export default function ShareSettings() {
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   // QR of a link, rendered on demand — print it and put it on the counter.
   const [qrFor, setQrFor] = useState<{ url: string; title: string } | null>(null);
+  const qrModal = useModal(!!qrFor, () => setQrFor(null), 'QR kód odkazu');
   const [qrData, setQrData] = useState('');
   useEffect(() => {
     if (!qrFor) { setQrData(''); return; }
@@ -302,7 +304,7 @@ export default function ShareSettings() {
       )}
       {qrFor && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setQrFor(null)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+          <div ref={qrModal.ref} {...qrModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">{qrFor.title}</h3>
             <p className="text-sm text-black/45 mb-4">Vytiskni a polož na pult — zákazník načte mobilem.</p>
             {qrData ? (

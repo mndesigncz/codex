@@ -7,6 +7,7 @@ import { Icon } from '../Icons';
 import { Button, Menu, EmptyState } from '../ui';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
+import { useModal } from '@/lib/useModal';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -193,6 +194,7 @@ export default function ScheduleBuilder({ user }: Props) {
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   // Copy a whole week of shifts onto another week — the "typical week" workflow.
   const [copyOpen, setCopyOpen] = useState(false);
+  const copyModal = useModal(copyOpen, () => setCopyOpen(false), 'Kopírovat týden');
   const [copySrc, setCopySrc] = useState('');
   const [copyDst, setCopyDst] = useState('');
   const [copying, setCopying] = useState(false);
@@ -333,6 +335,7 @@ export default function ScheduleBuilder({ user }: Props) {
 
   // import preview state
   const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[] } | null>(null);
+  const importModal = useModal(!!importPreview, () => setImportPreview(null), 'Náhled importu');
   const [importing, setImporting] = useState(false);
 
   const employees = useMemo(() => members.filter((m) => m.role === 'employee'), [members]);
@@ -977,7 +980,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
           {copyOpen && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setCopyOpen(false)}>
-              <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+              <div ref={copyModal.ref} {...copyModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
                 <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">Kopírovat týden</h3>
                 <p className="text-sm text-black/50 mb-4">Vezme všechny směny zdrojového týdne a naplánuje je do cílového (stejné dny, časy i lidi).</p>
                 <div className="space-y-3">
@@ -1357,7 +1360,7 @@ export default function ScheduleBuilder({ user }: Props) {
       {/* Import preview modal */}
       {importPreview && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
-          <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
+          <div ref={importModal.ref} {...importModal.dialogProps} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-bold text-[#16181A] min-w-0 truncate">Náhled importu</h3>
               <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
@@ -2034,6 +2037,7 @@ function DayModal({
   onRemoveProposed?: (p: Proposed) => void;
   events?: any[];
 }) {
+  const dm = useModal(true, onClose, 'Den v rozvrhu');
   // Opening hours for THIS day (keyed 0=Mon..6=Sun).
   const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
   const dayOpen = oh && !oh.closed ? oh.open : null;
@@ -2112,7 +2116,7 @@ function DayModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
-      <div className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
+      <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-bold text-[#16181A] cz-sentence min-w-0 truncate">{dayLabel(date)}</h3>
           <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
@@ -2567,6 +2571,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const am = useModal(true, onClose, 'Upravit dostupnost');
   // One state per day: '' | 'off' | 'type:<id>' (legacy 'morning'/'afternoon' kept readable).
   const [days, setDays] = useState<Record<string, string>>(() => {
     const d: Record<string, string> = {};
@@ -2643,7 +2648,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div ref={am.ref} {...am.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{member.avatar}</span>
           <div className="min-w-0 flex-1">

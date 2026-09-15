@@ -6,6 +6,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { planInfoOf, isPro, PRO_PRICE, type PlanInfo } from '@/lib/plan';
 import { Icon } from './Icons';
+import { useModal } from '@/lib/useModal';
 
 const PlanCtx = createContext<{ plan: PlanInfo | null; loaded: boolean }>({ plan: null, loaded: false });
 
@@ -76,9 +77,10 @@ export function ProGate({ feature, children, benefit, employer = true }: {
 
 /** Small modal for inline locked actions (e.g. a CSV button on Free). */
 export function UpgradeModal({ feature, onClose }: { feature: string; onClose: () => void }) {
+  const m = useModal(true, onClose, 'Přejít na Pro');
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center space-y-3" onClick={e => e.stopPropagation()}>
+      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center space-y-3" onClick={e => e.stopPropagation()}>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={20} /></div>
         <div className="flex items-center justify-center gap-2">
           <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{feature}</h3>

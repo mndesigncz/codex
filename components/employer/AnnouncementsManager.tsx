@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { dbTimeDayHM } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 interface Announcement {
   id: number;
@@ -68,6 +69,7 @@ export default function AnnouncementsManager() {
 
   // Edit in place + unpin instead of delete — unpinned stays here, hidden from the team.
   const [editing, setEditing] = useState<Announcement | null>(null);
+  const editModal = useModal(!!editing, () => setEditing(null), 'Upravit oznámení');
   const [editText, setEditText] = useState('');
   const patch = async (id: number, body: any) => {
     const r = await fetch('/api/announcements', {
@@ -173,7 +175,7 @@ export default function AnnouncementsManager() {
 
       {editing && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditing(null)}>
-          <div className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+          <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit oznámení</h3>
             <textarea rows={4} value={editText} maxLength={1000} onChange={(e) => setEditText(e.target.value)}
               className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none" />
