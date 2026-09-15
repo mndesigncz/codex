@@ -87,7 +87,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
         </div>
         <button type="button" onClick={() => onChange({ itemId: null, amount: null, unit: null })}
           title="Zrušit surovinu" aria-label="Zrušit surovinu"
-          className="rounded-full w-8 h-8 flex items-center justify-center text-black/30 hover:text-red-600 transition">
+          className="tap-target rounded-full w-8 h-8 flex items-center justify-center text-black/30 hover:text-red-600 transition">
           <Icon name="close" size={14} />
         </button>
       </div>

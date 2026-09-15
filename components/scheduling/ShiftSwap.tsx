@@ -104,7 +104,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
                     <p className="text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</p>
                   </div>
                   <button onClick={() => act({ shiftId: s.id, note: offerNote[s.id]?.trim() || undefined }, s.id, 'Směna je v burze. ✓')} disabled={busy === s.id}
-                    className="shrink-0 ml-auto rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
+                    className="tap-target shrink-0 ml-auto rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
                     Nabídnout
                   </button>
                 </div>

@@ -44,12 +44,12 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
       {onStep ? (
         <div className="flex items-center gap-1.5">
           <button onClick={() => onStep(item, -1)} disabled={item.quantity <= 0} title="Ubrat zavřené balení"
-            className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none disabled:opacity-30">−</button>
+            className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none disabled:opacity-30">−</button>
           <span className="text-base font-bold text-[#16181A] tabular-nums min-w-[3.5rem] text-center">
             {item.quantity} <span className="text-[11px] font-medium text-black/45">{item.unit}</span>
           </span>
           <button onClick={() => onStep(item, 1)} title="Přidat zavřené balení"
-            className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+            className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
         </div>
       ) : <span />}
       <div className="flex items-center gap-1">
@@ -59,11 +59,11 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
         )}
         {onEditItem && (
           <button onClick={() => onEditItem(item)} title="Upravit položku"
-            className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
+            className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
         )}
         {onRemoveItem && (
           <button onClick={() => onRemoveItem(item)} title="Smazat položku"
-            className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
+            className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
         )}
       </div>
     </div>
@@ -343,11 +343,11 @@ export default function CategoryStockView({
                     )}
                     {onEditItem && (
                       <button onClick={() => onEditItem(i)} title="Upravit položku"
-                        className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
+                        className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
                     )}
                     {onRemoveItem && (
                       <button onClick={() => onRemoveItem(i)} title="Smazat položku"
-                        className="rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
+                        className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
                     )}
                   </div>
                 </div>

@@ -95,14 +95,14 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
     <div className="space-y-4">
       {/* Week navigation */}
       <div className="flex items-center justify-between gap-2">
-        <button onClick={() => setOffset(o => o - 1)} aria-label="Předchozí týden" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
+        <button onClick={() => setOffset(o => o - 1)} aria-label="Předchozí týden" className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
         <p className="text-sm font-semibold text-[#16181A] text-center">
           {days[0].toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })} – {days[6].toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
           {offset === 0 && <span className="text-black/40 font-normal"> · tento týden</span>}
         </p>
-        <button onClick={() => setOffset(o => o + 1)} aria-label="Další týden" className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
+        <button onClick={() => setOffset(o => o + 1)} aria-label="Další týden" className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
           <Icon name="chevron" size={16} className="-rotate-90" />
         </button>
       </div>

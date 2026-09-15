@@ -29,7 +29,12 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
   const pad = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm';
   return (
     <div role="tablist" aria-label={ariaLabel}
-      className={`inline-flex max-w-full gap-1 rounded-[22px] glass border border-black/[0.07] p-1 ${wrap ? 'flex-wrap' : 'overflow-x-auto scrollbar-thin rounded-full'} ${className}`}>
+      // Ve dvou řádcích potřebuje svislá mezera víc než 4px: pilulka je vysoká
+      // 30px, ale `tap-target-sm` jí dotykovou plochu roztáhne na 36, takže při
+      // gap-1 se plochy sousedních řádků překrývaly a dotyk mezi nimi padl na
+      // řádek pod ním. Vodorovně to nevadí — pilulky jsou širší než 36px, tam
+      // se plocha nezvětšuje.
+      className={`inline-flex max-w-full ${wrap ? 'gap-x-1 gap-y-2' : 'gap-1'} rounded-[22px] glass border border-black/[0.07] p-1 ${wrap ? 'flex-wrap' : 'overflow-x-auto scrollbar-thin rounded-full'} ${className}`}>
       {options.map(o => {
         const on = o.id === value;
         return (
