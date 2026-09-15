@@ -96,8 +96,16 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 4500); return () => clearTimeout(t); } }, [toast]);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col" style={{ background: '#F1F3ED' }}>
-      <header className="px-4 sm:px-6 pt-4 pb-2 flex items-center gap-3 flex-wrap chrome-edge">
+    // Skořápka je svázaná s výškou okna a posouvá se uvnitř <main>, stejně jako
+    // administrace a zaměstnanec. Dřív tu bylo `min-h-[100dvh]` (roste s
+    // obsahem) a zároveň `overflow-y-auto` na <main> — kombinace, kterou nemá
+    // nikde jinde v appce. <main> se tím roztáhlo na celou výšku obsahu, takže
+    // nemělo co posouvat, a scrolloval dokument pod ním. Safari na iPhonu ale
+    // dotyk uvnitř `overflow-y-auto` přiřkne tomu boxu — a ten nemá kam jet,
+    // takže tah spolkne a stránka stojí. Na krátkých záložkách (Přehled) to
+    // nebylo vidět, na dlouhých (Stoly) se nedalo scrollovat vůbec.
+    <div className="h-[100dvh] flex flex-col overflow-hidden" style={{ background: '#F1F3ED' }}>
+      <header className="shrink-0 px-4 sm:px-6 pt-4 pb-2 flex items-center gap-3 flex-wrap chrome-edge">
         <button onClick={onExit} title="Zpět do administrace" aria-label="Zpět do administrace" className="tap-target rounded-full p-2 text-black/55 hover:text-black hover:bg-black/[0.05] transition"><Icon name="chevron" size={20} className="rotate-90" /></button>
         <LogoMark size={30} />
         <p className="font-bold tracking-tight leading-none">Managero <span className="text-black/45 font-semibold">client</span></p>
@@ -105,10 +113,10 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         {summary?.attention > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-1 text-[11px] font-bold tabular-nums">{summary.attention} k vyřízení</span>}
         <div className="ml-auto hidden sm:block"><Button variant="secondary" size="sm" icon="external" onClick={() => summary?.slug && window.open(`/client/${summary.slug}`, '_blank')} disabled={!summary?.slug}>Stránka pro hosty</Button></div>
       </header>
-      <div className="hidden md:block px-4 sm:px-6 pb-2">
+      <div className="shrink-0 hidden md:block px-4 sm:px-6 pb-2">
         <Segmented options={TABS.map(t => ({ id: t.id, label: t.label }))} value={tab} onChange={setTab} size="sm" ariaLabel="Části režimu Client" wrap />
       </div>
-      {toast && <p role="status" className="mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
+      {toast && <p role="status" className="shrink-0 mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
       <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-36 md:pb-8">
         {tab === 'overview' && <Overview summary={summary} go={setTab} onCustomer={openCustomer} />}
         {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} onCustomer={openCustomer} />}
