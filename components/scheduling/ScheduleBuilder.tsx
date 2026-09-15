@@ -2268,7 +2268,7 @@ function DayModal({
                     onClick={() => applyShiftType(t)}
                     title={`${rt.start}–${rt.end}`}
                     className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
-                      active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
+                      active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 on-accent hover:bg-black/[0.05]'
                     }`}
                   >
                     <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />

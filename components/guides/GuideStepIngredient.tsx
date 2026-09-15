@@ -79,7 +79,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
           {units.map(u => (
             <button key={u} type="button" onClick={() => onChange({ unit: u })}
               className={`rounded-full px-2.5 py-2 text-xs font-bold transition active:scale-95 ${
-                (step.unit ?? '') === u ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/50'
+                (step.unit ?? '') === u ? 'bg-[#C8F542] on-accent' : 'glass text-black/50'
               }`}>
               {u}
             </button>

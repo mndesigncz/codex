@@ -907,7 +907,7 @@ function GuideEditor({
                       title={s.itemId != null || s.unit != null ? 'Zrušit surovinu' : 'Označit jako surovinu'}
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
                         s.itemId != null || s.unit != null
-                          ? 'bg-[#C8F542] text-[#16181A]'
+                          ? 'bg-[#C8F542] on-accent'
                           : 'glass text-black/45 hover:text-[#5B7A08]'
                       }`}
                     >

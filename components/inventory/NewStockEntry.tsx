@@ -196,7 +196,7 @@ export default function NewStockEntry({
               <button key={u} type="button" onClick={() => setUnit(u)}
                 className={`tap-target-sm rounded-full font-semibold transition active:scale-95 whitespace-nowrap ${
                   big ? 'px-3 py-2 text-sm sm:px-4 sm:py-2.5 sm:text-base' : 'px-3 py-1.5 text-xs'
-                } ${unit === u ? 'bg-[#C8F542] text-[#16181A]' : 'glass text-black/55'}`}>
+                } ${unit === u ? 'bg-[#C8F542] on-accent' : 'glass text-black/55'}`}>
                 {u}
               </button>
             ))}

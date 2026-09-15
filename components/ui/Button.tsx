@@ -18,7 +18,7 @@ export type ButtonVariant = 'accent' | 'primary' | 'secondary' | 'ghost' | 'dang
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANT: Record<ButtonVariant, string> = {
-  accent: 'bg-[#C8F542] text-[#16181A] hover:brightness-105 shadow-[0_6px_18px_rgba(200,245,66,0.35)]',
+  accent: 'bg-[#C8F542] on-accent hover:brightness-105 shadow-[0_6px_18px_rgba(200,245,66,0.35)]',
   primary: 'bg-[#16181A] text-white hover:bg-black',
   secondary: 'glass border border-black/10 text-[#16181A] hover:bg-black/[0.05]',
   ghost: 'text-black/60 hover:text-[#16181A] hover:bg-black/[0.05]',

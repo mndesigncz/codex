@@ -535,7 +535,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   {/* Nesplněný krok není chyba — kolečko v barvě podniku, ne
                       červený kroužek, který vypadá jako poplach. */}
                   <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                    st.done ? 'bg-[#C8F542] text-[#16181A]' : 'border-2 border-black/15'}`}>
+                    st.done ? 'bg-[#C8F542] on-accent' : 'border-2 border-black/15'}`}>
                     {st.done && <Icon name="check" size={12} strokeWidth={2.6} />}
                   </span>
                   <span className={`min-w-0 flex-1 ${st.done ? 'line-through' : ''}`}>{st.label}</span>

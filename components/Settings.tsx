@@ -767,7 +767,7 @@ export default function Settings({ user, initialTab }: Props) {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button onClick={() => posDo('sync')} disabled={!!posAction}
-                          className="rounded-full bg-[#C8F542] text-[#16181A] px-4 py-2 text-sm font-semibold hover:brightness-105 disabled:opacity-50 transition inline-flex items-center gap-1.5">
+                          className="rounded-full bg-[#C8F542] on-accent px-4 py-2 text-sm font-semibold hover:brightness-105 disabled:opacity-50 transition inline-flex items-center gap-1.5">
                           <Icon name="refresh" size={15} /> {posAction === 'sync' ? 'Synchronizuji…' : 'Synchronizovat teď'}
                         </button>
                         <button onClick={() => { if (confirm('Načíst účtenky za posledních 180 dní? Trvá to pár desítek sekund.')) posDo('backfill', { days: 180 }); }} disabled={!!posAction}

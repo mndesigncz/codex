@@ -73,7 +73,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                   )}
                 </div>
               ) : (
-                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 rounded-full bg-[#C8F542] text-[#16181A] px-3.5 sm:px-4 py-2 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition whitespace-nowrap">Přihlásit</Link>
+                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 rounded-full bg-[#C8F542] on-accent px-3.5 sm:px-4 py-2 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition whitespace-nowrap">Přihlásit</Link>
               )}
             </nav>
           </div>
