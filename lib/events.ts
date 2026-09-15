@@ -96,14 +96,14 @@ export function normalizeEventMenu(raw: any): EventMenuLine[] {
 
 /** Doplní odkazovaným řádkům menu akce aktuální jméno a cenu z nabídky.
     `byId` je mapa menu_items id → {name, price}; smazané položky vypadnou. */
-export function resolveEventMenu(lines: EventMenuLine[], byId: Map<number, { name: string; price: number | null }>): EventMenuLine[] {
+export function resolveEventMenu(lines: EventMenuLine[], byId: Map<number, { name: string; price: number | null; pos?: boolean }>): (EventMenuLine & { pos?: boolean })[] {
   return lines
     .map(l => {
       if (l.itemId == null) return l;
       const hit = byId.get(l.itemId);
-      return hit ? { itemId: l.itemId, name: hit.name, price: hit.price } : null;
+      return hit ? { itemId: l.itemId, name: hit.name, price: hit.price, pos: hit.pos === true } : null;
     })
-    .filter((l): l is EventMenuLine => l != null);
+    .filter((l): l is EventMenuLine & { pos?: boolean } => l != null);
 }
 
 /** Fotky akce — jen adresy z vlastního veřejného výdeje obrázků. */

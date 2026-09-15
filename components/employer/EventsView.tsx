@@ -276,6 +276,11 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
   const [checkTxt, setCheckTxt] = useState('');
   const [packSearch, setPackSearch] = useState('');
   const [menuPickOpen, setMenuPickOpen] = useState(false);
+  const [crewSearch, setCrewSearch] = useState('');
+  const [crewOpen, setCrewOpen] = useState(false);
+  const [pos, setPos] = useState<any | null>(null);
+  const [posBusy, setPosBusy] = useState(false);
+  const [posErr, setPosErr] = useState('');
   const [uploading, setUploading] = useState(false);
   const [announcing, setAnnouncing] = useState(false);
   // Základ a peníze se editují v místě — ukládá se při opuštění pole.
@@ -301,6 +306,10 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
     patch(e.id, { menu: next });
   };
 
+  const crewCandidates = members
+    .filter(m => !e.crew.includes(m.id))
+    .filter(m => crewSearch.trim() === '' || String(m.name).toLowerCase().includes(crewSearch.trim().toLowerCase()))
+    .slice(0, 6);
   const packCandidates = packSearch.trim()
     ? items.filter(i => i.name.toLowerCase().includes(packSearch.toLowerCase())
         && !e.packing.some((p: any) => p.itemId === i.id)).slice(0, 6)
@@ -341,25 +350,25 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
 
         {/* kdy a kde — edituje se rovnou tady, uloží se při opuštění pole */}
         <Sec title="Kdy a kde">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* Pevné minimální šířky: nativní time input potřebuje ~110 px,
+              jinak hodnotu ořízne (vyfoceno „15:0…"). Řádek se láme, nemačká. */}
+          <div className="flex flex-wrap gap-2">
             <input type="date" aria-label="Datum akce" value={base.date}
               onChange={ev3 => setBase(b => ({ ...b, date: ev3.target.value }))}
               onBlur={() => { if (base.date && base.date !== e.date) patch(e.id, { date: base.date }); }}
-              className={`${inputClass} col-span-2 sm:col-span-1`} />
-            <div className="col-span-2 sm:col-span-1 grid grid-cols-2 gap-2">
-              <input type="time" aria-label="Začátek" value={base.start}
-                onChange={ev3 => setBase(b => ({ ...b, start: ev3.target.value }))}
-                onBlur={() => { if (base.start !== (e.startTime ?? '')) patch(e.id, { startTime: base.start }); }}
-                className={inputClass} />
-              <input type="time" aria-label="Konec" value={base.end}
-                onChange={ev3 => setBase(b => ({ ...b, end: ev3.target.value }))}
-                onBlur={() => { if (base.end !== (e.endTime ?? '')) patch(e.id, { endTime: base.end }); }}
-                className={inputClass} />
-            </div>
+              className={`${inputClass} !w-auto min-w-[150px] grow`} />
+            <input type="time" aria-label="Začátek" value={base.start}
+              onChange={ev3 => setBase(b => ({ ...b, start: ev3.target.value }))}
+              onBlur={() => { if (base.start !== (e.startTime ?? '')) patch(e.id, { startTime: base.start }); }}
+              className={`${inputClass} !w-[132px] shrink-0`} />
+            <input type="time" aria-label="Konec" value={base.end}
+              onChange={ev3 => setBase(b => ({ ...b, end: ev3.target.value }))}
+              onBlur={() => { if (base.end !== (e.endTime ?? '')) patch(e.id, { endTime: base.end }); }}
+              className={`${inputClass} !w-[132px] shrink-0`} />
             <input aria-label="Místo" placeholder={e.offsite ? 'Kam se jede — místo a adresa' : 'Místo v podniku'} value={base.location} maxLength={300}
               onChange={ev3 => setBase(b => ({ ...b, location: ev3.target.value }))}
               onBlur={() => { if (base.location !== (e.location ?? '')) patch(e.id, { location: base.location }); }}
-              className={`${inputClass} col-span-2`} />
+              className={`${inputClass} basis-full`} />
           </div>
           {e.public && <p className="text-[11px] text-black/40 mt-1.5">Změnu termínu veřejné akce pošleme hostům, kteří ji sledují.</p>}
         </Sec>
@@ -381,18 +390,41 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
           </Sec>
         )}
         <Sec title={e.offsite ? `Směna k akci (${e.crew.length}) — jen na tenhle výjezd` : `Navíc na akci (${e.crew.length}) — vytvoří směnu v rozvrhu`}>
-          <div className="flex flex-wrap gap-2">
-            {members.map(m => {
-              const on = e.crew.includes(m.id);
-              return (
-                <button key={m.id} onClick={() => toggleCrew(m.id)}
-                  className={`rounded-full px-3.5 py-2 text-sm transition ${
-                    on ? 'bg-[#C8F542]/20 text-[#5B7A08] border border-[#C8F542]/40 font-semibold' : 'glass text-black/55 hover:text-black border border-transparent'
-                  }`}>
-                  {m.avatar ?? ''} {m.name}{on ? <Icon name="check" size={13} className="inline ml-1 -mt-0.5" /> : null}
-                </button>
-              );
-            })}
+          {e.crew.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {e.crew.map((cid: number) => {
+                // crewPeople řeší jména server — members můžou být ještě nenačtení
+                const m = (e.crewPeople ?? []).find((x: any) => x.id === cid)
+                  ?? members.find(x => x.id === cid) ?? { id: cid, name: 'Neznámý', avatar: '' };
+                return (
+                  <span key={cid} className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#3E5406] border border-[#C8F542]/40 pl-3 pr-1.5 py-1.5 text-sm font-semibold">
+                    {m.avatar ?? ''} {m.name}
+                    <button type="button" aria-label={`Odebrat ${m.name} z akce`} onClick={() => toggleCrew(cid)}
+                      className="tap-target-sm rounded-full p-1 text-[#3E5406]/60 hover:text-red-600 transition"><Icon name="close" size={12} /></button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {/* Zeď všech členů nahradilo hledací pole — tým může mít i desítky lidí. */}
+          <div className="relative">
+            <input value={crewSearch} onChange={ev3 => setCrewSearch(ev3.target.value)}
+              onFocus={() => setCrewOpen(true)} onBlur={() => setTimeout(() => setCrewOpen(false), 150)}
+              placeholder="Přidat člověka — začni psát jméno…" className={inputClass} />
+            {crewOpen && crewCandidates.length > 0 && (
+              <div className="absolute inset-x-0 top-full mt-1 z-10 glass-strong rounded-2xl p-1.5 space-y-0.5 shadow-lg max-h-56 overflow-y-auto scrollbar-thin">
+                {crewCandidates.map(m => (
+                  <button key={m.id} type="button" onMouseDown={ev3 => ev3.preventDefault()}
+                    onClick={() => { toggleCrew(m.id); setCrewSearch(''); }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors">
+                    {m.avatar ?? ''} {m.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {crewOpen && crewCandidates.length === 0 && crewSearch.trim() !== '' && (
+              <div className="absolute inset-x-0 top-full mt-1 z-10 glass-strong rounded-2xl px-3 py-2.5 text-sm text-black/45 shadow-lg">Nikdo takový v týmu není.</div>
+            )}
           </div>
         </Sec>
 
@@ -484,6 +516,11 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                   {(e.menu ?? []).map((l: any, i: number) => (
                     <li key={`${l.itemId ?? 'x'}-${i}`} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
                       <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name}</span>
+                      {l.itemId != null && (
+                        l.pos
+                          ? <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#C8F542]/15 text-[#4F6A07] px-2 py-0.5 text-[11px] font-semibold" title="Spárováno s pokladnou — dá se namarkovat a tiskne se"><Icon name="receipt" size={11} />kasa</span>
+                          : <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5 text-[11px] font-semibold" title="Bez párování s pokladnou — v kase nepůjde namarkovat. Spáruj v Menu.">bez kasy</span>
+                      )}
                       {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
                       <button type="button" aria-label={`Vyřadit ${l.name} z menu akce`}
                         onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })}
@@ -615,6 +652,46 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
         {/* peníze — tržbu nese uzávěrka za akci; ručně jen když žádná není */}
         <Sec title="Peníze">
           <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+            {/* Akce u nás jede přes běžnou kasu — pokladna umí říct, co se
+                namarkovalo za dobu akce a kolik se prodalo z jejího menu. */}
+            {!e.offsite && (
+              <div className="mb-3">
+                {pos == null ? (
+                  <button disabled={posBusy}
+                    onClick={async () => {
+                      setPosBusy(true); setPosErr('');
+                      const r = await fetch(`/api/events/${e.id}/pos`).catch(() => null);
+                      const d = r ? await r.json().catch(() => null) : null;
+                      setPosBusy(false);
+                      if (r?.ok && d) setPos(d);
+                      else setPosErr(d?.error || 'Pokladna teď neodpovídá.');
+                    }}
+                    className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
+                    <Icon name="receipt" size={13} className="inline -mt-0.5 mr-1.5" />{posBusy ? 'Načítám z pokladny…' : 'Prodej z pokladny za dobu akce'}
+                  </button>
+                ) : (
+                  <div className="rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2.5 space-y-1.5">
+                    <p className="text-sm text-[#16181A]">
+                      <Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5 text-[#4F6A07]" />
+                      V kase {pos.from ? `${pos.from}–${pos.till ?? 'konec dne'}` : 'ten den'}: <span className="font-bold tabular-nums">{money(pos.revenue)}</span>
+                      <span className="text-black/45"> · {pos.bills} {pos.bills === 1 ? 'účtenka' : pos.bills < 5 ? 'účtenky' : 'účtenek'}</span>
+                    </p>
+                    {(pos.items ?? []).length > 0 && (
+                      <ul className="text-xs text-black/60 space-y-0.5">
+                        {pos.items.map((it: any, i: number) => (
+                          <li key={i} className="flex justify-between gap-2">
+                            <span className="min-w-0 truncate">{it.name}</span>
+                            <span className="shrink-0 tabular-nums">{it.paired ? `${it.qty}× ten den` : 'bez párování s kasou'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="text-[11px] text-black/40">Informativní pohled — do financí jde tržba dne přes běžnou uzávěrku, nic se tu nezapisuje.</p>
+                  </div>
+                )}
+                {posErr && <p className="text-xs text-red-600 mt-1.5">{posErr}</p>}
+              </div>
+            )}
             {e.closingsCount > 0 ? (
               <div className="flex items-center justify-between gap-2 flex-wrap rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2.5">
                 <p className="text-sm text-black/60"><Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5" />Tržba z {e.closingsCount === 1 ? 'uzávěrky za akci' : `${e.closingsCount} uzávěrek za akci`}</p>

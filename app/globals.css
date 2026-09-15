@@ -103,7 +103,11 @@ input::-webkit-date-and-time-value { text-align: left; }
 }
 
 .modal-sheet {
-  background: rgba(255,255,255,0.92);
+  /* 0.92 → 0.97: na iOS uvnitř fixed+scroll kontejneru backdrop-filter občas
+     nefunguje a při 8 % průhlednosti prosvítaly prvky stránky pod oknem
+     (vyfoceno na detailu akce). Sklo drží blur tam, kde běží; podklad už
+     ale nesmí prosvítat. */
+  background: rgba(255,255,255,0.97);
   backdrop-filter: blur(40px) saturate(1.7);
   -webkit-backdrop-filter: blur(40px) saturate(1.7);
   border: 1px solid rgba(255,255,255,0.6);
@@ -111,7 +115,7 @@ input::-webkit-date-and-time-value { text-align: left; }
 }
 :root[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.5); }
 :root[data-theme="dark"] .modal-sheet {
-  background: rgba(30,33,36,0.94);
+  background: rgba(30,33,36,0.97);
   border-color: rgba(255,255,255,0.10);
   box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
 }
