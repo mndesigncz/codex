@@ -938,7 +938,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     <div className="flex items-center rounded-2xl bg-black/[0.04] border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
                       <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
                         className="rounded-xl bg-black/[0.04] hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
-                      <input type="number" inputMode="numeric" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                      <input type="number" inputMode="numeric" aria-label="Množství" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                         className="flex-1 min-w-0 bg-transparent text-center text-sm font-semibold text-[#16181A] focus:outline-none tabular-nums" />
                       <button type="button" aria-label="Přidat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))}
                         className="rounded-xl bg-[#C8F542] hover:brightness-110 w-9 h-9 flex items-center justify-center text-lg leading-none text-black shrink-0">+</button>
@@ -950,7 +950,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   </div>
                   <div className="col-span-1">
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
-                    <input type="number" inputMode="numeric" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
+                    <input type="number" inputMode="numeric" aria-label="Maximální množství" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
                   </div>
                 </div>
 
@@ -967,7 +967,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       <div className="flex gap-2">
                         <input inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
                           placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
-                        <select value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
+                        <select aria-label="Jednotka obsahu" value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
                           className={`${inputClass} !w-20 shrink-0 px-2`}>
                           <option value="">{pk(form)?.contentUnit ?? '—'}</option>
                           {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
@@ -1030,7 +1030,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       <span className="w-2 h-2 rounded-full bg-orange-400" /> Upozornit při
                     </label>
                     <div className="relative">
-                      <input type="number" inputMode="numeric" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                      <input type="number" inputMode="numeric" aria-label="Minimální množství" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
                     </div>
                   </div>
@@ -1039,7 +1039,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       <span className="w-2 h-2 rounded-full bg-red-500" /> Kriticky málo při
                     </label>
                     <div className="relative">
-                      <input type="number" inputMode="numeric" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                      <input type="number" inputMode="numeric" aria-label="Kritické množství" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
                     </div>
                   </div>
@@ -1059,7 +1059,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Cena za jednotku</label>
                   <div className="relative">
-                    <input type="number" inputMode="numeric" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
+                    <input type="number" inputMode="numeric" aria-label="Cena za jednotku" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}/{form.unit || 'ks'}</span>
                   </div>
                   <p className="text-[11px] text-black/40 mt-1.5">Slouží k výpočtu hodnoty zásob.</p>

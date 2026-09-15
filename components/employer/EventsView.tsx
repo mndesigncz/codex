@@ -205,8 +205,8 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
           </div>
           <input type="date" aria-label="Datum akce" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
           <div className="grid grid-cols-2 gap-2">
-            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inputClass} />
-            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inputClass} />
+            <input type="time" aria-label="Začátek akce" value={startTime} onChange={e => setStartTime(e.target.value)} className={inputClass} />
+            <input type="time" aria-label="Konec akce" value={endTime} onChange={e => setEndTime(e.target.value)} className={inputClass} />
           </div>
           <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Místo (u venkovní akce adresa)" maxLength={300} className={inputClass} />
           <label className="flex items-center gap-2.5 cursor-pointer text-sm text-black/60">

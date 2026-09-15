@@ -112,6 +112,8 @@ export default function Tasks({ user }: Props) {
         <div className="flex items-start gap-3">
           <button
             onClick={() => updateStatus(task, task.status === 'done' ? 'pending' : 'done')}
+            aria-pressed={task.status === 'done'}
+            aria-label={`${task.status === 'done' ? 'Zrušit splnění' : 'Označit jako hotové'} — ${task.title}`}
             className={`tap-target w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
               task.status === 'done' ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15 hover:border-[#C8F542]/60'
             }`}

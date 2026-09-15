@@ -511,7 +511,7 @@ function ProcedureDetail({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
                 </button>
               )}
-              <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+              <button onClick={onClose} aria-label="Zavřít" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
@@ -651,7 +651,7 @@ function ProcedureEditor({
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <h2 className="text-xl font-bold tracking-tight text-[#16181A]">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
-          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+          <button onClick={onClose} aria-label="Zavřít" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
@@ -684,6 +684,8 @@ function ProcedureEditor({
                 <button
                   key={name}
                   onClick={() => setIcon(name)}
+                  aria-label={`Ikona ${name}`}
+                  aria-pressed={icon === name}
                   className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
                     icon === name
                       ? 'bg-[#C8F542] border-[#C8F542] text-black'
@@ -817,6 +819,7 @@ function ProcedureEditor({
                 </span>
                 <input
                   type="time"
+                  aria-label="Čas připomenutí"
                   value={remindAt ?? ''}
                   onChange={e => setRemindAt(e.target.value)}
                   className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
