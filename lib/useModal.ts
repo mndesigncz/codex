@@ -25,6 +25,25 @@
 
 import { useEffect, useRef } from 'react';
 
+// Zámek posuvu se počítá, ne přepisuje. Když se okna překrývají (z okna se
+// otevře další) a zavřou se v jiném pořadí, než se otevřela, prosté
+// „zapamatuj si předchozí hodnotu a vrať ji" nechá stránku navždy zamčenou:
+// vnitřní okno si zapamatuje „hidden" po tom vnějším a při zavření ho vrátí.
+// Proto se drží počet otevřených oken a odemyká se až u posledního.
+let lockCount = 0;
+let lockedFrom = '';
+
+function lockScroll() {
+  if (lockCount === 0) lockedFrom = document.body.style.overflow;
+  lockCount++;
+  document.body.style.overflow = 'hidden';
+}
+
+function unlockScroll() {
+  lockCount = Math.max(0, lockCount - 1);
+  if (lockCount === 0) document.body.style.overflow = lockedFrom;
+}
+
 const FOCUSABLE = [
   'a[href]', 'button:not([disabled])', 'input:not([disabled])',
   'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])',
@@ -41,8 +60,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     if (!open) return;
     const panel = ref.current;
     const restoreTo = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    lockScroll();
 
     const visible = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
       .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement);
@@ -78,7 +96,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     return () => {
       clearTimeout(t);
       document.removeEventListener('keydown', onKey, true);
-      document.body.style.overflow = prevOverflow;
+      unlockScroll();
       restoreTo?.focus?.({ preventScroll: true });
     };
   }, [open]);
