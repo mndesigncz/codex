@@ -77,7 +77,9 @@ export default function EventsView({ user }: { user: { id?: string } }) {
 
   const EventCard = ({ e }: { e: Ev }) => {
     const k = kindSpec(e.kind);
-    const result = e.revenue != null || e.costs != null ? (e.revenue ?? 0) - (e.costs ?? 0) : null;
+    // Stejná logika jako v detailu: tržbu akce s uzávěrkami nese uzávěrka.
+    const rev = e.closingsCount > 0 ? e.closingsTotal : e.revenue;
+    const result = rev != null || e.costs != null ? (rev ?? 0) - (e.costs ?? 0) : null;
     return (
       <button onClick={() => setDetail(e)}
         className="w-full glass-card p-5 text-left hover:bg-black/[0.02] transition">
@@ -98,7 +100,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
               : e.status === 'cancelled' ? 'bg-red-500/10 text-red-600'
               : 'bg-[#0A84FF]/10 text-[#0A6FE0]'
             }`}>{statusLabel(e.status)}</span>
-            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná{e.going > 0 ? ` · ✋ ${e.going}` : ''}</span>}
+            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná{e.going > 0 ? ` · přijde ${e.going}` : ''}</span>}
             {result != null && (
               <span className={`text-xs font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
                 {result >= 0 ? '+' : ''}{money(result)}
@@ -371,7 +373,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
               <div className="flex flex-wrap gap-1.5">
                 {(e.onShift ?? []).map((m2: any) => (
                   <span key={m2.id} className="rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] border border-[#0A84FF]/20 px-3 py-1.5 text-sm">
-                    {m2.avatar} {m2.name}<span className="text-[#0A6FE0]/70 tabular-nums">{m2.start ? ` · ${String(m2.start).slice(0, 5)}` : ''}{m2.end ? `–${String(m2.end).slice(0, 5)}` : ''}</span>
+                    {m2.avatar} {m2.name}<span className="text-[#0A6FE0] tabular-nums">{m2.start ? ` · ${String(m2.start).slice(0, 5)}` : ''}{m2.end ? `–${String(m2.end).slice(0, 5)}` : ''}</span>
                   </span>
                 ))}
               </div>
@@ -379,12 +381,12 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
           </Sec>
         )}
         <Sec title={e.offsite ? `Směna k akci (${e.crew.length}) — jen na tenhle výjezd` : `Navíc na akci (${e.crew.length}) — vytvoří směnu v rozvrhu`}>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {members.map(m => {
               const on = e.crew.includes(m.id);
               return (
                 <button key={m.id} onClick={() => toggleCrew(m.id)}
-                  className={`rounded-full px-3 py-1.5 text-sm transition ${
+                  className={`rounded-full px-3.5 py-2 text-sm transition ${
                     on ? 'bg-[#C8F542]/20 text-[#5B7A08] border border-[#C8F542]/40 font-semibold' : 'glass text-black/55 hover:text-black border border-transparent'
                   }`}>
                   {m.avatar ?? ''} {m.name}{on ? <Icon name="check" size={13} className="inline ml-1 -mt-0.5" /> : null}
@@ -462,7 +464,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                       <img src={url} alt={`Fotka akce ${i + 1}`} className="aspect-square w-full rounded-2xl object-cover border border-black/[0.06]" />
                       <button type="button" aria-label={`Odebrat fotku ${i + 1}`}
                         onClick={() => patch(e.id, { photos: (e.photos ?? []).filter((_: string, j: number) => j !== i) })}
-                        className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-[#16181A] text-white grid place-items-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"><Icon name="close" size={11} /></button>
+                        className="tap-target-sm absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-[#16181A] text-white grid place-items-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition"><Icon name="close" size={11} /></button>
                     </div>
                   ))}
                 </div>
@@ -473,7 +475,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
               <div className="flex items-center justify-between gap-2 mb-1">
                 <p className="text-[11px] uppercase tracking-wider text-black/40">Menu akce ({(e.menu ?? []).length}) — z nabídky podniku</p>
                 <button type="button" onClick={() => setMenuPickOpen(o => !o)} aria-expanded={menuPickOpen}
-                  className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-black transition">
+                  className="tap-target-sm shrink-0 whitespace-nowrap rounded-full bg-white/70 border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-black transition">
                   <Icon name="leaf" size={13} className="inline -mt-0.5 mr-1.5" />{menuPickOpen ? 'Hotovo' : 'Vybrat z nabídky'}
                 </button>
               </div>
@@ -485,7 +487,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                       {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
                       <button type="button" aria-label={`Vyřadit ${l.name} z menu akce`}
                         onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })}
-                        className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                        className="tap-target-sm shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
                     </li>
                   ))}
                 </ul>
@@ -497,12 +499,12 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                   ) : menuSections.map((sec: any) => (
                     <div key={sec.id}>
                       <p className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">{sec.title}</p>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-2">
                         {(sec.items ?? []).map((mi: any) => {
                           const on = menuHas(mi.id);
                           return (
                             <button key={mi.id} type="button" onClick={() => toggleMenuItem(mi.id)} aria-pressed={on}
-                              className={`rounded-full px-3 py-1.5 text-xs transition ${
+                              className={`rounded-full px-3.5 py-2 text-xs transition ${
                                 on ? 'bg-[#C8F542]/25 text-[#3E5406] border border-[#C8F542]/45 font-semibold' : 'bg-black/[0.04] text-black/55 hover:text-black border border-transparent'
                               }`}>
                               {mi.name}{mi.price != null ? ` · ${mi.price}` : ''}{on ? <Icon name="check" size={11} className="inline ml-1 -mt-0.5" /> : null}
@@ -512,7 +514,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                       </div>
                     </div>
                   ))}
-                  <a href="/employer/overview?mode=client&tab=menu" className="inline-block text-xs font-semibold text-[#0A6FE0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
+                  <a href="/employer/overview?mode=client&tab=menu" className="tap-target-sm inline-block py-1 text-xs font-semibold text-[#0A6FE0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
                 </div>
               )}
               {!menuPickOpen && (e.menu ?? []).length === 0 && (
@@ -532,13 +534,13 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                 }`}>
                 <button type="button" aria-pressed={c.done}
                   onClick={() => patch(e.id, { checklist: e.checklist.map((x: any, j: number) => j === i ? { ...x, done: !x.done } : x) })}
-                  className="flex items-center gap-2.5 text-left min-w-0 flex-1">
+                  className="tap-target flex items-center gap-2.5 text-left min-w-0 flex-1">
                   <span className={c.done ? 'text-[#4F6A07]' : 'text-black/30'}><Icon name={c.done ? 'check' : 'box'} size={16} /></span>
                   <span className="min-w-0 flex-1">{c.text}</span>
                 </button>
                 <button type="button" aria-label="Odebrat úkol"
                   onClick={() => patch(e.id, { checklist: e.checklist.filter((_: any, j: number) => j !== i) })}
-                  className="shrink-0 text-black/25 hover:text-red-600 px-1"><Icon name="close" size={15} /></button>
+                  className="tap-target-sm shrink-0 text-black/25 hover:text-red-600 px-1"><Icon name="close" size={15} /></button>
               </div>
             ))}
           </div>
@@ -547,7 +549,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
               onKeyDown={ev3 => { if (ev3.key === 'Enter' && checkTxt.trim()) { patch(e.id, { checklist: [...e.checklist, { text: checkTxt.trim(), done: false }] }); setCheckTxt(''); } }}
               className={inputClass} />
             <button onClick={() => { if (checkTxt.trim()) { patch(e.id, { checklist: [...e.checklist, { text: checkTxt.trim(), done: false }] }); setCheckTxt(''); } }}
-              className="shrink-0 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-4 text-sm hover:bg-black/[0.08] transition">+</button>
+              className="shrink-0 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 min-w-[48px] text-sm hover:bg-black/[0.08] transition">+</button>
           </div>
 
           {e.offsite && (
@@ -581,7 +583,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                     </span>
                     {!p2.packed && (
                       <button aria-label={`Odebrat ${p2.name} z balení`} onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
-                        className="shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                        className="tap-target-sm shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
                     )}
                   </div>
                 ))}

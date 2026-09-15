@@ -282,11 +282,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* /65 v řadě chybělo — a právě ho nosí štítky směn, takže na tmavém skle
    zůstávaly černé na černém (naměřeno 1,05:1, prakticky neviditelné). */
 :root[data-theme="dark"] .text-black\/65{ color:rgba(237,242,228,0.70) !important; }
-:root[data-theme="dark"] .text-black\/55{ color:rgba(237,242,228,0.60) !important; }
-:root[data-theme="dark"] .text-black\/50{ color:rgba(237,242,228,0.55) !important; }
-:root[data-theme="dark"] .text-black\/45{ color:rgba(237,242,228,0.50) !important; }
-:root[data-theme="dark"] .text-black\/40{ color:rgba(237,242,228,0.45) !important; }
-:root[data-theme="dark"] .text-black\/35{ color:rgba(237,242,228,0.40) !important; }
+:root[data-theme="dark"] .text-black\/55{ color:rgba(237,242,228,0.64) !important; }
+:root[data-theme="dark"] .text-black\/50{ color:rgba(237,242,228,0.60) !important; }
+:root[data-theme="dark"] .text-black\/45{ color:rgba(237,242,228,0.56) !important; }
+:root[data-theme="dark"] .text-black\/40{ color:rgba(237,242,228,0.55) !important; }
+:root[data-theme="dark"] .text-black\/35{ color:rgba(237,242,228,0.50) !important; }
 :root[data-theme="dark"] .text-black\/30{ color:rgba(237,242,228,0.35) !important; }
 :root[data-theme="dark"] .text-black\/80{ color:rgba(237,242,228,0.86) !important; }
 :root[data-theme="dark"] .text-black\/25{ color:rgba(237,242,228,0.30) !important; }
@@ -300,6 +300,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .text-\[\#4F6A07\]{ color:#C8F542 !important; }
 :root[data-theme="dark"] .text-\[\#5B7A08\]\/80{ color:rgba(200,245,66,0.88) !important; }
 :root[data-theme="dark"] .text-\[\#5B7A08\]\/70{ color:rgba(200,245,66,0.80) !important; }
+/* Modrá informační: na světlé stojí #0A6FE0, na tmavém skle je moc tmavá
+   (naměřeno 2,2:1 u pilulky „Za akci" v uzávěrce a 2,8:1 u termínů směn).
+   Stejné zesvětlení jako u zelené řady. */
+:root[data-theme="dark"] .text-\[\#0A6FE0\]{ color:#7EB8FF !important; }
 /* Ink-on-accent: text that sits on a lime (#C8F542) surface must stay dark in
    BOTH themes — these two are deliberately never overridden. */
 .on-accent{ color:#16181A; }
