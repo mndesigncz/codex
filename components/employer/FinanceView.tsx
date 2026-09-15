@@ -196,11 +196,11 @@ export default function FinanceView() {
         primary={<Button onClick={() => (pro ? setExportOpen(true) : setUpgradeFor('Export pro účetní'))} variant="accent" icon="download">Export pro účetní</Button>}
         aside={
           <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-fit">
-            <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
+            <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
             <span className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold cz-sentence text-[#16181A] truncate">{monthLabel(month)}</span>
-            <button onClick={() => shiftMonth(1)} aria-label="Další měsíc" className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
+            <button onClick={() => shiftMonth(1)} aria-label="Další měsíc" className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
               <Icon name="chevron" size={16} className="-rotate-90" />
             </button>
           </div>

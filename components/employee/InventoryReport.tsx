@@ -222,7 +222,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         <div className="flex items-center gap-1 shrink-0">
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) - 1)}
             aria-label={`Ubrat — ${item.name}`}
-            className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
+            className="tap-target rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
           <input
             type="number" inputMode="numeric"
             // Bez popisku odečítátko přečte jen „číslo" a člověk neví, čeho.
@@ -233,7 +233,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           />
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) + 1)}
             aria-label={`Přidat — ${item.name}`}
-            className="rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">+</button>
+            className="tap-target rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">+</button>
           <span className="text-xs text-black/40 w-6">{item.unit}</span>
         </div>
         {item.supplierUrl && (
@@ -242,7 +242,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         )}
         <button type="button" onClick={() => setParked(item, item.archived !== true)}
           title={item.archived ? 'Vrátit mezi to, co máme' : 'Momentálně nevedeme'}
-          className={`rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${
+          className={`tap-target rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${
             item.archived
               ? 'bg-[#C8F542] text-black hover:brightness-110'
               : 'glass border border-black/10 text-black/50 hover:text-black'
@@ -250,7 +250,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           {item.archived ? 'Máme zpátky' : 'Nevedeme'}
         </button>
         <button type="button" onClick={() => save(item)} disabled={!dirty || savingId === item.id}
-          className={`rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
+          className={`tap-target rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
           {savingId === item.id ? 'Ukládám…' : savedId === item.id && !dirty ? 'Uloženo ✓' : 'Uložit'}
         </button>
       </div>

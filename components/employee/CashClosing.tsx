@@ -1243,7 +1243,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       if (res.ok) setClosings(prev => prev.filter(x => x.id !== c.id));
                       else { const d = await res.json().catch(() => ({})); setErr(d.error || 'Smazání se nepodařilo.'); }
                     }}
-                    className="rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
+                    className="tap-target rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
                   ><Icon name="close" size={15} /></button>
                   <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 max-w-full ${
                     d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'

@@ -683,7 +683,7 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={() => setMonth(shiftMonth(month, -1))}
               title="Předchozí měsíc"
-              className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
+              className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
             >
               <Icon name="chevron" size={17} className="rotate-90" />
             </button>
@@ -693,7 +693,7 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={() => setMonth(shiftMonth(month, 1))}
               title="Další měsíc"
-              className="h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
+              className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
             >
               <Icon name="chevron" size={17} className="-rotate-90" />
             </button>

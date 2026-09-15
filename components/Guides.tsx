@@ -381,7 +381,12 @@ export default function Guides({ user }: { user: User }) {
                         )}
                       </h3>
                       {isEmployer && (
-                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        // gap-2, ne gap-1: tlačítka jsou 28px, ale `tap-target-sm`
+                        // jim dotykovou plochu roztáhne na 36 — při mezeře 4px se
+                        // plochy překrývaly a dotyk u pravého okraje tužky trefil
+                        // koš vedle ní. Osm pixelů je přesně tolik, aby se plochy
+                        // dotkly a nepřekryly.
+                        <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();

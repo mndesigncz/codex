@@ -69,7 +69,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
         {saving ? '…' : 'Odepsat'}
       </button>
       <button aria-label="Zavřít" onClick={() => { setOpen(false); setAmount(''); }}
-        className="rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-black text-sm"><Icon name="close" size={15} /></button>
+        className="tap-target rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-black text-sm"><Icon name="close" size={15} /></button>
     </div>
   );
 }

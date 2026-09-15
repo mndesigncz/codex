@@ -1643,9 +1643,9 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 {Number(i.packageSize) > 0 && (
                   <ConsumeControl itemId={i.id} unit={itemContentUnit(i, pk(i))} onDone={onConsumed} onFail={onConsumeFail} />
                 )}
-                <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
+                <button onClick={() => step(i, -1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
-                <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+                <button onClick={() => step(i, 1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
                     className="rounded-full bg-[#C8F542] text-black px-3.5 h-8 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
@@ -1714,9 +1714,9 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
             })()}
             <div className={`mt-auto pt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
-                <button onClick={() => step(i, -1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">−</button>
+                <button onClick={() => step(i, -1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">−</button>
                 <span className="text-lg font-bold text-[#16181A] w-16 text-center tabular-nums">{i.quantity} <span className="text-xs text-black/45">{i.unit}</span></span>
-                <button onClick={() => step(i, 1)} className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">+</button>
+                <button onClick={() => step(i, 1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">+</button>
               </div>
               <div className="flex items-center gap-1">
                 {i.archived ? (
@@ -2379,8 +2379,8 @@ function CategoryRow({
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
           <Icon name="box" size={15} />
         </button>
-        <button onClick={startEdit} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
-        <button onClick={onDelete} className="shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+        <button onClick={startEdit} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
+        <button onClick={onDelete} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm" aria-label="Zavřít"><Icon name="close" size={15} /></button>
       </div>
 
       {moveOpen && (
