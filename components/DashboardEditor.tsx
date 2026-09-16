@@ -53,7 +53,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
             <Icon name="settings" size={17} />
           </span>
           <div className="min-w-0">
-            <h3 className="font-bold tracking-tight text-[#16181A]">Skládání přehledu</h3>
+            <h3 className="t-card">Skládání přehledu</h3>
             <p className="text-xs text-black/45">Seřaď, skryj nebo přidej dlaždice.</p>
           </div>
         </div>

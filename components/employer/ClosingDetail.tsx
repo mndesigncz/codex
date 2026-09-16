@@ -237,11 +237,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 {/* Dva přepínače, které mění výpočet. Když nejsou vidět, vypadá
                     očekávaná kasa jako záhada. */}
                 <div className="flex flex-wrap gap-1.5 mt-3">
-                  <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-medium text-black/55">
+                  <span className="chip chip-muted">
                     Spropitné {c.tips_in_drawer ? 'zůstalo v kase' : 'se z kasy vyndalo'}
                   </span>
                   {payDailyCash && (
-                    <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-medium text-black/55">
+                    <span className="chip chip-muted">
                       Výplata {c.payout_from_register === false ? 'nešla z kasy' : 'šla z kasy'}
                     </span>
                   )}
@@ -249,7 +249,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     <span className="rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2.5 py-1 text-[11px] font-bold"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {c.event_title}</span>
                   )}
                   {c.shift_date && c.shift_date !== c.date && (
-                    <span className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-medium text-black/55">
+                    <span className="chip chip-muted">
                       Obchodní den {c.shift_date}
                     </span>
                   )}
@@ -433,7 +433,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 mb-1.5">Podle rozvrhu</p>
                     <div className="flex flex-wrap gap-1.5">
                       {d.planned.map((p, i) => (
-                        <span key={i} className="rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-medium text-black/55">
+                        <span key={i} className="chip chip-muted">
                           {p.employee?.name ?? '—'} {p.startTime}–{p.endTime}
                         </span>
                       ))}

@@ -291,7 +291,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
       {showForm && (
         <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">
-          <h3 className="font-bold tracking-tight text-[#16181A]">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
+          <h3 className="t-card">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název úkolu</label>
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Např. Umýt okna" className={inputClass} autoFocus />

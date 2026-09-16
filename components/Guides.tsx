@@ -798,7 +798,7 @@ function GuideEditor({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
+          <h2 className="t-section min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
@@ -1037,7 +1037,7 @@ function ManageCategories({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">Kategorie</h2>
+          <h2 className="t-section min-w-0 truncate">Kategorie</h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>

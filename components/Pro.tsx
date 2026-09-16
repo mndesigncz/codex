@@ -51,7 +51,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
       <div className="glass-card p-8 text-center space-y-3">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={24} /></div>
         <div className="flex items-center justify-center gap-2">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{feature}</h3>
+          <h3 className="t-card">{feature}</h3>
           <ProBadge />
         </div>
         <p className="text-sm text-black/55">
@@ -83,7 +83,7 @@ export function UpgradeModal({ feature, onClose }: { feature: string; onClose: (
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center space-y-3" onClick={e => e.stopPropagation()}>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={20} /></div>
         <div className="flex items-center justify-center gap-2">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{feature}</h3>
+          <h3 className="t-card">{feature}</h3>
           <ProBadge />
         </div>
         <p className="text-sm text-black/55">Tuhle funkci odemyká plán Pro ({PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}).</p>

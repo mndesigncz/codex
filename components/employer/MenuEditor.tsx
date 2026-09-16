@@ -375,7 +375,7 @@ export default function MenuEditor() {
   if (neniMigrace) {
     return (
       <div className="glass-card p-6 space-y-2">
-        <h2 className="font-bold tracking-tight text-[#16181A]">Menu pro hosty</h2>
+        <h2 className="t-section">Menu pro hosty</h2>
         <p className="text-sm text-black/60">
           Tabulky pro menu ještě nejsou v databázi. Otevři jednou <code>/api/init</code> a vrať se sem.
         </p>
@@ -387,7 +387,7 @@ export default function MenuEditor() {
     return (
       <div className="glass-card p-6 space-y-3">
         <div>
-          <h2 className="font-bold tracking-tight text-[#16181A]">Menu pro hosty</h2>
+          <h2 className="t-section">Menu pro hosty</h2>
           <p className="text-sm text-black/45">
             To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód.
           </p>
@@ -731,7 +731,7 @@ export default function MenuEditor() {
         <div className="glass-card p-5 space-y-3">
           <div className="flex items-start gap-3 flex-wrap">
             <div className="min-w-0 flex-1">
-              <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+              <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={18} className="text-black/40 shrink-0" />Tisk na terminálu
               </h3>
               {vazby.celkem === 0 ? (

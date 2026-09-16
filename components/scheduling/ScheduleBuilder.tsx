@@ -762,7 +762,7 @@ export default function ScheduleBuilder({ user }: Props) {
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <div className="flex items-center gap-2 min-w-0">
                 <Icon name="users" size={20} className="text-black/70 shrink-0" />
-                <h2 className="font-bold text-[#16181A] truncate">Dostupnost týmu</h2>
+                <h2 className="t-section truncate">Dostupnost týmu</h2>
               </div>
               <span className={`tap-target-sm shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
                 submissions.length >= assignable.length && assignable.length > 0
@@ -1197,7 +1197,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {/* Calendar grid */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-bold text-[#16181A] cz-sentence flex items-center gap-2">
+              <h2 className="t-section cz-sentence flex items-center gap-2">
                 <Icon name="calendar" size={20} /> {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs flex-wrap">
@@ -1519,7 +1519,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="clock" size={20} className="text-black/70 flex-shrink-0" />
-          <h2 className="font-bold text-[#16181A] truncate">Typy směn</h2>
+          <h2 className="t-section truncate">Typy směn</h2>
         </div>
         <button
           onClick={beginNew}
@@ -1752,7 +1752,7 @@ function OpeningHoursEditor({
     <div className="glass-card p-5 space-y-4">
       <div className="flex items-center gap-2">
         <Icon name="clock" size={20} className="text-black/70" />
-        <h2 className="font-bold text-[#16181A]">Otevírací doba</h2>
+        <h2 className="t-section">Otevírací doba</h2>
       </div>
       <p className="text-sm text-black/45">Nastav, kdy má provoz otevřeno. Zavřené dny algoritmus přeskočí.</p>
 
@@ -1877,7 +1877,7 @@ function FixedAssignmentsManager({
       <div className="glass-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Icon name="swap" size={20} className="text-black/70" />
-          <h2 className="font-bold text-[#16181A]">Přidat pevný den</h2>
+          <h2 className="t-section">Přidat pevný den</h2>
         </div>
         <p className="text-sm text-black/45">
           Přiřaď zaměstnance k opakujícímu se dni v týdnu. Algoritmus ho na tento den nasadí přednostně.
@@ -2405,7 +2405,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="clock" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Maximálně dní v řadě</h2>
+          <h2 className="t-section">Maximálně dní v řadě</h2>
         </div>
         <p className="text-sm text-black/50">
           Kolik dní po sobě může někdo pracovat. Generátor rozvrhu po dosažení limitu
@@ -2426,7 +2426,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="users" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Spravedlivé střídání</h2>
+          <h2 className="t-section">Spravedlivé střídání</h2>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={balance} onChange={e => setBalance(e.target.checked)}
@@ -2443,7 +2443,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="swap" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Dělení směn</h2>
+          <h2 className="t-section">Dělení směn</h2>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={split} onChange={e => setSplit(e.target.checked)}
@@ -2484,7 +2484,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="overview" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Maximálně hodin za měsíc</h2>
+          <h2 className="t-section">Maximálně hodin za měsíc</h2>
         </div>
         <p className="text-sm text-black/50">
           Strop odpracovaných hodin na osobu a měsíc — hodí se pro brigádníky (DPP)
@@ -2500,7 +2500,7 @@ function ScheduleRulesManager() {
       </div>
 
       <div className="glass-card p-5 space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výjimky pro jednotlivce</h3>
+        <h3 className="t-label">Výjimky pro jednotlivce</h3>
         <p className="text-sm text-black/50">
           Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse,
           nebo někdo, komu tři dny stačí.

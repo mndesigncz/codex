@@ -67,7 +67,7 @@ export default function KioskSettings() {
     <div className="glass-card p-6 space-y-4">
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-start justify-between gap-3 text-left">
         <div className="min-w-0">
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <span className="text-lg"><Icon name="clipboard" size={15} /></span> Tabletový účet (píchačky)
           </h3>
           <p className="text-black/45 text-sm mt-1">
@@ -83,7 +83,7 @@ export default function KioskSettings() {
           {err && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{err}</div>}
 
           <form onSubmit={saveAccount} className="space-y-3">
-            <p className="text-xs uppercase tracking-wider text-black/45">Přihlášení tabletu</p>
+            <p className="t-label">Přihlášení tabletu</p>
             <p className="text-xs text-black/45 -mt-1">Na tabletu se přihlásíš tímto e-mailem a heslem. Otevře se režim píchaček.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tablet@mojekavarna.cz" required className={inputClass} />
@@ -97,7 +97,7 @@ export default function KioskSettings() {
           <div className="h-px bg-black/[0.06]" />
 
           <div className="space-y-2.5">
-            <p className="text-xs uppercase tracking-wider text-black/45">PIN pro odpíchnutí (nepovinné)</p>
+            <p className="t-label">PIN pro odpíchnutí (nepovinné)</p>
             <p className="text-xs text-black/45 -mt-1">Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu — nikdo se nepodepíše za něj.</p>
             {members.length === 0 ? (
               <p className="text-sm text-black/40">Zatím žádní zaměstnanci.</p>

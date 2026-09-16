@@ -353,7 +353,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="users" size={18} className="text-[#5B7A08]" />
-          <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Právě na směně</h3>
+          <h3 className="t-label">Právě na směně</h3>
         </div>
         {onShift.length === 0 ? (
           <p className="text-sm text-black/40">Nikdo právě není na směně.</p>
@@ -396,7 +396,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Mzdové náklady */}
           {hasRates && (
             <div className="space-y-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Mzdy</h3>
+              <h3 className="t-card">Mzdy</h3>
               <div className="grid grid-cols-2 gap-4 max-w-md">
                 <div className="glass-card p-5 min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
@@ -433,7 +433,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Souhrn hodin */}
           {summary.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Souhrn hodin</h3>
+              <h3 className="t-card">Souhrn hodin</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {summary.map(s => {
                   const rate = rateById.get(s.id);
@@ -464,7 +464,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
           {/* Seznam záznamů */}
           <div className="space-y-3">
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Záznamy ({entries.length})</h3>
+            <h3 className="t-card">Záznamy ({entries.length})</h3>
             {entries.length === 0 ? (
               <div className="glass-card p-8 text-center">
                 <p className="text-black/45">Za zvolené období nejsou žádné záznamy docházky.</p>
@@ -550,7 +550,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <div ref={addModal.ref} {...addModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Přidat záznam docházky</h3>
+              <h3 className="t-card">Přidat záznam docházky</h3>
             </div>
             <p className="text-sm text-black/50 mb-4">Když se někdo zapomněl odpíchnout úplně.</p>
             {addErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{addErr}</div>}
@@ -591,7 +591,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Upravit čas na směně</h3>
+              <h3 className="t-card">Upravit čas na směně</h3>
             </div>
             <p className="text-sm text-black/50 mb-4">{editEntry.employeeName}</p>
             {editErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{editErr}</div>}

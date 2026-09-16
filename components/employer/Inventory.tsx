@@ -1242,7 +1242,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
           <div ref={reportsModal.ref} {...reportsModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
+              <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
               <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             {reports.length === 0 ? (
@@ -1386,7 +1386,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
       <div ref={bm.ref} {...bm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Hromadná úprava</h3>
+            <h3 className="t-card">Hromadná úprava</h3>
             <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
           </div>
           <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
@@ -2044,7 +2044,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
     <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
       <div ref={sm.ref} {...sm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
+          <h3 className="t-card">Nákupní seznam</h3>
           <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
@@ -2271,7 +2271,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
     <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
       <div ref={cm.ref} {...cm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Kategorie</h3>
+          <h3 className="t-card">Kategorie</h3>
           <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
@@ -2656,7 +2656,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={pm.ref} {...pm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
+          <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
           <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>

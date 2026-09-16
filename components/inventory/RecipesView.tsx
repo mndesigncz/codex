@@ -483,7 +483,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
         <button onClick={() => setDraft(null)}
           className="rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black transition">← Zpět</button>
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{draft.productName}</h2>
+          <h2 className="t-section truncate">{draft.productName}</h2>
           <p className="text-xs text-black/45">
             {ready === 0 ? 'Zatím bez surovin' : `${ready} ${ready === 1 ? 'surovina' : ready < 5 ? 'suroviny' : 'surovin'} v receptuře`}
             {menuPrice != null && <span> · v kase za {money(menuPrice)}</span>}

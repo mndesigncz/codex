@@ -139,7 +139,7 @@ export default function ShareSettings() {
       {/* ---- New link ---- */}
       <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="send" size={17} className="text-[#5B7A08]" /> Nový odkaz pro zákazníky
           </h3>
           <p className="text-sm text-black/45 mt-0.5">
@@ -198,7 +198,7 @@ export default function ShareSettings() {
       {/* ---- Existing links ---- */}
       {links.length > 0 && (
         <div className="glass-card p-6 space-y-4">
-          <h3 className="font-bold tracking-tight text-[#16181A]">Sdílené odkazy</h3>
+          <h3 className="t-card">Sdílené odkazy</h3>
           <div className="divide-y divide-black/[0.06]">
             {links.map(l => (
               <LinkRow key={l.id} link={l} cats={cats} guideCats={guideCats}
@@ -222,7 +222,7 @@ export default function ShareSettings() {
       ) : (
       <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="sun" size={17} className="text-[#5B7A08]" /> Vzhled sdílených stránek
           </h3>
           <p className="text-sm text-black/45 mt-0.5">Platí pro všechny odkazy najednou.</p>

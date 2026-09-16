@@ -100,7 +100,7 @@ export default function AnnouncementsManager() {
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="min-w-0">
-        <h2 className="font-bold tracking-tight text-[#16181A]"><Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nástěnka</h2>
+        <h2 className="t-section"><Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nástěnka</h2>
         <p className="text-sm text-black/45">
           Připnutá oznámení uvidí celý tým a přijde jim notifikace.
         </p>

@@ -100,7 +100,7 @@ export default function ClientHome() {
 function BizList({ title, items, today }: { title: string; items: Biz[]; today: string }) {
   return (
     <section>
-      <h2 className="text-lg font-bold tracking-tight mb-4">{title}</h2>
+      <h2 className="t-section mb-4">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
         {items.map((b, i) => (
           <Link key={b.slug} href={`/client/${b.slug}`}

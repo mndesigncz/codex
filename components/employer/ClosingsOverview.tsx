@@ -320,7 +320,7 @@ export default function ClosingsOverview() {
         <div className="rounded-3xl bg-red-500/[0.06] border border-red-500/25 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden>🚨</span>
-            <h3 className="font-bold text-[#16181A]">Chybí uzávěrka</h3>
+            <h3 className="t-card">Chybí uzávěrka</h3>
             <span className="rounded-full bg-red-500/15 text-red-600 px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
           </div>
           <p className="text-xs text-black/50">Tyto dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí, když ji vyplní jeden za všechny.</p>
@@ -351,7 +351,7 @@ export default function ClosingsOverview() {
         <div className="rounded-3xl bg-orange-500/[0.08] border border-orange-500/25 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
-            <h3 className="font-bold text-[#16181A]">Uzávěrky ke schválení</h3>
+            <h3 className="t-card">Uzávěrky ke schválení</h3>
             <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
           </div>
           {pending.map(c => {
@@ -464,7 +464,7 @@ export default function ClosingsOverview() {
       {analyticsOpen && (laborCost > 0 || purchases > 0) && pro && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
+            <h3 className="t-card"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
             <span className="text-[11px] text-black/35">orientační — bez DPH a fixních nákladů</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -516,7 +516,7 @@ export default function ClosingsOverview() {
       {analyticsOpen && pro && posInsights && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
+            <h3 className="t-card"><Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
             <span className="text-[11px] text-black/35">z účtenek Storyous</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
@@ -688,7 +688,7 @@ export default function ClosingsOverview() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Icon name="trend" size={18} className="text-[#5B7A08]" />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Trend tržeb</h3>
+              <h3 className="t-label">Trend tržeb</h3>
             </div>
             <div className="overflow-x-auto">
               <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-36 sm:h-44" style={{ minWidth: chartW }} role="img" aria-label="Denní tržby">
@@ -725,7 +725,7 @@ export default function ClosingsOverview() {
       <ClosingsCalendar selectedDate={selectedDate} onSelectDate={pickDate} reloadKey={dataVersion} />
 
       <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
-        <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
+        <h3 className="t-card">Uzávěrky ({topLevel.length})</h3>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <button onClick={() => openCreate()}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">

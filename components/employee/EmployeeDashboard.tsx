@@ -235,7 +235,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     nextShift: (
             <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs uppercase tracking-wider text-black/45">Nejbližší směna</p>
+                <p className="t-label">Nejbližší směna</p>
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
               </div>
               {nextShift ? (
@@ -274,17 +274,17 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     stats: (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
-                <p className="text-xs uppercase tracking-wider text-black/45">Moje úkoly</p>
+                <p className="t-label">Moje úkoly</p>
                 <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{activeTasks.length}</p>
                 <p className="text-xs text-black/45 mt-1">aktivních</p>
               </button>
               <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
-                <p className="text-xs uppercase tracking-wider text-black/45">Nepřečtené zprávy</p>
+                <p className="t-label">Nepřečtené zprávy</p>
                 <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{unreadChats}</p>
                 <p className="text-xs text-black/45 mt-1">v chatu</p>
               </button>
               <div className="text-left glass-card p-5 col-span-2 sm:col-span-1">
-                <p className="text-xs uppercase tracking-wider text-black/45">Odpracováno</p>
+                <p className="t-label">Odpracováno</p>
                 <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">
                   {workedH}<span className="text-lg font-semibold text-black/45"> h </span>{workedM > 0 && <>{workedM}<span className="text-lg font-semibold text-black/45"> min</span></>}
                 </p>
@@ -332,7 +332,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     lowStock: lowStock.length > 0 ? (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Zásoby, které docházejí</h3>
+                  <h3 className="t-card">Zásoby, které docházejí</h3>
                   <button onClick={() => onNavigate('inventory')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
                 </div>
                 <div className="flex flex-wrap gap-2">

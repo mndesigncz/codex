@@ -306,7 +306,7 @@ export default function Procedures({ user }: Props) {
       {/* Recent runs */}
       {(isEmployer || runs.length > 0) && !loading && (
         <div className="mt-10">
-          <h2 className="text-lg font-bold tracking-tight text-[#16181A]">
+          <h2 className="t-section">
             {isEmployer ? 'Poslední průběhy' : 'Moje průběhy'}
           </h2>
           {runs.length === 0 ? (
@@ -363,7 +363,7 @@ export default function Procedures({ user }: Props) {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
               </div>
               <div className="min-w-0">
-                <h3 className="font-bold tracking-tight text-[#16181A]">Smazat postup?</h3>
+                <h3 className="t-card">Smazat postup?</h3>
                 <p className="text-sm text-black/55 truncate">„{confirmDel.name}"</p>
               </div>
             </div>
@@ -498,7 +498,7 @@ function ProcedureDetail({
                 <Icon name={procedure.icon || 'check'} size={24} />
               </span>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{procedure.name}</h2>
+                <h2 className="t-section truncate">{procedure.name}</h2>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-black/50">
                   <span>{steps.length} {stepsWord(steps.length)}</span>
                   {mins > 0 && <><span className="text-black/25">•</span><span className="inline-flex items-center gap-1"><Icon name="clock" size={12} /> {fmtMinutes(mins)}</span></>}
@@ -650,7 +650,7 @@ function ProcedureEditor({
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <h2 className="text-xl font-bold tracking-tight text-[#16181A]">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
+          <h2 className="t-section">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
           <button onClick={onClose} aria-label="Zavřít" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>

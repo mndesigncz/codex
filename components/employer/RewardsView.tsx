@@ -340,7 +340,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
       {/* Levels */}
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-bold tracking-tight text-[#16181A]">Úrovně a výhody</h3>
+          <h3 className="t-card">Úrovně a výhody</h3>
           <button onClick={addLevel} className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
             <Icon name="plus" size={14} /> Přidat
           </button>

@@ -1222,7 +1222,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       {/* My past closings (hidden on the shared kiosk and when embedded) */}
       {!isKiosk && !hideHistory && (
       <div className="space-y-3">
-        <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+        <h3 className="t-card flex items-center gap-2">
           <Icon name="clock" size={18} /> Moje uzávěrky
         </h3>
         {loading ? (

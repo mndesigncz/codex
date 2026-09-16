@@ -446,7 +446,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <Avatar emoji={member.avatar} size="xl" ring={false} />
-        <h2 className="text-xl font-bold tracking-tight text-[#16181A] mt-2">{member.name}</h2>
+        <h2 className="t-section mt-2">{member.name}</h2>
         <p className="text-sm text-black/50 mt-1">
           {on
             ? `Na směně od ${timeOf(member.openSince!)} · ${elapsed(member.openSince!, now)}`

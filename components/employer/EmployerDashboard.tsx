@@ -60,7 +60,7 @@ function StatCard({ icon, label, value, onClick, alert = false }: { icon: string
   return (
     <button onClick={onClick} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
       <div className="flex items-start justify-between">
-        <p className="text-xs uppercase tracking-wider text-black/45">{label}</p>
+        <p className="t-label">{label}</p>
         <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-600' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#5B7A08]'}`}>
           <Icon name={icon} size={16} />
         </span>
@@ -373,7 +373,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08] shrink-0"><Icon name="award" size={17} /></span>
                     <div className="min-w-0">
-                      <h3 className="font-bold tracking-tight text-[#16181A]">Ohodnotit směny</h3>
+                      <h3 className="t-card">Ohodnotit směny</h3>
                       <p className="text-xs text-black/45">Projdi, co kdo udělal, a dej hodnocení.</p>
                     </div>
                   </div>
@@ -437,7 +437,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             <div className="glass-card p-6">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="min-w-0">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Dostupnost — {monthLabel}</h3>
+                  <h3 className="t-card">Dostupnost — {monthLabel}</h3>
                   <p className="text-sm text-black/45">{submittedIds.size} z {members.length} zaměstnanců zadalo dostupnost</p>
                 </div>
                 <button onClick={() => onNavigate('shifts')} className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110 whitespace-nowrap shrink-0">Sestavit rozvrh</button>
@@ -461,7 +461,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     lowStock: (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Nízké zásoby</h3>
+                  <h3 className="t-card">Nízké zásoby</h3>
                   <button onClick={() => onNavigate('inventory')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
                 </div>
                 {lowStock.length === 0 ? (
@@ -484,7 +484,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     todayShifts: (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Dnešní směny</h3>
+                  <h3 className="t-card">Dnešní směny</h3>
                   <button onClick={() => onNavigate('shifts')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Rozvrh →</button>
                 </div>
                 {todayShifts.length === 0 ? (

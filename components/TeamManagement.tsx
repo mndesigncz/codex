@@ -723,7 +723,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Business / localization settings — makes the app fit any team */}
       <div className="glass-card p-6 space-y-5">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="settings" size={18} /> Provoz podniku
           </h3>
           <p className="text-black/45 text-sm mt-1">Měna, formát čísel a cíle — přizpůsob appku svému podniku.</p>
@@ -775,7 +775,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Dashboard customization */}
       <div className="glass-card p-6 space-y-5">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="overview" size={18} /> Dashboardy
           </h3>
           <p className="text-black/45 text-sm mt-1">
@@ -818,7 +818,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Payout / cash settings */}
       <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="trend" size={18} /> Výplaty a uzávěrka
           </h3>
           <p className="text-black/45 text-sm mt-1">Nastavení, které ovlivňuje denní uzávěrku zaměstnanců.</p>
@@ -918,7 +918,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">
                 <Icon name="warning" size={20} />
               </div>
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Odebrat člena</h3>
+              <h3 className="t-card">Odebrat člena</h3>
             </div>
             <p className="text-sm text-black/60">
               Opravdu chcete odebrat <span className="text-[#16181A] font-medium">{removeTarget.name}</span> z týmu?

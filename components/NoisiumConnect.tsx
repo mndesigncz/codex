@@ -48,7 +48,7 @@ export default function NoisiumConnect() {
     <div className="glass-card p-6 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="kanban" size={18} className="flex-shrink-0" /> Propojení s Noisium
           </h3>
           <p className="text-black/45 text-sm mt-1">Publikuj úkoly z Plánování přímo do Noisium (Plan app).</p>

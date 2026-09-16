@@ -79,7 +79,7 @@ export default function FinanceAdvice({ month }: { month: string }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 px-1">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Co zlepšit</h3>
+          <h3 className="t-label">Co zlepšit</h3>
           {advice && advice.length > 0 && (
             <p className="text-xs text-black/45 mt-0.5">
               {advice.length} pozorování z čísel tohohle měsíce
@@ -154,7 +154,7 @@ export default function FinanceAdvice({ month }: { month: string }) {
                           </span>
                         )}
                         {a.evidence && (
-                          <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-[11px] text-black/50">{a.evidence}</span>
+                          <span className="chip chip-muted">{a.evidence}</span>
                         )}
                       </div>
                     )}

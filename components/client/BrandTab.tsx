@@ -110,7 +110,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       <section className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold tracking-tight">Galerie</h2>
+            <h2 className="t-section">Galerie</h2>
             <p className="text-xs text-black/50 mt-0.5">Až osm fotek z podniku. Host je uvidí na tvé stránce.</p>
           </div>
           <label className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 py-2 text-sm font-semibold hover:bg-black/[0.09] transition cursor-pointer">
@@ -138,7 +138,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
 
       <section className="glass-card p-5 grid gap-4">
         <div>
-          <h2 className="font-bold tracking-tight">Barva značky</h2>
+          <h2 className="t-section">Barva značky</h2>
           <p className="text-xs text-black/50 mt-0.5">Použije se na stránce pro hosty. Bez výběru zůstane limetková jako ve zbytku aplikace.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -155,7 +155,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       </section>
 
       <section className="glass-card p-5 grid gap-4">
-        <h2 className="font-bold tracking-tight">O podniku</h2>
+        <h2 className="t-section">O podniku</h2>
         <div><label htmlFor="b-tag" className={label}>Motto</label><input id="b-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." className={input} maxLength={120} /></div>
         <div><label htmlFor="b-desc" className={label}>Pár vět</label><textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malá čajovna v přízemí starého domu. Sedí se na zemi i u stolů." className={input} maxLength={1200} /></div>
         <div><label htmlFor="b-addr" className={label}>Adresa</label><input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" className={input} /></div>

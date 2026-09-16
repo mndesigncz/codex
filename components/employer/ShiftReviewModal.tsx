@@ -460,7 +460,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                 <div className="rounded-2xl border border-black/[0.06] bg-black/[0.02] p-3.5">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon name="bulb" size={14} className="text-black/45" />
-                    <span className="text-xs uppercase tracking-wider text-black/45">Automatické body</span>
+                    <span className="t-label">Automatické body</span>
                     <span className={`ml-auto text-sm font-bold tabular-nums ${summary.autoPoints.total > 0 ? 'text-[#5B7A08]' : summary.autoPoints.total < 0 ? 'text-red-600' : 'text-black/40'}`}>{signed(summary.autoPoints.total)}</span>
                   </div>
                   <div className="space-y-1">

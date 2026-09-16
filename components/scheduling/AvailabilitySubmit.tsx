@@ -245,7 +245,7 @@ export default function AvailabilitySubmit({ user }: Props) {
           {/* Calendar */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-bold text-[#16181A] cz-sentence flex items-center gap-2">
+              <h2 className="t-section cz-sentence flex items-center gap-2">
                 <Icon name="calendar" size={20} />
                 {monthLabel(month)}
               </h2>

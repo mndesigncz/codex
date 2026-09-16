@@ -247,7 +247,7 @@ export default function FinanceView() {
           {/* Where the money went */}
           {breakdown.length > 0 && (
             <div className="glass-card rounded-3xl p-5 space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Kam šly peníze</h3>
+              <h3 className="t-label">Kam šly peníze</h3>
               {breakdown.map(b => (
                 <div key={b.label}>
                   <div className="flex items-center justify-between text-sm mb-1">
@@ -272,7 +272,7 @@ export default function FinanceView() {
           {g && (g.orders > 0 || g.members > 0) && (
             <div className="glass-card rounded-3xl p-5 space-y-3">
               <div className="flex items-end justify-between gap-3 flex-wrap">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Hosté a věrnost</h3>
+                <h3 className="t-label">Hosté a věrnost</h3>
                 <span className="text-xs text-black/45">z objednávek od stolu a kartiček</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -283,7 +283,7 @@ export default function FinanceView() {
                   ['Uplatněných kuponů', String(g.couponsRedeemed), 'sleva na útratě'],
                 ] as [string, string, string][]).map(([lb, val, sub]) => (
                   <div key={lb} className="rounded-2xl bg-black/[0.035] px-3.5 py-3">
-                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">{lb}</p>
+                    <p className="t-label">{lb}</p>
                     <p className="mt-1 text-lg font-bold tabular-nums text-[#16181A]">{val}</p>
                     <p className="text-[11px] text-black/40 leading-snug">{sub}</p>
                   </div>
@@ -313,7 +313,7 @@ export default function FinanceView() {
           {pos && pos.items?.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-end justify-between gap-3 px-1">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Co vydělává (z pokladny)</h3>
+                <h3 className="t-label">Co vydělává (z pokladny)</h3>
                 {pos.totals?.marginPct != null && (
                   <span className="text-xs text-black/45">
                     marže <b className="text-[#5B7A08]">{pos.totals.marginPct} %</b> na položkách s recepturou
@@ -377,7 +377,7 @@ export default function FinanceView() {
           {/* Ledger */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výdaje ({filtered.length}{filtered.length !== ledger.length ? ` z ${ledger.length}` : ''}) · {money(filteredSum)}</h3>
+              <h3 className="t-label">Výdaje ({filtered.length}{filtered.length !== ledger.length ? ` z ${ledger.length}` : ''}) · {money(filteredSum)}</h3>
               <div className="flex items-center gap-2 flex-wrap min-w-0 w-full sm:w-auto">
               <div className="relative min-w-0 flex-1 sm:flex-none">
                 <Icon name="search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/35" />
@@ -432,7 +432,7 @@ export default function FinanceView() {
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setDetail(null)}>
           <div ref={detailModal.ref} {...detailModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-3 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+              <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> {detail.label}
               </h3>
               <button aria-label="Zavřít" onClick={() => setDetail(null)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>

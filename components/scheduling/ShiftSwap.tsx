@@ -74,7 +74,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
     <div className="px-6 pb-8 space-y-6 max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-2.5">
         <Icon name="swap" size={22} className="text-[#16181A]" />
-        <h2 className="text-xl font-bold tracking-tight text-[#16181A]">Burza směn</h2>
+        <h2 className="t-section">Burza směn</h2>
       </div>
 
       {msg && (
@@ -91,7 +91,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
 
       {/* Offer one of my upcoming shifts */}
       <div className="glass-card p-5 space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Nabídnout mou směnu</h3>
+        <h3 className="t-label">Nabídnout mou směnu</h3>
         {offerable.length === 0 ? (
           <p className="text-sm text-black/45">Nemáš žádnou nadcházející směnu k nabídnutí.</p>
         ) : (
@@ -119,7 +119,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
 
       {/* The board — colleagues' open shifts */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Volné směny kolegů</h3>
+        <h3 className="t-label">Volné směny kolegů</h3>
         {board.length === 0 ? (
           <div className="glass-card p-6 text-center text-sm text-black/45">Právě žádné volné směny.</div>
         ) : (
@@ -143,7 +143,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
       {/* Things I'm involved in */}
       {(mine.length > 0 || claimedByMe.length > 0) && (
         <div className="space-y-3">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Moje výměny</h3>
+          <h3 className="t-label">Moje výměny</h3>
           {mine.map(o => (
             <div key={o.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-2 flex-wrap">
               <div className="min-w-0 flex-1 basis-40">

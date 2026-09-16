@@ -96,7 +96,7 @@ export default function LiveRevenue() {
     <div className="glass-card p-5 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-bold tracking-tight text-[#16181A]">
+          <h3 className="t-card">
             Živě z pokladny{d?.placeName ? ` · ${d.placeName}` : ''}
           </h3>
           <p className="text-[11px] text-black/40">
@@ -139,12 +139,12 @@ export default function LiveRevenue() {
           {/* Peníze */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Tržba</p>
+              <p className="t-label">Tržba</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.total)}</p>
               <p className="text-[11px] text-black/40">{t.bills} účtenek · ⌀ {money(t.avgBill)}</p>
             </div>
             <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Hotově</p>
+              <p className="t-label">Hotově</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.cash)}</p>
               <p className="text-[11px] text-black/40">
                 {t.total > 0 ? Math.round((t.cash / t.total) * 100) : 0} % tržby
@@ -152,7 +152,7 @@ export default function LiveRevenue() {
               </p>
             </div>
             <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Kartou</p>
+              <p className="t-label">Kartou</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.card)}</p>
               <p className="text-[11px] text-black/40">
                 {t.total > 0 ? Math.round((t.card / t.total) * 100) : 0} % tržby
@@ -160,7 +160,7 @@ export default function LiveRevenue() {
               </p>
             </div>
             <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Spropitné</p>
+              <p className="t-label">Spropitné</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.tips)}</p>
               <p className="text-[11px] text-black/40">
                 {t.refundCount > 0 ? `${t.refundCount}× refundace ${money(t.refundTotal)}` : t.other > 0 ? `jinak ${money(t.other)}` : 'bez refundací'}

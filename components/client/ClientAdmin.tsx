@@ -45,7 +45,7 @@ function StatCard({ icon, label, value, onClick, tone = 'ok' }: { icon: string; 
   return (
     <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition-all duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-amber-500/25' : ''}`}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] uppercase tracking-wider text-black/50 leading-tight">{label}</p>
+        <p className="t-label">{label}</p>
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
       </div>
       <p className="text-3xl font-bold tracking-tight tabular-nums text-[#16181A] mt-3">{value}</p>
@@ -57,7 +57,7 @@ function StatCard({ icon, label, value, onClick, tone = 'ok' }: { icon: string; 
 function SectionTitle({ icon, children, action }: { icon: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-3">
-      <h2 className="text-base font-bold tracking-tight flex items-center gap-2.5">
+      <h2 className="t-section flex items-center gap-2.5">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name={icon} size={15} /></span>
         {children}
       </h2>
@@ -109,7 +109,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         <button onClick={onExit} title="Zpět do administrace" aria-label="Zpět do administrace" className="tap-target rounded-full p-2 text-black/55 hover:text-black hover:bg-black/[0.05] transition"><Icon name="chevron" size={20} className="rotate-90" /></button>
         <LogoMark size={30} />
         <p className="font-bold tracking-tight leading-none">Managero <span className="text-black/45 font-semibold">client</span></p>
-        {summary?.enabled === false && <span className="rounded-full bg-amber-500/15 text-amber-800 px-2.5 py-1 text-[11px] font-semibold">Pro hosty vypnuto</span>}
+        {summary?.enabled === false && <span className="chip chip-wait">Pro hosty vypnuto</span>}
         {summary?.attention > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-1 text-[11px] font-bold tabular-nums">{summary.attention} k vyřízení</span>}
         <div className="ml-auto hidden sm:block"><Button variant="secondary" size="sm" icon="external" onClick={() => summary?.slug && window.open(`/client/${summary.slug}`, '_blank')} disabled={!summary?.slug}>Stránka pro hosty</Button></div>
       </header>
@@ -339,7 +339,7 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
         ? <EmptyState icon="calendarCheck" title={range === 'past' ? 'Žádné minulé rezervace' : 'Zatím žádné rezervace'} hint={range === 'past' ? '' : 'Objeví se tu, jakmile si host zarezervuje stůl na tvé stránce.'} compact />
         : groups.map(([date, rows]) => (
           <section key={date} className="glass-card p-4 sm:p-5">
-            <h2 className="text-sm font-bold tracking-tight cz-sentence mb-1 flex items-center gap-2"><Icon name="calendar" size={15} className="text-[#4F6A07]" />{czDay(date, true)} <span className="text-black/40 font-medium">· {rows.length}</span></h2>
+            <h2 className="t-card cz-sentence mb-1 flex items-center gap-2"><Icon name="calendar" size={15} className="text-[#4F6A07]" />{czDay(date, true)} <span className="text-black/40 font-medium">· {rows.length}</span></h2>
             <ul className="divide-y divide-black/[0.06]">
               {rows.map((r: any) => {
                 const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
@@ -592,7 +592,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
         {!hoursOk && <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 px-3 py-2">Podnik nemá vyplněnou otevírací dobu (Rozvrh → Otevírací doba). Bez ní hosté nemůžou rezervovat.</p>}
       </section>
       <section className="glass-card p-5 grid gap-4">
-        <h2 className="font-bold tracking-tight">Nabídka pro hosty</h2>
+        <h2 className="t-section">Nabídka pro hosty</h2>
         <div>
           <label htmlFor="s-menu" className={label}>Které menu se hostům ukáže</label>
           <select id="s-menu" value={p.menu_slug ?? ''} onChange={e => setP({ ...p, menu_slug: e.target.value })} className={input}>
@@ -618,7 +618,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
         </div>
       </section>
       <section className="glass-card p-5 grid gap-4">
-        <h2 className="font-bold tracking-tight">Rezervace</h2>
+        <h2 className="t-section">Rezervace</h2>
         <label className="flex items-center min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={!!p.reservations_on} onChange={e => setP({ ...p, reservations_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou rezervovat</label>
         <label className="flex items-center min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={!!p.ordering_on} onChange={e => setP({ ...p, ordering_on: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /> Hosté můžou objednávat od stolu</label>
         <p className="text-xs text-black/50 -mt-2">Objednávky potřebují stoly (záložka Stoly) a nabídku z Menu. S napojenou pokladnou jdou přijaté objednávky rovnou na stůl v kase.</p>
@@ -630,7 +630,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
       </section>
       <section className="glass-card p-5 grid gap-4">
         <div>
-          <h2 className="font-bold tracking-tight">Ochrana objednávek od stolu</h2>
+          <h2 className="t-section">Ochrana objednávek od stolu</h2>
           <p className="text-xs text-black/50 mt-0.5">Aby objednával jen ten, kdo u stolu opravdu sedí. Dvě nezávislé stopy: QR kód na stole a poloha telefonu.</p>
         </div>
         <label className="flex items-start min-h-9 py-1 gap-3 text-sm"><input type="checkbox" checked={p.order_qr_required !== false} onChange={e => setP({ ...p, order_qr_required: e.target.checked })} className="h-4 w-4 mt-0.5 accent-[#16181A]" />

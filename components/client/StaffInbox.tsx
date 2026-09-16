@@ -193,13 +193,13 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       )}
       {inProgress.length > 0 && (
         <section>
-          <h2 className="text-sm font-bold tracking-tight mb-2">Připravuje se</h2>
+          <h2 className="t-card mb-2">Připravuje se</h2>
           <ul className="space-y-3">{inProgress.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
         </section>
       )}
       {!compact && reservations.length > 0 && (
         <section>
-          <h2 className="text-sm font-bold tracking-tight mb-2">Dnešní rezervace</h2>
+          <h2 className="t-card mb-2">Dnešní rezervace</h2>
           <ul className="divide-y divide-black/[0.06]">
             {reservations.map(r => (
               <li key={r.id} className="py-2 flex items-center gap-3 flex-wrap">

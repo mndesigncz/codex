@@ -81,7 +81,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
               <div className="flex items-center gap-3.5 px-5 pt-5 pb-3">
                 <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.employee.avatar || '👤'}</span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{p.employee.name}</h2>
+                  <h2 className="t-section truncate">{p.employee.name}</h2>
                   <p className="text-sm text-black/50 truncate">
                     {p.employee.jobTitle || 'Zaměstnanec'}
                     {p.employee.hourlyRate ? ` · ${p.employee.hourlyRate} Kč/h` : ''}
@@ -131,7 +131,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 
                   {/* This month */}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Tento měsíc</h3>
+                    <h3 className="t-label mb-2">Tento měsíc</h3>
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
                         <p className="text-base sm:text-xl font-bold tracking-tight text-[#16181A] tabular-nums whitespace-nowrap">{hours}<span className="text-xs font-semibold text-black/40"> h </span>{minutes > 0 && <>{minutes}<span className="text-xs font-semibold text-black/40"> m</span></>}</p>
@@ -160,7 +160,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 
                   {/* Points breakdown */}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Odkud má body</h3>
+                    <h3 className="t-label mb-2">Odkud má body</h3>
                     <div className="flex flex-wrap gap-1.5">
                       {([
                         ['Úkoly', p.breakdown.tasks], ['Postupy', p.breakdown.procedures], ['Uzávěrky', p.breakdown.closings],
@@ -201,7 +201,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   {/* Contact */}
                   {(p.employee.email || p.employee.phone) && (
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Kontakt</h3>
+                      <h3 className="t-label mb-2">Kontakt</h3>
                       <div className="rounded-2xl bg-black/[0.03] p-3.5 space-y-1 text-sm">
                         {p.employee.email && <p className="text-[#16181A] truncate"><Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.employee.email}</p>}
                         {p.employee.phone && <p className="text-[#16181A]">📞 {p.employee.phone}</p>}
@@ -227,7 +227,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     </div>
                   )}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Odpracované ({p.shifts.recent.length})</h3>
+                    <h3 className="t-label mb-2">Odpracované ({p.shifts.recent.length})</h3>
                     {p.shifts.recent.length === 0 ? (
                       <EmptyState illustration="smeny" title="Zatím žádná odpracovaná směna" compact />
                     ) : (

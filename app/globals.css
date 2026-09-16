@@ -158,11 +158,11 @@ body::after {
 /* ---------- Typografická škála ----------
    Nadpis obrazovky 28, sekce 18, karta 15, meta 13, štítek 11. Jediné
    povolené velikosti nadpisů — 10 velikostí h1 a 9 h2 bylo moc. */
-:where(.t-page) { font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.022em; color: var(--ink); }
-:where(.t-section) { font-size: 1.125rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
-:where(.t-card) { font-size: 0.9375rem; line-height: 1.3; font-weight: 600; color: var(--ink); }
-:where(.t-meta) { font-size: 0.8125rem; line-height: 1.4; color: rgba(22,24,26,0.60); }
-:where(.t-label) { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(22,24,26,0.50); }
+.t-page { font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.022em; color: var(--ink); }
+.t-section { font-size: 1.125rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
+.t-card { font-size: 0.9375rem; line-height: 1.3; font-weight: 600; color: var(--ink); }
+.t-meta { font-size: 0.8125rem; line-height: 1.4; color: rgba(22,24,26,0.60); }
+.t-label { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(22,24,26,0.50); }
 
 /* Everything tappable presses like a real surface. */
 button, a[role="button"], .pressable {

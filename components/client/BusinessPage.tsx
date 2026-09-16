@@ -192,7 +192,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
       <div className="space-y-6">
         {menu?.sections?.length ? menu.sections.map((s: any) => (
           <section key={s.id}>
-            <h2 className="text-lg font-bold tracking-tight mb-2">{s.title}</h2>
+            <h2 className="t-section mb-2">{s.title}</h2>
             <ul className="divide-y divide-black/[0.06]">
               {s.items.map((it: any) => (
                 <li key={it.id} className={`py-2.5 flex items-baseline gap-3 ${it.soldOut ? 'opacity-50' : ''}`}>
@@ -274,7 +274,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   return (
     <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 md:gap-10 items-start">
       <form onSubmit={submit} className="glass-card p-5 sm:p-6 grid gap-4" noValidate>
-        <h2 className="text-lg font-bold tracking-tight">Rezervovat stůl</h2>
+        <h2 className="t-section">Rezervovat stůl</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="grid gap-2">
             <label htmlFor="r-date" className={label}>Den</label>
@@ -364,7 +364,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
   return (
     <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6 md:gap-10 items-start">
       <section className="glass-card p-5 sm:p-6">
-        <h2 className="text-lg font-bold tracking-tight">Razítka a body</h2>
+        <h2 className="t-section">Razítka a body</h2>
         {me?.member ? (
           <>
             {(me.campaigns ?? []).length > 0 ? (
@@ -461,7 +461,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
         </form>
       </section>
       <section>
-        <h2 className="text-lg font-bold tracking-tight mb-3">Kupony za body</h2>
+        <h2 className="t-section mb-3">Kupony za body</h2>
         {err && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
         {coupons?.length ? (
           <ul className="divide-y divide-black/[0.06]">
@@ -639,7 +639,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
       </div>
       <aside className="space-y-4 md:sticky md:top-24">
         <div className="glass-card p-5 space-y-3">
-          <h2 className="text-lg font-bold tracking-tight">Objednávka</h2>
+          <h2 className="t-section">Objednávka</h2>
           {lines.length === 0 ? <p className="text-sm text-black/55">Zatím prázdná. Přidej něco z nabídky.</p> : (
             <ul className="divide-y divide-black/[0.06] text-sm">
               {lines.map(l => <li key={l.id} className="py-1.5 flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums">{l.price * l.count} {cur}</span></li>)}

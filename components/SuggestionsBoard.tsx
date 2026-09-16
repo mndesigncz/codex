@@ -289,7 +289,7 @@ export default function SuggestionsBoard() {
           <div ref={composeModal.ref} {...composeModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="grid place-items-center h-10 w-10 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="bulb" size={20} /></div>
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nový podnět</h3>
+              <h3 className="t-card">Nový podnět</h3>
             </div>
             {err && (
               <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2 mb-3">

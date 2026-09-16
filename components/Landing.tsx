@@ -126,7 +126,7 @@ export default function Landing() {
         </div>
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
           <div className="glass-card p-7 flex flex-col">
-            <h3 className="font-bold tracking-tight text-[#16181A]">Zdarma</h3>
+            <h3 className="t-card">Zdarma</h3>
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">0 Kč</p>
             <p className="text-xs text-black/40 mt-1">navždy</p>
             <p className="mt-4 text-sm text-black/55">Základ pro malý tým: směny, úkoly, chat, uzávěrky a sklad.</p>
@@ -136,7 +136,7 @@ export default function Landing() {
           </div>
           <div className="glass-card p-7 flex flex-col relative overflow-hidden border-2 !border-[#C8F542]/60">
             <span className="absolute top-4 right-4 rounded-full bg-[#C8F542] text-black text-[11px] font-bold uppercase tracking-wider px-2.5 py-1">Doporučeno</span>
-            <h3 className="font-bold tracking-tight text-[#16181A]">Pro</h3>
+            <h3 className="t-card">Pro</h3>
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">{PRO_PRICE.monthly} {PRO_PRICE.currency}</p>
             <p className="text-xs text-black/40 mt-1">{PRO_PRICE.per}</p>
             <p className="mt-4 text-sm text-black/55">Všechno bez limitů: neomezený tým, kiosk pro tablet, odměny, exporty a sdílené menu ve vašich barvách.</p>

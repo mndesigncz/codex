@@ -47,7 +47,7 @@ export default function ChatView({ user }: Props) {
       >
         <div className="px-5 py-4 border-b border-black/[0.06] flex items-center gap-2">
           <Icon name="chat" size={22} className="text-[#5B7A08]" />
-          <h2 className="text-lg font-semibold text-[#16181A]">Zprávy</h2>
+          <h2 className="t-section">Zprávy</h2>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
           {loading && (

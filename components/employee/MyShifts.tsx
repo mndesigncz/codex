@@ -117,21 +117,21 @@ export default function MyShifts({ user }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-black/45">Nadcházející</p>
+          <p className="t-label">Nadcházející</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{upcoming.length}</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${shifts.length ? Math.min(100, (upcoming.length / shifts.length) * 100) : 0}%` }} />
           </div>
         </div>
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-black/45">Odpracované</p>
+          <p className="t-label">Odpracované</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">{fmtHours(workedHours)} h</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, (workedHours / totalHours) * 100) : 0}%` }} />
           </div>
         </div>
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
-          <p className="text-xs uppercase tracking-wider text-black/45">Celkem směn</p>
+          <p className="t-label">Celkem směn</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{shifts.length}</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: shifts.length ? '100%' : '0%' }} />
@@ -165,7 +165,7 @@ export default function MyShifts({ user }: Props) {
         <>
           <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-              <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nadcházející směny</h3>
+              <h3 className="t-card"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nadcházející směny</h3>
               {upcoming.length > 0 && (
                 <button onClick={exportIcs}
                   className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
