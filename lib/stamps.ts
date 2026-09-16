@@ -8,6 +8,7 @@
 // (billDetail) — produkty se poznávají přes párování nabídky (pos_product_id).
 
 import { sql, couponCode } from './client';
+import { pragueToday, dayPlus } from './pragueTime';
 
 export interface StampCampaign {
   id: number; team_id: number; name: string; description: string; conditions: string;
@@ -128,8 +129,8 @@ export async function addStamps(
 
   // Každé dokončení = kupon s kódem (host ho ukáže u kasy).
   for (let i = 0; i < completions; i++) {
-    const validUntil = c.days_to_redeem > 0
-      ? new Date(Date.now() + c.days_to_redeem * 86400000).toISOString().slice(0, 10) : null;
+    // Lhůta se počítá od pražského dne, ne z UTC — po noční by jinak platila o den míň.
+    const validUntil = c.days_to_redeem > 0 ? dayPlus(pragueToday(), c.days_to_redeem) : null;
     const [coupon] = await sql`
       INSERT INTO client_coupons (team_id, title, description, cost_points, active, kind, valid_until)
       VALUES (${c.team_id}, ${c.reward_title || `Odměna — ${c.name}`}, ${'Za plnou kartu „' + c.name + '“.'}, 0, TRUE, 'stamps', ${validUntil})

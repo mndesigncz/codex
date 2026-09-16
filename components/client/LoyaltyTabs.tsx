@@ -286,7 +286,7 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
                 className="w-full text-left px-3.5 py-2 hover:bg-[#C8F542]/15 transition flex items-center gap-2">
                 <span className="text-sm font-medium min-w-0 flex-1 truncate">{i.name}</span>
                 <span className="text-[11px] text-black/45 shrink-0">{i.board}</span>
-                {!i.paired && <span className="shrink-0 text-[10px] font-semibold rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5">bez pokladny</span>}
+                {!i.paired && <span className="shrink-0 text-[11px] font-semibold rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5">bez pokladny</span>}
               </button>
             </li>
           ))}
