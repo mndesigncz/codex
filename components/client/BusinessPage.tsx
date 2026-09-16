@@ -121,7 +121,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
         </div>
       </section>
 
-      {flash && <p role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
+      {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
 
       {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel="Části stránky podniku" />}
 
@@ -807,7 +807,7 @@ function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose
             <Icon name="calendarCheck" size={15} className="shrink-0" />Přidat do kalendáře (.ics)
           </button>
           {!signedIn && <p className="text-xs text-black/45 mt-2 text-center">Na „Přijdu" a hlídání se přihlas — připomínku pošleme den předem.</p>}
-          {msg && <p role="status" className="text-xs text-[#3E5406] bg-[#C8F542]/15 border border-[#C8F542]/35 rounded-xl px-3 py-2 mt-2 text-center">{msg}</p>}
+          {msg && <p role="status" className="toast-in text-xs text-[#3E5406] bg-[#C8F542]/15 border border-[#C8F542]/35 rounded-xl px-3 py-2 mt-2 text-center">{msg}</p>}
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import React from 'react';
 
-// Kostra načítání ve tvaru obsahu, ne kolečko uprostřed.
+// Kostra načítání ve tvaru obsahu, ne kolečko uprostřed. Přes kostru běží
+// světelný pruh (shimmer) — pulzování celé plochy působilo jako blikání.
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div aria-hidden className={`rounded-2xl bg-black/[0.05] animate-pulse ${className}`} />;
+  return <div aria-hidden className={`rounded-2xl shimmer ${className}`} />;
 }
 
 /** Kostra celé obrazovky: nadpis, karta, dvě dlaždice, karta. */

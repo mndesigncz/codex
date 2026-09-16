@@ -116,7 +116,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
       <div className="shrink-0 hidden md:block px-4 sm:px-6 pb-2">
         <Segmented options={TABS.map(t => ({ id: t.id, label: t.label }))} value={tab} onChange={setTab} size="sm" ariaLabel="Části režimu Client" wrap />
       </div>
-      {toast && <p role="status" className="shrink-0 mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
+      {toast && <p role="status" className="toast-in shrink-0 mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
       <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-36 md:pb-8">
         {tab === 'overview' && <Overview summary={summary} go={setTab} onCustomer={openCustomer} />}
         {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} onCustomer={openCustomer} />}

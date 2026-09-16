@@ -61,7 +61,9 @@ export function Menu({ items, label = 'Další akce', size = 'md', align = 'righ
       {open && (
         <div
           role="menu"
-          className={`absolute top-full mt-2 z-40 min-w-[220px] max-w-[calc(100vw-2rem)] glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] rise-in ${align === 'right' ? 'right-0' : 'left-0'}`}
+          // Roste z tlačítka, které ho otevřelo — ne ze středu. Rychlé
+          // (160 ms): menu se otevírá desetkrát denně, ne jednou.
+          className={`absolute top-full mt-2 z-40 min-w-[220px] max-w-[calc(100vw-2rem)] glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] pop-in ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}
         >
           {visible.map((it, i) => (
             <button

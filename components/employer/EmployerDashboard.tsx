@@ -270,20 +270,22 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               )}
             </div>
           )}
-          <div className="grid grid-cols-3 gap-2 mt-2.5">
-            <button onClick={() => go('customers')} className="text-left rounded-2xl bg-black/[0.035] px-3 py-2.5 hover:bg-black/[0.06] transition">
-              <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">Členů</p>
-              <p className="text-lg font-bold tabular-nums text-[#16181A] leading-tight">{guests.members ?? 0}</p>
+          {/* Tři čísla vedle sebe oddělená linkou, ne tři šedé dlaždice v kartě —
+              karta v kartě dělá z přehledu skříňku se šuplíky. */}
+          <div className="grid grid-cols-3 divide-x divide-black/[0.07] mt-3 -mx-1">
+            <button onClick={() => go('customers')} className="text-left px-3 py-1 rounded-xl hover:bg-black/[0.035] transition-colors">
+              <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold leading-tight">Členů</p>
+              <p className="text-2xl font-bold tabular-nums text-[#16181A] leading-tight mt-0.5 tracking-tight">{guests.members ?? 0}</p>
               <p className="text-[11px] text-black/40 leading-snug">+{guests.newMembers30 ?? 0} za 30 dní</p>
             </button>
-            <button onClick={() => go('orders')} className="text-left rounded-2xl bg-black/[0.035] px-3 py-2.5 hover:bg-black/[0.06] transition">
-              <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">Dnes od stolu</p>
-              <p className="text-lg font-bold tabular-nums text-[#16181A] leading-tight">{guests.orders?.today ?? 0}</p>
+            <button onClick={() => go('orders')} className="text-left px-3 py-1 rounded-xl hover:bg-black/[0.035] transition-colors">
+              <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold leading-tight">Dnes od stolu</p>
+              <p className="text-2xl font-bold tabular-nums text-[#16181A] leading-tight mt-0.5 tracking-tight">{guests.orders?.today ?? 0}</p>
               <p className="text-[11px] text-black/40 leading-snug">{guests.reservations?.today ?? 0} rezervací</p>
             </button>
-            <button onClick={() => go('customers')} className="text-left rounded-2xl bg-black/[0.035] px-3 py-2.5 hover:bg-black/[0.06] transition">
-              <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">Hodnocení</p>
-              <p className="text-lg font-bold tabular-nums text-[#16181A] leading-tight">{guests.reviews?.avg != null ? String(guests.reviews.avg).replace('.', ',') : '–'}</p>
+            <button onClick={() => go('customers')} className="text-left px-3 py-1 rounded-xl hover:bg-black/[0.035] transition-colors">
+              <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold leading-tight">Hodnocení</p>
+              <p className="text-2xl font-bold tabular-nums text-[#16181A] leading-tight mt-0.5 tracking-tight">{guests.reviews?.avg != null ? String(guests.reviews.avg).replace('.', ',') : '–'}</p>
               <p className={`text-[11px] leading-snug ${(guests.reviews?.low7 ?? 0) > 0 ? 'text-amber-700 font-semibold' : 'text-black/40'}`}>
                 {(guests.reviews?.low7 ?? 0) > 0 ? `${guests.reviews.low7} nízkých za týden` : `${guests.reviews?.new7 ?? 0} nových za týden`}
               </p>
