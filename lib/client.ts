@@ -152,6 +152,9 @@ export function publicProfile(p: any) {
     gallery: Array.isArray(p.gallery) ? p.gallery : [],
     accent: p.accent || '',
     orderQrRequired: p.order_qr_required !== false,
+    // Podnik online platby zapnul (jde to až s aktivním Stripe účtem; platba
+    // si připravenost účtu ověří ještě sama, viz orders/[id]/pay).
+    onlinePaymentsOn: !!p.online_payments_on,
     orderGeo: (p.order_geo === 'off' || p.lat == null || p.lng == null) ? 'off' : (p.order_geo === 'block' ? 'block' : 'warn'),
   };
 }

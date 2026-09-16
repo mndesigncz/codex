@@ -550,6 +550,64 @@ function Loyalty({ toast }: { toast: (m: string) => void }) {
   return <LoyaltyTabs toast={toast} promos={<Promos toast={toast} />} />;
 }
 
+// ---- Online platby hostů (Stripe Connect) -----------------------------------------
+//
+// Podnik si propojí vlastní Stripe účet; peníze od hostů jdou přímo jemu.
+// Přepínač „hosté můžou platit online" se ukládá s ostatním nastavením
+// (tlačítko Uložit), propojení samo se dělá u Stripe a stav se čte z API.
+
+function OnlinePayments({ p, setP, toast }: { p: any; setP: (f: any) => void; toast: (m: string) => void }) {
+  const [st, setSt] = useState<{ configured: boolean; accountId: string | null; ready: boolean; requirementsDue: number; feePercent: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    // Po návratu z onboardingu se Stripe zeptáme znovu, jinak stačí uložený stav.
+    const q = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
+    const back = q?.get('connect') === 'return';
+    fetch(`/api/stripe/connect/status${back ? '?refresh=1' : ''}`).then(r => r.json()).then(d => {
+      setSt(d);
+      if (back) {
+        toast(d.ready ? 'Stripe je propojený. Teď stačí zapnout platby a uložit.' : 'Stripe ještě něco potřebuje doplnit — pokračuj tlačítkem níž.');
+        q!.delete('connect'); window.history.replaceState(null, '', `${window.location.pathname}?${q}`);
+      }
+    }).catch(() => setSt({ configured: false, accountId: null, ready: false, requirementsDue: 0, feePercent: 0 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!st || !st.configured) return null;
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/stripe/connect/onboard', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) { toast(d.error || 'Propojení se nepodařilo připravit.'); return; }
+      window.location.href = d.url;
+    } catch { toast('Propojení se nepodařilo připravit.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className="glass-card p-5 grid gap-4">
+      <div>
+        <h2 className="t-section">Online platby od hostů</h2>
+        <p className="text-xs text-black/50 mt-0.5">Host zaplatí objednávku od stolu kartou v telefonu. Peníze jdou na váš Stripe účet, výplaty i poplatky řešíte přímo se Stripe.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${st.ready ? 'bg-[#C8F542]/20 text-[#5B7A08]' : st.accountId ? 'bg-amber-500/15 text-amber-900' : 'bg-black/[0.06] text-black/60'}`}>
+          {st.ready ? 'Stripe propojený, platby aktivní' : st.accountId ? 'Stripe propojený, čeká na dokončení' : 'Bez propojení'}
+        </span>
+        <button type="button" onClick={connect} disabled={busy} className="rounded-full bg-[#16181A] text-white px-5 py-2 text-sm font-semibold hover:bg-black transition disabled:opacity-60">
+          {busy ? 'Připravuji…' : st.ready ? 'Otevřít nastavení Stripe' : st.accountId ? 'Dokončit propojení' : 'Propojit Stripe'}
+        </button>
+      </div>
+      {st.accountId && !st.ready && st.requirementsDue > 0 && (
+        <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 px-3 py-2">Stripe ještě potřebuje doplnit údaje ({st.requirementsDue}). Bez nich platby nepůjdou.</p>
+      )}
+      <label className={`flex items-start min-h-9 py-1 gap-3 text-sm ${st.ready ? '' : 'opacity-50'}`}>
+        <input type="checkbox" disabled={!st.ready} checked={!!p.online_payments_on && st.ready} onChange={e => setP({ ...p, online_payments_on: e.target.checked })} className="h-4 w-4 mt-0.5 accent-[#16181A]" />
+        <span>Hosté můžou objednávku zaplatit online<span className="block text-xs text-black/50">Ukáže se u objednávky jako „Zaplatit kartou online". Platit u obsluhy jde dál.{st.feePercent > 0 ? ` Managero si z online platby bere ${String(st.feePercent).replace('.', ',')} %.` : ''}</span></span>
+      </label>
+    </section>
+  );
+}
+
 function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange: () => void }) {
   const [d, setD] = useState<any | null>(null); const [p, setP] = useState<any | null>(null); const [busy, setBusy] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -559,7 +617,8 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
     e.preventDefault(); setBusy(true);
     try {
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null,
-        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos }) });
+        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos,
+        online_payments_on: !!p.online_payments_on }) });
       setP(r.profile); setD({ ...d, url: r.url }); toast(r.profile.enabled ? 'Uloženo. Podnik je pro hosty zapnutý.' : 'Uloženo. Podnik je zatím vypnutý.'); onChange();
     } catch (e: any) { toast(e.message); }
     setBusy(false);
@@ -628,6 +687,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
           <div><label htmlFor="s-slot" className={label}>Krok (min)</label><input id="s-slot" type="number" min={15} max={120} step={15} value={p.slot_minutes} onChange={e => setP({ ...p, slot_minutes: e.target.value })} className={input} /></div>
         </div>
       </section>
+      <OnlinePayments p={p} setP={setP} toast={toast} />
       <section className="glass-card p-5 grid gap-4">
         <div>
           <h2 className="t-section">Ochrana objednávek od stolu</h2>

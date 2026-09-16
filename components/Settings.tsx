@@ -96,6 +96,28 @@ export default function Settings({ user, initialTab }: Props) {
   const { theme, setTheme } = useTheme();
   const [section, setSection] = useState<SectionId>(initialTab ?? 'account');
   const [interestSent, setInterestSent] = useState(false);
+  // Online platba za Pro (Stripe). Když není zapnutá, zůstává „Mám zájem".
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingMsg, setBillingMsg] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const q = new URLSearchParams(window.location.search).get('billing');
+    if (q === 'success') return 'Díky! Platba proběhla, Pro se zapne během chvilky — stránku stačí obnovit.';
+    if (q === 'cancel') return 'Platba zrušena. Plán zůstává, jak byl.';
+    return '';
+  });
+  const [stripeOff, setStripeOff] = useState(false);
+  const goStripe = async (path: '/api/stripe/checkout' | '/api/stripe/portal') => {
+    if (billingBusy) return;
+    setBillingBusy(true); setBillingMsg('');
+    try {
+      const res = await fetch(path, { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 503 && d?.configured === false) { setStripeOff(true); return; }
+      if (!res.ok || !d?.url) { setBillingMsg(d?.error || 'Nepovedlo se. Zkuste to za chvíli.'); return; }
+      window.location.href = d.url;
+    } catch { setBillingMsg('Nepovedlo se. Zkuste to za chvíli.'); }
+    finally { setBillingBusy(false); }
+  };
   const [auditEntries, setAuditEntries] = useState<any[] | null>(null);
   // POS (Storyous) connection form.
   const [posStatus, setPosStatus] = useState<any | null>(null);
@@ -665,20 +687,43 @@ export default function Settings({ user, initialTab }: Props) {
                 <p className="mt-4 text-sm text-black/55 well border border-black/[0.07] px-4 py-3">
                   Plán <strong className="text-[#16181A]">Zdarma platí napořád</strong> — směny, uzávěrky, úkoly, chat i sklad
                   v něm fungují bez omezení času. Pro odemyká větší tým, kiosk, odměny, exporty, měsíční přehled a vlastní
-                  vzhled sdílených stránek. Online platby teprve připravujeme.
+                  vzhled sdílených stránek.
                 </p>
-                {plan?.effective !== 'pro' || plan?.trialing ? (
-                  <button
-                    onClick={async () => {
-                      if (interestSent) return;
-                      const res = await fetch('/api/billing/interest', { method: 'POST' }).catch(() => null);
-                      if (res?.ok) setInterestSent(true);
-                    }}
-                    className={`mt-3 w-full sm:w-auto rounded-full px-6 py-3 text-sm font-semibold transition ${
-                      interestSent ? 'bg-[#C8F542]/20 text-[#5B7A08] cursor-default' : 'bg-[#16181A] text-white hover:bg-black'
-                    }`}>
-                    {interestSent ? 'Díky! Ozveme se, až půjde Pro zaplatit ✓' : 'Mám zájem o Pro — dejte mi vědět'}
-                  </button>
+                {billingMsg && <p role="status" className="mt-3 text-sm rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3 text-[#16181A]">{billingMsg}</p>}
+                {plan?.subscription ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button onClick={() => goStripe('/api/stripe/portal')} disabled={billingBusy}
+                      className="w-full sm:w-auto rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-semibold hover:bg-black transition disabled:opacity-60">
+                      {billingBusy ? 'Otevírám…' : 'Spravovat předplatné'}
+                    </button>
+                    <p className="text-xs text-black/45">
+                      Karta, faktury i zrušení — vše ve Stripe.
+                      {plan.subscription.periodEnd ? ` Další platba ${new Date(plan.subscription.periodEnd).toLocaleDateString('cs-CZ')}.` : ''}
+                      {plan.subscription.status === 'past_due' ? ' Poslední platba neprošla, zkontrolujte kartu.' : ''}
+                    </p>
+                  </div>
+                ) : plan?.effective !== 'pro' || plan?.trialing ? (
+                  stripeOff ? (
+                    <button
+                      onClick={async () => {
+                        if (interestSent) return;
+                        const res = await fetch('/api/billing/interest', { method: 'POST' }).catch(() => null);
+                        if (res?.ok) setInterestSent(true);
+                      }}
+                      className={`mt-3 w-full sm:w-auto rounded-full px-6 py-3 text-sm font-semibold transition ${
+                        interestSent ? 'bg-[#C8F542]/20 text-[#5B7A08] cursor-default' : 'bg-[#16181A] text-white hover:bg-black'
+                      }`}>
+                      {interestSent ? 'Díky! Ozveme se, až půjde Pro zaplatit ✓' : 'Mám zájem o Pro — dejte mi vědět'}
+                    </button>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button onClick={() => goStripe('/api/stripe/checkout')} disabled={billingBusy}
+                        className="w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-6 py-3 text-sm font-semibold hover:brightness-105 transition disabled:opacity-60">
+                        {billingBusy ? 'Připravuji platbu…' : `Přejít na Pro — ${PRO_PRICE.monthly} ${PRO_PRICE.currency} ${PRO_PRICE.per}`}
+                      </button>
+                      <p className="text-xs text-black/45">Platba kartou přes Stripe. Zrušit jde kdykoli, faktura chodí e-mailem.</p>
+                    </div>
+                  )
                 ) : null}
               </div>
 

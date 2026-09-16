@@ -13,6 +13,8 @@ export interface PlanInfo {
   trialEndsAt: string | null;
   trialDaysLeft: number;
   trialing: boolean;
+  /** Živé předplatné ve Stripe (null = žádné, nebo Pro z historie). */
+  subscription: { status: string; periodEnd: string | null } | null;
 }
 
 export const TRIAL_DAYS = 30;
@@ -52,7 +54,12 @@ export const PLAN_FEATURES: { label: string; free: string | boolean; pro: string
  * wake up locked out.
  */
 export function planInfoOf(
-  row: { plan?: string | null; trial_ends_at?: string | Date | null } | null | undefined,
+  row: {
+    plan?: string | null;
+    trial_ends_at?: string | Date | null;
+    stripe_subscription_status?: string | null;
+    stripe_current_period_end?: string | Date | null;
+  } | null | undefined,
   now = Date.now(),
 ): PlanInfo {
   const stored: PlanId = row?.plan === 'free' ? 'free' : 'pro';
@@ -60,12 +67,16 @@ export function planInfoOf(
   const trialing = stored === 'free' && t != null && Number.isFinite(t) && t > now;
   const effective: PlanId = stored === 'pro' || trialing ? 'pro' : 'free';
   const trialDaysLeft = trialing && t ? Math.max(0, Math.ceil((t - now) / 86400000)) : 0;
+  const st = row?.stripe_subscription_status ?? null;
+  const live = st === 'active' || st === 'trialing' || st === 'past_due' || st === 'paused';
+  const pe = row?.stripe_current_period_end ? new Date(row.stripe_current_period_end).getTime() : null;
   return {
     plan: stored,
     effective,
     trialEndsAt: t && Number.isFinite(t) ? new Date(t).toISOString() : null,
     trialDaysLeft,
     trialing,
+    subscription: live && st ? { status: st, periodEnd: pe && Number.isFinite(pe) ? new Date(pe).toISOString() : null } : null,
   };
 }
 

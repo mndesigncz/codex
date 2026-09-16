@@ -70,7 +70,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   const p = await profileBySlug(params.slug);
   if (!p) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
   const orders = await sql`
-    SELECT o.id, o.items, o.total, o.note, o.status, o.pos_state, o.created_at, t.name AS table_name
+    SELECT o.id, o.items, o.total, o.note, o.status, o.pos_state, o.payment_status, o.created_at, t.name AS table_name
     FROM client_orders o LEFT JOIN client_tables t ON t.id = o.table_id
     WHERE o.team_id = ${p.team_id} AND o.customer_id = ${me.id} AND o.created_at > NOW() - INTERVAL '12 hours'
     ORDER BY o.created_at DESC LIMIT 10`;

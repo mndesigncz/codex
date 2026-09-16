@@ -105,6 +105,11 @@ export async function GET() {
     try {
       [planRow] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
     } catch { /* columns not migrated yet ⇒ grandfathered pro */ }
+    // Stripe columns separately: a pending migration must not hide the plan.
+    try {
+      const [s] = await sql`SELECT stripe_subscription_status, stripe_current_period_end FROM teams WHERE id = ${teamId}`;
+      if (s && planRow) planRow = { ...planRow, ...s };
+    } catch { /* stripe columns not migrated yet */ }
     const planInfo = planInfoOf(planRow);
 
     // The link pinned to every dashboard (employer, employees, kiosk).

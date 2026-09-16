@@ -528,6 +528,29 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
   useEffect(() => { if (geoMode !== 'off' && (!qrOnly || token)) askGeo(); }, [geoMode, qrOnly, token, askGeo]);
   const [cart, setCart] = useState<Record<number, number>>({});
   const [note, setNote] = useState('');
+  // Online platba objednávky: server vrátí adresu Stripe Checkoutu, sem se
+  // host vrátí s ?paid=<id>; „zaplaceno" se ale ukáže až podle webhooku.
+  const [paying, setPaying] = useState<number | null>(null);
+  const pay = async (orderId: number) => {
+    if (paying) return;
+    setPaying(orderId);
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders/${orderId}/pay`, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) { onDone(d.error || 'Platbu se nepodařilo připravit. Zaplať u obsluhy.'); return; }
+      window.location.href = d.url;
+    } catch { onDone('Platbu se nepodařilo připravit. Zaplať u obsluhy.'); }
+    finally { setPaying(null); }
+  };
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    if (!q.get('paid')) return;
+    onDone('Díky! Platbu zpracováváme, potvrzení uvidíš u objednávky za chvilku.');
+    q.delete('paid');
+    window.history.replaceState(null, '', `${window.location.pathname}${q.toString() ? `?${q}` : ''}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [orders, setOrders] = useState<any[] | null>(null);
@@ -655,7 +678,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
           </div>
           {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
           <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Objednat' : 'Přihlásit se a objednat'}</button>
-          <p className="text-xs text-black/45">Platí se u obsluhy jako obvykle. Za každých 100 {cur} dostaneš {b.pointsPer100} bodů.</p>
+          <p className="text-xs text-black/45">{b.onlinePaymentsOn ? 'Zaplatit můžeš kartou online hned po odeslání, nebo u obsluhy.' : 'Platí se u obsluhy jako obvykle.'} Za každých 100 {cur} dostaneš {b.pointsPer100} bodů.</p>
         </div>
         {orders && orders.length > 0 && (
           <section>
@@ -664,10 +687,16 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
               {orders.map(o => (
                 <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-amber-500/[0.08] border-amber-500/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ?? o.status}</span>
+                    <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ?? o.status}{o.payment_status === 'paid' ? ' · zaplaceno' : ''}</span>
                     <span className="text-sm tabular-nums">{o.total} {cur}{o.table_name ? ` · ${o.table_name}` : ''}</span>
                   </div>
                   <p className="text-xs text-black/55 truncate">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
+                  {b.onlinePaymentsOn && o.payment_status !== 'paid' && (o.status === 'new' || o.status === 'confirmed') && (
+                    <button onClick={() => pay(o.id)} disabled={paying === o.id}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-semibold hover:bg-black transition disabled:opacity-60">
+                      <Icon name="card" size={14} /> {paying === o.id ? 'Připravuji platbu…' : o.payment_status === 'pending' ? 'Dokončit platbu kartou' : 'Zaplatit kartou online'}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
