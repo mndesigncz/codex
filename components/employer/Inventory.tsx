@@ -683,7 +683,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     <img src={(i as any).photoUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-black/[0.06]" />
                   </a>
                 ) : (
-                  <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.04] flex items-center justify-center text-black/35">
+                  <span className="shrink-0 h-12 w-12 well rounded-xl flex items-center justify-center text-black/35">
                     <Icon name="box" size={19} strokeWidth={1.7} />
                   </span>
                 )}
@@ -914,7 +914,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     </div>
                     <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
                       title="Kam novou kategorii zařadit"
-                      className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+                      className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
                       <option value="">Hlavní</option>
                       {flatCats.map(({ cat: c, depth }) => (
                         <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
@@ -935,9 +935,9 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Aktuální množství</label>
-                    <div className="flex items-center rounded-2xl bg-black/[0.04] border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
+                    <div className="flex items-center well border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
                       <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
-                        className="rounded-xl bg-black/[0.04] hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
+                        className="well rounded-xl hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
                       <input type="number" inputMode="numeric" aria-label="Množství" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                         className="flex-1 min-w-0 bg-transparent text-center text-sm font-semibold text-[#16181A] focus:outline-none tabular-nums" />
                       <button type="button" aria-label="Přidat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))}
@@ -1088,7 +1088,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   </span>
                 </span>
               </label>
-              <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5">
+              <div className="well border border-black/[0.07] p-3.5">
                 <span className="block text-sm font-medium text-[#16181A]">Zvýraznit zákazníkům</span>
                 <span className="block text-[11px] text-black/45 mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</span>
                 <div className="flex gap-1.5">
@@ -1102,7 +1102,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   ))}
                 </div>
               </div>
-              <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 cursor-pointer">
+              <label className="flex items-start gap-2.5 well border border-black/[0.07] p-3.5 cursor-pointer">
                 <input type="checkbox" checked={form.hideFromOverview} onChange={e => setForm(f => ({ ...f, hideFromOverview: e.target.checked }))}
                   className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
                 <span className="min-w-0">
@@ -1118,7 +1118,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             {editing && itemLog.length > 0 && (
               <div className="px-6 pb-4">
                 <button type="button" onClick={() => setLogOpen(o => !o)}
-                  className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
+                  className="w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
                   <span>🕓 Historie změn ({itemLog.length})</span>
                   <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${logOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -1872,7 +1872,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                     </div>
                   </div>
                   {receivingId === o.id && (
-                    <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                    <div className="flex flex-wrap items-center gap-2 well border border-black/[0.06] p-3">
                       <label className="text-xs text-black/50 whitespace-nowrap">Celková cena ({symbol}, nepovinné)</label>
                       <input
                         type="number"
@@ -2282,7 +2282,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           {flat.length > 0 && (
             <select value={newParent} onChange={e => setNewParent(e.target.value)}
               title="Kam ji zařadit"
-              className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+              className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
               <option value="">Hlavní</option>
               {flat.map(({ cat: c, depth }) => (
                 <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
@@ -2349,7 +2349,7 @@ function CategoryRow({
           <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveRename(); } if (e.key === 'Escape') cancelEdit(); }}
             onBlur={saveRename}
-            className="flex-1 min-w-0 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+            className="flex-1 min-w-0 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
         ) : (
           <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
             {c.name}
@@ -2384,7 +2384,7 @@ function CategoryRow({
       </div>
 
       {moveOpen && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 well rounded-xl border border-black/[0.06] px-3 py-2">
           <span className="text-[11px] text-black/45">Zařadit:</span>
           <button onClick={() => setParent(null)} disabled={busy || c.parentId == null}
             className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId == null ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] on-accent hover:border-[#C8F542]'}`}>
@@ -2446,7 +2446,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
   };
 
   return (
-    <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+    <div className="mt-2.5 well border border-black/[0.06] p-3.5 space-y-3">
       <p className="text-[11px] text-black/50">
         Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.
       </p>
@@ -2532,7 +2532,7 @@ function PackagingEditor({ category, onSaved }: {
     setSteps(list => list.map((s, idx) => idx === i ? { ...s, ...patch } : s));
 
   return (
-    <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+    <div className="mt-2.5 well border border-black/[0.06] p-3.5 space-y-3">
       <label className="flex items-start gap-2.5 cursor-pointer">
         <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
         <span className="min-w-0">
@@ -2664,9 +2664,9 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
 
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Název dodavatele" maxLength={120}
-            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            className="field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200}
-            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            className="field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           <button onClick={add} disabled={busy || !name.trim()}
             className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
             Přidat
@@ -2683,7 +2683,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                 {editId === sp.id ? (
                   <span className="flex items-center gap-1.5">
                     <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="e-mail"
-                      className="tap-target-sm w-52 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                      className="tap-target-sm w-52 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
                     <button onClick={async () => {
                       const res = await fetch('/api/suppliers', {
                         method: 'PATCH', headers: { 'Content-Type': 'application/json' },

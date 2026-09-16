@@ -225,8 +225,8 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
         secondary={<Button variant="secondary" icon="cup" onClick={() => go('orders')}>Objednávky{summary.orders?.new ? ` (${summary.orders.new})` : ''}</Button>} />
 
       {attention.length > 0 && (
-        <div className="rounded-3xl border border-orange-500/25 bg-orange-500/[0.07] p-4 sm:p-5">
-          <p className="font-bold text-[#16181A] flex items-center gap-2 mb-2"><Icon name="warning" size={17} className="text-orange-600" /> Čeká na tebe</p>
+        <div className="card card-wait p-4 sm:p-5">
+          <p className="t-card flex items-center gap-2 mb-2.5"><Icon name="warning" size={17} className="text-[var(--wait-ink)]" /> Čeká na tebe</p>
           <div className="flex flex-wrap gap-2">
             {attention.map(a => (
               <button key={a.label} type="button" onClick={() => go(a.tab)} className="tap-target-sm rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
@@ -498,7 +498,7 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
                   </div>
                 </div>
                 {openId === c.id && (
-                  <div className="mt-2 ml-0 md:ml-12 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3 text-xs space-y-3">
+                  <div className="mt-2 ml-0 md:ml-12 well border border-black/[0.06] p-3 text-xs space-y-3">
                     <MemberGroups customerId={c.id} toast={toast} />
                     {ledger === null ? <Skeleton className="h-10 rounded-xl" /> : ledger.length === 0 ? <p className="text-black/55">Deník je prázdný.</p>
                       : <ul className="divide-y divide-black/[0.06]">{ledger.map((l: any) => (

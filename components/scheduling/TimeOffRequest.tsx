@@ -59,7 +59,7 @@ function formatRange(fromDate: string, toDate: string): string {
 }
 
 const inputCls =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm appearance-none min-w-0 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors';
+  'w-full field border border-black/[0.08] px-4 py-3 text-sm appearance-none min-w-0 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors';
 
 export default function TimeOffRequest() {
   const [requests, setRequests] = useState<TimeOffRequestItem[]>([]);
@@ -217,7 +217,7 @@ export default function TimeOffRequest() {
             {requests.map((r) => (
               <li
                 key={r.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl bg-black/[0.03] px-4 py-3"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 well px-4 py-3"
               >
                 <span className="text-sm font-medium text-[#16181A] tabular-nums">
                   {formatRange(r.fromDate, r.toDate)}

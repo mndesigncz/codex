@@ -38,7 +38,7 @@ interface PosProduct { productId: string; name: string; category: string; price:
 const VYCHOZI_SLUG = 'akce';
 
 const vstup =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none';
+  'w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none';
 
 export default function MenuEditor() {
   const [boards, setBoards] = useState<Board[]>([]);
@@ -462,7 +462,7 @@ export default function MenuEditor() {
           </button>
         </div>
 
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2">
+        <div className="well border border-black/[0.06] p-4 space-y-2">
           <p className="text-xs font-semibold text-black/50">Adresa pro iPad a pro hosty</p>
           <div className="flex items-center gap-2 flex-wrap">
             <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
@@ -505,18 +505,18 @@ export default function MenuEditor() {
                   menu s vlastní adresou by mu ji přepis vzal. */}
               {zive === 'vypnuto' ? (
                 <button type="button" disabled={ukladam} onClick={() => zverejnit({ enabled: true })}
-                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                  className="btn btn-primary btn-sm disabled:opacity-50">
                   {ukladam ? 'Ukládám…' : 'Zapnout menu pro hosty'}
                 </button>
               ) : ulozenySlug !== VYCHOZI_SLUG ? (
                 <button type="button" disabled={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}
-                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                  className="btn btn-primary btn-sm disabled:opacity-50">
                   {ukladam ? 'Ukládám…' : 'Nastavit jako menu pro iPad'}
                 </button>
               ) : (
                 <button type="button" disabled={ukladam}
                   onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}
-                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                  className="btn btn-primary btn-sm disabled:opacity-50">
                   {ukladam ? 'Ukládám…' : 'Zveřejnit znovu'}
                 </button>
               )}
@@ -788,7 +788,7 @@ export default function MenuEditor() {
           <div className="flex items-center gap-2 flex-wrap">
             <input aria-label="Název sekce menu" className={`${vstup} flex-1 min-w-[8rem] font-semibold`} value={s.title} maxLength={80}
               onChange={(e) => upravit((b) => { b.sections[si].title = e.target.value; })} />
-            <select value={s.column} aria-label="Sloupec sekce" className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-3 text-sm"
+            <select value={s.column} aria-label="Sloupec sekce" className="well border border-black/[0.08] px-3 py-3 text-sm"
               onChange={(e) => upravit((b) => { b.sections[si].column = Number(e.target.value) === 2 ? 2 : 1; })}>
               <option value={1}>Vlevo</option>
               <option value={2}>Vpravo</option>

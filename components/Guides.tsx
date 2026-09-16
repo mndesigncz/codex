@@ -327,7 +327,7 @@ export default function Guides({ user }: { user: User }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Hledat návody…"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="w-full field border border-black/[0.08] pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
           </div>
 
@@ -811,7 +811,7 @@ function GuideEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Např. Jak připravit matcha latte"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all"
             />
           </div>
 
@@ -821,7 +821,7 @@ function GuideEditor({
               aria-label="Kategorie"
               value={categoryId ?? ''}
               onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all appearance-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all appearance-none"
             >
               <option value="" className="bg-neutral-900">
                 Bez kategorie
@@ -841,7 +841,7 @@ function GuideEditor({
               onChange={(e) => setContent(e.target.value)}
               rows={12}
               placeholder={'Sem napište návod…\n\nTip: řádky **tučně** a odrážky pomocí „- “.'}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all leading-relaxed resize-y"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all leading-relaxed resize-y"
             />
             <p className="text-xs text-black/30 mt-2">Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.</p>
           </div>
@@ -897,7 +897,7 @@ function GuideEditor({
                         }
                       }}
                       placeholder={`Krok ${i + 1}`}
-                      className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm min-w-0"
+                      className="flex-1 field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm min-w-0"
                     />
                     <button
                       type="button"
@@ -1046,7 +1046,7 @@ function ManageCategories({
         <div className="space-y-2 mb-6">
           {items.length === 0 && <p className="text-black/45 text-sm">Zatím žádné kategorie.</p>}
           {items.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.08] px-3 py-2">
+            <div key={c.id} className="flex items-center gap-2 well border border-black/[0.08] px-3 py-2">
               <span className="text-black/55">
                 <Icon name={c.icon} size={18} />
               </span>
@@ -1090,7 +1090,7 @@ function ManageCategories({
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Název kategorie"
-              className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
             <button
               onClick={add}

@@ -46,10 +46,10 @@ export default function ClientHome() {
           </p>
           {!signedIn && (
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link href="/client/register" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition">
+              <Link href="/client/register" className="tap-target inline-flex items-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] transition">
                 <Icon name="plus" size={16} /> Založit účet
               </Link>
-              <Link href="/client/login" className="tap-target inline-flex items-center gap-2 rounded-full glass border border-black/10 px-5 py-3 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] transition">
+              <Link href="/client/login" className="tap-target inline-flex items-center gap-2 btn btn-secondary hover:bg-black/[0.05] active:scale-[0.98] transition">
                 Přihlásit se
               </Link>
             </div>

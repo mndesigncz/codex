@@ -58,7 +58,7 @@ export default function Landing() {
               které rozumí celý tým od první směny.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Link href="/register" className="pressable w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-7 py-3.5 text-sm font-semibold hover:brightness-105 active:scale-[0.97] shadow-[0_8px_24px_rgba(200,245,66,0.35)] inline-flex items-center justify-center gap-2">
+              <Link href="/register" className="pressable w-full sm:w-auto btn btn-accent btn-lg hover:brightness-105 active:scale-[0.97] shadow-[0_8px_24px_rgba(200,245,66,0.35)] inline-flex items-center justify-center gap-2">
                 Vyzkoušet {TRIAL_DAYS} dní zdarma <Icon name="chevron" size={15} className="-rotate-90" />
               </Link>
               <a href="#cenik" className="pressable w-full sm:w-auto rounded-full glass border border-black/[0.08] px-7 py-3.5 text-sm font-semibold text-black/70 hover:text-black active:scale-[0.97] inline-flex items-center justify-center">
@@ -140,7 +140,7 @@ export default function Landing() {
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">{PRO_PRICE.monthly} {PRO_PRICE.currency}</p>
             <p className="text-xs text-black/40 mt-1">{PRO_PRICE.per}</p>
             <p className="mt-4 text-sm text-black/55">Všechno bez limitů: neomezený tým, kiosk pro tablet, odměny, exporty a sdílené menu ve vašich barvách.</p>
-            <Link href="/register" className="mt-6 rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-semibold hover:bg-black transition-colors text-center">
+            <Link href="/register" className="mt-6 btn btn-primary hover:bg-black transition-colors text-center">
               Vyzkoušet {TRIAL_DAYS} dní zdarma
             </Link>
           </div>

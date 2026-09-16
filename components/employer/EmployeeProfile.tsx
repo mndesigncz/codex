@@ -109,7 +109,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
               {tab === 'overview' && (
                 <>
                   {/* Level + progress */}
-                  <div className="rounded-2xl bg-black/[0.03] border border-black/[0.05] p-4">
+                  <div className="well border border-black/[0.05] p-4">
                     <div className="flex items-end justify-between gap-2 flex-wrap">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 font-semibold">Úroveň</p>
@@ -133,15 +133,15 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <div>
                     <h3 className="t-label mb-2">Tento měsíc</h3>
                     <div className="grid grid-cols-3 gap-2.5">
-                      <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                      <div className="well p-3 text-center">
                         <p className="text-base sm:text-xl font-bold tracking-tight text-[#16181A] tabular-nums whitespace-nowrap">{hours}<span className="text-xs font-semibold text-black/40"> h </span>{minutes > 0 && <>{minutes}<span className="text-xs font-semibold text-black/40"> m</span></>}</p>
                         <p className="text-[11px] text-black/45 mt-0.5">odpracováno</p>
                       </div>
-                      <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                      <div className="well p-3 text-center">
                         <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.shifts}</p>
                         <p className="text-[11px] text-black/45 mt-0.5">směn</p>
                       </div>
-                      <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                      <div className="well p-3 text-center">
                         <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.closings}</p>
                         <p className="text-[11px] text-black/45 mt-0.5">uzávěrek</p>
                       </div>
@@ -202,7 +202,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   {(p.employee.email || p.employee.phone) && (
                     <div>
                       <h3 className="t-label mb-2">Kontakt</h3>
-                      <div className="rounded-2xl bg-black/[0.03] p-3.5 space-y-1 text-sm">
+                      <div className="well p-3.5 space-y-1 text-sm">
                         {p.employee.email && <p className="text-[#16181A] truncate"><Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.employee.email}</p>}
                         {p.employee.phone && <p className="text-[#16181A]">📞 {p.employee.phone}</p>}
                       </div>

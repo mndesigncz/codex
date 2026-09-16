@@ -15,7 +15,7 @@ import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 type GuideCat = { id: number; name: string };
 
@@ -173,7 +173,7 @@ export default function ShareSettings() {
           </div>
         )}
         {kind === 'guides' && (
-          <p className="text-[12px] text-black/45 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
+          <p className="text-[12px] text-black/45 well rounded-xl border border-black/[0.06] px-3 py-2">
             Sdílí se jen názvy návodů seřazené podle kategorií — obsah návodu se ven nedostane.
           </p>
         )}
@@ -310,7 +310,7 @@ export default function ShareSettings() {
             {qrData ? (
               <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
             ) : (
-              <div className="mx-auto w-64 h-64 rounded-2xl bg-black/[0.04] animate-pulse" />
+              <div className="mx-auto w-64 h-64 well animate-pulse" />
             )}
             <div className="flex gap-2 mt-5">
               <button onClick={() => setQrFor(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
@@ -397,7 +397,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
       </div>
 
       {open && (
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+        <div className="well border border-black/[0.06] p-3.5 space-y-3">
           <p className="text-[11px] text-black/45 break-all font-mono">{url}</p>
 
           <label className="flex items-center gap-2.5 cursor-pointer">

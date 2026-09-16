@@ -50,7 +50,7 @@ export default function GuideProductLink({ productId, productName, onPick }: {
           </button>
         </div>
       ) : open ? (
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3 space-y-2">
+        <div className="well border border-black/[0.07] p-3 space-y-2">
           <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
             placeholder="Hledat položku v kase…"
             className="w-full rounded-2xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />

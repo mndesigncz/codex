@@ -243,7 +243,7 @@ export default function CategoryStockView({
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder={`Hledat v ${category}…`}
-          className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
+          className="w-full field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
         />
       )}
 

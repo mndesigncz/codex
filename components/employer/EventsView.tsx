@@ -15,7 +15,7 @@ import { useModal } from '@/lib/useModal';
 type Ev = any;
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all';
+  'w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all';
 
 export default function EventsView({ user }: { user: { id?: string } }) {
   const money = useMoney();
@@ -469,7 +469,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
 
         {/* pro hosty — všechno, co uvidí zákazník, v jedné kartě */}
         <Sec title="Pro hosty">
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-4">
+          <div className="well border border-black/[0.06] p-4 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => patch(e.id, { public: !e.public })} aria-pressed={e.public}
                 className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-bold transition ${
@@ -655,7 +655,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
           </div>
 
           {e.offsite && (
-            <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+            <div className="mt-3 well border border-black/[0.06] p-4">
               <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45"><Icon name="tent" size={13} className="inline -mt-0.5 mr-1.5" />Balicí seznam (ze skladu)</p>
                 <div className="flex gap-1.5">
@@ -716,7 +716,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
 
         {/* peníze — tržbu nese uzávěrka za akci; ručně jen když žádná není */}
         <Sec title="Peníze">
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+          <div className="well border border-black/[0.06] p-4">
             {/* Akce u nás jede přes běžnou kasu — pokladna umí říct, co se
                 namarkovalo za dobu akce a kolik se prodalo z jejího menu. */}
             {(!e.offsite || e.posPlaceId) && (

@@ -329,7 +329,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
           </div>
-          <span className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
+          <span className="shrink-0 btn btn-primary btn-sm whitespace-nowrap">Otevřít →</span>
         </div>
       </a>
     ) : null,
@@ -471,7 +471,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                     {lowStock.slice(0, 5).map(i => {
                       const isCritical = i.status ? i.status === 'critical' : i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0);
                       return (
-                        <div key={i.id} className="flex items-center justify-between p-3 rounded-2xl bg-black/[0.04]">
+                        <div key={i.id} className="flex items-center justify-between p-3 well">
                           <span className="text-sm text-[#16181A]">{i.name}</span>
                           <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-orange-500/15 text-orange-600'}`}>{i.quantity} {i.unit}</span>
                         </div>
@@ -492,7 +492,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 ) : (
                   <div className="space-y-2">
                     {todayShifts.map(s => (
-                      <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-black/[0.04]">
+                      <div key={s.id} className="flex items-center gap-3 p-3 well">
                         <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-orange-500' : 'text-[#0A6FE0]'} /></span>
                         <div>
                           <PersonLink id={s.employeeId ?? s.employee_id}><p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p></PersonLink>

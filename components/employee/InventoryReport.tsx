@@ -229,7 +229,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             aria-label={`Množství — ${item.name}${item.unit ? ` (${item.unit})` : ''}`}
             value={qtyOf(item)}
             onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
-            className="w-16 text-center rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2 text-sm font-semibold text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+            className="w-16 text-center field border border-black/[0.08] px-2 py-2 text-sm font-semibold text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
           />
           <button type="button" onClick={() => setQty(item.id, qtyOf(item) + 1)}
             aria-label={`Přidat — ${item.name}`}
@@ -291,7 +291,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             </p>
           </div>
           <button onClick={() => setProposeOpen(o => !o)}
-            className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition">
+            className="shrink-0 btn btn-primary btn-sm hover:bg-black transition">
             {proposeOpen ? 'Zavřít' : '＋ Nová věc do skladu'}
           </button>
         </div>
@@ -392,7 +392,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Hledat položku..."
-              className="w-full max-w-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="w-full max-w-sm field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
           </div>
 
@@ -481,7 +481,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Poznámka (volitelné)</label>
                   <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
                     placeholder="Popište stav zásob nebo další informace..."
-                    className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm resize-none" />
+                    className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm resize-none" />
                 </div>
 
                 <button type="submit" disabled={selected.length === 0 || submitting}

@@ -138,7 +138,7 @@ export default function TimeOffApprovals() {
               {pending.map((r) => (
                 <li
                   key={r.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-black/[0.03] px-4 py-3"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 well px-4 py-3"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="h-9 w-9 shrink-0 rounded-full bg-[#C8F542]/25 flex items-center justify-center text-base">

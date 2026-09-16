@@ -325,7 +325,7 @@ export default function ClosingsOverview() {
           </div>
           <p className="text-xs text-black/50">Tyto dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí, když ji vyplní jeden za všechny.</p>
           {missing.map(m => (
-            <div key={m.date} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div key={m.date} className="well bg-white p-4 flex flex-wrap items-center gap-x-3 gap-y-2">
               <div className="min-w-0 flex-1">
                 <p className="font-bold tracking-tight text-[#16181A] cz-sentence">{fmtMissing(m.date)}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -357,7 +357,7 @@ export default function ClosingsOverview() {
           {pending.map(c => {
             const d = cashDifference(c);
             return (
-              <div key={c.id} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 space-y-3">
+              <div key={c.id} className="well bg-white p-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
                   <PersonLink id={c.created_by} className="text-lg flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</PersonLink>
                   <div className="min-w-0">
@@ -610,7 +610,7 @@ export default function ClosingsOverview() {
                 ))}
               </div>
               <button type="button" onClick={() => setReconcileOpen(o => !o)}
-                className="mt-2 w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
+                className="mt-2 w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
                 <span>Den po dni ({reconcile.totals?.comparedDays ?? 0} porovnaných)</span>
                 <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${reconcileOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -728,7 +728,7 @@ export default function ClosingsOverview() {
         <h3 className="t-card">Uzávěrky ({topLevel.length})</h3>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <button onClick={() => openCreate()}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
+            className="inline-flex items-center gap-1.5 btn btn-primary btn-sm hover:bg-black transition whitespace-nowrap">
             <Icon name="plus" size={16} /> Nová uzávěrka
           </button>
           {topLevel.length > 0 && (

@@ -102,7 +102,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
   return (
     <div className="space-y-5">
       {!p.loyalty_on && (
-        <div className="rounded-3xl border border-amber-500/25 bg-amber-500/[0.07] p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
+        <div className="card card-wait p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
           <p className="font-semibold text-[#16181A] flex items-center gap-2"><Icon name="warning" size={17} className="text-amber-700" />Věrnost je pro hosty vypnutá.</p>
           <Button size="sm" variant="accent" loading={busy} onClick={toggle}>Zapnout</Button>
         </div>
@@ -725,7 +725,7 @@ function Tiers({ toast }: { toast: (m: string) => void }) {
         hint="Čím víc návštěv, tím lepší úroveň. Sleva je informace pro obsluhu: při načtení kartičky u kasy uvidí, kolik hostovi odečíst. Úroveň vidí i host na své stránce.">
         <ul className="space-y-3">
           {tiers.map(t => (
-            <li key={t.id} className="rounded-2xl border border-black/[0.07] bg-white/60 p-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+            <li key={t.id} className="well bg-white p-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
               <div>
                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${t.tone}`}>{t.name}</span>
                 <p className="text-xs text-black/50 mt-1.5">{t.hint ?? t.at ?? 'Od kolika návštěv'}</p>

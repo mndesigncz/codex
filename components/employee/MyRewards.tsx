@@ -270,7 +270,7 @@ function MyRewardsInner() {
                 // takže na název zbývalo 116 px z potřebných 262 a četla se
                 // z něj necelá polovina. Název se teď zalomí místo useknutí
                 // a tlačítko spadne pod něj, když se vedle nevejde.
-                <div key={rw.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+                <div key={rw.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 well border border-black/[0.06] px-4 py-3">
                   <span className="text-2xl shrink-0">{rw.icon ?? '🎁'}</span>
                   <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[420px]:basis-0">
                     <p className="text-sm font-semibold text-[#16181A]">{rw.title}</p>
@@ -314,7 +314,7 @@ function MyRewardsInner() {
             { label: 'Uzávěrky', value: b.closings, icon: 'trend' },
             { label: 'Z hodnocení', value: fromReviews, icon: 'award' },
           ].map(s => (
-            <div key={s.label} className="rounded-2xl bg-black/[0.03] p-3 text-center">
+            <div key={s.label} className="well p-3 text-center">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] mb-1.5"><Icon name={s.icon} size={15} /></span>
               <p className="text-2xl font-bold tracking-tight text-[#16181A] tabular-nums">{s.value}</p>
               <p className="text-[11px] text-black/45">{s.label}</p>

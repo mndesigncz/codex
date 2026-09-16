@@ -293,7 +293,7 @@ export default function Procedures({ user }: Props) {
               onClick={openNew}
               className="glass rounded-3xl p-5 min-h-[176px] flex flex-col items-center justify-center gap-2 border border-dashed border-black/15 text-black/45 hover:text-black hover:border-black/30 transition"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/[0.04]">
+              <div className="flex h-12 w-12 items-center justify-center well">
                 <Icon name="plus" size={24} />
               </div>
               <span className="text-sm font-medium">{isEmployer ? 'Nový postup' : 'Navrhnout postup'}</span>
@@ -663,7 +663,7 @@ function ProcedureEditor({
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Např. Otevírání"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
             />
           </div>
 
@@ -673,7 +673,7 @@ function ProcedureEditor({
               value={description ?? ''}
               onChange={e => setDescription(e.target.value)}
               placeholder="Krátký popis postupu"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
             />
           </div>
 
@@ -704,7 +704,7 @@ function ProcedureEditor({
             <div className="space-y-2.5">
               {steps.map((s, i) => (
                 <div key={i} className="space-y-2.5">
-                <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-2.5 space-y-2">
+                <div className="well border border-black/[0.07] p-2.5 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={s.emoji ?? ''}
@@ -781,12 +781,12 @@ function ProcedureEditor({
                 </div>
               ))}
             </div>
-            <button onClick={addStep} className="mt-2.5 inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-black/[0.05] transition">
+            <button onClick={addStep} className="mt-2.5 inline-flex items-center gap-1.5 btn btn-secondary btn-sm text-[#16181A] hover:bg-black/[0.05] transition">
               <Icon name="plus" size={16} /> Přidat krok
             </button>
           </div>
 
-          <label className="flex items-start justify-between gap-4 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 cursor-pointer">
+          <label className="flex items-start justify-between gap-4 well border border-black/[0.07] p-4 cursor-pointer">
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-[#16181A]">Vyžadovat před uzávěrkou</span>
               <span className="block text-xs text-black/45 mt-0.5">Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne.</span>
@@ -814,7 +814,7 @@ function ProcedureEditor({
             </div>
             {remindAnchor === 'time' ? (
               <div className="flex items-center gap-2">
-                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-black/[0.04] border border-black/[0.08] text-[#5B7A08]">
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center well border border-black/[0.08] text-[#5B7A08]">
                   <Icon name="clock" size={20} />
                 </span>
                 <input
@@ -822,7 +822,7 @@ function ProcedureEditor({
                   aria-label="Čas připomenutí"
                   value={remindAt ?? ''}
                   onChange={e => setRemindAt(e.target.value)}
-                  className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                  className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
                 />
                 {remindAt && (
                   <button

@@ -19,7 +19,7 @@ type Suggestion = {
 };
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 // Pipeline stages, in the order the employer moves an idea through.
 const STATUS_META: Record<string, { label: string; chip: string }> = {
@@ -327,9 +327,9 @@ export default function SuggestionsBoard() {
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit podnět</h3>
             <div className="space-y-3">
               <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>

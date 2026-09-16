@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 
 const inputCls =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
+  'w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
 
 interface Receipt {
   id: number;
@@ -207,7 +207,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
                   <img src={r.photoUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-black/[0.06]" />
                 </a>
               ) : (
-                <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.04] flex items-center justify-center text-black/40">
+                <span className="shrink-0 h-12 w-12 well rounded-xl flex items-center justify-center text-black/40">
                   <Icon name="receipt" size={20} strokeWidth={1.7} />
                 </span>
               )}

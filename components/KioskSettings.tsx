@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 interface Member { id: number; name: string; avatar?: string; hasPin: boolean }
 
@@ -110,7 +110,7 @@ export default function KioskSettings() {
                 </span>
                 <input
                   value={pins[m.id] ?? ''} onChange={e => setPins(p => ({ ...p, [m.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-                  inputMode="numeric" placeholder={m.hasPin ? '••••' : 'PIN'} className="w-24 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-sm tabular-nums text-center focus:border-[#C8F542]/50 focus:outline-none shrink-0" />
+                  inputMode="numeric" placeholder={m.hasPin ? '••••' : 'PIN'} className="w-24 field rounded-xl border border-black/[0.08] px-3 py-2 text-sm tabular-nums text-center focus:border-[#C8F542]/50 focus:outline-none shrink-0" />
                 <button onClick={() => savePin(m.id)} className="rounded-full glass border border-black/10 text-[#16181A] px-3 py-2 text-xs font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
                   {(pins[m.id] ?? '') ? 'Uložit' : m.hasPin ? 'Zrušit' : 'Uložit'}
                 </button>

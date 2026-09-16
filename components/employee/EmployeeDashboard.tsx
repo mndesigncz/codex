@@ -227,7 +227,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
             </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
           </div>
-          <span className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
+          <span className="shrink-0 btn btn-primary btn-sm whitespace-nowrap">Otevřít →</span>
         </div>
       </a>
     ) : null,

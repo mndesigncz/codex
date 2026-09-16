@@ -19,8 +19,8 @@ type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 /** Zkratky měsíců pro dlaždici akce — celý název by se tam nevešel. */
 const MONTHS = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
 
-const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
-const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
+const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
+const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 btn btn-secondary hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
 const input = 'field text-sm';
 const label = 'field-label';
 
@@ -161,7 +161,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
             {events!.map((e: any) => (
               <li key={e.id}>
                 <button type="button" onClick={() => setEvDetail(e)}
-                  className="w-full text-left rounded-3xl border border-black/[0.06] bg-white/60 p-4 flex gap-3.5 hover:bg-white/80 active:scale-[0.99] transition">
+                  className="w-full text-left card p-4 flex gap-3.5 hover:bg-white/80 active:scale-[0.99] transition">
                   {e.photos?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={e.photos[0]} alt="" className="shrink-0 h-14 w-14 rounded-2xl object-cover" />
@@ -439,7 +439,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
             {campaigns.length > 0 && (
               <ul className="mt-4 space-y-3">
                 {campaigns.map((cp: any) => (
-                  <li key={cp.id} className="rounded-2xl bg-white/60 border border-black/[0.06] px-4 py-3">
+                  <li key={cp.id} className="well bg-white px-4 py-3">
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
                       <p className="text-xs text-black/50 tabular-nums shrink-0">{cp.required} razítek</p>
@@ -455,7 +455,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
           <label htmlFor="promo-code" className={label}>Máš promo kód?</label>
           <div className="flex gap-2">
             <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder="Z letáku nebo účtenky" autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
-            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
+            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-red-700">{promoErr}</p>}
         </form>
@@ -776,7 +776,7 @@ function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose
           )}
 
           {menu.length > 0 && (
-            <div className="mt-4 rounded-2xl border border-black/[0.06] bg-white/60 p-4">
+            <div className="mt-4 well bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Co se bude podávat</p>
               <ul className="divide-y divide-black/[0.06]">
                 {menu.map((l: any, i: number) => (

@@ -49,7 +49,7 @@ export default function ShiftSwapApprovals() {
         <span className="rounded-full bg-[#0A84FF]/15 text-[#0A6FE0] px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
       </div>
       {pending.map(o => (
-        <div key={o.id} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 space-y-3">
+        <div key={o.id} className="well bg-white p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-[#16181A]">{o.offeredByName ?? 'Kolega'}</span>
             <Icon name="swap" size={15} className="text-black/35" />

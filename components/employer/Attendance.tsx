@@ -337,7 +337,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             ))}
           </div>
           <button onClick={() => { setAddOpen(true); setAddErr(''); }}
-            className="rounded-full bg-[#C8F542] on-accent px-4 py-2 text-sm font-semibold hover:brightness-105 transition whitespace-nowrap">
+            className="btn btn-accent btn-sm hover:brightness-105 transition whitespace-nowrap">
             + Přidat záznam
           </button>
           {entries.length > 0 && (
@@ -558,7 +558,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zaměstnanec</label>
                 <select aria-label="Zaměstnanec" value={addEmp} onChange={e => setAddEmp(e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
                   <option value="">— vyber —</option>
                   {roster.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
@@ -566,12 +566,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>
                 <input type="datetime-local" aria-label="Příchod" value={addIn} onChange={e => setAddIn(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odchod</label>
                 <input type="datetime-local" aria-label="Odchod" value={addOut} onChange={e => setAddOut(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
@@ -599,12 +599,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>
                 <input type="datetime-local" aria-label="Příchod" value={editIn} onChange={e => setEditIn(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odchod <span className="normal-case text-black/35">(prázdné = stále na směně)</span></label>
                 <input type="datetime-local" aria-label="Odchod" value={editOut} onChange={e => setEditOut(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">

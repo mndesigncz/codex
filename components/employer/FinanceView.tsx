@@ -282,7 +282,7 @@ export default function FinanceView() {
                   ['Členů věrnosti', String(g.members), `${g.newMembers} nových tento měsíc`],
                   ['Uplatněných kuponů', String(g.couponsRedeemed), 'sleva na útratě'],
                 ] as [string, string, string][]).map(([lb, val, sub]) => (
-                  <div key={lb} className="rounded-2xl bg-black/[0.035] px-3.5 py-3">
+                  <div key={lb} className="well px-3.5 py-3">
                     <p className="t-label">{lb}</p>
                     <p className="mt-1 text-lg font-bold tabular-nums text-[#16181A]">{val}</p>
                     <p className="text-[11px] text-black/40 leading-snug">{sub}</p>
@@ -441,7 +441,7 @@ export default function FinanceView() {
               {new Date(detail.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
               {' · '}<span className="font-bold text-[#16181A] tabular-nums">{money(detail.amount)}</span>
             </p>
-            {detail.note && <p className="text-sm text-black/60 bg-black/[0.03] rounded-2xl px-4 py-2.5">{detail.note}</p>}
+            {detail.note && <p className="text-sm text-black/60 well px-4 py-2.5">{detail.note}</p>}
             {detail.photoUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}

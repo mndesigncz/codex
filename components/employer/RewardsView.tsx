@@ -97,7 +97,7 @@ function RewardsViewInner() {
             <p className="font-bold text-[#16181A] mb-2.5"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o odměny</p>
             <div className="space-y-2">
               {redemptions.filter(r => r.status === 'pending').map(r => (
-                <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5">
+                <div key={r.id} className="flex flex-wrap items-center gap-2 well border border-black/[0.06] px-4 py-2.5">
                   <span className="min-w-0 flex-1 basis-full sm:basis-0 text-sm text-[#16181A] line-clamp-2 sm:truncate">
                     {r.employee_avatar ?? '👤'} <strong>{r.employee_name}</strong> · {r.title}
                     <span className="text-black/40"> · {r.cost} b.</span>
@@ -120,11 +120,11 @@ function RewardsViewInner() {
               roztáhl celou obrazovku. Na mobilu jsou proto pod sebou. */}
           <div className="grid grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[56px_minmax(0,1fr)_90px_auto] gap-2 mb-3">
             <input value={newIcon} onChange={e => setNewIcon(e.target.value)} maxLength={4} aria-label="Ikona odměny"
-              className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-2 py-2.5 text-center text-lg focus:outline-none focus:border-[#C8F542]/50" />
+              className="field border border-black/[0.08] px-2 py-2.5 text-center text-lg focus:outline-none focus:border-[#C8F542]/50" />
             <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Např. Směna končí o hodinu dřív" maxLength={120}
-              className="min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+              className="min-w-0 field border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
             <input value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="body" type="number" inputMode="numeric" min={1}
-              className="col-span-2 sm:col-span-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
+              className="col-span-2 sm:col-span-1 min-w-0 field border border-black/[0.08] px-3 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
             <button
               onClick={async () => {
                 if (!newTitle.trim() || !Number(newCost) || adding) return;
@@ -348,7 +348,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
         <p className="text-sm text-black/50 mb-4">Od kolika bodů úroveň platí a co za ni zaměstnanec dostane.</p>
         <div className="space-y-3">
           {levels.map((l, i) => (
-            <div key={i} className="rounded-2xl bg-black/[0.03] border border-black/[0.05] p-3.5 space-y-2.5">
+            <div key={i} className="well border border-black/[0.05] p-3.5 space-y-2.5">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] text-xs font-bold">{i + 1}</span>
                 <input value={l.name} onChange={e => setLevel(i, { name: e.target.value })} placeholder="Název úrovně" className={`${inputCls} !py-2 flex-1`} />

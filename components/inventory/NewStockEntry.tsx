@@ -125,7 +125,7 @@ export default function NewStockEntry({
     setSaving(false);
   };
 
-  const field = `w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none ${
+  const field = `w-full field border border-black/[0.08] text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none ${
     big ? 'px-5 py-4 text-lg' : 'px-4 py-3 text-sm'
   }`;
   const label = `block font-semibold text-black/55 mb-1.5 ${big ? 'text-sm' : 'text-xs'}`;

@@ -84,7 +84,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
 
       {canCreate && (
         creating ? (
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 space-y-2">
+          <div className="well border border-black/[0.07] p-3.5 space-y-2">
             {err && <p className="text-xs text-red-600">{err}</p>}
             <input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Otázka ankety…" maxLength={200}
               className="w-full rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />

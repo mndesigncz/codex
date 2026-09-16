@@ -258,7 +258,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
 
               {!c.covered_by && (
                 <Section title="Jak vyšla kasa" hint="Řádek po řádku, v pořadí, jak se peníze pohnuly.">
-                  <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] px-4 py-2">
+                  <div className="well border border-black/[0.07] px-4 py-2">
                     {lines.map(l => (
                       <Row key={l.label} label={l.label} value={`${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`} />
                     ))}
@@ -285,7 +285,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   obrazovce — a jediné, které uzávěrka sama nemůže potvrdit. */}
               <Section title="Kontrola proti pokladně">
                 {d.pos ? (
-                  <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] px-4 py-2">
+                  <div className="well border border-black/[0.07] px-4 py-2">
                     <Row label={`Pokladna — hotovost (${d.pos.bills} úč.)`} value={money(d.pos.cash)} />
                     <Row label="Uzávěrka — hotovost" value={money(d.pos.dayCash)} />
                     <Row label="Rozdíl hotovost" value={`${d.pos.diffCash > 0 ? '+' : ''}${money(d.pos.diffCash)}`}
@@ -522,7 +522,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   {c.approvedByName && <Row label="Schválil/a" value={c.approvedByName} />}
                 </div>
                 {c.review_note && (
-                  <div className="mt-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5">
+                  <div className="mt-2 well border border-black/[0.06] p-3.5">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 mb-0.5">Poznámka vedení</p>
                     <p className="text-sm text-black/65 whitespace-pre-wrap">{c.review_note}</p>
                   </div>
@@ -536,7 +536,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           <div className="dock-strong shrink-0 px-5 sm:px-6 py-3 border-t border-black/[0.07] flex items-center gap-2">
             {c.approved === false && (
               <button onClick={approve} disabled={busy}
-                className="rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:opacity-90 transition disabled:opacity-50">
+                className="btn btn-primary hover:opacity-90 transition disabled:opacity-50">
                 {busy ? 'Schvaluji…' : 'Schválit uzávěrku'}
               </button>
             )}

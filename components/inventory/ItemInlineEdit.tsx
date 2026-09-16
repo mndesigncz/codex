@@ -12,7 +12,7 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 
 const field =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
+  'w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
 
 export type Portion = { name: string; amount: number };
 

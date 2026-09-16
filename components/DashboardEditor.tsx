@@ -58,7 +58,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
           </div>
         </div>
         <button onClick={onClose}
-          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:brightness-125 transition shrink-0">
+          className="btn btn-primary btn-sm hover:brightness-125 transition shrink-0">
           Hotovo
         </button>
       </div>
@@ -88,7 +88,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
         <div className="space-y-1.5">
           {layout.map((e, i) => (
             <div key={`${e.type}-${e.type === 'link' ? e.target : e.id}-${i}`}
-              className="flex items-center gap-2 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
+              className="flex items-center gap-2 well rounded-xl border border-black/[0.06] px-3 py-2">
               <div className="flex flex-col shrink-0">
                 <button onClick={() => onChange(moveEntry(layout, i, -1))} disabled={i === 0}
                   className="text-black/35 hover:text-black disabled:opacity-20 leading-none text-[11px]">▲</button>
@@ -116,7 +116,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
         />
       ) : (
         <button onClick={() => setAdding(true)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542] text-black px-4 py-2 text-sm font-semibold hover:brightness-110 transition">
+          className="inline-flex items-center gap-1.5 btn btn-accent btn-sm hover:brightness-110 transition">
           <Icon name="plus" size={15} /> Přidat dlaždici
         </button>
       )}
@@ -152,7 +152,7 @@ function AddPanel({ spare, onAdd, onClose }: {
   }, [source]);
 
   return (
-    <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+    <div className="well border border-black/[0.06] p-3.5 space-y-3">
       {spare.length > 0 && (
         <div>
           <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Widgety</p>

@@ -337,7 +337,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                       ))}
                     </div>
                     {summary.closing.expected != null && summary.closing.difference != null && (
-                      <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-black/[0.03] px-3 py-2 text-[13px]">
+                      <div className="mt-2.5 flex items-center justify-between gap-2 well rounded-xl px-3 py-2 text-[13px]">
                         <span className="text-black/50">Očekávaná kasa {money(summary.closing.expected)}</span>
                         <span className={`font-semibold tabular-nums ${summary.closing.difference === 0 ? 'text-[#5B7A08]' : summary.closing.difference > 0 ? 'text-amber-600' : 'text-red-600'}`}>
                           {summary.closing.difference === 0 ? 'sedí' : `${summary.closing.difference > 0 ? 'přebytek' : 'manko'} ${money(Math.abs(summary.closing.difference))}`}

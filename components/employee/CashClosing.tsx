@@ -15,7 +15,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 const today = () => pragueToday();
 
@@ -80,7 +80,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
                   value={cnt === 0 ? '' : cnt}
                   onChange={e => setCount(d, e.target.value)}
                   placeholder="0"
-                  className="w-14 h-9 text-center rounded-xl bg-black/[0.04] border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                  className="w-14 h-9 text-center field rounded-xl border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                 />
                 <button type="button" onClick={() => bump(d, 1)} aria-label={`Přidat ${fmtDenom(d)} ${symbol}`}
                   className="rounded-xl bg-[#C8F542] w-9 h-9 flex items-center justify-center text-lg leading-none text-black hover:brightness-110 active:scale-95 transition">+</button>
@@ -1145,7 +1145,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           {/* Say WHY nothing is being demanded, so a blank space doesn't read
               as a bug the next time somebody expects the checklist. */}
           {missingRequired.length === 0 && requiredProcs.length > 0 && !proceduresApply && (
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+            <div className="well border border-black/[0.06] px-4 py-3">
               <p className="text-[13px] text-black/50">
                 {eventId !== '' ? 'Uzávěrka za akci — povinné postupy prodejny se u ní neřeší.'
                   : !closingIsToday ? 'Uzávěrka za jiný den — dnešní postupy ji neblokují.'
@@ -1170,7 +1170,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           )}
 
           {todayRuns.length > 0 && (
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+            <div className="well border border-black/[0.06] p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní postupy</p>
               <div className="flex flex-wrap gap-1.5">
                 {todayRuns.map((r: any) => {
@@ -1196,7 +1196,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
           )}
 
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2.5">
+          <div className="well border border-black/[0.06] p-4 space-y-2.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-black/45"><Icon name="handover" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Předávka pro další směnu <span className="normal-case font-normal text-black/35">(nepovinné — uvidí ji tým na přehledu a tabletu)</span></p>
             <input value={hoTodo} onChange={e => setHoTodo(e.target.value)} maxLength={500}
               placeholder="Co zbývá dodělat…"
@@ -1270,7 +1270,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.self_payout)}</p></div>}
                 </div>
                 {(c.movements?.length ?? 0) > 0 && (
-                  <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                  <div className="mt-3 well border border-black/[0.06] p-3">
                     <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Pohyby v kase</p>
                     <div className="divide-y divide-black/[0.06]">
                       {c.movements!.map((m, i) => {
@@ -1289,7 +1289,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 {hasDenominations(c.denominations) && (
-                  <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                  <div className="mt-3 well border border-black/[0.06] p-3">
                     <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Kasa napočítaná po bankovkách</p>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(c.denominations!)
@@ -1303,7 +1303,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 {(Number(c.final_removal) || 0) > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 py-2.5 text-sm">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 well border border-black/[0.06] px-3 py-2.5 text-sm">
                     <span className="text-black/55 whitespace-nowrap">Odvod na konci: <strong className="text-[#16181A] tabular-nums">−{money(Number(c.final_removal))}</strong></span>
                     <span className="text-black/55 whitespace-nowrap">V kase zůstalo: <strong className="text-[#16181A] tabular-nums">{money(cashLeft(c))}</strong></span>
                   </div>
