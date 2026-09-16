@@ -43,58 +43,74 @@ export default function Landing() {
         </nav>
       </header>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-10 sm:pt-20 pb-14 text-center">
-        {/* Nadpis unese sám sebe — štítek nad ním („eyebrow") byl jen ozdoba,
-            a to, co říkal, patří do věty pod nadpisem. */}
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-[#16181A] leading-[1.05] text-balance">
-          Provoz vašeho podniku<br className="hidden sm:block" /> na jednom místě
-        </h1>
-        <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-black/55 text-pretty">
-          Směny, uzávěrky, sklad, úkoly i týmový chat pro čajovny, kavárny a malé podniky —
-          místo pěti aplikací a papírků jedna, které rozumí celý tým od první směny.
-        </p>
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link href="/register" className="w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-8 py-3.5 text-sm font-semibold hover:brightness-105 shadow-[0_8px_24px_rgba(200,245,66,0.35)] transition-all inline-flex items-center justify-center gap-2">
-            Vyzkoušet {TRIAL_DAYS} dní zdarma <Icon name="chevron" size={15} className="-rotate-90" />
-          </Link>
-          <a href="#cenik" className="w-full sm:w-auto rounded-full glass border border-black/[0.08] px-8 py-3.5 text-sm font-semibold text-black/70 hover:text-black transition-all inline-flex items-center justify-center">
-            Kolik to stojí?
-          </a>
-        </div>
-        <p className="mt-4 text-xs text-black/40">Bez karty. Zaměstnanci se připojí jedním kódem.</p>
-      </section>
-
-      {/* One quiet image instead of a wall of screenshots — the room the app is
-          actually used in. 22 kB, so it costs the visitor nothing. */}
-      <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-14 sm:pb-20">
-        <figure className="relative overflow-hidden rounded-[32px] border border-black/[0.06] shadow-[0_30px_80px_rgba(25,35,15,0.14)] rise-in">
-          <img
-            src="/brand/hero-tea-bar.webp"
-            alt="Pult čajovny s konvicí, sklenicemi a čajovými dózami v ranním světle"
-            width={1376} height={768} loading="eager" fetchPriority="high"
-            className="w-full h-[220px] sm:h-[380px] object-cover"
-          />
-          <figcaption className="absolute inset-x-0 bottom-0 p-5 sm:p-8 bg-gradient-to-t from-black/60 via-black/20 to-transparent">
-            <p className="text-white/95 text-sm sm:text-base font-semibold max-w-md leading-snug sm:ml-auto sm:pr-2">
-              Ráno otevřete. Managero už ví, kdo má směnu, co došlo a co se má stihnout.
+      {/* Hero: text vlevo, fotka vpravo vybíhá za okraj kontejneru. Souměrný
+          střed s obrázkem pod sebou vypadal jako každá druhá šablona; tady
+          má stránka těžiště a směr — čte se zleva doprava, do fotky. */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-8 sm:pt-16 pb-12 sm:pb-20 overflow-x-clip">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 lg:gap-8 items-center">
+          <div className="max-w-xl rise-in">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/50">Pro čajovny, kavárny a malé podniky</p>
+            <h1 className="mt-4 text-[2.6rem] leading-[1.02] sm:text-6xl lg:text-[4.25rem] font-bold tracking-[-0.03em] text-[#16181A] text-balance">
+              Provoz podniku na jednom místě.
+            </h1>
+            <p className="mt-6 text-base sm:text-lg text-black/60 leading-relaxed max-w-[46ch] text-pretty">
+              Směny, uzávěrky, sklad, úkoly i týmový chat — místo pěti aplikací a papírků jedna,
+              které rozumí celý tým od první směny.
             </p>
-          </figcaption>
-        </figure>
+            <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <Link href="/register" className="w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-7 py-3.5 text-sm font-semibold hover:brightness-105 shadow-[0_8px_24px_rgba(200,245,66,0.35)] transition-all inline-flex items-center justify-center gap-2">
+                Vyzkoušet {TRIAL_DAYS} dní zdarma <Icon name="chevron" size={15} className="-rotate-90" />
+              </Link>
+              <a href="#cenik" className="w-full sm:w-auto rounded-full glass border border-black/[0.08] px-7 py-3.5 text-sm font-semibold text-black/70 hover:text-black transition-all inline-flex items-center justify-center">
+                Kolik to stojí?
+              </a>
+            </div>
+            <p className="mt-4 text-xs text-black/45">Bez karty. Zaměstnanci se připojí jedním kódem.</p>
+          </div>
+
+          <figure className="relative lg:-mr-[14vw] xl:-mr-[10vw] rise-in" style={{ animationDelay: '120ms' }}>
+            <div className="relative overflow-hidden rounded-[32px] border border-black/[0.06] shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
+              <img
+                src="/brand/hero-tea-bar.webp"
+                srcSet="/brand/hero-tea-bar-sm.webp 800w, /brand/hero-tea-bar.webp 1600w"
+                sizes="(min-width: 1024px) 60vw, 100vw"
+                alt="Pult čajovny: skleněná konvice nalévá čaj do limetkového šálku, v pozadí černé dózy v ranním světle"
+                width={1600} height={900} loading="eager" fetchPriority="high"
+                className="w-full aspect-[16/10] lg:aspect-[16/11] object-cover object-left"
+              />
+            </div>
+            {/* Plovoucí lístek z aplikace přes roh fotky — jediný kousek UI na
+                celé stránce, a je to to, co ráno otevřete jako první. */}
+            <figcaption className="absolute -bottom-5 left-4 sm:left-8 lg:-left-10 glass-strong rounded-[22px] px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)] rise-in" style={{ animationDelay: '320ms' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
+              <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30" />Směna: Eva 8–16, Martin od 12</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/30" />Dochází sencha — objednávka připravená</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-black/25 ring-2 ring-black/10" />Včerejší uzávěrka sedí na korunu</li>
+              </ul>
+            </figcaption>
+          </figure>
+        </div>
       </section>
 
-      {/* Features */}
-      <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
-          {FEATURES.map(f => (
-            <div key={f.title} className="glass-card p-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
-                <Icon name={f.icon} size={22} />
+      {/* Features: jedno velké téma a pak menší vedle sebe — bento místo tří
+          stejných sloupců. První karta má prostor říct větu, ostatní heslo. */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-8 pb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4 stagger">
+          {FEATURES.map((f, i) => {
+            const big = i === 0 || i === 3;
+            // Řádky 4+2 / 2+4 / 3+3 — mřížka se nikde neopakuje a nikde nezůstane díra.
+            const span = big ? 'sm:col-span-4' : i >= 4 ? 'sm:col-span-3' : 'sm:col-span-2';
+            return (
+              <div key={f.title} className={`glass-card p-6 sm:p-7 flex flex-col ${span} ${i === 3 ? 'sm:col-start-3' : ''}`}>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]">
+                  <Icon name={f.icon} size={22} />
+                </div>
+                <h3 className={`mt-5 font-bold tracking-tight text-[#16181A] ${big ? 'text-2xl' : 'text-lg'}`}>{f.title}</h3>
+                <p className={`mt-2 text-black/60 leading-relaxed text-pretty ${big ? 'text-base max-w-[52ch]' : 'text-sm'}`}>{f.text}</p>
               </div>
-              <h3 className="mt-4 font-bold tracking-tight text-[#16181A]">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-black/55 leading-relaxed">{f.text}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
