@@ -37,7 +37,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
   const { pro, loaded } = usePlan();
   if (loaded && !pro) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-[100dvh] flex items-center justify-center p-6">
         <div className="glass-card p-10 max-w-md text-center space-y-3">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={28} /></div>
           <div className="flex items-center justify-center gap-2">
@@ -81,7 +81,7 @@ function KioskShell({ user }: { user: KioskUser }) {
   const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
 
   return (
-    <div className="min-h-screen flex flex-col p-5 sm:p-8">
+    <div className="min-h-[100dvh] flex flex-col p-5 sm:p-8">
       {/* Header */}
       {/* Kiosk běží hlavně na tabletu, ale na úzkém displeji se jméno mačkalo
           mezi značku a velké hodiny na 28 px. Identita si vezme celý řádek

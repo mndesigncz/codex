@@ -23,7 +23,7 @@ function Cell({ v }: { v: string | boolean }) {
 
 export default function Landing() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       {/* Header */}
       <header className="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -76,7 +76,7 @@ export default function Landing() {
                 sizes="(min-width: 1024px) 60vw, 100vw"
                 alt="Pult čajovny: skleněná konvice nalévá čaj do limetkového šálku, v pozadí černé dózy v ranním světle"
                 width={1600} height={900} loading="eager" fetchPriority="high"
-                className="w-full aspect-[16/10] lg:aspect-[16/11] object-cover object-left"
+                className="w-full aspect-[16/10] lg:aspect-[16/11] object-cover object-left ken-burns"
               />
             </div>
             {/* Plovoucí lístek z aplikace přes roh fotky — jediný kousek UI na
@@ -84,7 +84,7 @@ export default function Landing() {
             <figcaption className="absolute -bottom-5 left-4 sm:left-8 lg:-left-10 glass-strong rounded-[22px] px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)] rise-in" style={{ animationDelay: '320ms' }}>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
               <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
-                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30" />Směna: Eva 8–16, Martin od 12</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30 i-pulse" />Směna: Eva 8–16, Martin od 12</li>
                 <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/30" />Dochází sencha — objednávka připravená</li>
                 <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-black/25 ring-2 ring-black/10" />Včerejší uzávěrka sedí na korunu</li>
               </ul>
@@ -116,17 +116,21 @@ export default function Landing() {
 
       {/* Pricing */}
       <section id="cenik" className="max-w-4xl mx-auto px-5 sm:px-8 pb-16">
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A] text-center">Jednoduchý ceník</h2>
-        <p className="mt-2 text-sm text-black/50 text-center">
-          Během beta období je všechno odemčené zdarma. Nový podnik navíc dostane {TRIAL_DAYS} dní plné verze.
-        </p>
+        {/* Nadpis vlevo nad souměrnými kartami — stránka drží těžiště vlevo od
+            hero až dolů, ceník se nevrací do středu jako u šablon. */}
+        <div className="max-w-xl">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A]">Jednoduchý ceník</h2>
+          <p className="mt-2 text-sm text-black/55 text-pretty">
+            Během beta období je všechno odemčené zdarma. Nový podnik navíc dostane {TRIAL_DAYS} dní plné verze.
+          </p>
+        </div>
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
           <div className="glass-card p-7 flex flex-col">
             <h3 className="font-bold tracking-tight text-[#16181A]">Zdarma</h3>
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">0 Kč</p>
             <p className="text-xs text-black/40 mt-1">navždy</p>
             <p className="mt-4 text-sm text-black/55">Základ pro malý tým: směny, úkoly, chat, uzávěrky a sklad.</p>
-            <Link href="/register" className="mt-6 rounded-full glass border border-black/[0.08] px-6 py-3 text-sm font-semibold text-black/70 hover:text-black transition-all text-center">
+            <Link href="/register" className="mt-6 rounded-full glass border border-black/[0.08] px-6 py-3 text-sm font-semibold text-black/70 hover:text-black transition-colors text-center">
               Začít zdarma
             </Link>
           </div>
@@ -136,7 +140,7 @@ export default function Landing() {
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">{PRO_PRICE.monthly} {PRO_PRICE.currency}</p>
             <p className="text-xs text-black/40 mt-1">{PRO_PRICE.per}</p>
             <p className="mt-4 text-sm text-black/55">Všechno bez limitů: neomezený tým, kiosk pro tablet, odměny, exporty a sdílené menu ve vašich barvách.</p>
-            <Link href="/register" className="mt-6 rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-semibold hover:bg-black transition-all text-center">
+            <Link href="/register" className="mt-6 rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-semibold hover:bg-black transition-colors text-center">
               Vyzkoušet {TRIAL_DAYS} dní zdarma
             </Link>
           </div>

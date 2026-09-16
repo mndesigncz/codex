@@ -125,6 +125,13 @@ input::-webkit-date-and-time-value { text-align: left; }
   .modal-overlay { animation: pangea-fade-in 0.16s ease-out; }
 }
 
+/* Hero fotka pomalu dýchá (Ken Burns, 40 s tam a zpět) — jediný trvalý pohyb
+   na landingu, na plochách aplikace nic takového nebude. */
+@keyframes ken-burns { from { transform: scale(1); } to { transform: scale(1.06); } }
+@media (prefers-reduced-motion: no-preference) {
+  .ken-burns { animation: ken-burns 40s ease-in-out infinite alternate; transform-origin: 35% 60%; will-change: transform; }
+}
+
 /* Toast: přijede shora o kousek, opacitou; jeden tvar pro celou aplikaci. */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.98); }

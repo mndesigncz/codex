@@ -64,7 +64,7 @@ function JoinForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
@@ -117,7 +117,7 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-black/45 text-sm">Načítání…</div>}>
+    <Suspense fallback={<div className="min-h-[100dvh] flex items-center justify-center text-black/45 text-sm">Načítání…</div>}>
       <JoinForm />
     </Suspense>
   );
