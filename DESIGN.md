@@ -1,79 +1,126 @@
-# Managero — DESIGN.md
+# Managero — DESIGN.md (v2, „Managero 2“)
 
 Vizuální systém zachycený z kódu (app/globals.css, components/ui). Jedna
 aplikace, tři prostředí: administrace, TO GO/kiosk, Managero client — vše
-mluví stejným jazykem.
+mluví jedním jazykem. Verze 2 vznikla po redesignu celé aplikace: místo
+skla a devíti druhů karet jsou tři vrstvy ploch, tři rádiusy, jedna
+typografická škála a jedna sada stavových barev.
 
 ## Tón
 
-Světlé, klidné, papírově zelenkavé pozadí s jemným zrnem; jedna limetková
-jako jediná hlavní akce na obrazovce; tmavá inkoustová pro vybraný stav.
-Sklo (blur) jen jako materiál karet a lišt, ne dekorace.
+Světlé, klidné, papírově zelenkavé pozadí s jemným zrnem. Obsah leží na
+bílých kartách s měkkým stínem; uvnitř karet jsou „jamky“ (well) — tónované
+plochy bez stínu. Jedna limetková akce na obrazovce; tmavá inkoustová pro
+vybraný stav a sekundární akce. Sklo (blur) zůstává jen na plovoucí liště,
+docku a topbaru, nikde jinde.
 
-## Tokeny
+## Tokeny (app/globals.css, `:root`)
 
-- Pozadí: `#F1F3ED` (hostovská část natvrdo, jinak `--bg` s jemnými
-  radiálními světly limetky a modré). Přes celou stránku leží pevné zrno
-  (`body::after`, 3,5 % multiply; ve tmavém 5 % screen) — vypíná se při
-  `prefers-reduced-transparency` a v tisku.
-- Inkoust: `#16181A`; sekundární text `black/55–70`.
-- Značková limetka: `#C8F542` (na ní vždy tmavý text; text limetkové řady
-  na světlém podkladu ztmavený na `#4F6A07`/`#3E5406` kvůli kontrastu).
-- Stavové: čeká `amber-500/15` + `amber-800`; chyba `red-500/10` +
-  `red-700`; hotovo `black/[0.06]`.
-- Rádiusy: karty `rounded-3xl`/`rounded-[28px]`, pole `rounded-2xl`,
-  tlačítka a chipy `rounded-full`.
-- Písmo **Geist** (balíček `geist`, self-hosted, `--font-geist-sans`);
-  kódy kartiček a kuponů **Geist Mono** (`font-mono`). Nadpisy `font-bold
-  tracking-tight(er)`; h1 `-0.022em`, h2 `-0.015em`; čísla `tabular-nums`;
-  štítky sekcí `text-[11px] uppercase tracking-wider text-black/45–50`;
-  minimum písma 11 px; odstavce `text-wrap: pretty` (globálně).
+- Pozadí `--bg #F3F4F0` + `--bg-gradient` (dvě radiální světla). Zrno přes
+  celou stránku (`body::after`), vypíná se při `prefers-reduced-transparency`
+  a v tisku.
+- Inkoust `--ink #16181A`; sekundární text `black/55–70`, meta `black/60`.
+- Limetka `--lime #C8F542` (vždy tmavý text na ní); limetkový text na světlém
+  podkladu ztmavený na `#3E5406`/`#5B7A08`.
+- Plochy: `--surface #fff`, `--surface-line` (7 % inkoustu), `--well`
+  (3,5 %), stíny `--shadow-card` / `--shadow-float` / `--shadow-modal`.
+- Rádiusy — tři a dost: `--r-lg 20px` (karta, modál), `--r-md 14px` (pole,
+  dlaždice, řádek), `--r-sm 10px` (drobnosti), `--r-chip` kulatý. Tailwind
+  `rounded-3xl/2xl/xl` na ně míří (tailwind.config.js).
+- Stavové barvy, jedna sada pro chipy, panely, hlášky i text:
+  `--ok`, `--wait`, `--bad`, `--info`, `--muted`, vždy dvojice `-bg` / `-ink`.
+- Tmavý motiv: přemapování týchž tokenů pod `[data-theme="dark"]`;
+  hostovská část se připíná na světlý.
+
+## Vrstvy ploch (CSS třídy)
+
+| Třída | Použití |
+|---|---|
+| `.card` (alias `.glass-card`) | bílá karta se stínem — obsahová jednotka obrazovky |
+| `.card-accent` / `.card-wait` / `.card-danger` / `.card-info` | tónovaná karta: „čeká na tebe“, chybí uzávěrka, upozornění |
+| `.well` | jamka uvnitř karty: sloupec kanbanu, pole formuláře v modálu, kód k zkopírování |
+| `.note` + `note-danger/wait/info/ok` | inline hláška (chyba, čeká, info); nikdy ručně `bg-red-500/10` |
+| `.glass` | tónovaný povrch bez bluru (starší kód); `.glass-strong` blur jen pro plovoucí chrome |
+| `.list` + `.list-row` (+ `.list-row-tap`) | seznam v jedné kartě, linky mezi řádky kreslí `.list` |
+
+Karty v kartách jsou zakázané — uvnitř karty je jamka nebo seznam.
+
+## Typografická škála
+
+Písmo **Geist** (balíček `geist`, `--font-geist-sans`), kódy kartiček a kuponů
+**Geist Mono**. Pět velikostí a dost:
+
+- `.t-page` 28 px bold (jediný h1 na obrazovce; kreslí ho `PageHeader`)
+- `.t-section` 18 px semibold (h2 sekce; kreslí `Section`)
+- `.t-card` 15 px semibold (titulek karty, dlaždice, modálu)
+- `.t-meta` 13 px, 60 % inkoustu (podtitulky, meta řádky)
+- `.t-label` 11 px caps, tracking 0.08em (štítek nad blokem, ne popisek pole)
+- Popisky polí `.field-label` 13 px medium, bez verzálek.
+
+Čísla `tabular-nums`; odstavce `text-wrap: pretty`; minimum písma 11 px
+(hlídá `scripts/check-contrast-classes.mjs`).
+
+## Ovládací prvky
+
+- Pole: jedna třída `.field` (bílé, 14px rádius, limetkový focus ring).
+  Ikonové pole doplní odsazení jako `!pl-10` — `.field` sedí v
+  `@layer components`, takže běžné utility přebije jen s `!`.
+- Tlačítka: `<Button>` z `components/ui`, nebo třídy `.btn` +
+  `btn-accent` (limetková, jediná hlavní) / `btn-primary` (tmavá) /
+  `btn-secondary` (tónovaná) / `btn-ghost`; výšky `btn-sm` 36, základ 44,
+  `btn-lg` 48. Ručně psané pilulky `rounded-full bg-[#16181A] …` jsou
+  zakázané.
+- Chipy stavu: `.chip` + `chip-ok/wait/bad/info/muted/ink`, `chip-sm`.
+- Přepínač pohledu: `Segmented` (tmavá pilulka klouže, `aria-selected`).
+- Statistiky: `Stat` / `StatRow` (štítek `.t-label`, číslo 28 px tabular).
 
 ## Komponenty (components/ui)
 
-Button (accent = limetková, jediná primární; primary = tmavá; secondary,
-ghost, danger; icon/loading/size), PageHeader (title/subtitle/primary/
-secondary/aside/menu), Segmented (jedna tmavá pilulka, která KLOUŽE mezi
-položkami — měří se z DOM, `aria-selected`, `wrap`), EmptyState (ikona,
-titulek, hint, akce), Skeleton/PageSkel (shimmer pruh, ne pulz), Menu
-(popover roste z tlačítka: `origin-top-right/left` + `pop-in` 160 ms),
-Avatar/Initials (tmavé kolečko, limetkové iniciály). Klient navíc: StatCard
-(štítek, ikona v tónovaném kolečku, číslo), SectionTitle (ikona v kolečku +
-akce vpravo), TableMap (pilulky stolů na tečkovaném plánku).
+Button, PageHeader (title/subtitle/primary/secondary/aside/menu), Section
+(t-section + jedna akce vpravo), Segmented, EmptyState, Skeleton/PageSkel
+(shimmer), Menu (roste z tlačítka, `pop-in` 160 ms), Avatar/Initials,
+Card/Well, Field/Label/Input/Select/Textarea, Chip, ListRow, Stat/StatRow,
+Toast. Klient navíc: StatCard, SectionTitle, TableMap.
 
-## Vzory
+## Vzory obrazovek
 
+- Každá obrazovka: `PageHeader` (h1 + podtitulek, vpravo přepínač a jedna
+  limetková akce), pak karty. Šířka obsahu: seznamové obrazovky `max-w-4xl`,
+  datové (finance, docházka, sklad) plná šířka `max-w-7xl`.
+- Seznam = jedna karta s `.list`; ne jedna karta na položku (Úkoly, Nápady,
+  Průběhy). Dlaždice (návody, kategorie skladu) max. 2 sloupce vedle railu.
+- „Čeká na tebe“: `card-wait` s chipy-prokliky, jeden na obrazovce.
+- Kanban: sloupce `well`, karty `card` s `hover:shadow-float`.
 - Navigace: desktop levý rail (administrace) nebo horní záložky (client);
-  mobil vždy spodní dock `dock-strong` (3–4 položky + Více → MobileMoreSheet).
-- „Čeká na tebe": oranžový panel s chipy-prokliky, jeden na obrazovce.
-- Karty seznamů: `glass-card` + `divide-y divide-black/[0.06]`; řádek =
-  Initials + obsah + chip stavu vpravo.
-- Chip stavu: `rounded-full text-[11px] font-semibold` v stavové barvě.
-- Kontrolní seznam propojení: řádky s kolečkem (limetka = hotovo) a šipkou.
-- Formuláře: `label` 12px semibold, pole `bg-white/70 border-black/[0.08]`
-  s limetkovým focus ringem; destruktivní akce vždy s confirm.
+  mobil spodní dock `dock-strong`.
+- Destruktivní akce vždy s confirm; hlášky přes `.note`.
 
 ## Pohyb a přístupnost
 
-Křivky: `--ease-out` `cubic-bezier(0.23,1,0.32,1)` pro vstupy a výstupy,
-`--ease-in-out` pro pohyb po obrazovce, `--ease-drawer` pro zásuvky
-(Tailwind `ease-out`/`ease-in-out`/`ease-drawer` na ně míří). Doby:
-stisk 120 ms, změna stavu 220 ms, příchod plochy 340 ms; menu a popovery
-≤ 160 ms; nic přes 300 ms mimo modály. Vstup nikdy ze `scale(0)` — z 0.96
-s opacitou. `active:scale-[0.97]` na stisk (globálně na `button`); žádné
-animace klávesových akcí. Hover jen pod kurzorem
-(`future.hoverOnlyWhenSupported` v Tailwindu). Kolečko načítání 0,7 s.
-Dotykové cíle ≥36 px (`tap-target(-sm)`), `cz-sentence` pro česká data,
-`aria-pressed` na přepínačích, `role=status` na toastech. Tmavý motiv:
-přemapování přes `[data-theme="dark"]` v globals.css; hostovská část se
-připíná na světlý (ThemeProvider). `prefers-reduced-motion`: pohyb pryč,
-zpětná vazba zůstává (opacita); `prefers-reduced-transparency`: sklo i zrno
-pryč; `prefers-contrast: more`: tvrdší okraje.
+Křivky `--ease-out` pro vstupy/výstupy, `--ease-in-out` pro pohyb po
+obrazovce, `--ease-drawer` pro zásuvky. Doby: stisk 120 ms, změna stavu
+220 ms, příchod plochy 340 ms; menu ≤ 160 ms; nic přes 300 ms mimo modály.
+Vstup z 0.96 s opacitou, nikdy ze `scale(0)`. `active:scale-[0.97]` globálně
+na `button`. Hover jen pod kurzorem (`future.hoverOnlyWhenSupported`).
+Dotykové cíle ≥ 36 px (`tap-target(-sm)`), `aria-pressed` na přepínačích,
+`role=status` na toastech, `role=dialog` + fokus trap (`useModal`).
+`prefers-reduced-motion`: pohyb pryč, opacita zůstává;
+`prefers-reduced-transparency`: blur i zrno pryč; `prefers-contrast: more`:
+tvrdší okraje.
+
+## Ověření
+
+Před pushem: `npm run typecheck && npm test && npm run build` + skripty
+`check-time`, `check-decimal-inputs`, `check-width-clash`,
+`check-contrast-classes`. Vizuálně: Playwright screenshoty všech ~100
+obrazovek (desktop 1280, mobil 390, úzký 320) a sweep přetečení, dotykových
+cílů, duplicitních id a vnořených klikatelných prvků — vše 0.
 
 ## Anti-vzory (zdejší zákazy)
 
-Title Case v češtině; víc limetkových akcí na jedné obrazovce; `capitalize`
-na datech; `String(date).slice` místo pragueTime; písmo pod 11 px; ořez
-krátkých českých popisků; nové barvy mimo paletu; `transition: all`;
-`ease-in` na UI; keyframes na rychle opakovaných prvcích (toasty, přepínače)
-místo transitions; hover efekt bez `hover: hover`.
+Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
+pilulky, panely a štítky místo `.btn`/`.note`/`.t-label`; nové rádiusy
+mimo tři tokeny; nové barvy mimo paletu; Title Case v češtině; `capitalize`
+na datech; `String(date).slice` místo pragueTime; písmo pod 11 px;
+`transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
+blur mimo plovoucí lištu, dock a topbar.
