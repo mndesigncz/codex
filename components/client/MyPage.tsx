@@ -76,7 +76,18 @@ export default function MyPage() {
                       {m.credit > 0 && <p className="text-sm font-semibold tabular-nums text-[#5B7A08] leading-tight">{m.credit} Kč kreditu</p>}
                     </div>
                   </div>
-                  {m.stampTarget > 0 && (
+                  {(m.campaigns ?? []).length > 0 ? (
+                    <div className="mt-3 space-y-2.5">
+                      {m.campaigns.map((cp: any) => (
+                        <div key={cp.id}>
+                          <div className="flex gap-1" aria-label={`${cp.name}: ${cp.stamps} z ${cp.required} razítek`}>
+                            {Array.from({ length: Math.min(cp.required, 12) }).map((_, i) => <span key={i} className={`h-2 flex-1 rounded-full ${i < cp.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />)}
+                          </div>
+                          <p className="text-xs text-black/55 mt-1.5 tabular-nums">{cp.name} · {cp.stamps}/{cp.required}{cp.reward ? ` · ${cp.reward}` : ''}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : m.stampTarget > 0 && (
                     <div className="mt-3">
                       <div className="flex gap-1" aria-label={`${m.stamps} z ${m.stampTarget} razítek`}>
                         {Array.from({ length: Math.min(m.stampTarget, 12) }).map((_, i) => <span key={i} className={`h-2 flex-1 rounded-full ${i < m.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />)}

@@ -1365,6 +1365,74 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_ledger_member ON client_loyalty_ledger (team_id, customer_id)`);
 
+    // ---- Věrnost I: razítkové kampaně (po vzoru Kartičky) --------------------
+    // Místo jednoho počítadla razítek na podnik běží vedle sebe víc kampaní
+    // („10+1 dýmka", „5+1 čaj"), každá s vlastními pravidly: za které položky
+    // nabídky se razítko připisuje, kolik jich je potřeba a co je odměna.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_stamp_campaigns (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        conditions TEXT DEFAULT '',
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        valid_since TEXT,
+        valid_till TEXT,
+        required_stamps INTEGER NOT NULL DEFAULT 10,
+        rule_type TEXT NOT NULL DEFAULT 'visit',
+        stamp_items JSONB NOT NULL DEFAULT '[]',
+        min_value INTEGER,
+        min_value_multiple BOOLEAN NOT NULL DEFAULT FALSE,
+        one_per_order BOOLEAN NOT NULL DEFAULT FALSE,
+        reward_title TEXT NOT NULL DEFAULT '',
+        reward_items JSONB NOT NULL DEFAULT '[]',
+        days_to_finish INTEGER NOT NULL DEFAULT 0,
+        days_to_redeem INTEGER NOT NULL DEFAULT 0,
+        repeat_mode TEXT NOT NULL DEFAULT 'immediately',
+        stack_cards BOOLEAN NOT NULL DEFAULT TRUE,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_stamp_campaigns_team ON client_stamp_campaigns (team_id)`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_stamp_progress (
+        campaign_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        stamps INTEGER NOT NULL DEFAULT 0,
+        completed INTEGER NOT NULL DEFAULT 0,
+        started_at TIMESTAMP DEFAULT NOW(),
+        last_stamp_at TIMESTAMP,
+        last_completed_at TIMESTAMP,
+        PRIMARY KEY (campaign_id, customer_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_stamp_progress_member ON client_stamp_progress (team_id, customer_id)`);
+    // Účtenka smí věrnost připsat jen jednou — guard proti dvojímu načtení.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_bill_awards (
+        team_id INTEGER NOT NULL,
+        bill_id TEXT NOT NULL,
+        customer_id INTEGER NOT NULL,
+        awarded_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, bill_id)
+      )`);
+    // Migrace jednoduchého razítka: podnik se zapnutým stamp_target dostane
+    // výchozí kampaň „za návštěvu" a rozsbíraná razítka členů se přenesou.
+    await ddl(sql`
+      INSERT INTO client_stamp_campaigns (team_id, name, description, rule_type, required_stamps, reward_title, position)
+      SELECT p.team_id, 'Razítko za návštěvu', 'Jedno razítko za každou návštěvu.', 'visit', GREATEST(1, p.stamp_target), COALESCE(NULLIF(p.stamp_reward, ''), 'Odměna za razítka'), 0
+      FROM client_profiles p
+      WHERE p.stamp_target > 0
+        AND NOT EXISTS (SELECT 1 FROM client_stamp_campaigns c WHERE c.team_id = p.team_id)`);
+    await ddl(sql`
+      INSERT INTO client_stamp_progress (campaign_id, customer_id, team_id, stamps)
+      SELECT c.id, m.customer_id, m.team_id, m.stamps
+      FROM client_memberships m
+      JOIN client_stamp_campaigns c ON c.team_id = m.team_id AND c.rule_type = 'visit'
+      WHERE m.stamps > 0
+        AND NOT EXISTS (SELECT 1 FROM client_stamp_progress sp WHERE sp.campaign_id = c.id AND sp.customer_id = m.customer_id)`);
+
     // ---- Managero client III: kartička, hodnocení, zprávy, promo kódy ----
     // Kartička: jeden kód na hosta pro všechny podniky (jako Kartička nebo
     // karta v peněžence). Obsluha ho načte u kasy a dá razítko či body.

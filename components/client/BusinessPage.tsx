@@ -128,7 +128,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
       {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} events={d.events} gallery={b.gallery} accent={accent} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} slug={slug} signedIn={d.signedIn} businessName={b.name} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
       {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} plan={d.plan} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
-      {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
+      {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} campaigns={d.stampCampaigns ?? []} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
     </div>
   );
 }
@@ -333,7 +333,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   );
 }
 
-function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; b: any; me: any; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
+function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slug: string; b: any; me: any; campaigns: any[]; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [err, setErr] = useState('');
   const [promo, setPromo] = useState('');
@@ -367,7 +367,25 @@ function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; 
         <h2 className="text-lg font-bold tracking-tight">Razítka a body</h2>
         {me?.member ? (
           <>
-            {target > 0 && (
+            {(me.campaigns ?? []).length > 0 ? (
+              <ul className="mt-4 space-y-4">
+                {me.campaigns.map((cp: any) => (
+                  <li key={cp.id}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
+                      <p className="text-sm font-semibold tabular-nums shrink-0">{cp.stamps} / {cp.required}</p>
+                    </div>
+                    {cp.description && <p className="text-xs text-black/55 mt-0.5">{cp.description}</p>}
+                    <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(cp.required, 10)}, minmax(0, 1fr))` }} aria-hidden>
+                      {Array.from({ length: Math.min(cp.required, 20) }).map((_, i) => (
+                        <span key={i} className={`h-8 rounded-lg border ${i < cp.stamps ? 'bg-[#C8F542] border-[#C8F542]' : 'bg-white/60 border-black/[0.08]'}`} />
+                      ))}
+                    </div>
+                    {cp.reward && <p className="mt-2 text-xs text-black/55">Za plnou kartu: <strong className="text-black/80">{cp.reward}</strong>{cp.completed > 0 ? ` · dokončeno ${cp.completed}×` : ''}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : target > 0 && (
               <div className="mt-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-sm text-black/60">Razítka za návštěvy</p>
@@ -416,7 +434,22 @@ function LoyaltyTab({ slug, b, me, coupons, signedIn, onDone }: { slug: string; 
             )}
           </>
         ) : (
-          <p className="mt-2 text-sm text-black/60">Staň se členem a začni sbírat razítka za návštěvy a body za útratu. Kartičku s QR máš v Moje.</p>
+          <>
+            <p className="mt-2 text-sm text-black/60">Staň se členem a začni sbírat razítka za návštěvy a body za útratu. Kartičku s QR máš v Moje.</p>
+            {campaigns.length > 0 && (
+              <ul className="mt-4 space-y-3">
+                {campaigns.map((cp: any) => (
+                  <li key={cp.id} className="rounded-2xl bg-white/60 border border-black/[0.06] px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
+                      <p className="text-xs text-black/50 tabular-nums shrink-0">{cp.required} razítek</p>
+                    </div>
+                    <p className="text-xs text-black/55 mt-0.5">{cp.description || (cp.reward ? `Za plnou kartu: ${cp.reward}` : '')}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
         <form onSubmit={usePromo} className="mt-5 border-t border-black/[0.06] pt-4">
           <label htmlFor="promo-code" className={label}>Máš promo kód?</label>

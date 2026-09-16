@@ -30,9 +30,32 @@ export async function GET() {
     FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id JOIN client_profiles p ON p.team_id = cl.team_id JOIN teams t ON t.id = cl.team_id
     WHERE cl.customer_id = ${me.id} ORDER BY cl.redeemed_at NULLS FIRST, cl.claimed_at DESC LIMIT 40`;
   const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
+  // Razítkové kampaně všech mých podniků + můj průběh — dvě skupinové otázky.
+  let campaignRows: any[] = []; let progRows: any[] = [];
+  try {
+    const teamIds = memberships.map(m => Number(m.team_id));
+    if (teamIds.length) {
+      [campaignRows, progRows] = await Promise.all([
+        sql`SELECT * FROM client_stamp_campaigns WHERE team_id = ANY(${teamIds}) AND active = TRUE
+             AND (valid_since IS NULL OR valid_since <= ${today}) AND (valid_till IS NULL OR valid_till >= ${today})
+             ORDER BY position, id` as any,
+        sql`SELECT * FROM client_stamp_progress WHERE customer_id = ${me.id}` as any,
+      ]);
+    }
+  } catch { /* před migrací */ }
+  const progBy = new Map(progRows.map((r: any) => [Number(r.campaign_id), r]));
+  const campsByTeam = new Map<number, any[]>();
+  for (const r of campaignRows) {
+    const t = Number(r.team_id);
+    if (!campsByTeam.has(t)) campsByTeam.set(t, []);
+    campsByTeam.get(t)!.push({
+      id: Number(r.id), name: String(r.name), required: Math.max(1, Number(r.required_stamps) || 1),
+      reward: String(r.reward_title ?? ''), stamps: Number(progBy.get(Number(r.id))?.stamps ?? 0),
+    });
+  }
   return NextResponse.json({
     me: profile ?? me,
-    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at })),
+    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [] })),
     reservations, orders, claims, today,
   });
 }
