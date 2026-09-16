@@ -114,7 +114,7 @@ export default function EmployeeLayout({ user }: Props) {
           {sidebarOpen && (
             <div className="overflow-hidden">
               <p className="font-bold text-sm leading-tight tracking-tight">Managero</p>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 mt-0.5">Portál zaměstnance</p>
+              <p className="t-label text-black/40 mt-0.5">Portál zaměstnance</p>
             </div>
           )}
         </div>

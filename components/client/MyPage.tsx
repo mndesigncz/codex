@@ -29,7 +29,7 @@ export default function MyPage() {
   }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
 
-  if (err) return <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>;
+  if (err) return <p className="note note-danger text-sm px-4 py-3">{err}</p>;
   if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-3xl" /><Skeleton className="h-24 rounded-3xl" /><Skeleton className="h-40 rounded-3xl" /></div>;
 
   const open = (d.claims ?? []).filter((c: any) => !c.redeemed_at);
@@ -194,7 +194,7 @@ function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => v
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         <span className="font-mono tracking-[0.2em] font-bold text-sm rounded-xl bg-black/[0.05] px-3 py-2">{code}</span>
         <button type="button" onClick={copy} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-secondary btn-sm hover:bg-black/[0.05] active:scale-[0.98] transition"><Icon name="copy" size={15} /> Kopírovat odkaz</button>
-        <button type="button" onClick={share} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-3.5 py-2 text-sm font-semibold hover:bg-black active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
+        <button type="button" onClick={share} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-primary active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
       </div>
     </section>
   );
@@ -246,7 +246,7 @@ function ReviewPrompt({ p, onDone }: { p: any; onDone: () => void }) {
       </div>
       <div className="mt-2 flex gap-2 flex-wrap">
         <input value={note} onChange={e => setNote(e.target.value)} placeholder="Pár slov, když chceš" aria-label="Poznámka k hodnocení" className={`${input} flex-1 basis-48`} maxLength={500} />
-        <button type="button" onClick={send} disabled={busy} className="tap-target inline-flex items-center gap-2 btn btn-primary hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Odeslat'}</button>
+        <button type="button" onClick={send} disabled={busy} className="tap-target inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Odeslat'}</button>
       </div>
       {err && <p role="alert" className="mt-2 text-sm text-red-700">{err}</p>}
     </li>
@@ -275,7 +275,7 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: (me: any) => void }) {
         <div><label htmlFor="pf-phone" className={label}>Telefon</label><input id="pf-phone" type="tel" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} placeholder="Pro potvrzení rezervace" className={input} /></div>
         <div><label htmlFor="pf-bday" className={label}>Narozeniny</label><input id="pf-bday" type="date" value={f.birthday} onChange={e => setF({ ...f, birthday: e.target.value })} className={input} /></div>
         <p className="sm:col-span-2 text-xs text-black/50">E-mail: {me?.email}. Narozeniny vidí jen podniky, kde jsi členem, kvůli přání a odměně.</p>
-        <button type="submit" disabled={busy} className="tap-target justify-self-start sm:justify-self-end inline-flex items-center gap-2 btn btn-primary hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
+        <button type="submit" disabled={busy} className="tap-target justify-self-start sm:justify-self-end inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
         {err && <p role="alert" className="sm:col-span-3 text-sm text-red-700">{err}</p>}
       </form>
     </details>

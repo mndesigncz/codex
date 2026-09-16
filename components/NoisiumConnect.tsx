@@ -57,7 +57,7 @@ export default function NoisiumConnect() {
       </div>
 
       {msg && <div className="p-3 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 text-[#5B7A08] text-sm">{msg}</div>}
-      {err && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{err}</div>}
+      {err && <div className="p-3 note note-danger text-sm">{err}</div>}
 
       {connected ? (
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -67,12 +67,12 @@ export default function NoisiumConnect() {
       ) : (
         <form onSubmit={connect} className="space-y-3">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">API token</label>
+            <label className="field-label">API token</label>
             <input value={token} onChange={e => setToken(e.target.value)} placeholder="tymbr_xxxxxxxxxxxxx" required className={inputClass} />
             <p className="text-xs text-black/40 mt-1.5">Vytvoř v Noisium: Nastavení → API tokeny. Token uvidíš jen jednou.</p>
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">API URL (volitelné)</label>
+            <label className="field-label">API URL (volitelné)</label>
             <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://noisium.app/api" className={inputClass} />
           </div>
           <button type="submit" disabled={busy || !token.trim()} className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black disabled:opacity-50 whitespace-nowrap">

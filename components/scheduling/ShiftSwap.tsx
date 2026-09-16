@@ -83,7 +83,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
         </div>
       )}
       {loadErr && (
-        <div role="alert" className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm flex items-center gap-2 flex-wrap">
+        <div role="alert" className="p-3 note note-danger text-sm flex items-center gap-2 flex-wrap">
           <Icon name="warning" size={16} /> Burzu se nepodařilo načíst — tohle nemusí být všechny volné směny.
           <button onClick={() => { setLoading(true); load(); }} className="ml-auto font-semibold underline underline-offset-2">Zkusit znovu</button>
         </div>

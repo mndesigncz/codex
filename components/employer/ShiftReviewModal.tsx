@@ -269,7 +269,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
         <div className="p-5 space-y-5">
           {/* Date picker */}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Den směny</label>
+            <label className="field-label">Den směny</label>
             <input type="date" aria-label="Datum směny" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
@@ -480,15 +480,15 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           {/* Rating */}
           <div className="space-y-3 pt-1">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Celkové hodnocení směny</label>
+              <label className="field-label">Celkové hodnocení směny</label>
               <StarPicker value={rating} onChange={setRating} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zpětná vazba (uvidí zaměstnanec)</label>
+              <label className="field-label">Zpětná vazba (uvidí zaměstnanec)</label>
               <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Co bylo super, co příště zlepšit…" className={`${inputCls} resize-none`} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Body za směnu</label>
+              <label className="field-label">Body za směnu</label>
               <div className="flex items-center gap-2 flex-wrap">
                 <input type="number" inputMode="numeric" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
                 <span className="text-xs text-black/45">bodů {!ptsTouched && rating > 0 && '(návrh z hvězd)'}</span>

@@ -38,7 +38,7 @@ export default function GuideProductLink({ productId, productName, onPick }: {
 
   return (
     <div>
-      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Položka v kase (volitelné)</label>
+      <label className="field-label">Položka v kase (volitelné)</label>
       {productId ? (
         <div className="flex items-center gap-2 rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-2.5">
           <Icon name="receipt" size={15} className="shrink-0 text-[#5B7A08]" />

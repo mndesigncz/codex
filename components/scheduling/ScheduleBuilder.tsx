@@ -671,7 +671,7 @@ export default function ScheduleBuilder({ user }: Props) {
             Only the schedule grid is month-scoped; the calendar and the
             settings tabs bring their own navigation. */}
         {boardError && (
-          <div className="w-full rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm font-medium text-red-600 flex items-center justify-between gap-3">
+          <div className="w-full note note-danger px-4 py-3 text-sm font-medium flex items-center justify-between gap-3">
             <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
             <button aria-label="Zavřít" onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600"><Icon name="close" size={15} /></button>
           </div>
@@ -1409,7 +1409,7 @@ export default function ScheduleBuilder({ user }: Props) {
             )}
 
             {importPreview.errors.length > 0 && (
-              <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-3">
+              <div className="note note-danger p-3">
                 <p className="text-sm font-medium text-red-500 mb-1 flex items-center gap-1.5">
                   <Icon name="warning" size={16} /> {importPreview.errors.length} problémů (přeskočeno)
                 </p>
@@ -2125,7 +2125,7 @@ function DayModal({
         </div>
 
         {(dayGaps.length > 0 || missingHere.length > 0) && (
-          <div className="rounded-2xl bg-red-500/10 border border-red-500/35 p-3.5">
+          <div className="note note-danger p-3.5">
             <p className="text-sm font-semibold text-red-700 flex items-center gap-1.5">
               <Icon name="warning" size={16} /> Díra v obsazení
             </p>
@@ -2550,7 +2550,7 @@ function ScheduleRulesManager() {
       {err && <p className="text-sm text-red-600">{err}</p>}
       {msg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-2.5">{msg}</p>}
       <button onClick={save} disabled={saving}
-        className="rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+        className="btn btn-primary disabled:opacity-50 transition">
         {saving ? 'Ukládám…' : 'Uložit pravidla'}
       </button>
     </div>

@@ -412,7 +412,7 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
               )}
               {profileErr && (
-                <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
+                <div className="note note-danger p-4 text-sm flex items-center gap-2">
                   <Icon name="warning" size={16} /> {profileErr}
                 </div>
               )}
@@ -613,7 +613,7 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
               )}
               {pwdErr && (
-                <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
+                <div className="note note-danger p-4 text-sm flex items-center gap-2">
                   <Icon name="warning" size={16} /> {pwdErr}
                 </div>
               )}
@@ -747,7 +747,7 @@ export default function Settings({ user, initialTab }: Props) {
                         ))}
                       </div>
                       {posHealth.lastError && (
-                        <p className="text-xs rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 px-3 py-2">
+                        <p className="text-xs note note-danger px-3 py-2">
                           Poslední chyba{posHealth.lastErrorAt ? ` (${dbTimeDayHM(posHealth.lastErrorAt)})` : ''}: {posHealth.lastError}
                         </p>
                       )}

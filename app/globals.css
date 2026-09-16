@@ -149,6 +149,16 @@ body::after {
 .chip-muted { background: var(--muted-bg); color: var(--muted-ink); }
 .chip-ink   { background: var(--ink);      color: #fff; }
 
+/* ---------- Upozornění v toku (chyba, čeká, info) ----------
+   Jeden tvar pro inline hlášky; dřív 29 ručně obarvených červených panelů. */
+@layer components {
+.note { display: block; border-radius: var(--r-md); padding: 0.75rem 1rem; font-size: 0.875rem; line-height: 1.4; border: 1px solid transparent; }
+.note-danger { background: var(--bad-bg);  color: var(--bad-ink);  border-color: rgba(220,38,38,0.22); }
+.note-wait   { background: var(--wait-bg); color: var(--wait-ink); border-color: rgba(245,158,11,0.25); }
+.note-info   { background: var(--info-bg); color: var(--info-ink); border-color: rgba(10,132,255,0.22); }
+.note-ok     { background: var(--ok-bg);   color: var(--ok-ink);   border-color: rgba(143,184,17,0.30); }
+}
+
 /* ---------- Tlačítka mimo <Button> ----------
    Odkazy a ručně psaná tlačítka dostávají tytéž čtyři podoby jako
    komponenta Button — accent (jediná hlavní), primary (tmavá), secondary

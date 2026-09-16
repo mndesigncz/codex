@@ -103,7 +103,7 @@ function RewardsViewInner() {
                     <span className="text-black/40"> · {r.cost} b.</span>
                   </span>
                   <button onClick={() => decide(r.id, 'approve')} disabled={busyId !== null}
-                    className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black disabled:opacity-50 transition">Schválit ✓</button>
+                    className="tap-target-sm shrink-0 btn btn-primary btn-sm disabled:opacity-50 transition">Schválit ✓</button>
                   <button onClick={() => decide(r.id, 'decline')} disabled={busyId !== null}
                     className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition">Zamítnout</button>
                 </div>
@@ -296,7 +296,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
   // Reward fields stay non-negative; penalty fields must accept minus values.
   const field = (label: string, key: keyof PointsConfig, hint: string, allowNegative = false) => (
     <div>
-      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
+      <label className="field-label">{label}</label>
       <input
         type="number" inputMode="numeric" min={allowNegative ? -100 : 0} max={100} value={pts[key]}
         onChange={e => {

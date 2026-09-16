@@ -175,7 +175,7 @@ export default function Tasks({ user }: Props) {
         primary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
           options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />} />
 
-      {saveErr && <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-sm text-red-600">{saveErr}</div>}
+      {saveErr && <div className="note note-danger px-4 py-2.5 text-sm">{saveErr}</div>}
 
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>

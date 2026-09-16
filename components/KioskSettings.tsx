@@ -80,7 +80,7 @@ export default function KioskSettings() {
       {open && (
         <div className="space-y-5 pt-1">
           {msg && <div className="p-3 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 text-[#5B7A08] text-sm">{msg}</div>}
-          {err && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{err}</div>}
+          {err && <div className="p-3 note note-danger text-sm">{err}</div>}
 
           <form onSubmit={saveAccount} className="space-y-3">
             <p className="t-label">Přihlášení tabletu</p>

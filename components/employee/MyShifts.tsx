@@ -144,7 +144,7 @@ export default function MyShifts({ user }: Props) {
 
       {timeOff.length > 0 && (
         <div className="glass-card p-5">
-          <p className="text-xs uppercase tracking-wider text-black/45 mb-2.5"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Schválené volno</p>
+          <p className="t-label mb-2.5"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Schválené volno</p>
           <div className="flex flex-wrap gap-2">
             {timeOff.map((t, i) => {
               const one = t.fromDate === t.toDate;

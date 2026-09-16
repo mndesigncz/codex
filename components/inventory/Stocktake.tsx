@@ -224,7 +224,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                     </button>
                   ) : (
                     <button onClick={() => setConfirmDone(true)} disabled={countedN === 0}
-                      className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold disabled:opacity-40 transition">
+                      className="btn btn-primary btn-sm disabled:opacity-40 transition">
                       Dokončit a zapsat
                     </button>
                   )

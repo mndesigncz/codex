@@ -293,16 +293,16 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">
           <h3 className="t-card">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název úkolu</label>
+            <label className="field-label">Název úkolu</label>
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Např. Umýt okna" className={inputClass} autoFocus />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Popis (nepovinné)</label>
+            <label className="field-label">Popis (nepovinné)</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className={`${inputClass} resize-none`} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
+              <label className="field-label">Kdo úkol udělá</label>
               <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
                 <option value="">Kdokoliv (podle dne)</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
@@ -314,7 +314,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </p>
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">
+              <label className="field-label">
                 {editingSeries ? 'Termín (od kdy)' : `Termín ${form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}`}
               </label>
               <input type="date" aria-label="Termín úkolu" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
@@ -326,7 +326,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             </p>
           )}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Priorita</label>
+            <label className="field-label">Priorita</label>
             <div className="flex flex-wrap gap-2">
               {PRIORITIES.map(p => (
                 <button key={p.value} type="button" onClick={() => setForm(f => ({ ...f, priority: p.value }))}
@@ -340,7 +340,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Opakování</label>
+                  <label className="field-label">Opakování</label>
                   <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
                     className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }}>
                     {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -350,7 +350,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kontrolní seznam (nepovinné)</label>
+                <label className="field-label">Kontrolní seznam (nepovinné)</label>
                 <div className="space-y-2">
                   {form.checklist.map((it, i) => (
                     <div key={i} className="space-y-2">

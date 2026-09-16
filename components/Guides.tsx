@@ -373,7 +373,7 @@ export default function Guides({ user }: { user: User }) {
                                   }).catch(() => null);
                                   if (res?.ok) await loadGuides();
                                 }}
-                                className="rounded-full bg-[#16181A] text-white px-2.5 py-0.5 text-[11px] font-semibold hover:bg-black transition whitespace-nowrap">
+                                className="btn btn-primary btn-sm transition whitespace-nowrap">
                                 Schválit
                               </button>
                             )}
@@ -490,7 +490,7 @@ export default function Guides({ user }: { user: User }) {
                             }).catch(() => null);
                             if (res?.ok) await loadGuides();
                           }}
-                          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
+                          className="btn btn-primary btn-sm transition">
                           <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Potvrzuji přečtení
                         </button>
                       )}
@@ -806,7 +806,7 @@ function GuideEditor({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název</label>
+            <label className="field-label">Název</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -816,7 +816,7 @@ function GuideEditor({
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
+            <label className="field-label">Kategorie</label>
             <select
               aria-label="Kategorie"
               value={categoryId ?? ''}
@@ -835,7 +835,7 @@ function GuideEditor({
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Obsah</label>
+            <label className="field-label">Obsah</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -1070,7 +1070,7 @@ function ManageCategories({
         </div>
 
         <div className="border-t border-black/[0.08] pt-5">
-          <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Nová kategorie</label>
+          <label className="field-label">Nová kategorie</label>
           <div className="flex gap-2 mb-3 flex-wrap">
             {CATEGORY_ICONS.map((ic) => (
               <button

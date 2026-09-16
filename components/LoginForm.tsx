@@ -89,7 +89,7 @@ export default function LoginForm() {
               </div>
             </div>
 
-            {error && <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}
+            {error && <div className="p-3.5 note note-danger text-sm">{error}</div>}
 
             <Button type="submit" variant="accent" size="lg" loading={isLoading} className="w-full">
               Přihlásit se

@@ -292,18 +292,18 @@ export default function SuggestionsBoard() {
               <h3 className="t-card">Nový podnět</h3>
             </div>
             {err && (
-              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2 mb-3">
+              <div className="p-3 note note-danger text-sm flex items-center gap-2 mb-3">
                 <Icon name="warning" size={16} /> {err}
               </div>
             )}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Co navrhuješ?</label>
+                <label className="field-label">Co navrhuješ?</label>
                 <input value={title} onChange={e => setTitle(e.target.value)} maxLength={160} autoFocus
                   placeholder="Např. Přidat druhý mlýnek na kávu" className={inputClass} />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vysvětli to blíž (nepovinné)</label>
+                <label className="field-label">Vysvětli to blíž (nepovinné)</label>
                 <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} maxLength={2000}
                   placeholder="Proč to pomůže, jak by to mělo fungovat…" className={`${inputClass} resize-none`} />
               </div>

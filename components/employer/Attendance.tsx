@@ -541,7 +541,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <h3 className="t-card">Přidat záznam docházky</h3>
             </div>
             <p className="text-sm text-black/50 mb-4">Když se někdo zapomněl odpíchnout úplně.</p>
-            {addErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{addErr}</div>}
+            {addErr && <div className="p-3 note note-danger text-sm mb-3">{addErr}</div>}
             <div className="space-y-3">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zaměstnanec</label>
@@ -582,7 +582,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <h3 className="t-card">Upravit čas na směně</h3>
             </div>
             <p className="text-sm text-black/50 mb-4">{editEntry.employeeName}</p>
-            {editErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{editErr}</div>}
+            {editErr && <div className="p-3 note note-danger text-sm mb-3">{editErr}</div>}
             <div className="space-y-3">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>

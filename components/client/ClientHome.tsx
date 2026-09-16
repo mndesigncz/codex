@@ -75,7 +75,7 @@ export default function ClientHome() {
         </div>
       </section>
 
-      {err && <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>}
+      {err && <p className="note note-danger text-sm px-4 py-3">{err}</p>}
 
       {list === null ? (
         <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">

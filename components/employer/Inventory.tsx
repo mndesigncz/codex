@@ -706,7 +706,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     if (res?.ok) await load();
                     else showNotice('Schválení se nepodařilo.');
                   }}
-                  className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">
+                  className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
                   Schválit
                 </button>
                 <button
@@ -757,7 +757,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
             {selecting && (
               <button onClick={exitSelection}
-                className="rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-medium whitespace-nowrap">
+                className="btn btn-primary whitespace-nowrap">
                 Zrušit výběr
               </button>
             )}
@@ -797,14 +797,14 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         </span>
         {showArchived && (
           <button onClick={() => setShowArchived(false)}
-            className="tap-target-sm rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-medium">
+            className="tap-target-sm btn btn-primary btn-sm">
             Zpět na aktivní sklad
           </button>
         )}
       </div>
 
       {consumeErr && (
-        <div role="alert" className="rounded-2xl bg-red-500/10 border border-red-500/25 text-red-700 px-4 py-3 text-sm font-semibold">{consumeErr}</div>
+        <div role="alert" className="note note-danger px-4 py-3 text-sm font-semibold">{consumeErr}</div>
       )}
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
@@ -881,7 +881,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     className={`${inputClass} resize-none`} />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
+                  <label className="field-label">Kategorie</label>
                   {(flatCats.length > 0 || orphanNames.length > 0) && (
                     <div className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
                       {flatCats.map(({ cat: c, depth }) => (
@@ -1182,7 +1182,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               Vybrat vše ({filtered.length})
             </button>
             <button onClick={() => setShowBulk(true)}
-              className="tap-target-sm rounded-full bg-[#C8F542] text-black px-4 py-1.5 text-xs font-bold hover:brightness-110 transition whitespace-nowrap">
+              className="tap-target-sm btn btn-accent btn-sm transition whitespace-nowrap">
               Upravit
             </button>
             <button onClick={async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); }}
@@ -1648,7 +1648,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 <button onClick={() => step(i, 1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
-                    className="rounded-full bg-[#C8F542] text-black px-3.5 h-8 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
+                    className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
@@ -1721,7 +1721,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
               <div className="flex items-center gap-1">
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
-                    className="rounded-full bg-[#C8F542] text-black px-4 h-9 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
+                    className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
@@ -1887,7 +1887,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                       <button
                         onClick={() => markReceived(o)}
                         disabled={busyId === o.id}
-                        className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-semibold hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0">
+                        className="btn btn-primary btn-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0">
                         {busyId === o.id ? 'Naskladňuji…' : 'Potvrdit příjem'}
                       </button>
                     </div>
@@ -2057,7 +2057,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">{supplier}</p>
                   {supplierByName(supplier)?.email && (
                     <button onClick={() => emailGroup(supplier, list)} disabled={emailing === supplier}
-                      className="rounded-full bg-[#16181A] text-white px-3 py-1 text-[11px] font-semibold hover:bg-black disabled:opacity-50 transition whitespace-nowrap">
+                      className="btn btn-primary btn-sm disabled:opacity-50 transition whitespace-nowrap">
                       {emailing === supplier ? 'Odesílám…' : 'Objednat e-mailem'}
                     </button>
                   )}
@@ -2690,7 +2690,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                         body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
                       }).catch(() => null);
                       if (res?.ok) { setEditId(null); await onChanged(); }
-                    }} className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-semibold">Uložit</button>
+                    }} className="tap-target-sm btn btn-primary btn-sm">Uložit</button>
                   </span>
                 ) : (
                   <>

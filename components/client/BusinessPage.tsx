@@ -302,7 +302,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
             <input id="r-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Kočárek, oslava, u okna…" className={input} maxLength={300} />
           </div>
         </div>
-        {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+        {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
         <button type="submit" disabled={busy || !slots.length} className={btnPrimary}>
           <Icon name="calendarCheck" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Odeslat rezervaci' : 'Přihlásit se a rezervovat'}
         </button>
@@ -455,14 +455,14 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
           <label htmlFor="promo-code" className={label}>Máš promo kód?</label>
           <div className="flex gap-2">
             <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder="Z letáku nebo účtenky" autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
-            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
+            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-red-700">{promoErr}</p>}
         </form>
       </section>
       <section>
         <h2 className="t-section mb-3">Kupony za body</h2>
-        {err && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+        {err && <p role="alert" className="mb-3 note note-danger text-sm px-3 py-2">{err}</p>}
         {coupons?.length ? (
           <ul className="divide-y divide-black/[0.06]">
             {coupons.map((c: any) => {
@@ -485,7 +485,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? 'zdarma' : `${c.cost_points} b.`}</p>
                     <button onClick={() => claim(c.id)} disabled={busy === c.id || (signedIn && me?.member && !can)}
-                      className="tap-target-sm mt-1 rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:bg-black active:scale-[0.97] disabled:opacity-40 transition">
+                      className="tap-target-sm mt-1 btn btn-primary btn-sm active:scale-[0.97] disabled:opacity-40 transition">
                       {busy === c.id ? '…' : 'Vzít'}
                     </button>
                   </div>
@@ -653,7 +653,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             <label htmlFor="o-note" className={label}>Poznámka pro obsluhu</label>
             <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Bez cukru, vyšší konvička…" className={input} maxLength={300} />
           </div>
-          {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+          {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
           <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Objednat' : 'Přihlásit se a objednat'}</button>
           <p className="text-xs text-black/45">Platí se u obsluhy jako obvykle. Za každých 100 {cur} dostaneš {b.pointsPer100} bodů.</p>
         </div>

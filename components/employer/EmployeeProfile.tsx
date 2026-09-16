@@ -112,7 +112,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <div className="well border border-black/[0.05] p-4">
                     <div className="flex items-end justify-between gap-2 flex-wrap">
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 font-semibold">Úroveň</p>
+                        <p className="t-label text-black/40">Úroveň</p>
                         <p className="text-2xl font-bold tracking-tight text-[#16181A]">{p.standing.levelName}</p>
                       </div>
                       {p.standing.next && (
@@ -246,7 +246,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                               <span className="text-[11px] font-medium text-orange-600 bg-orange-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
                             )}
                             <button onClick={() => setRateDate(sh.date)}
-                              className="rounded-full bg-[#16181A] text-white px-3 py-1.5 text-[11px] font-semibold hover:brightness-125 transition shrink-0">
+                              className="btn btn-primary btn-sm transition shrink-0">
                               {sh.reviewed ? 'Upravit' : 'Ohodnotit'}
                             </button>
                           </div>

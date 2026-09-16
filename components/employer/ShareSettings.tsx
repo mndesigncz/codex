@@ -294,7 +294,7 @@ export default function ShareSettings() {
               <img src={theme.logoUrl} alt="" style={{ maxHeight: 36, margin: '0 auto 10px', objectFit: 'contain' }} />
             )}
             {theme.businessName && (
-              <p className="text-[11px] uppercase tracking-[0.16em] opacity-60">{theme.businessName}</p>
+              <p className="t-label opacity-60">{theme.businessName}</p>
             )}
             <p style={{ color: theme.accent }} className="text-xl font-bold tracking-tight mt-1">Naše nabídka</p>
             <p className="text-xs opacity-60 mt-2">Ukázka toho, jak stránka vypadá.</p>
@@ -381,7 +381,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
           ⬚
         </button>
         <button onClick={onCopy} title="Zkopírovat odkaz"
-          className="tap-target-sm shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-1.5 text-xs font-bold hover:brightness-110">
+          className="tap-target-sm shrink-0 btn btn-accent btn-sm">
           Kopírovat
         </button>
         <a href={url} target="_blank" rel="noopener" title="Otevřít stránku"

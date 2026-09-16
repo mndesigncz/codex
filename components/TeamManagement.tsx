@@ -470,7 +470,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
       )}
       {error && (
-        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
+        <div className="note note-danger p-4 text-sm flex items-center gap-2">
           <Icon name="warning" size={16} /> {error}
         </div>
       )}
@@ -662,7 +662,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <div className="flex items-center gap-2 flex-wrap min-w-0 basis-full sm:basis-auto sm:ml-auto">
                       {m.role === 'employee' && (
                         <button onClick={() => setProfileId(m.id)}
-                          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-medium hover:brightness-125 transition-all whitespace-nowrap">
+                          className="btn btn-primary transition-all whitespace-nowrap">
                           Profil
                         </button>
                       )}
@@ -858,7 +858,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               className="w-32 field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-right tabular-nums" />
             {floatDraft !== null && (
               <button onClick={saveFloat} disabled={savingFloat}
-                className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black disabled:opacity-50 transition">
+                className="btn btn-primary btn-sm disabled:opacity-50 transition">
                 {savingFloat ? '…' : 'Uložit'}
               </button>
             )}

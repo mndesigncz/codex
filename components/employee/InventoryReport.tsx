@@ -291,7 +291,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             </p>
           </div>
           <button onClick={() => setProposeOpen(o => !o)}
-            className="shrink-0 btn btn-primary btn-sm hover:bg-black transition">
+            className="shrink-0 btn btn-primary btn-sm transition">
             {proposeOpen ? 'Zavřít' : '＋ Nová věc do skladu'}
           </button>
         </div>
@@ -478,7 +478,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Poznámka (volitelné)</label>
+                  <label className="field-label">Poznámka (volitelné)</label>
                   <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
                     placeholder="Popište stav zásob nebo další informace..."
                     className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm resize-none" />

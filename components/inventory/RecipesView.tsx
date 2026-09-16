@@ -278,7 +278,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
           </p>
         </div>
         <button onClick={sync} disabled={syncing}
-          className="rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-bold hover:bg-black disabled:opacity-50 transition inline-flex items-center gap-2">
+          className="btn btn-primary disabled:opacity-50 transition inline-flex items-center gap-2">
           <Icon name="swap" size={16} className="i-lead" /> {syncing ? 'Odepisuji…' : 'Odepsat prodeje'}
         </button>
       </div>
@@ -679,7 +679,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
 
         <div className="space-y-2">
           <button onClick={save} disabled={saving}
-            className="w-full rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+            className="w-full btn btn-primary disabled:opacity-50 transition">
             {saving ? 'Ukládám…' : 'Uložit recepturu'}
           </button>
           {draft.existing && (

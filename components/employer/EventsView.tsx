@@ -661,7 +661,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 <div className="flex gap-1.5">
                   {e.packing.some((p: any) => p.itemId && !p.packed) && (
                     <button onClick={() => { if (confirm('Vyskladnit vše nesbalené? Množství se odečte ze skladu (s poznámkou u položek).')) patch(e.id, { packAction: 'checkout' }); }}
-                      className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-bold hover:bg-black transition">
+                      className="tap-target-sm btn btn-primary btn-sm transition">
                       <Icon name="box" size={13} className="inline -mt-0.5 mr-1.5 shrink-0" />Vyskladnit
                     </button>
                   )}

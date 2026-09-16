@@ -242,7 +242,7 @@ export default function Procedures({ user }: Props) {
                           }).catch(() => null);
                           if (res?.ok) await load();
                         }}
-                        className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1 text-xs font-semibold hover:bg-black transition">
+                        className="tap-target-sm btn btn-primary btn-sm transition">
                         Schválit ✓
                       </button>
                     )}

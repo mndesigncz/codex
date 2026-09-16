@@ -141,7 +141,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={confirmAdd} disabled={!!busy}
-                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black disabled:opacity-50 transition">
+                  className="btn btn-primary btn-sm disabled:opacity-50 transition">
                   {busy ? 'Ukládám…' : 'Přidat'}
                 </button>
                 <button type="button" onClick={() => { setPicked(null); setAmount(''); }}

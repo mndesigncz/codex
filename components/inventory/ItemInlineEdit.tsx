@@ -122,7 +122,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
 
       <div className="flex items-center gap-2">
         <button onClick={save} disabled={saving}
-          className="rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+          className="btn btn-primary disabled:opacity-50 transition">
           {saving ? 'Ukládám…' : 'Uložit položku'}
         </button>
         <button onClick={onClose} disabled={saving}

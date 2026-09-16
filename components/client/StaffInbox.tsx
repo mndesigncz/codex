@@ -116,7 +116,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
     setBusy(null);
   };
 
-  if (err) return <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>;
+  if (err) return <p className="note note-danger text-sm px-4 py-3">{err}</p>;
   if (!d) return <div className="space-y-3"><Skeleton className="h-16 rounded-2xl" /><Skeleton className="h-16 rounded-2xl" /></div>;
   const orders: any[] = d.orders ?? [];
   const news = orders.filter(o => o.status === 'new');

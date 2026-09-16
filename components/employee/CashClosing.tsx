@@ -599,7 +599,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     const unit = opts?.unit === undefined ? symbol : opts.unit;
     return (
       <div>
-        <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
+        <label className="field-label">{label}</label>
         <div className="relative">
           <input type="number" inputMode="numeric" value={form[key]} onChange={set(key)}
             placeholder={opts?.placeholder ?? '0'} className={`${inputClass} ${unit ? 'pr-12' : ''}`} />
@@ -619,7 +619,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </div>
       )}
       {err && (
-        <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2">
+        <div className="p-3.5 note note-danger text-sm flex items-center gap-2">
           <Icon name="warning" size={17} /> {err}
         </div>
       )}
@@ -766,7 +766,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
             {isKiosk ? (
               <div className="min-w-0">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kterou směnu uzavíráš?</label>
+                <label className="field-label">Kterou směnu uzavíráš?</label>
                 <div className="flex flex-col gap-2">
                   {eligible.map(s => {
                     const active = form.date === s.date && selEmployee === (s.employeeId ?? null);
@@ -800,7 +800,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             ) : isEmployer ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
                 <div className="min-w-0">
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Za koho</label>
+                  <label className="field-label">Za koho</label>
                   <select value={selEmployee ?? ''} aria-label="Kdo byl na směně" onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
                     className={`${inputClass} appearance-none min-w-0 h-[46px]`} style={{ WebkitAppearance: 'none' }}>
                     {members.map(m => (
@@ -809,7 +809,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </select>
                 </div>
                 <div className="min-w-0">
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
+                  <label className="field-label">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
                   <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
@@ -840,7 +840,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
+                  <label className="field-label">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
                   <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
@@ -873,7 +873,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     tips: pos.tips > 0 ? String(pos.tips) : f.tips,
                     tipsCard: pos.tipsCard != null && pos.tipsCard > 0 ? String(pos.tipsCard) : f.tipsCard,
                   }))}
-                  className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
+                  className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
                   Předvyplnit z pokladny
                 </button>
               </div>
@@ -1122,7 +1122,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 </div>
               </div>
               {leaveTooHigh ? (
-                <p className="text-[13px] text-red-600 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                <p className="text-[13px] note note-danger px-3 py-2">
                   V kase je napočítáno jen {money(n(form.closingCash))} — nemůže v ní zůstat víc.
                 </p>
               ) : leaveCash !== '' && finalRemoval > 0 ? (
@@ -1209,7 +1209,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               className={inputClass} />
           </div>
 
-          <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Poznámka</label>
+          <label className="field-label">Poznámka</label>
           <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
         </div>
 

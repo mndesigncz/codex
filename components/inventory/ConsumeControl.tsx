@@ -65,7 +65,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
       {unit && <span className="text-[11px] text-black/40">{unit}</span>}
       <button onClick={() => consume(Number(amount.replace(',', '.')))}
         disabled={saving || !(Number(amount.replace(',', '.')) > 0)}
-        className="rounded-full bg-[#16181A] text-white px-3.5 h-8 text-xs font-bold hover:bg-black transition disabled:opacity-40">
+        className="btn btn-primary btn-sm transition disabled:opacity-40">
         {saving ? '…' : 'Odepsat'}
       </button>
       <button aria-label="Zavřít" onClick={() => { setOpen(false); setAmount(''); }}

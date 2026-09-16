@@ -422,7 +422,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
                           )}
-                          <button onClick={() => setRating(r)} className="tap-target-sm rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
+                          <button onClick={() => setRating(r)} className="tap-target-sm btn btn-primary btn-sm transition shrink-0">
                             {r.reviewed ? 'Upravit' : 'Ohodnotit'}
                           </button>
                         </div>
@@ -444,7 +444,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               </div>
               {notSubmitted.length > 0 ? (
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-black/45 mb-2">Ještě nezadali</p>
+                  <p className="t-label mb-2">Ještě nezadali</p>
                   <div className="flex flex-wrap gap-2">
                     {notSubmitted.map(m => (
                       <PersonLink key={m.id} id={m.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</PersonLink>
