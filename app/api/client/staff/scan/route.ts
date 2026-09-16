@@ -6,6 +6,8 @@ import { tierFor } from '@/lib/clientSlots';
 import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, normalizeCardCode } from '@/lib/client';
 import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
+import { activeCampaigns, progressFor, addStamps, applyBillToCampaigns } from '@/lib/stamps';
+import { getConnection, billDetail } from '@/lib/storyous';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -25,8 +27,14 @@ async function summary(teamId: number, customerId: number, p?: any) {
     silverAt: Number(p.silver_at), goldAt: Number(p.gold_at),
     memberDiscount: Number(p.member_discount), silverDiscount: Number(p.silver_discount), goldDiscount: Number(p.gold_discount),
   } : null);
+  const camps = await activeCampaigns(teamId, pragueToday());
+  const prog = camps.length ? await progressFor(teamId, customerId) : new Map();
   return {
     member: !!m, points, credit: Number(m?.credit ?? 0), stamps: Number(m?.stamps ?? 0), visits,
+    campaigns: camps.map(c => ({
+      id: c.id, name: c.name, required: c.required_stamps, ruleType: c.rule_type,
+      stamps: Number(prog.get(c.id)?.stamps ?? 0),
+    })),
     levelLabel: tier.label, tier: tier.id, discount: tier.discount,
     nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel,
     stampedToday: !!last && pragueDayOf(last) === pragueToday(),
@@ -74,8 +82,52 @@ export async function POST(req: NextRequest) {
   if (action === 'stamp') {
     const before = await summary(u.team_id, c.id);
     if (before.stampedToday) return NextResponse.json({ error: `${c.name} dnes razítko už má.` }, { status: 409 });
-    const r = await stampVisit(u.team_id, c.id, p, 'card');
-    msg = r.rewarded ? `${c.name}: razítka kompletní, odměna „${p.stamp_reward}" je v kuponech.` : `${c.name}: razítko ${r.stamps}/${p.stamp_target}.`;
+    // Kampaně „za návštěvu": razítko dostane každá; návštěvu počítá stampVisit.
+    const visitCamps = (await activeCampaigns(u.team_id, pragueToday())).filter(x => x.rule_type === 'visit');
+    if (visitCamps.length) {
+      // Návštěva a starý čítač se posunou (kvůli úrovním a dennímu zámku),
+      // ale odměnu řídí kampaně — starý cíl vypneme nulou, ať se nezdvojí.
+      await stampVisit(u.team_id, c.id, { ...p, stamp_target: 0 }, 'card');
+      const parts2: string[] = [];
+      for (const vc of visitCamps) {
+        const r = await addStamps(vc, c.id, 1, 'card');
+        if (r.skipped) { parts2.push(`${vc.name}: ${r.skipped}`); continue; }
+        parts2.push(r.completions > 0 ? `${vc.name}: karta plná — odměna je v kuponech` : `${vc.name}: ${r.stamps}/${vc.required_stamps}`);
+      }
+      msg = `${c.name}: ${parts2.join(' · ')}`;
+    } else {
+      const r = await stampVisit(u.team_id, c.id, p, 'card');
+      msg = r.rewarded ? `${c.name}: razítka kompletní, odměna „${p.stamp_reward}" je v kuponech.` : `${c.name}: razítko ${r.stamps}/${p.stamp_target}.`;
+    }
+  } else if (action === 'bill') {
+    // Připsání Z ÚČTENKY: razítka podle pravidel kampaní z položek účtu +
+    // body a cashback z částky. Účtenka smí věrnost připsat jen jednou.
+    const billId = String(b.billId ?? '').slice(0, 60);
+    if (!billId) return NextResponse.json({ error: 'Vyber účtenku.' }, { status: 400 });
+    const guard = await sql`
+      INSERT INTO client_bill_awards (team_id, bill_id, customer_id)
+      VALUES (${u.team_id}, ${billId}, ${c.id})
+      ON CONFLICT (team_id, bill_id) DO NOTHING RETURNING bill_id`;
+    if (!guard.length) return NextResponse.json({ error: 'Tahle účtenka už věrnost připsala.' }, { status: 409 });
+    const conn = await getConnection(u.team_id);
+    let items: { productId: string | null; qty: number }[] = [];
+    let total = Math.max(0, Math.round(Number(b.amount) || 0));
+    if (conn) {
+      try {
+        const d = await billDetail(conn, billId);
+        items = d.items.map(it => ({ productId: it.productId, qty: Number(it.amount) || 1 }));
+        if (d.head?.finalPrice != null) total = Math.max(0, Math.round(Number(d.head.finalPrice)));
+      } catch { /* detail nedostupný — zbude útrata */ }
+    }
+    const parts: string[] = [];
+    const st = await applyBillToCampaigns(u.team_id, c.id, pragueToday(), { billId, total, items });
+    parts.push(...st.lines);
+    const pts = Math.floor(total / 100) * (Number(p.points_per_100) || 0);
+    const back = Math.floor(total * (Number(p.cashback_pct) || 0) / 100);
+    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${total} Kč z účtenky`); parts.push(`+${pts} bodů (celkem ${points})`); }
+    if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${total} Kč`); parts.push(`+${back} Kč kreditu`); }
+    if (!parts.length) parts.push('žádné pravidlo se netrefilo');
+    msg = `${c.name} · účtenka ${total} Kč: ${parts.join(' · ')}`;
   } else if (action === 'points') {
     const amount = Math.max(0, Math.min(100000, Math.round(Number(b.amount) || 0)));
     const pts = Math.floor(amount / 100) * (Number(p.points_per_100) || 0);

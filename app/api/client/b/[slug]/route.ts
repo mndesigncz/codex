@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { normalizePlan } from '@/lib/floorplan';
 import { tierFor } from '@/lib/clientSlots';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
+import { activeCampaigns, progressFor } from '@/lib/stamps';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -68,11 +69,18 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
       silverAt: Number(p.silver_at), goldAt: Number(p.gold_at),
       memberDiscount: Number(p.member_discount), silverDiscount: Number(p.silver_discount), goldDiscount: Number(p.gold_discount),
     });
+    const myCamps = await activeCampaigns(teamId, today);
+    const myProg = myCamps.length ? await progressFor(teamId, me.id) : new Map();
     mine = {
       member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
       credit: Number(m?.credit ?? 0),
       level: tier.id, levelLabel: tier.label, discount: tier.discount,
       nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel,
+      campaigns: myCamps.map(c => ({
+        id: c.id, name: c.name, description: c.description, required: c.required_stamps,
+        reward: c.reward_title, stamps: Number(myProg.get(c.id)?.stamps ?? 0),
+        completed: Number(myProg.get(c.id)?.completed ?? 0),
+      })),
       reservations, claims,
     };
   }
@@ -140,8 +148,16 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
     }));
   } catch { events = []; }
 
+  // Kartičky podniku vidí i nepřihlášený host — je to lákadlo k registraci.
+  let stampCampaigns: any[] = [];
+  try {
+    stampCampaigns = (await activeCampaigns(teamId, today)).map(c => ({
+      id: c.id, name: c.name, description: c.description, required: c.required_stamps, reward: c.reward_title,
+    }));
+  } catch { stampCampaigns = []; }
+
   let news: any[] = [];
   try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
   const plan = p.floorplan && p.ordering_on ? normalizePlan(p.floorplan) : null;
-  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons, news, events, me: mine, signedIn: !!me, today });
+  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons, news, events, stampCampaigns, me: mine, signedIn: !!me, today });
 }

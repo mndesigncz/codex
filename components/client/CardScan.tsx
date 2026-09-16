@@ -16,6 +16,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const [code, setCode] = useState('');
   const [hit, setHit] = useState<any | null>(null);
   const [amount, setAmount] = useState('');
+  const [bill, setBill] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [cam, setCam] = useState(false);
@@ -33,13 +34,13 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     } catch (e: any) { setErr(e.message); setHit(null); }
     setBusy('');
   };
-  const act = async (action: 'stamp' | 'points' | 'credit') => {
+  const act = async (action: 'stamp' | 'points' | 'credit' | 'bill') => {
     setBusy(action); setErr('');
     try {
-      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, action, amount: Number(amount) || 0 }) });
+      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, action, amount: Number(amount) || 0, billId: action === 'bill' ? bill : undefined }) });
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); onChange?.();
+      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); onChange?.();
     } catch (e: any) { setErr(e.message); }
     setBusy('');
   };
@@ -53,7 +54,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     } catch (e: any) { setErr(e.message); }
     setBusy('');
   };
-  const reset = () => { setHit(null); setCode(''); setErr(''); setAmount(''); };
+  const reset = () => { setHit(null); setCode(''); setErr(''); setAmount(''); setBill(null); };
 
   return (
     <section aria-labelledby="h-scan" className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 space-y-3">
@@ -74,7 +75,9 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
             <Initials name={hit.customer.name} size={40} />
             <div className="min-w-0 flex-1">
               <p className="font-bold leading-tight truncate">{hit.customer.name}</p>
-              <p className="text-sm text-black/55 tabular-nums">{hit.member ? `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv` : 'Ještě není členem. Prvním razítkem se stane.'}</p>
+              <p className="text-sm text-black/55 tabular-nums">{hit.member
+                ? (hit.campaigns?.length > 0 ? `${hit.points} b. · ${hit.visits} návštěv` : `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv`)
+                : 'Ještě není členem. Prvním razítkem se stane.'}</p>
             </div>
           </div>
           {hit.member && (hit.discount > 0 || hit.credit > 0 || hit.levelLabel !== 'Člen') && (
@@ -93,8 +96,27 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               )}
             </div>
           )}
+          {hit.campaigns?.length > 0 && (
+            <ul className="space-y-1.5">
+              {hit.campaigns.map((cp: any) => (
+                <li key={cp.id} className="rounded-2xl bg-white/60 border border-black/[0.06] px-3.5 py-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
+                    <p className="text-xs font-semibold tabular-nums text-black/60 shrink-0">{cp.stamps}/{cp.required}</p>
+                  </div>
+                  <div className="flex gap-1 mt-1.5" aria-hidden>
+                    {Array.from({ length: Math.min(cp.required, 12) }).map((_, i) => (
+                      <span key={i} className={`h-1.5 flex-1 rounded-full ${i < cp.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Button variant="accent" icon="check" loading={busy === 'stamp'} disabled={hit.stampedToday || !hit.rules?.stampTarget} onClick={() => act('stamp')}>
+            <Button variant="accent" icon="check" loading={busy === 'stamp'}
+              disabled={hit.stampedToday || (!hit.rules?.stampTarget && !hit.campaigns?.some((cp: any) => cp.ruleType === 'visit'))}
+              onClick={() => act('stamp')}>
               {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
             </Button>
             <form onSubmit={e => { e.preventDefault(); act('points'); }} className="flex gap-2">
@@ -107,10 +129,19 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-1.5">Dnešní účty z pokladny</p>
               <div className="flex flex-wrap gap-1.5">
                 {hit.bills.map((bl: any) => (
-                  <button key={bl.bill_id} type="button" onClick={() => setAmount(String(Math.round(Number(bl.final_price))))}
-                    className="tap-target-sm rounded-full bg-black/[0.05] hover:bg-black/[0.09] px-3 py-1.5 text-xs font-semibold tabular-nums transition">{Math.round(Number(bl.final_price))} Kč</button>
+                  <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id}
+                    onClick={() => { const on = bill === bl.bill_id; setBill(on ? null : bl.bill_id); setAmount(on ? '' : String(Math.round(Number(bl.final_price)))); }}
+                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums transition border ${bill === bl.bill_id ? 'bg-[#16181A] text-[#C8F542] border-[#16181A]' : 'bg-black/[0.05] hover:bg-black/[0.09] border-transparent'}`}>
+                    {Math.round(Number(bl.final_price))} Kč
+                  </button>
                 ))}
               </div>
+              {bill && (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <Button size="sm" variant="primary" icon="check" loading={busy === 'bill'} onClick={() => act('bill')}>Připsat z účtenky</Button>
+                  <p className="text-xs text-black/50">Razítka podle položek účtu + body a kredit z částky. Jde to jen jednou na účtenku.</p>
+                </div>
+              )}
             </div>
           )}
           {hit.credit > 0 && (
