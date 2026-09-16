@@ -51,7 +51,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
               <div
                 onClick={() => interactive && onToggle?.(i)}
                 onContextMenu={(e) => { if (interactive && onSkip) { e.preventDefault(); onSkip(i); } }}
-                className={`rounded-[20px] px-3.5 ${compact ? 'py-2.5' : 'py-3'} border transition ${
+                className={`rounded-3xl px-3.5 ${compact ? 'py-2.5' : 'py-3'} border transition ${
                   done
                     ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/30'
                     : skipped

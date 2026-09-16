@@ -11,8 +11,8 @@ import { Initials } from './ClientShell';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field !py-2.5 text-sm';
+const label = 'field-label';
 
 export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons' | 'tiers' | 'promos';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
@@ -44,7 +44,7 @@ function Tile({ icon, label: lb, value, unit, tone = 'ok' }: { icon: string; lab
   return (
     <div className="glass-card p-4 sm:p-5">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] uppercase tracking-wider text-black/50 leading-tight">{lb}</p>
+        <p className="t-label">{lb}</p>
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
       </div>
       <p className="text-3xl font-bold tracking-tight tabular-nums text-[#16181A] mt-3">{value}{unit && <span className="text-base font-medium text-black/45 ml-1">{unit}</span>}</p>
@@ -56,7 +56,7 @@ function Saver({ busy, onSave, children, title, hint }: { busy: boolean; onSave:
   return (
     <section className="glass-card p-5 space-y-4">
       <div>
-        <h2 className="font-bold tracking-tight">{title}</h2>
+        <h2 className="t-section">{title}</h2>
         {hint && <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">{hint}</p>}
       </div>
       {children}
@@ -102,7 +102,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
   return (
     <div className="space-y-5">
       {!p.loyalty_on && (
-        <div className="rounded-3xl border border-amber-500/25 bg-amber-500/[0.07] p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
+        <div className="card card-wait p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
           <p className="font-semibold text-[#16181A] flex items-center gap-2"><Icon name="warning" size={17} className="text-amber-700" />Věrnost je pro hosty vypnutá.</p>
           <Button size="sm" variant="accent" loading={busy} onClick={toggle}>Zapnout</Button>
         </div>
@@ -117,7 +117,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
         const days = d.series.map((r: any) => String(r.day));
         return (
           <section className="glass-card p-4 sm:p-5">
-            <h2 className="text-base font-bold tracking-tight mb-3">Posledních 31 dní</h2>
+            <h2 className="t-section mb-3">Posledních 31 dní</h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
               <Spark title="Členové u kasy" data={d.series.map((r: any) => Number(r.active) || 0)} days={days} />
               <Spark title="Rozdané body" data={d.series.map((r: any) => Number(r.points_given) || 0)} days={days} />
@@ -129,7 +129,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
       })()}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5 items-start">
         <section className="glass-card p-4 sm:p-5">
-          <h2 className="text-base font-bold tracking-tight mb-3">Poslední pohyby</h2>
+          <h2 className="t-section mb-3">Poslední pohyby</h2>
           {(d.recent ?? []).length === 0 ? <p className="text-sm text-black/55">Zatím se nic nedělo. První body přijdou s objednávkou nebo razítkem u kasy.</p> : (
             <ul className="divide-y divide-black/[0.06]">
               {d.recent.map((l: any) => (
@@ -149,7 +149,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
           )}
         </section>
         <section className="glass-card p-4 sm:p-5 space-y-3">
-          <h2 className="text-base font-bold tracking-tight">Za posledních 30 dní</h2>
+          <h2 className="t-section">Za posledních 30 dní</h2>
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div><dt className="text-black/50 text-xs">Rozdáno bodů</dt><dd className="text-xl font-bold tabular-nums">{s.pointsGiven30 ?? 0}</dd></div>
             <div><dt className="text-black/50 text-xs">Utraceno bodů</dt><dd className="text-xl font-bold tabular-nums">{s.pointsSpent30 ?? 0}</dd></div>
@@ -353,7 +353,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
         </button>
         <section className="glass-card p-5 space-y-4">
           <div>
-            <h2 className="font-bold tracking-tight">{f.id ? `Upravit „${f.name || '…'}"` : 'Nová kartička'}</h2>
+            <h2 className="t-section">{f.id ? `Upravit „${f.name || '…'}"` : 'Nová kartička'}</h2>
             <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">Za plnou kartu dostane host kupon s kódem — obsluha ho uplatní u kasy.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -576,7 +576,7 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
         </button>
         <section className="glass-card p-5 space-y-4">
           <div>
-            <h2 className="font-bold tracking-tight">{f.id ? `Upravit „${f.title || '…'}"` : 'Nový kupon'}</h2>
+            <h2 className="t-section">{f.id ? `Upravit „${f.title || '…'}"` : 'Nový kupon'}</h2>
             <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">Host si ho vezme za body na tvé stránce; dostane kód a obsluha ho uplatní u kasy.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-4">
@@ -657,7 +657,7 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
     <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
       <div className="space-y-5">
         <form onSubmit={redeem} className="glass-card p-5 space-y-3">
-          <h2 className="font-bold tracking-tight">Uplatnit kupon</h2>
+          <h2 className="t-section">Uplatnit kupon</h2>
           <p className="text-xs text-black/50">Host ukáže kód ze své kartičky. Kupon jde uplatnit jednou; podmínky (útrata, 18+) připomene potvrzení.</p>
           <div><label htmlFor="c-code" className={label}>Kód od hosta</label><input id="c-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" className={`${input} font-mono tracking-widest`} /></div>
           <Button type="submit" variant="primary" icon="check" loading={busy === 'redeem'}>Uplatnit</Button>
@@ -725,7 +725,7 @@ function Tiers({ toast }: { toast: (m: string) => void }) {
         hint="Čím víc návštěv, tím lepší úroveň. Sleva je informace pro obsluhu: při načtení kartičky u kasy uvidí, kolik hostovi odečíst. Úroveň vidí i host na své stránce.">
         <ul className="space-y-3">
           {tiers.map(t => (
-            <li key={t.id} className="rounded-2xl border border-black/[0.07] bg-white/60 p-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+            <li key={t.id} className="well bg-white p-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
               <div>
                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${t.tone}`}>{t.name}</span>
                 <p className="text-xs text-black/50 mt-1.5">{t.hint ?? t.at ?? 'Od kolika návštěv'}</p>
@@ -768,7 +768,7 @@ function Groups({ toast }: { toast: (m: string) => void }) {
   return (
     <section className="glass-card p-5 space-y-4">
       <div>
-        <h2 className="font-bold tracking-tight">Skupiny hostů</h2>
+        <h2 className="t-section">Skupiny hostů</h2>
         <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Hosty do nich přidáš v Zákaznících; kupony na ně cílíš v jejich editoru.</p>
       </div>
       {list === null ? <Skeleton className="h-16 rounded-2xl" /> : list.length > 0 && (

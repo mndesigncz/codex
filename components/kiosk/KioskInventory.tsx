@@ -189,7 +189,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
           </div>
 
           {saveErr && (
-            <div role="alert" className="rounded-2xl bg-red-500/10 border border-red-500/25 text-red-700 px-5 py-3.5 text-base font-semibold flex items-center gap-2">
+            <div role="alert" className="note note-danger px-5 py-3.5 text-base font-semibold flex items-center gap-2">
               <Icon name="warning" size={18} className="shrink-0" />{saveErr}
             </div>
           )}

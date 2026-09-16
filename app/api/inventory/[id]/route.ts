@@ -7,6 +7,14 @@ import { notifyUser } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus, consumeContent } from '@/lib/packaging';
 import { resolveActingUser } from '@/lib/kioskActing';
 import { packagingSourceOf } from '@/lib/categoryTree';
+import { ensureProductionTasks } from '@/lib/production';
+
+// Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
+// úkol „vyrobit“, doplněný ho zavře, chybějící suroviny dostanou vlajku do nákupu.
+async function afterStockChange(teamId: number | null) {
+  if (!teamId) return;
+  try { await ensureProductionTasks(teamId, null); } catch { /* před migrací */ }
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -188,6 +196,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ),
       );
     }
+    await afterStockChange(me.teamId);
     return NextResponse.json(await mappedItem(id, me.teamId));
   }
 
@@ -279,6 +288,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
+    await afterStockChange(me.teamId);
     return NextResponse.json(await mappedItem(id, me.teamId));
   }
 
@@ -432,7 +442,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       VALUES (${id}, ${me.meId}, ${Number(item.quantity)}, ${quantity}, ${note}, NOW())`;
   }
 
-  return NextResponse.json(await mappedItem(id, me.teamId));
+  await afterStockChange(me.teamId);
+    return NextResponse.json(await mappedItem(id, me.teamId));
 }
 
 // DELETE (employer): remove item.

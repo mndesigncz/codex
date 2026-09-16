@@ -52,7 +52,7 @@ interface Invitation {
 }
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 function roleChip(role: string) {
   return role === 'employer'
@@ -470,14 +470,14 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
       )}
       {error && (
-        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
+        <div className="note note-danger p-4 text-sm flex items-center gap-2">
           <Icon name="warning" size={16} /> {error}
         </div>
       )}
 
       {/* Team name */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
+        <div className="t-label flex items-center gap-2">
           <Icon name="users" size={16} /> Název týmu
         </div>
         {editingName ? (
@@ -507,12 +507,12 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       {/* Join code */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
+        <div className="t-label flex items-center gap-2">
           <Icon name="check" size={16} /> Připojovací kód
         </div>
         <p className="text-sm text-black/45">Zaměstnanci se připojí zadáním tohoto kódu na stránce <span className="font-medium text-[#16181A]">/join</span>.</p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex-1 min-w-0 well border border-black/[0.08] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.25em] sm:tracking-[0.3em] text-[#5B7A08] break-all min-w-0">{team.join_code}</span>
             <button onClick={copyCode} title="Kopírovat"
               className="w-full sm:w-auto rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">
@@ -528,7 +528,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       {/* Invite */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
+        <div className="t-label flex items-center gap-2">
           <Icon name="plus" size={16} /> Pozvat nového člena
         </div>
         <form onSubmit={sendInvite} className="space-y-3">
@@ -583,7 +583,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         )}
 
         <div className="pt-2">
-          <p className="text-xs uppercase tracking-wider text-black/45 mb-3">Odeslané pozvánky ({pending.length})</p>
+          <p className="t-label mb-3">Odeslané pozvánky ({pending.length})</p>
           {invitations.length === 0 ? (
             <EmptyState illustration="tym" title="Zatím žádná pozvánka" hint="Pošli kód nebo odkaz — člověk se připojí za minutu a hned vidí rozvrh." compact />
           ) : (
@@ -626,7 +626,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       {/* Members */}
       <div className="glass-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-black/45 text-xs uppercase tracking-wider">
+        <div className="t-label flex items-center gap-2">
           <Icon name="users" size={16} /> Členové týmu ({members.length})
         </div>
         <div className="divide-y divide-black/[0.06]">
@@ -662,7 +662,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <div className="flex items-center gap-2 flex-wrap min-w-0 basis-full sm:basis-auto sm:ml-auto">
                       {m.role === 'employee' && (
                         <button onClick={() => setProfileId(m.id)}
-                          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-medium hover:brightness-125 transition-all whitespace-nowrap">
+                          className="btn btn-primary transition-all whitespace-nowrap">
                           Profil
                         </button>
                       )}
@@ -681,7 +681,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 {editing && (
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pl-0 sm:pl-15">
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Role</label>
+                      <label className="field-label">Role</label>
                       <select value={editRole} aria-label="Role člena" onChange={e => setEditRole(e.target.value)}
                         className={inputClass + ' appearance-none'}>
                         <option value="employee" className="bg-neutral-900">Zaměstnanec</option>
@@ -689,11 +689,11 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Pozice</label>
+                      <label className="field-label">Pozice</label>
                       <input value={editJob} onChange={e => setEditJob(e.target.value)} className={inputClass} />
                     </div>
                     <div>
-                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Hodinová sazba</label>
+                      <label className="field-label">Hodinová sazba</label>
                       <div className="relative">
                         <input value={editRate} inputMode="numeric"
                           onChange={e => setEditRate(e.target.value.replace(/\D/g, ''))}
@@ -723,7 +723,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Business / localization settings — makes the app fit any team */}
       <div className="glass-card p-6 space-y-5">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="settings" size={18} /> Provoz podniku
           </h3>
           <p className="text-black/45 text-sm mt-1">Měna, formát čísel a cíle — přizpůsob appku svému podniku.</p>
@@ -731,7 +731,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="min-w-0">
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Měna</label>
+            <label className="field-label">Měna</label>
             <select value={team?.currency ?? 'CZK'} aria-label="Měna" disabled={savingBiz}
               onChange={e => saveBiz({ currency: e.target.value })}
               className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
@@ -739,7 +739,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </select>
           </div>
           <div className="min-w-0">
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Formát čísel (jazyk)</label>
+            <label className="field-label">Formát čísel (jazyk)</label>
             <select value={team?.locale ?? 'cs-CZ'} aria-label="Jazyk a formát" disabled={savingBiz}
               onChange={e => saveBiz({ locale: e.target.value })}
               className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
@@ -747,7 +747,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </select>
           </div>
           <div className="min-w-0">
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Začátek týdne</label>
+            <label className="field-label">Začátek týdne</label>
             <select value={String(team?.week_start ?? 1)} aria-label="Začátek týdne" disabled={savingBiz}
               onChange={e => saveBiz({ weekStart: Number(e.target.value) })}
               className={`${inputClass} appearance-none h-[46px]`} style={{ WebkitAppearance: 'none' }}>
@@ -756,7 +756,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </select>
           </div>
           <div className="min-w-0">
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Cíl mzdových nákladů</label>
+            <label className="field-label">Cíl mzdových nákladů</label>
             <div className="relative">
               <input type="number" inputMode="numeric" min={0} max={100} value={laborInput} disabled={savingBiz}
                 onChange={e => setLaborInput(e.target.value)}
@@ -775,7 +775,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Dashboard customization */}
       <div className="glass-card p-6 space-y-5">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="overview" size={18} /> Dashboardy
           </h3>
           <p className="text-black/45 text-sm mt-1">
@@ -818,7 +818,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Payout / cash settings */}
       <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="trend" size={18} /> Výplaty a uzávěrka
           </h3>
           <p className="text-black/45 text-sm mt-1">Nastavení, které ovlivňuje denní uzávěrku zaměstnanců.</p>
@@ -855,10 +855,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               value={floatDraft ?? (team?.drawer_float != null ? String(team.drawer_float) : '')}
               onChange={e => setFloatDraft(e.target.value)}
               placeholder="nenastaveno"
-              className="w-32 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-right tabular-nums" />
+              className="w-32 field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-right tabular-nums" />
             {floatDraft !== null && (
               <button onClick={saveFloat} disabled={savingFloat}
-                className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black disabled:opacity-50 transition">
+                className="btn btn-primary btn-sm disabled:opacity-50 transition">
                 {savingFloat ? '…' : 'Uložit'}
               </button>
             )}
@@ -918,7 +918,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">
                 <Icon name="warning" size={20} />
               </div>
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Odebrat člena</h3>
+              <h3 className="t-card">Odebrat člena</h3>
             </div>
             <p className="text-sm text-black/60">
               Opravdu chcete odebrat <span className="text-[#16181A] font-medium">{removeTarget.name}</span> z týmu?

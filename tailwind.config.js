@@ -62,8 +62,12 @@ module.exports = {
         },
         cream: '#faf8f3',
       },
+      // Tři rádiusy pro celou aplikaci (Managero 2): karta 20, pole 14,
+      // drobná dlaždice 10. Cokoli většího/menšího v kódu se sem přemapuje.
       borderRadius: {
-        '3xl': '1.5rem',
+        xl: 'var(--r-sm)',
+        '2xl': 'var(--r-md)',
+        '3xl': 'var(--r-lg)',
       },
     },
   },

@@ -8,8 +8,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field text-sm';
+const label = 'field-label';
 
 function Field({ id, label: l, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (
@@ -47,8 +47,8 @@ export function RegisterForm() {
         <Field id="r-email" label="E-mail"><input id="r-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
         <Field id="r-pw" label="Heslo" hint="Aspoň 8 znaků."><input id="r-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" required /></Field>
         <Field id="r-ref" label="Kód od kamaráda" hint="Nepovinné. Až se přidáš do podniku, kde je členem, dostanete oba body."><input id="r-ref" className={`${input} font-mono tracking-widest`} value={ref} onChange={e => setRef(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="off" /></Field>
-        {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy} className="tap-target rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
+        {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
+        <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
           {busy ? 'Zakládám…' : <><Icon name="plus" size={16} /> Založit účet</>}
         </button>
         <p className="text-sm text-black/55 text-center">Už účet máš? <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Přihlas se</Link></p>
@@ -74,8 +74,8 @@ export function LoginForm() {
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <Field id="l-email" label="E-mail"><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
         <Field id="l-pw" label="Heslo"><input id="l-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required /></Field>
-        {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
-        <button type="submit" disabled={busy} className="tap-target rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition">
+        {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
+        <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition">
           {busy ? 'Přihlašuji…' : 'Přihlásit se'}
         </button>
         <p className="text-sm text-black/55 text-center">Ještě účet nemáš? <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Založ si ho</Link></p>

@@ -47,7 +47,7 @@ export default function ChatView({ user }: Props) {
       >
         <div className="px-5 py-4 border-b border-black/[0.06] flex items-center gap-2">
           <Icon name="chat" size={22} className="text-[#5B7A08]" />
-          <h2 className="text-lg font-semibold text-[#16181A]">Zprávy</h2>
+          <h2 className="t-section">Zprávy</h2>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
           {loading && (
@@ -308,7 +308,7 @@ function Thread({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Napište zprávu…"
-          className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+          className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
         <button
           type="submit"

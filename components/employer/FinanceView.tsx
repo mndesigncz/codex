@@ -217,7 +217,7 @@ export default function FinanceView() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="relative overflow-hidden rounded-[26px] bg-[#16181A] text-white p-4">
+            <div className="relative overflow-hidden rounded-3xl bg-[#16181A] text-white p-4">
               <div className="pointer-events-none absolute -top-14 -right-10 h-32 w-32 rounded-full bg-[#C8F542]/25 blur-2xl" />
               <p className="text-[11px] uppercase tracking-wider text-white/70 font-bold">Tržby</p>
               <p className="mt-1 text-xl font-bold tabular-nums">{money(s.revenue)}</p>
@@ -225,19 +225,19 @@ export default function FinanceView() {
                 {trendPct != null ? `${trendPct >= 0 ? '+' : ''}${trendPct} % vs. minulý měsíc` : `${s.closingsCount} uzávěrek`}
               </p>
             </div>
-            <div className="glass-card rounded-[26px] p-4">
+            <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Nákupy a výdaje</p>
               <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A]">{money(s.purchases)}</p>
               <p className="text-[11px] text-black/40 mt-0.5">účtenky, objednávky, kasa</p>
             </div>
-            <div className="glass-card rounded-[26px] p-4">
+            <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Mzdy</p>
               <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A]">{money(Math.max(s.wagesCash, s.wagesWorked))}</p>
               <p className="text-[11px] text-black/40 mt-0.5">
                 {s.wagesWorked > 0 ? 'z docházky × sazby' : 'z denních výplat'}
               </p>
             </div>
-            <div className="glass-card rounded-[26px] p-4">
+            <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Hrubý výsledek</p>
               <p className={`mt-1 text-xl font-bold tabular-nums ${s.gross >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>{money(s.gross)}</p>
               <p className="text-[11px] text-black/40 mt-0.5">tržby − nákupy − mzdy</p>
@@ -246,8 +246,8 @@ export default function FinanceView() {
 
           {/* Where the money went */}
           {breakdown.length > 0 && (
-            <div className="glass-card rounded-[26px] p-5 space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Kam šly peníze</h3>
+            <div className="glass-card rounded-3xl p-5 space-y-3">
+              <h3 className="t-label">Kam šly peníze</h3>
               {breakdown.map(b => (
                 <div key={b.label}>
                   <div className="flex items-center justify-between text-sm mb-1">
@@ -270,9 +270,9 @@ export default function FinanceView() {
           {/* Hosté a věrnost — peníze, které přišly přes stůl a kartičku.
               Patří k financím: objednávka mimo pokladnu v tržbách chybí. */}
           {g && (g.orders > 0 || g.members > 0) && (
-            <div className="glass-card rounded-[26px] p-5 space-y-3">
+            <div className="glass-card rounded-3xl p-5 space-y-3">
               <div className="flex items-end justify-between gap-3 flex-wrap">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Hosté a věrnost</h3>
+                <h3 className="t-label">Hosté a věrnost</h3>
                 <span className="text-xs text-black/45">z objednávek od stolu a kartiček</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -282,8 +282,8 @@ export default function FinanceView() {
                   ['Členů věrnosti', String(g.members), `${g.newMembers} nových tento měsíc`],
                   ['Uplatněných kuponů', String(g.couponsRedeemed), 'sleva na útratě'],
                 ] as [string, string, string][]).map(([lb, val, sub]) => (
-                  <div key={lb} className="rounded-2xl bg-black/[0.035] px-3.5 py-3">
-                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold leading-tight">{lb}</p>
+                  <div key={lb} className="well px-3.5 py-3">
+                    <p className="t-label">{lb}</p>
                     <p className="mt-1 text-lg font-bold tabular-nums text-[#16181A]">{val}</p>
                     <p className="text-[11px] text-black/40 leading-snug">{sub}</p>
                   </div>
@@ -313,7 +313,7 @@ export default function FinanceView() {
           {pos && pos.items?.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-end justify-between gap-3 px-1">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Co vydělává (z pokladny)</h3>
+                <h3 className="t-label">Co vydělává (z pokladny)</h3>
                 {pos.totals?.marginPct != null && (
                   <span className="text-xs text-black/45">
                     marže <b className="text-[#5B7A08]">{pos.totals.marginPct} %</b> na položkách s recepturou
@@ -377,7 +377,7 @@ export default function FinanceView() {
           {/* Ledger */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výdaje ({filtered.length}{filtered.length !== ledger.length ? ` z ${ledger.length}` : ''}) · {money(filteredSum)}</h3>
+              <h3 className="t-label">Výdaje ({filtered.length}{filtered.length !== ledger.length ? ` z ${ledger.length}` : ''}) · {money(filteredSum)}</h3>
               <div className="flex items-center gap-2 flex-wrap min-w-0 w-full sm:w-auto">
               <div className="relative min-w-0 flex-1 sm:flex-none">
                 <Icon name="search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/35" />
@@ -397,7 +397,7 @@ export default function FinanceView() {
             {filtered.length === 0 ? (
               <div className="glass-card p-8 text-center text-black/45">V tomhle měsíci tu nic není.</div>
             ) : (
-              <div className="glass-card rounded-[26px] divide-y divide-black/[0.05] overflow-hidden">
+              <div className="glass-card rounded-3xl divide-y divide-black/[0.05] overflow-hidden">
                 {filtered.map((r, i) => {
                   const meta = KIND_META[r.kind] ?? { label: r.kind, cls: 'bg-black/[0.06] text-black/55' };
                   const clickable = r.kind === 'receipt';
@@ -432,7 +432,7 @@ export default function FinanceView() {
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setDetail(null)}>
           <div ref={detailModal.ref} {...detailModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-3 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+              <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> {detail.label}
               </h3>
               <button aria-label="Zavřít" onClick={() => setDetail(null)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
@@ -441,7 +441,7 @@ export default function FinanceView() {
               {new Date(detail.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
               {' · '}<span className="font-bold text-[#16181A] tabular-nums">{money(detail.amount)}</span>
             </p>
-            {detail.note && <p className="text-sm text-black/60 bg-black/[0.03] rounded-2xl px-4 py-2.5">{detail.note}</p>}
+            {detail.note && <p className="text-sm text-black/60 well px-4 py-2.5">{detail.note}</p>}
             {detail.photoUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}

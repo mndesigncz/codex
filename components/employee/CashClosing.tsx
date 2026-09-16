@@ -15,7 +15,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 const today = () => pragueToday();
 
@@ -80,7 +80,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
                   value={cnt === 0 ? '' : cnt}
                   onChange={e => setCount(d, e.target.value)}
                   placeholder="0"
-                  className="w-14 h-9 text-center rounded-xl bg-black/[0.04] border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                  className="w-14 h-9 text-center field rounded-xl border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                 />
                 <button type="button" onClick={() => bump(d, 1)} aria-label={`Přidat ${fmtDenom(d)} ${symbol}`}
                   className="rounded-xl bg-[#C8F542] w-9 h-9 flex items-center justify-center text-lg leading-none text-black hover:brightness-110 active:scale-95 transition">+</button>
@@ -599,7 +599,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     const unit = opts?.unit === undefined ? symbol : opts.unit;
     return (
       <div>
-        <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">{label}</label>
+        <label className="field-label">{label}</label>
         <div className="relative">
           <input type="number" inputMode="numeric" value={form[key]} onChange={set(key)}
             placeholder={opts?.placeholder ?? '0'} className={`${inputClass} ${unit ? 'pr-12' : ''}`} />
@@ -619,7 +619,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </div>
       )}
       {err && (
-        <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2">
+        <div className="p-3.5 note note-danger text-sm flex items-center gap-2">
           <Icon name="warning" size={17} /> {err}
         </div>
       )}
@@ -766,7 +766,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
             {isKiosk ? (
               <div className="min-w-0">
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kterou směnu uzavíráš?</label>
+                <label className="field-label">Kterou směnu uzavíráš?</label>
                 <div className="flex flex-col gap-2">
                   {eligible.map(s => {
                     const active = form.date === s.date && selEmployee === (s.employeeId ?? null);
@@ -800,7 +800,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             ) : isEmployer ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
                 <div className="min-w-0">
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Za koho</label>
+                  <label className="field-label">Za koho</label>
                   <select value={selEmployee ?? ''} aria-label="Kdo byl na směně" onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
                     className={`${inputClass} appearance-none min-w-0 h-[46px]`} style={{ WebkitAppearance: 'none' }}>
                     {members.map(m => (
@@ -809,7 +809,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </select>
                 </div>
                 <div className="min-w-0">
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
+                  <label className="field-label">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
                   <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
@@ -840,7 +840,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Datum</label>
+                  <label className="field-label">Datum</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
                   <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
@@ -873,7 +873,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     tips: pos.tips > 0 ? String(pos.tips) : f.tips,
                     tipsCard: pos.tipsCard != null && pos.tipsCard > 0 ? String(pos.tipsCard) : f.tipsCard,
                   }))}
-                  className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
+                  className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
                   Předvyplnit z pokladny
                 </button>
               </div>
@@ -1122,7 +1122,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 </div>
               </div>
               {leaveTooHigh ? (
-                <p className="text-[13px] text-red-600 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                <p className="text-[13px] note note-danger px-3 py-2">
                   V kase je napočítáno jen {money(n(form.closingCash))} — nemůže v ní zůstat víc.
                 </p>
               ) : leaveCash !== '' && finalRemoval > 0 ? (
@@ -1145,7 +1145,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           {/* Say WHY nothing is being demanded, so a blank space doesn't read
               as a bug the next time somebody expects the checklist. */}
           {missingRequired.length === 0 && requiredProcs.length > 0 && !proceduresApply && (
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+            <div className="well border border-black/[0.06] px-4 py-3">
               <p className="text-[13px] text-black/50">
                 {eventId !== '' ? 'Uzávěrka za akci — povinné postupy prodejny se u ní neřeší.'
                   : !closingIsToday ? 'Uzávěrka za jiný den — dnešní postupy ji neblokují.'
@@ -1170,7 +1170,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           )}
 
           {todayRuns.length > 0 && (
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
+            <div className="well border border-black/[0.06] p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní postupy</p>
               <div className="flex flex-wrap gap-1.5">
                 {todayRuns.map((r: any) => {
@@ -1196,7 +1196,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
           )}
 
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4 space-y-2.5">
+          <div className="well border border-black/[0.06] p-4 space-y-2.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-black/45"><Icon name="handover" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Předávka pro další směnu <span className="normal-case font-normal text-black/35">(nepovinné — uvidí ji tým na přehledu a tabletu)</span></p>
             <input value={hoTodo} onChange={e => setHoTodo(e.target.value)} maxLength={500}
               placeholder="Co zbývá dodělat…"
@@ -1209,7 +1209,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               className={inputClass} />
           </div>
 
-          <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Poznámka</label>
+          <label className="field-label">Poznámka</label>
           <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
         </div>
 
@@ -1222,7 +1222,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       {/* My past closings (hidden on the shared kiosk and when embedded) */}
       {!isKiosk && !hideHistory && (
       <div className="space-y-3">
-        <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+        <h3 className="t-card flex items-center gap-2">
           <Icon name="clock" size={18} /> Moje uzávěrky
         </h3>
         {loading ? (
@@ -1270,7 +1270,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.self_payout)}</p></div>}
                 </div>
                 {(c.movements?.length ?? 0) > 0 && (
-                  <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                  <div className="mt-3 well border border-black/[0.06] p-3">
                     <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Pohyby v kase</p>
                     <div className="divide-y divide-black/[0.06]">
                       {c.movements!.map((m, i) => {
@@ -1289,7 +1289,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 {hasDenominations(c.denominations) && (
-                  <div className="mt-3 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                  <div className="mt-3 well border border-black/[0.06] p-3">
                     <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Kasa napočítaná po bankovkách</p>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(c.denominations!)
@@ -1303,7 +1303,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 {(Number(c.final_removal) || 0) > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 py-2.5 text-sm">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 well border border-black/[0.06] px-3 py-2.5 text-sm">
                     <span className="text-black/55 whitespace-nowrap">Odvod na konci: <strong className="text-[#16181A] tabular-nums">−{money(Number(c.final_removal))}</strong></span>
                     <span className="text-black/55 whitespace-nowrap">V kase zůstalo: <strong className="text-[#16181A] tabular-nums">{money(cashLeft(c))}</strong></span>
                   </div>

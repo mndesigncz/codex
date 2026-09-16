@@ -19,7 +19,7 @@ type Suggestion = {
 };
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 // Pipeline stages, in the order the employer moves an idea through.
 const STATUS_META: Record<string, { label: string; chip: string }> = {
@@ -160,7 +160,7 @@ export default function SuggestionsBoard() {
   const shown = filter === 'all' ? items : items.filter(s => s.status === filter);
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-6">
       {/* Hlavička jako u ostatních obrazovek. Dřív tu byla uvítací karta s
           h3 a pod ní tmavé tlačítko: obrazovka neměla hlavní nadpis a hlavní
           akce se barvou lišila od zbytku aplikace. */}
@@ -201,12 +201,12 @@ export default function SuggestionsBoard() {
             : <EmptyState icon="bulb" title="V této kategorii nic není" compact />}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="card divide-y divide-black/[0.06]">
           {shown.map(s => {
             const meta = STATUS_META[s.status] ?? STATUS_META.new;
             const mine = meId != null && s.authorId === meId;
             return (
-              <div key={s.id} className="glass-card p-5">
+              <div key={s.id} className="p-5">
                 <div className="flex items-start gap-3">
                   {/* Vote pill */}
                   <button onClick={() => toggleVote(s)}
@@ -289,21 +289,21 @@ export default function SuggestionsBoard() {
           <div ref={composeModal.ref} {...composeModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-4">
               <div className="grid place-items-center h-10 w-10 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="bulb" size={20} /></div>
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nový podnět</h3>
+              <h3 className="t-card">Nový podnět</h3>
             </div>
             {err && (
-              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2 mb-3">
+              <div className="p-3 note note-danger text-sm flex items-center gap-2 mb-3">
                 <Icon name="warning" size={16} /> {err}
               </div>
             )}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Co navrhuješ?</label>
+                <label className="field-label">Co navrhuješ?</label>
                 <input value={title} onChange={e => setTitle(e.target.value)} maxLength={160} autoFocus
                   placeholder="Např. Přidat druhý mlýnek na kávu" className={inputClass} />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vysvětli to blíž (nepovinné)</label>
+                <label className="field-label">Vysvětli to blíž (nepovinné)</label>
                 <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} maxLength={2000}
                   placeholder="Proč to pomůže, jak by to mělo fungovat…" className={`${inputClass} resize-none`} />
               </div>
@@ -327,9 +327,9 @@ export default function SuggestionsBoard() {
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit podnět</h3>
             <div className="space-y-3">
               <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>

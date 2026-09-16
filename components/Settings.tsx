@@ -41,8 +41,8 @@ interface Notif {
 const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍🍳', '🧑‍💼', '🙂', '😎', '🌿', '🍵', '🧋', '☕'];
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const labelClass = 'block text-xs uppercase tracking-wider text-black/45 mb-2';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const labelClass = 'field-label';
 const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50';
 const cardTitle = 'font-bold tracking-tight text-[#16181A]';
 
@@ -412,7 +412,7 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
               )}
               {profileErr && (
-                <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
+                <div className="note note-danger p-4 text-sm flex items-center gap-2">
                   <Icon name="warning" size={16} /> {profileErr}
                 </div>
               )}
@@ -481,7 +481,7 @@ export default function Settings({ user, initialTab }: Props) {
                   <h3 className={cardTitle}>Vzhled</h3>
                   <p className="text-black/45 text-sm mt-1">Vyberte světlý nebo tmavý motiv aplikace.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 rounded-2xl bg-black/[0.04] border border-black/[0.08] p-1.5 max-w-sm">
+                <div className="grid grid-cols-2 gap-2 well border border-black/[0.08] p-1.5 max-w-sm">
                   {([
                     { id: 'light', label: 'Světlý', icon: 'sun' },
                     { id: 'dark', label: 'Tmavý', icon: 'moon' },
@@ -502,7 +502,7 @@ export default function Settings({ user, initialTab }: Props) {
                   <h3 className={cardTitle}>Jazyk</h3>
                   <p className="text-black/45 text-sm mt-1">Jazyk rozhraní aplikace.</p>
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 opacity-70">
+                <div className="flex items-center justify-between gap-4 well border border-black/[0.08] px-4 py-3 opacity-70">
                   <span className="text-sm font-medium text-[#16181A] flex items-center gap-2">🇨🇿 Čeština</span>
                   <span className="text-xs text-black/45">Výchozí</span>
                 </div>
@@ -613,7 +613,7 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
               )}
               {pwdErr && (
-                <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-red-600 text-sm flex items-center gap-2">
+                <div className="note note-danger p-4 text-sm flex items-center gap-2">
                   <Icon name="warning" size={16} /> {pwdErr}
                 </div>
               )}
@@ -662,7 +662,7 @@ export default function Settings({ user, initialTab }: Props) {
                     Potom se podnik přepne na plán Zdarma — o data nepřijdete.
                   </p>
                 )}
-                <p className="mt-4 text-sm text-black/55 rounded-2xl bg-black/[0.03] border border-black/[0.07] px-4 py-3">
+                <p className="mt-4 text-sm text-black/55 well border border-black/[0.07] px-4 py-3">
                   Plán <strong className="text-[#16181A]">Zdarma platí napořád</strong> — směny, uzávěrky, úkoly, chat i sklad
                   v něm fungují bez omezení času. Pro odemyká větší tým, kiosk, odměny, exporty, měsíční přehled a vlastní
                   vzhled sdílených stránek. Online platby teprve připravujeme.
@@ -747,7 +747,7 @@ export default function Settings({ user, initialTab }: Props) {
                         ))}
                       </div>
                       {posHealth.lastError && (
-                        <p className="text-xs rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 px-3 py-2">
+                        <p className="text-xs note note-danger px-3 py-2">
                           Poslední chyba{posHealth.lastErrorAt ? ` (${dbTimeDayHM(posHealth.lastErrorAt)})` : ''}: {posHealth.lastError}
                         </p>
                       )}
@@ -767,7 +767,7 @@ export default function Settings({ user, initialTab }: Props) {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button onClick={() => posDo('sync')} disabled={!!posAction}
-                          className="rounded-full bg-[#C8F542] on-accent px-4 py-2 text-sm font-semibold hover:brightness-105 disabled:opacity-50 transition inline-flex items-center gap-1.5">
+                          className="btn btn-accent btn-sm hover:brightness-105 disabled:opacity-50 transition inline-flex items-center gap-1.5">
                           <Icon name="refresh" size={15} /> {posAction === 'sync' ? 'Synchronizuji…' : 'Synchronizovat teď'}
                         </button>
                         <button onClick={() => { if (confirm('Načíst účtenky za posledních 180 dní? Trvá to pár desítek sekund.')) posDo('backfill', { days: 180 }); }} disabled={!!posAction}
@@ -791,7 +791,7 @@ export default function Settings({ user, initialTab }: Props) {
                           {([['Adresa (URL)', posHealth.webhookUrl], ['Tajemství (Authorization)', posHealth.webhookSecret]] as const).map(([k, v]) => (
                             <div key={k} className="flex items-center gap-2 min-w-0">
                               <span className="text-[11px] uppercase tracking-wider text-black/55 w-28 shrink-0">{k}</span>
-                              <code className="flex-1 min-w-0 truncate rounded-xl bg-black/[0.04] px-3 py-1.5 text-xs">{v}</code>
+                              <code className="flex-1 min-w-0 truncate well rounded-xl px-3 py-1.5 text-xs">{v}</code>
                               <button onClick={() => { navigator.clipboard?.writeText(String(v)); setPosMsg('Zkopírováno ✓'); }}
                                 className="tap-target-sm shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium text-black/60 hover:text-black">Kopírovat</button>
                             </div>
@@ -824,7 +824,7 @@ export default function Settings({ user, initialTab }: Props) {
                       <label className="block text-xs uppercase tracking-wider text-black/45 mb-1">{lbl}</label>
                       <input value={(posForm as any)[k]} onChange={e => setPosForm(f => ({ ...f, [k]: e.target.value }))}
                         type={k === 'clientSecret' ? 'password' : 'text'} autoComplete="off"
-                        className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] font-mono focus:border-[#C8F542]/50 focus:outline-none" />
+                        className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] font-mono focus:border-[#C8F542]/50 focus:outline-none" />
                     </div>
                   ))}
                   <button onClick={posConnect} disabled={posBusy || Object.values(posForm).some(v => !v.trim())}

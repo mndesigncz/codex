@@ -116,7 +116,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
     setBusy(null);
   };
 
-  if (err) return <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>;
+  if (err) return <p className="note note-danger text-sm px-4 py-3">{err}</p>;
   if (!d) return <div className="space-y-3"><Skeleton className="h-16 rounded-2xl" /><Skeleton className="h-16 rounded-2xl" /></div>;
   const orders: any[] = d.orders ?? [];
   const news = orders.filter(o => o.status === 'new');
@@ -193,13 +193,13 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       )}
       {inProgress.length > 0 && (
         <section>
-          <h2 className="text-sm font-bold tracking-tight mb-2">Připravuje se</h2>
+          <h2 className="t-card mb-2">Připravuje se</h2>
           <ul className="space-y-3">{inProgress.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
         </section>
       )}
       {!compact && reservations.length > 0 && (
         <section>
-          <h2 className="text-sm font-bold tracking-tight mb-2">Dnešní rezervace</h2>
+          <h2 className="t-card mb-2">Dnešní rezervace</h2>
           <ul className="divide-y divide-black/[0.06]">
             {reservations.map(r => (
               <li key={r.id} className="py-2 flex items-center gap-3 flex-wrap">

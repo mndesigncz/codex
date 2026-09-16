@@ -46,3 +46,17 @@ Každé kolo: tsc, čtyři guardy (čas, desetinná pole, šířky, kontrast),
 produkční build, rig orientace (~90 obrazovek) a rig rozložení (~665 stavů,
 10 šířek), snímky mobil+desktop, živé ověření na produkci s testovacím
 týmem (claude-test@pangea.test, profil casa-test) a úklid testovacích dat.
+
+## Výroba vlastních produktů
+
+Položka skladu označená „vyrábíme sami" (limonáda, ice tea, extrakt, sirup,
+pečivo) nechodí do nákupního seznamu. Když jí dochází, vznikne směně úkol
+„Vyrobit X" (název jde přejmenovat, třeba „Uvař limonádu") s výrobní
+recepturou: suroviny × množství na dávku, kolik dávek je potřeba do plného
+stavu a jestli je na to ve skladu dost. Co chybí, dostane vlajku do nákupního
+seznamu — nakupují se jen suroviny. Odškrtnutí úkolu (nebo „Vyrobeno" na
+dashboardu, v TO GO či ve Skladu) dávku naskladní a suroviny odepíše.
+Spouští se po každém pohybu skladu včetně odpisů z prodejů v pokladně
+(prodej limonády → dochází → úkol), takže úkol nikdy nechybí a nikdy není
+dvakrát; když se zásoba doplní jinak, zavře se sám. Kód: lib/production.ts
+(data), lib/productionPlan.ts (čistá logika, testy v `npm test`).

@@ -5,6 +5,7 @@ import { tierFor } from '../lib/clientSlots.ts';
 import { normName, matchByName, sectionTitles } from '../lib/menuPos.ts';
 import { contrast, normalizeQrDesign } from '../lib/qrDesign.ts';
 import { sanitizeSvg } from '../lib/svgSanitize.ts';
+import { batchesNeeded, planFor, recipeUnit, availableOf, taskTitleFor, checklistFor } from '../lib/productionPlan.ts';
 
 let failed = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -73,3 +74,32 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
 
 if (failed) { console.error(`\n${failed} test(ů) selhalo.`); process.exit(1); }
 console.log('\nVšechny testy prošly.');
+
+// --- Výroba vlastních produktů: dávky, suroviny, co chybí (lib/productionPlan) ---
+{
+  const row = (o: any) => ({
+    id: 1, name: 'X', category: 'Nápoje', categoryId: null, quantity: 0, minQuantity: 3, criticalQuantity: 1, maxQuantity: 10,
+    unit: 'l', packageSize: null, openAmount: null, contentUnit: null, madeInHouse: true, batchYield: 5, batchSteps: null,
+    productionLabel: null, packaging: null, status: 'low', ...o,
+  });
+  const lim = row({ id: 1, name: 'Limonáda', quantity: 1 });
+  eq('výroba: dávky do plného stavu (10−1)/5 → 2', batchesNeeded(lim), 2);
+  eq('výroba: bez max míří na 2×min', batchesNeeded(row({ id: 1, quantity: 0, maxQuantity: 0, minQuantity: 4, batchYield: 2 })), 4);
+  eq('výroba: aspoň jedna dávka', batchesNeeded(row({ id: 1, quantity: 9 })), 1);
+  eq('výroba: strop 10 dávek', batchesNeeded(row({ id: 1, quantity: 0, maxQuantity: 1000, batchYield: 1 })), 10);
+  const citron = row({ id: 2, name: 'Citron', unit: 'kg', quantity: 1, madeInHouse: false, batchYield: null });
+  const cukr = row({ id: 3, name: 'Cukr', unit: 'ks', quantity: 2, packageSize: 1000, openAmount: 500, contentUnit: 'g', madeInHouse: false, batchYield: null });
+  const stock = new Map<number, any>([[1, lim], [2, citron], [3, cukr]]);
+  eq('výroba: jednotka receptury u baleného = obsah', recipeUnit(cukr), 'g');
+  eq('výroba: dostupné u baleného = balení×velikost + načaté', availableOf(cukr), 2500);
+  const plan = planFor(lim, [{ ingredientId: 2, amount: 1 }, { ingredientId: 3, amount: 800 }], stock);
+  eq('výroba: potřeba × dávky', plan.lines.map(l => l.need), [2, 1600]);
+  eq('výroba: chybí jen citron (1 kg z 2)', plan.missing.map(l => `${l.name}:${l.missing}`), ['Citron:1']);
+  eq('výroba: výnos celkem', plan.yieldTotal, 10);
+  eq('výroba: neznámá surovina se přeskočí', planFor(lim, [{ ingredientId: 99, amount: 1 }], stock).lines.length, 0);
+  eq('výroba: název úkolu default', taskTitleFor(lim), 'Vyrobit Limonáda');
+  eq('výroba: název úkolu vlastní', taskTitleFor(row({ productionLabel: 'Uvař limonádu' })), 'Uvař limonádu');
+  eq('výroba: kroky postupu jako checklist', checklistFor(planFor(row({ batchSteps: '1. Nakrájet\n- Svařit\n\nStočit' }), [], stock)).map(c => c.text), ['Nakrájet', 'Svařit', 'Stočit']);
+  // toLocaleString('cs-CZ') odděluje tisíce nezlomitelnou mezerou — pro srovnání ji narovnáme.
+  eq('výroba: bez postupu checklist ze surovin', checklistFor(plan).map(c => c.text.replace(/\s/g, ' ')), ['Odměřit Citron 2 kg', 'Odměřit Cukr 1 600 g']);
+}

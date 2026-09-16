@@ -170,7 +170,7 @@ export default function PlanningBoard() {
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.id); }}
               onDragLeave={() => setDragOverCol(c => (c === col.id ? null : c))}
               onDrop={() => handleDrop(col.id)}
-              className={`glass rounded-3xl p-4 flex flex-col gap-3 transition-all ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.04]' : ''}`}
+              className={`well rounded-3xl p-3 flex flex-col gap-3 transition-all ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.06]' : ''}`}
             >
               <div className="flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">
@@ -187,7 +187,7 @@ export default function PlanningBoard() {
                     draggable
                     onDragStart={() => setDragId(card.id)}
                     onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
-                    className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-4 hover:bg-black/[0.06] transition-all duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''} ${menuId === card.id ? 'z-30' : ''}`}
+                    className={`relative card p-4 hover:shadow-[var(--shadow-float)] transition-shadow duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''} ${menuId === card.id ? 'z-30' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -257,14 +257,14 @@ export default function PlanningBoard() {
                     value={newCard.title}
                     onChange={e => setNewCard(prev => prev ? { ...prev, title: e.target.value } : null)}
                     placeholder="Název karty..."
-                    className="w-full text-sm rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all"
+                    className="w-full text-sm field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all"
                   />
                   <textarea
                     value={newCard.description}
                     onChange={e => setNewCard(prev => prev ? { ...prev, description: e.target.value } : null)}
                     placeholder="Popis (volitelné)"
                     rows={2}
-                    className="w-full text-xs rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all resize-none"
+                    className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all resize-none"
                   />
                   <div className="flex gap-2">
                     <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
@@ -295,10 +295,10 @@ export default function PlanningBoard() {
             <div className="space-y-3">
               <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
                 placeholder="Název" maxLength={200}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
               <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
                 placeholder="Popis (nepovinný)" rows={3}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setEditCard(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>

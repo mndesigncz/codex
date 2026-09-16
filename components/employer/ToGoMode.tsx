@@ -11,6 +11,7 @@ import { Avatar } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { useTheme } from '../ThemeProvider';
 import ReceiptsPanel from './ReceiptsPanel';
+import ProductionBoard from '../inventory/ProductionBoard';
 
 function pragueToday(offset = 0): string {
   return new Date(Date.now() + offset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
@@ -52,8 +53,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       setRoster(Array.isArray(d.roster) ? d.roster : []);
     }).catch(() => {});
     fetch('/api/inventory').then(r => r.json()).then(d => {
-      const items = Array.isArray(d.items) ? d.items : [];
-      setLowItems(items.filter((i: any) => i.status === 'low' || i.status === 'critical'));
+      // Endpoint vrací holé pole; dřív se četlo d.items a dlaždice byla vždy prázdná.
+      const items = Array.isArray(d) ? d : Array.isArray(d?.items) ? d.items : [];
+      setLowItems(items.filter((i: any) => !i.madeInHouse && (i.status === 'low' || i.status === 'critical')));
     }).catch(() => {});
   }, []);
 
@@ -98,22 +100,22 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-[#F1F4EC] pb-16"
+    <div className="min-h-[100dvh] bg-[var(--bg)] pb-16"
       style={{ backgroundImage: 'radial-gradient(1100px 500px at 85% -10%, rgba(200,245,66,0.22), transparent 60%), radial-gradient(900px 500px at -15% 25%, rgba(143,184,17,0.10), transparent 55%)' }}>
 
       {/* Floating glass header */}
       <div className="sticky top-0 z-20 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2">
-        <div className="max-w-lg mx-auto glass-strong rounded-[24px] px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
+        <div className="max-w-lg mx-auto glass-strong rounded-3xl px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
           <LogoMark size={34} />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">TO GO</p>
+            <p className="t-label text-[#5B7A08] leading-none">TO GO</p>
             <h1 className="text-[15px] font-bold tracking-tight text-[#16181A] truncate mt-0.5">
               {greeting}{firstName ? `, ${firstName}` : ''}
             </h1>
           </div>
           <button onClick={onExit}
-            className="shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-2 text-[11px] font-extrabold tracking-wide hover:brightness-105 transition active:scale-95 shadow-[0_4px_14px_rgba(143,184,17,0.35)]">
-            ADMINISTRACE →
+            className="btn btn-accent btn-sm shrink-0">
+            Administrace →
           </button>
         </div>
       </div>
@@ -121,13 +123,13 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       <div className="max-w-lg mx-auto px-4 pt-3 space-y-4">
 
         {/* Dark hero — today's number, big and calm */}
-        <div className="relative overflow-hidden rounded-[30px] bg-[#16181A] text-white p-5 shadow-[0_18px_50px_rgba(15,20,8,0.35)]">
+        <div className="relative overflow-hidden rounded-3xl bg-[#16181A] text-white p-5 shadow-[0_18px_50px_rgba(15,20,8,0.35)]">
           <div className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-10 h-48 w-48 rounded-full bg-[#8FB811]/15 blur-3xl" />
           <div className="relative">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-white/45 font-bold">Dnešní tržba</p>
+                <p className="t-label text-white/45">Dnešní tržba</p>
                 <p className="mt-1.5 text-[40px] leading-none font-bold tabular-nums tracking-tight">
                   {money(todayTotal)}
                 </p>
@@ -173,9 +175,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         </div>
 
         {/* Crew strip — who is here now / planned today */}
-        <div className="glass-card rounded-[26px] p-4">
+        <div className="glass-card rounded-3xl p-4">
           <div className="flex items-center justify-between mb-2.5">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-black/45 font-bold">Dnes v podniku</p>
+            <p className="t-label text-black/45">Dnes v podniku</p>
             {onShift.length > 0 && (
               <span className="rounded-full bg-[#C8F542]/25 text-[#5B7A08] px-2 py-0.5 text-[11px] font-extrabold">
                 {onShift.length} na směně
@@ -214,7 +216,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         <div className="grid grid-cols-3 gap-2.5 stagger">
           {tiles.map(t => (
             <button key={t.view} onClick={() => onOpenView(t.view)}
-              className="relative glass-card rounded-[22px] px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
+              className="relative glass-card rounded-3xl px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
               {t.badge != null && (
                 <span className={`absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-extrabold flex items-center justify-center ${t.badgeTone}`}>
                   {t.badge}
@@ -229,9 +231,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         {/* Low stock — the three most urgent, actionable */}
         {lowItems.length > 0 && (
           <button onClick={() => onOpenView('inventory')}
-            className="w-full glass-card rounded-[26px] p-4 text-left active:scale-[0.99] transition">
+            className="w-full glass-card rounded-3xl p-4 text-left active:scale-[0.99] transition">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-amber-700 font-bold flex items-center gap-1.5">
+              <p className="t-label text-amber-700 flex items-center gap-1.5">
                 <Icon name="box" size={14} strokeWidth={2} /> Dochází ve skladu
               </p>
               <span className="text-[11px] font-bold text-black/35">{lowItems.length} celkem →</span>
@@ -247,6 +249,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             </div>
           </button>
         )}
+
+        {/* K výrobě — z docházejícího skladu rovnou úkol s recepturou. */}
+        <ProductionBoard compact onOpenTasks={() => onOpenView('tasks')} />
 
         {/* Receipts — the TO GO superpower */}
         <ReceiptsPanel compact />

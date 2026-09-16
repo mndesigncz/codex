@@ -25,11 +25,12 @@ interface Task {
   completedBy?: number | null;
   completedByName?: string | null;
   completedByAvatar?: string | null;
+  source?: string | null;
 }
 interface Member { id: number; name: string; role: string; avatar?: string }
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 const PRIORITIES = [
   { value: 'low', label: 'Nízká', dot: 'bg-[#C8F542]' },
@@ -224,8 +225,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     // Future occurrences aren't active yet → show them greyed until their day comes.
     const inactive = !done && !!t.dueDate && t.dueDate > today;
     return (
-      <div key={t.id} className={`glass-card ${compact ? 'p-3' : 'p-4'} ${inactive ? 'opacity-60' : ''}`}>
-        <div className="flex items-start gap-2.5">
+      <div key={t.id} className={`${compact ? 'card p-3' : 'list-row items-start'} ${inactive ? 'opacity-60' : ''}`}>
+        <div className="flex items-start gap-2.5 w-full min-w-0">
           <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
             className={`tap-target mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
             {done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
@@ -241,6 +242,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                 {!compact && t.dueDate ? ` · ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}` : ''}
                 {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
               </span>
+              {t.source === 'production' && (
+                <span className="chip chip-sm chip-info shrink-0" title="Vzniká sám, když dochází vlastní výroba">Výroba</span>
+              )}
               {recurrenceLabel(t.recurrence) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>
               )}
@@ -266,9 +270,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const section = (title: string, list: Task[], tone = 'text-black/45') =>
     list.length > 0 && (
-      <div className="space-y-2.5">
-        <h3 className={`text-xs font-bold uppercase tracking-[0.13em] ${tone}`}>{title} ({list.length})</h3>
-        <div className="space-y-2.5">{list.map(t => renderCard(t))}</div>
+      <div className="space-y-2">
+        <h3 className={`t-label ${tone}`}>{title} ({list.length})</h3>
+        <div className="card"><div className="list">{list.map(t => renderCard(t))}</div></div>
       </div>
     );
 
@@ -291,18 +295,18 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
       {showForm && (
         <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">
-          <h3 className="font-bold tracking-tight text-[#16181A]">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
+          <h3 className="t-card">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název úkolu</label>
+            <label className="field-label">Název úkolu</label>
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Např. Umýt okna" className={inputClass} autoFocus />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Popis (nepovinné)</label>
+            <label className="field-label">Popis (nepovinné)</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className={`${inputClass} resize-none`} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kdo úkol udělá</label>
+              <label className="field-label">Kdo úkol udělá</label>
               <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
                 <option value="">Kdokoliv (podle dne)</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
@@ -314,7 +318,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </p>
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">
+              <label className="field-label">
                 {editingSeries ? 'Termín (od kdy)' : `Termín ${form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}`}
               </label>
               <input type="date" aria-label="Termín úkolu" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
@@ -326,7 +330,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             </p>
           )}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Priorita</label>
+            <label className="field-label">Priorita</label>
             <div className="flex flex-wrap gap-2">
               {PRIORITIES.map(p => (
                 <button key={p.value} type="button" onClick={() => setForm(f => ({ ...f, priority: p.value }))}
@@ -340,7 +344,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Opakování</label>
+                  <label className="field-label">Opakování</label>
                   <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
                     className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }}>
                     {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -350,7 +354,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kontrolní seznam (nepovinné)</label>
+                <label className="field-label">Kontrolní seznam (nepovinné)</label>
                 <div className="space-y-2">
                   {form.checklist.map((it, i) => (
                     <div key={i} className="space-y-2">

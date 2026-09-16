@@ -250,7 +250,7 @@ export default function FloatingRunner() {
                 <button
                   onClick={doComplete}
                   disabled={completing}
-                  className="flex-1 rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap disabled:opacity-60"
+                  className="flex-1 btn btn-primary hover:brightness-110 transition whitespace-nowrap disabled:opacity-60"
                 >
                   {completing ? 'Ukládám…' : 'Přesto dokončit'}
                 </button>

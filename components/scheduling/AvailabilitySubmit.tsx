@@ -245,7 +245,7 @@ export default function AvailabilitySubmit({ user }: Props) {
           {/* Calendar */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-bold text-[#16181A] cz-sentence flex items-center gap-2">
+              <h2 className="t-section cz-sentence flex items-center gap-2">
                 <Icon name="calendar" size={20} />
                 {monthLabel(month)}
               </h2>
@@ -329,7 +329,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                 value={maxShifts}
                 onChange={(e) => setMaxShifts(e.target.value)}
                 placeholder="např. 12"
-                className="w-40 max-w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
+                className="w-40 max-w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>
 
@@ -342,7 +342,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
                 placeholder="Např. preferuji víkendy, ve středu mám školu…"
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors resize-none"
+                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors resize-none"
               />
             </div>
           </div>

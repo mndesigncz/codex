@@ -316,7 +316,7 @@ function ChatWindow({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Zpráva…"
-          className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+          className="flex-1 min-w-0 field border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
         <button
           type="submit"

@@ -45,11 +45,11 @@ export default function ShiftSwapApprovals() {
     <div className="rounded-3xl bg-[#0A84FF]/[0.06] border border-[#0A84FF]/20 p-5 space-y-3">
       <div className="flex items-center gap-2">
         <Icon name="swap" size={18} className="text-[#0A6FE0]" />
-        <h3 className="font-bold text-[#16181A]">Výměny směn ke schválení</h3>
+        <h3 className="t-card">Výměny směn ke schválení</h3>
         <span className="rounded-full bg-[#0A84FF]/15 text-[#0A6FE0] px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
       </div>
       {pending.map(o => (
-        <div key={o.id} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 space-y-3">
+        <div key={o.id} className="well bg-white p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-[#16181A]">{o.offeredByName ?? 'Kolega'}</span>
             <Icon name="swap" size={15} className="text-black/35" />

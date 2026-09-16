@@ -81,7 +81,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
               <div className="flex items-center gap-3.5 px-5 pt-5 pb-3">
                 <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.employee.avatar || '👤'}</span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{p.employee.name}</h2>
+                  <h2 className="t-section truncate">{p.employee.name}</h2>
                   <p className="text-sm text-black/50 truncate">
                     {p.employee.jobTitle || 'Zaměstnanec'}
                     {p.employee.hourlyRate ? ` · ${p.employee.hourlyRate} Kč/h` : ''}
@@ -109,10 +109,10 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
               {tab === 'overview' && (
                 <>
                   {/* Level + progress */}
-                  <div className="rounded-2xl bg-black/[0.03] border border-black/[0.05] p-4">
+                  <div className="well border border-black/[0.05] p-4">
                     <div className="flex items-end justify-between gap-2 flex-wrap">
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 font-semibold">Úroveň</p>
+                        <p className="t-label text-black/40">Úroveň</p>
                         <p className="text-2xl font-bold tracking-tight text-[#16181A]">{p.standing.levelName}</p>
                       </div>
                       {p.standing.next && (
@@ -131,17 +131,17 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 
                   {/* This month */}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Tento měsíc</h3>
+                    <h3 className="t-label mb-2">Tento měsíc</h3>
                     <div className="grid grid-cols-3 gap-2.5">
-                      <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                      <div className="well p-3 text-center">
                         <p className="text-base sm:text-xl font-bold tracking-tight text-[#16181A] tabular-nums whitespace-nowrap">{hours}<span className="text-xs font-semibold text-black/40"> h </span>{minutes > 0 && <>{minutes}<span className="text-xs font-semibold text-black/40"> m</span></>}</p>
                         <p className="text-[11px] text-black/45 mt-0.5">odpracováno</p>
                       </div>
-                      <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                      <div className="well p-3 text-center">
                         <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.shifts}</p>
                         <p className="text-[11px] text-black/45 mt-0.5">směn</p>
                       </div>
-                      <div className="rounded-2xl bg-black/[0.03] p-3 text-center">
+                      <div className="well p-3 text-center">
                         <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.closings}</p>
                         <p className="text-[11px] text-black/45 mt-0.5">uzávěrek</p>
                       </div>
@@ -160,7 +160,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 
                   {/* Points breakdown */}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Odkud má body</h3>
+                    <h3 className="t-label mb-2">Odkud má body</h3>
                     <div className="flex flex-wrap gap-1.5">
                       {([
                         ['Úkoly', p.breakdown.tasks], ['Postupy', p.breakdown.procedures], ['Uzávěrky', p.breakdown.closings],
@@ -201,8 +201,8 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   {/* Contact */}
                   {(p.employee.email || p.employee.phone) && (
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Kontakt</h3>
-                      <div className="rounded-2xl bg-black/[0.03] p-3.5 space-y-1 text-sm">
+                      <h3 className="t-label mb-2">Kontakt</h3>
+                      <div className="well p-3.5 space-y-1 text-sm">
                         {p.employee.email && <p className="text-[#16181A] truncate"><Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.employee.email}</p>}
                         {p.employee.phone && <p className="text-[#16181A]">📞 {p.employee.phone}</p>}
                       </div>
@@ -227,7 +227,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     </div>
                   )}
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-black/40 mb-2">Odpracované ({p.shifts.recent.length})</h3>
+                    <h3 className="t-label mb-2">Odpracované ({p.shifts.recent.length})</h3>
                     {p.shifts.recent.length === 0 ? (
                       <EmptyState illustration="smeny" title="Zatím žádná odpracovaná směna" compact />
                     ) : (
@@ -246,7 +246,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                               <span className="text-[11px] font-medium text-orange-600 bg-orange-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
                             )}
                             <button onClick={() => setRateDate(sh.date)}
-                              className="rounded-full bg-[#16181A] text-white px-3 py-1.5 text-[11px] font-semibold hover:brightness-125 transition shrink-0">
+                              className="btn btn-primary btn-sm transition shrink-0">
                               {sh.reviewed ? 'Upravit' : 'Ohodnotit'}
                             </button>
                           </div>

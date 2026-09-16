@@ -15,7 +15,7 @@ import ItemInlineEdit from './ItemInlineEdit';
 import NewIngredientInline from './NewIngredientInline';
 
 const inputCls =
-  'rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
+  'field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
 
 type Ingredient = { itemId: string; amount: string; unit: string };
 type Draft = { productId: string; productName: string; ingredients: Ingredient[]; existing: boolean };
@@ -278,7 +278,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
           </p>
         </div>
         <button onClick={sync} disabled={syncing}
-          className="rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-bold hover:bg-black disabled:opacity-50 transition inline-flex items-center gap-2">
+          className="btn btn-primary disabled:opacity-50 transition inline-flex items-center gap-2">
           <Icon name="swap" size={16} className="i-lead" /> {syncing ? 'Odepisuji…' : 'Odepsat prodeje'}
         </button>
       </div>
@@ -483,7 +483,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
         <button onClick={() => setDraft(null)}
           className="rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black transition">← Zpět</button>
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{draft.productName}</h2>
+          <h2 className="t-section truncate">{draft.productName}</h2>
           <p className="text-xs text-black/45">
             {ready === 0 ? 'Zatím bez surovin' : `${ready} ${ready === 1 ? 'surovina' : ready < 5 ? 'suroviny' : 'surovin'} v receptuře`}
             {menuPrice != null && <span> · v kase za {money(menuPrice)}</span>}
@@ -503,7 +503,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
         <label className="flex flex-wrap items-center gap-2 text-xs text-black/50">
           <span className="font-semibold">Převzít z jiné položky:</span>
           <select value="" onChange={e => copyFrom(e.target.value)}
-            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none max-w-[16rem]">
+            className="field border border-black/[0.08] px-3 py-2 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none max-w-[16rem]">
             <option value="">— vyber recepturu —</option>
             {copyable.map(r => (
               <option key={r.productId} value={r.productId}>
@@ -522,7 +522,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
           const conv = opts.find(u => u.label === ing.unit)?.toBase ?? 1;
           const y = item ? yieldOf(item, num(ing.amount) * conv) : null;
           return (
-            <div key={idx} className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3 space-y-2">
+            <div key={idx} className="well border border-black/[0.06] p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2 justify-start">
                 <select value={ing.itemId}
                   onChange={e => {
@@ -654,7 +654,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
         </div>
 
         {menuPrice != null && (
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 space-y-1">
+          <div className="well border border-black/[0.06] px-4 py-3 space-y-1">
             <div className="flex items-baseline justify-between gap-2 text-sm">
               <span className="text-black/50">Cena v kase</span>
               <span className="font-semibold tabular text-[#16181A]">{money(menuPrice)}</span>
@@ -679,7 +679,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
 
         <div className="space-y-2">
           <button onClick={save} disabled={saving}
-            className="w-full rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+            className="w-full btn btn-primary disabled:opacity-50 transition">
             {saving ? 'Ukládám…' : 'Uložit recepturu'}
           </button>
           {draft.existing && (
@@ -694,7 +694,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
 
         {guide && (
           <a href={`/employer/overview?view=guides&guide=${guide.id}`}
-            className="flex items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3.5 py-2.5 text-sm text-[#16181A] hover:bg-black/[0.05] transition">
+            className="flex items-center gap-2 well border border-black/[0.06] px-3.5 py-2.5 text-sm text-[#16181A] hover:bg-black/[0.05] transition">
             <Icon name="book" size={15} className="shrink-0 text-black/40" />
             <span className="min-w-0 truncate">Návod: {guide.title}</span>
           </a>

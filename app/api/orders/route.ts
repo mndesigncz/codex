@@ -3,6 +3,7 @@ import { sendOrderEmail } from '@/lib/email';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { ensureProductionTasks } from '@/lib/production';
 
 export const dynamic = 'force-dynamic';
 
@@ -154,6 +155,8 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // Příjem surovin může odblokovat výrobu (vlajky v nákupu zmizí, úkol se přepíše).
+  if (restocked > 0 && c.teamId) { try { await ensureProductionTasks(c.teamId, c.meId); } catch { /* před migrací */ } }
   return NextResponse.json({ ok: true, order: shape(row), restocked });
 }
 

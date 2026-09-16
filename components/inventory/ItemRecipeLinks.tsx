@@ -111,7 +111,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
                   const v = dec(e.target.value);
                   if (v > 0 && v !== l.amount) send(l.productId, l.productName, v);
                 }}
-                className="tap-target-sm w-20 shrink-0 rounded-xl bg-black/[0.04] border border-black/[0.07] px-2.5 py-1.5 text-xs text-right tabular-nums text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none"
+                className="tap-target-sm w-20 shrink-0 field rounded-xl border border-black/[0.07] px-2.5 py-1.5 text-xs text-right tabular-nums text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none"
               />
               <span className="shrink-0 text-[11px] text-black/40 w-8">{unitLabel}</span>
               <button type="button" onClick={() => send(l.productId, l.productName, 0)}
@@ -141,7 +141,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={confirmAdd} disabled={!!busy}
-                  className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black disabled:opacity-50 transition">
+                  className="btn btn-primary btn-sm disabled:opacity-50 transition">
                   {busy ? 'Ukládám…' : 'Přidat'}
                 </button>
                 <button type="button" onClick={() => { setPicked(null); setAmount(''); }}

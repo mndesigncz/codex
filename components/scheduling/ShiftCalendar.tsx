@@ -144,7 +144,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (
-                      <PersonLink key={p.id} id={p.id} className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#16181A] text-white px-2.5 py-1 text-xs font-medium">
+                      <PersonLink key={p.id} id={p.id} className="tap-target-sm inline-flex items-center gap-1 btn btn-primary btn-sm">
                         <span>{p.avatar ?? '👤'}</span> {p.name}
                       </PersonLink>
                     ))}

@@ -58,7 +58,7 @@ export default function Landing() {
               které rozumí celý tým od první směny.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Link href="/register" className="pressable w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-7 py-3.5 text-sm font-semibold hover:brightness-105 active:scale-[0.97] shadow-[0_8px_24px_rgba(200,245,66,0.35)] inline-flex items-center justify-center gap-2">
+              <Link href="/register" className="pressable w-full sm:w-auto btn btn-accent btn-lg hover:brightness-105 active:scale-[0.97] shadow-[0_8px_24px_rgba(200,245,66,0.35)] inline-flex items-center justify-center gap-2">
                 Vyzkoušet {TRIAL_DAYS} dní zdarma <Icon name="chevron" size={15} className="-rotate-90" />
               </Link>
               <a href="#cenik" className="pressable w-full sm:w-auto rounded-full glass border border-black/[0.08] px-7 py-3.5 text-sm font-semibold text-black/70 hover:text-black active:scale-[0.97] inline-flex items-center justify-center">
@@ -69,7 +69,7 @@ export default function Landing() {
           </div>
 
           <figure className="relative lg:-mr-[14vw] xl:-mr-[10vw] rise-in" style={{ animationDelay: '120ms' }}>
-            <div className="relative overflow-hidden rounded-[32px] border border-black/[0.06] shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
+            <div className="relative overflow-hidden rounded-3xl border border-black/[0.06] shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
               <img
                 src="/brand/hero-tea-bar.webp"
                 srcSet="/brand/hero-tea-bar-sm.webp 800w, /brand/hero-tea-bar.webp 1600w"
@@ -81,7 +81,7 @@ export default function Landing() {
             </div>
             {/* Plovoucí lístek z aplikace přes roh fotky — jediný kousek UI na
                 celé stránce, a je to to, co ráno otevřete jako první. */}
-            <figcaption className="absolute -bottom-5 left-4 sm:left-8 lg:-left-10 glass-strong rounded-[22px] px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)] rise-in" style={{ animationDelay: '320ms' }}>
+            <figcaption className="absolute -bottom-5 left-4 sm:left-8 lg:-left-10 glass-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)] rise-in" style={{ animationDelay: '320ms' }}>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
               <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
                 <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30 i-pulse" />Směna: Eva 8–16, Martin od 12</li>
@@ -126,7 +126,7 @@ export default function Landing() {
         </div>
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
           <div className="glass-card p-7 flex flex-col">
-            <h3 className="font-bold tracking-tight text-[#16181A]">Zdarma</h3>
+            <h3 className="t-card">Zdarma</h3>
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">0 Kč</p>
             <p className="text-xs text-black/40 mt-1">navždy</p>
             <p className="mt-4 text-sm text-black/55">Základ pro malý tým: směny, úkoly, chat, uzávěrky a sklad.</p>
@@ -136,11 +136,11 @@ export default function Landing() {
           </div>
           <div className="glass-card p-7 flex flex-col relative overflow-hidden border-2 !border-[#C8F542]/60">
             <span className="absolute top-4 right-4 rounded-full bg-[#C8F542] text-black text-[11px] font-bold uppercase tracking-wider px-2.5 py-1">Doporučeno</span>
-            <h3 className="font-bold tracking-tight text-[#16181A]">Pro</h3>
+            <h3 className="t-card">Pro</h3>
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">{PRO_PRICE.monthly} {PRO_PRICE.currency}</p>
             <p className="text-xs text-black/40 mt-1">{PRO_PRICE.per}</p>
             <p className="mt-4 text-sm text-black/55">Všechno bez limitů: neomezený tým, kiosk pro tablet, odměny, exporty a sdílené menu ve vašich barvách.</p>
-            <Link href="/register" className="mt-6 rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-semibold hover:bg-black transition-colors text-center">
+            <Link href="/register" className="mt-6 btn btn-primary hover:bg-black transition-colors text-center">
               Vyzkoušet {TRIAL_DAYS} dní zdarma
             </Link>
           </div>

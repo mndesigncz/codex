@@ -226,13 +226,13 @@ export default function EmployerLayout({ user }: Props) {
     <ProfileLinkProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-[28px] text-[#16181A] flex-col transition-all duration-300 flex-shrink-0`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-all duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-3.5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
           <LogoMark size={40} />
           {sidebarOpen && (
             <div className="overflow-hidden">
               <p className="font-bold text-sm leading-tight tracking-tight">Managero</p>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-black/40 mt-0.5">Správa podniku</p>
+              <p className="t-label text-black/40 mt-0.5">Správa podniku</p>
             </div>
           )}
         </div>
@@ -327,7 +327,7 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Zkoušíte Pro — zbývá {czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.
           </button>
         )}
-        <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-[28px]' : 'overflow-y-auto scrollbar-thin'}`}>
+        <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-3xl' : 'overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? renderView() : (
             <div className="mx-auto w-full max-w-7xl">{renderView()}</div>
           )}
@@ -338,7 +338,7 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Mobile bottom dock */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-        <nav className="dock-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
+        <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
               className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
@@ -362,7 +362,7 @@ export default function EmployerLayout({ user }: Props) {
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setReceiptsOpen(false)}>
           <div ref={receiptsModal.ref} {...receiptsModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+              <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky
               </h3>
               <button aria-label="Zavřít" onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>

@@ -15,7 +15,7 @@ import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
 
 const inputClass =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
 
 type GuideCat = { id: number; name: string };
 
@@ -139,7 +139,7 @@ export default function ShareSettings() {
       {/* ---- New link ---- */}
       <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="send" size={17} className="text-[#5B7A08]" /> Nový odkaz pro zákazníky
           </h3>
           <p className="text-sm text-black/45 mt-0.5">
@@ -173,7 +173,7 @@ export default function ShareSettings() {
           </div>
         )}
         {kind === 'guides' && (
-          <p className="text-[12px] text-black/45 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
+          <p className="text-[12px] text-black/45 well rounded-xl border border-black/[0.06] px-3 py-2">
             Sdílí se jen názvy návodů seřazené podle kategorií — obsah návodu se ven nedostane.
           </p>
         )}
@@ -198,7 +198,7 @@ export default function ShareSettings() {
       {/* ---- Existing links ---- */}
       {links.length > 0 && (
         <div className="glass-card p-6 space-y-4">
-          <h3 className="font-bold tracking-tight text-[#16181A]">Sdílené odkazy</h3>
+          <h3 className="t-card">Sdílené odkazy</h3>
           <div className="divide-y divide-black/[0.06]">
             {links.map(l => (
               <LinkRow key={l.id} link={l} cats={cats} guideCats={guideCats}
@@ -222,7 +222,7 @@ export default function ShareSettings() {
       ) : (
       <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="font-bold tracking-tight text-[#16181A] flex items-center gap-2">
+          <h3 className="t-card flex items-center gap-2">
             <Icon name="sun" size={17} className="text-[#5B7A08]" /> Vzhled sdílených stránek
           </h3>
           <p className="text-sm text-black/45 mt-0.5">Platí pro všechny odkazy najednou.</p>
@@ -294,7 +294,7 @@ export default function ShareSettings() {
               <img src={theme.logoUrl} alt="" style={{ maxHeight: 36, margin: '0 auto 10px', objectFit: 'contain' }} />
             )}
             {theme.businessName && (
-              <p className="text-[11px] uppercase tracking-[0.16em] opacity-60">{theme.businessName}</p>
+              <p className="t-label opacity-60">{theme.businessName}</p>
             )}
             <p style={{ color: theme.accent }} className="text-xl font-bold tracking-tight mt-1">Naše nabídka</p>
             <p className="text-xs opacity-60 mt-2">Ukázka toho, jak stránka vypadá.</p>
@@ -310,7 +310,7 @@ export default function ShareSettings() {
             {qrData ? (
               <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
             ) : (
-              <div className="mx-auto w-64 h-64 rounded-2xl bg-black/[0.04] animate-pulse" />
+              <div className="mx-auto w-64 h-64 well animate-pulse" />
             )}
             <div className="flex gap-2 mt-5">
               <button onClick={() => setQrFor(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
@@ -381,7 +381,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
           ⬚
         </button>
         <button onClick={onCopy} title="Zkopírovat odkaz"
-          className="tap-target-sm shrink-0 rounded-full bg-[#C8F542] text-black px-3.5 py-1.5 text-xs font-bold hover:brightness-110">
+          className="tap-target-sm shrink-0 btn btn-accent btn-sm">
           Kopírovat
         </button>
         <a href={url} target="_blank" rel="noopener" title="Otevřít stránku"
@@ -397,7 +397,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
       </div>
 
       {open && (
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+        <div className="well border border-black/[0.06] p-3.5 space-y-3">
           <p className="text-[11px] text-black/45 break-all font-mono">{url}</p>
 
           <label className="flex items-center gap-2.5 cursor-pointer">

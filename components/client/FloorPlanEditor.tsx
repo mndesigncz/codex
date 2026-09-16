@@ -182,7 +182,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
     setBusy(false);
   };
 
-  if (!plan) return <div className="glass-card p-5"><div className="h-64 rounded-2xl bg-black/[0.04] animate-pulse" /></div>;
+  if (!plan) return <div className="glass-card p-5"><div className="h-64 well animate-pulse" /></div>;
 
   const selShape: any = sel?.kind === 'shape' ? plan.shapes.find(s => s.id === sel.id) : null;
   const selTable = sel?.kind === 'table' ? tables.find(t => t.id === sel.id) : null;
@@ -192,7 +192,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
     <section className="glass-card p-4 sm:p-5 space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-base font-bold tracking-tight flex items-center gap-2.5">
+          <h2 className="t-section flex items-center gap-2.5">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name="location" size={15} /></span>
             Plánek podniku
           </h2>

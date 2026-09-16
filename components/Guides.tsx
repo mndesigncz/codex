@@ -327,7 +327,7 @@ export default function Guides({ user }: { user: User }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Hledat návody…"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="w-full field border border-black/[0.08] !pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
           </div>
 
@@ -348,7 +348,7 @@ export default function Guides({ user }: { user: User }) {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
               {filtered.map((g) => {
                 const cat = g.categoryId != null ? catById.get(g.categoryId) : undefined;
                 return (
@@ -358,7 +358,7 @@ export default function Guides({ user }: { user: User }) {
                     className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition-all duration-300 flex flex-col group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0 flex-1 break-words">
+                      <h3 className="t-card min-w-0 flex-1 break-words">
                         {g.title}
                         {g.approved === false && (
                           <span className="ml-2 align-middle inline-flex items-center gap-1.5">
@@ -373,7 +373,7 @@ export default function Guides({ user }: { user: User }) {
                                   }).catch(() => null);
                                   if (res?.ok) await loadGuides();
                                 }}
-                                className="rounded-full bg-[#16181A] text-white px-2.5 py-0.5 text-[11px] font-semibold hover:bg-black transition whitespace-nowrap">
+                                className="btn btn-primary btn-sm transition whitespace-nowrap">
                                 Schválit
                               </button>
                             )}
@@ -490,7 +490,7 @@ export default function Guides({ user }: { user: User }) {
                             }).catch(() => null);
                             if (res?.ok) await loadGuides();
                           }}
-                          className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-bold hover:bg-black transition">
+                          className="btn btn-primary btn-sm transition">
                           <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Potvrzuji přečtení
                         </button>
                       )}
@@ -798,7 +798,7 @@ function GuideEditor({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
+          <h2 className="t-section min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
@@ -806,22 +806,22 @@ function GuideEditor({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název</label>
+            <label className="field-label">Název</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Např. Jak připravit matcha latte"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
+            <label className="field-label">Kategorie</label>
             <select
               aria-label="Kategorie"
               value={categoryId ?? ''}
               onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all appearance-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all appearance-none"
             >
               <option value="" className="bg-neutral-900">
                 Bez kategorie
@@ -835,13 +835,13 @@ function GuideEditor({
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Obsah</label>
+            <label className="field-label">Obsah</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={12}
               placeholder={'Sem napište návod…\n\nTip: řádky **tučně** a odrážky pomocí „- “.'}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all leading-relaxed resize-y"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all leading-relaxed resize-y"
             />
             <p className="text-xs text-black/30 mt-2">Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.</p>
           </div>
@@ -897,7 +897,7 @@ function GuideEditor({
                         }
                       }}
                       placeholder={`Krok ${i + 1}`}
-                      className="flex-1 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm min-w-0"
+                      className="flex-1 field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm min-w-0"
                     />
                     <button
                       type="button"
@@ -1037,7 +1037,7 @@ function ManageCategories({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 truncate">Kategorie</h2>
+          <h2 className="t-section min-w-0 truncate">Kategorie</h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
@@ -1046,7 +1046,7 @@ function ManageCategories({
         <div className="space-y-2 mb-6">
           {items.length === 0 && <p className="text-black/45 text-sm">Zatím žádné kategorie.</p>}
           {items.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.08] px-3 py-2">
+            <div key={c.id} className="flex items-center gap-2 well border border-black/[0.08] px-3 py-2">
               <span className="text-black/55">
                 <Icon name={c.icon} size={18} />
               </span>
@@ -1070,7 +1070,7 @@ function ManageCategories({
         </div>
 
         <div className="border-t border-black/[0.08] pt-5">
-          <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Nová kategorie</label>
+          <label className="field-label">Nová kategorie</label>
           <div className="flex gap-2 mb-3 flex-wrap">
             {CATEGORY_ICONS.map((ic) => (
               <button
@@ -1090,7 +1090,7 @@ function ManageCategories({
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Název kategorie"
-              className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
             <button
               onClick={add}

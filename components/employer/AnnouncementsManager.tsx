@@ -100,7 +100,7 @@ export default function AnnouncementsManager() {
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="min-w-0">
-        <h2 className="font-bold tracking-tight text-[#16181A]"><Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nástěnka</h2>
+        <h2 className="t-section"><Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nástěnka</h2>
         <p className="text-sm text-black/45">
           Připnutá oznámení uvidí celý tým a přijde jim notifikace.
         </p>
@@ -113,7 +113,7 @@ export default function AnnouncementsManager() {
           maxLength={1000}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Např. V pátek zavíráme dřív…"
-          className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none"
+          className="w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none"
         />
         <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60">
           <input type="checkbox" checked={alsoChat} onChange={e => setAlsoChat(e.target.checked)}
@@ -178,7 +178,7 @@ export default function AnnouncementsManager() {
           <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit oznámení</h3>
             <textarea rows={4} value={editText} maxLength={1000} onChange={(e) => setEditText(e.target.value)}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none" />
+              className="w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             <div className="flex gap-2 mt-4">
               <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
               <button onClick={async () => { if (await patch(editing.id, { content: editText.trim() })) setEditing(null); }}

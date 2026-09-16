@@ -302,7 +302,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
               </p>
               <p className="text-sm text-black/50 mt-0.5 truncate">Stránka pro zákazníky — otoč tablet a ukaž, co máme.</p>
             </div>
-            <span className="shrink-0 rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
+            <span className="shrink-0 btn btn-primary whitespace-nowrap">Otevřít →</span>
           </div>
         </a>
       )}

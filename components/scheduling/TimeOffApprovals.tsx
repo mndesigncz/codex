@@ -119,7 +119,7 @@ export default function TimeOffApprovals() {
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="font-bold tracking-tight text-[#16181A]"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o volno</h2>
+        <h2 className="t-section"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o volno</h2>
         {pending.length > 0 && (
           <span className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-0.5 text-xs font-semibold tabular-nums">
             {pending.length}
@@ -138,7 +138,7 @@ export default function TimeOffApprovals() {
               {pending.map((r) => (
                 <li
                   key={r.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-black/[0.03] px-4 py-3"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 well px-4 py-3"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="h-9 w-9 shrink-0 rounded-full bg-[#C8F542]/25 flex items-center justify-center text-base">

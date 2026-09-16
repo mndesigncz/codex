@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import { Button, PageHeader, Segmented } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -321,39 +322,26 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Header + period selector */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
-            {PERIODS.map(p => (
-              <button key={p} onClick={() => setDays(p)} aria-pressed={days === p}
-                className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${days === p ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-                {p} dní
-              </button>
-            ))}
-          </div>
-          <button onClick={() => { setAddOpen(true); setAddErr(''); }}
-            className="rounded-full bg-[#C8F542] on-accent px-4 py-2 text-sm font-semibold hover:brightness-105 transition whitespace-nowrap">
-            + Přidat záznam
-          </button>
-          {entries.length > 0 && (
-            <button onClick={exportCsv}
-              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
-              Export CSV ↓
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Docházka"
+        subtitle="Kdo je na směně, odpracované hodiny a mzdy za období."
+        secondary={<Segmented size="sm" ariaLabel="Období" value={String(days)} onChange={v => setDays(Number(v) as typeof PERIODS[number])}
+          options={PERIODS.map(p => ({ id: String(p), label: `${p} dní` }))} />}
+        primary={
+          <>
+            {entries.length > 0 && (
+              <Button variant="secondary" icon="download" onClick={exportCsv}>Export CSV</Button>
+            )}
+            <Button variant="accent" icon="plus" onClick={() => { setAddOpen(true); setAddErr(''); }}>Přidat záznam</Button>
+          </>
+        }
+      />
 
       {/* Právě na směně */}
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="users" size={18} className="text-[#5B7A08]" />
-          <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Právě na směně</h3>
+          <h3 className="t-label">Právě na směně</h3>
         </div>
         {onShift.length === 0 ? (
           <p className="text-sm text-black/40">Nikdo právě není na směně.</p>
@@ -396,7 +384,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Mzdové náklady */}
           {hasRates && (
             <div className="space-y-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Mzdy</h3>
+              <h2 className="t-section">Mzdy</h2>
               <div className="grid grid-cols-2 gap-4 max-w-md">
                 <div className="glass-card p-5 min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
@@ -433,7 +421,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Souhrn hodin */}
           {summary.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Souhrn hodin</h3>
+              <h2 className="t-section">Souhrn hodin</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {summary.map(s => {
                   const rate = rateById.get(s.id);
@@ -464,7 +452,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
           {/* Seznam záznamů */}
           <div className="space-y-3">
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Záznamy ({entries.length})</h3>
+            <h2 className="t-section">Záznamy ({entries.length})</h2>
             {entries.length === 0 ? (
               <div className="glass-card p-8 text-center">
                 <p className="text-black/45">Za zvolené období nejsou žádné záznamy docházky.</p>
@@ -550,15 +538,15 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <div ref={addModal.ref} {...addModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Přidat záznam docházky</h3>
+              <h3 className="t-card">Přidat záznam docházky</h3>
             </div>
             <p className="text-sm text-black/50 mb-4">Když se někdo zapomněl odpíchnout úplně.</p>
-            {addErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{addErr}</div>}
+            {addErr && <div className="p-3 note note-danger text-sm mb-3">{addErr}</div>}
             <div className="space-y-3">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zaměstnanec</label>
                 <select aria-label="Zaměstnanec" value={addEmp} onChange={e => setAddEmp(e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
                   <option value="">— vyber —</option>
                   {roster.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
@@ -566,12 +554,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>
                 <input type="datetime-local" aria-label="Příchod" value={addIn} onChange={e => setAddIn(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odchod</label>
                 <input type="datetime-local" aria-label="Odchod" value={addOut} onChange={e => setAddOut(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
@@ -591,20 +579,20 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-1">
               <Icon name="clock" size={20} className="text-[#16181A]" />
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Upravit čas na směně</h3>
+              <h3 className="t-card">Upravit čas na směně</h3>
             </div>
             <p className="text-sm text-black/50 mb-4">{editEntry.employeeName}</p>
-            {editErr && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm mb-3">{editErr}</div>}
+            {editErr && <div className="p-3 note note-danger text-sm mb-3">{editErr}</div>}
             <div className="space-y-3">
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Příchod</label>
                 <input type="datetime-local" aria-label="Příchod" value={editIn} onChange={e => setEditIn(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odchod <span className="normal-case text-black/35">(prázdné = stále na směně)</span></label>
                 <input type="datetime-local" aria-label="Odchod" value={editOut} onChange={e => setEditOut(e.target.value)}
-                  className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+                  className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">

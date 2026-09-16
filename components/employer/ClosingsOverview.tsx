@@ -317,15 +317,15 @@ export default function ClosingsOverview() {
       <PageHeader title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
       {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
       {missing.length > 0 && (
-        <div className="rounded-3xl bg-red-500/[0.06] border border-red-500/25 p-5 space-y-3">
+        <div className="card card-danger p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden>🚨</span>
-            <h3 className="font-bold text-[#16181A]">Chybí uzávěrka</h3>
+            <h3 className="t-card">Chybí uzávěrka</h3>
             <span className="rounded-full bg-red-500/15 text-red-600 px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
           </div>
           <p className="text-xs text-black/50">Tyto dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí, když ji vyplní jeden za všechny.</p>
           {missing.map(m => (
-            <div key={m.date} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div key={m.date} className="well bg-white p-4 flex flex-wrap items-center gap-x-3 gap-y-2">
               <div className="min-w-0 flex-1">
                 <p className="font-bold tracking-tight text-[#16181A] cz-sentence">{fmtMissing(m.date)}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -348,16 +348,16 @@ export default function ClosingsOverview() {
 
       {/* Uzávěrky ke schválení */}
       {pending.length > 0 && (
-        <div className="rounded-3xl bg-orange-500/[0.08] border border-orange-500/25 p-5 space-y-3">
+        <div className="card card-wait p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
-            <h3 className="font-bold text-[#16181A]">Uzávěrky ke schválení</h3>
+            <h3 className="t-card">Uzávěrky ke schválení</h3>
             <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
           </div>
           {pending.map(c => {
             const d = cashDifference(c);
             return (
-              <div key={c.id} className="rounded-2xl bg-white/60 border border-black/[0.06] p-4 space-y-3">
+              <div key={c.id} className="well bg-white p-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
                   <PersonLink id={c.created_by} className="text-lg flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{c.author_avatar ?? '👤'}</PersonLink>
                   <div className="min-w-0">
@@ -464,7 +464,7 @@ export default function ClosingsOverview() {
       {analyticsOpen && (laborCost > 0 || purchases > 0) && pro && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
+            <h3 className="t-card"><Icon name="trend" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {month === 'all' ? 'Období v číslech' : 'Měsíc v číslech'}</h3>
             <span className="text-[11px] text-black/35">orientační — bez DPH a fixních nákladů</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -516,7 +516,7 @@ export default function ClosingsOverview() {
       {analyticsOpen && pro && posInsights && (
         <div className="glass-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
+            <h3 className="t-card"><Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pokladna — {new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</h3>
             <span className="text-[11px] text-black/35">z účtenek Storyous</span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
@@ -610,7 +610,7 @@ export default function ClosingsOverview() {
                 ))}
               </div>
               <button type="button" onClick={() => setReconcileOpen(o => !o)}
-                className="mt-2 w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
+                className="mt-2 w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
                 <span>Den po dni ({reconcile.totals?.comparedDays ?? 0} porovnaných)</span>
                 <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${reconcileOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -688,7 +688,7 @@ export default function ClosingsOverview() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Icon name="trend" size={18} className="text-[#5B7A08]" />
-              <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Trend tržeb</h3>
+              <h3 className="t-label">Trend tržeb</h3>
             </div>
             <div className="overflow-x-auto">
               <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-36 sm:h-44" style={{ minWidth: chartW }} role="img" aria-label="Denní tržby">
@@ -725,10 +725,10 @@ export default function ClosingsOverview() {
       <ClosingsCalendar selectedDate={selectedDate} onSelectDate={pickDate} reloadKey={dataVersion} />
 
       <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
-        <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Uzávěrky ({topLevel.length})</h3>
+        <h3 className="t-card">Uzávěrky ({topLevel.length})</h3>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <button onClick={() => openCreate()}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold hover:bg-black transition whitespace-nowrap">
+            className="inline-flex items-center gap-1.5 btn btn-primary btn-sm hover:bg-black transition whitespace-nowrap">
             <Icon name="plus" size={16} /> Nová uzávěrka
           </button>
           {topLevel.length > 0 && (

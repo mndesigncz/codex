@@ -46,10 +46,10 @@ export default function ClientHome() {
           </p>
           {!signedIn && (
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link href="/client/register" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition">
+              <Link href="/client/register" className="tap-target inline-flex items-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] transition">
                 <Icon name="plus" size={16} /> Založit účet
               </Link>
-              <Link href="/client/login" className="tap-target inline-flex items-center gap-2 rounded-full glass border border-black/10 px-5 py-3 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] transition">
+              <Link href="/client/login" className="tap-target inline-flex items-center gap-2 btn btn-secondary hover:bg-black/[0.05] active:scale-[0.98] transition">
                 Přihlásit se
               </Link>
             </div>
@@ -75,7 +75,7 @@ export default function ClientHome() {
         </div>
       </section>
 
-      {err && <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>}
+      {err && <p className="note note-danger text-sm px-4 py-3">{err}</p>}
 
       {list === null ? (
         <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
@@ -100,7 +100,7 @@ export default function ClientHome() {
 function BizList({ title, items, today }: { title: string; items: Biz[]; today: string }) {
   return (
     <section>
-      <h2 className="text-lg font-bold tracking-tight mb-4">{title}</h2>
+      <h2 className="t-section mb-4">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
         {items.map((b, i) => (
           <Link key={b.slug} href={`/client/${b.slug}`}

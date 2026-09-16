@@ -96,7 +96,7 @@ export default function LiveRevenue() {
     <div className="glass-card p-5 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-bold tracking-tight text-[#16181A]">
+          <h3 className="t-card">
             Živě z pokladny{d?.placeName ? ` · ${d.placeName}` : ''}
           </h3>
           <p className="text-[11px] text-black/40">
@@ -122,10 +122,10 @@ export default function LiveRevenue() {
         ))}
         <span className="text-black/20">·</span>
         <input type="date" aria-label="Od data" value={from} max={to} onChange={e => setFrom(e.target.value)}
-          className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          className="tap-target-sm field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
         <span className="text-xs text-black/35">–</span>
         <input type="date" aria-label="Do data" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
-          className="tap-target-sm rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          className="tap-target-sm field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
       </div>
 
       {err && <p className="text-sm text-amber-800 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">{err}</p>}
@@ -138,29 +138,29 @@ export default function LiveRevenue() {
         <>
           {/* Peníze */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Tržba</p>
+            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
+              <p className="t-label">Tržba</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.total)}</p>
               <p className="text-[11px] text-black/40">{t.bills} účtenek · ⌀ {money(t.avgBill)}</p>
             </div>
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Hotově</p>
+            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
+              <p className="t-label">Hotově</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.cash)}</p>
               <p className="text-[11px] text-black/40">
                 {t.total > 0 ? Math.round((t.cash / t.total) * 100) : 0} % tržby
                 {t.tipsCash > 0 ? ` · sprop. ${money(t.tipsCash)}` : ''}
               </p>
             </div>
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Kartou</p>
+            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
+              <p className="t-label">Kartou</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.card)}</p>
               <p className="text-[11px] text-black/40">
                 {t.total > 0 ? Math.round((t.card / t.total) * 100) : 0} % tržby
                 {t.tipsCard > 0 ? ` · sprop. ${money(t.tipsCard)}` : ''}
               </p>
             </div>
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-black/45">Spropitné</p>
+            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
+              <p className="t-label">Spropitné</p>
               <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.tips)}</p>
               <p className="text-[11px] text-black/40">
                 {t.refundCount > 0 ? `${t.refundCount}× refundace ${money(t.refundTotal)}` : t.other > 0 ? `jinak ${money(t.other)}` : 'bez refundací'}
@@ -261,7 +261,7 @@ export default function LiveRevenue() {
           {(d.days?.length ?? 0) > 1 && (
             <div>
               <button type="button" onClick={() => setOpenDays(o => !o)}
-                className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
+                className="w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
                 <span>Den po dni ({d.days?.length ?? 0})</span>
                 <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${openDays ? 'rotate-180' : ''}`} />
               </button>

@@ -43,7 +43,7 @@ export interface Summary {
 }
 
 const todayStr = () => pragueToday();
-const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const inputCls = 'field';
 const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
 
@@ -269,7 +269,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
         <div className="p-5 space-y-5">
           {/* Date picker */}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Den směny</label>
+            <label className="field-label">Den směny</label>
             <input type="date" aria-label="Datum směny" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
@@ -337,7 +337,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                       ))}
                     </div>
                     {summary.closing.expected != null && summary.closing.difference != null && (
-                      <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-black/[0.03] px-3 py-2 text-[13px]">
+                      <div className="mt-2.5 flex items-center justify-between gap-2 well rounded-xl px-3 py-2 text-[13px]">
                         <span className="text-black/50">Očekávaná kasa {money(summary.closing.expected)}</span>
                         <span className={`font-semibold tabular-nums ${summary.closing.difference === 0 ? 'text-[#5B7A08]' : summary.closing.difference > 0 ? 'text-amber-600' : 'text-red-600'}`}>
                           {summary.closing.difference === 0 ? 'sedí' : `${summary.closing.difference > 0 ? 'přebytek' : 'manko'} ${money(Math.abs(summary.closing.difference))}`}
@@ -460,7 +460,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                 <div className="rounded-2xl border border-black/[0.06] bg-black/[0.02] p-3.5">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon name="bulb" size={14} className="text-black/45" />
-                    <span className="text-xs uppercase tracking-wider text-black/45">Automatické body</span>
+                    <span className="t-label">Automatické body</span>
                     <span className={`ml-auto text-sm font-bold tabular-nums ${summary.autoPoints.total > 0 ? 'text-[#5B7A08]' : summary.autoPoints.total < 0 ? 'text-red-600' : 'text-black/40'}`}>{signed(summary.autoPoints.total)}</span>
                   </div>
                   <div className="space-y-1">
@@ -480,15 +480,15 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           {/* Rating */}
           <div className="space-y-3 pt-1">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Celkové hodnocení směny</label>
+              <label className="field-label">Celkové hodnocení směny</label>
               <StarPicker value={rating} onChange={setRating} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zpětná vazba (uvidí zaměstnanec)</label>
+              <label className="field-label">Zpětná vazba (uvidí zaměstnanec)</label>
               <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Co bylo super, co příště zlepšit…" className={`${inputCls} resize-none`} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Body za směnu</label>
+              <label className="field-label">Body za směnu</label>
               <div className="flex items-center gap-2 flex-wrap">
                 <input type="number" inputMode="numeric" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
                 <span className="text-xs text-black/45">bodů {!ptsTouched && rating > 0 && '(návrh z hvězd)'}</span>

@@ -84,7 +84,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
 
       {canCreate && (
         creating ? (
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 space-y-2">
+          <div className="well border border-black/[0.07] p-3.5 space-y-2">
             {err && <p className="text-xs text-red-600">{err}</p>}
             <input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Otázka ankety…" maxLength={200}
               className="w-full rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
@@ -100,7 +100,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
               <span className="flex-1" />
               <button onClick={() => setCreating(false)} className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-semibold text-black/55 hover:text-black">Zrušit</button>
               <button onClick={create} disabled={!question.trim() || opts.filter(o => o.trim()).length < 2}
-                className="tap-target-sm rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-bold disabled:opacity-40 hover:bg-black transition">
+                className="tap-target-sm btn btn-primary btn-sm disabled:opacity-40 transition">
                 Založit anketu
               </button>
             </div>

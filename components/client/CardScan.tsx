@@ -9,7 +9,7 @@ import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { Initials } from './ClientShell';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
+const input = 'field !py-2.5 text-sm';
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
 
 export default function CardScan({ onToast, onChange }: { onToast: (m: string) => void; onChange?: () => void }) {
@@ -58,7 +58,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const reset = () => { setHit(null); setCode(''); setErr(''); setAmount(''); setBill(null); };
 
   return (
-    <section aria-labelledby="h-scan" className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 space-y-3">
+    <section aria-labelledby="h-scan" className="card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         <h2 id="h-scan" className="font-bold tracking-tight flex items-center gap-2"><Icon name="card" size={18} className="text-black/55" />Kartička hosta</h2>
         {hit && <button type="button" onClick={reset} className="tap-target-sm ml-auto text-xs font-semibold text-black/55 hover:text-black">Jiný host</button>}
@@ -100,7 +100,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
           {hit.campaigns?.length > 0 && (
             <ul className="space-y-1.5">
               {hit.campaigns.map((cp: any) => (
-                <li key={cp.id} className="rounded-2xl bg-white/60 border border-black/[0.06] px-3.5 py-2">
+                <li key={cp.id} className="well bg-white px-3.5 py-2">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
                     <p className="text-xs font-semibold tabular-nums text-black/60 shrink-0">{cp.stamps}/{cp.required}</p>

@@ -1198,6 +1198,42 @@ export async function GET(request: Request) {
     // přepisovalo u každého koktejlu znovu (a někde se spletl řád).
     await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS portions JSONB DEFAULT '[]'`);
 
+    // ---- Výroba vlastních produktů (lib/production.ts) ----
+    // Položka „vyrábíme sami" nejde do nákupu; když dochází, vznikne směně
+    // úkol s výrobní recepturou a chybějící suroviny dostanou vlajku do nákupu.
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS made_in_house BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS batch_yield NUMERIC`);      // kolik jednotek vyjde z jedné dávky
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS batch_steps TEXT`);         // postup, řádek = krok
+    await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS production_label TEXT`);    // název úkolu („Uvař limonádu")
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS item_recipes (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        ingredient_id INTEGER NOT NULL,
+        amount NUMERIC NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (item_id, ingredient_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS item_recipes_team ON item_recipes (team_id, item_id)`);
+    // Surovina, kterou je třeba koupit kvůli výrobě konkrétního produktu.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS purchase_flags (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        for_item_id INTEGER NOT NULL,
+        amount NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (item_id, for_item_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS purchase_flags_team ON purchase_flags (team_id)`);
+    // Odkud úkol vznikl (production → source_ref = položka skladu), aby nikdy nebyl dvakrát.
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source TEXT`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source_ref INTEGER`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS source_meta JSONB`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS tasks_source ON tasks (team_id, source, source_ref)`);
+
     // ---- Počítadlo neúspěšných pokusů (heslo, PIN, join kód) ----
     // Bez něj šlo čtyřmístný PIN uhodnout za pár minut a heslo hádat donekonečna.
     await ddl(sql`

@@ -31,7 +31,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
   const [open, setOpen] = useState(false);
   const active = (p: string) => path === p || (p !== '/client' && path?.startsWith(p));
   return (
-    <div className="min-h-[100dvh] flex flex-col" style={{ background: '#F1F3ED', color: '#16181A' }}>
+    <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)', color: '#16181A' }}>
       <header className="sticky top-0 z-30 chrome-edge">
         <div className="glass-strong border-b border-black/[0.06]">
           <div className="mx-auto max-w-5xl px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-3 min-w-0">
@@ -89,7 +89,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
       {/* Mobilní spodní dock — stejný jazyk jako administrace. */}
       {me && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-          <nav className="dock-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace">
+          <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace">
             {([
               { href: '/client', label: 'Podniky', icon: 'location', on: path === '/client' || (!!path?.startsWith('/client/') && !path.startsWith('/client/me')) },
               { href: '/client/me', label: 'Moje', icon: 'card', on: !!path?.startsWith('/client/me') },

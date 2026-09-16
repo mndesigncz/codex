@@ -14,11 +14,11 @@ export function PageSkeleton({ tiles = 2 }: { tiles?: number }) {
         <Skeleton className="h-8 w-48 rounded-full" />
         <Skeleton className="h-4 w-72 max-w-full rounded-full" />
       </div>
-      <Skeleton className="h-28 rounded-[28px]" />
+      <Skeleton className="h-28 rounded-3xl" />
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(160px, 1fr))` }}>
-        {Array.from({ length: tiles }).map((_, i) => <Skeleton key={i} className="h-24 rounded-[28px]" />)}
+        {Array.from({ length: tiles }).map((_, i) => <Skeleton key={i} className="h-24 rounded-3xl" />)}
       </div>
-      <Skeleton className="h-40 rounded-[28px]" />
+      <Skeleton className="h-40 rounded-3xl" />
     </div>
   );
 }

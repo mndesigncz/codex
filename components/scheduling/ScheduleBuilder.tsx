@@ -671,7 +671,7 @@ export default function ScheduleBuilder({ user }: Props) {
             Only the schedule grid is month-scoped; the calendar and the
             settings tabs bring their own navigation. */}
         {boardError && (
-          <div className="w-full rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm font-medium text-red-600 flex items-center justify-between gap-3">
+          <div className="w-full note note-danger px-4 py-3 text-sm font-medium flex items-center justify-between gap-3">
             <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
             <button aria-label="Zavřít" onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600"><Icon name="close" size={15} /></button>
           </div>
@@ -762,7 +762,7 @@ export default function ScheduleBuilder({ user }: Props) {
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <div className="flex items-center gap-2 min-w-0">
                 <Icon name="users" size={20} className="text-black/70 shrink-0" />
-                <h2 className="font-bold text-[#16181A] truncate">Dostupnost týmu</h2>
+                <h2 className="t-section truncate">Dostupnost týmu</h2>
               </div>
               <span className={`tap-target-sm shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
                 submissions.length >= assignable.length && assignable.length > 0
@@ -823,7 +823,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     const s = submissions.find((x) => x.employeeId === expanded);
                     if (!s) return null;
                     return (
-                      <div className="rounded-2xl bg-black/[0.03] border border-black/[0.08] p-4 space-y-2 text-sm">
+                      <div className="well border border-black/[0.08] p-4 space-y-2 text-sm">
                         <div className="flex items-center gap-2 font-semibold text-[#16181A]">
                           <span className="text-lg">{s.employeeAvatar}</span> {s.employeeName}
                         </div>
@@ -987,7 +987,7 @@ export default function ScheduleBuilder({ user }: Props) {
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zkopírovat týden</label>
                     <select value={copySrc} onChange={(e) => setCopySrc(e.target.value)}
-                      className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                      className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
                       <option value="">— vyber —</option>
                       {weekOptions(4, 0).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                     </select>
@@ -995,7 +995,7 @@ export default function ScheduleBuilder({ user }: Props) {
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Do týdne</label>
                     <select value={copyDst} onChange={(e) => setCopyDst(e.target.value)}
-                      className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                      className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
                       <option value="">— vyber —</option>
                       {weekOptions(0, 5).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                     </select>
@@ -1037,7 +1037,7 @@ export default function ScheduleBuilder({ user }: Props) {
                 <>
                   <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
                     {adjust.changes.map((ch: any, i: number) => (
-                      <div key={i} className={`flex items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.06] px-3.5 py-2.5 text-sm flex-wrap transition ${adjustSkipped.has(i) ? 'opacity-45' : ''}`}>
+                      <div key={i} className={`flex items-center gap-2.5 well bg-white px-3.5 py-2.5 text-sm flex-wrap transition ${adjustSkipped.has(i) ? 'opacity-45' : ''}`}>
                         <input type="checkbox" checked={!adjustSkipped.has(i)}
                           onChange={() => setAdjustSkipped(prev => {
                             const n = new Set(prev);
@@ -1197,7 +1197,7 @@ export default function ScheduleBuilder({ user }: Props) {
           {/* Calendar grid */}
           <div className="glass-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="font-bold text-[#16181A] cz-sentence flex items-center gap-2">
+              <h2 className="t-section cz-sentence flex items-center gap-2">
                 <Icon name="calendar" size={20} /> {monthLabel(month)}
               </h2>
               <div className="flex items-center gap-3 text-xs flex-wrap">
@@ -1367,7 +1367,7 @@ export default function ScheduleBuilder({ user }: Props) {
                 ×
               </button>
             </div>
-            <div className="rounded-2xl bg-black/[0.03] border border-black/[0.08] p-3 text-xs text-black/55">
+            <div className="well border border-black/[0.08] p-3 text-xs text-black/55">
               Očekávaný formát: <code className="text-black/80">datum,zaměstnanec,od,do,typ</code> — např.{' '}
               <code className="text-black/80">2026-08-03,anna@cajovna.cz,08:00,14:00,morning</code>. Sloupec „zaměstnanec"
               může být e-mail nebo jméno. Typ: morning / afternoon / flexible.
@@ -1409,7 +1409,7 @@ export default function ScheduleBuilder({ user }: Props) {
             )}
 
             {importPreview.errors.length > 0 && (
-              <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-3">
+              <div className="note note-danger p-3">
                 <p className="text-sm font-medium text-red-500 mb-1 flex items-center gap-1.5">
                   <Icon name="warning" size={16} /> {importPreview.errors.length} problémů (přeskočeno)
                 </p>
@@ -1519,7 +1519,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="clock" size={20} className="text-black/70 flex-shrink-0" />
-          <h2 className="font-bold text-[#16181A] truncate">Typy směn</h2>
+          <h2 className="t-section truncate">Typy směn</h2>
         </div>
         <button
           onClick={beginNew}
@@ -1557,7 +1557,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
           ) : (
             <div
               key={t.id}
-              className="flex items-center gap-3 rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3"
+              className="flex items-center gap-3 well border border-black/[0.08] px-4 py-3"
             >
               <span className="h-4 w-4 rounded-md flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
               <div className="flex-1 min-w-0">
@@ -1634,30 +1634,30 @@ function TypeForm({
   onCancel: () => void;
 }) {
   return (
-    <div className="rounded-2xl bg-black/[0.03] border border-[#C8F542]/30 p-4 space-y-3">
+    <div className="well border border-[#C8F542]/30 p-4 space-y-3">
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Název (např. Ranní)"
-        className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+        className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
       />
       <div className="flex gap-3">
         <div className="flex-1">
           <label className="block text-xs font-medium text-black/55 mb-1">Od</label>
           {startsAtOpen ? (
-            <div className="w-full rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3 text-sm text-black/45">Otevření podniku</div>
+            <div className="w-full well border border-black/[0.08] px-4 py-3 text-sm text-black/45">Otevření podniku</div>
           ) : (
             <input type="time" value={start} onChange={(e) => setStart(e.target.value)}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
           )}
         </div>
         <div className="flex-1">
           <label className="block text-xs font-medium text-black/55 mb-1">Do</label>
           {endsAtClose ? (
-            <div className="w-full rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3 text-sm text-black/45">Zavření podniku</div>
+            <div className="w-full well border border-black/[0.08] px-4 py-3 text-sm text-black/45">Zavření podniku</div>
           ) : (
             <input type="time" value={end} onChange={(e) => setEnd(e.target.value)}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
           )}
         </div>
       </div>
@@ -1752,7 +1752,7 @@ function OpeningHoursEditor({
     <div className="glass-card p-5 space-y-4">
       <div className="flex items-center gap-2">
         <Icon name="clock" size={20} className="text-black/70" />
-        <h2 className="font-bold text-[#16181A]">Otevírací doba</h2>
+        <h2 className="t-section">Otevírací doba</h2>
       </div>
       <p className="text-sm text-black/45">Nastav, kdy má provoz otevřeno. Zavřené dny algoritmus přeskočí.</p>
 
@@ -1762,7 +1762,7 @@ function OpeningHoursEditor({
           return (
             <div
               key={d}
-              className="flex items-center gap-3 rounded-2xl bg-black/[0.03] border border-black/[0.08] px-4 py-3 flex-wrap"
+              className="flex items-center gap-3 well border border-black/[0.08] px-4 py-3 flex-wrap"
             >
               <span className="w-24 font-medium text-[#16181A] truncate">{label}</span>
               <button
@@ -1781,14 +1781,14 @@ function OpeningHoursEditor({
                     type="time"
                     value={day.open}
                     onChange={(e) => update(d, { open: e.target.value })}
-                    className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                    className="field border border-black/[0.08] px-3 py-2 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
                   />
                   <span className="text-black/40">–</span>
                   <input
                     type="time"
                     value={day.close}
                     onChange={(e) => update(d, { close: e.target.value })}
-                    className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                    className="field border border-black/[0.08] px-3 py-2 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
                   />
                 </div>
               )}
@@ -1877,7 +1877,7 @@ function FixedAssignmentsManager({
       <div className="glass-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Icon name="swap" size={20} className="text-black/70" />
-          <h2 className="font-bold text-[#16181A]">Přidat pevný den</h2>
+          <h2 className="t-section">Přidat pevný den</h2>
         </div>
         <p className="text-sm text-black/45">
           Přiřaď zaměstnance k opakujícímu se dni v týdnu. Algoritmus ho na tento den nasadí přednostně.
@@ -1892,7 +1892,7 @@ function FixedAssignmentsManager({
               <select
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value === '' ? '' : parseInt(e.target.value))}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
               >
                 <option value="">Vyber…</option>
                 {employees.map((e) => (
@@ -1907,7 +1907,7 @@ function FixedAssignmentsManager({
               <select
                 value={weekday}
                 onChange={(e) => setWeekday(parseInt(e.target.value))}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
               >
                 {CZ_DAYS_FULL.map((label, d) => (
                   <option key={d} value={d}>
@@ -1923,7 +1923,7 @@ function FixedAssignmentsManager({
               <select
                 value={shiftTypeId}
                 onChange={(e) => setShiftTypeId(e.target.value === '' ? '' : parseInt(e.target.value))}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
               >
                 <option value="">Libovolná</option>
                 {shiftTypes.map((t) => (
@@ -2125,7 +2125,7 @@ function DayModal({
         </div>
 
         {(dayGaps.length > 0 || missingHere.length > 0) && (
-          <div className="rounded-2xl bg-red-500/10 border border-red-500/35 p-3.5">
+          <div className="note note-danger p-3.5">
             <p className="text-sm font-semibold text-red-700 flex items-center gap-1.5">
               <Icon name="warning" size={16} /> Díra v obsazení
             </p>
@@ -2160,7 +2160,7 @@ function DayModal({
             {shifts.map((s) => {
               const rt = resolveShiftType(s, shiftTypes);
               return (
-              <div key={s.id} className="flex items-center gap-3 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 py-2">
+              <div key={s.id} className="flex items-center gap-3 well border border-black/[0.08] px-3 py-2">
                 <span className="text-lg flex-shrink-0">{s.employeeAvatar}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#16181A] truncate">{s.employeeName}</p>
@@ -2298,7 +2298,7 @@ function DayModal({
                 type="time"
                 value={start}
                 onChange={(e) => { setStart(e.target.value); pickCustom(); }}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
+                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>
             <div className="flex-1">
@@ -2307,7 +2307,7 @@ function DayModal({
                 type="time"
                 value={end}
                 onChange={(e) => { setEnd(e.target.value); pickCustom(); }}
-                className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
+                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -2405,7 +2405,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="clock" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Maximálně dní v řadě</h2>
+          <h2 className="t-section">Maximálně dní v řadě</h2>
         </div>
         <p className="text-sm text-black/50">
           Kolik dní po sobě může někdo pracovat. Generátor rozvrhu po dosažení limitu
@@ -2414,7 +2414,7 @@ function ScheduleRulesManager() {
         <div className="flex items-center gap-3 flex-wrap">
           <label className="text-sm font-medium text-[#16181A]">Pro celý tým:</label>
           <select value={teamMax} onChange={e => setTeamMax(e.target.value)}
-            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+            className="field border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
             <option value="">Bez omezení</option>
             {[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
               <option key={n} value={n}>max {n} {n <= 4 ? 'dny' : 'dní'} po sobě</option>
@@ -2426,7 +2426,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="users" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Spravedlivé střídání</h2>
+          <h2 className="t-section">Spravedlivé střídání</h2>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={balance} onChange={e => setBalance(e.target.checked)}
@@ -2443,7 +2443,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="swap" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Dělení směn</h2>
+          <h2 className="t-section">Dělení směn</h2>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={split} onChange={e => setSplit(e.target.checked)}
@@ -2456,7 +2456,7 @@ function ScheduleRulesManager() {
           </span>
         </label>
         {split && (
-          <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-1">
+          <div className="well border border-black/[0.06] p-3.5 space-y-1">
             <p className="text-[11px] font-bold uppercase tracking-wider text-black/45 mb-1.5">
               Komu se smí směna rozdělit
             </p>
@@ -2484,7 +2484,7 @@ function ScheduleRulesManager() {
       <div className="glass-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Icon name="overview" size={18} className="text-[#5B7A08]" />
-          <h2 className="font-bold text-[#16181A]">Maximálně hodin za měsíc</h2>
+          <h2 className="t-section">Maximálně hodin za měsíc</h2>
         </div>
         <p className="text-sm text-black/50">
           Strop odpracovaných hodin na osobu a měsíc — hodí se pro brigádníky (DPP)
@@ -2494,13 +2494,13 @@ function ScheduleRulesManager() {
           <label className="text-sm font-medium text-[#16181A]">Pro celý tým:</label>
           <input type="number" inputMode="numeric" min={8} max={400} value={teamMaxHours}
             onChange={e => setTeamMaxHours(e.target.value)} placeholder="bez omezení"
-            className="w-36 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            className="w-36 field border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           <span className="text-sm text-black/45">hodin / měsíc</span>
         </div>
       </div>
 
       <div className="glass-card p-5 space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Výjimky pro jednotlivce</h3>
+        <h3 className="t-label">Výjimky pro jednotlivce</h3>
         <p className="text-sm text-black/50">
           Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse,
           nebo někdo, komu tři dny stačí.
@@ -2524,7 +2524,7 @@ function ScheduleRulesManager() {
                   <span className="text-[11px] uppercase tracking-wider text-black/35">dní po sobě</span>
                   <select value={v}
                     onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}
-                    className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                    className="field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
                     <option value="">Podle týmu</option>
                     <option value="0">Bez omezení</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
@@ -2539,7 +2539,7 @@ function ScheduleRulesManager() {
                     onChange={e => setHourOverrides(o => ({ ...o, [m.id]: e.target.value }))}
                     placeholder="podle týmu"
                     title="Prázdné = podle týmu, 0 = bez omezení"
-                    className="w-28 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+                    className="w-28 field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
                 </div>
               </div>
             );
@@ -2550,7 +2550,7 @@ function ScheduleRulesManager() {
       {err && <p className="text-sm text-red-600">{err}</p>}
       {msg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-2.5">{msg}</p>}
       <button onClick={save} disabled={saving}
-        className="rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+        className="btn btn-primary disabled:opacity-50 transition">
         {saving ? 'Ukládám…' : 'Uložit pravidla'}
       </button>
     </div>
@@ -2693,7 +2693,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
           <div>
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Preferuje celkově</label>
             <select value={preferred} onChange={(e) => setPreferred(e.target.value)}
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+              className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
               <option value="flexible">Flexibilní</option>
               <option value="morning">Ranní</option>
               <option value="afternoon">Odpolední</option>
@@ -2703,14 +2703,14 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
             <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max směn</label>
             <input type="number" inputMode="numeric" min={1} max={31} value={maxShifts}
               onChange={(e) => setMaxShifts(e.target.value)} placeholder="bez limitu"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+              className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           </div>
         </div>
 
         <div>
           <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Poznámka</label>
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500}
-            className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+            className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
         </div>
 
         {err && <p className="text-sm text-red-600">{err}</p>}

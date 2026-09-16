@@ -242,7 +242,7 @@ export default function Procedures({ user }: Props) {
                           }).catch(() => null);
                           if (res?.ok) await load();
                         }}
-                        className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1 text-xs font-semibold hover:bg-black transition">
+                        className="tap-target-sm btn btn-primary btn-sm transition">
                         Schválit ✓
                       </button>
                     )}
@@ -288,12 +288,12 @@ export default function Procedures({ user }: Props) {
             );
           })}
 
-          {user.role !== 'kiosk' && (
+          {user.role !== 'kiosk' && !isEmployer && (
             <button
               onClick={openNew}
               className="glass rounded-3xl p-5 min-h-[176px] flex flex-col items-center justify-center gap-2 border border-dashed border-black/15 text-black/45 hover:text-black hover:border-black/30 transition"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/[0.04]">
+              <div className="flex h-12 w-12 items-center justify-center well">
                 <Icon name="plus" size={24} />
               </div>
               <span className="text-sm font-medium">{isEmployer ? 'Nový postup' : 'Navrhnout postup'}</span>
@@ -306,7 +306,7 @@ export default function Procedures({ user }: Props) {
       {/* Recent runs */}
       {(isEmployer || runs.length > 0) && !loading && (
         <div className="mt-10">
-          <h2 className="text-lg font-bold tracking-tight text-[#16181A]">
+          <h2 className="t-section">
             {isEmployer ? 'Poslední průběhy' : 'Moje průběhy'}
           </h2>
           {runs.length === 0 ? (
@@ -363,7 +363,7 @@ export default function Procedures({ user }: Props) {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
               </div>
               <div className="min-w-0">
-                <h3 className="font-bold tracking-tight text-[#16181A]">Smazat postup?</h3>
+                <h3 className="t-card">Smazat postup?</h3>
                 <p className="text-sm text-black/55 truncate">„{confirmDel.name}"</p>
               </div>
             </div>
@@ -498,7 +498,7 @@ function ProcedureDetail({
                 <Icon name={procedure.icon || 'check'} size={24} />
               </span>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold tracking-tight text-[#16181A] truncate">{procedure.name}</h2>
+                <h2 className="t-section truncate">{procedure.name}</h2>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-black/50">
                   <span>{steps.length} {stepsWord(steps.length)}</span>
                   {mins > 0 && <><span className="text-black/25">•</span><span className="inline-flex items-center gap-1"><Icon name="clock" size={12} /> {fmtMinutes(mins)}</span></>}
@@ -650,7 +650,7 @@ function ProcedureEditor({
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <h2 className="text-xl font-bold tracking-tight text-[#16181A]">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
+          <h2 className="t-section">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
           <button onClick={onClose} aria-label="Zavřít" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -663,7 +663,7 @@ function ProcedureEditor({
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Např. Otevírání"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
             />
           </div>
 
@@ -673,7 +673,7 @@ function ProcedureEditor({
               value={description ?? ''}
               onChange={e => setDescription(e.target.value)}
               placeholder="Krátký popis postupu"
-              className="w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
             />
           </div>
 
@@ -704,7 +704,7 @@ function ProcedureEditor({
             <div className="space-y-2.5">
               {steps.map((s, i) => (
                 <div key={i} className="space-y-2.5">
-                <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-2.5 space-y-2">
+                <div className="well border border-black/[0.07] p-2.5 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={s.emoji ?? ''}
@@ -781,12 +781,12 @@ function ProcedureEditor({
                 </div>
               ))}
             </div>
-            <button onClick={addStep} className="mt-2.5 inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-black/[0.05] transition">
+            <button onClick={addStep} className="mt-2.5 inline-flex items-center gap-1.5 btn btn-secondary btn-sm text-[#16181A] hover:bg-black/[0.05] transition">
               <Icon name="plus" size={16} /> Přidat krok
             </button>
           </div>
 
-          <label className="flex items-start justify-between gap-4 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-4 cursor-pointer">
+          <label className="flex items-start justify-between gap-4 well border border-black/[0.07] p-4 cursor-pointer">
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-[#16181A]">Vyžadovat před uzávěrkou</span>
               <span className="block text-xs text-black/45 mt-0.5">Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne.</span>
@@ -814,7 +814,7 @@ function ProcedureEditor({
             </div>
             {remindAnchor === 'time' ? (
               <div className="flex items-center gap-2">
-                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-black/[0.04] border border-black/[0.08] text-[#5B7A08]">
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center well border border-black/[0.08] text-[#5B7A08]">
                   <Icon name="clock" size={20} />
                 </span>
                 <input
@@ -822,7 +822,7 @@ function ProcedureEditor({
                   aria-label="Čas připomenutí"
                   value={remindAt ?? ''}
                   onChange={e => setRemindAt(e.target.value)}
-                  className="flex-1 min-w-0 rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
+                  className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
                 />
                 {remindAt && (
                   <button

@@ -256,7 +256,7 @@ function MyRewardsInner() {
       {catalog.length > 0 && (
         <div className="glass-card p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-            <h3 className="font-bold tracking-tight text-[#16181A]"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Katalog odměn</h3>
+            <h3 className="t-card"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Katalog odměn</h3>
             <span className="text-xs text-black/40">máš {me.points} bodů</span>
           </div>
           <p className="text-sm text-black/45 mb-4">Vyměň body za odměnu — žádost schválí vedení a body se odečtou.</p>
@@ -270,7 +270,7 @@ function MyRewardsInner() {
                 // takže na název zbývalo 116 px z potřebných 262 a četla se
                 // z něj necelá polovina. Název se teď zalomí místo useknutí
                 // a tlačítko spadne pod něj, když se vedle nevejde.
-                <div key={rw.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3">
+                <div key={rw.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 well border border-black/[0.06] px-4 py-3">
                   <span className="text-2xl shrink-0">{rw.icon ?? '🎁'}</span>
                   <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[420px]:basis-0">
                     <p className="text-sm font-semibold text-[#16181A]">{rw.title}</p>
@@ -306,7 +306,7 @@ function MyRewardsInner() {
 
       {/* How points are earned */}
       <div className="glass-card p-5">
-        <h3 className="font-bold tracking-tight text-[#16181A] mb-3">Odkud máš body</h3>
+        <h3 className="t-card mb-3">Odkud máš body</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Úkoly', value: b.tasks, icon: 'check' },
@@ -314,7 +314,7 @@ function MyRewardsInner() {
             { label: 'Uzávěrky', value: b.closings, icon: 'trend' },
             { label: 'Z hodnocení', value: fromReviews, icon: 'award' },
           ].map(s => (
-            <div key={s.label} className="rounded-2xl bg-black/[0.03] p-3 text-center">
+            <div key={s.label} className="well p-3 text-center">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] mb-1.5"><Icon name={s.icon} size={15} /></span>
               <p className="text-2xl font-bold tracking-tight text-[#16181A] tabular-nums">{s.value}</p>
               <p className="text-[11px] text-black/45">{s.label}</p>
@@ -325,7 +325,7 @@ function MyRewardsInner() {
 
       {/* All levels */}
       <div className="glass-card p-5">
-        <h3 className="font-bold tracking-tight text-[#16181A] mb-3">Úrovně</h3>
+        <h3 className="t-card mb-3">Úrovně</h3>
         <div className="space-y-2">
           {levels.map((lv, i) => {
             const reached = i <= me.levelIndex;
@@ -354,7 +354,7 @@ function MyRewardsInner() {
           <div className="flex items-center gap-2.5 mb-3">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500/12 text-red-600 shrink-0"><Icon name="warning" size={17} /></span>
             <div className="min-w-0">
-              <h3 className="font-bold tracking-tight text-[#16181A]">Něco je potřeba napravit</h3>
+              <h3 className="t-card">Něco je potřeba napravit</h3>
               <p className="text-xs text-black/50">Vedení u těchto směn označilo, co příště udělat jinak.</p>
             </div>
           </div>
@@ -366,7 +366,7 @@ function MyRewardsInner() {
 
       {/* Feedback from employer */}
       <div className="glass-card p-5">
-        <h3 className="font-bold tracking-tight text-[#16181A] mb-3">Hodnocení směn</h3>
+        <h3 className="t-card mb-3">Hodnocení směn</h3>
         {normalDays.length === 0 ? (
           <p className="text-sm text-black/45">
             {flaggedDays.length > 0 ? 'Další hodnocení zatím nemáš.' : <EmptyState illustration="odmeny" title="Zatím žádné hodnocení" hint="Vedení hodnotí směny průběžně — body za úkoly, postupy a uzávěrky se přičítají samy." compact />}

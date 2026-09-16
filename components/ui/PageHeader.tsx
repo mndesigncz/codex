@@ -27,8 +27,8 @@ export function PageHeader({ title, subtitle, primary, secondary, menu, aside, c
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1 basis-[14rem]">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] text-balance">{title}</h1>
-          {subtitle && <p className="text-sm text-black/55 mt-1 text-pretty">{subtitle}</p>}
+          <h1 className="t-page text-balance">{title}</h1>
+          {subtitle && <p className="t-meta mt-1.5 max-w-[70ch] text-pretty">{subtitle}</p>}
         </div>
         {(primary || secondary || (menu && menu.length > 0)) && (
           <div className="flex items-center gap-2 shrink-0 ml-auto">

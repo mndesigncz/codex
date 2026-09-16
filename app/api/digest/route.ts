@@ -100,6 +100,11 @@ export async function GET(request: Request) {
       // --- stock running low: same effective measure the stock screens use,
       // so open packages and content-unit thresholds don't fake alarms ---
       let lowCount = 0;
+      let makeCount = 0;
+      try {
+        const { ensureProductionTasks } = await import('@/lib/production');
+        makeCount = (await ensureProductionTasks(Number(team.id), null)).open;
+      } catch { /* před migrací */ }
       try {
         const items = await sql`
           SELECT id, name, category, category_id, quantity, min_quantity, critical_quantity,
@@ -221,7 +226,7 @@ export async function GET(request: Request) {
         real.length ? `Tržba ${czk(revenue)} · ${verdict}` : 'Bez uzávěrky',
         worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` + (stillOn.length ? `, ${stillOn.length} ještě na směně` : '') : stillOn.length ? `${stillOn.length} ještě na směně` : null,
         procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
-        lowCount ? `${lowCount} položek dochází` : null,
+        lowCount ? `${lowCount} položek dochází${makeCount ? ` (${makeCount} k výrobě)` : ''}` : null,
         tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
         posLine,
         guestLine,
@@ -234,7 +239,7 @@ export async function GET(request: Request) {
           <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${verdict}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${[...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + procsMissing.join(', ') : 'hotové ✓'}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' : 'nic ✓'}</td></tr>
+          <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' + (makeCount ? ` (${makeCount} k výrobě)` : '') : 'nic ✓'}</td></tr>
           ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${posLine.replace('Pokladna: ', '')}</td></tr>` : ''}
           ${guestLine ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${guestLine}</td></tr>` : ''}
           ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${reviewLine}</td></tr>` : ''}

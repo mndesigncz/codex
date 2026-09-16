@@ -12,7 +12,7 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 
 const field =
-  'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
+  'w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
 
 export type Portion = { name: string; amount: number };
 
@@ -122,7 +122,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
 
       <div className="flex items-center gap-2">
         <button onClick={save} disabled={saving}
-          className="rounded-full bg-[#16181A] text-white px-5 py-2.5 text-sm font-bold hover:bg-black disabled:opacity-50 transition">
+          className="btn btn-primary disabled:opacity-50 transition">
           {saving ? 'Ukládám…' : 'Uložit položku'}
         </button>
         <button onClick={onClose} disabled={saving}

@@ -5,6 +5,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from './storyous';
 import { audit } from './audit';
+import { ensureProductionTasks } from './production';
 import { pragueToday, dayPlus } from './pragueTime';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -173,6 +174,9 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   if (deducted.length) {
     audit(teamId, actor, 'pos.sync', 'pos', null,
       deducted.map(d => `${d.name} −${d.amount}`).join(', ').slice(0, 280));
+    // Prodej odepsal i vlastní produkty (limonáda, ice tea…) — když teď
+    // docházejí, směna dostane úkol je vyrobit, ne nákupní seznam.
+    try { await ensureProductionTasks(teamId, actor); } catch { /* před migrací */ }
   }
   // Prodeje a nenamapované položky zapíšeme dávkově v transakci místo jednoho
   // round-tripu na řádek (rušné okno = stovky produktů). Skupina se přeskočí

@@ -18,6 +18,8 @@ import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
+import ProductionRecipe from '../inventory/ProductionRecipe';
+import ProductionBoard from '../inventory/ProductionBoard';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useModal } from '@/lib/useModal';
 
@@ -46,6 +48,11 @@ interface Item {
   submittedBy?: number | null;
   updatedAt?: string;
   updatedByName?: string;
+  madeInHouse?: boolean;
+  batchYield?: number | null;
+  productionLabel?: string | null;
+  /** koupit kvůli výrobě těchhle vlastních produktů */
+  buyFor?: { itemId: number; name: string; amount: number | null }[];
 }
 
 interface Category {
@@ -85,7 +92,7 @@ type SortKey = 'name' | 'qtyAsc' | 'qtyDesc' | 'status' | 'updated';
 type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
-const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const inputClass = 'field';
 /** Číslo z pole, které snese i desetinnou čárku. V poli type="number"
  *  se „0,7" zahodí na prázdno — a velikost balení pak tiše zmizí. */
 const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
@@ -115,7 +122,9 @@ function suggestedAmount(i: Item): number {
   const base = i.maxQuantity && i.maxQuantity > 0
     ? i.maxQuantity - i.quantity
     : i.minQuantity * 2 - i.quantity;
-  return Math.max(1, Math.max(0, base));
+  // Surovina chybějící na výrobu: aspoň tolik, kolik na dávky chybí.
+  const forMaking = (i.buyFor ?? []).reduce((s, f) => s + (f.amount ?? 0), 0);
+  return Math.max(1, Math.max(0, base), Math.ceil(forMaking));
 }
 
 function plural(n: number) {
@@ -358,14 +367,17 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const low = active.filter(i => statusOf(i, pk) === 'low');
 
   // Items to (re)order: critical first, then low, alphabetically within each group.
+  // Vlastní výroba do nákupu nepatří — ta dostává úkol „vyrobit". Naopak
+  // surovina, která chybí na dávku, jde do nákupu i když sama pod limitem není.
   const toBuy = useMemo(() =>
     active
-      .filter(i => statusOf(i, pk) !== 'ok')
+      .filter(i => !i.madeInHouse && (statusOf(i, pk) !== 'ok' || (i.buyFor?.length ?? 0) > 0))
       .sort((a, b) => {
         const d = statusRank[statusOf(a, pk)] - statusRank[statusOf(b, pk)];
         return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
       }),
   [active, pk]);
+  const toMake = useMemo(() => active.filter(i => i.madeInHouse && statusOf(i, pk) !== 'ok'), [active, pk]);
 
   // Defaults for a category = everything its ancestors set, overridden by its
   // own, so a rule high up still holds while a subcategory can tweak one field.
@@ -683,7 +695,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     <img src={(i as any).photoUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-black/[0.06]" />
                   </a>
                 ) : (
-                  <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.04] flex items-center justify-center text-black/35">
+                  <span className="shrink-0 h-12 w-12 well rounded-xl flex items-center justify-center text-black/35">
                     <Icon name="box" size={19} strokeWidth={1.7} />
                   </span>
                 )}
@@ -706,7 +718,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     if (res?.ok) await load();
                     else showNotice('Schválení se nepodařilo.');
                   }}
-                  className="tap-target-sm shrink-0 rounded-full bg-[#16181A] text-white px-4 py-1.5 text-xs font-semibold hover:bg-black transition">
+                  className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
                   Schválit
                 </button>
                 <button
@@ -731,6 +743,8 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             {critical.length > 0 && <span className="text-red-600">{critical.length} kriticky málo</span>}
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
             {low.length > 0 && <span className="text-orange-600">{low.length} dochází</span>}
+            {toMake.length > 0 && <span className="text-black/30">·</span>}
+            {toMake.length > 0 && <span className="text-[#0A5CC0]">{toMake.length} k výrobě</span>}
           </p>
           {/* Není to název, je to výčet — u 190 položek chtěl řádek 17 000 px.
               Na desktopu se z něj po `truncate` četlo pět procent, takže se
@@ -742,6 +756,10 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         </div>
       )}
 
+      {/* Co si směna má vyrobit — s recepturou a stavem surovin. */}
+      <ProductionBoard onOpenTasks={onNavigate ? () => onNavigate('tasks') : undefined}
+        onChanged={msg => { setNotice(msg); load(); }} />
+
       {/* Toolbar */}
       <div ref={sentinel} aria-hidden className="h-px -mb-px" />
       <div className={`sticky top-0 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 bg-white/60 dark:bg-transparent backdrop-blur-md transition-[padding] ${
@@ -752,12 +770,12 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={16} /></span>
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Hledat položku nebo dodavatele..."
-              className={`${inputClass} pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
+              className={`${inputClass} !pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
             {selecting && (
               <button onClick={exitSelection}
-                className="rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-medium whitespace-nowrap">
+                className="btn btn-primary whitespace-nowrap">
                 Zrušit výběr
               </button>
             )}
@@ -797,14 +815,14 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         </span>
         {showArchived && (
           <button onClick={() => setShowArchived(false)}
-            className="tap-target-sm rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-medium">
+            className="tap-target-sm btn btn-primary btn-sm">
             Zpět na aktivní sklad
           </button>
         )}
       </div>
 
       {consumeErr && (
-        <div role="alert" className="rounded-2xl bg-red-500/10 border border-red-500/25 text-red-700 px-4 py-3 text-sm font-semibold">{consumeErr}</div>
+        <div role="alert" className="note note-danger px-4 py-3 text-sm font-semibold">{consumeErr}</div>
       )}
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
@@ -857,6 +875,15 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
                 />
               )}
+              {/* Z čeho se položka dělá — když ji vyrábíme sami. */}
+              {editing && (
+                <ProductionRecipe
+                  item={{ id: editing.id, name: editing.name, unit: editing.unit }}
+                  items={items.filter(i => !i.archived)}
+                  onSaved={r => setItems(prev => prev.map(x => x.id === r.itemId
+                    ? { ...x, madeInHouse: r.madeInHouse, batchYield: r.batchYield, productionLabel: r.productionLabel || null } : x))}
+                />
+              )}
               {/* Section: základ */}
               <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
@@ -881,7 +908,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     className={`${inputClass} resize-none`} />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kategorie</label>
+                  <label className="field-label">Kategorie</label>
                   {(flatCats.length > 0 || orphanNames.length > 0) && (
                     <div className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
                       {flatCats.map(({ cat: c, depth }) => (
@@ -914,7 +941,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     </div>
                     <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
                       title="Kam novou kategorii zařadit"
-                      className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+                      className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
                       <option value="">Hlavní</option>
                       {flatCats.map(({ cat: c, depth }) => (
                         <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
@@ -935,9 +962,9 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Aktuální množství</label>
-                    <div className="flex items-center rounded-2xl bg-black/[0.04] border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
+                    <div className="flex items-center well border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
                       <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
-                        className="rounded-xl bg-black/[0.04] hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
+                        className="well rounded-xl hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
                       <input type="number" inputMode="numeric" aria-label="Množství" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                         className="flex-1 min-w-0 bg-transparent text-center text-sm font-semibold text-[#16181A] focus:outline-none tabular-nums" />
                       <button type="button" aria-label="Přidat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))}
@@ -1072,7 +1099,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="send" size={15} /></span>
-                    <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={`${inputClass} pl-10`} />
+                    <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={`${inputClass} !pl-10`} />
                   </div>
                 </div>
               </div>
@@ -1088,7 +1115,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   </span>
                 </span>
               </label>
-              <div className="rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5">
+              <div className="well border border-black/[0.07] p-3.5">
                 <span className="block text-sm font-medium text-[#16181A]">Zvýraznit zákazníkům</span>
                 <span className="block text-[11px] text-black/45 mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</span>
                 <div className="flex gap-1.5">
@@ -1102,7 +1129,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   ))}
                 </div>
               </div>
-              <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.07] p-3.5 cursor-pointer">
+              <label className="flex items-start gap-2.5 well border border-black/[0.07] p-3.5 cursor-pointer">
                 <input type="checkbox" checked={form.hideFromOverview} onChange={e => setForm(f => ({ ...f, hideFromOverview: e.target.checked }))}
                   className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
                 <span className="min-w-0">
@@ -1118,7 +1145,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             {editing && itemLog.length > 0 && (
               <div className="px-6 pb-4">
                 <button type="button" onClick={() => setLogOpen(o => !o)}
-                  className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
+                  className="w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
                   <span>🕓 Historie změn ({itemLog.length})</span>
                   <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${logOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -1182,7 +1209,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               Vybrat vše ({filtered.length})
             </button>
             <button onClick={() => setShowBulk(true)}
-              className="tap-target-sm rounded-full bg-[#C8F542] text-black px-4 py-1.5 text-xs font-bold hover:brightness-110 transition whitespace-nowrap">
+              className="tap-target-sm btn btn-accent btn-sm transition whitespace-nowrap">
               Upravit
             </button>
             <button onClick={async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); }}
@@ -1242,7 +1269,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
           <div ref={reportsModal.ref} {...reportsModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
+              <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
               <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
             </div>
             {reports.length === 0 ? (
@@ -1386,7 +1413,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
       <div ref={bm.ref} {...bm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Hromadná úprava</h3>
+            <h3 className="t-card">Hromadná úprava</h3>
             <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
           </div>
           <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
@@ -1648,7 +1675,7 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 <button onClick={() => step(i, 1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
-                    className="rounded-full bg-[#C8F542] text-black px-3.5 h-8 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
+                    className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
@@ -1695,7 +1722,10 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 {i.description && <p className="text-xs text-black/55 line-clamp-2 mt-0.5">{i.description}</p>}
                 <p className="text-xs text-black/40 line-clamp-2 mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
-              <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium shrink-0 ${chip}`}>{st === 'critical' ? 'Kriticky' : st === 'low' ? 'Dochází' : 'OK'}</span>
+              <span className="flex items-center gap-1 shrink-0">
+                {i.madeInHouse && <span className="chip chip-sm chip-info" title="Vyrábíme sami — místo nákupu dostane směna úkol">vyrábíme</span>}
+                <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${chip}`}>{st === 'critical' ? (i.madeInHouse ? 'Vyrobit' : 'Kriticky') : st === 'low' ? (i.madeInHouse ? 'Vyrobit' : 'Dochází') : 'OK'}</span>
+              </span>
             </div>
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
               <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
@@ -1721,7 +1751,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
               <div className="flex items-center gap-1">
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
-                    className="rounded-full bg-[#C8F542] text-black px-4 h-9 flex items-center text-xs font-bold whitespace-nowrap hover:brightness-110">Naskladnit</button>
+                    className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
@@ -1872,7 +1902,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                     </div>
                   </div>
                   {receivingId === o.id && (
-                    <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3">
+                    <div className="flex flex-wrap items-center gap-2 well border border-black/[0.06] p-3">
                       <label className="text-xs text-black/50 whitespace-nowrap">Celková cena ({symbol}, nepovinné)</label>
                       <input
                         type="number"
@@ -1887,7 +1917,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                       <button
                         onClick={() => markReceived(o)}
                         disabled={busyId === o.id}
-                        className="rounded-full bg-[#16181A] text-white px-4 py-2 text-xs font-semibold hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0">
+                        className="btn btn-primary btn-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0">
                         {busyId === o.id ? 'Naskladňuji…' : 'Potvrdit příjem'}
                       </button>
                     </div>
@@ -1998,7 +2028,8 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       lines.push('');
       lines.push(`${supplier}:`);
       list.forEach(i => {
-        lines.push(`• ${i.name} — objednat ${suggestedAmount(i)} ${i.unit} (zbývá ${i.quantity})`);
+        const why = (i.buyFor?.length ?? 0) > 0 ? ` — na výrobu: ${i.buyFor!.map(f => f.name).join(', ')}` : '';
+        lines.push(`• ${i.name} — objednat ${suggestedAmount(i)} ${i.unit} (zbývá ${i.quantity})${why}`);
       });
     });
     return lines.join('\n');
@@ -2044,7 +2075,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
     <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
       <div ref={sm.ref} {...sm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Nákupní seznam</h3>
+          <h3 className="t-card">Nákupní seznam</h3>
           <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
@@ -2057,7 +2088,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">{supplier}</p>
                   {supplierByName(supplier)?.email && (
                     <button onClick={() => emailGroup(supplier, list)} disabled={emailing === supplier}
-                      className="rounded-full bg-[#16181A] text-white px-3 py-1 text-[11px] font-semibold hover:bg-black disabled:opacity-50 transition whitespace-nowrap">
+                      className="btn btn-primary btn-sm disabled:opacity-50 transition whitespace-nowrap">
                       {emailing === supplier ? 'Odesílám…' : 'Objednat e-mailem'}
                     </button>
                   )}
@@ -2068,8 +2099,13 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   const st = statusOf(i, pk);
                   return (
                     <div key={i.id} className="flex items-center gap-2.5 py-2.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} title={st === 'critical' ? 'Kriticky málo' : 'Dochází'} />
-                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-[#16181A]">{i.name}</span>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate text-sm font-medium text-[#16181A]">{i.name}</span>
+                        {(i.buyFor?.length ?? 0) > 0 && (
+                          <span className="block truncate text-[11px] text-[#0A5CC0]">na výrobu: {i.buyFor!.map(f => f.name).join(', ')}</span>
+                        )}
+                      </span>
                       <span className="shrink-0 text-xs text-black/45 tabular-nums whitespace-nowrap">{i.quantity} {i.unit}</span>
                       <span className="shrink-0 text-sm font-bold text-[#16181A] tabular-nums whitespace-nowrap">objednat +{suggestedAmount(i)} {i.unit}</span>
                       {i.supplierUrl && (
@@ -2271,7 +2307,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
     <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
       <div ref={cm.ref} {...cm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]">Kategorie</h3>
+          <h3 className="t-card">Kategorie</h3>
           <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
@@ -2282,7 +2318,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           {flat.length > 0 && (
             <select value={newParent} onChange={e => setNewParent(e.target.value)}
               title="Kam ji zařadit"
-              className="shrink-0 max-w-[9rem] rounded-2xl bg-black/[0.04] border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+              className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
               <option value="">Hlavní</option>
               {flat.map(({ cat: c, depth }) => (
                 <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
@@ -2349,7 +2385,7 @@ function CategoryRow({
           <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveRename(); } if (e.key === 'Escape') cancelEdit(); }}
             onBlur={saveRename}
-            className="flex-1 min-w-0 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
+            className="flex-1 min-w-0 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
         ) : (
           <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
             {c.name}
@@ -2384,7 +2420,7 @@ function CategoryRow({
       </div>
 
       {moveOpen && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-black/[0.03] border border-black/[0.06] px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 well rounded-xl border border-black/[0.06] px-3 py-2">
           <span className="text-[11px] text-black/45">Zařadit:</span>
           <button onClick={() => setParent(null)} disabled={busy || c.parentId == null}
             className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId == null ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] on-accent hover:border-[#C8F542]'}`}>
@@ -2446,7 +2482,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
   };
 
   return (
-    <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+    <div className="mt-2.5 well border border-black/[0.06] p-3.5 space-y-3">
       <p className="text-[11px] text-black/50">
         Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.
       </p>
@@ -2532,7 +2568,7 @@ function PackagingEditor({ category, onSaved }: {
     setSteps(list => list.map((s, idx) => idx === i ? { ...s, ...patch } : s));
 
   return (
-    <div className="mt-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3.5 space-y-3">
+    <div className="mt-2.5 well border border-black/[0.06] p-3.5 space-y-3">
       <label className="flex items-start gap-2.5 cursor-pointer">
         <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
         <span className="min-w-0">
@@ -2656,7 +2692,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={pm.ref} {...pm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
-          <h3 className="text-lg font-bold tracking-tight text-[#16181A]"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
+          <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
           <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
@@ -2664,9 +2700,9 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
 
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Název dodavatele" maxLength={120}
-            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            className="field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200}
-            className="rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+            className="field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           <button onClick={add} disabled={busy || !name.trim()}
             className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
             Přidat
@@ -2683,14 +2719,14 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                 {editId === sp.id ? (
                   <span className="flex items-center gap-1.5">
                     <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="e-mail"
-                      className="tap-target-sm w-52 rounded-xl bg-black/[0.04] border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                      className="tap-target-sm w-52 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
                     <button onClick={async () => {
                       const res = await fetch('/api/suppliers', {
                         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
                       }).catch(() => null);
                       if (res?.ok) { setEditId(null); await onChanged(); }
-                    }} className="tap-target-sm rounded-full bg-[#16181A] text-white px-3 py-1.5 text-xs font-semibold">Uložit</button>
+                    }} className="tap-target-sm btn btn-primary btn-sm">Uložit</button>
                   </span>
                 ) : (
                   <>

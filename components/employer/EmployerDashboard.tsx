@@ -60,7 +60,7 @@ function StatCard({ icon, label, value, onClick, alert = false }: { icon: string
   return (
     <button onClick={onClick} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
       <div className="flex items-start justify-between">
-        <p className="text-xs uppercase tracking-wider text-black/45">{label}</p>
+        <p className="t-label">{label}</p>
         <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-600' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#5B7A08]'}`}>
           <Icon name={icon} size={16} />
         </span>
@@ -329,7 +329,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
           </div>
-          <span className="shrink-0 rounded-full bg-[#16181A] text-white px-4 py-2 text-sm font-semibold whitespace-nowrap">Otevřít →</span>
+          <span className="shrink-0 btn btn-primary btn-sm whitespace-nowrap">Otevřít →</span>
         </div>
       </a>
     ) : null,
@@ -373,7 +373,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08] shrink-0"><Icon name="award" size={17} /></span>
                     <div className="min-w-0">
-                      <h3 className="font-bold tracking-tight text-[#16181A]">Ohodnotit směny</h3>
+                      <h3 className="t-card">Ohodnotit směny</h3>
                       <p className="text-xs text-black/45">Projdi, co kdo udělal, a dej hodnocení.</p>
                     </div>
                   </div>
@@ -422,7 +422,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
                           )}
-                          <button onClick={() => setRating(r)} className="tap-target-sm rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:brightness-125 transition shrink-0">
+                          <button onClick={() => setRating(r)} className="tap-target-sm btn btn-primary btn-sm transition shrink-0">
                             {r.reviewed ? 'Upravit' : 'Ohodnotit'}
                           </button>
                         </div>
@@ -437,14 +437,14 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             <div className="glass-card p-6">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="min-w-0">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Dostupnost — {monthLabel}</h3>
+                  <h3 className="t-card">Dostupnost — {monthLabel}</h3>
                   <p className="text-sm text-black/45">{submittedIds.size} z {members.length} zaměstnanců zadalo dostupnost</p>
                 </div>
                 <button onClick={() => onNavigate('shifts')} className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110 whitespace-nowrap shrink-0">Sestavit rozvrh</button>
               </div>
               {notSubmitted.length > 0 ? (
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-black/45 mb-2">Ještě nezadali</p>
+                  <p className="t-label mb-2">Ještě nezadali</p>
                   <div className="flex flex-wrap gap-2">
                     {notSubmitted.map(m => (
                       <PersonLink key={m.id} id={m.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/60">{m.avatar} {m.name}</PersonLink>
@@ -461,7 +461,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     lowStock: (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Nízké zásoby</h3>
+                  <h3 className="t-card">Nízké zásoby</h3>
                   <button onClick={() => onNavigate('inventory')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Sklad →</button>
                 </div>
                 {lowStock.length === 0 ? (
@@ -471,7 +471,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                     {lowStock.slice(0, 5).map(i => {
                       const isCritical = i.status ? i.status === 'critical' : i.quantity <= (i.criticalQuantity ?? i.critical_quantity ?? 0);
                       return (
-                        <div key={i.id} className="flex items-center justify-between p-3 rounded-2xl bg-black/[0.04]">
+                        <div key={i.id} className="flex items-center justify-between p-3 well">
                           <span className="text-sm text-[#16181A]">{i.name}</span>
                           <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-orange-500/15 text-orange-600'}`}>{i.quantity} {i.unit}</span>
                         </div>
@@ -484,7 +484,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     todayShifts: (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold tracking-tight text-[#16181A]">Dnešní směny</h3>
+                  <h3 className="t-card">Dnešní směny</h3>
                   <button onClick={() => onNavigate('shifts')} className="tap-target-sm text-sm text-[#5B7A08] hover:brightness-110">Rozvrh →</button>
                 </div>
                 {todayShifts.length === 0 ? (
@@ -492,7 +492,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 ) : (
                   <div className="space-y-2">
                     {todayShifts.map(s => (
-                      <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-black/[0.04]">
+                      <div key={s.id} className="flex items-center gap-3 p-3 well">
                         <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-orange-500' : 'text-[#0A6FE0]'} /></span>
                         <div>
                           <PersonLink id={s.employeeId ?? s.employee_id}><p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p></PersonLink>
@@ -553,9 +553,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       })()}
 
       {(pendingApprovals.timeoff > 0 || pendingApprovals.swaps > 0 || pendingApprovals.closings > 0) && (
-        <div className="rounded-3xl border border-orange-500/25 bg-orange-500/[0.07] p-4 sm:p-5">
-          <p className="font-bold text-[#16181A] flex items-center gap-2 mb-2">
-            <Icon name="warning" size={17} className="text-orange-600" /> Čeká na tvoje rozhodnutí
+        <div className="card card-wait p-4 sm:p-5">
+          <p className="t-card flex items-center gap-2 mb-2.5">
+            <Icon name="warning" size={17} className="text-[var(--wait-ink)]" /> Čeká na tvoje rozhodnutí
           </p>
           <div className="flex flex-wrap gap-2">
             {pendingApprovals.timeoff > 0 && (

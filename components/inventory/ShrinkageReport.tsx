@@ -58,17 +58,17 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
+        <div className="well border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Chybí</p>
           <p className="text-[15px] sm:text-lg font-bold tabular-nums text-red-600 whitespace-nowrap">{money(Math.abs(t.lostValue))}</p>
           <p className="text-[11px] text-black/35">{t.missing} položek</p>
         </div>
-        <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
+        <div className="well border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Přebývá</p>
           <p className="text-[15px] sm:text-lg font-bold tabular-nums text-[#5B7A08] whitespace-nowrap">{money(t.surplusValue)}</p>
           <p className="text-[11px] text-black/35">{t.surplus} položek</p>
         </div>
-        <div className="col-span-2 sm:col-span-1 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
+        <div className="col-span-2 sm:col-span-1 well border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Celkem</p>
           <p className={`text-[15px] sm:text-lg font-bold tabular-nums whitespace-nowrap ${t.netValue < 0 ? 'text-red-600' : 'text-[#16181A]'}`}>
             {t.netValue > 0 ? '+' : ''}{money(t.netValue)}
@@ -89,7 +89,7 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
       {!!d.rows?.length && (
         <div>
           <button type="button" onClick={() => setOpen(o => !o)}
-            className="w-full flex items-center justify-between gap-2 rounded-2xl bg-black/[0.03] border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
+            className="w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
             <span>Rozdíly po položkách ({d.rows?.length ?? 0})</span>
             <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${open ? 'rotate-180' : ''}`} />
           </button>

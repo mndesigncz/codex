@@ -19,10 +19,10 @@ type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 /** Zkratky měsíců pro dlaždici akce — celý název by se tam nevešel. */
 const MONTHS = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
 
-const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
-const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
+const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 btn btn-secondary hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
+const input = 'field text-sm';
+const label = 'field-label';
 
 export default function BusinessPage({ slug }: { slug: string }) {
   const [d, setD] = useState<any | null>(null);
@@ -65,14 +65,14 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[13rem] sm:min-h-[16rem] flex flex-col justify-end p-5 sm:p-7`}>
+      <section className={`relative overflow-hidden rounded-3xl border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[13rem] sm:min-h-[16rem] flex flex-col justify-end p-5 sm:p-7`}>
         {b.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         )}
         {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/35 to-[#16181A]/5" />}
         {!b.coverUrl && (
-          <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none" aria-hidden>
+          <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none" aria-hidden>
             <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full blur-3xl" style={{ background: accent, opacity: 0.22 }} />
             <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#0A84FF]/10 blur-3xl" />
           </div>
@@ -161,7 +161,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
             {events!.map((e: any) => (
               <li key={e.id}>
                 <button type="button" onClick={() => setEvDetail(e)}
-                  className="w-full text-left rounded-3xl border border-black/[0.06] bg-white/60 p-4 flex gap-3.5 hover:bg-white/80 active:scale-[0.99] transition">
+                  className="w-full text-left card p-4 flex gap-3.5 hover:bg-white/80 active:scale-[0.99] transition">
                   {e.photos?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={e.photos[0]} alt="" className="shrink-0 h-14 w-14 rounded-2xl object-cover" />
@@ -192,7 +192,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
       <div className="space-y-6">
         {menu?.sections?.length ? menu.sections.map((s: any) => (
           <section key={s.id}>
-            <h2 className="text-lg font-bold tracking-tight mb-2">{s.title}</h2>
+            <h2 className="t-section mb-2">{s.title}</h2>
             <ul className="divide-y divide-black/[0.06]">
               {s.items.map((it: any) => (
                 <li key={it.id} className={`py-2.5 flex items-baseline gap-3 ${it.soldOut ? 'opacity-50' : ''}`}>
@@ -274,7 +274,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   return (
     <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 md:gap-10 items-start">
       <form onSubmit={submit} className="glass-card p-5 sm:p-6 grid gap-4" noValidate>
-        <h2 className="text-lg font-bold tracking-tight">Rezervovat stůl</h2>
+        <h2 className="t-section">Rezervovat stůl</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="grid gap-2">
             <label htmlFor="r-date" className={label}>Den</label>
@@ -302,7 +302,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
             <input id="r-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Kočárek, oslava, u okna…" className={input} maxLength={300} />
           </div>
         </div>
-        {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+        {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
         <button type="submit" disabled={busy || !slots.length} className={btnPrimary}>
           <Icon name="calendarCheck" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Odeslat rezervaci' : 'Přihlásit se a rezervovat'}
         </button>
@@ -364,7 +364,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
   return (
     <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6 md:gap-10 items-start">
       <section className="glass-card p-5 sm:p-6">
-        <h2 className="text-lg font-bold tracking-tight">Razítka a body</h2>
+        <h2 className="t-section">Razítka a body</h2>
         {me?.member ? (
           <>
             {(me.campaigns ?? []).length > 0 ? (
@@ -439,7 +439,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
             {campaigns.length > 0 && (
               <ul className="mt-4 space-y-3">
                 {campaigns.map((cp: any) => (
-                  <li key={cp.id} className="rounded-2xl bg-white/60 border border-black/[0.06] px-4 py-3">
+                  <li key={cp.id} className="well bg-white px-4 py-3">
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
                       <p className="text-xs text-black/50 tabular-nums shrink-0">{cp.required} razítek</p>
@@ -455,14 +455,14 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
           <label htmlFor="promo-code" className={label}>Máš promo kód?</label>
           <div className="flex gap-2">
             <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder="Z letáku nebo účtenky" autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
-            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
+            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-red-700">{promoErr}</p>}
         </form>
       </section>
       <section>
-        <h2 className="text-lg font-bold tracking-tight mb-3">Kupony za body</h2>
-        {err && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+        <h2 className="t-section mb-3">Kupony za body</h2>
+        {err && <p role="alert" className="mb-3 note note-danger text-sm px-3 py-2">{err}</p>}
         {coupons?.length ? (
           <ul className="divide-y divide-black/[0.06]">
             {coupons.map((c: any) => {
@@ -485,7 +485,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? 'zdarma' : `${c.cost_points} b.`}</p>
                     <button onClick={() => claim(c.id)} disabled={busy === c.id || (signedIn && me?.member && !can)}
-                      className="tap-target-sm mt-1 rounded-full bg-[#16181A] text-white px-3.5 py-1.5 text-xs font-semibold hover:bg-black active:scale-[0.97] disabled:opacity-40 transition">
+                      className="tap-target-sm mt-1 btn btn-primary btn-sm active:scale-[0.97] disabled:opacity-40 transition">
                       {busy === c.id ? '…' : 'Vzít'}
                     </button>
                   </div>
@@ -639,7 +639,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
       </div>
       <aside className="space-y-4 md:sticky md:top-24">
         <div className="glass-card p-5 space-y-3">
-          <h2 className="text-lg font-bold tracking-tight">Objednávka</h2>
+          <h2 className="t-section">Objednávka</h2>
           {lines.length === 0 ? <p className="text-sm text-black/55">Zatím prázdná. Přidej něco z nabídky.</p> : (
             <ul className="divide-y divide-black/[0.06] text-sm">
               {lines.map(l => <li key={l.id} className="py-1.5 flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums">{l.price * l.count} {cur}</span></li>)}
@@ -653,7 +653,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             <label htmlFor="o-note" className={label}>Poznámka pro obsluhu</label>
             <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Bez cukru, vyšší konvička…" className={input} maxLength={300} />
           </div>
-          {err && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-3 py-2">{err}</p>}
+          {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
           <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Objednat' : 'Přihlásit se a objednat'}</button>
           <p className="text-xs text-black/45">Platí se u obsluhy jako obvykle. Za každých 100 {cur} dostaneš {b.pointsPer100} bodů.</p>
         </div>
@@ -776,7 +776,7 @@ function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose
           )}
 
           {menu.length > 0 && (
-            <div className="mt-4 rounded-2xl border border-black/[0.06] bg-white/60 p-4">
+            <div className="mt-4 well bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Co se bude podávat</p>
               <ul className="divide-y divide-black/[0.06]">
                 {menu.map((l: any, i: number) => (

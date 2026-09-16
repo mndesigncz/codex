@@ -11,8 +11,8 @@ import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
 import { czDay, RES_STATUS, tierFor } from '@/lib/clientSlots';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field !py-2.5 text-sm';
+const label = 'field-label';
 const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n > 1 && n < 5 ? few : many);
 
 export default function MyPage() {
@@ -29,8 +29,8 @@ export default function MyPage() {
   }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
 
-  if (err) return <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>;
-  if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-[28px]" /><Skeleton className="h-24 rounded-3xl" /><Skeleton className="h-40 rounded-3xl" /></div>;
+  if (err) return <p className="note note-danger text-sm px-4 py-3">{err}</p>;
+  if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-3xl" /><Skeleton className="h-24 rounded-3xl" /><Skeleton className="h-40 rounded-3xl" /></div>;
 
   const open = (d.claims ?? []).filter((c: any) => !c.redeemed_at);
   const upcoming = (d.reservations ?? []).filter((r: any) => r.date >= d.today && !['cancelled', 'declined', 'done'].includes(r.status));
@@ -58,7 +58,7 @@ export default function MyPage() {
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {d.memberships.map((m: any) => (
               <li key={m.slug}>
-                <Link href={`/client/${m.slug}`} className="block rounded-3xl border border-black/[0.06] bg-white/60 hover:bg-white/80 active:scale-[0.99] transition p-5">
+                <Link href={`/client/${m.slug}`} className="block card active:scale-[0.99] transition p-5">
                   <div className="flex items-start gap-3">
                     <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
@@ -101,7 +101,7 @@ export default function MyPage() {
           </ul>
         ) : (
           <EmptyState icon="location" title="Zatím nejsi členem žádného podniku" hint="Vyber si podnik a přidej se. První body dostaneš hned."
-            action={<Link href="/client" className="tap-target inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 transition">Vybrat podnik</Link>} />
+            action={<Link href="/client" className="tap-target inline-flex items-center gap-2 btn btn-accent hover:brightness-105 transition">Vybrat podnik</Link>} />
         )}
       </section>
 
@@ -188,13 +188,13 @@ function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => v
     else copy();
   };
   return (
-    <section aria-labelledby="h-invite" className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 sm:p-5">
+    <section aria-labelledby="h-invite" className="card p-4 sm:p-5">
       <h2 id="h-invite" className="text-lg font-bold tracking-tight">Pozvi kamaráda</h2>
       <p className="mt-1 text-sm text-black/60 max-w-[52ch] text-pretty">Pošli mu odkaz. Když se přidá do podniku, kde jsi členem, dostanete oba body — pokud to podnik ve věrnosti zapnul.</p>
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         <span className="font-mono tracking-[0.2em] font-bold text-sm rounded-xl bg-black/[0.05] px-3 py-2">{code}</span>
-        <button type="button" onClick={copy} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-3.5 py-2 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] transition"><Icon name="copy" size={15} /> Kopírovat odkaz</button>
-        <button type="button" onClick={share} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-white px-3.5 py-2 text-sm font-semibold hover:bg-black active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
+        <button type="button" onClick={copy} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-secondary btn-sm hover:bg-black/[0.05] active:scale-[0.98] transition"><Icon name="copy" size={15} /> Kopírovat odkaz</button>
+        <button type="button" onClick={share} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-primary active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
       </div>
     </section>
   );
@@ -203,7 +203,7 @@ function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => v
 /** Kartička: tmavá, s QR. Kód i textem, kdyby čtečka selhala. */
 function MemberCard({ name, card }: { name: string; card: any | null }) {
   return (
-    <section aria-label="Kartička" className="rounded-[28px] bg-[#16181A] text-white p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 items-center">
+    <section aria-label="Kartička" className="rounded-3xl bg-[#16181A] text-white p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 items-center">
       <div className="min-w-0 order-2 sm:order-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C8F542] mb-2">Managero client</p>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter leading-[1.05] break-words">{name}</h1>
@@ -236,7 +236,7 @@ function ReviewPrompt({ p, onDone }: { p: any; onDone: () => void }) {
     onDone();
   };
   return (
-    <li className="rounded-3xl border border-black/[0.06] bg-white/60 p-4 sm:p-5">
+    <li className="card p-4 sm:p-5">
       <p className="font-semibold leading-tight">{p.business} <span className="text-black/50 font-medium">· {p.kind === 'order' ? 'objednávka od stolu' : 'rezervace'}</span></p>
       <div className="mt-2 flex items-center gap-1" role="radiogroup" aria-label="Hodnocení">
         {[1, 2, 3, 4, 5].map(n => (
@@ -246,7 +246,7 @@ function ReviewPrompt({ p, onDone }: { p: any; onDone: () => void }) {
       </div>
       <div className="mt-2 flex gap-2 flex-wrap">
         <input value={note} onChange={e => setNote(e.target.value)} placeholder="Pár slov, když chceš" aria-label="Poznámka k hodnocení" className={`${input} flex-1 basis-48`} maxLength={500} />
-        <button type="button" onClick={send} disabled={busy} className="tap-target inline-flex items-center gap-2 rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Odeslat'}</button>
+        <button type="button" onClick={send} disabled={busy} className="tap-target inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Odeslat'}</button>
       </div>
       {err && <p role="alert" className="mt-2 text-sm text-red-700">{err}</p>}
     </li>
@@ -270,12 +270,12 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: (me: any) => void }) {
       <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
         <Icon name="chevron" size={16} className="transition-transform group-open:rotate-180" />Účet
       </summary>
-      <form onSubmit={save} className="mt-3 rounded-3xl border border-black/[0.06] bg-white/60 p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end max-w-2xl">
+      <form onSubmit={save} className="mt-3 card p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end max-w-2xl">
         <div><label htmlFor="pf-name" className={label}>Jméno</label><input id="pf-name" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} className={input} required /></div>
         <div><label htmlFor="pf-phone" className={label}>Telefon</label><input id="pf-phone" type="tel" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} placeholder="Pro potvrzení rezervace" className={input} /></div>
         <div><label htmlFor="pf-bday" className={label}>Narozeniny</label><input id="pf-bday" type="date" value={f.birthday} onChange={e => setF({ ...f, birthday: e.target.value })} className={input} /></div>
         <p className="sm:col-span-2 text-xs text-black/50">E-mail: {me?.email}. Narozeniny vidí jen podniky, kde jsi členem, kvůli přání a odměně.</p>
-        <button type="submit" disabled={busy} className="tap-target justify-self-start sm:justify-self-end inline-flex items-center gap-2 rounded-full bg-[#16181A] text-white px-4 py-2.5 text-sm font-semibold hover:bg-black active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
+        <button type="submit" disabled={busy} className="tap-target justify-self-start sm:justify-self-end inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
         {err && <p role="alert" className="sm:col-span-3 text-sm text-red-700">{err}</p>}
       </form>
     </details>

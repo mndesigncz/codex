@@ -207,7 +207,7 @@ function ItemRow({ item, packaging, onChanged }: {
           {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
         </p>
         <button onClick={() => apply({ archived: false })} disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542] text-black px-5 py-3 text-sm font-bold min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
+          className="inline-flex items-center gap-1.5 btn btn-accent btn-lg min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
           <Icon name="check" size={15} /> Máme zpátky
         </button>
       </div>
@@ -341,7 +341,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
           </p>
         </div>
         <button onClick={onDone}
-          className="rounded-full bg-[#16181A] text-white px-6 py-3 text-sm font-bold min-h-[48px] active:scale-[0.97] transition">
+          className="btn btn-primary btn-lg min-h-[48px] active:scale-[0.97] transition">
           Zpět na seznam
         </button>
       </section>
