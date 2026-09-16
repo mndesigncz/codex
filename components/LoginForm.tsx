@@ -35,7 +35,7 @@ export default function LoginForm() {
   const inputClass = 'w-full rounded-2xl bg-black/[0.03] border border-black/[0.09] px-4 py-3.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542] focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-3 sm:p-6">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center p-3 sm:p-6">
       <div className="w-full max-w-5xl grid md:grid-cols-2 rounded-[32px] overflow-hidden bg-white/70 backdrop-blur-xl border border-black/[0.06] shadow-[0_30px_80px_rgba(25,35,15,0.12)]">
         {/* Left — brand panel */}
         <div className="relative hidden md:flex flex-col justify-between p-10 min-h-[560px] overflow-hidden">

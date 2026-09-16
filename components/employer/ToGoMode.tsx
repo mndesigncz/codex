@@ -98,7 +98,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F1F4EC] pb-16"
+    <div className="min-h-[100dvh] bg-[#F1F4EC] pb-16"
       style={{ backgroundImage: 'radial-gradient(1100px 500px at 85% -10%, rgba(200,245,66,0.22), transparent 60%), radial-gradient(900px 500px at -15% 25%, rgba(143,184,17,0.10), transparent 55%)' }}>
 
       {/* Floating glass header */}

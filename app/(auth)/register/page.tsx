@@ -47,7 +47,7 @@ export default function RegisterPage() {
   // Success screen — reveal the team join code
   if (joinCode) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-[100dvh] flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center">
           <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
           <div className="glass-card p-8">
@@ -72,7 +72,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-5"><LogoMark size={64} /></div>

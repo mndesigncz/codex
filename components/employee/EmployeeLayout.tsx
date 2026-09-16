@@ -107,7 +107,7 @@ export default function EmployeeLayout({ user }: Props) {
     .filter(g => g.items.length);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[100dvh] overflow-hidden">
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-[28px] text-[#16181A] flex-col transition-all duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
           <LogoMark size={40} />
