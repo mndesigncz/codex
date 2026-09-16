@@ -19,6 +19,7 @@ interface Task {
   teamTask?: boolean;
   completedByName?: string | null;
   checklist?: ChecklistItem[];
+  source?: string | null;
 }
 
 interface Props {
@@ -134,13 +135,16 @@ export default function Tasks({ user }: Props) {
                 {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
-            {task.description && <p className="text-sm text-black/55 mt-1.5">{task.description}</p>}
+            {task.description && <p className="text-sm text-black/55 mt-1.5 whitespace-pre-wrap">{task.description}</p>}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {task.dueDate && (
                 <p className={`text-xs ${task.dueDate < today && task.status !== 'done' ? 'text-red-600 font-medium' : 'text-black/45'}`}>
                   {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                   {task.dueDate < today && task.status !== 'done' && ' · po termínu'}
                 </p>
+              )}
+              {task.source === 'production' && (
+                <span className="chip chip-sm chip-info" title="Odškrtnutí naskladní dávku a odepíše suroviny"><Icon name="leaf" size={12} className="inline -mt-0.5 mr-1 shrink-0" /> Výroba</span>
               )}
               {task.teamTask && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-semibold"><Icon name="calendar" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro kohokoliv</span>

@@ -6,6 +6,7 @@ import { Avatar } from '../ui';
 import ClockWidget from '../employer/ClockWidget';
 import AnnouncementBanner from '../AnnouncementBanner';
 import StaffInbox from '../client/StaffInbox';
+import ProductionBoard from '../inventory/ProductionBoard';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
 import { pragueToday, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
@@ -97,7 +98,9 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
   const nextShift = upcoming[0];
   const activeTasks = tasks.filter(t => t.status !== 'done');
-  const lowStock = inventory.filter(i => i.quantity <= i.minQuantity);
+  // Stav ze serveru — stejná odpověď jako Sklad (načatá balení, kritický práh).
+  // Vlastní výroba sem nepatří, ta má svůj panel „K výrobě".
+  const lowStock = inventory.filter(i => !i.madeInHouse && (i.status ? i.status !== 'ok' : i.quantity <= i.minQuantity));
 
   // Feedback the employee hasn't acknowledged yet. Capped to the last week so a
   // database without the seen_at column can't keep the card open forever.
@@ -357,6 +360,9 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
       {/* Objednávky od stolu a dnešní rezervace: kdo je na směně, vidí je
           hned pod pozdravem. Když nic není, pruh se nevykreslí. */}
       <StaffInbox compact />
+
+      {/* Co si směna má uvařit / namíchat, s recepturou — vzniká samo z docházejícího skladu. */}
+      <ProductionBoard onOpenTasks={() => onNavigate('tasks')} />
 
       {layout.map((e, i) =>
         e.type === 'link'

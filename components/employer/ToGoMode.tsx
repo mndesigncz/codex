@@ -11,6 +11,7 @@ import { Avatar } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { useTheme } from '../ThemeProvider';
 import ReceiptsPanel from './ReceiptsPanel';
+import ProductionBoard from '../inventory/ProductionBoard';
 
 function pragueToday(offset = 0): string {
   return new Date(Date.now() + offset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
@@ -52,8 +53,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       setRoster(Array.isArray(d.roster) ? d.roster : []);
     }).catch(() => {});
     fetch('/api/inventory').then(r => r.json()).then(d => {
-      const items = Array.isArray(d.items) ? d.items : [];
-      setLowItems(items.filter((i: any) => i.status === 'low' || i.status === 'critical'));
+      // Endpoint vrací holé pole; dřív se četlo d.items a dlaždice byla vždy prázdná.
+      const items = Array.isArray(d) ? d : Array.isArray(d?.items) ? d.items : [];
+      setLowItems(items.filter((i: any) => !i.madeInHouse && (i.status === 'low' || i.status === 'critical')));
     }).catch(() => {});
   }, []);
 
@@ -247,6 +249,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             </div>
           </button>
         )}
+
+        {/* K výrobě — z docházejícího skladu rovnou úkol s recepturou. */}
+        <ProductionBoard compact onOpenTasks={() => onOpenView('tasks')} />
 
         {/* Receipts — the TO GO superpower */}
         <ReceiptsPanel compact />

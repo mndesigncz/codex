@@ -19,6 +19,7 @@ interface Task {
   assigneeName?: string | null;
   assigneeAvatar?: string | null;
   completedByName?: string | null;
+  source?: string | null;
 }
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
@@ -108,7 +109,8 @@ export default function KioskTasks() {
               <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${prioDot(t.priority)}`} />
               {t.title}
             </p>
-            {t.description && !isDone && <p className="text-sm text-black/50 mt-1">{t.description}</p>}
+            {t.source === 'production' && !isDone && <span className="chip chip-sm chip-info mt-1">Výroba · odškrtnutí naskladní dávku</span>}
+            {t.description && !isDone && <p className="text-sm text-black/50 mt-1 whitespace-pre-wrap">{t.description}</p>}
             <p className="text-xs text-black/40 mt-1.5 truncate">
               {t.teamTask || t.assignedTo == null ? 'Kdokoliv' : `${t.assigneeAvatar ?? '👤'} ${t.assigneeName ?? ''}`}
               {t.dueDate && (

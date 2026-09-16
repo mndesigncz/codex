@@ -49,6 +49,9 @@ export async function GET() {
         i.photo_url         AS "photoUrl",
         i.portions,
         i.category_id       AS "categoryId",
+        i.made_in_house     AS "madeInHouse",
+        i.batch_yield       AS "batchYield",
+        i.production_label  AS "productionLabel",
         i.updated_at        AS "updatedAt",
         i.updated_by        AS "updatedBy",
         u.name              AS "updatedByName",
@@ -59,6 +62,37 @@ export async function GET() {
       WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
       ORDER BY i.name ASC`;
   } catch {
+   try {
+    // Před migrací výroby: stejný výběr bez sloupců made_in_house/batch_yield.
+    items = await sql`
+      SELECT
+        i.id, i.name, i.category, i.quantity,
+        i.min_quantity      AS "minQuantity",
+        i.critical_quantity AS "criticalQuantity",
+        i.max_quantity      AS "maxQuantity",
+        i.unit, i.supplier,
+        i.supplier_url      AS "supplierUrl",
+        i.unit_cost         AS "unitCost",
+        i.package_size      AS "packageSize",
+        i.open_amount       AS "openAmount",
+        i.content_unit      AS "contentUnit",
+        i.brand, i.description, i.archived,
+        i.hide_from_overview AS "hideFromOverview",
+        i.highlight,
+        i.approved, i.submitted_by AS "submittedBy",
+        i.photo_url         AS "photoUrl",
+        i.portions,
+        i.category_id       AS "categoryId",
+        i.updated_at        AS "updatedAt",
+        i.updated_by        AS "updatedBy",
+        u.name              AS "updatedByName",
+        s.name              AS "submittedByName"
+      FROM inventory_items i
+      LEFT JOIN users u ON u.id = i.updated_by
+      LEFT JOIN users s ON s.id = i.submitted_by
+      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      ORDER BY i.name ASC`;
+   } catch {
    try {
     items = await sql`
       SELECT
@@ -95,7 +129,23 @@ export async function GET() {
       WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
       ORDER BY i.name ASC`;
    }
+   }
   }
+
+  // Vlajky „koupit kvůli výrobě“: surovina, která chybí na dávku vlastního
+  // produktu, patří do nákupu i když sama pod limitem není.
+  const buyFor = new Map<number, { itemId: number; name: string; amount: number | null }[]>();
+  try {
+    const flags = await sql`
+      SELECT f.item_id, f.for_item_id, f.amount, p.name AS for_name
+      FROM purchase_flags f JOIN inventory_items p ON p.id = f.for_item_id
+      WHERE f.team_id = ${me.teamId}`;
+    for (const f of flags) {
+      const list = buyFor.get(Number(f.item_id)) ?? [];
+      list.push({ itemId: Number(f.for_item_id), name: String(f.for_name), amount: f.amount != null ? Number(f.amount) : null });
+      buyFor.set(Number(f.item_id), list);
+    }
+  } catch { /* před migrací */ }
 
   // The category decides whether the thresholds mean packages or content, so the
   // status is computed once here. Every screen reads `status` instead of
@@ -152,6 +202,10 @@ export async function GET() {
       archived: i.archived === true,
       status: stockStatus(sized as any, packaging),
       thresholdUnit: packaging?.thresholdUnit ?? 'package',
+      madeInHouse: i.madeInHouse === true,
+      batchYield: i.batchYield != null ? Number(i.batchYield) : null,
+      productionLabel: i.productionLabel ?? null,
+      buyFor: buyFor.get(Number(i.id)) ?? [],
     };
   }));
 }

@@ -18,6 +18,8 @@ import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
+import ProductionRecipe from '../inventory/ProductionRecipe';
+import ProductionBoard from '../inventory/ProductionBoard';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useModal } from '@/lib/useModal';
 
@@ -46,6 +48,11 @@ interface Item {
   submittedBy?: number | null;
   updatedAt?: string;
   updatedByName?: string;
+  madeInHouse?: boolean;
+  batchYield?: number | null;
+  productionLabel?: string | null;
+  /** koupit kvůli výrobě těchhle vlastních produktů */
+  buyFor?: { itemId: number; name: string; amount: number | null }[];
 }
 
 interface Category {
@@ -115,7 +122,9 @@ function suggestedAmount(i: Item): number {
   const base = i.maxQuantity && i.maxQuantity > 0
     ? i.maxQuantity - i.quantity
     : i.minQuantity * 2 - i.quantity;
-  return Math.max(1, Math.max(0, base));
+  // Surovina chybějící na výrobu: aspoň tolik, kolik na dávky chybí.
+  const forMaking = (i.buyFor ?? []).reduce((s, f) => s + (f.amount ?? 0), 0);
+  return Math.max(1, Math.max(0, base), Math.ceil(forMaking));
 }
 
 function plural(n: number) {
@@ -358,14 +367,17 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const low = active.filter(i => statusOf(i, pk) === 'low');
 
   // Items to (re)order: critical first, then low, alphabetically within each group.
+  // Vlastní výroba do nákupu nepatří — ta dostává úkol „vyrobit". Naopak
+  // surovina, která chybí na dávku, jde do nákupu i když sama pod limitem není.
   const toBuy = useMemo(() =>
     active
-      .filter(i => statusOf(i, pk) !== 'ok')
+      .filter(i => !i.madeInHouse && (statusOf(i, pk) !== 'ok' || (i.buyFor?.length ?? 0) > 0))
       .sort((a, b) => {
         const d = statusRank[statusOf(a, pk)] - statusRank[statusOf(b, pk)];
         return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
       }),
   [active, pk]);
+  const toMake = useMemo(() => active.filter(i => i.madeInHouse && statusOf(i, pk) !== 'ok'), [active, pk]);
 
   // Defaults for a category = everything its ancestors set, overridden by its
   // own, so a rule high up still holds while a subcategory can tweak one field.
@@ -731,6 +743,8 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             {critical.length > 0 && <span className="text-red-600">{critical.length} kriticky málo</span>}
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
             {low.length > 0 && <span className="text-orange-600">{low.length} dochází</span>}
+            {toMake.length > 0 && <span className="text-black/30">·</span>}
+            {toMake.length > 0 && <span className="text-[#0A5CC0]">{toMake.length} k výrobě</span>}
           </p>
           {/* Není to název, je to výčet — u 190 položek chtěl řádek 17 000 px.
               Na desktopu se z něj po `truncate` četlo pět procent, takže se
@@ -741,6 +755,10 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           </p>
         </div>
       )}
+
+      {/* Co si směna má vyrobit — s recepturou a stavem surovin. */}
+      <ProductionBoard onOpenTasks={onNavigate ? () => onNavigate('tasks') : undefined}
+        onChanged={msg => { setNotice(msg); load(); }} />
 
       {/* Toolbar */}
       <div ref={sentinel} aria-hidden className="h-px -mb-px" />
@@ -855,6 +873,15 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   unitLabel={editing.contentUnit ?? editing.unit}
                   onChanged={next => setPosUsage(u => ({ ...u, [String(editing.id)]: next }))}
                   onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
+                />
+              )}
+              {/* Z čeho se položka dělá — když ji vyrábíme sami. */}
+              {editing && (
+                <ProductionRecipe
+                  item={{ id: editing.id, name: editing.name, unit: editing.unit }}
+                  items={items.filter(i => !i.archived)}
+                  onSaved={r => setItems(prev => prev.map(x => x.id === r.itemId
+                    ? { ...x, madeInHouse: r.madeInHouse, batchYield: r.batchYield, productionLabel: r.productionLabel || null } : x))}
                 />
               )}
               {/* Section: základ */}
@@ -1695,7 +1722,10 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 {i.description && <p className="text-xs text-black/55 line-clamp-2 mt-0.5">{i.description}</p>}
                 <p className="text-xs text-black/40 line-clamp-2 mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
-              <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium shrink-0 ${chip}`}>{st === 'critical' ? 'Kriticky' : st === 'low' ? 'Dochází' : 'OK'}</span>
+              <span className="flex items-center gap-1 shrink-0">
+                {i.madeInHouse && <span className="chip chip-sm chip-info" title="Vyrábíme sami — místo nákupu dostane směna úkol">vyrábíme</span>}
+                <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${chip}`}>{st === 'critical' ? (i.madeInHouse ? 'Vyrobit' : 'Kriticky') : st === 'low' ? (i.madeInHouse ? 'Vyrobit' : 'Dochází') : 'OK'}</span>
+              </span>
             </div>
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
               <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
@@ -1998,7 +2028,8 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       lines.push('');
       lines.push(`${supplier}:`);
       list.forEach(i => {
-        lines.push(`• ${i.name} — objednat ${suggestedAmount(i)} ${i.unit} (zbývá ${i.quantity})`);
+        const why = (i.buyFor?.length ?? 0) > 0 ? ` — na výrobu: ${i.buyFor!.map(f => f.name).join(', ')}` : '';
+        lines.push(`• ${i.name} — objednat ${suggestedAmount(i)} ${i.unit} (zbývá ${i.quantity})${why}`);
       });
     });
     return lines.join('\n');
@@ -2068,8 +2099,13 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   const st = statusOf(i, pk);
                   return (
                     <div key={i.id} className="flex items-center gap-2.5 py-2.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} title={st === 'critical' ? 'Kriticky málo' : 'Dochází'} />
-                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-[#16181A]">{i.name}</span>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate text-sm font-medium text-[#16181A]">{i.name}</span>
+                        {(i.buyFor?.length ?? 0) > 0 && (
+                          <span className="block truncate text-[11px] text-[#0A5CC0]">na výrobu: {i.buyFor!.map(f => f.name).join(', ')}</span>
+                        )}
+                      </span>
                       <span className="shrink-0 text-xs text-black/45 tabular-nums whitespace-nowrap">{i.quantity} {i.unit}</span>
                       <span className="shrink-0 text-sm font-bold text-[#16181A] tabular-nums whitespace-nowrap">objednat +{suggestedAmount(i)} {i.unit}</span>
                       {i.supplierUrl && (

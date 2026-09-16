@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { ensureProductionTasks, produceBatch } from '@/lib/production';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,9 @@ const shape = (r: any) => ({
   assigneeName: r.assignee_name ?? null, assigneeAvatar: r.assignee_avatar ?? null,
   completedBy: r.completed_by ?? null,
   completedByName: r.completed_by_name ?? null, completedByAvatar: r.completed_by_avatar ?? null,
+  source: r.source ?? null,
+  sourceRef: r.source_ref ?? null,
+  sourceMeta: r.source_meta ?? null,
 });
 
 const RECURRENCES = ['daily', 'weekdays', 'weekly'];
@@ -111,7 +115,11 @@ export async function GET() {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
-  if (c.teamId) { try { await topUpSeries(c.teamId); } catch { /* ignore */ } }
+  if (c.teamId) {
+    try { await topUpSeries(c.teamId); } catch { /* ignore */ }
+    // Docházející vlastní produkty mají mít úkol „vyrobit“ ještě než se seznam otevře.
+    try { await ensureProductionTasks(c.teamId, null); } catch { /* před migrací */ }
+  }
 
   const teamWide = (c.role === 'employer' || c.role === 'kiosk') && c.teamId;
   const order = `ORDER BY (t.status = 'done'), t.due_date ASC NULLS LAST, t.created_at DESC`;
@@ -427,6 +435,19 @@ export async function PATCH(req: NextRequest) {
   const effectiveId = await resolveActingUser(c.meId, c.role, c.teamId, b.actingAs, req);
   let row: any;
   const done = b.status === 'done';
+  // Výrobní úkol: odškrtnutí = vyrobeno. Dávka se naskladní a suroviny odepíšou
+  // tady na serveru, aby to platilo z appky, tabletu i z telefonu stejně.
+  if (done && task.source === 'production' && task.source_ref && taskTeam && !task.source_meta?.produced) {
+    try {
+      await produceBatch(Number(taskTeam), Number(task.source_ref), Number(task.source_meta?.batches) || 1, effectiveId, { taskId: id });
+      const [fresh] = await sql`
+        SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar,
+               cu.name AS completed_by_name, cu.avatar AS completed_by_avatar
+        FROM tasks t LEFT JOIN users u ON u.id = t.assigned_to LEFT JOIN users cu ON cu.id = t.completed_by
+        WHERE t.id = ${id}`;
+      if (fresh) return NextResponse.json(shape(fresh));
+    } catch { /* položka mezitím zmizela nebo přestala být vlastní výroba — dokončí se jako běžný úkol */ }
+  }
   try {
     [row] = await sql`
       UPDATE tasks SET status = ${b.status}, completed_by = ${done ? effectiveId : null},

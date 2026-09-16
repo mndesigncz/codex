@@ -25,6 +25,7 @@ interface Task {
   completedBy?: number | null;
   completedByName?: string | null;
   completedByAvatar?: string | null;
+  source?: string | null;
 }
 interface Member { id: number; name: string; role: string; avatar?: string }
 
@@ -241,6 +242,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                 {!compact && t.dueDate ? ` · ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}` : ''}
                 {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
               </span>
+              {t.source === 'production' && (
+                <span className="chip chip-sm chip-info shrink-0" title="Vzniká sám, když dochází vlastní výroba">Výroba</span>
+              )}
               {recurrenceLabel(t.recurrence) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>
               )}
