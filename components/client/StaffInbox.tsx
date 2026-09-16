@@ -178,7 +178,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
           </button>
         </p>
       )}
-      {flash && <p role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
+      {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
       {compact ? (
         <details className="group">
           <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none"><Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" /></summary>

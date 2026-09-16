@@ -58,10 +58,10 @@ export default function Landing() {
               které rozumí celý tým od první směny.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Link href="/register" className="w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-7 py-3.5 text-sm font-semibold hover:brightness-105 shadow-[0_8px_24px_rgba(200,245,66,0.35)] transition-all inline-flex items-center justify-center gap-2">
+              <Link href="/register" className="pressable w-full sm:w-auto rounded-full bg-[#C8F542] on-accent px-7 py-3.5 text-sm font-semibold hover:brightness-105 active:scale-[0.97] shadow-[0_8px_24px_rgba(200,245,66,0.35)] inline-flex items-center justify-center gap-2">
                 Vyzkoušet {TRIAL_DAYS} dní zdarma <Icon name="chevron" size={15} className="-rotate-90" />
               </Link>
-              <a href="#cenik" className="w-full sm:w-auto rounded-full glass border border-black/[0.08] px-7 py-3.5 text-sm font-semibold text-black/70 hover:text-black transition-all inline-flex items-center justify-center">
+              <a href="#cenik" className="pressable w-full sm:w-auto rounded-full glass border border-black/[0.08] px-7 py-3.5 text-sm font-semibold text-black/70 hover:text-black active:scale-[0.97] inline-flex items-center justify-center">
                 Kolik to stojí?
               </a>
             </div>

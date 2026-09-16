@@ -119,8 +119,19 @@ input::-webkit-date-and-time-value { text-align: left; }
   to   { opacity: 1; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .modal-sheet { animation: pangea-sheet-in 0.28s cubic-bezier(0.2, 0.8, 0.3, 1); }
-  .modal-overlay { animation: pangea-fade-in 0.2s ease-out; }
+  /* Okno dorazí rychle a měkce dosedne (silné ease-out); pozadí ztmavne
+     dřív než okno dojede, ať se nezdá, že se objevilo z ničeho. */
+  .modal-sheet { animation: pangea-sheet-in 0.24s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)); }
+  .modal-overlay { animation: pangea-fade-in 0.16s ease-out; }
+}
+
+/* Toast: přijede shora o kousek, opacitou; jeden tvar pro celou aplikaci. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toast-in { animation: toast-in 0.22s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both; }
 }
 
 .modal-sheet {

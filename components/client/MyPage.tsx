@@ -41,7 +41,7 @@ export default function MyPage() {
     <div className="space-y-8 sm:space-y-10">
       <MemberCard name={d.me?.name} card={card} />
 
-      {flash && <p role="status" className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
+      {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
 
       {pending.length > 0 && (
         <section aria-labelledby="h-review">
