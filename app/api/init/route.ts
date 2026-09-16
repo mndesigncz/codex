@@ -898,6 +898,10 @@ export async function GET(request: Request) {
         PRIMARY KEY (event_id, customer_id)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_event_follows_customer ON client_event_follows (customer_id)`);
+    // výjezd s vlastním Storyous terminálem: akce může číst jinou provozovnu
+    await ddl(sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS pos_place_id TEXT`);
+    // denní uzávěrka umí rozepsat okna akcí toho dne (kolik z tržby byla akce)
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS event_breakdown JSONB`);
     // POS connection (Storyous): one per team, credentials live server-side only
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS pos_connections (

@@ -90,6 +90,13 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
     // Menu akce jsou odkazy do nabídky — host má vidět aktuální jména a ceny.
     const menuIds = Array.from(new Set(rows.flatMap((r: any) => (Array.isArray(r.menu) ? r.menu : [])
       .map((l: any) => Number(l?.itemId)).filter((n: number) => Number.isFinite(n) && n > 0))));
+    const boardIds = Array.from(new Set(rows.flatMap((r: any) => (Array.isArray(r.menu) ? r.menu : [])
+      .map((l: any) => Number(l?.boardId)).filter((n: number) => Number.isFinite(n) && n > 0))));
+    let boardRows: any[] = [];
+    if (boardIds.length) {
+      try { boardRows = await sql`SELECT id, name FROM menu_boards WHERE team_id = ${teamId} AND id = ANY(${boardIds})` as any[]; } catch { boardRows = []; }
+    }
+    const boardById = new Map(boardRows.map((r: any) => [Number(r.id), String(r.name)]));
     let menuRows: any[] = [];
     if (menuIds.length) {
       try { menuRows = await sql`SELECT id, name, price FROM menu_items WHERE id = ANY(${menuIds})` as any[]; } catch { menuRows = []; }
@@ -114,6 +121,11 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
       photos: Array.isArray(r.photos) ? r.photos.filter((x: any) => /^\/api\/client\/img\/\d+$/.test(String(x))).slice(0, 8) : [],
       menu: (Array.isArray(r.menu) ? r.menu.slice(0, 30) : [])
         .map((l: any) => {
+          const boardId = Number(l?.boardId);
+          if (Number.isFinite(boardId) && boardId > 0) {
+            const bn = boardById.get(boardId);
+            return bn ? { board: true, name: bn, price: null } : null;
+          }
           const itemId = Number(l?.itemId);
           if (Number.isFinite(itemId) && itemId > 0) {
             const hit = menuById.get(itemId);

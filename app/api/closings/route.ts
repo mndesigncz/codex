@@ -6,6 +6,8 @@ import { notifyUser } from '@/lib/push';
 import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { windowOf, coveredBy } from '@/lib/shiftWindow';
+import { getConnection } from '@/lib/storyous';
+import { eventWindowFromPos } from '@/lib/eventPos';
 
 export const dynamic = 'force-dynamic';
 
@@ -255,6 +257,8 @@ export async function GET() {
 }
 
 // POST — create a closing (employee or employer). Bound to the author's team.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
@@ -566,6 +570,37 @@ export async function POST(request: Request) {
         row.event_id = eventId;
       } catch { /* column not migrated yet */ }
     }
+  }
+
+  // ---- „podřadná uzávěrka" akce: denní uzávěrka sama rozepíše okna akcí ----
+  // Když se ten den u nás koná akce s časem, uzávěrka pozná kolik z tržby
+  // spadlo do jejího okna (z účtenek pokladny) a rozpis si uloží k sobě.
+  // Jen informativní vrstva — částky uzávěrky se nemění, finance nedvojí.
+  if (row?.id && eventId == null) {
+    try {
+      const dayEvents = await sql`
+        SELECT id, title, start_time, end_time FROM events
+        WHERE team_id = ${c.teamId} AND date = ${shiftDate} AND status <> 'cancelled'
+          AND offsite = FALSE AND start_time IS NOT NULL`;
+      if ((dayEvents as any[]).length) {
+        const conn = await getConnection(c.teamId);
+        if (conn) {
+          const breakdown: any[] = [];
+          for (const ev2 of (dayEvents as any[]).slice(0, 3)) {
+            try {
+              const w = await eventWindowFromPos(conn, { date: shiftDate, startTime: ev2.start_time, endTime: ev2.end_time }, 8);
+              breakdown.push({ eventId: Number(ev2.id), title: String(ev2.title), from: w.from, till: w.till, revenue: w.revenue, bills: w.bills });
+            } catch { /* jedno okno nesmí shodit uzávěrku */ }
+          }
+          if (breakdown.length) {
+            try {
+              await sql`UPDATE cash_closings SET event_breakdown = ${JSON.stringify(breakdown)}::jsonb WHERE id = ${row.id}`;
+              row.event_breakdown = breakdown;
+            } catch { /* sloupec před migrací */ }
+          }
+        }
+      }
+    } catch { /* rozpis je bonus — uzávěrka platí i bez něj */ }
   }
 
   if (tipsCard > 0 && row?.id) {
