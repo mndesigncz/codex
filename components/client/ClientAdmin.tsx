@@ -498,7 +498,8 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
                   </div>
                 </div>
                 {openId === c.id && (
-                  <div className="mt-2 ml-0 md:ml-12 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3 text-xs">
+                  <div className="mt-2 ml-0 md:ml-12 rounded-2xl bg-black/[0.03] border border-black/[0.06] p-3 text-xs space-y-3">
+                    <MemberGroups customerId={c.id} toast={toast} />
                     {ledger === null ? <Skeleton className="h-10 rounded-xl" /> : ledger.length === 0 ? <p className="text-black/55">Deník je prázdný.</p>
                       : <ul className="divide-y divide-black/[0.06]">{ledger.map((l: any) => (
                           <li key={l.id} className="py-1.5 flex gap-3"><span className="text-black/45 w-24 shrink-0">{dbTimeDayHM(l.created_at)}</span><span className={`w-12 shrink-0 font-semibold tabular-nums ${l.delta > 0 ? 'text-[#3E5406]' : l.delta < 0 ? 'text-red-700' : 'text-black/45'}`}>{l.delta > 0 ? '+' : ''}{l.delta}</span><span className="min-w-0 truncate">{l.note || l.kind}</span></li>))}</ul>}
@@ -507,6 +508,38 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
               </li>
             ))}
           </ul>}
+    </div>
+  );
+}
+
+/** Štítky skupin u člena: klepnutím se host do skupiny přidá / odebere.
+ *  Skupiny se zakládají ve Věrnost → Slevy a úrovně. */
+function MemberGroups({ customerId, toast }: { customerId: number; toast: (m: string) => void }) {
+  const [groups, setGroups] = useState<any[] | null>(null);
+  const [mine, setMine] = useState<number[]>([]);
+  const [busy, setBusy] = useState(0);
+  const load = useCallback(() => fetch(`/api/client/admin/groups?customerId=${customerId}`).then(r => r.json())
+    .then(d => { setGroups(d.groups ?? []); setMine(d.customerGroupIds ?? []); }).catch(() => setGroups([])), [customerId]);
+  useEffect(() => { load(); }, [load]);
+  if (groups === null || groups.length === 0) return null;
+  const flip = async (g: any) => {
+    const on = mine.includes(g.id);
+    setBusy(g.id);
+    try {
+      await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, [on ? 'remove' : 'add']: [customerId] }) });
+      setMine(on ? mine.filter(x => x !== g.id) : [...mine, g.id]);
+    } catch (e: any) { toast(e.message); }
+    setBusy(0);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-black/45 font-semibold uppercase tracking-wider text-[10px] mr-1">Skupiny</span>
+      {groups.map((g: any) => (
+        <button key={g.id} type="button" onClick={() => flip(g)} disabled={busy === g.id} aria-pressed={mine.includes(g.id)}
+          className={`tap-target-sm rounded-full px-2.5 py-1 text-[11px] font-semibold transition border ${mine.includes(g.id) ? 'bg-[#16181A] text-[#C8F542] border-[#16181A]' : 'bg-white/70 text-black/55 border-black/[0.09] hover:bg-black/[0.05]'}`}>
+          {g.name}
+        </button>
+      ))}
     </div>
   );
 }

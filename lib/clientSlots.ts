@@ -57,23 +57,27 @@ export const RES_STATUS: Record<string, { label: string; tone: 'wait' | 'ok' | '
 // pětadvacet návštěv opravdový štamgast.
 
 export interface TierRules {
-  silverAt?: number; goldAt?: number;
-  memberDiscount?: number; silverDiscount?: number; goldDiscount?: number;
+  silverAt?: number; goldAt?: number; platinumAt?: number;
+  memberDiscount?: number; silverDiscount?: number; goldDiscount?: number; platinumDiscount?: number;
 }
 
-export type TierId = 'bronze' | 'silver' | 'gold';
+export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum';
 
 export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null }
 
-/** Úroveň hosta i s tím, co z ní plyne — sleva a kolik chybí do další. */
+/** Úroveň hosta i s tím, co z ní plyne — sleva a kolik chybí do další.
+ *  Platina běží jen tam, kde ji podnik zapnul (platinumAt > 0). */
 export function tierFor(visits: number, r?: TierRules | null): Tier {
   const v = Math.max(0, Number(visits) || 0);
   const silverAt = Math.max(1, Number(r?.silverAt) || 10);
   const goldAt = Math.max(silverAt + 1, Number(r?.goldAt) || 25);
+  const platinumAt = Number(r?.platinumAt) > 0 ? Math.max(goldAt + 1, Number(r?.platinumAt)) : 0;
   const base = Math.max(0, Math.min(90, Number(r?.memberDiscount) || 0));
   const sd = Math.max(base, Math.min(90, Number(r?.silverDiscount) || 0));
   const gd = Math.max(sd, Math.min(90, Number(r?.goldDiscount) || 0));
-  if (v >= goldAt) return { id: 'gold', label: 'Zlatý host', discount: gd, nextAt: null, nextLabel: null };
+  const pd = Math.max(gd, Math.min(90, Number(r?.platinumDiscount) || 0));
+  if (platinumAt > 0 && v >= platinumAt) return { id: 'platinum', label: 'Platinový host', discount: pd, nextAt: null, nextLabel: null };
+  if (v >= goldAt) return { id: 'gold', label: 'Zlatý host', discount: gd, nextAt: platinumAt > 0 ? platinumAt : null, nextLabel: platinumAt > 0 ? 'Platinový host' : null };
   if (v >= silverAt) return { id: 'silver', label: 'Stříbrný host', discount: sd, nextAt: goldAt, nextLabel: 'Zlatý host' };
   return { id: 'bronze', label: 'Člen', discount: base, nextAt: silverAt, nextLabel: 'Stříbrný host' };
 }

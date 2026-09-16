@@ -6,7 +6,8 @@ import { normalizePlan } from '@/lib/floorplan';
 import { tierFor } from '@/lib/clientSlots';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
 import { activeCampaigns, progressFor } from '@/lib/stamps';
-import { pragueToday } from '@/lib/pragueTime';
+import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
+import { pragueToday, pragueHM } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -50,14 +51,16 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   const [menu, tables, coupons] = await Promise.all([
     menuFor(teamId, p.menu_slug ?? null),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
-    p.loyalty_on ? sql`SELECT id, title, description, cost_points, kind, valid_until FROM client_coupons
+    p.loyalty_on ? sql`SELECT * FROM client_coupons
                        WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND (valid_until IS NULL OR valid_until >= ${today})
                        ORDER BY cost_points, id` : Promise.resolve([]),
   ]);
 
   let mine: any = null;
+  let myBirthday: string | null = null;
   if (me) {
     const m = await membership(me.id, teamId);
+    try { const [us] = await sql`SELECT birthday FROM users WHERE id = ${me.id}`; myBirthday = us?.birthday ?? null; } catch { myBirthday = null; }
     const reservations = await sql`
       SELECT id, date, time, party, note, status, created_at FROM client_reservations
       WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date >= ${today} AND status NOT IN ('cancelled','declined','done')
@@ -66,8 +69,9 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
       SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;
     const tier = tierFor(Number(m?.visits ?? 0), {
-      silverAt: Number(p.silver_at), goldAt: Number(p.gold_at),
+      silverAt: Number(p.silver_at), goldAt: Number(p.gold_at), platinumAt: Number(p.platinum_at) || 0,
       memberDiscount: Number(p.member_discount), silverDiscount: Number(p.silver_discount), goldDiscount: Number(p.gold_discount),
+      platinumDiscount: Number(p.platinum_discount) || 0,
     });
     const myCamps = await activeCampaigns(teamId, today);
     const myProg = myCamps.length ? await progressFor(teamId, me.id) : new Map();
@@ -159,5 +163,24 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   let news: any[] = [];
   try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
   const plan = p.floorplan && p.ordering_on ? normalizePlan(p.floorplan) : null;
-  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons, news, events, stampCampaigns, me: mine, signedIn: !!me, today });
+
+  // Kupony v plné síle: výhoda + štítky podmínek, a přihlášenému členovi
+  // rovnou důvod, proč na kupon teď nedosáhne (okno, úroveň, 18+). Skupiny
+  // a limity se doříkají až při vyzvednutí — bez dotazu na každý kupon.
+  const hm = pragueHM();
+  const shapedCoupons = (coupons as any[]).map((r: any) => {
+    const s = shapeCoupon(r);
+    let blocked: string | null = windowOk(r, { today, hm });
+    if (!blocked && mine?.member && s.targetTiers.length && !s.targetTiers.includes(mine.level)) {
+      blocked = `Jen pro ${s.targetTiers.map((t: string) => TIER_LABELS[t]).join(' / ')}.`;
+    }
+    if (!blocked && mine?.member && s.adultOnly) {
+      const age = ageFrom(myBirthday, today);
+      if (age == null) blocked = 'Kupon je 18+ — doplň si datum narození v Moje.';
+      else if (age < 18) blocked = 'Jen pro plnoleté.';
+    }
+    // cost_points nechává starý název — stránka hosta ho už čte.
+    return { ...s, cost_points: s.costPoints, valid_until: s.validUntil, blocked };
+  });
+  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, me: mine, signedIn: !!me, today });
 }

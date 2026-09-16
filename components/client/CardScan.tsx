@@ -50,7 +50,8 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       const r = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: couponCode }) });
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      onToast(`Uplatněno: ${x.title}.`); setHit((h: any) => ({ ...h, openCoupons: (h.openCoupons ?? []).filter((c: any) => c.code !== couponCode) }));
+      onToast(`Uplatněno: ${x.title}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` Zkontroluj: ${x.badges.join(', ')}.` : ''}`);
+      setHit((h: any) => ({ ...h, openCoupons: (h.openCoupons ?? []).filter((c: any) => c.code !== couponCode) }));
     } catch (e: any) { setErr(e.message); }
     setBusy('');
   };
