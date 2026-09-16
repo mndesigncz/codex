@@ -212,6 +212,19 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   <Row label="Kasa na začátku" value={money(c.opening_cash)} />
                   <Row label="Tržba hotově" value={money(c.cash_revenue)} />
                   <Row label="Tržba kartou" value={money(c.card_revenue)} />
+                  {Array.isArray((c as any).event_breakdown) && (c as any).event_breakdown.length > 0 && (
+                    // „Podřadná uzávěrka" akce: kolik z denní tržby spadlo do
+                    // okna akce (z účtenek pokladny). Jen rozpis, nic se nemění.
+                    <div className="rounded-xl bg-[#0A84FF]/[0.06] border border-[#0A84FF]/20 px-3 py-2 my-1.5 space-y-1">
+                      {(c as any).event_breakdown.map((eb: any, i: number) => (
+                        <p key={i} className="text-sm text-[#16181A]">
+                          <Icon name="calendarCheck" size={14} className="inline -mt-0.5 mr-1.5 text-[#0A6FE0]" />
+                          Z toho akce „{eb.title}"{eb.from ? ` (${eb.from}–${eb.till ?? 'konec'})` : ''}: <span className="font-bold tabular-nums">{money(eb.revenue)}</span>
+                          <span className="text-black/45"> · {eb.bills} úč.</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
                   <Row label="Spropitné hotově" value={money(cashTips)} />
                   <Row label="Spropitné kartou" value={money(Number(c.tips_card) || 0)} />
                   <Row label="Výdaje z kasy" value={money(c.expenses)} />

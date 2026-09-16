@@ -715,8 +715,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <div className="rounded-2xl border border-[#0A84FF]/25 bg-[#0A84FF]/[0.06] p-4 space-y-2.5" role="radiogroup" aria-label="Za co je tahle uzávěrka">
               <p className="text-sm font-semibold text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {evsToday.length === 1 ? `Ten den se koná akce: ${evsToday[0].title}` : 'Ten den se konají akce'}</p>
               <p className="text-[12px] text-black/45">
-                Akce má vlastní kasu — její uzávěrka se ukládá zvlášť a nemíchá se s kasou
-                podniku. Denní uzávěrku podniku uděláš normálně vedle.
+                Výjezd s vlastní kasou má uzávěrku zvlášť („Za akci") a s kasou podniku se
+                nemíchá. U akce u nás stačí běžná uzávěrka podniku — kolik z tržby spadlo
+                do okna akce se po uložení rozepíše samo (z účtenek pokladny).
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button type="button" role="radio" aria-checked={eventId === ''} onClick={() => setEventId('')}

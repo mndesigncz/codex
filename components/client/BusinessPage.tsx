@@ -740,7 +740,7 @@ function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose
               <ul className="divide-y divide-black/[0.06]">
                 {menu.map((l: any, i: number) => (
                   <li key={i} className="py-1.5 flex items-baseline gap-3">
-                    <span className="min-w-0 flex-1">{l.name}</span>
+                    <span className="min-w-0 flex-1">{l.board ? <>Platí celá naše nabídka „{l.name}" <span className="text-black/45">— mrkni do záložky Menu</span></> : l.name}</span>
                     {l.price != null && <span className="shrink-0 text-sm text-black/60 tabular-nums">{l.price} {cur}</span>}
                   </li>
                 ))}

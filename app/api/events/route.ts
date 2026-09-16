@@ -25,7 +25,7 @@ async function me() {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
-function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number; menuById?: Map<number, { name: string; price: number | null }> }) {
+function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number; menuById?: Map<number, { name: string; price: number | null }>; menuBoards?: Map<number, { name: string; count: number }> }) {
   const crew = normalizeCrew(r.crew);
   return {
     id: r.id, title: r.title, description: r.description ?? null,
@@ -37,7 +37,8 @@ function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; clos
     checklist: normalizeChecklist(r.checklist),
     packing: normalizePacking(r.packing),
     photos: normalizePhotos(r.photos),
-    menu: resolveEventMenu(normalizeEventMenu(r.menu), extra?.menuById ?? new Map()),
+    menu: resolveEventMenu(normalizeEventMenu(r.menu), extra?.menuById ?? new Map(), extra?.menuBoards),
+    posPlaceId: r.pos_place_id ?? null,
     crew,
     crewPeople: crew.map(id => people.get(id) ?? { id, name: 'Neznámý', avatar: '👤' }),
     // U akce v podniku je základ obsluhy ten, kdo má ten den běžnou směnu.
@@ -68,8 +69,10 @@ export async function GET() {
     // Tři skupinové dotazy vedle sebe — kdo je ty dny na běžné směně (základ
     // obsluhy akce v podniku), kolik uzávěrek se k akcím váže a kolik hostů
     // akce sleduje / přijde. Po jednom na akci by to bylo 3×100 dotazů.
-    const menuIds = Array.from(new Set((rows as any[]).flatMap(r => normalizeEventMenu(r.menu).map(l => l.itemId).filter((x): x is number => x != null))));
-    const [people, shiftRows, closingRows, followRows, menuRows] = await Promise.all([
+    const allLines = (rows as any[]).flatMap(r => normalizeEventMenu(r.menu));
+    const menuIds = Array.from(new Set(allLines.map(l => l.itemId).filter((x): x is number => x != null)));
+    const boardIds = Array.from(new Set(allLines.map(l => l.boardId).filter((x): x is number => x != null)));
+    const [people, shiftRows, closingRows, followRows, menuRows, boardRows] = await Promise.all([
       teamPeople(u.team_id),
       dates.length ? sql`
         SELECT s.date, s.start_time, s.end_time, us.id, us.name, us.avatar
@@ -85,8 +88,16 @@ export async function GET() {
         FROM client_event_follows WHERE event_id = ANY(${ids})
         GROUP BY event_id`.catch(() => [] as any[]) : Promise.resolve([] as any[]),
       menuIds.length ? sql`SELECT id, name, price, pos_product_id FROM menu_items WHERE id = ANY(${menuIds})` : Promise.resolve([] as any[]),
+      boardIds.length ? sql`
+        SELECT mb.id, mb.name, COUNT(mi.id)::int AS count
+        FROM menu_boards mb
+        LEFT JOIN menu_sections ms ON ms.board_id = mb.id
+        LEFT JOIN menu_items mi ON mi.section_id = ms.id
+        WHERE mb.id = ANY(${boardIds}) AND mb.team_id = ${u.team_id}
+        GROUP BY mb.id, mb.name` : Promise.resolve([] as any[]),
     ]);
     const menuById = new Map((menuRows as any[]).map(r => [Number(r.id), { name: String(r.name), price: r.price == null ? null : Number(r.price), pos: !!r.pos_product_id }]));
+    const menuBoards = new Map((boardRows as any[]).map(r => [Number(r.id), { name: String(r.name), count: Number(r.count) || 0 }]));
     const byDate = new Map<string, any[]>();
     for (const r of shiftRows as any[]) {
       const k = String(r.date);
@@ -103,6 +114,7 @@ export async function GET() {
         followers: followsBy.get(Number(r.id))?.followers,
         going: followsBy.get(Number(r.id))?.going,
         menuById,
+        menuBoards,
       })),
       isEmployer: u.role === 'employer',
     });

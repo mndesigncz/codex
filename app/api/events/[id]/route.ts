@@ -187,21 +187,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await sql`UPDATE events SET photos = ${JSON.stringify(photos)}::jsonb WHERE id = ${id}`;
   }
   if (b.menu !== undefined) {
-    // Menu akce jsou odkazy do nabídky podniku — cizí ani smazané položky se
-    // neuloží (ověřuje se řetěz items → sections → boards vlastního týmu).
+    // Menu akce = odkazy do nabídky podniku: celé tabule ({boardId}), jednotlivé
+    // položky ({itemId}) a u výjezdů volné řádky. Cizí ani smazané odkazy se
+    // neuloží (ověřuje se vlastnictví přes boards týmu).
     const want = normalizeEventMenu(b.menu);
     const wantIds = want.map(l => l.itemId).filter((x): x is number => x != null);
-    const owned = wantIds.length
-      ? await sql`
+    const wantBoards = want.map(l => l.boardId).filter((x): x is number => x != null);
+    const [owned, ownedBoards] = await Promise.all([
+      wantIds.length ? sql`
           SELECT mi.id FROM menu_items mi
           JOIN menu_sections ms ON ms.id = mi.section_id
           JOIN menu_boards mb ON mb.id = ms.board_id
-          WHERE mb.team_id = ${u.team_id} AND mi.id = ANY(${wantIds})`
-      : [] as any[];
+          WHERE mb.team_id = ${u.team_id} AND mi.id = ANY(${wantIds})` : Promise.resolve([] as any[]),
+      wantBoards.length ? sql`
+          SELECT id FROM menu_boards WHERE team_id = ${u.team_id} AND id = ANY(${wantBoards})` : Promise.resolve([] as any[]),
+    ]);
     const ownedSet = new Set((owned as any[]).map(r => Number(r.id)));
-    const menu = want.filter(l => l.itemId == null ? true : ownedSet.has(l.itemId))
-      .map(l => l.itemId != null ? { itemId: l.itemId } : l);
+    const ownedBoardSet = new Set((ownedBoards as any[]).map(r => Number(r.id)));
+    const menu = want
+      .filter(l => l.boardId != null ? ownedBoardSet.has(l.boardId) : l.itemId != null ? ownedSet.has(l.itemId) : true)
+      .map(l => l.boardId != null ? { boardId: l.boardId } : l.itemId != null ? { itemId: l.itemId } : l);
     await sql`UPDATE events SET menu = ${JSON.stringify(menu)}::jsonb WHERE id = ${id}`;
+  }
+  if (b.posPlaceId !== undefined) {
+    // Kasa akce: jiná provozovna Storyous pro výjezd s vlastním terminálem.
+    const v = b.posPlaceId ? String(b.posPlaceId).slice(0, 60) : null;
+    try { await sql`UPDATE events SET pos_place_id = ${v} WHERE id = ${id}`; } catch { /* před migrací */ }
   }
 
   // ---- rozkřiknout členům: novinka na stránce podniku + push všem členům ----

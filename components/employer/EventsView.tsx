@@ -28,7 +28,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
   const [err, setErr] = useState('');
   const [showPast, setShowPast] = useState(false);
 
-  const [menuSections, setMenuSections] = useState<any[]>([]);
+  const [menuBoards, setMenuBoards] = useState<any[]>([]);
   const load = async () => {
     try {
       const [ed, td, iv, mb] = await Promise.all([
@@ -40,10 +40,10 @@ export default function EventsView({ user }: { user: { id?: string } }) {
       setEvents(Array.isArray(ed.events) ? ed.events : []);
       setMembers((td.members ?? []).filter((m: any) => m.role !== 'kiosk'));
       setItems(Array.isArray(iv) ? iv.filter((i: any) => i.archived !== true && i.approved !== false) : []);
-      // Nabídka podniku po sekcích (přes všechny tabule) — menu akce se z ní jen odkazuje.
-      setMenuSections(Array.isArray(mb?.boards)
-        ? mb.boards.flatMap((bd: any) => (bd.sections ?? []).map((sec: any) => ({ ...sec, id: `${bd.id}-${sec.id}` })))
-            .filter((sec: any) => (sec.items ?? []).length > 0)
+      // Nabídka podniku po tabulích — menu akce si bere celé tabule i položky.
+      setMenuBoards(Array.isArray(mb?.boards)
+        ? mb.boards.map((bd: any) => ({ id: bd.id, name: bd.name, sections: (bd.sections ?? []).filter((sec: any) => (sec.items ?? []).length > 0) }))
+            .filter((bd: any) => bd.sections.length > 0)
         : []);
       if (ed.notMigrated) setErr('Akce budou dostupné po migraci (/api/init).');
     } catch { setErr('Akce se nepodařilo načíst.'); }
@@ -165,7 +165,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         <EventEditor onClose={() => setCreating(false)} onSaved={async (ev) => { setCreating(false); await load(); setDetail(ev); }} />
       )}
       {detail && (
-        <EventDetail event={detail} members={members} items={items} menuSections={menuSections} money={money} patch={patch}
+        <EventDetail event={detail} members={members} items={items} menuBoards={menuBoards} money={money} patch={patch}
           onClose={() => setDetail(null)}
           onDeleted={async () => { setDetail(null); await load(); }} />
       )}
@@ -267,8 +267,8 @@ function Sec({ title, children, action }: { title: string; children: React.React
   );
 }
 
-function EventDetail({ event: e, members, items, menuSections, money, patch, onClose, onDeleted }: {
-  event: any; members: any[]; items: any[]; menuSections: any[]; money: (n: number) => string;
+function EventDetail({ event: e, members, items, menuBoards, money, patch, onClose, onDeleted }: {
+  event: any; members: any[]; items: any[]; menuBoards: any[]; money: (n: number) => string;
   patch: (id: number, body: any) => Promise<boolean>;
   onClose: () => void; onDeleted: () => void;
 }) {
@@ -278,6 +278,9 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
   const [menuPickOpen, setMenuPickOpen] = useState(false);
   const [crewSearch, setCrewSearch] = useState('');
   const [crewOpen, setCrewOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customPrice, setCustomPrice] = useState('');
+  const [places, setPlaces] = useState<any | null>(null);
   const [pos, setPos] = useState<any | null>(null);
   const [posBusy, setPosBusy] = useState(false);
   const [posErr, setPosErr] = useState('');
@@ -299,12 +302,31 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
     patch(e.id, { crew: next });
   };
   const menuHas = (itemId: number) => (e.menu ?? []).some((l: any) => l.itemId === itemId);
+  const boardOn = (boardId: number) => (e.menu ?? []).some((l: any) => l.boardId === boardId);
   const toggleMenuItem = (itemId: number) => {
     const next = menuHas(itemId)
       ? (e.menu ?? []).filter((l: any) => l.itemId !== itemId)
       : [...(e.menu ?? []), { itemId }];
     patch(e.id, { menu: next });
   };
+  const toggleBoard = (boardId: number) => {
+    const next = boardOn(boardId)
+      ? (e.menu ?? []).filter((l: any) => l.boardId !== boardId)
+      : [...(e.menu ?? []), { boardId }];
+    patch(e.id, { menu: next });
+  };
+  const addCustomLine = () => {
+    if (!customName.trim()) return;
+    patch(e.id, { menu: [...(e.menu ?? []), { name: customName.trim(), price: customPrice === '' ? null : Number(customPrice) }] });
+    setCustomName(''); setCustomPrice('');
+  };
+
+  useEffect(() => {
+    if (!e.offsite) return;
+    let dead = false;
+    fetch('/api/pos/places').then(r => r.json()).then(d => { if (!dead) setPlaces(d); }).catch(() => {});
+    return () => { dead = true; };
+  }, [e.offsite]);
 
   const crewCandidates = members
     .filter(m => !e.crew.includes(m.id))
@@ -371,6 +393,23 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
               className={`${inputClass} basis-full`} />
           </div>
           {e.public && <p className="text-[11px] text-black/40 mt-1.5">Změnu termínu veřejné akce pošleme hostům, kteří ji sledují.</p>}
+          {/* Výjezd s vlastním Storyous terminálem: přiřaď akci její provozovnu
+              a tržby dvou kas se nikdy nesmíchají. Nabízí se jen, když má
+              merchant provozoven víc. */}
+          {e.offsite && places && (places.places ?? []).length > 1 && (
+            <div className="mt-2.5">
+              <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Kasa akce (provozovna Storyous)</label>
+              <select value={e.posPlaceId ?? ''} aria-label="Kasa akce"
+                onChange={ev3 => patch(e.id, { posPlaceId: ev3.target.value || null })}
+                className={inputClass}>
+                <option value="">Bez vlastní kasy — na místě jen hotovost (uzávěrka za akci)</option>
+                {(places.places ?? []).filter((pl: any) => pl.placeId !== places.current).map((pl: any) => (
+                  <option key={pl.placeId} value={pl.placeId}>{pl.name || pl.placeId}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-black/40 mt-1">S vlastní kasou umí akce načíst svoji tržbu za celý den — odděleně od podniku.</p>
+            </div>
+          )}
         </Sec>
 
         {/* lidé */}
@@ -514,8 +553,9 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
               {(e.menu ?? []).length > 0 && (
                 <ul className="space-y-1.5">
                   {(e.menu ?? []).map((l: any, i: number) => (
-                    <li key={`${l.itemId ?? 'x'}-${i}`} className="flex items-center gap-2.5 rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2 text-sm">
-                      <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name}</span>
+                    <li key={`${l.boardId ?? 'b'}-${l.itemId ?? 'x'}-${i}`} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm ${l.boardId != null ? 'bg-[#C8F542]/[0.10] border-[#C8F542]/30' : 'bg-white/60 border-black/[0.06]'}`}>
+                      {l.boardId != null && <Icon name="leaf" size={14} className="shrink-0 text-[#4F6A07]" />}
+                      <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.boardId != null ? <>Celá nabídka „{l.name}"<span className="text-black/45"> · {l.count ?? 0} položek</span></> : l.name}</span>
                       {l.itemId != null && (
                         l.pos
                           ? <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#C8F542]/15 text-[#4F6A07] px-2 py-0.5 text-[11px] font-semibold" title="Spárováno s pokladnou — dá se namarkovat a tiskne se"><Icon name="receipt" size={11} />kasa</span>
@@ -531,9 +571,20 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
               )}
               {menuPickOpen && (
                 <div className="mt-2 rounded-2xl bg-white/70 border border-black/[0.08] p-3 max-h-64 overflow-y-auto scrollbar-thin space-y-3">
-                  {menuSections.length === 0 ? (
+                  {menuBoards.length === 0 ? (
                     <p className="text-sm text-black/45">Nabídka je prázdná — nejdřív ji naplň v sekci Menu.</p>
-                  ) : menuSections.map((sec: any) => (
+                  ) : menuBoards.map((bd: any) => (
+                    <div key={bd.id} className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-[#16181A]">{bd.name}</p>
+                        <button type="button" onClick={() => toggleBoard(bd.id)} aria-pressed={boardOn(bd.id)}
+                          className={`tap-target-sm rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                            boardOn(bd.id) ? 'bg-[#C8F542] on-accent' : 'bg-black/[0.05] text-black/55 hover:text-black'
+                          }`}>
+                          {boardOn(bd.id) ? 'Celá nabídka ✓' : 'Vzít celou nabídku'}
+                        </button>
+                      </div>
+                      {!boardOn(bd.id) && bd.sections.map((sec: any) => (
                     <div key={sec.id}>
                       <p className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">{sec.title}</p>
                       <div className="flex flex-wrap gap-2">
@@ -550,8 +601,22 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                         })}
                       </div>
                     </div>
+                      ))}
+                    </div>
                   ))}
                   <a href="/employer/overview?mode=client&tab=menu" className="tap-target-sm inline-block py-1 text-xs font-semibold text-[#0A6FE0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
+                </div>
+              )}
+              {/* Výjezd mívá úplně vlastní menu — volný řádek s cenou, vždy po ruce. */}
+              {e.offsite && (
+                <div className="flex gap-2 mt-2">
+                  <input value={customName} onChange={ev3 => setCustomName(ev3.target.value)} maxLength={120}
+                    placeholder="Vlastní položka výjezdu…"
+                    onKeyDown={ev3 => { if (ev3.key === 'Enter') addCustomLine(); }}
+                    className={inputClass} />
+                  <input value={customPrice} onChange={ev3 => setCustomPrice(ev3.target.value)} type="number" inputMode="numeric" placeholder="Kč" aria-label="Cena vlastní položky"
+                    className={`${inputClass} !w-24 text-center`} />
+                  <button onClick={addCustomLine} className="shrink-0 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 min-w-[48px] text-sm hover:bg-black/[0.08] transition">+</button>
                 </div>
               )}
               {!menuPickOpen && (e.menu ?? []).length === 0 && (
@@ -654,7 +719,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
           <div className="rounded-2xl bg-black/[0.03] border border-black/[0.06] p-4">
             {/* Akce u nás jede přes běžnou kasu — pokladna umí říct, co se
                 namarkovalo za dobu akce a kolik se prodalo z jejího menu. */}
-            {!e.offsite && (
+            {(!e.offsite || e.posPlaceId) && (
               <div className="mb-3">
                 {pos == null ? (
                   <button disabled={posBusy}
@@ -667,7 +732,7 @@ function EventDetail({ event: e, members, items, menuSections, money, patch, onC
                       else setPosErr(d?.error || 'Pokladna teď neodpovídá.');
                     }}
                     className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
-                    <Icon name="receipt" size={13} className="inline -mt-0.5 mr-1.5" />{posBusy ? 'Načítám z pokladny…' : 'Prodej z pokladny za dobu akce'}
+                    <Icon name="receipt" size={13} className="inline -mt-0.5 mr-1.5" />{posBusy ? 'Načítám z pokladny…' : e.offsite ? 'Tržba kasy akce (celý den)' : 'Prodej z pokladny za dobu akce'}
                   </button>
                 ) : (
                   <div className="rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2.5 space-y-1.5">

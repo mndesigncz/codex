@@ -76,34 +76,51 @@ export function normalizeCrew(raw: any): number[] {
 /** Menu akce = odkazy do nabídky podniku. Jméno a cena se dočítají z Menu
     při čtení, takže když se cena změní v Menu, akce ji ukáže taky. Starší
     volné řádky (bez itemId) se dál zobrazí, nové se zakládají jen odkazem. */
-export interface EventMenuLine { itemId: number | null; name: string; price: number | null; }
+export interface EventMenuLine {
+  /** Odkaz na jednu položku nabídky. */
+  itemId: number | null;
+  /** Odkaz na CELOU tabuli nabídky („na akci platí celé menu"). */
+  boardId: number | null;
+  name: string;
+  price: number | null;
+}
 
 export function normalizeEventMenu(raw: any): EventMenuLine[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((l: any) => {
       const itemId = Number(l?.itemId);
+      const boardId = Number(l?.boardId);
       const price = l?.price == null || l?.price === '' ? null : Math.max(0, Math.round(Number(l.price) || 0));
       return {
         itemId: Number.isFinite(itemId) && itemId > 0 ? itemId : null,
+        boardId: Number.isFinite(boardId) && boardId > 0 ? boardId : null,
         name: String(l?.name ?? '').trim().slice(0, 120),
         price,
       };
     })
-    .filter(l => l.itemId != null || l.name)
-    .slice(0, 30);
+    .filter(l => l.itemId != null || l.boardId != null || l.name)
+    .slice(0, 40);
 }
 
 /** Doplní odkazovaným řádkům menu akce aktuální jméno a cenu z nabídky.
     `byId` je mapa menu_items id → {name, price}; smazané položky vypadnou. */
-export function resolveEventMenu(lines: EventMenuLine[], byId: Map<number, { name: string; price: number | null; pos?: boolean }>): (EventMenuLine & { pos?: boolean })[] {
+export function resolveEventMenu(
+  lines: EventMenuLine[],
+  byId: Map<number, { name: string; price: number | null; pos?: boolean }>,
+  byBoard?: Map<number, { name: string; count: number }>,
+): (EventMenuLine & { pos?: boolean; count?: number })[] {
   return lines
     .map(l => {
+      if (l.boardId != null) {
+        const b = byBoard?.get(l.boardId);
+        return b ? { itemId: null, boardId: l.boardId, name: b.name, price: null, count: b.count } : null;
+      }
       if (l.itemId == null) return l;
       const hit = byId.get(l.itemId);
-      return hit ? { itemId: l.itemId, name: hit.name, price: hit.price, pos: hit.pos === true } : null;
+      return hit ? { itemId: l.itemId, boardId: null, name: hit.name, price: hit.price, pos: hit.pos === true } : null;
     })
-    .filter((l): l is EventMenuLine & { pos?: boolean } => l != null);
+    .filter((l): l is EventMenuLine & { pos?: boolean; count?: number } => l != null);
 }
 
 /** Fotky akce — jen adresy z vlastního veřejného výdeje obrázků. */

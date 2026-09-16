@@ -11,21 +11,14 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { getConnection, billsInRange } from '@/lib/storyous';
-import { dayPlus } from '@/lib/pragueTime';
+import { getConnection } from '@/lib/storyous';
+import { eventWindowFromPos } from '@/lib/eventPos';
 import { normalizeEventMenu } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const sql = neon(process.env.DATABASE_URL!);
-
-/** ISO čas účtenky → „HH:MM" v Praze (paidAt nese posun, Intl ho přepočítá). */
-function pragueHM(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
-  } catch { return '00:00'; }
-}
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -37,34 +30,31 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const id = parseInt(params.id);
   const [ev] = await sql`SELECT * FROM events WHERE id = ${id} AND team_id = ${u.team_id}`;
   if (!ev) return NextResponse.json({ error: 'Akce nenalezena' }, { status: 404 });
-  if (ev.offsite === true) return NextResponse.json({ error: 'Výjezd jede mimo kasu — použijte uzávěrku za akci.' }, { status: 400 });
+  // Výjezd bez vlastního terminálu jede mimo kasu — tam patří uzávěrka za
+  // akci. Výjezd s VLASTNÍ kasou (jiná provozovna Storyous) se ale číst dá.
+  if (ev.offsite === true && !ev.pos_place_id) {
+    return NextResponse.json({ error: 'Výjezd jede mimo kasu — použijte uzávěrku za akci, nebo akci přiřaďte provozovnu (Kasa akce).' }, { status: 400 });
+  }
 
   const conn = await getConnection(u.team_id);
   if (!conn) return NextResponse.json({ error: 'Pokladna není připojená (Nastavení → Pokladna).' }, { status: 400 });
 
   const date = String(ev.date);
-  const start = ev.start_time ? String(ev.start_time).slice(0, 5) : null;
-  // Bez konce se bere start + 4 hodiny; bez začátku celý obchodní den.
-  const end = ev.end_time
-    ? String(ev.end_time).slice(0, 5)
-    : start ? `${String(Math.min(23, parseInt(start) + 4)).padStart(2, '0')}${start.slice(2)}` : null;
-
-  // --- tržba za okno akce: účtenky dne, filtr na čas zaplacení ---
-  let revenue = 0, bills = 0;
+  let win;
   try {
-    await billsInRange(conn, date, dayPlus(date, 2), (b) => {
-      if (b.day !== date || b.deleted || b.refunded) return;
-      if (start) {
-        const hm = pragueHM(b.paidAt ?? b.createdAt);
-        if (hm < start || (end != null && hm > end)) return;
-      }
-      revenue += Number(b.finalPrice) || 0;
-      bills++;
-    }, 40);
+    // Výjezd s vlastní kasou čte CELÝ den své provozovny (celá kasa je akce);
+    // akce u nás filtruje společnou kasu na okno start–konec.
+    win = await eventWindowFromPos(conn, {
+      date,
+      startTime: ev.offsite === true ? null : ev.start_time,
+      endTime: ev.offsite === true ? null : ev.end_time,
+      posPlaceId: ev.pos_place_id ?? null,
+    });
   } catch (e) {
     console.error('event pos window failed', e);
     return NextResponse.json({ error: 'Pokladna teď neodpovídá — zkus to za chvíli.' }, { status: 502 });
   }
+  const { revenue, bills, from: start, till: end } = win;
 
   // --- prodané kusy položek menu akce (přes párování menu ↔ POS produkt) ---
   const lines = normalizeEventMenu(ev.menu);
