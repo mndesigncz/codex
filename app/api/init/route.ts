@@ -1433,6 +1433,48 @@ export async function GET(request: Request) {
       WHERE m.stamps > 0
         AND NOT EXISTS (SELECT 1 FROM client_stamp_progress sp WHERE sp.campaign_id = c.id AND sp.customer_id = m.customer_id)`);
 
+    // ---- Věrnost II: kupony v plné síle + skupiny členů + Platina ------------
+    // Kupon říká, co host dostane (procenta, koruny, X+Y, nebo volný text),
+    // pro koho platí (úrovně, ruční skupiny), kdy (dny, hodiny, od–do) a jak
+    // často (limit na hosta, cooldown). Uvítací kupon padá sám novým členům.
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS benefit_kind TEXT NOT NULL DEFAULT 'text'`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS percent_off INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS amount_off INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS xy_buy INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS xy_free INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS min_order_value INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS target_tiers JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS target_groups JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS per_customer INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS cooldown_days INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS days_of_week JSONB`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS hour_from TEXT`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS hour_till TEXT`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS adult_only BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS welcome BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS valid_since TEXT`);
+    // Ruční skupiny členů („štamgasti", „firemní akce") — cílení kuponů a zpráv.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_groups (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_groups_team ON client_groups (team_id)`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_group_members (
+        group_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        added_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (group_id, customer_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_group_members_customer ON client_group_members (team_id, customer_id)`);
+    // Platina: čtvrtá úroveň nad Zlatým hostem. 0 = vypnuto.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);
+
     // ---- Managero client III: kartička, hodnocení, zprávy, promo kódy ----
     // Kartička: jeden kód na hosta pro všechny podniky (jako Kartička nebo
     // karta v peněžence). Obsluha ho načte u kasy a dá razítko či body.

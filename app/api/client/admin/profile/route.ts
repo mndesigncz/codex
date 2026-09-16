@@ -76,6 +76,8 @@ export async function PUT(req: NextRequest) {
       member_discount = ${num(b.member_discount, Number(cur.member_discount) || 0, 0, 90)},
       silver_discount = ${num(b.silver_discount, Number(cur.silver_discount) || 0, 0, 90)},
       gold_discount = ${num(b.gold_discount, Number(cur.gold_discount) || 0, 0, 90)},
+      platinum_at = ${num(b.platinum_at, Number(cur.platinum_at) || 0, 0, 2000)},
+      platinum_discount = ${num(b.platinum_discount, Number(cur.platinum_discount) || 0, 0, 90)},
       cashback_pct = ${num(b.cashback_pct, Number(cur.cashback_pct) || 0, 0, 50)},
       logo_url = ${b.logo_url !== undefined ? (imgUrl(b.logo_url) || null) : cur.logo_url},
       gallery = ${b.gallery !== undefined ? JSON.stringify(gallery(b.gallery)) : JSON.stringify(cur.gallery ?? [])},

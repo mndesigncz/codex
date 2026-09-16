@@ -24,8 +24,9 @@ async function summary(teamId: number, customerId: number, p?: any) {
   const last = parseDbTime(m?.last_visit_at);
   const visits = Number(m?.visits ?? 0);
   const tier = tierFor(visits, p ? {
-    silverAt: Number(p.silver_at), goldAt: Number(p.gold_at),
+    silverAt: Number(p.silver_at), goldAt: Number(p.gold_at), platinumAt: Number(p.platinum_at) || 0,
     memberDiscount: Number(p.member_discount), silverDiscount: Number(p.silver_discount), goldDiscount: Number(p.gold_discount),
+    platinumDiscount: Number(p.platinum_discount) || 0,
   } : null);
   const camps = await activeCampaigns(teamId, pragueToday());
   const prog = camps.length ? await progressFor(teamId, customerId) : new Map();

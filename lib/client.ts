@@ -136,9 +136,11 @@ export function publicProfile(p: any) {
     pointsPer100: Number(p.points_per_100) || 0,
     tiers: {
       silverAt: Number(p.silver_at) || 10, goldAt: Number(p.gold_at) || 25,
+      platinumAt: Number(p.platinum_at) || 0,
       memberDiscount: Number(p.member_discount) || 0,
       silverDiscount: Number(p.silver_discount) || 0,
       goldDiscount: Number(p.gold_discount) || 0,
+      platinumDiscount: Number(p.platinum_discount) || 0,
     },
     cashbackPct: Number(p.cashback_pct) || 0,
     stampTarget: Number(p.stamp_target) || 0,
@@ -169,7 +171,15 @@ export async function join(customerId: number, teamId: number): Promise<any> {
     RETURNING *`;
   // Pozvi kamaráda: odměna padá při PRVNÍM členství ve společném podniku.
   // award() volá join() taky, ale to už členství existuje, takže se nezacyklí.
-  if (!existing) await maybeReferralReward(customerId, teamId).catch(() => {});
+  if (!existing) {
+    await maybeReferralReward(customerId, teamId).catch(() => {});
+    // Uvítací balíček: aktivní welcome kupony padnou novému členovi samy.
+    // Dynamický import, ať se lib/client a lib/coupons nezacyklí.
+    try {
+      const { grantWelcomeCoupons } = await import('./coupons');
+      await grantWelcomeCoupons(teamId, customerId, couponCode);
+    } catch { /* uvítací kupony nesmí shodit vstup do podniku */ }
+  }
   return m;
 }
 

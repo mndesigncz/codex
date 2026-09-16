@@ -466,13 +466,21 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
         {coupons?.length ? (
           <ul className="divide-y divide-black/[0.06]">
             {coupons.map((c: any) => {
-              const can = me?.member && me.points >= Number(c.cost_points);
+              const can = me?.member && me.points >= Number(c.cost_points) && !c.blocked;
               return (
-                <li key={c.id} className="py-3.5 flex items-center gap-4">
+                <li key={c.id} className={`py-3.5 flex items-center gap-4 ${c.blocked ? 'opacity-60' : ''}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{c.title}</p>
+                    <p className="font-semibold">
+                      {c.title}
+                      {c.benefit && <span className="ml-2 rounded-full bg-[#C8F542]/25 text-[#3E5406] px-2 py-0.5 text-[11px] font-bold align-middle whitespace-nowrap">{c.benefit}</span>}
+                    </p>
                     {c.description && <p className="text-sm text-black/55 text-pretty">{c.description}</p>}
-                    {c.valid_until && <p className="text-xs text-black/45 mt-0.5">Platí do {czDay(c.valid_until)}</p>}
+                    {(c.badges?.length > 0 || c.valid_until) && (
+                      <p className="text-xs text-black/45 mt-0.5">
+                        {[...(c.badges ?? []), c.valid_until ? `do ${czDay(c.valid_until)}` : null].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                    {c.blocked && <p className="text-xs text-amber-800 mt-0.5">{c.blocked}</p>}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? 'zdarma' : `${c.cost_points} b.`}</p>
