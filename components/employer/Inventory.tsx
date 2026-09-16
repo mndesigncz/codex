@@ -752,7 +752,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={16} /></span>
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Hledat položku nebo dodavatele..."
-              className={`${inputClass} pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
+              className={`${inputClass} !pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
             {selecting && (
@@ -1072,7 +1072,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="send" size={15} /></span>
-                    <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={`${inputClass} pl-10`} />
+                    <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={`${inputClass} !pl-10`} />
                   </div>
                 </div>
               </div>

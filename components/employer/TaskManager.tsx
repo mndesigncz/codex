@@ -224,8 +224,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     // Future occurrences aren't active yet → show them greyed until their day comes.
     const inactive = !done && !!t.dueDate && t.dueDate > today;
     return (
-      <div key={t.id} className={`glass-card ${compact ? 'p-3' : 'p-4'} ${inactive ? 'opacity-60' : ''}`}>
-        <div className="flex items-start gap-2.5">
+      <div key={t.id} className={`${compact ? 'card p-3' : 'list-row items-start'} ${inactive ? 'opacity-60' : ''}`}>
+        <div className="flex items-start gap-2.5 w-full min-w-0">
           <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
             className={`tap-target mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
             {done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
@@ -266,9 +266,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const section = (title: string, list: Task[], tone = 'text-black/45') =>
     list.length > 0 && (
-      <div className="space-y-2.5">
-        <h3 className={`text-xs font-bold uppercase tracking-[0.13em] ${tone}`}>{title} ({list.length})</h3>
-        <div className="space-y-2.5">{list.map(t => renderCard(t))}</div>
+      <div className="space-y-2">
+        <h3 className={`t-label ${tone}`}>{title} ({list.length})</h3>
+        <div className="card"><div className="list">{list.map(t => renderCard(t))}</div></div>
       </div>
     );
 

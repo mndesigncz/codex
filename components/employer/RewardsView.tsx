@@ -81,7 +81,7 @@ function RewardsViewInner() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-6">
       <PageHeader title="Odměny" subtitle="Úrovně, body a hodnocení směn zaměstnanců."
         primary={<Segmented size="sm" ariaLabel="Část" value={tab} onChange={setTab}
           options={[{ id: 'board', label: 'Žebříček' }, { id: 'calendar', label: 'Kalendář' }, { id: 'settings', label: 'Nastavení' }]} />} />

@@ -327,7 +327,7 @@ export default function Guides({ user }: { user: User }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Hledat návody…"
-              className="w-full field border border-black/[0.08] pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="w-full field border border-black/[0.08] !pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
             />
           </div>
 
@@ -348,7 +348,7 @@ export default function Guides({ user }: { user: User }) {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
               {filtered.map((g) => {
                 const cat = g.categoryId != null ? catById.get(g.categoryId) : undefined;
                 return (
@@ -358,7 +358,7 @@ export default function Guides({ user }: { user: User }) {
                     className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition-all duration-300 flex flex-col group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0 flex-1 break-words">
+                      <h3 className="t-card min-w-0 flex-1 break-words">
                         {g.title}
                         {g.approved === false && (
                           <span className="ml-2 align-middle inline-flex items-center gap-1.5">

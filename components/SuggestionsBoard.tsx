@@ -160,7 +160,7 @@ export default function SuggestionsBoard() {
   const shown = filter === 'all' ? items : items.filter(s => s.status === filter);
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto w-full space-y-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-6">
       {/* Hlavička jako u ostatních obrazovek. Dřív tu byla uvítací karta s
           h3 a pod ní tmavé tlačítko: obrazovka neměla hlavní nadpis a hlavní
           akce se barvou lišila od zbytku aplikace. */}
@@ -201,12 +201,12 @@ export default function SuggestionsBoard() {
             : <EmptyState icon="bulb" title="V této kategorii nic není" compact />}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="card divide-y divide-black/[0.06]">
           {shown.map(s => {
             const meta = STATUS_META[s.status] ?? STATUS_META.new;
             const mine = meId != null && s.authorId === meId;
             return (
-              <div key={s.id} className="glass-card p-5">
+              <div key={s.id} className="p-5">
                 <div className="flex items-start gap-3">
                   {/* Vote pill */}
                   <button onClick={() => toggleVote(s)}

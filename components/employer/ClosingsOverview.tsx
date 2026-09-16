@@ -317,7 +317,7 @@ export default function ClosingsOverview() {
       <PageHeader title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
       {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
       {missing.length > 0 && (
-        <div className="rounded-3xl bg-red-500/[0.06] border border-red-500/25 p-5 space-y-3">
+        <div className="card card-danger p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden>🚨</span>
             <h3 className="t-card">Chybí uzávěrka</h3>
@@ -348,7 +348,7 @@ export default function ClosingsOverview() {
 
       {/* Uzávěrky ke schválení */}
       {pending.length > 0 && (
-        <div className="rounded-3xl bg-orange-500/[0.08] border border-orange-500/25 p-5 space-y-3">
+        <div className="card card-wait p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
             <h3 className="t-card">Uzávěrky ke schválení</h3>

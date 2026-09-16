@@ -288,7 +288,7 @@ export default function Procedures({ user }: Props) {
             );
           })}
 
-          {user.role !== 'kiosk' && (
+          {user.role !== 'kiosk' && !isEmployer && (
             <button
               onClick={openNew}
               className="glass rounded-3xl p-5 min-h-[176px] flex flex-col items-center justify-center gap-2 border border-dashed border-black/15 text-black/45 hover:text-black hover:border-black/30 transition"

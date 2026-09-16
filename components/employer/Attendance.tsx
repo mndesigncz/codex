@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import { Button, PageHeader, Segmented } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -321,33 +322,20 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Header + period selector */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Icon name="clock" size={22} className="text-[#16181A] shrink-0" />
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A] truncate">Docházka</h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1">
-            {PERIODS.map(p => (
-              <button key={p} onClick={() => setDays(p)} aria-pressed={days === p}
-                className={`tap-target tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${days === p ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
-                {p} dní
-              </button>
-            ))}
-          </div>
-          <button onClick={() => { setAddOpen(true); setAddErr(''); }}
-            className="btn btn-accent btn-sm hover:brightness-105 transition whitespace-nowrap">
-            + Přidat záznam
-          </button>
-          {entries.length > 0 && (
-            <button onClick={exportCsv}
-              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
-              Export CSV ↓
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Docházka"
+        subtitle="Kdo je na směně, odpracované hodiny a mzdy za období."
+        secondary={<Segmented size="sm" ariaLabel="Období" value={String(days)} onChange={v => setDays(Number(v) as typeof PERIODS[number])}
+          options={PERIODS.map(p => ({ id: String(p), label: `${p} dní` }))} />}
+        primary={
+          <>
+            {entries.length > 0 && (
+              <Button variant="secondary" icon="download" onClick={exportCsv}>Export CSV</Button>
+            )}
+            <Button variant="accent" icon="plus" onClick={() => { setAddOpen(true); setAddErr(''); }}>Přidat záznam</Button>
+          </>
+        }
+      />
 
       {/* Právě na směně */}
       <div className="glass-card p-5 space-y-3">
@@ -396,7 +384,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Mzdové náklady */}
           {hasRates && (
             <div className="space-y-3">
-              <h3 className="t-card">Mzdy</h3>
+              <h2 className="t-section">Mzdy</h2>
               <div className="grid grid-cols-2 gap-4 max-w-md">
                 <div className="glass-card p-5 min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
@@ -433,7 +421,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Souhrn hodin */}
           {summary.length > 0 && (
             <div className="space-y-3">
-              <h3 className="t-card">Souhrn hodin</h3>
+              <h2 className="t-section">Souhrn hodin</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {summary.map(s => {
                   const rate = rateById.get(s.id);
@@ -464,7 +452,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
           {/* Seznam záznamů */}
           <div className="space-y-3">
-            <h3 className="t-card">Záznamy ({entries.length})</h3>
+            <h2 className="t-section">Záznamy ({entries.length})</h2>
             {entries.length === 0 ? (
               <div className="glass-card p-8 text-center">
                 <p className="text-black/45">Za zvolené období nejsou žádné záznamy docházky.</p>
