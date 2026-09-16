@@ -161,7 +161,8 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
   } catch { stampCampaigns = []; }
 
   let news: any[] = [];
-  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
+  // Jen opravdu odeslané — naplánované zprávy nesmí do Novinek předčasně.
+  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} AND COALESCE(status, 'sent') = 'sent' ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
   const plan = p.floorplan && p.ordering_on ? normalizePlan(p.floorplan) : null;
 
   // Kupony v plné síle: výhoda + štítky podmínek, a přihlášenému členovi

@@ -79,6 +79,7 @@ export async function PUT(req: NextRequest) {
       platinum_at = ${num(b.platinum_at, Number(cur.platinum_at) || 0, 0, 2000)},
       platinum_discount = ${num(b.platinum_discount, Number(cur.platinum_discount) || 0, 0, 90)},
       cashback_pct = ${num(b.cashback_pct, Number(cur.cashback_pct) || 0, 0, 50)},
+      cashback_mode = ${['credit', 'points'].includes(String(b.cashback_mode)) ? String(b.cashback_mode) : (cur.cashback_mode ?? 'credit')},
       logo_url = ${b.logo_url !== undefined ? (imgUrl(b.logo_url) || null) : cur.logo_url},
       gallery = ${b.gallery !== undefined ? JSON.stringify(gallery(b.gallery)) : JSON.stringify(cur.gallery ?? [])},
       accent = ${b.accent !== undefined ? (accent(b.accent) ?? null) : cur.accent},

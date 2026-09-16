@@ -1475,6 +1475,16 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);
 
+    // ---- Věrnost III: plánované zprávy, cíl akce, cashback jako body ---------
+    // Zpráva členům může počkat na svůj čas (scheduled_at) a nést, kam má
+    // hosta vzít (link_kind). Cashback se podle podniku vrací jako kredit,
+    // nebo jako body (v Kartičce jde 2 % útraty do bodů).
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'sent'`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS link_kind TEXT`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_broadcasts_due ON client_broadcasts (scheduled_at) WHERE status = 'scheduled'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS cashback_mode TEXT NOT NULL DEFAULT 'credit'`);
+
     // ---- Managero client III: kartička, hodnocení, zprávy, promo kódy ----
     // Kartička: jeden kód na hosta pro všechny podniky (jako Kartička nebo
     // karta v peněžence). Obsluha ho načte u kasy a dá razítko či body.
