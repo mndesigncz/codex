@@ -533,7 +533,7 @@ function MemberGroups({ customerId, toast }: { customerId: number; toast: (m: st
   };
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-black/45 font-semibold uppercase tracking-wider text-[10px] mr-1">Skupiny</span>
+      <span className="text-black/45 font-semibold uppercase tracking-wider text-[11px] mr-1">Skupiny</span>
       {groups.map((g: any) => (
         <button key={g.id} type="button" onClick={() => flip(g)} disabled={busy === g.id} aria-pressed={mine.includes(g.id)}
           className={`tap-target-sm rounded-full px-2.5 py-1 text-[11px] font-semibold transition border ${mine.includes(g.id) ? 'bg-[#16181A] text-[#C8F542] border-[#16181A]' : 'bg-white/70 text-black/55 border-black/[0.09] hover:bg-black/[0.05]'}`}>
