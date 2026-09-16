@@ -217,7 +217,7 @@ export default function FinanceView() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="relative overflow-hidden rounded-[26px] bg-[#16181A] text-white p-4">
+            <div className="relative overflow-hidden rounded-3xl bg-[#16181A] text-white p-4">
               <div className="pointer-events-none absolute -top-14 -right-10 h-32 w-32 rounded-full bg-[#C8F542]/25 blur-2xl" />
               <p className="text-[11px] uppercase tracking-wider text-white/70 font-bold">Tržby</p>
               <p className="mt-1 text-xl font-bold tabular-nums">{money(s.revenue)}</p>
@@ -225,19 +225,19 @@ export default function FinanceView() {
                 {trendPct != null ? `${trendPct >= 0 ? '+' : ''}${trendPct} % vs. minulý měsíc` : `${s.closingsCount} uzávěrek`}
               </p>
             </div>
-            <div className="glass-card rounded-[26px] p-4">
+            <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Nákupy a výdaje</p>
               <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A]">{money(s.purchases)}</p>
               <p className="text-[11px] text-black/40 mt-0.5">účtenky, objednávky, kasa</p>
             </div>
-            <div className="glass-card rounded-[26px] p-4">
+            <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Mzdy</p>
               <p className="mt-1 text-xl font-bold tabular-nums text-[#16181A]">{money(Math.max(s.wagesCash, s.wagesWorked))}</p>
               <p className="text-[11px] text-black/40 mt-0.5">
                 {s.wagesWorked > 0 ? 'z docházky × sazby' : 'z denních výplat'}
               </p>
             </div>
-            <div className="glass-card rounded-[26px] p-4">
+            <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Hrubý výsledek</p>
               <p className={`mt-1 text-xl font-bold tabular-nums ${s.gross >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>{money(s.gross)}</p>
               <p className="text-[11px] text-black/40 mt-0.5">tržby − nákupy − mzdy</p>
@@ -246,7 +246,7 @@ export default function FinanceView() {
 
           {/* Where the money went */}
           {breakdown.length > 0 && (
-            <div className="glass-card rounded-[26px] p-5 space-y-3">
+            <div className="glass-card rounded-3xl p-5 space-y-3">
               <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Kam šly peníze</h3>
               {breakdown.map(b => (
                 <div key={b.label}>
@@ -270,7 +270,7 @@ export default function FinanceView() {
           {/* Hosté a věrnost — peníze, které přišly přes stůl a kartičku.
               Patří k financím: objednávka mimo pokladnu v tržbách chybí. */}
           {g && (g.orders > 0 || g.members > 0) && (
-            <div className="glass-card rounded-[26px] p-5 space-y-3">
+            <div className="glass-card rounded-3xl p-5 space-y-3">
               <div className="flex items-end justify-between gap-3 flex-wrap">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-black/55">Hosté a věrnost</h3>
                 <span className="text-xs text-black/45">z objednávek od stolu a kartiček</span>
@@ -397,7 +397,7 @@ export default function FinanceView() {
             {filtered.length === 0 ? (
               <div className="glass-card p-8 text-center text-black/45">V tomhle měsíci tu nic není.</div>
             ) : (
-              <div className="glass-card rounded-[26px] divide-y divide-black/[0.05] overflow-hidden">
+              <div className="glass-card rounded-3xl divide-y divide-black/[0.05] overflow-hidden">
                 {filtered.map((r, i) => {
                   const meta = KIND_META[r.kind] ?? { label: r.kind, cls: 'bg-black/[0.06] text-black/55' };
                   const clickable = r.kind === 'receipt';

@@ -35,8 +35,8 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'settings', label: 'Nastavení', icon: 'settings' },
 ];
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field !py-2.5 text-sm';
+const label = 'field-label';
 const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-red-500/10 text-red-700'}`;
 
 /** Dlaždice jako na přehledu podniku: štítek, ikona v tónovaném kolečku, číslo. Kliknutím do záložky. */
@@ -149,7 +149,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace a zaměstnanec. */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-        <nav className="dock-strong mx-auto max-w-md rounded-[26px] px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace klienta">
+        <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace klienta">
           {TABS.filter(t => dockIds.includes(t.id)).map(item => (
             <button key={item.id} onClick={() => { setTab(item.id); setMoreOpen(false); }} title={item.label}
               className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${tab === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>

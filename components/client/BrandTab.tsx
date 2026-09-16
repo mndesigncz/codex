@@ -9,8 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, PageHeader, Skeleton } from '../ui';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field !py-2.5 text-sm';
+const label = 'field-label';
 
 /** Předvolené barvy značky — podnik si může vybrat i vlastní. */
 const ACCENTS = ['#C8F542', '#E8A33D', '#D9644A', '#7C9A6B', '#4A7DBF', '#9B6BAE', '#16181A'];

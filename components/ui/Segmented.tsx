@@ -56,7 +56,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
       // gap-1 se plochy sousedních řádků překrývaly a dotyk mezi nimi padl na
       // řádek pod ním. Vodorovně to nevadí — pilulky jsou širší než 36px, tam
       // se plocha nezvětšuje.
-      className={`relative inline-flex max-w-full ${wrap ? 'gap-x-1 gap-y-2' : 'gap-1'} rounded-[22px] glass border border-black/[0.07] p-1 ${wrap ? 'flex-wrap' : 'overflow-x-auto scrollbar-thin rounded-full'} ${className}`}>
+      className={`relative inline-flex max-w-full ${wrap ? 'gap-x-1 gap-y-2' : 'gap-1'} rounded-3xl glass border border-black/[0.07] p-1 ${wrap ? 'flex-wrap' : 'overflow-x-auto scrollbar-thin rounded-full'} ${className}`}>
       {pill && (
         <span aria-hidden
           className="absolute left-0 top-0 rounded-full bg-[#16181A] shadow-sm pointer-events-none motion-safe:transition-[transform,width,height] motion-safe:duration-[240ms] motion-safe:ease-out"

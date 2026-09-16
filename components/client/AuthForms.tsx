@@ -8,8 +8,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field text-sm';
+const label = 'field-label';
 
 function Field({ id, label: l, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (

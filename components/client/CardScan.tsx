@@ -9,7 +9,7 @@ import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { Initials } from './ClientShell';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
+const input = 'field !py-2.5 text-sm';
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
 
 export default function CardScan({ onToast, onChange }: { onToast: (m: string) => void; onChange?: () => void }) {

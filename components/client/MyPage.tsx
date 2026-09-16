@@ -11,8 +11,8 @@ import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
 import { czDay, RES_STATUS, tierFor } from '@/lib/clientSlots';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field !py-2.5 text-sm';
+const label = 'field-label';
 const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n > 1 && n < 5 ? few : many);
 
 export default function MyPage() {
@@ -30,7 +30,7 @@ export default function MyPage() {
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
 
   if (err) return <p className="rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm px-4 py-3">{err}</p>;
-  if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-[28px]" /><Skeleton className="h-24 rounded-3xl" /><Skeleton className="h-40 rounded-3xl" /></div>;
+  if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-3xl" /><Skeleton className="h-24 rounded-3xl" /><Skeleton className="h-40 rounded-3xl" /></div>;
 
   const open = (d.claims ?? []).filter((c: any) => !c.redeemed_at);
   const upcoming = (d.reservations ?? []).filter((r: any) => r.date >= d.today && !['cancelled', 'declined', 'done'].includes(r.status));
@@ -203,7 +203,7 @@ function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => v
 /** Kartička: tmavá, s QR. Kód i textem, kdyby čtečka selhala. */
 function MemberCard({ name, card }: { name: string; card: any | null }) {
   return (
-    <section aria-label="Kartička" className="rounded-[28px] bg-[#16181A] text-white p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 items-center">
+    <section aria-label="Kartička" className="rounded-3xl bg-[#16181A] text-white p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 items-center">
       <div className="min-w-0 order-2 sm:order-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C8F542] mb-2">Managero client</p>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter leading-[1.05] break-words">{name}</h1>

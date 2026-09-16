@@ -103,7 +103,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
 
       {/* Floating glass header */}
       <div className="sticky top-0 z-20 px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2">
-        <div className="max-w-lg mx-auto glass-strong rounded-[24px] px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
+        <div className="max-w-lg mx-auto glass-strong rounded-3xl px-4 py-3 flex items-center gap-3 shadow-[0_12px_36px_rgba(25,35,15,0.14)]">
           <LogoMark size={34} />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.16em] text-[#5B7A08] font-bold leading-none">TO GO</p>
@@ -121,7 +121,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       <div className="max-w-lg mx-auto px-4 pt-3 space-y-4">
 
         {/* Dark hero — today's number, big and calm */}
-        <div className="relative overflow-hidden rounded-[30px] bg-[#16181A] text-white p-5 shadow-[0_18px_50px_rgba(15,20,8,0.35)]">
+        <div className="relative overflow-hidden rounded-3xl bg-[#16181A] text-white p-5 shadow-[0_18px_50px_rgba(15,20,8,0.35)]">
           <div className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-10 h-48 w-48 rounded-full bg-[#8FB811]/15 blur-3xl" />
           <div className="relative">
@@ -173,7 +173,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         </div>
 
         {/* Crew strip — who is here now / planned today */}
-        <div className="glass-card rounded-[26px] p-4">
+        <div className="glass-card rounded-3xl p-4">
           <div className="flex items-center justify-between mb-2.5">
             <p className="text-[11px] uppercase tracking-[0.12em] text-black/45 font-bold">Dnes v podniku</p>
             {onShift.length > 0 && (
@@ -214,7 +214,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         <div className="grid grid-cols-3 gap-2.5 stagger">
           {tiles.map(t => (
             <button key={t.view} onClick={() => onOpenView(t.view)}
-              className="relative glass-card rounded-[22px] px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
+              className="relative glass-card rounded-3xl px-2 py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition hover:bg-white/70">
               {t.badge != null && (
                 <span className={`absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-extrabold flex items-center justify-center ${t.badgeTone}`}>
                   {t.badge}
@@ -229,7 +229,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         {/* Low stock — the three most urgent, actionable */}
         {lowItems.length > 0 && (
           <button onClick={() => onOpenView('inventory')}
-            className="w-full glass-card rounded-[26px] p-4 text-left active:scale-[0.99] transition">
+            className="w-full glass-card rounded-3xl p-4 text-left active:scale-[0.99] transition">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[11px] uppercase tracking-[0.12em] text-amber-700 font-bold flex items-center gap-1.5">
                 <Icon name="box" size={14} strokeWidth={2} /> Dochází ve skladu

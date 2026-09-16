@@ -42,7 +42,7 @@ const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍�
 
 const inputClass =
   'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
-const labelClass = 'block text-xs uppercase tracking-wider text-black/45 mb-2';
+const labelClass = 'field-label';
 const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50';
 const cardTitle = 'font-bold tracking-tight text-[#16181A]';
 

@@ -85,7 +85,7 @@ type SortKey = 'name' | 'qtyAsc' | 'qtyDesc' | 'status' | 'updated';
 type View = 'list' | 'grid';
 
 const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
-const inputClass = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const inputClass = 'field';
 /** Číslo z pole, které snese i desetinnou čárku. V poli type="number"
  *  se „0,7" zahodí na prázdno — a velikost balení pak tiše zmizí. */
 const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;

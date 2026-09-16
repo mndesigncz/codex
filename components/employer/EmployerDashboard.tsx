@@ -553,9 +553,9 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       })()}
 
       {(pendingApprovals.timeoff > 0 || pendingApprovals.swaps > 0 || pendingApprovals.closings > 0) && (
-        <div className="rounded-3xl border border-orange-500/25 bg-orange-500/[0.07] p-4 sm:p-5">
-          <p className="font-bold text-[#16181A] flex items-center gap-2 mb-2">
-            <Icon name="warning" size={17} className="text-orange-600" /> Čeká na tvoje rozhodnutí
+        <div className="card card-wait p-4 sm:p-5">
+          <p className="t-card flex items-center gap-2 mb-2.5">
+            <Icon name="warning" size={17} className="text-[var(--wait-ink)]" /> Čeká na tvoje rozhodnutí
           </p>
           <div className="flex flex-wrap gap-2">
             {pendingApprovals.timeoff > 0 && (

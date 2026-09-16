@@ -21,7 +21,7 @@ interface Standing {
   next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number;
 }
 
-const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const inputCls = 'field';
 
 export default function RewardsView({ user }: { user: { id?: string } }) {
   // Rewards & levels are a Pro feature — the gate sells it instead of hiding it.

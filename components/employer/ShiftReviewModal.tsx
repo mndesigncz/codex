@@ -43,7 +43,7 @@ export interface Summary {
 }
 
 const todayStr = () => pragueToday();
-const inputCls = 'w-full rounded-2xl bg-black/[0.04] border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+const inputCls = 'field';
 const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
 

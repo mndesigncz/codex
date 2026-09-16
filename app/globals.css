@@ -2,21 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =====================================================================
+   Managero 2 — jeden vizuální jazyk pro celou aplikaci.
+   Plochy jsou vrstvené a pevné: papír → bílá karta s vláskovou linkou →
+   tónovaná jamka uvnitř. Sklo (blur) zůstává jen plovoucímu chromu (rail,
+   dock, menu, modál), ne obsahu. Tři rádiusy, jedna typografická škála,
+   jedna sada stavových barev. Staré třídy (glass-card, glass, glass-strong)
+   míří na nové plochy, takže se překlopila celá aplikace naráz.
+   ===================================================================== */
 :root {
-  --bg: #F1F3ED;
-  --bg-gradient: radial-gradient(ellipse 70% 45% at 20% -10%, rgba(200,245,66,0.22), transparent),
-                 radial-gradient(ellipse 60% 40% at 90% 0%, rgba(10,132,255,0.10), transparent),
-                 radial-gradient(ellipse 80% 50% at 50% 110%, rgba(200,245,66,0.10), transparent);
+  --bg: #F3F4F0;
+  --bg-gradient: radial-gradient(ellipse 70% 40% at 15% -10%, rgba(200,245,66,0.16), transparent 70%);
   --ink: #16181A;
   --lime: #C8F542;
+  --lime-ink: #4F6A07;
 
-  /* Stupnice zaoblení — jedna pro celou aplikaci. Dřív se střídalo 26, 24,
-     16 a 12 px podle toho, kdo kterou obrazovku dělal. Kontejner nejměkčí,
-     ovládací prvek nejtvrdší, čip kulatý. */
-  --r-card: 1.75rem;   /* karta, panel, modál       */
-  --r-panel: 1.25rem;  /* vnořený blok v kartě       */
-  --r-control: 0.875rem; /* pole, výběr, dlaždice    */
-  --r-chip: 9999px;    /* tlačítko, štítek, přepínač */
+  /* Plochy */
+  --surface: #FFFFFF;
+  --surface-line: rgba(22,24,26,0.07);
+  --well: rgba(22,24,26,0.035);
+  --well-line: rgba(22,24,26,0.05);
+  --shadow-card: 0 1px 2px rgba(25,35,15,0.04), 0 10px 28px -14px rgba(25,35,15,0.12);
+  --shadow-float: 0 12px 36px -8px rgba(25,35,15,0.20), 0 2px 6px rgba(25,35,15,0.06);
+  --shadow-modal: 0 30px 80px rgba(15,20,25,0.26);
+
+  /* Rádiusy — tři a dost. Karta/modál 20, pole/dlaždice 14, čip kulatý.
+     Tailwind rounded-3xl / rounded-2xl / rounded-xl na ně míří (config). */
+  --r-lg: 20px;
+  --r-md: 14px;
+  --r-sm: 10px;
+  --r-chip: 9999px;
+  /* Zpětná jména — starší kód je ještě používá. */
+  --r-card: var(--r-lg);
+  --r-panel: var(--r-md);
+  --r-control: var(--r-md);
+
+  /* Stavové barvy — jedna sada pro chipy, panely i text. */
+  --ok-bg: rgba(200,245,66,0.22);   --ok-ink: #3E5406;
+  --wait-bg: rgba(245,158,11,0.14); --wait-ink: #92400E;
+  --bad-bg: rgba(220,38,38,0.10);   --bad-ink: #991B1B;
+  --info-bg: rgba(10,132,255,0.10); --info-ink: #0A5CC0;
+  --muted-bg: rgba(22,24,26,0.06);  --muted-ink: rgba(22,24,26,0.62);
 }
 
 * { box-sizing: border-box; padding: 0; margin: 0; }
@@ -53,35 +79,90 @@ body::after {
 :root[data-theme="dark"] body::after { mix-blend-mode: screen; opacity: 0.05; }
 @media (prefers-reduced-transparency: reduce), print { body::after { display: none; } }
 
-/* ---------- Light frosted surfaces ---------- */
-.glass {
-  background: rgba(255,255,255,0.52);
-  backdrop-filter: blur(26px) saturate(1.5);
-  -webkit-backdrop-filter: blur(26px) saturate(1.5);
-  border: 1px solid rgba(255,255,255,0.55);
-  outline: 1px solid rgba(0,0,0,0.05);
-  outline-offset: -1px;
+/* ---------- Plochy (Managero 2) ----------
+   card   … bílá karta s vláskovou linkou — jediný kontejner obsahu
+   well   … tónovaná jamka uvnitř karty pro vnořený obsah
+   glass  … zpětné jméno: tónovaná plocha ovládacích prvků (bez blur)
+   glass-strong … plovoucí chrom (rail, dock, menu) — jediné místo s blur
+   glass-card   … zpětné jméno pro card; starší obrazovky se překlopí samy */
+:where(.card, .glass-card) {
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+.card-accent { background: linear-gradient(180deg, rgba(200,245,66,0.16), rgba(200,245,66,0.06)), var(--surface); border-color: rgba(200,245,66,0.55); }
+.card-wait   { background: linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04)), var(--surface); border-color: rgba(245,158,11,0.35); }
+.card-danger { background: linear-gradient(180deg, rgba(220,38,38,0.07), rgba(220,38,38,0.03)), var(--surface); border-color: rgba(220,38,38,0.25); }
+.card-info   { background: linear-gradient(180deg, rgba(10,132,255,0.08), rgba(10,132,255,0.03)), var(--surface); border-color: rgba(10,132,255,0.28); }
+:where(.well) {
+  background: var(--well);
+  border: 1px solid var(--well-line);
+  border-radius: var(--r-md);
+}
+:where(.glass) {
+  background: rgba(22,24,26,0.04);
+  border: 1px solid rgba(22,24,26,0.08);
 }
 .glass-strong {
-  background: rgba(255,255,255,0.74);
-  backdrop-filter: blur(36px) saturate(1.6);
-  -webkit-backdrop-filter: blur(36px) saturate(1.6);
-  border: 1px solid rgba(255,255,255,0.65);
-  outline: 1px solid rgba(0,0,0,0.05);
-  outline-offset: -1px;
-  box-shadow: 0 8px 28px rgba(25,35,15,0.10);
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--surface-line);
+  box-shadow: var(--shadow-float);
 }
-.glass-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.56));
-  backdrop-filter: blur(28px) saturate(1.5);
-  -webkit-backdrop-filter: blur(28px) saturate(1.5);
-  border: 1px solid rgba(255,255,255,0.60);
-  outline: 1px solid rgba(0,0,0,0.045);
-  outline-offset: -1px;
-  border-radius: 1.75rem;
-  box-shadow: 0 16px 40px rgba(25,35,15,0.08), inset 0 1px 0 rgba(255,255,255,0.85);
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
+
+/* ---------- Pole a popisky ----------
+   Jedna podoba pole pro celou aplikaci; dřív jich bylo osm kopií. */
+:where(.field) {
+  width: 100%;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid rgba(22,24,26,0.12);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--ink);
+  transition: border-color var(--dur-2, .22s) ease, box-shadow var(--dur-2, .22s) ease, background-color var(--dur-2, .22s) ease;
 }
+.field::placeholder { color: rgba(22,24,26,0.38); }
+.field:hover { border-color: rgba(22,24,26,0.20); }
+.field:focus, .field:focus-visible { outline: none; border-color: #9FC22A !important; box-shadow: 0 0 0 3px rgba(200,245,66,0.30); }
+.field:disabled { background: var(--well); color: rgba(22,24,26,0.5); cursor: not-allowed; }
+.field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: rgba(22,24,26,0.70); margin-bottom: 0.375rem; }
+
+/* ---------- Chipy stavu ---------- */
+:where(.chip) {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  border-radius: var(--r-chip);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem; font-weight: 600; line-height: 1.2;
+  white-space: nowrap;
+}
+.chip-sm { padding: 0.125rem 0.5rem; font-size: 0.6875rem; }
+.chip-ok    { background: var(--ok-bg);    color: var(--ok-ink); }
+.chip-wait  { background: var(--wait-bg);  color: var(--wait-ink); }
+.chip-bad   { background: var(--bad-bg);   color: var(--bad-ink); }
+.chip-info  { background: var(--info-bg);  color: var(--info-ink); }
+.chip-muted { background: var(--muted-bg); color: var(--muted-ink); }
+.chip-ink   { background: var(--ink);      color: #fff; }
+
+/* ---------- Seznamy ----------
+   Řádky dělí linka, kterou kreslí seznam; řádek sám je jen obsah. */
+.list > * + * { border-top: 1px solid var(--surface-line); }
+:where(.list-row) { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; min-height: 3.25rem; }
+:where(.list-row-tap) { border-radius: var(--r-md); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; transition: background-color var(--dur-2, .22s) ease; }
+@media (hover: hover) { .list-row-tap:hover { background: var(--well); } }
+.list-row-tap:active { background: rgba(22,24,26,0.06); }
+
+/* ---------- Typografická škála ----------
+   Nadpis obrazovky 28, sekce 18, karta 15, meta 13, štítek 11. Jediné
+   povolené velikosti nadpisů — 10 velikostí h1 a 9 h2 bylo moc. */
+:where(.t-page) { font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.022em; color: var(--ink); }
+:where(.t-section) { font-size: 1.125rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
+:where(.t-card) { font-size: 0.9375rem; line-height: 1.3; font-weight: 600; color: var(--ink); }
+:where(.t-meta) { font-size: 0.8125rem; line-height: 1.4; color: rgba(22,24,26,0.60); }
+:where(.t-label) { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(22,24,26,0.50); }
 
 /* Everything tappable presses like a real surface. */
 button, a[role="button"], .pressable {
@@ -142,15 +223,10 @@ input::-webkit-date-and-time-value { text-align: left; }
 }
 
 .modal-sheet {
-  /* 0.92 → 0.97: na iOS uvnitř fixed+scroll kontejneru backdrop-filter občas
-     nefunguje a při 8 % průhlednosti prosvítaly prvky stránky pod oknem
-     (vyfoceno na detailu akce). Sklo drží blur tam, kde běží; podklad už
-     ale nesmí prosvítat. */
-  background: rgba(255,255,255,0.97);
-  backdrop-filter: blur(40px) saturate(1.7);
-  -webkit-backdrop-filter: blur(40px) saturate(1.7);
-  border: 1px solid rgba(255,255,255,0.6);
-  box-shadow: 0 30px 80px rgba(15,20,25,0.28), inset 0 1px 0 rgba(255,255,255,0.85);
+  /* Pevná bílá — sklo pod modálem nemá co ukazovat, jen mate. */
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
+  box-shadow: var(--shadow-modal);
 }
 :root[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.5); }
 :root[data-theme="dark"] .modal-sheet {
@@ -314,9 +390,33 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
     radial-gradient(ellipse 60% 40% at 90% 0%, rgba(10,132,255,0.08), transparent);
   color:#EDF2E4;
 }
-:root[data-theme="dark"] .glass{ background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.10); outline-color:rgba(0,0,0,0.35); backdrop-filter:blur(26px) saturate(1.3); -webkit-backdrop-filter:blur(26px) saturate(1.3); }
-:root[data-theme="dark"] .glass-strong{ background:rgba(28,31,34,0.84); border-color:rgba(255,255,255,0.10); outline-color:rgba(0,0,0,0.4); box-shadow:0 8px 28px rgba(0,0,0,0.4); }
-:root[data-theme="dark"] .glass-card{ background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.035)); border-color:rgba(255,255,255,0.09); outline-color:rgba(0,0,0,0.4); box-shadow:0 16px 40px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.07); }
+:root[data-theme="dark"] {
+  --surface: #17191C;
+  --surface-line: rgba(255,255,255,0.09);
+  --well: rgba(255,255,255,0.05);
+  --well-line: rgba(255,255,255,0.06);
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -14px rgba(0,0,0,0.5);
+  --shadow-float: 0 12px 36px -8px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.3);
+  --ok-bg: rgba(200,245,66,0.18);   --ok-ink: #C8F542;
+  --wait-bg: rgba(245,158,11,0.18); --wait-ink: #F5C46A;
+  --bad-bg: rgba(220,38,38,0.18);   --bad-ink: #FF8A80;
+  --info-bg: rgba(10,132,255,0.18); --info-ink: #7EB8FF;
+  --muted-bg: rgba(255,255,255,0.08); --muted-ink: rgba(237,242,228,0.66);
+}
+:root[data-theme="dark"] .glass{ background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.10); }
+:root[data-theme="dark"] .glass-strong{ background:rgba(28,31,34,0.86); border-color:rgba(255,255,255,0.10); }
+:root[data-theme="dark"] .card-accent{ background:linear-gradient(180deg, rgba(200,245,66,0.12), rgba(200,245,66,0.04)), var(--surface); border-color:rgba(200,245,66,0.35); }
+:root[data-theme="dark"] .card-wait{ background:linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04)), var(--surface); }
+:root[data-theme="dark"] .card-danger{ background:linear-gradient(180deg, rgba(220,38,38,0.12), rgba(220,38,38,0.04)), var(--surface); }
+:root[data-theme="dark"] .card-info{ background:linear-gradient(180deg, rgba(10,132,255,0.12), rgba(10,132,255,0.04)), var(--surface); }
+:root[data-theme="dark"] .field{ background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.14); color:#EDF2E4; }
+:root[data-theme="dark"] .field::placeholder{ color:rgba(237,242,228,0.35); }
+:root[data-theme="dark"] .field-label{ color:rgba(237,242,228,0.72); }
+:root[data-theme="dark"] .t-page, :root[data-theme="dark"] .t-section, :root[data-theme="dark"] .t-card{ color:#EDF2E4; }
+:root[data-theme="dark"] .t-meta{ color:rgba(237,242,228,0.62); }
+:root[data-theme="dark"] .t-label{ color:rgba(237,242,228,0.52); }
+:root[data-theme="dark"] .list-row-tap:active{ background:rgba(255,255,255,0.08); }
+:root[data-theme="dark"] .chip-ink{ background:#EDF2E4; color:#16181A; }
 
 /* text */
 :root[data-theme="dark"] .text-\[\#16181A\]{ color:#EDF2E4 !important; }

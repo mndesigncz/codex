@@ -9,8 +9,8 @@ import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { QR_DEFAULT, QR_SHEETS, QR_STYLES, contrast, normalizeQrDesign, type QrDesign } from '@/lib/qrDesign';
 
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field !py-2.5 text-sm';
+const label = 'field-label';
 
 /** Barvy, které se na papíře osvědčí. Vlastní odstín jde nastavit vedle. */
 const INKS = ['#16181A', '#3E5406', '#0A5FC4', '#7A2E12', '#5B2A7A', '#0F5C52'];

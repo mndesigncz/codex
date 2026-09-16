@@ -69,7 +69,7 @@ export default function Landing() {
           </div>
 
           <figure className="relative lg:-mr-[14vw] xl:-mr-[10vw] rise-in" style={{ animationDelay: '120ms' }}>
-            <div className="relative overflow-hidden rounded-[32px] border border-black/[0.06] shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
+            <div className="relative overflow-hidden rounded-3xl border border-black/[0.06] shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
               <img
                 src="/brand/hero-tea-bar.webp"
                 srcSet="/brand/hero-tea-bar-sm.webp 800w, /brand/hero-tea-bar.webp 1600w"
@@ -81,7 +81,7 @@ export default function Landing() {
             </div>
             {/* Plovoucí lístek z aplikace přes roh fotky — jediný kousek UI na
                 celé stránce, a je to to, co ráno otevřete jako první. */}
-            <figcaption className="absolute -bottom-5 left-4 sm:left-8 lg:-left-10 glass-strong rounded-[22px] px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)] rise-in" style={{ animationDelay: '320ms' }}>
+            <figcaption className="absolute -bottom-5 left-4 sm:left-8 lg:-left-10 glass-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)] rise-in" style={{ animationDelay: '320ms' }}>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
               <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
                 <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30 i-pulse" />Směna: Eva 8–16, Martin od 12</li>

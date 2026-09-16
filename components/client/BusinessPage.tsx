@@ -21,8 +21,8 @@ const MONTHS = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'z�
 
 const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 rounded-full bg-[#C8F542] on-accent px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
 const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
-const input = 'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition text-sm';
-const label = 'block text-xs font-semibold text-black/55 mb-1.5';
+const input = 'field text-sm';
+const label = 'field-label';
 
 export default function BusinessPage({ slug }: { slug: string }) {
   const [d, setD] = useState<any | null>(null);
@@ -65,14 +65,14 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section className={`relative overflow-hidden rounded-[28px] border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[13rem] sm:min-h-[16rem] flex flex-col justify-end p-5 sm:p-7`}>
+      <section className={`relative overflow-hidden rounded-3xl border border-black/[0.06] ${b.coverUrl ? 'bg-[#16181A]' : 'glass-card'} min-h-[13rem] sm:min-h-[16rem] flex flex-col justify-end p-5 sm:p-7`}>
         {b.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={b.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         )}
         {b.coverUrl && <div className="absolute inset-0 bg-gradient-to-t from-[#16181A]/90 via-[#16181A]/35 to-[#16181A]/5" />}
         {!b.coverUrl && (
-          <div className="absolute inset-0 overflow-hidden rounded-[28px] pointer-events-none" aria-hidden>
+          <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none" aria-hidden>
             <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full blur-3xl" style={{ background: accent, opacity: 0.22 }} />
             <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-[#0A84FF]/10 blur-3xl" />
           </div>
