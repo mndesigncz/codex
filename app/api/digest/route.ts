@@ -26,6 +26,9 @@ export async function GET(request: Request) {
   const dateLabel = new Date(today + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
   let sent = 0;
 
+  // Záchranná síť pro naplánované zprávy členům: co nestihl provoz, pošle cron.
+  try { const { dispatchDueBroadcasts } = await import('@/lib/broadcasts'); await dispatchDueBroadcasts(); } catch { /* nesmí shodit digest */ }
+
   try {
     const teams = await sql`SELECT id, name FROM teams ORDER BY id`;
     for (const team of teams as any[]) {

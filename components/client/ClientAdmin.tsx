@@ -707,16 +707,30 @@ function Reviews() {
 
 function Broadcast({ toast }: { toast: (m: string) => void }) {
   const [d, setD] = useState<any | null>(null);
-  const [f, setF] = useState({ title: '', body: '', audience: 'all' }); const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' }); const [busy, setBusy] = useState(false);
   const load = useCallback(() => fetch('/api/client/admin/broadcast').then(r => r.json()).then(setD).catch(() => setD({ history: [], members: 0 })), []);
   useEffect(() => { load(); }, [load]);
-  const target = f.audience === 'quiet' ? (d?.quiet ?? 0) : f.audience === 'gold' ? (d?.gold ?? 0) : (d?.members ?? 0);
+  const target = f.audience === 'quiet' ? (d?.quiet ?? 0)
+    : f.audience === 'tier:silver' ? (d?.silver ?? 0)
+    : f.audience === 'tier:gold' || f.audience === 'gold' ? (d?.gold ?? 0)
+    : f.audience === 'tier:platinum' ? (d?.platinum ?? 0)
+    : f.audience.startsWith('group:') ? (d?.groups?.find((g: any) => `group:${g.id}` === f.audience)?.members ?? 0)
+    : (d?.members ?? 0);
+  const planned = !!f.scheduledAt && new Date(f.scheduledAt).getTime() > Date.now();
   const send = async (e: React.FormEvent) => {
     e.preventDefault(); if (!f.title.trim()) return;
-    if (!confirm(`Poslat zprávu ${target} členům?`)) return;
+    if (!confirm(planned ? `Naplánovat zprávu pro ${target} členů na ${new Date(f.scheduledAt).toLocaleString('cs-CZ')}?` : `Poslat zprávu ${target} členům?`)) return;
     setBusy(true);
-    try { const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) }); toast(`Odesláno ${r.broadcast.recipients} členům.`); setF({ title: '', body: '', audience: 'all' }); load(); } catch (e: any) { toast(e.message); }
+    try {
+      const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) });
+      toast(r.scheduled ? 'Zpráva je naplánovaná — odejde ve svůj čas.' : `Odesláno ${r.broadcast.recipients} členům.`);
+      setF({ title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' }); load();
+    } catch (e: any) { toast(e.message); }
     setBusy(false);
+  };
+  const cancel = async (h: any) => {
+    if (!confirm(`Zrušit naplánovanou zprávu „${h.title}"?`)) return;
+    try { await j(`/api/client/admin/broadcast?id=${h.id}`, { method: 'DELETE' }); toast('Zpráva zrušena.'); load(); } catch (e: any) { toast(e.message); }
   };
   if (!d) return <PageSkel />;
   return (
@@ -729,20 +743,47 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
             <select id="bc-aud" value={f.audience} onChange={e => setF({ ...f, audience: e.target.value })} className={input}>
               <option value="all">Všem členům ({d.members})</option>
               <option value="quiet">Kdo dlouho nebyl — 30 a víc dní ({d.quiet ?? 0})</option>
-              <option value="gold">Zlatým hostům — 25+ návštěv ({d.gold ?? 0})</option>
+              <option value="tier:silver">Stříbrným a výš ({d.silver ?? 0})</option>
+              <option value="tier:gold">Zlatým a výš ({d.gold ?? 0})</option>
+              {d.platinum != null && <option value="tier:platinum">Platinovým hostům ({d.platinum})</option>}
+              {(d.groups ?? []).map((g: any) => <option key={g.id} value={`group:${g.id}`}>Skupina {g.name} ({g.members})</option>)}
             </select>
-            <p className="text-xs text-black/50 mt-1">Zpráva se objeví i v Novinkách na tvé stránce pro hosty.</p></div>
-          <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!target}>Poslat {target} {target === 1 ? 'členovi' : 'členům'}</Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label htmlFor="bc-link" className={label}>Kam zpráva vezme</label>
+              <select id="bc-link" value={f.linkKind} onChange={e => setF({ ...f, linkKind: e.target.value })} className={input}>
+                <option value="page">Na stránku podniku</option>
+                <option value="loyalty">Na věrnost a kupony</option>
+                <option value="order">Na objednávku od stolu</option>
+                <option value="me">Na jeho kartičku (Moje)</option>
+              </select>
+            </div>
+            <div><label htmlFor="bc-at" className={label}>Odeslat (prázdné = hned)</label>
+              <input id="bc-at" type="datetime-local" value={f.scheduledAt} onChange={e => setF({ ...f, scheduledAt: e.target.value })} className={input} />
+            </div>
+          </div>
+          <p className="text-xs text-black/50">Zpráva se objeví i v Novinkách na tvé stránce pro hosty. Naplánovaná odejde ve svůj čas a do té doby jde zrušit.</p>
+          <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!target}>
+            {planned ? `Naplánovat pro ${target} ${target === 1 ? 'člena' : 'členů'}` : `Poslat ${target} ${target === 1 ? 'členovi' : 'členům'}`}
+          </Button>
         </form>
         <section>
           <SectionTitle icon="mail">Odeslané</SectionTitle>
           {d.history.length === 0 ? <EmptyState icon="mail" title="Zatím nic odeslaného" hint="První zpráva půjde všem, kdo se k podniku přidali." compact />
             : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">{d.history.map((h: any) => (
                 <li key={h.id} className="py-3">
-                  <p className="font-semibold leading-tight">{h.title}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold leading-tight min-w-0">{h.title}
+                      {h.status === 'scheduled' && <span className="ml-2 rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5 text-[11px] font-semibold align-middle">naplánováno</span>}
+                    </p>
+                    {h.status === 'scheduled' && <Button size="sm" variant="ghost" onClick={() => cancel(h)}>Zrušit</Button>}
+                  </div>
                   {h.body && <p className="text-sm text-black/65 mt-0.5 text-pretty">{h.body}</p>}
-                  <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(h.sent_at)} · {h.recipients} {h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}{h.audience === 'quiet' ? ' · kdo dlouho nebyl' : h.audience === 'gold' ? ' · zlatí hosté' : ''}</p>
-                  {(Number(h.visits_after) > 0 || Number(h.visits_before) > 0) && (() => {
+                  <p className="text-xs text-black/45 mt-1">
+                    {h.status === 'scheduled' ? `odejde ${dbTimeDayHM(h.scheduled_at)}` : `${dbTimeDayHM(h.sent_at)} · ${h.recipients} ${h.recipients === 1 ? 'člen' : h.recipients < 5 ? 'členové' : 'členů'}`}
+                    {h.audience === 'quiet' ? ' · kdo dlouho nebyl' : h.audience === 'gold' || h.audience === 'tier:gold' ? ' · zlatí hosté' : h.audience === 'tier:silver' ? ' · stříbrní a výš' : h.audience === 'tier:platinum' ? ' · platinoví' : String(h.audience ?? '').startsWith('group:') ? ' · skupina' : ''}
+                  </p>
+                  {h.status !== 'scheduled' && (Number(h.visits_after) > 0 || Number(h.visits_before) > 0) && (() => {
                     const a = Number(h.visits_after) || 0, bft = Number(h.visits_before) || 0;
                     const diff = a - bft;
                     return (

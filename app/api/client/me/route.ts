@@ -1,6 +1,7 @@
 // Moje podniky: členství s body a razítky, rezervace, objednávky, kupony.
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer, publicProfile } from '@/lib/client';
+import { dispatchDueBroadcasts } from '@/lib/broadcasts';
 import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,9 @@ export const fetchCache = 'force-no-store';
 export async function GET() {
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  // Naplánované zprávy členům: hosté jsou nejčastější provoz, tak se fronta
+  // prohlédne tady (levný dotaz přes částečný index) — cron je jen záloha.
+  await dispatchDueBroadcasts();
   const today = pragueToday();
   const memberships = await sql`
     SELECT m.points, m.stamps, m.visits, m.credit, m.joined_at, m.last_visit_at, p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency

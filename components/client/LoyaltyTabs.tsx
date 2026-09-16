@@ -67,6 +67,26 @@ function Saver({ busy, onSave, children, title, hint }: { busy: boolean; onSave:
 
 // ---- Přehled --------------------------------------------------------------------
 
+/** Sloupky za 31 dní — rytmus týdne je vidět bez knihovny na grafy. */
+function Spark({ title, data, days }: { title: string; data: number[]; days: string[] }) {
+  const max = Math.max(1, ...data);
+  const total = data.reduce((a, b) => a + b, 0);
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs text-black/50">{title}</p>
+        <p className="text-sm font-bold tabular-nums">{total}</p>
+      </div>
+      <div className="flex items-end gap-[2px] h-10 mt-1" aria-hidden>
+        {data.map((v, i) => (
+          <span key={i} title={`${days[i]?.slice(8, 10)}. ${days[i]?.slice(5, 7)}.: ${v}`}
+            className="flex-1 rounded-t bg-[#C8F542]" style={{ height: `${Math.max(6, (v / max) * 100)}%`, opacity: v ? 1 : 0.25 }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Overview({ go }: { go: (s: LoyaltySub) => void }) {
   const [d, setD] = useState<any | null>(null);
   const { p, setP } = useProfile();
@@ -93,6 +113,20 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
         <Tile icon="card" label="Kredit hostů" value={s.credit ?? 0} unit="Kč" />
         <Tile icon="gift" label="Kupony k vyzvednutí" value={s.couponsOpen ?? 0} tone={(s.couponsOpen ?? 0) > 0 ? 'wait' : 'ok'} />
       </div>
+      {(d.series ?? []).length > 0 && (() => {
+        const days = d.series.map((r: any) => String(r.day));
+        return (
+          <section className="glass-card p-4 sm:p-5">
+            <h2 className="text-base font-bold tracking-tight mb-3">Posledních 31 dní</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <Spark title="Členové u kasy" data={d.series.map((r: any) => Number(r.active) || 0)} days={days} />
+              <Spark title="Rozdané body" data={d.series.map((r: any) => Number(r.points_given) || 0)} days={days} />
+              <Spark title="Noví členové" data={d.series.map((r: any) => Number(r.new_members) || 0)} days={days} />
+              <Spark title="Uplatněné kupony" data={d.series.map((r: any) => Number(r.redeemed) || 0)} days={days} />
+            </div>
+          </section>
+        );
+      })()}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5 items-start">
         <section className="glass-card p-4 sm:p-5">
           <h2 className="text-base font-bold tracking-tight mb-3">Poslední pohyby</h2>
@@ -141,7 +175,7 @@ function Points({ toast }: { toast: (m: string) => void }) {
   const save = async () => {
     setBusy(true);
     try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, birthday_points: p.birthday_points, referral_points: p.referral_points }) });
+      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points }) });
       setP(r.profile); toast('Pravidla bodů uložena.');
     } catch (e: any) { toast(e.message); }
     setBusy(false);
@@ -163,8 +197,13 @@ function Points({ toast }: { toast: (m: string) => void }) {
         {row('l-bday', 'Narozeniny', 'jako dárek v den narozenin. 0 = nedávat.', 'birthday_points', 1000, 'bodů')}
         {row('l-ref', 'Pozvání', 'pro oba, když pozvaný kamarád poprvé vstoupí do podniku. 0 = vypnuto.', 'referral_points', 1000, 'bodů')}
       </Saver>
-      <Saver busy={busy} onSave={save} title="Kredit z útraty" hint="Cashback jako v Kartičce: část útraty se hostovi vrátí jako kredit v korunách. Kredit uplatní u kasy — obsluha ho odečte při načtení kartičky.">
-        {row('l-cash', 'Vrátit', 'z útraty jako kredit. 0 = nepoužívat. Kredit se načítá při zaúčtování útraty u kasy.', 'cashback_pct', 50, '%')}
+      <Saver busy={busy} onSave={save} title="Cashback z útraty" hint="Jako v Kartičce: část útraty se hostovi vrací. Buď jako kredit v korunách (obsluha ho odečte u kasy), nebo jako body (přibudou k ostatním bodům).">
+        {row('l-cash', 'Vrátit', 'z útraty. 0 = nepoužívat. Načítá se při zaúčtování útraty u kasy.', 'cashback_pct', 50, '%')}
+        <div>
+          <p className={label}>V čem se vrací</p>
+          <Segmented options={[{ id: 'credit', label: 'Kredit v Kč' }, { id: 'points', label: 'Body' }]}
+            value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => setP({ ...p, cashback_mode: v })} size="sm" ariaLabel="Podoba cashbacku" />
+        </div>
       </Saver>
       <p className="text-xs text-black/50">Uvítacích 10 bodů dostane každý nový člen automaticky. Ruční úpravu bodů i kreditu najdeš u konkrétního hosta v Zákaznících.</p>
     </div>
