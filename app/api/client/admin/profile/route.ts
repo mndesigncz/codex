@@ -65,6 +65,7 @@ export async function PUT(req: NextRequest) {
       cover_url = ${b.cover_url !== undefined ? imgUrl(b.cover_url) : String(cur.cover_url ?? '')},
       reservations_on = ${b.reservations_on != null ? !!b.reservations_on : cur.reservations_on},
       ordering_on = ${b.ordering_on != null ? !!b.ordering_on : cur.ordering_on},
+      online_payments_on = ${b.online_payments_on != null ? !!b.online_payments_on : !!cur.online_payments_on},
       loyalty_on = ${b.loyalty_on != null ? !!b.loyalty_on : cur.loyalty_on},
       points_per_100 = ${num(b.points_per_100, Number(cur.points_per_100), 0, 100)},
       stamp_target = ${num(b.stamp_target, Number(cur.stamp_target), 0, 50)},

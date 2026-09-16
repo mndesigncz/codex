@@ -640,6 +640,24 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`);
+    // ---- Stripe (docs/stripe.md) ----
+    // Předplatné Pro: zákazník a předplatné ve Stripe, jeho stav a konec období.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_subscription_status TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_current_period_end TIMESTAMP`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS teams_stripe_customer ON teams (stripe_customer_id) WHERE stripe_customer_id IS NOT NULL`);
+    // Online platby hostů: propojený účet podniku (Connect) a jestli už smí přijímat karty.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_account_id TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_payments_ready BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS teams_stripe_account ON teams (stripe_account_id) WHERE stripe_account_id IS NOT NULL`);
+    // Každá událost ze Stripe se zpracuje nejvýš jednou.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS stripe_events (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        received_at TIMESTAMP DEFAULT NOW()
+      )`);
     // end-of-shift removal: cash carried out AFTER the drawer was counted
     await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`);
 
@@ -1592,6 +1610,12 @@ export async function GET(request: Request) {
     // která nikdy nedojela na terminál, a neměla jak zjistit proč.
     await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_note TEXT`);
     await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS pos_tried_at TIMESTAMP`);
+    // Online platba objednávky (Stripe): unpaid | pending | paid | failed.
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'unpaid'`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS stripe_session_id TEXT`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS stripe_payment_intent TEXT`);
+    await ddl(sql`ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS online_payments_on BOOLEAN NOT NULL DEFAULT FALSE`);
     // Mapa stolů (souřadnice v procentech plánku), narozeninová odměna a
     // publikum zpráv členům (všichni / dlouho nebyli / zlatí hosté).
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_x DOUBLE PRECISION`);

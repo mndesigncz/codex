@@ -6,6 +6,11 @@ import { normName, matchByName, sectionTitles } from '../lib/menuPos.ts';
 import { contrast, normalizeQrDesign } from '../lib/qrDesign.ts';
 import { sanitizeSvg } from '../lib/svgSanitize.ts';
 import { batchesNeeded, planFor, recipeUnit, availableOf, taskTitleFor, checklistFor } from '../lib/productionPlan.ts';
+import {
+  planForSubscription, subscriptionLive, czkToMinor, platformFeeMinor, checkoutLines, linesTotalMinor,
+  integrationId, sessionPaid, merchantReady, requirementsDue, periodEndOf, subscriptionIdOfInvoice, idOf, intOf,
+} from '../lib/stripeBilling.ts';
+import { planInfoOf } from '../lib/plan.ts';
 
 let failed = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -71,6 +76,69 @@ let threw = false; try { sanitizeSvg('tohle není svg'); } catch { threw = true;
 ok('svg: co není SVG, vyhodí chybu', threw);
 let threwBig = false; try { sanitizeSvg('<svg>' + 'a'.repeat(500000) + '</svg>'); } catch { threwBig = true; }
 ok('svg: příliš velký soubor vyhodí chybu', threwBig);
+
+// --- Stripe: předplatné, haléře, provize, objednávka (peníze) ---
+{
+  eq('stripe: active = pro', planForSubscription('active'), 'pro');
+  eq('stripe: trialing = pro', planForSubscription('trialing'), 'pro');
+  eq('stripe: past_due zůstává pro (Stripe zkouší kartu znovu)', planForSubscription('past_due'), 'pro');
+  eq('stripe: canceled = free', planForSubscription('canceled'), 'free');
+  eq('stripe: unpaid = free', planForSubscription('unpaid'), 'free');
+  eq('stripe: incomplete = free', planForSubscription('incomplete'), 'free');
+  eq('stripe: bez stavu = free', planForSubscription(null), 'free');
+  eq('stripe: živé předplatné', ['active', 'trialing', 'past_due', 'paused', 'canceled', null].map(subscriptionLive), [true, true, true, true, false, false]);
+
+  eq('stripe: koruny → haléře', czkToMinor(249), 24900);
+  eq('stripe: desetinná čárka', czkToMinor('12,50'), 1250);
+  eq('stripe: zaokrouhlení haléřů', czkToMinor(0.015), 2);
+  eq('stripe: záporné a nesmysl = 0', [czkToMinor(-5), czkToMinor('abc'), czkToMinor(null)], [0, 0, 0]);
+
+  eq('stripe: provize 1,5 % z 10 000 Kč', platformFeeMinor(1000000, 1.5), 15000);
+  eq('stripe: provize 0 % = nic', platformFeeMinor(1000000, 0), 0);
+  eq('stripe: provize nikdy nad částku', platformFeeMinor(1000, 150), 1000);
+  eq('stripe: provize z nesmyslu = 0', [platformFeeMinor(NaN, 5), platformFeeMinor(1000, NaN), platformFeeMinor(-1, 5)], [0, 0, 0]);
+
+  const lines = checkoutLines([
+    { name: 'Sencha', price: 85, count: 2 },
+    { name: 'Matcha', price: '120', count: '1' },
+    { name: 'Nula', price: 0, count: 3 },        // zdarma se do Checkoutu nedává
+    { name: 'Bez kusů', price: 50, count: 0 },
+    { name: 'Půl', price: 10, count: 1.7 },      // kusy se zaokrouhlí dolů
+  ]);
+  eq('stripe: položky objednávky → Checkout', lines, [
+    { name: 'Sencha', unitAmount: 8500, quantity: 2 },
+    { name: 'Matcha', unitAmount: 12000, quantity: 1 },
+    { name: 'Půl', unitAmount: 1000, quantity: 1 },
+  ]);
+  eq('stripe: součet položek v haléřích', linesTotalMinor(lines), 8500 * 2 + 12000 + 1000);
+  eq('stripe: prázdné položky', [checkoutLines(null), checkoutLines(undefined), checkoutLines('x' as any)], [[], [], []]);
+
+  const id = integrationId('managero_pro', () => 0);
+  eq('stripe: integration_identifier tvar', id, 'managero_pro_aaaaaaaa');
+  ok('stripe: integration_identifier náhodná přípona 8 písmen', /^managero_order_[a-z]{8}$/.test(integrationId('managero-order')));
+
+  eq('stripe: zaplacená session', [sessionPaid({ payment_status: 'paid' }), sessionPaid({ payment_status: 'no_payment_required' }), sessionPaid({ payment_status: 'unpaid' }), sessionPaid(null)], [true, true, false, false]);
+  eq('stripe: účet připravený = card_payments active', merchantReady({ configuration: { merchant: { capabilities: { card_payments: { status: 'active' } } } } }), true);
+  eq('stripe: účet pending není připravený', merchantReady({ configuration: { merchant: { capabilities: { card_payments: { status: 'pending' } } } } }), false);
+  eq('stripe: účet bez konfigurace', merchantReady({}), false);
+  eq('stripe: požadavky účtu', [requirementsDue({ requirements: { entries: [{}, {}] } }), requirementsDue({})], [2, 0]);
+
+  eq('stripe: konec období z položky (nové API)', periodEndOf({ items: { data: [{ current_period_end: 1700000000 }] } })?.toISOString(), '2023-11-14T22:13:20.000Z');
+  eq('stripe: konec období ze starého tvaru', periodEndOf({ current_period_end: 1700000000 })?.toISOString(), '2023-11-14T22:13:20.000Z');
+  eq('stripe: konec období chybí', periodEndOf({}), null);
+  eq('stripe: předplatné z faktury (nový tvar)', subscriptionIdOfInvoice({ parent: { subscription_details: { subscription: 'sub_1' } } }), 'sub_1');
+  eq('stripe: předplatné z faktury (starý tvar, rozbalené)', subscriptionIdOfInvoice({ subscription: { id: 'sub_2' } }), 'sub_2');
+  eq('stripe: faktura bez předplatného', subscriptionIdOfInvoice({}), null);
+  eq('stripe: idOf', [idOf('cus_1'), idOf({ id: 'cus_2' }), idOf(null)], ['cus_1', 'cus_2', null]);
+  eq('stripe: intOf', [intOf('12'), intOf(7), intOf('x'), intOf(0), intOf(undefined)], [12, 7, null, null, null]);
+
+  // Plán podniku vidí živé předplatné; podnik z historie (pro bez Stripe) žádné nemá.
+  const now = Date.parse('2026-09-16T12:00:00Z');
+  eq('plán: pro s předplatným', planInfoOf({ plan: 'pro', stripe_subscription_status: 'active', stripe_current_period_end: '2026-10-16T00:00:00Z' }, now).subscription, { status: 'active', periodEnd: '2026-10-16T00:00:00.000Z' });
+  eq('plán: grandfathered pro bez předplatného', planInfoOf({ plan: 'pro' }, now).subscription, null);
+  eq('plán: zrušené předplatné se neukazuje', planInfoOf({ plan: 'free', stripe_subscription_status: 'canceled' }, now).subscription, null);
+  eq('plán: chybějící sloupce nevadí', planInfoOf({ plan: 'free', trial_ends_at: null }, now).effective, 'free');
+}
 
 if (failed) { console.error(`\n${failed} test(ů) selhalo.`); process.exit(1); }
 console.log('\nVšechny testy prošly.');
