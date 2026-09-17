@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState, PageHeader, Segmented } from '../ui';
+import { EmptyState, PageHeader, Segmented, BulkBar, SelectBox, useSelection, runBulk } from '../ui';
 import { DEFAULT_POINTS, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
@@ -57,16 +57,40 @@ function RewardsViewInner() {
       setRedemptions(Array.isArray(d.redemptions) ? d.redemptions : []);
     }).catch(() => {}), []);
   useEffect(() => { loadShop(); }, [loadShop]);
+  const patchRedemption = async (id: number, action: 'approve' | 'decline') => {
+    const res = await fetch('/api/rewards/catalog', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action }),
+    });
+    if (!res.ok) throw new Error('nepovedlo se');
+  };
+
   const decide = async (id: number, action: 'approve' | 'decline') => {
     if (busyId !== null) return;
     setBusyId(id);
-    try {
-      const res = await fetch('/api/rewards/catalog', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
-      }).catch(() => null);
-      if (res?.ok) { await loadShop(); load(); }
-    } finally { setBusyId(null); }
+    try { await patchRedemption(id, action); await loadShop(); load(); }
+    catch { /* ignore */ }
+    finally { setBusyId(null); }
+  };
+
+  // Deset žádostí = deset čekání za sebou, protože `busyId` zamykal všechna
+  // tlačítka najednou. Výběr je pustí zároveň.
+  const pendingRedemptions = redemptions.filter(r => r.status === 'pending');
+  const redSel = useSelection<number>();
+  const [redNote, setRedNote] = useState('');
+  const decideMany = async (action: 'approve' | 'decline') => {
+    const ids = Array.from(redSel.selected);
+    if (ids.length === 0) return;
+    setRedNote('');
+    const { failed } = await runBulk(ids, id => patchRedemption(id, action));
+    await loadShop(); load();
+    if (failed.length) {
+      setRedNote(failed.length === ids.length
+        ? 'Nepodařilo se to uložit. Zkuste to znovu.'
+        : `${failed.length} z ${ids.length} se neuložilo — zkuste to znovu.`);
+      return;
+    }
+    redSel.exit();
   };
 
   const load = useCallback(() => {
@@ -93,23 +117,51 @@ function RewardsViewInner() {
         <div className="space-y-3">{[0, 1, 2].map(i => <div key={i} className="glass-card h-24 animate-pulse" />)}</div>
       ) : tab === 'board' ? (
         <>
-        {redemptions.some(r => r.status === 'pending') && (
+        {pendingRedemptions.length > 0 && (
           <div className="glass-card p-5 border border-[#C8F542]/30">
-            <p className="font-bold text-[#16181A] mb-2.5"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o odměny</p>
+            <div className="flex items-center gap-2 flex-wrap mb-2.5">
+              <p className="font-bold text-[#16181A]"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o odměny</p>
+              {pendingRedemptions.length > 1 && !redSel.selecting && (
+                <button type="button" onClick={redSel.start}
+                  className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+                  <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
+                </button>
+              )}
+            </div>
             <div className="space-y-2">
-              {redemptions.filter(r => r.status === 'pending').map(r => (
+              {pendingRedemptions.map(r => (
                 <div key={r.id} className="flex flex-wrap items-center gap-2 well border border-black/[0.06] px-4 py-2.5">
+                  {redSel.selecting && (
+                    <SelectBox checked={redSel.has(r.id)} onChange={() => redSel.toggle(r.id)}
+                      label={`Vybrat žádost — ${r.employee_name}, ${r.title}`} />
+                  )}
                   <span className="min-w-0 flex-1 basis-full sm:basis-0 text-sm text-[#16181A] line-clamp-2 sm:truncate">
                     {r.employee_avatar ?? '👤'} <strong>{r.employee_name}</strong> · {r.title}
                     <span className="text-black/40"> · {r.cost} b.</span>
                   </span>
-                  <button onClick={() => decide(r.id, 'approve')} disabled={busyId !== null}
-                    className="tap-target-sm shrink-0 btn btn-primary btn-sm disabled:opacity-50 transition">Schválit ✓</button>
-                  <button onClick={() => decide(r.id, 'decline')} disabled={busyId !== null}
-                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition">Zamítnout</button>
+                  {!redSel.selecting && (<>
+                    <button type="button" onClick={() => decide(r.id, 'approve')} disabled={busyId !== null}
+                      className="tap-target-sm shrink-0 btn btn-primary btn-sm disabled:opacity-50 transition">Schválit</button>
+                    <button type="button" onClick={() => decide(r.id, 'decline')} disabled={busyId !== null}
+                      className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition">Zamítnout</button>
+                  </>)}
                 </div>
               ))}
             </div>
+
+            {redSel.selecting && (
+              <BulkBar
+                count={redSel.count}
+                totalLabel={`Vybrat vše (${pendingRedemptions.length})`}
+                onSelectAll={() => redSel.selectAll(pendingRedemptions.map(r => r.id))}
+                onExit={() => { redSel.exit(); setRedNote(''); }}
+                note={redNote}
+                actions={[
+                  { label: 'Schválit', primary: true, onClick: () => decideMany('approve') },
+                  { label: 'Zamítnout', danger: true, onClick: () => decideMany('decline') },
+                ]}
+              />
+            )}
           </div>
         )}
         <StandingsBoard standings={standings} onRate={setRating} onOpen={s => setProfileId(s.id)} />

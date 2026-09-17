@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, EmptyState, SearchField } from '../ui';
+import { Button, PageHeader, EmptyState, SearchField, BulkBar, SelectBox, useSelection, runBulk } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
@@ -229,6 +229,40 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     noticeTimer.current = setTimeout(() => setNotice(''), 4000);
   };
   useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+
+  // Návrhy od týmu: po inventuře jich přijde třicet a schvalovaly se po
+  // jedné, každá s vlastním načtením celého skladu.
+  const proposals = items.filter(i => i.approved === false);
+  const propSel = useSelection<number>();
+  const [propNote, setPropNote] = useState('');
+
+  const approveProposal = async (id: number) => {
+    const res = await fetch(`/api/inventory/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approve: true }),
+    });
+    if (!res.ok) throw new Error('nepovedlo se');
+  };
+  const rejectProposal = async (id: number) => {
+    const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('nepovedlo se');
+  };
+
+  const decideProposals = async (action: 'approve' | 'reject') => {
+    const ids = Array.from(propSel.selected);
+    if (ids.length === 0) return;
+    if (action === 'reject' && !confirm(`Zamítnout a smazat ${ids.length} ${ids.length === 1 ? 'návrh' : ids.length < 5 ? 'návrhy' : 'návrhů'}?`)) return;
+    setPropNote('');
+    const { failed } = await runBulk(ids, id => action === 'approve' ? approveProposal(id) : rejectProposal(id));
+    await load();
+    if (failed.length) {
+      setPropNote(failed.length === ids.length
+        ? 'Nepodařilo se to uložit. Zkuste to znovu.'
+        : `${failed.length} z ${ids.length} se neuložilo — zkuste to znovu.`);
+      return;
+    }
+    propSel.exit();
+  };
 
   const loadOrders = async () => {
     try {
@@ -688,10 +722,22 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
       {items.some(i => i.approved === false) && (
         <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
-          <p className="font-semibold text-sm text-[#16181A]"><Icon name="inbox" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nové věci od týmu ({items.filter(i => i.approved === false).length})</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-sm text-[#16181A]"><Icon name="inbox" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nové věci od týmu ({proposals.length})</p>
+            {proposals.length > 1 && !propSel.selecting && (
+              <button type="button" onClick={propSel.start}
+                className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+                <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
+              </button>
+            )}
+          </div>
           <div className="space-y-2">
-            {items.filter(i => i.approved === false).map(i => (
+            {proposals.map(i => (
               <div key={i.id} className="flex flex-wrap items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-2.5">
+                {propSel.selecting && (
+                  <SelectBox checked={propSel.has(i.id)} onChange={() => propSel.toggle(i.id)}
+                    label={`Vybrat návrh — ${i.name}`} />
+                )}
                 {(i as any).photoUrl ? (
                   <a href={(i as any).photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -712,30 +758,41 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     {(i as any).description ? ` · „${(i as any).description}"` : ''}
                   </span>
                 </span>
-                <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/inventory/${i.id}`, {
-                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ approve: true }),
-                    }).catch(() => null);
-                    if (res?.ok) await load();
-                    else showNotice('Schválení se nepodařilo.');
-                  }}
-                  className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
-                  Schválit
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!confirm(`Zamítnout a smazat návrh „${i.name}"?`)) return;
-                    const res = await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' }).catch(() => null);
-                    if (res?.ok) await load();
-                  }}
-                  className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">
-                  Zamítnout
-                </button>
+                {!propSel.selecting && (<>
+                  <button type="button"
+                    onClick={async () => {
+                      try { await approveProposal(i.id); await load(); }
+                      catch { showNotice('Schválení se nepodařilo.'); }
+                    }}
+                    className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
+                    Schválit
+                  </button>
+                  <button type="button"
+                    onClick={async () => {
+                      if (!confirm(`Zamítnout a smazat návrh „${i.name}"?`)) return;
+                      try { await rejectProposal(i.id); await load(); } catch { /* ignore */ }
+                    }}
+                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">
+                    Zamítnout
+                  </button>
+                </>)}
               </div>
             ))}
           </div>
+
+          {propSel.selecting && (
+            <BulkBar
+              count={propSel.count}
+              totalLabel={`Vybrat vše (${proposals.length})`}
+              onSelectAll={() => propSel.selectAll(proposals.map(i => i.id))}
+              onExit={() => { propSel.exit(); setPropNote(''); }}
+              note={propNote}
+              actions={[
+                { label: 'Schválit', primary: true, onClick: () => decideProposals('approve') },
+                { label: 'Zamítnout', danger: true, onClick: () => decideProposals('reject') },
+              ]}
+            />
+          )}
         </div>
       )}
 
@@ -1206,32 +1263,21 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         </div>
       )}
 
-      {selecting && selected.size > 0 && (
-        <div className="sticky bottom-[calc(104px+env(safe-area-inset-bottom))] md:bottom-4 z-30 mx-auto w-fit max-w-full">
-          <div className="flex items-center gap-2 flex-wrap justify-center rounded-full bg-[#16181A] text-white px-4 py-2.5 shadow-xl shadow-black/20">
-            <span className="text-sm font-semibold whitespace-nowrap px-1">
-              {selected.size} vybráno
-            </span>
-            <button onClick={() => setSelected(new Set(filtered.map(i => i.id)))}
-              className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
-              Vybrat vše ({filtered.length})
-            </button>
-            <button onClick={() => setShowBulk(true)}
-              className="tap-target-sm btn btn-accent btn-sm transition whitespace-nowrap">
-              Upravit
-            </button>
-            <button onClick={async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); }}
-              className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
-              {showArchived ? 'Naskladnit' : 'Odložit'}
-            </button>
-            <button onClick={bulkDelete}
-              className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/25 transition whitespace-nowrap">
-              Smazat
-            </button>
-            <button onClick={exitSelection} title="Zrušit výběr"
-              className="rounded-full w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition"><Icon name="close" size={15} /></button>
-          </div>
-        </div>
+      {/* Lišta, ze které tenhle vzor vzešel — teď už sdílená komponenta,
+          takže vypadá stejně tady i ve frontách ke schválení. */}
+      {selecting && (
+        <BulkBar
+          count={selected.size}
+          totalLabel={`Vybrat vše (${filtered.length})`}
+          onSelectAll={() => setSelected(new Set(filtered.map(i => i.id)))}
+          onExit={exitSelection}
+          actions={[
+            { label: 'Upravit', primary: true, onClick: () => setShowBulk(true) },
+            { label: showArchived ? 'Naskladnit' : 'Odložit',
+              onClick: async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); } },
+            { label: 'Smazat', danger: true, onClick: bulkDelete },
+          ]}
+        />
       )}
 
       {showBulk && (
