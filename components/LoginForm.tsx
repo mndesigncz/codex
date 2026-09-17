@@ -43,7 +43,7 @@ export default function LoginForm() {
               designu) fotka baru, kde se aplikace opravdu používá. Limetkový
               závoj drží značku, tmavý spodek nese text. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/hero-tea-bar.webp" alt="" aria-hidden
+          <img src="/brand/hero-counter.webp" alt="" aria-hidden
             className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(200,245,66,0.22)_0%,rgba(200,245,66,0.06)_40%,rgba(22,24,26,0.72)_100%)]" />
           <div className="relative flex items-center gap-2.5">
@@ -54,7 +54,7 @@ export default function LoginForm() {
             <h2 className="text-3xl font-bold tracking-tight text-white leading-snug text-balance">
               Směny, kasa a sklad<br />na jednom místě.
             </h2>
-            <p className="text-white/70 text-sm mt-2">Pro čajovny, kavárny a malé podniky.</p>
+            <p className="text-white/70 text-sm mt-2">Pro kavárny, restaurace a malé podniky.</p>
           </div>
         </div>
 

@@ -175,7 +175,7 @@ export default function Tasks({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-2xl mx-auto w-full">
-      <PageHeader title="Úkoly" subtitle="Co je dnes na tobě — a co je pro kohokoli."
+      <PageHeader hintId="tasks" title="Úkoly" subtitle="Co je dnes na tobě — a co je pro kohokoli."
         primary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
           options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />} />
 

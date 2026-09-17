@@ -314,7 +314,7 @@ export default function ClosingsOverview() {
       {/* Nadpis obrazovky — dřív začínala rovnou červenou kartou „Chybí
           uzávěrka" a nebylo poznat, kde je člověk, jakmile horní lišta
           odrolovala. */}
-      <PageHeader title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
+      <PageHeader hintId="closingsoverview" title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
       {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
       {missing.length > 0 && (
         <div className="card card-danger p-5 space-y-3">

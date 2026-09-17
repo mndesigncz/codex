@@ -28,7 +28,7 @@ const ITEMS_PER_RUN = 150;
  * Kolik času si běh dá, než uklidí a nechá zbytek na příště.
  *
  * Funkce na Vercelu má minutu. Testovací podnik má 77 účtenek a stihne se
- * celý; ostrá čajovna jich má za dva měsíce tisíce a jedním dechem se
+ * celý; ostrý provoz jich má za dva měsíce tisíce a jedním dechem se
  * stáhnout nedají. Proto se každý běh vejde do rozpočtu a co nestihne,
  * dobere ten další — historie se plní sama po kouscích.
  */

@@ -91,7 +91,9 @@ interface Order {
 type SortKey = 'name' | 'qtyAsc' | 'qtyDesc' | 'status' | 'updated';
 type View = 'list' | 'grid';
 
-const DEFAULT_CATEGORIES = ['Čaje', 'Přísady', 'Nádobí', 'Doplňky'];
+// Výchozí kategorie musí dávat smysl kavárně, restauraci i čajovně —
+// proto obecné skupiny, ne konkrétní sortiment.
+const DEFAULT_CATEGORIES = ['Nápoje', 'Suroviny', 'Nádobí', 'Drogerie'];
 const inputClass = 'field';
 /** Číslo z pole, které snese i desetinnou čárku. V poli type="number"
  *  se „0,7" zahodí na prázdno — a velikost balení pak tiše zmizí. */
@@ -613,7 +615,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader
+      <PageHeader hintId="inventory"
         title="Sklad"
         subtitle={<>
           {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
@@ -897,7 +899,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název</label>
-                    <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Sencha Gyokuro" className={inputClass} />
+                    <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Mléko plnotučné" className={inputClass} />
                   </div>
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Značka</label>
@@ -1098,7 +1100,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název dodavatele</label>
-                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Čajovna s.r.o." className={inputClass} list="managero-suppliers" />
+                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Velkoobchod s.r.o." className={inputClass} list="managero-suppliers" />
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
@@ -2337,7 +2339,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
         {categories.length === 0 ? (
           <div className="text-center space-y-3 py-4">
-            <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — čaje, sirupy, mléko, drogerie. Můžeš je nechat založit podle čajovny a upravit." compact />
+            <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit." compact />
             <button onClick={seedDefaults} disabled={busy} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm font-medium disabled:opacity-40">
               Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}
             </button>

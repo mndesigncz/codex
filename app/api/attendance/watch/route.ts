@@ -2,7 +2,7 @@
 //  1. Směna podle plánu skončila a člověk je pořád píchnutý → jedno pripomenutí.
 //  2. Zavírat smí až noční průchod, kdy v podniku prokazatelně nikdo není.
 //     Večerní běh připomíná, ale nezavírá — ve tři čtvrtě na dvanáct se
-//     v čajovně ještě pracuje a ukončit někomu směnu uprostřed práce znamená
+//     v podniku ještě pracuje a ukončit někomu směnu uprostřed práce znamená
 //     sebrat mu odpracované hodiny a nechat den bez uzávěrky.
 // Protected like the other crons: Vercel sends Authorization: Bearer $CRON_SECRET.
 

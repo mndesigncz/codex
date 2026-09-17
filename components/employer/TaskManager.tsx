@@ -278,7 +278,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto w-full">
-      <PageHeader
+      <PageHeader hintId="taskmanager"
         title="Úkoly"
         subtitle="Úkoly na den nebo pro konkrétní lidi — a jejich plnění."
         secondary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}

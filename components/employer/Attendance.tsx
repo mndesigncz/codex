@@ -322,7 +322,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader
+      <PageHeader hintId="attendance"
         title="Docházka"
         subtitle="Kdo je na směně, odpracované hodiny a mzdy za období."
         secondary={<Segmented size="sm" ariaLabel="Období" value={String(days)} onChange={v => setDays(Number(v) as typeof PERIODS[number])}

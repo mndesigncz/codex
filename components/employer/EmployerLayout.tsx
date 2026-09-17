@@ -119,6 +119,10 @@ export default function EmployerLayout({ user }: Props) {
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
+    // Rada, která říká „nastav to v Nastavení → Pokladna", musí umět
+    // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
+    // hledal dál sám.
+    setSettingsTab(view === 'settings' ? arg : undefined);
     setCurrentView(view);
   };
   // Deep links from notifications and old bookmarks: /employer/overview?view=X
@@ -127,9 +131,10 @@ export default function EmployerLayout({ user }: Props) {
     if (v && (byId[v] || v === 'settings' || v === 'team-settings')) setCurrentView(v);
   }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const openSettings = () => { setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
+  const openSettings = () => { setSettingsTab(undefined); setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
   const openTeam = () => { setCurrentView('team-settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
@@ -168,7 +173,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'reports':   return <ClosingsOverview />;
       case 'finance':   return <FinanceView />;
       case 'suggestions': return <SuggestionsBoard />;
-      case 'settings':  return <Settings user={user as any} initialTab="account" />;
+      case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} />;
       case 'team-settings': return <TeamManagement user={user as any} />;
       default:          return <EmployerDashboard user={user as any} onNavigate={navigate} />;
     }
@@ -326,7 +331,11 @@ export default function EmployerLayout({ user }: Props) {
         {plan?.pastDue ? (
           <button onClick={() => setCurrentView('settings')}
             className="mx-4 mt-3 note note-danger text-left font-medium hover:brightness-95 transition">
-            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />Platba předplatného se nezdařila. Zkontrolujte kartu v Nastavení → Předplatné.
+            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />Platba předplatného se nezdařila.{' '}
+            <button type="button" onClick={() => navigate('settings', 'billing')}
+              className="tap-target-sm font-semibold underline underline-offset-2 hover:no-underline">
+              Zkontrolovat kartu
+            </button>
           </button>
         ) : plan?.trialing ? (
           <button onClick={() => setCurrentView('settings')}

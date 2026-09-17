@@ -132,7 +132,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} onCustomer={openCustomer} />}
         {tab === 'orders' && (
           <div className="space-y-5 max-w-3xl">
-            <PageHeader title="Objednávky" subtitle="Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body." />
+            <PageHeader hintId="clientadmin-1" title="Objednávky" subtitle="Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body." />
             <StaffInbox onToast={setToast} />
           </div>
         )}
@@ -143,7 +143,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
             nadpisu a člověk nepoznal, kde je. */}
         {tab === 'menu' && (
           <div className="space-y-5 max-w-3xl">
-            <PageHeader title="Menu" subtitle="Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek." />
+            <PageHeader hintId="clientadmin-2" title="Menu" subtitle="Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek." />
             <MenuEditor />
           </div>
         )}
@@ -201,7 +201,7 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
   if (!summary.enabled) {
     return (
       <div className="max-w-2xl">
-        <PageHeader title="Přehled" subtitle="Rezervace, objednávky od stolu, členové a věrnost hostů na jednom místě." />
+        <PageHeader hintId="clientadmin-3" title="Přehled" subtitle="Rezervace, objednávky od stolu, členové a věrnost hostů na jednom místě." />
         <div className="mt-6">
           <EmptyState icon="sparkle" title="Managero client je pro hosty vypnutý"
             hint="Nastav profil podniku a zapni ho. Hosté pak podnik najdou, přidají se, rezervují a objednají od stolu."
@@ -228,7 +228,7 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
   const doneN = steps.filter(x => x.done).length;
   return (
     <div className="space-y-6">
-      <PageHeader title="Přehled" subtitle={`Hosté tě najdou na /client/${summary.slug}. Rezervace, objednávky, členové a věrnost na jednom místě.`}
+      <PageHeader hintId="clientadmin-4" title="Přehled" subtitle={`Hosté tě najdou na /client/${summary.slug}. Rezervace, objednávky, členové a věrnost na jednom místě.`}
         primary={<Button variant="accent" icon="calendarCheck" onClick={() => go('reservations')}>Rezervace{summary.reservations.requested ? ` (${summary.reservations.requested})` : ''}</Button>}
         secondary={<Button variant="secondary" icon="cup" onClick={() => go('orders')}>Objednávky{summary.orders?.new ? ` (${summary.orders.new})` : ''}</Button>} />
 
@@ -341,7 +341,7 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
   }, [d]);
   return (
     <div className="space-y-5">
-      <PageHeader title="Rezervace" subtitle="Požadavky potvrď nebo odmítni; při příchodu hosty usaď — s napojenou pokladnou se rovnou otevře účet na stole."
+      <PageHeader hintId="clientadmin-5" title="Rezervace" subtitle="Požadavky potvrď nebo odmítni; při příchodu hosty usaď — s napojenou pokladnou se rovnou otevře účet na stole."
         aside={<Segmented options={[{ id: 'today', label: 'Dnes' }, { id: 'upcoming', label: 'Nadcházející' }, { id: 'past', label: 'Minulé' }]} value={range} onChange={setRange} size="sm" ariaLabel="Období" />} />
       {d === null ? <PageSkel /> : groups.length === 0
         ? <EmptyState icon="calendarCheck" title={range === 'past' ? 'Žádné minulé rezervace' : 'Zatím žádné rezervace'} hint={range === 'past' ? '' : 'Objeví se tu, jakmile si host zarezervuje stůl na tvé stránce.'} compact />
@@ -425,7 +425,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
   const del = async (id: number) => { if (!confirm('Smazat stůl?')) return; await fetch(`/api/client/admin/tables?id=${id}`, { method: 'DELETE' }); load(); };
   return (
     <div className="space-y-5">
-      <PageHeader title="Stoly" subtitle="Ke stolům se vážou rezervace i objednávky. S napojenou pokladnou je vezmi odtamtud, ať sedí čísla. Ikona tiskárny vytiskne QR na stůl, ze kterého host objedná."
+      <PageHeader hintId="clientadmin-6" title="Stoly" subtitle="Ke stolům se vážou rezervace i objednávky. S napojenou pokladnou je vezmi odtamtud, ať sedí čísla. Ikona tiskárny vytiskne QR na stůl, ze kterého host objedná."
         primary={d?.posConnected ? <Button variant="accent" icon="download" loading={busy} onClick={imp}>Načíst z pokladny</Button> : undefined} />
       <form onSubmit={add} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end max-w-md">
         <div><label htmlFor="t-name" className={label}>Název stolu</label><input id="t-name" value={name} onChange={e => setName(e.target.value)} placeholder="U okna" className={input} /></div>
@@ -465,7 +465,7 @@ function Customers({ toast, initialQuery = '' }: { toast: (m: string) => void; i
   };
   return (
     <div className="space-y-5">
-      <PageHeader title="Zákazníci" subtitle={sub_title[sub]} />
+      <PageHeader hintId="clientadmin-7" title="Zákazníci" subtitle={sub_title[sub]} />
       <Segmented options={[{ id: 'members', label: 'Členové' }, { id: 'reviews', label: 'Hodnocení' }, { id: 'messages', label: 'Zprávy členům' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části zákazníků" wrap />
       {sub === 'members' && <Members toast={toast} initialQuery={initialQuery} />}
       {sub === 'reviews' && <Reviews />}
@@ -611,7 +611,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
   const hoursOk = Object.values(p.opening_hours ?? {}).some((h: any) => h && !h.closed && h.open);
   return (
     <form onSubmit={save} className="space-y-6 max-w-3xl">
-      <PageHeader title="Nastavení" subtitle="Jak podnik vidí hosté a co u něj můžou dělat." primary={<Button type="submit" variant="accent" loading={busy}>Uložit</Button>} />
+      <PageHeader hintId="clientadmin-8" title="Nastavení" subtitle="Jak podnik vidí hosté a co u něj můžou dělat." primary={<Button type="submit" variant="accent" loading={busy}>Uložit</Button>} />
       <section className="glass-card p-5 space-y-4">
         <label className="flex items-center min-h-9 py-1 gap-3"><input type="checkbox" checked={!!p.enabled} onChange={e => setP({ ...p, enabled: e.target.checked })} className="h-4 w-4 accent-[#16181A]" /><span className="font-semibold">Zapnout pro hosty</span></label>
         <div>

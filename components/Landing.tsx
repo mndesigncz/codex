@@ -45,7 +45,7 @@ export default function Landing() {
       <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-8 sm:pt-16 pb-12 sm:pb-20 overflow-x-clip">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 lg:gap-8 items-center">
           <div className="max-w-xl rise-in">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/50">Pro čajovny, kavárny a malé podniky</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/50">Pro kavárny, restaurace a malé podniky</p>
             <h1 className="mt-4 text-[2.6rem] leading-[1.02] sm:text-6xl lg:text-[4.25rem] font-bold tracking-[-0.03em] text-[#16181A] text-balance">
               Provoz podniku na jednom místě.
             </h1>
@@ -67,10 +67,10 @@ export default function Landing() {
           <figure className="relative lg:-mr-[14vw] xl:-mr-[10vw] rise-in" style={{ animationDelay: '120ms' }}>
             <div className="relative overflow-hidden rounded-3xl border border-black/[0.06] shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
               <img
-                src="/brand/hero-tea-bar.webp"
-                srcSet="/brand/hero-tea-bar-sm.webp 800w, /brand/hero-tea-bar.webp 1600w"
+                src="/brand/hero-counter.webp"
+                srcSet="/brand/hero-counter-sm.webp 800w, /brand/hero-counter.webp 1600w"
                 sizes="(min-width: 1024px) 60vw, 100vw"
-                alt="Pult čajovny: skleněná konvice nalévá čaj do limetkového šálku, v pozadí černé dózy v ranním světle"
+                alt="Interiér kavárny v ranním světle: dřevěný bar se stoličkami, kávovar a police s šálky, vpravo stoly u velkého okna"
                 width={1600} height={900} loading="eager" fetchPriority="high"
                 className="w-full aspect-[16/10] lg:aspect-[16/11] object-cover object-left ken-burns"
               />
@@ -81,7 +81,7 @@ export default function Landing() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
               <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
                 <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30 i-pulse" />Směna: Eva 8–16, Martin od 12</li>
-                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/30" />Dochází sencha — objednávka připravená</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/30" />Dochází mléko — objednávka připravená</li>
                 <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-black/25 ring-2 ring-black/10" />Včerejší uzávěrka sedí na korunu</li>
               </ul>
             </figcaption>

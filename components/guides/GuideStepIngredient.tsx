@@ -2,7 +2,7 @@
 
 // Krok návodu označený jako surovina.
 //
-// „Nasyp 2 g matchy" je zároveň instrukce pro baristu a odpis ze skladu.
+// „Nasyp 2 g kakaa" je zároveň instrukce pro obsluhu a odpis ze skladu.
 // Dokud to byly dvě obrazovky, psalo se to dvakrát a po první změně gramáže
 // se to rozešlo. Tenhle panel drží obojí v jednom řádku.
 

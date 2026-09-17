@@ -241,7 +241,7 @@ export default function Guides({ user }: { user: User }) {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-6">
-      <PageHeader title="Návody" subtitle="Jak se co dělá — s obrázky, na baru po ruce."
+      <PageHeader hintId="guides" title="Návody" subtitle="Jak se co dělá — s obrázky, na baru po ruce."
         primary={user.role !== 'kiosk' && (
           <Button variant="accent" icon="plus" onClick={() => openEditor()} title={isEmployer ? undefined : 'Návrh schválí vedení'}>
             {isEmployer ? 'Nový návod' : 'Navrhnout návod'}
@@ -335,7 +335,7 @@ export default function Guides({ user }: { user: User }) {
               ) : (
                 <EmptyState illustration="postupy" title="Zatím žádné návody"
                   hint={isEmployer
-                    ? 'Jak se připravuje matcha, jak se čistí kávovar, co říct hostovi o pu-erhu — návody s obrázky, které si tým otevře na baru.'
+                    ? 'Jak se připravuje váš podpis nápoj, jak se čistí kávovar, co říct hostovi o nabídce — návody s obrázky, které si tým otevře na baru.'
                     : 'Až je vedení sepíše, najdeš je tady — s obrázky a krok za krokem.'}
                   action={isEmployer ? <Button variant="accent" icon="plus" onClick={() => openEditor()}>Nový návod</Button> : undefined} />
               )}
@@ -803,7 +803,7 @@ function GuideEditor({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Např. Jak připravit matcha latte"
+              placeholder="Např. Jak připravit naši signature kávu"
               className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all"
             />
           </div>

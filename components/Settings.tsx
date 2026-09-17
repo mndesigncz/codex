@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
 import { Icon } from './Icons';
-import { EmptyState } from './ui';
+import { EmptyState, Button, Hint, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
@@ -97,6 +97,10 @@ export default function Settings({ user, initialTab }: Props) {
   const { theme, setTheme } = useTheme();
   const [section, setSection] = useState<SectionId>(initialTab ?? 'account');
   const [interestSent, setInterestSent] = useState(false);
+  // Stav nápověd se čte až v prohlížeči — server localStorage nezná.
+  const [hintsOn, setHintsOn] = useState(true);
+  const [hintsHidden, setHintsHidden] = useState(0);
+  useEffect(() => { setHintsOn(hintsEnabled()); setHintsHidden(dismissedCount()); }, [section]);
   const [auditEntries, setAuditEntries] = useState<any[] | null>(null);
   // POS (Storyous) connection form.
   const [posStatus, setPosStatus] = useState<any | null>(null);
@@ -495,6 +499,42 @@ export default function Settings({ user, initialTab }: Props) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Nápovědy */}
+              <div className="glass-card p-6 space-y-4">
+                <div>
+                  <h3 className={cardTitle}>Nápovědy</h3>
+                  <p className="text-black/45 text-sm mt-1">
+                    Krátké rady u obrazovek. Jednotlivou radu zavřeš křížkem a už se neukáže — tady je můžeš všechny vrátit nebo vypnout úplně.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 well border border-black/[0.08] p-1.5 max-w-sm">
+                  {([
+                    { on: true, label: 'Zobrazovat', icon: 'bulb' },
+                    { on: false, label: 'Nezobrazovat', icon: 'close' },
+                  ] as const).map(opt => (
+                    <button key={String(opt.on)} type="button"
+                      onClick={() => { setHintsEnabled(opt.on); setHintsOn(opt.on); }}
+                      aria-pressed={hintsOn === opt.on}
+                      className={`tap-target-sm flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+                        hintsOn === opt.on ? 'bg-[#C8F542] text-black shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.04]'
+                      }`}>
+                      <Icon name={opt.icon} size={17} /> {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {hintsHidden > 0 && (
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <p className="text-xs text-black/45">
+                      Zavřených rad: <span className="tabular-nums font-semibold">{hintsHidden}</span>
+                    </p>
+                    <Button variant="secondary" size="sm" icon="refresh"
+                      onClick={() => { resetHints(); setHintsHidden(0); setHintsOn(true); }}>
+                      Zobrazit znovu všechny
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Language */}

@@ -1,5 +1,5 @@
 'use client';
-import { SearchField } from '../ui';
+import { SearchField, Button } from '../ui';
 
 // Receptury: co ze skladu zmizí, když se na pokladně prodá jedna položka.
 //
@@ -261,9 +261,15 @@ export default function RecipesView({ openProductId, onNavigate }: {
           </div>
           <h2 className="font-bold text-lg text-[#16181A]">Receptury potřebují připojenou pokladnu</h2>
           <p className="text-sm text-black/55">
-            Propoj Storyous v Nastavení → Pokladna. Pak si u každé položky z menu naklikáš, co a kolik se z ní
-            odepíše ze skladu.
+            Propoj pokladnu a pak si u každé položky z menu naklikáš, co a kolik se z ní odepíše ze skladu.
           </p>
+          {/* Rada, která jmenuje místo, tam musí i zavést — jinak ho člověk
+              hledá v nastavení sám. */}
+          {onNavigate && (
+            <Button variant="accent" icon="receipt" onClick={() => onNavigate('settings', 'pos')} className="mt-1">
+              Nastavit pokladnu
+            </Button>
+          )}
         </div>
       </div>
     );

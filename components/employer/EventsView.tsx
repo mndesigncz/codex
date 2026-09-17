@@ -123,7 +123,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader title="Akce" subtitle="Koncerty, přednášky i výjezdy čajovny — se směnami, balením a vyúčtováním."
+      <PageHeader hintId="eventsview" title="Akce" subtitle="Koncerty, přednášky i výjezdy mimo podnik — se směnami, balením a vyúčtováním."
         primary={<Button variant="accent" icon="plus" onClick={() => setCreating(true)}>Nová akce</Button>} />
 
       {err && <p className="text-sm text-red-600">{err}</p>}

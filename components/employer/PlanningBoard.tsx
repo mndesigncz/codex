@@ -142,7 +142,7 @@ export default function PlanningBoard() {
     <div className="p-6 space-y-5">
       {/* Nadpis obrazovky: bez něj tabule začínala rovnou sloupci a nedalo se
           poznat, kde je člověk — horní lišta je malá a při rolování zmizí. */}
-      <PageHeader title="Plánování" subtitle="Nápady a úkoly, které čekají na svůj čas." />
+      <PageHeader hintId="planningboard" title="Plánování" subtitle="Nápady a úkoly, které čekají na svůj čas." />
       {flash && (
         <div className="mb-4 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-3 text-[#5B7A08] text-sm">{flash}</div>
       )}

@@ -909,7 +909,16 @@ export default function ScheduleBuilder({ user }: Props) {
                                   </span>
                                 ))}
                               </span>
-                              <span className="block text-[11px] text-black/40 mt-0.5">Generátor tyhle dny automaticky vynechá. Upravit jde v „Žádosti o volno" pod rozvrhem.</span>
+                              <span className="block text-[11px] text-black/40 mt-0.5">
+                                Generátor tyhle dny automaticky vynechá.{' '}
+                                {/* Odkaz místo popisu cesty: rada, která říká
+                                    „je to níž na stránce", tam má i sjet. */}
+                                <button type="button"
+                                  onClick={() => document.getElementById('zadosti-o-volno')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                  className="font-semibold underline underline-offset-2 hover:no-underline">
+                                  Upravit v Žádostech o volno
+                                </button>
+                              </span>
                             </div>
                           );
                         })()}
