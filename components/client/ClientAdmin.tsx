@@ -229,7 +229,7 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
           <p className="t-card flex items-center gap-2 mb-2.5"><Icon name="warning" size={17} className="text-[var(--wait-ink)]" /> Čeká na tebe</p>
           <div className="flex flex-wrap gap-2">
             {attention.map(a => (
-              <button key={a.label} type="button" onClick={() => go(a.tab)} className="tap-target-sm rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+              <button key={a.label} type="button" onClick={() => go(a.tab)} className="tap-target-sm btn btn-secondary">
                 <Icon name={a.icon} size={15} className="text-black/45" /> {a.n}× {a.label}
               </button>
             ))}

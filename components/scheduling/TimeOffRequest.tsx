@@ -176,7 +176,7 @@ export default function TimeOffRequest() {
               onClick={() => setType(t.id)}
               className={`rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 type === t.id
-                  ? 'bg-[#16181A] text-white'
+                  ? 'seg-on'
                   : 'bg-black/[0.04] border border-black/[0.08] text-black/60 hover:bg-black/[0.07]'
               }`}
             >

@@ -385,7 +385,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                     const pending = (rosters[d] ?? []).filter(r => r.worked && !r.reviewed).length;
                     return (
                       <button key={d} onClick={() => setReviewDate(d)}
-                        className={`tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                        className={`tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'seg-on' : 'seg-off'}`}>
                         {label}
                         {pending > 0 && (
                           <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
@@ -559,17 +559,17 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           </p>
           <div className="flex flex-wrap gap-2">
             {pendingApprovals.timeoff > 0 && (
-              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+              <button onClick={() => onNavigate('shifts')} className="btn btn-secondary">
                 <Icon name="calendar" size={15} className="text-black/45" /> {pendingApprovals.timeoff}× žádost o volno
               </button>
             )}
             {pendingApprovals.swaps > 0 && (
-              <button onClick={() => onNavigate('shifts')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+              <button onClick={() => onNavigate('shifts')} className="btn btn-secondary">
                 <Icon name="swap" size={15} className="text-black/45" /> {pendingApprovals.swaps}× výměna směny
               </button>
             )}
             {pendingApprovals.closings > 0 && (
-              <button onClick={() => onNavigate('reports')} className="rounded-full bg-white/70 border border-black/[0.07] px-4 py-2 text-sm font-medium text-[#16181A] hover:bg-white transition inline-flex items-center gap-1.5">
+              <button onClick={() => onNavigate('reports')} className="btn btn-secondary">
                 <Icon name="trend" size={15} className="text-black/45" /> {pendingApprovals.closings}× uzávěrka ke schválení
               </button>
             )}
@@ -583,14 +583,14 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           <Avatar emoji={user.avatar} size="lg" />
           <div className="min-w-0">
             <p className="text-black/55 text-sm">{greeting()},</p>
-            <h1 className="text-2xl font-bold tracking-tight text-[#16181A] truncate">{user.name}</h1>
+            <h1 className="t-page truncate">{user.name}</h1>
           </div>
         </div>
         <button
           onClick={() => setEditing(v => !v)}
           title="Upravit přehled"
           className={`shrink-0 rounded-full w-10 h-10 flex items-center justify-center transition ${
-            editing ? 'bg-[#16181A] text-white' : 'glass text-black/45 hover:text-black'
+            editing ? 'seg-on' : 'seg-off glass'
           }`}
         >
           <Icon name="settings" size={18} />

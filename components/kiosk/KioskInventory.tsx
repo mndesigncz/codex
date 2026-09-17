@@ -1,4 +1,5 @@
 'use client';
+import { SearchField } from '../ui';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
@@ -166,15 +167,13 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
               Zapsáno do skladu ✓ Vedení to potvrdí.
             </div>
           )}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={17} /></span>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku…"
-              className="w-full rounded-2xl bg-white/70 border border-black/[0.08] pl-11 pr-4 py-3.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-base" />
-          </div>
+          <SearchField value={search} onChange={setSearch} placeholder="Hledat položku…" storageKey="inventory-kiosk"
+            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))}
+            inputClassName="!py-3.5 text-base" />
           {(parkedCount > 0 || showParked) && (
             <button onClick={() => setShowParked(v => !v)}
               className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
-                showParked ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/55'
+                showParked ? 'seg-on' : 'seg-off glass'
               }`}>
               {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
             </button>
@@ -182,7 +181,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
           <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
             {cats.map(c => (
               <button key={c} onClick={() => setCat(c)}
-                className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition ${cat === c ? 'bg-[#16181A] text-white' : 'glass text-black/55'}`}>
+                className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
                 {c}
               </button>
             ))}
@@ -194,7 +193,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             </div>
           )}
           {loading ? (
-            <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+            <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
           ) : loadErr ? (
             <div className="glass-card p-8 text-center space-y-3">
               <p className="text-base font-semibold text-red-700">Sklad se nepodařilo načíst.</p>

@@ -91,7 +91,7 @@ export default function FinanceAdvice({ month }: { month: string }) {
           <div className="flex gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x -mx-1 px-1 max-w-full">
             <button onClick={() => setOnly('all')}
               className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
-                only === 'all' ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/60 hover:bg-black/[0.04]'}`}>
+                only === 'all' ? 'seg-on' : 'seg-off glass'}`}>
               Vše
             </button>
             {GROUPS.map(g => {
@@ -100,7 +100,7 @@ export default function FinanceAdvice({ month }: { month: string }) {
               return (
                 <button key={g.id} onClick={() => setOnly(only === g.id ? 'all' : g.id)}
                   className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
-                    only === g.id ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/60 hover:bg-black/[0.04]'}`}>
+                    only === g.id ? 'seg-on' : 'seg-off glass'}`}>
                   {g.label} <span className="opacity-60 tabular-nums">{n}</span>
                 </button>
               );

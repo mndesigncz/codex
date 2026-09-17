@@ -126,7 +126,7 @@ export function UpgradeModal({ feature, onClose }: { feature: string; onClose: (
         </div>
         <p className="text-sm text-black/55">Tuhle funkci odemyká plán Pro ({PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}).</p>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
+          <button onClick={onClose} className="btn btn-secondary flex-1">Zavřít</button>
           <button onClick={() => { window.location.href = '/employer/overview?view=settings'; }}
             className="flex-1 rounded-full bg-[#C8F542] on-accent font-semibold px-5 py-3 text-sm hover:brightness-105 transition">
             Zjistit víc

@@ -60,11 +60,11 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
     <div className="glass-card p-4 sm:p-5">
       {/* Header + month nav */}
       <div className="flex items-center justify-between gap-2 mb-4">
-        <button onClick={() => step(-1)} aria-label="Předchozí měsíc" className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
+        <button onClick={() => step(-1)} aria-label="Předchozí měsíc" className="tap-target btn-icon">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
         <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence">{MONTHS[m - 1]} {y}</h3>
-        <button onClick={() => step(1)} aria-label="Další měsíc" className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
+        <button onClick={() => step(1)} aria-label="Další měsíc" className="tap-target btn-icon">
           <Icon name="chevron" size={16} className="-rotate-90" />
         </button>
       </div>
@@ -77,7 +77,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-56"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-56"><div className="spinner" /></div>
       ) : (
         <>
           <div className="grid grid-cols-7 gap-1 sm:gap-1.5">

@@ -238,7 +238,7 @@ export default function AvailabilitySubmit({ user }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : (
         <>

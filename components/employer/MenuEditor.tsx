@@ -400,7 +400,7 @@ export default function MenuEditor() {
             </button>
           )}
           <button type="button" onClick={() => zalozit(true)} disabled={ukladam || !!importuji}
-            className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${posPripojena ? 'border border-black/10 text-black/70' : 'bg-[#16181A] text-white'}`}>
+            className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${posPripojena ? 'border border-black/10 text-black/70' : 'seg-on'}`}>
             {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
           </button>
         </div>
@@ -916,7 +916,7 @@ export default function MenuEditor() {
           </button>
           <button type="button" onClick={() => ulozit()} disabled={ukladam}
             className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${
-              neulozeno ? 'bg-[#C8F542] text-black' : 'bg-[#16181A] text-white'}`}>
+              neulozeno ? 'bg-[#C8F542] text-black' : 'seg-on'}`}>
             {ukladam ? 'Ukládám…' : neulozeno ? 'Uložit změny' : 'Uložit menu'}
           </button>
         </div>

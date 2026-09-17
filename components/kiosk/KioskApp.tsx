@@ -109,7 +109,7 @@ function KioskShell({ user }: { user: KioskUser }) {
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
-              tab === t.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+              tab === t.id ? 'seg-on' : 'seg-off glass'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}

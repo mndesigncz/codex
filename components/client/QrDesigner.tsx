@@ -142,7 +142,7 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
               <div className="flex flex-wrap gap-1.5">
                 {QR_STYLES.map(s => (
                   <button key={s.id} type="button" onClick={() => set({ style: s.id })} title={s.hint} aria-pressed={d.style === s.id}
-                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${d.style === s.id ? 'bg-[#16181A] text-white' : 'bg-black/[0.06] text-black/60 hover:bg-black/[0.1]'}`}>{s.label}</button>
+                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${d.style === s.id ? 'seg-on' : 'seg-off'}`}>{s.label}</button>
                 ))}
               </div>
             </div>

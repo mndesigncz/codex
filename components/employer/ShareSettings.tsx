@@ -151,7 +151,7 @@ export default function ShareSettings() {
           {([['inventory', 'Ze skladu'], ['guides', 'Z návodů']] as const).map(([k, label]) => (
             <button key={k} onClick={() => { setKind(k); setCategoryId(''); }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                kind === k ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                kind === k ? 'seg-on' : 'seg-off'
               }`}>
               {label}
             </button>
@@ -234,7 +234,7 @@ export default function ShareSettings() {
             return (
               <button key={p.id} onClick={() => saveTheme({ ...theme, ...p.theme })}
                 className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-medium transition ${
-                  active ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                  active ? 'seg-on' : 'seg-off glass'
                 }`}>
                 <span className="inline-flex gap-0.5" aria-hidden>
                   <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.theme.background }} />
@@ -313,7 +313,7 @@ export default function ShareSettings() {
               <div className="mx-auto w-64 h-64 well animate-pulse" />
             )}
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setQrFor(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
+              <button onClick={() => setQrFor(null)} className="btn btn-secondary flex-1">Zavřít</button>
               {qrData && (
                 <a href={qrData} download="qr-nabidka.png"
                   className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black transition">
@@ -372,7 +372,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
         <button onClick={() => onPatch({ pinned: !(link.pinned === true) })}
           title={link.pinned ? 'Odepnout z nástěnek' : 'Připnout na nástěnku všech (i tabletu)'}
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            link.pinned ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+            link.pinned ? 'seg-on' : 'seg-off glass'
           }`}>
           <Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
         </button>
@@ -390,7 +390,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
         </a>
         <button onClick={() => setOpen(o => !o)} title="Nastavení odkazu"
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            open ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+            open ? 'seg-on' : 'seg-off glass'
           }`}>
           <Icon name="settings" size={14} />
         </button>

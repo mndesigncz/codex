@@ -182,7 +182,7 @@ export default function Tasks({ user }: Props) {
       {saveErr && <div className="note note-danger px-4 py-2.5 text-sm">{saveErr}</div>}
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
       ) : view === 'week' ? (
         <TaskWeekBoard tasks={tasks} weekStart={weekStart}
           onComplete={(t, done) => updateStatus(t as Task, done ? 'done' : 'pending')}

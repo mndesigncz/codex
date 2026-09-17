@@ -258,7 +258,7 @@ export default function EmployerLayout({ user }: Props) {
                   {items.map(item => (
                     <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
                       className={`w-full flex items-center gap-3 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
-                        currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
+                        currentView === item.id ? 'seg-on' : 'seg-off'
                       }`}>
                       <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
                         motion={currentView === item.id ? 'pop' : undefined}
@@ -380,7 +380,7 @@ export default function EmployerLayout({ user }: Props) {
               <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky
               </h3>
-              <button aria-label="Zavřít" onClick={() => setReceiptsOpen(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" onClick={() => setReceiptsOpen(false)} className="btn-icon"><Icon name="close" size={15} /></button>
             </div>
             <ReceiptsPanel />
           </div>

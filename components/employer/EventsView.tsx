@@ -130,7 +130,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
 
       {loading ? (
         <div className="flex items-center justify-center h-40">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : (
         <>
@@ -207,11 +207,11 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
               výjezd ven (vlastní směna k akci, balení skladu, uzávěrka za akci). */}
           <div className="grid grid-cols-2 gap-1.5 rounded-2xl glass border border-black/[0.07] p-1" role="radiogroup" aria-label="Kde se akce koná">
             <button type="button" role="radio" aria-checked={!offsite} onClick={() => setOffsite(false)}
-              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${!offsite ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${!offsite ? 'seg-on' : 'seg-off'}`}>
               <Icon name="overview" size={15} className="inline -mt-0.5 mr-1.5" />U nás v podniku
             </button>
             <button type="button" role="radio" aria-checked={offsite} onClick={() => setOffsite(true)}
-              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${offsite ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${offsite ? 'seg-on' : 'seg-off'}`}>
               <Icon name="tent" size={15} className="inline -mt-0.5 mr-1.5" />Výjezd ven
             </button>
           </div>
@@ -219,7 +219,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
           <div className="flex flex-wrap gap-1.5">
             {EVENT_KINDS.map(k => (
               <button key={k.id} type="button" onClick={() => { setKind(k.id); if (k.id === 'outdoor') setOffsite(true); }}
-                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${kind === k.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${kind === k.id ? 'seg-on' : 'seg-off glass'}`}>
                 <Icon name={k.icon} size={15} className="inline -mt-0.5 mr-1.5" />{k.label}
               </button>
             ))}
@@ -239,9 +239,9 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
           </p>
         </div>
         <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+          <button onClick={onClose} className="btn btn-secondary flex-1">Zrušit</button>
           <button onClick={save} disabled={busy || !title.trim() || !date}
-            className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+            className="btn btn-primary flex-1 disabled:opacity-50">
             {busy ? 'Zakládám…' : 'Založit akci'}
           </button>
         </div>
@@ -350,7 +350,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
               {e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="tap-target-sm shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         {/* stav + oznámení týmu */}
@@ -358,7 +358,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
           {EVENT_STATUSES.map(st => (
             <button key={st.id} onClick={() => patch(e.id, { status: st.id })}
               className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                e.status === st.id ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                e.status === st.id ? 'seg-on' : 'seg-off glass'
               }`}>
               {st.label}
             </button>

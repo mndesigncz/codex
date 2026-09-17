@@ -1,4 +1,5 @@
 'use client';
+import { SearchField } from '../ui';
 
 // Receptury: co ze skladu zmizí, když se na pokladně prodá jedna položka.
 //
@@ -247,7 +248,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
 
   if (loading) {
     return <div className="flex items-center justify-center h-64">
-      <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+      <div className="spinner" />
     </div>;
   }
 
@@ -272,7 +273,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Receptury</h1>
+          <h1 className="t-page">Receptury</h1>
           <p className="text-sm text-black/50 mt-0.5">
             Co ze skladu ubude, když se prodá jedna položka. Podle toho se sklad odepisuje sám.
           </p>
@@ -336,17 +337,11 @@ export default function RecipesView({ openProductId, onNavigate }: {
           {/* Procházení menu — kategorie, hledání, jen chybějící */}
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none">
-                  <Icon name="search" size={16} />
-                </span>
-                <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder={`Hledat mezi ${products.length} položkami menu…`}
-                  className={`${inputCls} w-full pl-10`} />
-              </div>
+              <SearchField className="flex-1 min-w-[200px]" value={search} onChange={setSearch}
+                placeholder={`Hledat mezi ${products.length} položkami menu…`} storageKey="recipes" />
               <button onClick={() => setOnlyMissing(v => !v)}
                 className={`rounded-full px-4 py-2.5 text-sm font-semibold transition active:scale-95 ${
-                  onlyMissing ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                  onlyMissing ? 'seg-on' : 'seg-off glass'
                 }`}>
                 Jen bez receptury
               </button>
@@ -355,7 +350,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
               {categories.map(c => (
                 <button key={c} onClick={() => setCat(c)}
                   className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition ${
-                    cat === c ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                    cat === c ? 'seg-on' : 'seg-off glass'
                   }`}>
                   {c}
                 </button>

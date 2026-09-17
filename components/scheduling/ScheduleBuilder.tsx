@@ -664,7 +664,7 @@ export default function ScheduleBuilder({ user }: Props) {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Rozvrh</h1>
+          <h1 className="t-page">Rozvrh</h1>
           <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
         </div>
         {/* Month selector — arrows for any month, chips for the usual ones.
@@ -683,7 +683,7 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={() => setMonth(shiftMonth(month, -1))}
               title="Předchozí měsíc"
-              className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
+              className="tap-target btn-icon"
             >
               <Icon name="chevron" size={17} className="rotate-90" />
             </button>
@@ -693,7 +693,7 @@ export default function ScheduleBuilder({ user }: Props) {
             <button
               onClick={() => setMonth(shiftMonth(month, 1))}
               title="Další měsíc"
-              className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition"
+              className="tap-target btn-icon"
             >
               <Icon name="chevron" size={17} className="-rotate-90" />
             </button>
@@ -733,7 +733,7 @@ export default function ScheduleBuilder({ user }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : tab === 'kalendar' ? (
         <div className="space-y-3">
@@ -927,13 +927,14 @@ export default function ScheduleBuilder({ user }: Props) {
               tlačítek vedle sebe neříkalo, čím začít. Postup je vygenerovat →
               zkontrolovat → publikovat; vygenerovat je limetkové, publikovat
               tmavé, všechno ostatní čeká v menu. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="accent" icon="bulb" onClick={generate} loading={generating}>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+            <Button variant="accent" icon="bulb" onClick={generate} loading={generating} className="w-full sm:w-auto justify-center">
               Vygenerovat rozvrh
             </Button>
-            <Button variant="primary" icon="check" onClick={publish} loading={publishing}>
-              Publikovat rozvrh
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button variant="primary" icon="check" onClick={publish} loading={publishing} className="flex-1 sm:flex-none justify-center">
+                Publikovat rozvrh
+              </Button>
             <Button
               variant="secondary" icon="swap" onClick={runAdjust} loading={adjusting}
               disabled={shifts.length === 0}
@@ -954,6 +955,7 @@ export default function ScheduleBuilder({ user }: Props) {
                   hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' },
               ]}
             />
+            </div>
             <input
               ref={fileRef}
               type="file"
@@ -1003,9 +1005,9 @@ export default function ScheduleBuilder({ user }: Props) {
                   {copyMsg && <p className={`text-sm ${copyMsg.includes('✓') ? 'text-[#5B7A08]' : 'text-red-600'}`}>{copyMsg}</p>}
                 </div>
                 <div className="flex gap-2 mt-5">
-                  <button onClick={() => setCopyOpen(false)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zavřít</button>
+                  <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zavřít</button>
                   <button onClick={copyWeek} disabled={copying || !copySrc || !copyDst}
-                    className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                    className="btn btn-primary flex-1 disabled:opacity-50">
                     {copying ? 'Kopíruji…' : 'Zkopírovat'}
                   </button>
                 </div>
@@ -2395,7 +2397,7 @@ function ScheduleRulesManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+        <div className="spinner" />
       </div>
     );
   }
@@ -2655,7 +2657,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
             <p className="text-xs text-black/45 cz-sentence">{monthLabel(month)}</p>
           </div>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black shrink-0" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="btn-icon shrink-0" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <p className="text-xs text-black/45">
@@ -2715,9 +2717,9 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
 
         {err && <p className="text-sm text-red-600">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+          <button onClick={onClose} className="btn btn-secondary flex-1">Zrušit</button>
           <button onClick={save} disabled={saving}
-            className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+            className="btn btn-primary flex-1 disabled:opacity-50">
             {saving ? 'Ukládám…' : 'Uložit a upozornit'}
           </button>
         </div>

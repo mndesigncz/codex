@@ -108,12 +108,12 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
     <div className="glass-card p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2 mb-1">
         <button onClick={() => step(-1)} aria-label="Předchozí měsíc"
-          className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
+          className="btn-icon">
           <Icon name="chevron" size={16} className="rotate-90" />
         </button>
         <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence truncate">{MONTHS[m - 1]} {y}</h3>
         <button onClick={() => step(1)} aria-label="Další měsíc"
-          className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05] transition">
+          className="btn-icon">
           <Icon name="chevron" size={16} className="-rotate-90" />
         </button>
       </div>
@@ -132,7 +132,7 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
 
       {loading ? (
         <div className="flex items-center justify-center h-56">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : (
         <div className="grid grid-cols-7 gap-1 sm:gap-1.5">

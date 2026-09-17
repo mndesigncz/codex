@@ -418,7 +418,7 @@ export default function Procedures({ user }: Props) {
             <div ref={runModal.ref} {...runModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
               <div className="flex items-start justify-between gap-3 mb-1">
                 <h3 className="text-lg font-bold tracking-tight text-[#16181A] min-w-0">{runDetail.procedure_name}</h3>
-                <button aria-label="Zavřít" onClick={() => setRunDetail(null)} className="shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+                <button aria-label="Zavřít" onClick={() => setRunDetail(null)} className="shrink-0 btn-icon"><Icon name="close" size={15} /></button>
               </div>
               <p className="text-sm text-black/50 mb-4">
                 {runDetail.user_avatar ?? '👤'} {runDetail.user_name} · {fmtWhen(runDetail.completed_at || runDetail.started_at)} · {fmtDuration(runDetail.duration_seconds)}
@@ -507,11 +507,11 @@ function ProcedureDetail({
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {isEmployer && (
-                <button onClick={onEdit} title="Upravit" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+                <button onClick={onEdit} title="Upravit" className="btn-icon">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
                 </button>
               )}
-              <button onClick={onClose} aria-label="Zavřít" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+              <button onClick={onClose} aria-label="Zavřít" className="btn-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
@@ -651,7 +651,7 @@ function ProcedureEditor({
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <h2 className="t-section">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
-          <button onClick={onClose} aria-label="Zavřít" className="flex h-9 w-9 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition">
+          <button onClick={onClose} aria-label="Zavřít" className="btn-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
@@ -737,7 +737,7 @@ function ProcedureEditor({
                         <button key={w.id} type="button" title={`${w.hint} (+${w.plus} / −${s.penalty ?? w.minus})`}
                           onClick={() => patchStep(i, { weight: w.id })}
                           className={`tap-target-sm rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                            (s.weight ?? 'normal') === w.id ? 'bg-[#16181A] text-white' : 'text-black/45 hover:text-black'
+                            (s.weight ?? 'normal') === w.id ? 'seg-on' : 'seg-off'
                           }`}>
                           {w.label}
                         </button>

@@ -116,6 +116,28 @@ Před pushem: `npm run typecheck && npm test && npm run build` + skripty
 obrazovek (desktop 1280, mobil 390, úzký 320) a sweep přetečení, dotykových
 cílů, duplicitních id a vnořených klikatelných prvků — vše 0.
 
+## Responzivní pravidla (mobil / tablet / desktop)
+
+Ověřováno na šířkách 320, 390, 768, 1024, 1280 a 1440 px — nula
+horizontálních přetečení a chyb v konzoli na všech obrazovkách.
+
+- **Primární akce na mobilu přes celý řádek.** Dvojice hlavních tlačítek
+  (např. Vygenerovat/Publikovat rozvrh) se pod `sm` skládá pod sebe,
+  každé `w-full justify-center`; overflow menu `···` zůstává vedle
+  posledního tlačítka, ne osiřelé na vlastním řádku.
+- **Dvě stejně vypadající tlačítka vedle sebe nesmí znamenat různé věci.**
+  Sekundární volba (Nevedeme) zůstává vlevo u obsahu, potvrzující akce
+  (Uložit) se odděluje `ml-auto` doprava a při dirty stavu limetkou.
+  Pozice + barva nesou význam, ne jen text.
+- **Dlouhé seznamy řeší `SearchField`**, ne scrollování: klik nabídne
+  předvolby (kategorie, dodavatelé, poslední hledání), psaní filtruje.
+- **Přepínače pohledů** (`.seg-on`/`.seg-off`) při přetečení scrollují
+  horizontálně uvnitř vlastního pásu, nikdy nerozbíjí stránku.
+- **Hlavičková akce** (`PageHeader`) je na mobilu vpravo pod titulkem —
+  jednotně na všech obrazovkách, jediná limetková akce na stránce.
+- **Tablet (768–1024)**: postranní menu se zužuje na ikony, obsah drží
+  dvousloupcové karty; kiosk běží na plné šířce s pilulkovou navigací.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

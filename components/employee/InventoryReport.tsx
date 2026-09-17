@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
-import { PageHeader } from '../ui';
+import { PageHeader , SearchField } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
@@ -250,7 +250,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           {item.archived ? 'Máme zpátky' : 'Nevedeme'}
         </button>
         <button type="button" onClick={() => save(item)} disabled={!dirty || savingId === item.id}
-          className={`tap-target rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
+          className={`tap-target ml-auto rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
           {savingId === item.id ? 'Ukládám…' : savedId === item.id && !dirty ? 'Uloženo ✓' : 'Uložit'}
         </button>
       </div>
@@ -357,7 +357,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
       ) : (
         <>
           {/* Prominent low / critical items on top */}
@@ -388,12 +388,9 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
           {/* Full list with steppers */}
           <div>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Hledat položku..."
-              className="w-full max-w-sm field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
-            />
+            <SearchField className="max-w-sm" value={search} onChange={setSearch}
+              placeholder="Hledat položku…" storageKey="inventory-employee"
+              suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))} />
           </div>
 
           <div className="glass-card overflow-hidden">
@@ -404,7 +401,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
               {(parkedCount > 0 || showParked) && (
                 <button onClick={() => setShowParked(v => !v)}
                   className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                    showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                    showParked ? 'seg-on' : 'seg-off glass'
                   }`}>
                   {showParked ? 'Zpět na to, co máme' : `Nevedeme (${parkedCount})`}
                 </button>

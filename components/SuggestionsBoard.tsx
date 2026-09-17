@@ -180,7 +180,7 @@ export default function SuggestionsBoard() {
             return (
               <button key={f.id} onClick={() => setFilter(f.id)}
                 className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
-                  filter === f.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                  filter === f.id ? 'seg-on' : 'seg-off glass'
                 }`}>
                 {f.label} {cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/35'}>· {cnt}</span>}
               </button>
@@ -192,7 +192,7 @@ export default function SuggestionsBoard() {
       {/* List */}
       {loading ? (
         <div className="flex items-center justify-center h-40">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : shown.length === 0 ? (
         <div className="glass-card">
@@ -310,11 +310,11 @@ export default function SuggestionsBoard() {
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setComposing(false)}
-                className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">
+                className="btn btn-secondary flex-1">
                 Zrušit
               </button>
               <button onClick={submit} disabled={submitting}
-                className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
+                className="btn btn-primary flex-1 disabled:opacity-50 inline-flex items-center justify-center gap-2">
                 {submitting ? 'Odesílám…' : <>Odeslat podnět <Icon name="send" size={16} /></>}
               </button>
             </div>
@@ -332,8 +332,8 @@ export default function SuggestionsBoard() {
                 className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit || !editTitle.trim()} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+              <button onClick={() => setEditing(null)} className="btn btn-secondary flex-1">Zrušit</button>
+              <button onClick={saveEdit} disabled={savingEdit || !editTitle.trim()} className="btn btn-primary flex-1 disabled:opacity-50">
                 {savingEdit ? 'Ukládám…' : 'Uložit'}
               </button>
             </div>

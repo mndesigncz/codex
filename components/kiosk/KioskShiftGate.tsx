@@ -230,7 +230,7 @@ function LockScreen() {
           </>
         ) : (
           <>
-            <h1 className="text-2xl font-bold tracking-tight text-[#16181A]">Kdo přichází na směnu?</h1>
+            <h1 className="t-page">Kdo přichází na směnu?</h1>
             <p className="text-black/45 mt-2">Ťukni na sebe a zaznamenej příchod.</p>
             <div className="mt-7">
               <PersonPicker

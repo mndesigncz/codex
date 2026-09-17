@@ -157,7 +157,7 @@ export default function KioskTasks() {
         {FILTERS.map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
             className={`rounded-full px-4 py-2.5 text-sm font-semibold min-h-[44px] transition active:scale-[0.97] ${
-              filter === f.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+              filter === f.id ? 'seg-on' : 'seg-off glass'
             }`}>
             {f.label}
           </button>
@@ -165,7 +165,7 @@ export default function KioskTasks() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center text-black/45">
           {filter === 'done' ? 'Zatím nic hotového.' : 'Žádné úkoly. 🎉'}

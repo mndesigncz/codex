@@ -47,7 +47,7 @@ export default function CategoryNav<T extends CategoryNode>({
       <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1 py-0.5">
         <button onClick={() => onNavigate(null)}
           className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
-            current === null ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+            current === null ? 'seg-on' : 'seg-off glass'
           }`}>
           {rootLabel}
         </button>
@@ -56,7 +56,7 @@ export default function CategoryNav<T extends CategoryNode>({
             <Icon name="chevron" size={12} className="text-black/20 -rotate-90 shrink-0" />
             <button onClick={() => onNavigate(c.id)}
               className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
-                c.id === current ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                c.id === current ? 'seg-on' : 'seg-off glass'
               }`}>
               {c.name}
             </button>
@@ -92,7 +92,7 @@ export default function CategoryNav<T extends CategoryNode>({
       <div className="flex items-center gap-1 flex-wrap text-sm">
         <button onClick={() => onNavigate(null)}
           className={`rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
-            current === null ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+            current === null ? 'seg-on' : 'seg-off glass'
           }`}>
           {rootLabel}
         </button>
@@ -101,7 +101,7 @@ export default function CategoryNav<T extends CategoryNode>({
             <Icon name="chevron" size={13} className="text-black/20 -rotate-90 shrink-0" />
             <button onClick={() => onNavigate(c.id)}
               className={`rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
-                i === trail.length - 1 ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                i === trail.length - 1 ? 'seg-on' : 'seg-off glass'
               }`}>
               {c.name}
             </button>

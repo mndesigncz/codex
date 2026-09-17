@@ -115,7 +115,7 @@ export default function LiveRevenue() {
         {presets.map(([label, a, b]) => (
           <button key={label} onClick={() => preset(a, b)}
             className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
-              isPreset(a, b) ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+              isPreset(a, b) ? 'seg-on' : 'seg-off glass'
             }`}>
             {label}
           </button>
@@ -132,7 +132,7 @@ export default function LiveRevenue() {
 
       {loading && !d ? (
         <div className="flex items-center justify-center h-28">
-          <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : t ? (
         <>

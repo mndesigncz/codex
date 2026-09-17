@@ -94,7 +94,7 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
             <h3 className="t-section truncate">{trial ? `Vyzkoušet ${PLAN_NAMES[plan]} na ${TRIAL_DAYS} dní zdarma` : `Předplatit ${PLAN_NAMES[plan]}`}</h3>
             <p className="t-meta">{trial ? `Karta se zadá teď, první platba ${czk(amount)} až po ${TRIAL_DAYS} dnech.` : `${czk(amount)} ${interval === 'year' ? 'ročně' : 'měsíčně'} za podnik.`}</p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin grid grid-cols-1 md:grid-cols-[260px_1fr]">
@@ -117,7 +117,7 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
           <section className="px-6 pb-6 md:pl-0 min-h-[420px]">
             {state === 'loading' && (
               <div className="h-full min-h-[420px] rounded-2xl well flex flex-col items-center justify-center gap-3">
-                <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+                <div className="spinner" />
                 <p className="text-sm text-black/45">Připravujeme bezpečnou platbu…</p>
               </div>
             )}

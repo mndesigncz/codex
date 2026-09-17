@@ -149,7 +149,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
             className={`shrink-0 rounded-2xl border flex items-center justify-center overflow-hidden transition active:scale-95 ${
               photoUrl ? 'border-[#C8F542]/50' : 'border-dashed border-black/20 text-black/40 hover:text-black'
             } ${compact ? 'h-16 w-16' : 'h-20 w-20'}`}>
-            {uploading ? <span className="h-5 w-5 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+            {uploading ? <span className="spinner spinner-sm" />
               : photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photoUrl} alt="Účtenka" className="h-full w-full object-cover" />

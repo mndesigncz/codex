@@ -141,7 +141,7 @@ export default function NewStockEntry({
           className={`shrink-0 rounded-2xl border flex items-center justify-center overflow-hidden transition active:scale-95 ${
             photoUrl ? 'border-[#C8F542]/50' : 'border-dashed border-black/20 text-black/40 hover:text-black'
           } ${big ? 'h-28 w-28' : 'h-20 w-20'}`}>
-          {uploading ? <span className="h-5 w-5 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          {uploading ? <span className="spinner spinner-sm" />
             : photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photoUrl} alt="Nová položka" className="h-full w-full object-cover" />
@@ -164,7 +164,7 @@ export default function NewStockEntry({
                 className={`tap-target-sm rounded-full font-semibold transition active:scale-95 max-w-full truncate ${
                   big ? 'px-2.5 py-2 text-xs min-[360px]:px-3 min-[360px]:text-sm sm:px-4 sm:py-2.5 sm:text-base' : 'px-3 py-1.5 text-xs'
                 } ${categoryId === cat.id
-                  ? 'bg-[#16181A] text-white'
+                  ? 'seg-on'
                   : 'glass text-black/60 hover:text-[#16181A]'}`}>
                 {depth > 0 && <span className="opacity-40">{'· '.repeat(depth)}</span>}{cat.name}
               </button>

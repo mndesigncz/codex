@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
-import { EmptyState, Button, PageHeader } from './ui';
+import { EmptyState, Button, PageHeader , SearchField } from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
@@ -320,20 +320,13 @@ export default function Guides({ user }: { user: User }) {
         {/* Main */}
         <main className="flex-1 min-w-0">
           <div className="relative mb-5">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30">
-              <Icon name="search" size={18} />
-            </span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Hledat návody…"
-              className="w-full field border border-black/[0.08] !pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
-            />
+            <SearchField value={search} onChange={setSearch} placeholder="Hledat návody…" storageKey="guides"
+              suggestions={categories.map(c => ({ label: c.name, hint: 'kategorie' }))} />
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center h-48">
-              <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+              <div className="spinner" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="glass-card">
@@ -549,7 +542,7 @@ export default function Guides({ user }: { user: User }) {
 
             {readerLoading ? (
               <div className="flex items-center justify-center h-32">
-                <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+                <div className="spinner" />
               </div>
             ) : (
               <>
@@ -799,7 +792,7 @@ function GuideEditor({
       >
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="t-section min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
@@ -1038,7 +1031,7 @@ function ManageCategories({
       >
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="t-section min-w-0 truncate">Kategorie</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>

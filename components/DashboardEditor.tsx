@@ -68,7 +68,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
           {([['employer', 'Můj přehled'], ['employee', 'Přehled zaměstnanců']] as const).map(([r, lbl]) => (
             <button key={r} onClick={() => onSwitchRole(r)}
               className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
-                role === r ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                role === r ? 'seg-on' : 'seg-off'
               }`}>
               {lbl}
             </button>
@@ -102,7 +102,7 @@ export function DashboardEditor({ role, layout, widgets, onChange, onClose, canS
                 <span className="text-[11px] uppercase tracking-wider text-black/30 shrink-0">odkaz</span>
               )}
               <button onClick={() => onChange(layout.filter((_, idx) => idx !== i))} title="Odebrat z přehledu"
-                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600"><Icon name="close" size={15} /></button>
+                className="shrink-0 btn-icon btn-icon-danger"><Icon name="close" size={15} /></button>
             </div>
           ))}
         </div>
@@ -173,14 +173,14 @@ function AddPanel({ spare, onAdd, onClose }: {
           {LINK_SOURCES.map(s => (
             <button key={s.kind} onClick={() => setSource(source === s.kind ? null : s.kind)}
               className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                source === s.kind ? 'bg-[#16181A] text-white' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
+                source === s.kind ? 'seg-on' : 'seg-off glass'
               }`}>
               <Icon name={s.icon} size={13} /> {s.label}
             </button>
           ))}
           <button onClick={() => setSource(source === 'view' ? null : 'view')}
             className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              source === 'view' ? 'bg-[#16181A] text-white' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
+              source === 'view' ? 'seg-on' : 'seg-off glass'
             }`}>
             <Icon name="menu" size={13} /> Záložka
           </button>

@@ -45,7 +45,7 @@ export default function GuideProductLink({ productId, productName, onPick }: {
           <span className="min-w-0 flex-1 truncate text-sm text-[#16181A]">{productName ?? productId}</span>
           <button type="button" onClick={() => { onPick(null, null); setOpen(false); setQuery(''); }}
             title="Zrušit vazbu" aria-label="Zrušit vazbu"
-            className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600 transition">
+            className="shrink-0 btn-icon btn-icon-danger transition">
             <Icon name="close" size={13} />
           </button>
         </div>

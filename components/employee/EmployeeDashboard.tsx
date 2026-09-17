@@ -353,7 +353,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         <Avatar emoji={user.avatar} size="lg" />
         <div className="min-w-0">
           <p className="text-black/55 text-sm">{greeting},</p>
-          <h1 className="text-2xl font-bold tracking-tight text-[#16181A] truncate">{user.name}</h1>
+          <h1 className="t-page truncate">{user.name}</h1>
         </div>
       </div>
 
