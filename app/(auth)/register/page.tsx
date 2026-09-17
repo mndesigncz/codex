@@ -120,8 +120,8 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-6 space-y-1.5 text-center text-sm">
-            <p className="text-black/45">Jste zaměstnanec? <Link href="/join" className="text-[#5B7A08] hover:underline font-medium">Připojit se k týmu →</Link></p>
-            <p className="text-black/45">Už máte účet? <Link href="/login" className="text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link></p>
+            <p className="text-black/45">Jste zaměstnanec? <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Připojit se k týmu →</Link></p>
+            <p className="text-black/45">Už máte účet? <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link></p>
           </div>
         </div>
       </div>

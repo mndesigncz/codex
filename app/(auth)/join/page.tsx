@@ -107,7 +107,7 @@ function JoinForm() {
           </form>
 
           <p className="text-center text-black/45 text-sm mt-6">
-            Už máte účet? <Link href="/login" className="text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link>
+            Už máte účet? <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link>
           </p>
         </div>
       </div>

@@ -91,7 +91,7 @@ export default function CategoryNav<T extends CategoryNode>({
       {/* Breadcrumb — every step back is one tap. */}
       <div className="flex items-center gap-1 flex-wrap text-sm">
         <button onClick={() => onNavigate(null)}
-          className={`rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
+          className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
             current === null ? 'seg-on' : 'seg-off glass'
           }`}>
           {rootLabel}
@@ -100,7 +100,7 @@ export default function CategoryNav<T extends CategoryNode>({
           <span key={c.id} className="flex items-center gap-1">
             <Icon name="chevron" size={13} className="text-black/20 -rotate-90 shrink-0" />
             <button onClick={() => onNavigate(c.id)}
-              className={`rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
+              className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
                 i === trail.length - 1 ? 'seg-on' : 'seg-off glass'
               }`}>
               {c.name}

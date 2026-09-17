@@ -121,8 +121,8 @@ export default function Landing() {
             <span>Managero — systém pro správu podniku</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="hover:text-black transition-colors">Přihlášení</Link>
-            <Link href="/register" className="hover:text-black transition-colors">Registrace</Link>
+            <Link href="/login" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Přihlášení</Link>
+            <Link href="/register" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Registrace</Link>
           </div>
         </div>
       </footer>

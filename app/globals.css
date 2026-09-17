@@ -225,6 +225,24 @@ body::after {
 :where(.list-row-tap) { border-radius: var(--r-md); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; transition: background-color var(--dur-2, .22s) ease; }
 @media (hover: hover) { .list-row-tap:hover { background: var(--well); } }
 .list-row-tap:active { background: rgba(22,24,26,0.06); }
+/* Sloupce řádku. Čísla drží svisle jen tehdy, když mají pevnou šířku —
+   `auto` se v gridu sází v každém řádku zvlášť, takže 320 b. a 1 240 b.
+   skončí každé jinde a seznam se nedá přečíst očima po sloupci. */
+.list-value  { width: 7rem; text-align: right; font-variant-numeric: tabular-nums; }
+.list-aside  { width: 8.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+/* Akce mají vlastní sloupec, ať hlavní tlačítko začíná u všech řádků
+   na stejné svislici, i když má jeden řádek akce dvě a druhý jednu. */
+.list-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; }
+/* Na počítači ocas neexistuje a jeho děti sedí přímo v řádku — jen tak
+   drží sloupce svisle přes všechny řádky. */
+.list-tail { display: contents; }
+@media (max-width: 640px) {
+  /* Na mobilu se ocas odlomí pod jméno: číslo vlevo, akce vpravo. Pevná
+     šířka sloupce by tu jen ubírala místo textu, tak ji pouštíme. */
+  :where(.list-row) { flex-wrap: wrap; }
+  .list-tail { display: flex; flex: 1 1 100%; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+  .list-value { width: auto; text-align: left; }
+}
 
 /* ---------- Typografická škála ----------
    Nadpis obrazovky 28, sekce 18, karta 15, meta 13, štítek 11. Jediné
