@@ -12,13 +12,26 @@ import { useModal } from '@/lib/useModal';
 // okno zavře. Tohle je ta jedna podoba; `useModal` pod ním řeší fokus,
 // Escape a zámek posouvání.
 
-export function Modal({ open, onClose, title, subtitle, size = 'md', children, footer, className = '' }: {
+export function Modal({ open, onClose, title, subtitle, size = 'md', sheet = false, children, footer, className = '' }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
-  /** sm = krátký formulář, md = běžné okno, lg = tabulka nebo náhled. */
+  /**
+   * Tři velikosti a nic mezi tím:
+   *   sm — potvrzení a krátký formulář (dvě tři pole)
+   *   md — běžné okno (výchozí)
+   *   lg — tabulka, náhled nebo editor
+   * V aplikaci se dřív vyskytovalo šest různých šířek, protože každé okno
+   * si tu svoji odhadlo samo.
+   */
   size?: 'sm' | 'md' | 'lg';
+  /**
+   * Na telefonu vyjede zdola a drží se spodní hrany (jako list), na
+   * monitoru zůstává vystředěné okno. Pro dlouhý obsah, kde je palec
+   * u spodního kraje — třeba detail uzávěrky nebo výběr z dlouhého seznamu.
+   */
+  sheet?: boolean;
   children: React.ReactNode;
   /** Patička s tlačítky. Hlavní akce vpravo, stejně jako všude jinde. */
   footer?: React.ReactNode;
@@ -28,9 +41,15 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   if (!open) return null;
   const width = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
+    <div
+      className={`fixed inset-0 z-[70] flex justify-center modal-overlay ${sheet ? 'items-end sm:items-center p-0 sm:p-4' : 'items-center p-4'}`}
+      onClick={onClose}>
       <div ref={modal.ref} {...modal.dialogProps}
-        className={`modal-sheet rounded-3xl w-full ${width} max-h-[calc(100dvh-2rem)] flex flex-col ${className}`}
+        className={`modal-sheet w-full ${width} flex flex-col ${className} ${
+          sheet
+            ? 'rounded-t-3xl sm:rounded-3xl max-h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-2rem)]'
+            : 'rounded-3xl max-h-[calc(100dvh-2rem)]'
+        }`}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 p-6 pb-3">
           <div className="min-w-0 flex-1">

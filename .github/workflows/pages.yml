@@ -66,3 +66,7 @@ jobs:
       # Oranžová i žlutá pro „čeká" znamenají, že barva přestala nést význam.
       - name: Paleta
         run: node scripts/check-palette.mjs
+      # Ručně psaná okna se převádějí postupně; tohle hlídá, aby jich
+      # nepřibývalo a aby nové vznikalo komponentou <Modal>.
+      - name: Okna
+        run: node scripts/check-modals.mjs

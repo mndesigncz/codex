@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 
-import { EmptyState, Button, PageHeader } from '../ui';
+import { EmptyState, Button, PageHeader, Modal } from '../ui';
 import { useModal } from '@/lib/useModal';
 interface PlanningCard {
   id: number;
@@ -31,7 +31,6 @@ export default function PlanningBoard() {
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
   // Inline edit of an existing card — a typo shouldn't mean delete + retype.
   const [editCard, setEditCard] = useState<{ id: number; title: string; description: string } | null>(null);
-  const cardModal = useModal(!!editCard, () => setEditCard(null), 'Upravit kartu');
   const [savingEdit, setSavingEdit] = useState(false);
   const saveEdit = async () => {
     if (!editCard || !editCard.title.trim()) return;
@@ -294,25 +293,18 @@ export default function PlanningBoard() {
         </div>
       )}
       {editCard && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditCard(null)}>
-          <div ref={cardModal.ref} {...cardModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Upravit kartu</h3>
-            <div className="space-y-3">
-              <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
-                placeholder="Název" maxLength={200}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-              <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
-                placeholder="Popis (nepovinný)" rows={3}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none resize-none" />
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setEditCard(null)} className="btn btn-secondary flex-1">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit || !editCard.title.trim()} className="btn btn-primary flex-1 disabled:opacity-50">
-                {savingEdit ? 'Ukládám…' : 'Uložit'}
-              </button>
-            </div>
+        <Modal open onClose={() => setEditCard(null)} title="Upravit kartu" size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditCard(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" loading={savingEdit} disabled={!editCard.title.trim()} onClick={saveEdit}>Uložit</Button>
+          </>}>
+          <div className="space-y-3">
+            <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
+              placeholder="Název" maxLength={200} className="field" />
+            <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
+              placeholder="Popis (nepovinný)" rows={3} className="field resize-none" />
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>
