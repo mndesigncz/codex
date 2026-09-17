@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, Segmented } from '../ui';
+import { Button, PageHeader, Segmented, Modal } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -103,8 +103,6 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [savingEdit, setSavingEdit] = useState(false);
   // Manual entry — someone forgot to punch entirely.
   const [addOpen, setAddOpen] = useState(false);
-  const addModal = useModal(addOpen, () => setAddOpen(false), 'Přidat záznam docházky');
-  const editModal = useModal(!!editEntry, () => setEditEntry(null), 'Upravit záznam docházky');
   const [addEmp, setAddEmp] = useState<number | ''>('');
   const [addIn, setAddIn] = useState('');
   const [addOut, setAddOut] = useState('');
@@ -543,13 +541,12 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
       {/* Edit time modal */}
       {addOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setAddOpen(false)}>
-          <div ref={addModal.ref} {...addModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-2.5 mb-1">
-              <Icon name="clock" size={20} className="text-[#16181A]" />
-              <h3 className="t-card">Přidat záznam docházky</h3>
-            </div>
-            <p className="text-sm text-black/50 mb-4">Když se někdo zapomněl odpíchnout úplně.</p>
+        <Modal open onClose={() => setAddOpen(false)} size="sm"
+          title="Přidat záznam docházky" subtitle="Když se někdo zapomněl odpíchnout úplně."
+          footer={<>
+            <Button variant="secondary" onClick={() => setAddOpen(false)}>Zrušit</Button>
+            <Button variant="primary" icon="plus" loading={savingAdd} onClick={saveAdd}>Přidat záznam</Button>
+          </>}>
             {addErr && <div className="p-3 note note-danger text-sm mb-3">{addErr}</div>}
             <div className="space-y-3">
               <div>
@@ -571,26 +568,18 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setAddOpen(false)} className="btn btn-secondary flex-1">Zrušit</button>
-              <button onClick={saveAdd} disabled={savingAdd} className="btn btn-primary flex-1 disabled:opacity-50">
-                {savingAdd ? 'Ukládám…' : 'Uložit'}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
 
       {editEntry && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditEntry(null)}>
-          <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-2.5 mb-1">
-              <Icon name="clock" size={20} className="text-[#16181A]" />
-              <h3 className="t-card">Upravit čas na směně</h3>
-            </div>
-            <p className="text-sm text-black/50 mb-4">{editEntry.employeeName}</p>
+        <Modal open onClose={() => setEditEntry(null)} size="sm"
+          title="Upravit čas na směně" subtitle={editEntry.employeeName}
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditEntry(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" loading={savingEdit} onClick={saveEdit}>Uložit</Button>
+          </>}>
             {editErr && <div className="p-3 note note-danger text-sm mb-3">{editErr}</div>}
             <div className="space-y-3">
               <div>
@@ -604,14 +593,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setEditEntry(null)} className="btn btn-secondary flex-1">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit} className="btn btn-primary flex-1 disabled:opacity-50">
-                {savingEdit ? 'Ukládám…' : 'Uložit'}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
