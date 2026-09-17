@@ -537,7 +537,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
               <Button type="submit" variant="accent" icon={edit ? 'check' : 'plus'} loading={busy} className="flex-1 justify-center">
                 {edit ? 'Uložit' : 'Přidat stůl'}
               </Button>
-              <Button type="button" variant="secondary" onClick={() => { setAddOpen(false); setEdit(null); }}>Zpět</Button>
+              <Button type="button" variant="secondary" onClick={() => { setAddOpen(false); setEdit(null); }}>Zrušit</Button>
             </div>
           </form>
         </Modal>

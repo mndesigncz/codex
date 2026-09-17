@@ -1026,7 +1026,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                   )}
                 </div>
                 <div className="flex gap-2 mt-5">
-                  <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zavřít</button>
+                  <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zrušit</button>
                   <button onClick={copyWeek} disabled={copying || !copySrc || !copyDst}
                     className="btn btn-primary flex-1 disabled:opacity-50">
                     {copying ? 'Kopíruji…' : 'Zkopírovat'}

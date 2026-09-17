@@ -116,6 +116,18 @@ Před pushem: `npm run typecheck && npm test && npm run build` + skripty
 obrazovek (desktop 1280, mobil 390, úzký 320) a sweep přetečení, dotykových
 cílů, duplicitních id a vnořených klikatelných prvků — vše 0.
 
+## Texty tlačítek
+
+**„Zrušit" opouští rozdělanou akci, „Zavřít" zavírá náhled.** Kde je
+formulář nebo se něco chystá provést, patří *Zrušit* — člověk přichází
+o to, co zadal. Kde se jen dívá (QR k tisku, nabídka na vyšší plán,
+panel hledání), patří *Zavřít*, protože se neruší nic.
+
+„Zpět" je na krok v posloupnosti, ne na zavření okna.
+
+Potvrzení pojmenuje, co udělá: *Přidat stůl*, *Uložit*, *Zkopírovat* —
+ne *OK*. Člověk pak nemusí luštit z nadpisu, co se stane.
+
 ## Okna
 
 Jedna komponenta — `Modal` z `components/ui` — a **tři velikosti**:
