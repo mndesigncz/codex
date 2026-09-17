@@ -298,7 +298,7 @@ export default function Guides({ user }: { user: User }) {
             {isEmployer && categories.length > 0 && (
               <button
                 onClick={() => setManageOpen(true)}
-                className="mt-2 w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center gap-2 text-sm transition-all"
+                className="mt-2 w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center gap-2 text-sm transition"
               >
                 <Icon name="plus" size={16} strokeWidth={2} />
                 Kategorie
@@ -309,7 +309,7 @@ export default function Guides({ user }: { user: User }) {
               <button
                 onClick={createDefaults}
                 disabled={creatingCat}
-                className="mt-2 w-full rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] px-3 py-2.5 text-sm font-medium hover:bg-[#C8F542]/20 transition-all disabled:opacity-50"
+                className="mt-2 w-full rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] px-3 py-2.5 text-sm font-medium hover:bg-[#C8F542]/20 transition disabled:opacity-50"
               >
                 {creatingCat ? 'Vytvářím…' : 'Vytvořit výchozí kategorie'}
               </button>
@@ -348,7 +348,7 @@ export default function Guides({ user }: { user: User }) {
                   <div
                     key={g.id}
                     onClick={() => openReader(g.id)}
-                    className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition-all duration-300 flex flex-col group"
+                    className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition duration-300 flex flex-col group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h3 className="t-card min-w-0 flex-1 break-words">
@@ -387,7 +387,7 @@ export default function Guides({ user }: { user: User }) {
                               const d = await r.json();
                               if (d.guide) openEditor({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
                             }}
-                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition text-xs"
                             title="Upravit"
                           >
                             <Icon name="pencil" size={13} />
@@ -397,7 +397,7 @@ export default function Guides({ user }: { user: User }) {
                               e.stopPropagation();
                               deleteGuide(g.id);
                             }}
-                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition-all"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition"
                             title="Smazat"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -517,13 +517,13 @@ export default function Guides({ user }: { user: User }) {
                         openEditor(reader);
                         setReader(null);
                       }}
-                      className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-3 py-1.5 text-sm transition-all whitespace-nowrap"
+                      className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-3 py-1.5 text-sm transition whitespace-nowrap"
                     >
                       Upravit
                     </button>
                     <button
                       onClick={() => deleteGuide(reader.id)}
-                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 hover:bg-red-500/[0.06] transition-all"
+                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 hover:bg-red-500/[0.06] transition"
                       title="Smazat"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -533,7 +533,7 @@ export default function Guides({ user }: { user: User }) {
                 <button
                   onClick={() => setReader(null)}
                   title="Zavřít"
-                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all"
+                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition"
                 >
                   <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
                 </button>
@@ -623,7 +623,7 @@ function ReaderChecklist({ steps, guideId }: { steps: GuideStep[]; guideId?: num
       {/* Progress bar */}
       <div className="h-1.5 w-full rounded-full bg-black/[0.06] overflow-hidden mb-4">
         <div
-          className="h-full rounded-full bg-[#C8F542] transition-all duration-300"
+          className="h-full rounded-full bg-[#C8F542] transition duration-300"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -675,7 +675,7 @@ function CatButton({
   return (
     <button
       onClick={onClick}
-      className={`tap-target-sm flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm transition-all flex-shrink-0 whitespace-nowrap lg:w-full ${
+      className={`tap-target-sm flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm transition flex-shrink-0 whitespace-nowrap lg:w-full ${
         active ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'text-black/60 hover:bg-black/[0.04] hover:text-black'
       }`}
     >
@@ -804,7 +804,7 @@ function GuideEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Např. Jak připravit naši signature kávu"
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition"
             />
           </div>
 
@@ -814,7 +814,7 @@ function GuideEditor({
               aria-label="Kategorie"
               value={categoryId ?? ''}
               onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all appearance-none"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition appearance-none"
             >
               <option value="" className="bg-neutral-900">
                 Bez kategorie
@@ -834,7 +834,7 @@ function GuideEditor({
               onChange={(e) => setContent(e.target.value)}
               rows={12}
               placeholder={'Sem napište návod…\n\nTip: řádky **tučně** a odrážky pomocí „- “.'}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all leading-relaxed resize-y"
+              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition leading-relaxed resize-y"
             />
             <p className="text-xs text-black/30 mt-2">Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.</p>
           </div>
@@ -864,7 +864,7 @@ function GuideEditor({
                         type="button"
                         onClick={() => moveStep(i, -1)}
                         disabled={i === 0}
-                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition-all rotate-180"
+                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition rotate-180"
                         title="Nahoru"
                       >
                         <Icon name="chevron" size={14} strokeWidth={2.5} />
@@ -873,7 +873,7 @@ function GuideEditor({
                         type="button"
                         onClick={() => moveStep(i, 1)}
                         disabled={i === steps.length - 1}
-                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition-all"
+                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition"
                         title="Dolů"
                       >
                         <Icon name="chevron" size={14} strokeWidth={2.5} />
@@ -890,7 +890,7 @@ function GuideEditor({
                         }
                       }}
                       placeholder={`Krok ${i + 1}`}
-                      className="flex-1 field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm min-w-0"
+                      className="flex-1 field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm min-w-0"
                     />
                     <button
                       type="button"
@@ -898,7 +898,7 @@ function GuideEditor({
                         ? { itemId: null, amount: null, unit: null }
                         : { itemId: null, amount: null, unit: '' })}
                       title={s.itemId != null || s.unit != null ? 'Zrušit surovinu' : 'Označit jako surovinu'}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition flex-shrink-0 ${
                         s.itemId != null || s.unit != null
                           ? 'bg-[#C8F542] on-accent'
                           : 'glass text-black/45 hover:text-[#5B7A08]'
@@ -909,7 +909,7 @@ function GuideEditor({
                     <button
                       type="button"
                       onClick={() => removeStep(i)}
-                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-red-600 transition-all flex-shrink-0"
+                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-red-600 transition flex-shrink-0"
                       title="Odebrat krok"
                     >
                       <Icon name="close" size={14} />
@@ -931,7 +931,7 @@ function GuideEditor({
             <button
               type="button"
               onClick={addStep}
-              className="w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center justify-center gap-2 text-sm transition-all"
+              className="w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center justify-center gap-2 text-sm transition"
             >
               <Icon name="plus" size={16} strokeWidth={2} />
               Přidat krok
@@ -957,14 +957,14 @@ function GuideEditor({
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 mt-6">
           <button
             onClick={onClose}
-            className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition-all whitespace-nowrap"
+            className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition whitespace-nowrap"
           >
             Zrušit
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition-all disabled:opacity-50 whitespace-nowrap"
+            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-50 whitespace-nowrap"
           >
             {saving ? 'Ukládám…' : editing ? 'Uložit změny' : 'Vytvořit návod'}
           </button>
@@ -1054,7 +1054,7 @@ function ManageCategories({
               />
               <button
                 onClick={() => remove(c.id)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-red-600 transition-all text-xs flex-shrink-0"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-red-600 transition text-xs flex-shrink-0"
                 title="Smazat"
               >
                 <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
@@ -1070,7 +1070,7 @@ function ManageCategories({
               <button
                 key={ic}
                 onClick={() => setNewIcon(ic)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition ${
                   newIcon === ic ? 'bg-[#C8F542]/15 text-[#5B7A08] border border-[#C8F542]/30' : 'glass text-black/55 hover:text-black'
                 }`}
               >
@@ -1084,12 +1084,12 @@ function ManageCategories({
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && add()}
               placeholder="Název kategorie"
-              className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
+              className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
             />
             <button
               onClick={add}
               disabled={busy || !newName.trim()}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition-all disabled:opacity-50 flex-shrink-0 whitespace-nowrap"
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-50 flex-shrink-0 whitespace-nowrap"
             >
               Přidat
             </button>

@@ -42,9 +42,9 @@ interface Notif {
 const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍🍳', '🧑‍💼', '🙂', '😎', '🌿', '🍵', '🧋', '☕'];
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 const labelClass = 'field-label';
-const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50';
+const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50';
 const cardTitle = 'font-bold tracking-tight text-[#16181A]';
 
 const typeIcon: Record<string, string> = {
@@ -373,7 +373,7 @@ export default function Settings({ user, initialTab }: Props) {
       <div className="md:hidden -mx-1 flex gap-1 overflow-x-auto scrollbar-thin pb-1 px-1">
         {sections.map(s => (
           <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
-            className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
+            className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition duration-300 flex items-center gap-2 ${
               section === s.id ? 'bg-[#16181A] text-white font-semibold' : 'glass text-black/60 hover:text-black'
             }`}>
             <Icon name={s.icon} size={16} /> {s.label}
@@ -386,7 +386,7 @@ export default function Settings({ user, initialTab }: Props) {
         <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0">
           {sections.map(s => (
             <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
-              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
+              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition duration-200 ${
                 section === s.id ? 'seg-on' : 'seg-off'
               }`}>
               <Icon name={s.icon} size={20} className="flex-shrink-0" />
@@ -431,7 +431,7 @@ export default function Settings({ user, initialTab }: Props) {
                   <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
                     {AVATARS.map(a => (
                       <button key={a} type="button" onClick={() => setAvatar(a)}
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition ${
                           avatar === a ? 'bg-[#C8F542]/20 border border-[#C8F542]/40' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                         }`}>
                         {a}
@@ -492,7 +492,7 @@ export default function Settings({ user, initialTab }: Props) {
                     { id: 'dark', label: 'Tmavý', icon: 'moon' },
                   ] as const).map(opt => (
                     <button key={opt.id} type="button" onClick={() => setTheme(opt.id)}
-                      className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+                      className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
                         theme === opt.id ? 'bg-[#C8F542] text-black shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.04]'
                       }`}>
                       <Icon name={opt.icon} size={17} /> {opt.label}
@@ -517,7 +517,7 @@ export default function Settings({ user, initialTab }: Props) {
                     <button key={String(opt.on)} type="button"
                       onClick={() => { setHintsEnabled(opt.on); setHintsOn(opt.on); }}
                       aria-pressed={hintsOn === opt.on}
-                      className={`tap-target-sm flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+                      className={`tap-target-sm flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
                         hintsOn === opt.on ? 'bg-[#C8F542] text-black shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.04]'
                       }`}>
                       <Icon name={opt.icon} size={17} /> {opt.label}
@@ -601,7 +601,7 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
                 {unreadCount > 0 && (
                   <button onClick={markAllRead}
-                    className="rounded-full glass border border-black/10 hover:bg-black/[0.05] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
+                    className="rounded-full glass border border-black/10 hover:bg-black/[0.05] text-[#16181A] px-4 py-2 text-sm font-medium transition whitespace-nowrap">
                     Označit vše jako přečtené
                   </button>
                 )}

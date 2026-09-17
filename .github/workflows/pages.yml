@@ -70,3 +70,6 @@ jobs:
       # nepřibývalo a aby nové vznikalo komponentou <Modal>.
       - name: Okna
         run: node scripts/check-modals.mjs
+      # `transition-all` animuje i rozvržení; na tabletu u kasy to poskakuje.
+      - name: Přechody
+        run: node scripts/check-transitions.mjs

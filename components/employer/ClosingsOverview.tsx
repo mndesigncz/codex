@@ -771,12 +771,12 @@ export default function ClosingsOverview() {
       {months.length > 1 && !selectedDate && (
         <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
           <button onClick={() => setMonth('all')}
-            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${month === 'all' ? 'seg-on' : 'seg-off glass'}`}>
+            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition ${month === 'all' ? 'seg-on' : 'seg-off glass'}`}>
             Vše
           </button>
           {months.map(m => (
             <button key={m} onClick={() => setMonth(m)}
-              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all cz-sentence ${month === m ? 'seg-on' : 'seg-off glass'}`}>
+              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition cz-sentence ${month === m ? 'seg-on' : 'seg-off glass'}`}>
               {monthLabel(m)}
             </button>
           ))}

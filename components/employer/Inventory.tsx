@@ -969,7 +969,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Aktuální množství</label>
-                    <div className="flex items-center well border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition-all">
+                    <div className="flex items-center well border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition">
                       <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
                         className="well rounded-xl hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
                       <input type="number" inputMode="numeric" aria-label="Množství" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
@@ -1497,7 +1497,7 @@ function CatChip({ name, active, small, onPick }: {
 }) {
   return (
     <button type="button" onClick={onPick}
-      className={`tap-target-sm rounded-full font-medium transition-all inline-flex items-center gap-1.5 ${
+      className={`tap-target-sm rounded-full font-medium transition inline-flex items-center gap-1.5 ${
         small ? 'px-3 py-1 text-[11px]' : 'px-3.5 py-1.5 text-xs'
       } ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
       {active && <Icon name="check" size={small ? 11 : 13} />}{name}
@@ -1735,7 +1735,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
               </span>
             </div>
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
-              <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+              <div className={`h-full ${barColor} rounded-full transition-[width,background-color]`} style={{ width: `${pct}%` }} />
             </div>
             {Number(i.packageSize) > 0 && (() => {
               const cu = itemContentUnit(i, pk(i));

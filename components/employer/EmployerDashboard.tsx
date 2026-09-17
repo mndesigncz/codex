@@ -58,7 +58,7 @@ function nextMonthStr() {
 
 function StatCard({ icon, label, value, onClick, alert = false }: { icon: string; label: string; value: number | string; onClick?: () => void; alert?: boolean }) {
   return (
-    <button onClick={onClick} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+    <button onClick={onClick} className="text-left glass-card p-5 hover:bg-black/[0.05] transition duration-300">
       <div className="flex items-start justify-between">
         <p className="t-label">{label}</p>
         <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-600' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#5B7A08]'}`}>
@@ -295,7 +295,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       );
     })() : null,
     nextEvent: nextEvent ? (
-      <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition-all">
+      <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
@@ -320,7 +320,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     ) : null,
     sharedLink: pinnedShare ? (
       <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
-        className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
+        className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
@@ -343,7 +343,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             </div>
     ),
     onShift: onShift.length > 0 ? (
-              <button onClick={() => onNavigate('attendance')} className="w-full text-left rounded-3xl bg-[#C8F542]/[0.12] border border-[#C8F542]/35 p-5 hover:bg-[#C8F542]/[0.18] transition-all">
+              <button onClick={() => onNavigate('attendance')} className="w-full text-left rounded-3xl bg-[#C8F542]/[0.12] border border-[#C8F542]/35 p-5 hover:bg-[#C8F542]/[0.18] transition">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="relative flex h-2.5 w-2.5 shrink-0">

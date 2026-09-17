@@ -154,7 +154,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
                 const isToday = d.date === today;
                 return (
                   <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5">
-                    <div className="w-full rounded-full transition-all"
+                    <div className="w-full rounded-full transition"
                       style={{
                         height: `${h}px`,
                         background: isToday

@@ -58,7 +58,7 @@ const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11
 function StatCard({ icon, label, value, onClick, tone = 'ok' }: { icon: string; label: string; value: number | string; onClick?: () => void; tone?: 'ok' | 'wait' | 'muted' }) {
   const ring = tone === 'wait' ? 'bg-amber-500/15 border-amber-500/25 text-amber-800' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
   return (
-    <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition-all duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-amber-500/25' : ''}`}>
+    <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-amber-500/25' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <p className="t-label">{label}</p>
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
@@ -149,7 +149,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
                 <div className="space-y-px">
                   {sec.ids.map(id => BY_ID[id]).filter(Boolean).map(item => (
                     <button key={item.id} onClick={() => setTab(item.id)} title={item.label}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
+                      className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-2xl text-sm font-medium transition duration-200 ${
                         tab === item.id ? 'seg-on' : 'seg-off'
                       }`}>
                       <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
@@ -201,13 +201,13 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace klienta">
           {TABS.filter(t => dockIds.includes(t.id)).map(item => (
             <button key={item.id} onClick={() => { setTab(item.id); setMoreOpen(false); }} title={item.label}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${tab === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
+              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-200 ${tab === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
               <Icon key={tab === item.id ? 'on' : 'off'} name={item.icon} size={22} strokeWidth={tab === item.id ? 2 : 1.7} className="i-lead" motion={tab === item.id ? 'pop' : undefined} />
               <span className={`text-[11px] leading-none font-medium ${tab === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{item.label}</span>
             </button>
           ))}
           <button onClick={() => setMoreOpen(v => !v)} title="Více"
-            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${moreOpen || !dockIds.includes(tab) ? 'text-[#16181A]' : 'text-black/40'}`}>
+            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-200 ${moreOpen || !dockIds.includes(tab) ? 'text-[#16181A]' : 'text-black/40'}`}>
             <Icon name="menu" size={22} />
             <span className="text-[11px] leading-none font-medium">Více</span>
           </button>

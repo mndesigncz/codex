@@ -282,7 +282,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                     key={cell}
                     onClick={() => cycleDay(cell)}
                     title={meta.label}
-                    className={`tap-target-sm aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-all duration-200 border ${meta.cls} ${
+                    className={`tap-target-sm aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition duration-200 border ${meta.cls} ${
                       isToday ? 'ring-2 ring-[#C8F542]/60' : ''
                     }`}
                   >
@@ -309,7 +309,7 @@ export default function AvailabilitySubmit({ user }: Props) {
                   <button
                     key={s.id}
                     onClick={() => setPreferredShift(s.id)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition duration-300 ${
                       preferredShift === s.id
                         ? 'bg-[#C8F542] text-black font-semibold'
                         : 'text-black/60 hover:text-black hover:bg-black/[0.06]'

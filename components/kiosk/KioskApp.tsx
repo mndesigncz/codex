@@ -293,7 +293,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
 
       {pinnedShare && (
         <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
-          className="md:col-span-2 block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
+          className="md:col-span-2 block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="font-bold text-[#16181A] truncate flex items-center gap-2">

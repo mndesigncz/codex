@@ -242,7 +242,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         )}
         <button type="button" onClick={() => setParked(item, item.archived !== true)}
           title={item.archived ? 'Vrátit mezi to, co máme' : 'Momentálně nevedeme'}
-          className={`tap-target rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${
+          className={`tap-target rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition ${
             item.archived
               ? 'bg-[#C8F542] text-black hover:brightness-110'
               : 'glass border border-black/10 text-black/50 hover:text-black'
@@ -250,7 +250,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           {item.archived ? 'Máme zpátky' : 'Nevedeme'}
         </button>
         <button type="button" onClick={() => save(item)} disabled={!dirty || savingId === item.id}
-          className={`tap-target ml-auto rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition-all ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
+          className={`tap-target ml-auto rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
           {savingId === item.id ? 'Ukládám…' : savedId === item.id && !dirty ? 'Uloženo ✓' : 'Uložit'}
         </button>
       </div>
@@ -458,7 +458,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                     const isChecked = selected.includes(item.id);
                     return (
                       <label key={item.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-black/[0.03] transition-colors ${isChecked ? 'bg-[#C8F542]/[0.06]' : ''}`}>
-                        <span className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${isChecked ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15'}`}>
+                        <span className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition ${isChecked ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15'}`}>
                           {isChecked && <span className="text-xs font-bold"><Icon name="check" size={15} /></span>}
                         </span>
                         <input type="checkbox" checked={isChecked} onChange={() => toggle(item.id)} className="sr-only" />
@@ -478,11 +478,11 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                   <label className="field-label">Poznámka (volitelné)</label>
                   <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
                     placeholder="Popište stav zásob nebo další informace..."
-                    className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm resize-none" />
+                    className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm resize-none" />
                 </div>
 
                 <button type="submit" disabled={selected.length === 0 || submitting}
-                  className="rounded-full bg-[#C8F542] text-black font-semibold px-6 py-3 hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-full bg-[#C8F542] text-black font-semibold px-6 py-3 hover:brightness-110 transition disabled:opacity-40 disabled:cursor-not-allowed">
                   {submitting ? 'Odesílám…' : `Odeslat hlášení (${selected.length} položek)`}
                 </button>
               </form>

@@ -174,7 +174,7 @@ export default function PlanningBoard() {
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.id); }}
               onDragLeave={() => setDragOverCol(c => (c === col.id ? null : c))}
               onDrop={() => handleDrop(col.id)}
-              className={`well rounded-3xl p-3 flex flex-col gap-3 transition-all ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.06]' : ''}`}
+              className={`well rounded-3xl p-3 flex flex-col gap-3 transition ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.06]' : ''}`}
             >
               <div className="flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">
@@ -261,20 +261,20 @@ export default function PlanningBoard() {
                     value={newCard.title}
                     onChange={e => setNewCard(prev => prev ? { ...prev, title: e.target.value } : null)}
                     placeholder="Název karty..."
-                    className="w-full text-sm field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all"
+                    className="w-full text-sm field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition"
                   />
                   <textarea
                     value={newCard.description}
                     onChange={e => setNewCard(prev => prev ? { ...prev, description: e.target.value } : null)}
                     placeholder="Popis (volitelné)"
                     rows={2}
-                    className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all resize-none"
+                    className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition resize-none"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
+                    <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition">
                       {adding ? 'Přidávám…' : 'Přidat'}
                     </button>
-                    <button onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition-all">
+                    <button onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition">
                       Zrušit
                     </button>
                   </div>
@@ -282,7 +282,7 @@ export default function PlanningBoard() {
               ) : (
                 <button
                   onClick={() => setNewCard({ column: col.id, title: '', description: '' })}
-                  className="w-full py-2.5 border border-dashed border-black/10 rounded-2xl text-xs text-black/30 hover:border-[#C8F542]/40 hover:text-[#5B7A08] transition-all duration-300"
+                  className="w-full py-2.5 border border-dashed border-black/10 rounded-2xl text-xs text-black/30 hover:border-[#C8F542]/40 hover:text-[#5B7A08] transition duration-300"
                 >
                   + Přidat kartu
                 </button>

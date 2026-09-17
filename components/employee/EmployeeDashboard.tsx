@@ -221,7 +221,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     ) : null,
     sharedLink: pinnedShare ? (
       <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
-        className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition-all">
+        className="block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
@@ -236,7 +236,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     ) : null,
     clock: user.id ? <ClockWidget userId={parseInt(String(user.id))} /> : null,
     nextShift: (
-            <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+            <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition duration-300">
               <div className="flex items-center justify-between mb-3">
                 <p className="t-label">Nejbližší směna</p>
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
@@ -255,7 +255,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     ),
     feedback: (latestReview || unseenFlagged > 0) ? (
               <button onClick={() => onNavigate('rewards')}
-                className={`w-full text-left rounded-3xl border p-5 transition-all ${feedbackAlert ? 'bg-red-500/[0.07] border-red-500/30 hover:bg-red-500/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
+                className={`w-full text-left rounded-3xl border p-5 transition ${feedbackAlert ? 'bg-red-500/[0.07] border-red-500/30 hover:bg-red-500/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
                 <div className="flex items-center gap-3">
                   <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${feedbackAlert ? 'bg-red-500/15 text-red-600' : 'bg-[#16181A] text-[#C8F542]'}`}>
                     <Icon name={feedbackAlert ? 'warning' : 'award'} size={18} />
@@ -276,12 +276,12 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     ) : null,
     stats: (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+              <button onClick={() => onNavigate('tasks')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition duration-300">
                 <p className="t-label">Moje úkoly</p>
                 <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{activeTasks.length}</p>
                 <p className="text-xs text-black/45 mt-1">aktivních</p>
               </button>
-              <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+              <button onClick={() => onNavigate('chat')} className="text-left glass-card p-5 hover:bg-black/[0.05] transition duration-300">
                 <p className="t-label">Nepřečtené zprávy</p>
                 <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{unreadChats}</p>
                 <p className="text-xs text-black/45 mt-1">v chatu</p>
@@ -297,7 +297,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     ),
     announcements: <AnnouncementBanner />,
     closing: closingsDue.length > 0 ? (
-              <button onClick={() => onNavigate('closing')} className="w-full text-left rounded-3xl bg-[#C8F542]/15 border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/20 transition-all">
+              <button onClick={() => onNavigate('closing')} className="w-full text-left rounded-3xl bg-[#C8F542]/15 border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/20 transition">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
                   <div className="flex-1 min-w-0">
@@ -310,7 +310,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
                 </div>
               </button>
             ) : (
-              <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition-all duration-300">
+              <button onClick={() => onNavigate('closing')} className="w-full text-left glass-card p-5 hover:bg-black/[0.05] transition duration-300">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
                   <div className="flex-1 min-w-0">
@@ -322,7 +322,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
               </button>
     ),
     availability: availabilitySubmitted === false ? (
-              <button onClick={() => onNavigate('availability')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition-all">
+              <button onClick={() => onNavigate('availability')} className="w-full text-left rounded-3xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-5 hover:bg-[#C8F542]/15 transition">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="calendar" size={18} /></span>
                   <div>

@@ -68,7 +68,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
         draggable={!!onMove}
         onDragStart={() => setDragId(t.id)}
         onDragEnd={() => { setDragId(null); setDragOver(null); }}
-        className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-3 transition-all ${onMove ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === t.id ? 'opacity-40' : 'hover:bg-black/[0.06]'} ${done ? 'opacity-60' : ''}`}
+        className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-3 transition ${onMove ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === t.id ? 'opacity-40' : 'hover:bg-black/[0.06]'} ${done ? 'opacity-60' : ''}`}
       >
         <div className="flex items-start gap-2">
           <button onClick={() => onComplete(t, !done)} title={done ? 'Zrušit hotové' : 'Hotovo'}
@@ -119,7 +119,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
               onDragOver={onMove ? (e => { e.preventDefault(); setDragOver(key); }) : undefined}
               onDragLeave={onMove ? (() => setDragOver(c => (c === key ? null : c))) : undefined}
               onDrop={onMove ? (() => drop(key)) : undefined}
-              className={`shrink-0 w-[15rem] snap-start glass rounded-3xl p-3.5 flex flex-col gap-3 transition-all ${dragOver === key ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.05]' : ''} ${isToday ? 'ring-1 ring-[#C8F542]/40' : ''}`}
+              className={`shrink-0 w-[15rem] snap-start glass rounded-3xl p-3.5 flex flex-col gap-3 transition ${dragOver === key ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.05]' : ''} ${isToday ? 'ring-1 ring-[#C8F542]/40' : ''}`}
             >
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2 min-w-0">

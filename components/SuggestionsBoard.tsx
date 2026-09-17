@@ -19,7 +19,7 @@ type Suggestion = {
 };
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
 // Pipeline stages, in the order the employer moves an idea through.
 const STATUS_META: Record<string, { label: string; chip: string }> = {
@@ -179,7 +179,7 @@ export default function SuggestionsBoard() {
             const cnt = f.id === 'all' ? items.length : (counts[f.id] ?? 0);
             return (
               <button key={f.id} onClick={() => setFilter(f.id)}
-                className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition ${
                   filter === f.id ? 'seg-on' : 'seg-off glass'
                 }`}>
                 {f.label} {cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/35'}>· {cnt}</span>}
