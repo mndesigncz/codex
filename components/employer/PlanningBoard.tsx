@@ -13,11 +13,16 @@ interface PlanningCard {
   position: number;
 }
 
+// Sloupce tabule jsou kategorie, ne stavy — každý potřebuje vlastní
+// rozlišitelnou barvu, a stavové tóny na to nestačí. Proto kategoriální
+// řada z globals.css. (Dokud tu „Ke schválení" bylo žluté a
+// „Rozpracováno" oranžové, vypadalo to jako dva odstíny téhož; po
+// sjednocení oranžové na amber z nich byla dokonce jedna barva.)
 const COLUMNS = [
-  { id: 'ideas', label: 'Nápady', dot: 'bg-[#0A84FF]', chip: 'bg-[#0A84FF]/15 text-[#0A6FE0]' },
-  { id: 'in_progress', label: 'Rozpracováno', dot: 'bg-orange-400', chip: 'bg-orange-500/15 text-orange-600' },
-  { id: 'review', label: 'Ke schválení', dot: 'bg-yellow-400', chip: 'bg-yellow-500/15 text-yellow-600' },
-  { id: 'done', label: 'Hotovo', dot: 'bg-[#C8F542]', chip: 'bg-[#C8F542]/15 text-[#5B7A08]' },
+  { id: 'ideas', label: 'Nápady', dot: 'cat-dot-2', chip: 'cat-2' },
+  { id: 'in_progress', label: 'Rozpracováno', dot: 'cat-dot-4', chip: 'cat-4' },
+  { id: 'review', label: 'Ke schválení', dot: 'cat-dot-5', chip: 'cat-5' },
+  { id: 'done', label: 'Hotovo', dot: 'cat-dot-1', chip: 'cat-1' },
 ];
 
 export default function PlanningBoard() {

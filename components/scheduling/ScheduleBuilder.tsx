@@ -813,9 +813,13 @@ export default function ScheduleBuilder({ user }: Props) {
                       <span className="text-lg opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{e.name}</span>
-                        <span className="block text-[11px] uppercase tracking-wide text-black/30">
-                          {e.role === 'employer' ? 'vedení · ' : ''}čeká na vyplnění · vyplnit za něj
+                        {/* Verzálky jsou na krátký štítek, ne na větu. Tahle
+                            se na 1280 px lámala na dva řádky a četla se jako
+                            křik. Stav zůstává štítkem, výzva k akci je věta. */}
+                        <span className="block t-meta truncate">
+                          {e.role === 'employer' ? 'Vedení · ' : ''}Čeká na vyplnění
                         </span>
+                        <span className="block text-[11px] text-[#5B7A08] font-semibold">Vyplnit za něj</span>
                       </span>
                     </button>
                   ))}
@@ -865,7 +869,7 @@ export default function ScheduleBuilder({ user }: Props) {
                             .filter(([d, v]) => (v === 'morning' || v === 'afternoon' || /^type:\d+$/.test(String(v))) && d.startsWith(month + '-'))
                             .sort(([a], [b]) => a.localeCompare(b));
                           const kinds = Array.from(new Set(prefs.map(([, v]) => String(v))));
-                          const CHIP_TONES = ['bg-amber-500/15 text-amber-700', 'bg-indigo-500/15 text-indigo-600', 'bg-purple-500/15 text-purple-700', 'bg-teal-500/15 text-teal-700'];
+                          const CHIP_TONES = ['cat-4', 'cat-2', 'cat-3', 'cat-5'];
                           const chips = (kind: string, tone: string) => {
                             const list = prefs.filter(([, v]) => v === kind);
                             if (!list.length) return null;
@@ -1085,7 +1089,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     ))}
                   </div>
                   {adjust.warnings.length > 0 && (
-                    <ul className="text-xs text-orange-700 space-y-0.5">
+                    <ul className="text-xs text-amber-800 space-y-0.5">
                       {adjust.warnings.slice(0, 10).map((w, i) => <li key={i}>⚠ {w}</li>)}
                     </ul>
                   )}
@@ -1128,16 +1132,16 @@ export default function ScheduleBuilder({ user }: Props) {
               </div>
 
               {preview.warnings.length > 0 && (
-                <div className="rounded-2xl bg-orange-500/10 border border-orange-500/25 p-3">
-                  <p className="text-sm font-medium text-orange-600 mb-1 flex items-center gap-1.5">
+                <div className="rounded-2xl bg-amber-500/10 border border-amber-500/25 p-3">
+                  <p className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1.5">
                     <Icon name="warning" size={16} /> Upozornění ({preview.warnings.length})
                   </p>
-                  <ul className="text-xs text-orange-700/90 space-y-0.5 max-h-40 overflow-y-auto">
+                  <ul className="text-xs text-amber-800/90 space-y-0.5 max-h-40 overflow-y-auto">
                     {preview.warnings.slice(0, 40).map((w, i) => (
                       <li key={i}>• {w}</li>
                     ))}
                     {preview.warnings.length > 40 && (
-                      <li className="text-orange-700/60">…a dalších {preview.warnings.length - 40}</li>
+                      <li className="text-amber-800/60">…a dalších {preview.warnings.length - 40}</li>
                     )}
                   </ul>
                 </div>
@@ -2202,7 +2206,8 @@ function DayModal({
         {/* Auto-generated proposal for this day — the review the calendar icons can't give. */}
         {proposed.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#5B7A08] font-semibold"><Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Navržené směny (náhled — zatím neuloženo)</p>
+            {/* Věta v závorce není štítek — verzálky z ní dělají křik. */}
+          <p className="text-[13px] text-[#5B7A08] font-semibold"><Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />Navržené směny <span className="font-medium text-black/50">— náhled, zatím neuloženo</span></p>
             {proposed.map((p, idx) => (
               <div key={`prop-${idx}`} className="flex items-center gap-3 rounded-2xl border border-dashed border-[#5B7A08]/50 bg-[#C8F542]/[0.08] px-3 py-2">
                 <span className="text-lg flex-shrink-0">{p.employeeAvatar}</span>
@@ -2254,7 +2259,7 @@ function DayModal({
                       <span className="text-lg flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="flex-1 min-w-0 truncate text-sm text-[#16181A]">{e.name}</span>
                       {blocked && (
-                        <span className="flex items-center gap-1 text-xs text-orange-600 font-medium whitespace-nowrap flex-shrink-0">
+                        <span className="flex items-center gap-1 text-xs text-amber-700 font-medium whitespace-nowrap flex-shrink-0">
                           <Icon name="warning" size={14} /> nemůže
                         </span>
                       )}
@@ -2267,7 +2272,7 @@ function DayModal({
               </div>
             )}
             {employeeId !== '' && unavailable.has(Number(employeeId)) && (
-              <p className="mt-2 text-xs text-orange-600 flex items-center gap-1.5">
+              <p className="mt-2 text-xs text-amber-700 flex items-center gap-1.5">
                 <Icon name="warning" size={14} /> Tento zaměstnanec označil tento den jako nedostupný.
               </p>
             )}
@@ -2305,7 +2310,7 @@ function DayModal({
               </button>
             </div>
             {typeName !== '' && (shiftTypes.find(t => t.name === typeName)?.endsAtClose) && !dayClose && (
-              <p className="text-[11px] text-orange-600 mt-1.5">Tento den je zavřeno — použije se výchozí konec typu.</p>
+              <p className="text-[11px] text-amber-700 mt-1.5">Tento den je zavřeno — použije se výchozí konec typu.</p>
             )}
           </div>
 
@@ -2618,12 +2623,9 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
     });
 
   const grid = buildGrid(month);
-  const TYPE_TONES = [
-    'bg-amber-500/15 border-amber-500/40 text-amber-700',
-    'bg-indigo-500/15 border-indigo-500/40 text-indigo-600',
-    'bg-purple-500/15 border-purple-500/40 text-purple-700',
-    'bg-teal-500/15 border-teal-500/40 text-teal-700',
-  ];
+  // Kategoriální paleta z globals.css — stejné odstíny jako v Dostupnosti.
+  // Dřív si obě obrazovky psaly vlastní pole a lišily se.
+  const TYPE_TONES = ['cat-4 border', 'cat-2 border', 'cat-3 border', 'cat-5 border'];
   const toneOf = (v: string) => {
     if (v === 'off') return 'bg-red-500/15 border-red-500/40 text-red-600';
     if (v === 'morning') return TYPE_TONES[0];
@@ -2680,7 +2682,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
           Klikáním na den přepínáš: volno → <span className="text-red-600 font-medium">nemůže</span>
           {shiftTypes.length
             ? shiftTypes.map((t) => <span key={t.id}> → <span className="font-medium">jen {t.name}</span></span>)
-            : <> → <span className="text-amber-700 font-medium">jen ranní</span> → <span className="text-indigo-600 font-medium">jen odpolední</span></>}
+            : <> → <span className="text-amber-700 font-medium">jen ranní</span> → <span className="font-medium text-[#0A5FC0]">jen odpolední</span></>}
           . Denní volby jsou pro generátor závazné — typy se berou z nastavení „Typy směn".
         </p>
 

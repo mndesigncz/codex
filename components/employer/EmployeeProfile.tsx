@@ -243,7 +243,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                                 <PointsBadge n={sh.reviewPoints} />
                               </span>
                             ) : (
-                              <span className="text-[11px] font-medium text-orange-600 bg-orange-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
+                              <span className="text-[11px] font-medium text-amber-700 bg-amber-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
                             )}
                             <button onClick={() => setRateDate(sh.date)}
                               className="btn btn-primary btn-sm transition shrink-0">

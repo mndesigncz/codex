@@ -23,7 +23,7 @@ const inputClass =
 
 // Pipeline stages, in the order the employer moves an idea through.
 const STATUS_META: Record<string, { label: string; chip: string }> = {
-  new:      { label: 'Nový',        chip: 'bg-orange-500/15 text-orange-600' },
+  new:      { label: 'Nový',        chip: 'bg-amber-500/15 text-amber-700' },
   planned:  { label: 'Naplánováno', chip: 'bg-[#0A84FF]/15 text-[#0A6FE0]' },
   done:     { label: 'Hotovo',      chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
   declined: { label: 'Zamítnuto',   chip: 'bg-black/[0.06] text-black/45' },

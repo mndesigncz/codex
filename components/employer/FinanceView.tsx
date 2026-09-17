@@ -25,7 +25,7 @@ const KIND_META: Record<string, { label: string; cls: string }> = {
   receipt: { label: 'Účtenka', cls: 'bg-[#C8F542]/20 text-[#5B7A08]' },
   order: { label: 'Objednávka', cls: 'bg-[#0A84FF]/12 text-[#0A6FE0]' },
   expense: { label: 'Výdaj z kasy', cls: 'bg-amber-500/15 text-amber-700' },
-  wage: { label: 'Výplata', cls: 'bg-purple-500/12 text-purple-700' },
+  wage: { label: 'Výplata', cls: 'bg-[#16181A]/[0.07] text-[#16181A]/75' },
   removal: { label: 'Odvod', cls: 'bg-black/[0.06] text-black/55' },
 };
 
@@ -89,7 +89,7 @@ export default function FinanceView() {
     const rows = [
       { label: 'Nákupy a účtenky', amount: ledger.filter(r => r.kind === 'receipt' || r.kind === 'order').reduce((a, r) => a + r.amount, 0), cls: 'bg-[#C8F542]' },
       { label: 'Výdaje z kasy', amount: ledger.filter(r => r.kind === 'expense').reduce((a, r) => a + r.amount, 0), cls: 'bg-amber-400' },
-      { label: 'Mzdy', amount: wages, cls: 'bg-purple-400' },
+      { label: 'Mzdy', amount: wages, cls: 'bg-[#16181A]/70' },
     ].filter(r => r.amount > 0);
     const max = Math.max(...rows.map(r => r.amount), 1);
     return rows.map(r => ({ ...r, pct: Math.round((r.amount / max) * 100) }));

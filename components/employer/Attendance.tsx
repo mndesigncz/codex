@@ -486,7 +486,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                           </div>
                           {stale && (
                             <div className="flex items-center gap-2 flex-wrap min-w-0">
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-orange-500/15 text-orange-600 px-2 py-0.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 whitespace-nowrap">
                                 <Icon name="warning" size={12} /> Zapomenutý odchod?
                               </span>
                               <button onClick={() => closeEntry(e)}
@@ -496,7 +496,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </div>
                           )}
                           <div className="flex items-center gap-2 shrink-0 ml-auto">
-                            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : e.source === 'closing' ? 'bg-orange-500/15 text-orange-600' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
+                            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : e.source === 'closing' ? 'bg-amber-500/15 text-amber-700' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
                               {e.source === 'kiosk' ? 'kiosk' : e.source === 'closing' ? 'z uzávěrky' : 'ručně'}
                             </span>
                             <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${open ? 'text-[#5B7A08]' : 'text-[#16181A]'}`}>
@@ -516,10 +516,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </button>
                           </div>
                           {e.note && (
-                            <div className="w-full flex items-center gap-1.5 rounded-xl bg-orange-500/[0.07] border border-orange-500/20 px-3 py-2 text-xs text-orange-700">
+                            <div className="w-full flex items-center gap-1.5 rounded-xl bg-amber-500/[0.07] border border-amber-500/20 px-3 py-2 text-xs text-amber-800">
                               <Icon name="warning" size={13} className="shrink-0" />
                               <span className="min-w-0">{e.note}</span>
-                              <button onClick={() => openEdit(e)} className="tap-target-sm ml-auto shrink-0 font-semibold text-orange-700 hover:underline whitespace-nowrap">Zkontrolovat čas</button>
+                              <button onClick={() => openEdit(e)} className="tap-target-sm ml-auto shrink-0 font-semibold text-amber-800 hover:underline whitespace-nowrap">Zkontrolovat čas</button>
                             </div>
                           )}
                         </div>

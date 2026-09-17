@@ -388,7 +388,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                         className={`tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'seg-on' : 'seg-off'}`}>
                         {label}
                         {pending > 0 && (
-                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-orange-500/15 text-orange-600'}`}>{pending}</span>
+                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-amber-500/15 text-amber-700'}`}>{pending}</span>
                         )}
                       </button>
                     );
@@ -420,7 +420,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                               {r.rating > 0 && <><Icon name="star" size={12} className="shrink-0" />{r.rating}</>} Hodnoceno
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/12 text-orange-600 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 text-amber-700 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
                           )}
                           <button onClick={() => setRating(r)} className="tap-target-sm btn btn-primary btn-sm transition shrink-0">
                             {r.reviewed ? 'Upravit' : 'Ohodnotit'}
@@ -473,7 +473,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                       return (
                         <div key={i.id} className="flex items-center justify-between p-3 well">
                           <span className="text-sm text-[#16181A]">{i.name}</span>
-                          <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-orange-500/15 text-orange-600'}`}>{i.quantity} {i.unit}</span>
+                          <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-amber-500/15 text-amber-700'}`}>{i.quantity} {i.unit}</span>
                         </div>
                       );
                     })}
@@ -493,7 +493,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   <div className="space-y-2">
                     {todayShifts.map(s => (
                       <div key={s.id} className="flex items-center gap-3 p-3 well">
-                        <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-orange-500' : 'text-[#0A6FE0]'} /></span>
+                        <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-amber-600' : 'text-[#0A6FE0]'} /></span>
                         <div>
                           <PersonLink id={s.employeeId ?? s.employee_id}><p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p></PersonLink>
                           <p className="text-xs text-black/45">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>

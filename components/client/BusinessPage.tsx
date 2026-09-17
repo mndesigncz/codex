@@ -92,16 +92,12 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</span>
                 {b.address && <span className="inline-flex items-center gap-1.5"><Icon name="location" size={15} />{b.address}</span>}
               </p>
-              {tabs.length > 1 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {tabs.filter(t => t.id !== 'menu' && t.id !== tab).map(t => (
-                    <button key={t.id} type="button" onClick={() => setTab(t.id)}
-                      className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition active:scale-[0.98] ${b.coverUrl ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur' : 'bg-white/70 border border-black/[0.07] text-[#16181A] hover:bg-white'}`}>
-                      <Icon name={t.icon} size={13} />{t.id === 'reserve' ? 'Rezervovat' : t.id === 'order' ? 'Objednat od stolu' : 'Kartička a kupony'}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Tady dřív stály pilulky „Rezervovat / Objednat od stolu /
+                  Kartička a kupony". Volaly přesně totéž co přepínač
+                  o čtyřicet pixelů níž — tentýž ovladač dvakrát, pokaždé
+                  jiným slovníkem („Rezervovat" nahoře, „Rezervace" dole).
+                  Host tak na první obrazovce řešil, jestli jsou to dvě
+                  různé věci. Zůstává jedna nabídka a jedna hlavní akce. */}
             </div>
           </div>
           <div className="shrink-0">

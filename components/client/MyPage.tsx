@@ -115,7 +115,11 @@ export default function MyPage() {
           )}
           {open.length > 0 && (
             <section aria-labelledby="h-coup">
-              <h2 id="h-coup" className="text-lg font-bold tracking-tight mb-3">Kupony k uplatnění</h2>
+              {/* Vysvětlení patří pod nadpis, ne pod seznam: zbytek aplikace
+                  má všude nadpis + jednu větu, co se tu dělá. Pod seznamem
+                  to vypadalo jako osiřelý popisek. */}
+              <h2 id="h-coup" className="text-lg font-bold tracking-tight">Kupony k uplatnění</h2>
+              <p className="text-sm text-black/55 mt-1 mb-3">Kód ukaž obsluze u kasy.</p>
               <ul className="space-y-2">
                 {open.map((c: any) => (
                   <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3 flex items-center gap-3">
@@ -127,7 +131,6 @@ export default function MyPage() {
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-black/50 mt-2">Kód ukaž obsluze u kasy.</p>
             </section>
           )}
         </div>
@@ -213,8 +216,17 @@ function MemberCard({ name, card }: { name: string; card: any | null }) {
         <p className="mt-3 text-sm text-white/60 max-w-[34ch] text-pretty">Ukaž u kasy. Obsluha načte kód a přidá razítko za návštěvu nebo body za útratu. Jedna kartička pro všechny podniky.</p>
       </div>
       <div className="order-1 sm:order-2 justify-self-center sm:justify-self-end">
-        <div className="rounded-2xl bg-white p-3 w-40 h-40 sm:w-44 sm:h-44 grid place-items-center [&_svg]:w-full [&_svg]:h-full" aria-hidden>
-          {card?.svg ? <span dangerouslySetInnerHTML={{ __html: card.svg }} className="block w-full h-full" /> : <Skeleton className="w-full h-full rounded-lg" />}
+        {/* Když QR nedorazí, nesmí tu zůstat šedý obdélník donekonečna —
+            host stojí u kasy a potřebuje ukázat aspoň něco. Kód funguje
+            i bez čtečky, tak ho v tom případě ukážeme velký místo QR. */}
+        <div className="rounded-2xl bg-white p-3 w-40 h-40 sm:w-44 sm:h-44 grid place-items-center [&_svg]:w-full [&_svg]:h-full">
+          {card?.svg
+            ? <span dangerouslySetInnerHTML={{ __html: card.svg }} className="block w-full h-full" aria-hidden />
+            : card?.code
+            ? <p className="font-mono text-base font-bold tracking-[0.12em] text-[#16181A] text-center break-all px-1">{card.code}</p>
+            : card === null
+            ? <p className="text-xs text-black/45 text-center px-2">QR se nenačetlo.<br />Řekni obsluze kód nahoře.</p>
+            : <Skeleton className="w-full h-full rounded-lg" />}
         </div>
       </div>
     </section>

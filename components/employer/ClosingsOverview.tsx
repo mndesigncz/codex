@@ -352,7 +352,7 @@ export default function ClosingsOverview() {
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
             <h3 className="t-card">Uzávěrky ke schválení</h3>
-            <span className="rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
+            <span className="rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
           </div>
           {pending.map(c => {
             const d = cashDifference(c);
@@ -839,7 +839,7 @@ export default function ClosingsOverview() {
                       </span>
                     )}
                     {c.approved === false && (
-                      <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                      <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                     )}
                     <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
                       d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'

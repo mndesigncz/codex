@@ -63,3 +63,6 @@ jobs:
       # Gyokuro" v poli říká zákazníkovi s bistrem, že to není pro něj.
       - name: Univerzální texty
         run: node scripts/check-generic-copy.mjs
+      # Oranžová i žlutá pro „čeká" znamenají, že barva přestala nést význam.
+      - name: Paleta
+        run: node scripts/check-palette.mjs

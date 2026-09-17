@@ -24,7 +24,7 @@ interface Task {
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
-const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
+const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
 const todayStr = () => pragueToday();
 
 export default function KioskTasks() {

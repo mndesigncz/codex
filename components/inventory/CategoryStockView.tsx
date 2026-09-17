@@ -98,7 +98,7 @@ function ParkButton({ item, busy, onToggle, className = '' }: {
 
 const TONE = {
   critical: { bar: 'bg-red-500', text: 'text-red-600', chip: 'bg-red-500/12 text-red-600' },
-  low: { bar: 'bg-orange-400', text: 'text-orange-600', chip: 'bg-orange-500/12 text-orange-600' },
+  low: { bar: 'bg-amber-400', text: 'text-amber-700', chip: 'bg-amber-500/12 text-amber-700' },
   ok: { bar: 'bg-[#C8F542]', text: 'text-[#5B7A08]', chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
 } as const;
 

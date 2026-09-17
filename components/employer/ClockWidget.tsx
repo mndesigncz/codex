@@ -55,11 +55,11 @@ export default function ClockWidget({ userId }: { userId: number }) {
 
   return (
     <div className={`rounded-3xl p-5 flex items-center justify-between gap-3 flex-wrap border ${
-      zapomenuty ? 'bg-orange-500/[0.10] border-orange-500/40' : on ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40' : 'glass-card'
+      zapomenuty ? 'bg-amber-500/[0.10] border-amber-500/40' : on ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40' : 'glass-card'
     }`}>
       <div className="flex items-center gap-3 min-w-0">
         <span className={`inline-flex h-11 w-11 items-center justify-center rounded-full shrink-0 ${
-          zapomenuty ? 'bg-orange-500/15 text-orange-700' : on ? 'bg-[#16181A] text-[#C8F542]' : 'bg-[#C8F542]/15 text-[#5B7A08]'
+          zapomenuty ? 'bg-amber-500/15 text-amber-800' : on ? 'bg-[#16181A] text-[#C8F542]' : 'bg-[#C8F542]/15 text-[#5B7A08]'
         }`}>
           <Icon name={zapomenuty ? 'warning' : 'clock'} size={20} />
         </span>
@@ -68,7 +68,7 @@ export default function ClockWidget({ userId }: { userId: number }) {
             {zapomenuty ? 'Zapomenutý odchod' : on ? 'Jsi na směně' : 'Můžeš být na směně'}
           </p>
           {zapomenuty
-            ? <p className="text-sm text-orange-700">Běží od {zacatek} — to je {dlouho}. Odpíchni odchod, ať docházka sedí.</p>
+            ? <p className="text-sm text-amber-800">Běží od {zacatek} — to je {dlouho}. Odpíchni odchod, ať docházka sedí.</p>
             : on
               ? <p className="text-sm text-[#5B7A08] tabular-nums">{timer}</p>
               : <p className="text-sm text-black/45">Odpíchni si příchod, když jdeš pracovat.</p>}

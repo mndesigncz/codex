@@ -19,12 +19,14 @@ const SHIFTS = [
 
 // One tone per shift type, cycled by position — the day choices mirror the
 // team's OWN shift types, nothing is hard-coded to "ranní/odpolední".
+// Kategoriální paleta z globals.css — tytéž odstíny jako v Rozvrhu, ať
+// „druhý typ směny" vypadá na obou obrazovkách stejně.
 const TYPE_TONES = [
-  { cls: 'bg-[#C8F542]/25 border-[#C8F542]/50 text-[#5B7A08] hover:bg-[#C8F542]/35', dot: 'bg-[#C8F542] ring-1 ring-[#C8F542]/60' },
-  { cls: 'bg-blue-500/20 border-blue-500/40 text-blue-700 hover:bg-blue-500/30', dot: 'bg-blue-500 ring-1 ring-blue-500/50' },
-  { cls: 'bg-purple-500/20 border-purple-500/40 text-purple-700 hover:bg-purple-500/30', dot: 'bg-purple-500 ring-1 ring-purple-500/50' },
-  { cls: 'bg-amber-500/20 border-amber-500/40 text-amber-700 hover:bg-amber-500/30', dot: 'bg-amber-500 ring-1 ring-amber-500/50' },
-  { cls: 'bg-teal-500/20 border-teal-500/40 text-teal-700 hover:bg-teal-500/30', dot: 'bg-teal-500 ring-1 ring-teal-500/50' },
+  { cls: 'cat-1', dot: 'cat-dot-1 ring-1 ring-black/10' },
+  { cls: 'cat-2', dot: 'cat-dot-2 ring-1 ring-black/10' },
+  { cls: 'cat-3', dot: 'cat-dot-3 ring-1 ring-black/10' },
+  { cls: 'cat-4', dot: 'cat-dot-4 ring-1 ring-black/10' },
+  { cls: 'cat-5', dot: 'cat-dot-5 ring-1 ring-black/10' },
 ];
 const AVAILABLE_META = {
   label: 'Dostupný',
