@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Segmented, EmptyState, Skeleton, ErrorState } from '../ui';
+import { Button, Segmented, EmptyState, Skeleton, ErrorState, PageHeader } from '../ui';
 import { Initials } from './ClientShell';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
@@ -14,14 +14,16 @@ import { czDay } from '@/lib/clientSlots';
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
 
-export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons' | 'tiers' | 'promos';
+// Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
+// nad sebou. Přitom „Body" a „Slevy a úrovně" jsou jedna věc (co host
+// nasbírá a co za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
+// Spojené do jedné stránky po sekcích se hledají líp než ve dvou záložkách.
+export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
   { id: 'overview', label: 'Přehled' },
-  { id: 'points', label: 'Body' },
+  { id: 'points', label: 'Body a úrovně' },
   { id: 'stamps', label: 'Razítka' },
-  { id: 'coupons', label: 'Kupony' },
-  { id: 'tiers', label: 'Slevy a úrovně' },
-  { id: 'promos', label: 'Promo kódy' },
+  { id: 'coupons', label: 'Kupony a kódy' },
 ];
 
 async function j(url: string, init?: RequestInit) {
@@ -57,7 +59,12 @@ function Tile({ icon, label: lb, value, unit, tone = 'ok' }: { icon: string; lab
         <p className="t-label">{lb}</p>
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
       </div>
-      <p className="text-3xl font-bold tracking-tight tabular-nums text-[#16181A] mt-3">{value}{unit && <span className="text-base font-medium text-black/45 ml-1">{unit}</span>}</p>
+      {/* Tisíce s mezerou jako všude jinde v aplikaci: „18 420", ne
+          „18420". Bez toho se velké číslo čte po slabikách. */}
+      <p className="text-3xl font-bold tracking-tight tabular-nums text-[#16181A] mt-3">
+        {typeof value === 'number' ? value.toLocaleString('cs-CZ') : value}
+        {unit && <span className="text-base font-medium text-black/45 ml-1">{unit}</span>}
+      </p>
     </div>
   );
 }
@@ -809,25 +816,20 @@ export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => v
   const [sub, setSub] = useState<LoyaltySub>('overview');
   const HINTS: Record<LoyaltySub, string> = {
     overview: 'Jak si věrnostní program vede a co se v něm poslední dobou dělo.',
-    points: 'Za co host dostane body a kolik se mu vrátí z útraty jako kredit.',
+    points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
     stamps: 'Razítkové kartičky — za návštěvy, za vybrané položky, nebo za útratu. Klidně víc najednou.',
-    coupons: 'Kupony se vším všudy: sleva v % i Kč, X+Y, cílení na úrovně a skupiny, časová okna, limity, 18+ i uvítací dárek.',
-    tiers: 'Úrovně podle počtu návštěv (až po Platinu), jejich slevy a vlastní skupiny hostů.',
-    promos: 'Kódy na leták, do příspěvku nebo na účtenku. Host je zadá na tvé stránce.',
+    coupons: 'Co host uplatní: kupony se slevou v % i Kč, X+Y, cílením a limity — a promo kódy na leták nebo účtenku.',
   };
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Věrnost</h1>
-        <p className="text-sm text-black/55 mt-1 max-w-[75ch]">{HINTS[sub]}</p>
-      </div>
+      {/* Ručně psaný nadpis nahradil PageHeader — stejná hlavička jako
+          všude jinde, a popis jde zavřít jako ostatní nápovědy. */}
+      <PageHeader hintId={`loyalty-${sub}`} title="Věrnost" subtitle={HINTS[sub]} />
       <Segmented options={LOYALTY_SUBS} value={sub} onChange={setSub} size="sm" ariaLabel="Části věrnosti" wrap />
       {sub === 'overview' && <Overview go={setSub} />}
-      {sub === 'points' && <Points toast={toast} />}
+      {sub === 'points' && <div className="space-y-5"><Points toast={toast} /><Tiers toast={toast} /></div>}
       {sub === 'stamps' && <Stamps toast={toast} />}
-      {sub === 'coupons' && <Coupons toast={toast} />}
-      {sub === 'tiers' && <Tiers toast={toast} />}
-      {sub === 'promos' && promos}
+      {sub === 'coupons' && <div className="space-y-5"><Coupons toast={toast} />{promos}</div>}
     </div>
   );
 }
