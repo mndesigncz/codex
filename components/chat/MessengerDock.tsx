@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/Icons';
+import { EmptyState } from '../ui';
 import { MessageBubble } from './ChatView';
 import {
   Conversation,
@@ -142,7 +143,8 @@ function ConversationPopover({
       </div>
       <div className="overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
         {conversations.length === 0 && (
-          <div className="p-6 text-center text-black/45 text-sm">Žádné konverzace</div>
+          <div className="p-2"><EmptyState icon="chat" compact title="Žádné konverzace"
+            hint="Napiš celému týmu, nebo si vyber člověka a začni konverzaci." /></div>
         )}
         {conversations.map((c) => (
           <button

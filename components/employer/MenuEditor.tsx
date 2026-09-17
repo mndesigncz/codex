@@ -753,7 +753,7 @@ export default function MenuEditor() {
           </div>
           {vazby.celkem > 0 && (
             <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden" aria-hidden>
-              <div className="h-full rounded-full bg-[#C8F542] transition-all" style={{ width: `${vazby.celkem ? (vazby.spojene / vazby.celkem) * 100 : 0}%` }} />
+              <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${vazby.celkem ? (vazby.spojene / vazby.celkem) * 100 : 0}%` }} />
             </div>
           )}
           <div className="flex flex-wrap gap-2">

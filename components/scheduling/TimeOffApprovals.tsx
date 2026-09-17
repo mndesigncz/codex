@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Icon } from '../Icons';
+import { EmptyState } from '../ui';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -128,7 +129,8 @@ export default function TimeOffApprovals() {
       </div>
 
       {requests.length === 0 ? (
-        <p className="text-sm text-black/40">Žádné žádosti o volno.</p>
+        <EmptyState icon="sun" compact title="Žádné žádosti o volno"
+          hint="Zaměstnanci je posílají z Moje směny. Schválené dny generátor rozvrhu automaticky vynechá." />
       ) : (
         <>
           {pending.length === 0 ? (

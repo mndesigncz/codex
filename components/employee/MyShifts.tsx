@@ -116,21 +116,21 @@ export default function MyShifts({ user }: Props) {
       <PageHeader hintId="myshifts" title="Moje směny" subtitle="Co tě čeká a co už máš odpracované." />
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+        <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
           <p className="t-label">Nadcházející</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{upcoming.length}</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${shifts.length ? Math.min(100, (upcoming.length / shifts.length) * 100) : 0}%` }} />
           </div>
         </div>
-        <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+        <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
           <p className="t-label">Odpracované</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">{fmtHours(workedHours)} h</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
             <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, (workedHours / totalHours) * 100) : 0}%` }} />
           </div>
         </div>
-        <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+        <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
           <p className="t-label">Celkem směn</p>
           <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{shifts.length}</p>
           <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
@@ -163,7 +163,7 @@ export default function MyShifts({ user }: Props) {
         <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
       ) : (
         <>
-          <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+          <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
               <h3 className="t-card"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nadcházející směny</h3>
               {upcoming.length > 0 && (
@@ -199,7 +199,7 @@ export default function MyShifts({ user }: Props) {
           </div>
 
           {past.length > 0 && (
-            <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">
+            <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
               <h3 className="font-bold tracking-tight text-[#16181A] mb-4"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Minulé směny</h3>
               <div className="divide-y divide-black/[0.06]">
                 {past.slice(0, 5).map(s => (

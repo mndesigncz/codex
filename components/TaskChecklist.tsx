@@ -31,7 +31,7 @@ export function TaskChecklist({ items, onToggle }: {
     <div className="mt-2.5 space-y-1.5">
       <div className="flex items-center gap-2">
         <div className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden">
-          <div className="h-full rounded-full bg-[#C8F542] transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${pct}%` }} />
         </div>
         <span className="text-[11px] font-medium tabular-nums text-black/45 shrink-0">{done}/{items.length}</span>
       </div>

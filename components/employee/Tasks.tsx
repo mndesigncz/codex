@@ -109,7 +109,7 @@ export default function Tasks({ user }: Props) {
     // Future occurrences aren't active yet → show them greyed until their day comes.
     const inactive = task.status !== 'done' && !!task.dueDate && task.dueDate > today;
     return (
-      <div key={task.id} className={`glass-card p-5 sm:p-6 transition-all ${task.status === 'done' ? 'opacity-50' : inactive ? 'opacity-60' : ''}`}>
+      <div key={task.id} className={`glass-card p-5 sm:p-6 transition ${task.status === 'done' ? 'opacity-50' : inactive ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-3">
           <button
             onClick={() => updateStatus(task, task.status === 'done' ? 'pending' : 'done')}

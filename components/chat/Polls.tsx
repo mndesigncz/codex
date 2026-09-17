@@ -69,7 +69,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
                   className={`relative w-full overflow-hidden rounded-xl border px-3 py-2 text-left text-sm transition ${
                     mine ? 'border-[#5B9E00]/50 bg-white/70' : 'border-black/[0.07] bg-white/50 hover:bg-white/80'
                   }`}>
-                  <span className="absolute inset-y-0 left-0 bg-[#C8F542]/30 transition-all" style={{ width: `${pct}%` }} />
+                  <span className="absolute inset-y-0 left-0 bg-[#C8F542]/30 transition-[width]" style={{ width: `${pct}%` }} />
                   <span className="relative flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-[#16181A]">{mine ? '● ' : ''}{o}</span>
                     <span className="shrink-0 text-xs text-black/45 tabular-nums">{p.counts[i]} ({pct} %)</span>

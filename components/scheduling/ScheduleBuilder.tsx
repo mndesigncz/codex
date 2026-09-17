@@ -168,7 +168,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'pravidla', label: 'Pravidla' },
 ];
 
-export default function ScheduleBuilder({ user }: Props) {
+export default function ScheduleBuilder({ user, onNavigate }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
   const now = new Date();
   const currentMonth = ym(now);
   const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
@@ -725,7 +725,7 @@ export default function ScheduleBuilder({ user }: Props) {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition duration-300 ${
               tab === t.id ? 'bg-[#16181A] text-white font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
             }`}
           >
@@ -751,6 +751,7 @@ export default function ScheduleBuilder({ user }: Props) {
         <OpeningHoursEditor value={openingHours} onSaved={(v) => setOpeningHours(v)} />
       ) : tab === 'pevne' ? (
         <FixedAssignmentsManager
+          onNavigate={onNavigate}
           employees={assignable}
           shiftTypes={shiftTypes}
           assignments={fixed}
@@ -786,7 +787,7 @@ export default function ScheduleBuilder({ user }: Props) {
                       <button
                         key={s.employeeId}
                         onClick={() => setExpanded(expanded === s.employeeId ? null : s.employeeId)}
-                        className={`flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm border text-left transition-all ${
+                        className={`flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm border text-left transition ${
                           expanded === s.employeeId
                             ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#16181A]'
                             : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-black/80 hover:bg-[#C8F542]/15'
@@ -1025,7 +1026,7 @@ export default function ScheduleBuilder({ user }: Props) {
                   )}
                 </div>
                 <div className="flex gap-2 mt-5">
-                  <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zavřít</button>
+                  <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zrušit</button>
                   <button onClick={copyWeek} disabled={copying || !copySrc || !copyDst}
                     className="btn btn-primary flex-1 disabled:opacity-50">
                     {copying ? 'Kopíruji…' : 'Zkopírovat'}
@@ -1273,7 +1274,7 @@ export default function ScheduleBuilder({ user }: Props) {
                     key={cell}
                     onClick={() => setDayModal(cell)}
                     title={problemTitle}
-                    className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition-all flex flex-col gap-1 overflow-hidden border ${
+                    className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition flex flex-col gap-1 overflow-hidden border ${
                       hole
                         ? 'bg-red-500/12 border-red-500/60 hover:bg-red-500/[0.18]'
                         : problem
@@ -1356,6 +1357,7 @@ export default function ScheduleBuilder({ user }: Props) {
       {/* Day modal */}
       {dayModal && (
         <DayModal
+          onNavigate={onNavigate}
           date={dayModal}
           employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
@@ -1700,7 +1702,7 @@ function TypeForm({
             <button
               key={c}
               onClick={() => setColor(c)}
-              className={`h-7 w-7 rounded-lg transition-all ${color === c ? 'ring-2 ring-offset-2 ring-black/40' : ''}`}
+              className={`h-7 w-7 rounded-lg transition ${color === c ? 'ring-2 ring-offset-2 ring-black/40' : ''}`}
               style={{ backgroundColor: c }}
             />
           ))}
@@ -1789,7 +1791,7 @@ function OpeningHoursEditor({
               <span className="w-24 font-medium text-[#16181A] truncate">{label}</span>
               <button
                 onClick={() => update(d, { closed: !day.closed })}
-                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition-all ${
+                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition ${
                   day.closed
                     ? 'bg-red-500/15 border-red-500/30 text-red-600'
                     : 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
@@ -1843,7 +1845,9 @@ function FixedAssignmentsManager({
   shiftTypes,
   assignments,
   onReload,
+  onNavigate,
 }: {
+  onNavigate?: (view: string, arg?: string) => void;
   employees: Member[];
   shiftTypes: ShiftType[];
   assignments: FixedAssignment[];
@@ -1906,7 +1910,11 @@ function FixedAssignmentsManager({
         </p>
 
         {employees.length === 0 ? (
-          <p className="text-black/45 text-sm">Žádní zaměstnanci v týmu.</p>
+          /* Holá věta je slepá ulička: člověk se dozví, že nikoho nemá,
+             ale ne co s tím. Prázdný stav má vést tam, kde se to spraví. */
+          <EmptyState icon="users" compact title="Zatím nikdo v týmu"
+            hint="Pevné dny se přiřazují lidem — nejdřív je pozvi do týmu."
+            action={onNavigate ? <Button variant="accent" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -2032,6 +2040,7 @@ function FixedAssignmentsManager({
 // ---- Day modal for assigning shifts ----
 function DayModal({
   date,
+  onNavigate,
   employees,
   shifts,
   proposed = [],
@@ -2045,6 +2054,7 @@ function DayModal({
   onRemoveProposed,
   events = [],
 }: {
+  onNavigate?: (view: string, arg?: string) => void;
   date: string;
   employees: Member[];
   shifts: Shift[];
@@ -2240,7 +2250,9 @@ function DayModal({
           <div>
             <label className="block text-sm font-medium text-black/70 mb-2">Zaměstnanec</label>
             {employees.length === 0 ? (
-              <p className="text-black/45 text-sm">Žádní zaměstnanci v týmu.</p>
+              <EmptyState icon="users" compact title="Zatím nikdo v týmu"
+                hint="Směnu je komu přiřadit, až budou v týmu lidé."
+                action={onNavigate ? <Button variant="accent" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
             ) : (
               <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto">
                 {employees.map((e) => {
@@ -2250,7 +2262,7 @@ function DayModal({
                     <button
                       key={e.id}
                       onClick={() => setEmployeeId(e.id)}
-                      className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 text-left border transition-all ${
+                      className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 text-left border transition ${
                         employeeId === e.id
                           ? 'bg-[#C8F542]/15 border-[#C8F542]/40'
                           : 'bg-black/[0.03] border-black/[0.08] hover:bg-black/[0.05]'
@@ -2290,7 +2302,7 @@ function DayModal({
                     key={t.id}
                     onClick={() => applyShiftType(t)}
                     title={`${rt.start}–${rt.end}`}
-                    className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
+                    className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition inline-flex items-center gap-1.5 ${
                       active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 on-accent hover:bg-black/[0.05]'
                     }`}
                   >
@@ -2302,7 +2314,7 @@ function DayModal({
               })}
               <button
                 onClick={pickCustom}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition-all ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition ${
                   typeName === '' ? 'bg-[#16181A] text-white border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
                 }`}
               >

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 
-import { EmptyState, Button, PageHeader } from '../ui';
+import { EmptyState, Button, PageHeader, Modal } from '../ui';
 import { useModal } from '@/lib/useModal';
 interface PlanningCard {
   id: number;
@@ -31,7 +31,6 @@ export default function PlanningBoard() {
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
   // Inline edit of an existing card — a typo shouldn't mean delete + retype.
   const [editCard, setEditCard] = useState<{ id: number; title: string; description: string } | null>(null);
-  const cardModal = useModal(!!editCard, () => setEditCard(null), 'Upravit kartu');
   const [savingEdit, setSavingEdit] = useState(false);
   const saveEdit = async () => {
     if (!editCard || !editCard.title.trim()) return;
@@ -175,7 +174,7 @@ export default function PlanningBoard() {
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.id); }}
               onDragLeave={() => setDragOverCol(c => (c === col.id ? null : c))}
               onDrop={() => handleDrop(col.id)}
-              className={`well rounded-3xl p-3 flex flex-col gap-3 transition-all ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.06]' : ''}`}
+              className={`well rounded-3xl p-3 flex flex-col gap-3 transition ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.06]' : ''}`}
             >
               <div className="flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">
@@ -262,20 +261,20 @@ export default function PlanningBoard() {
                     value={newCard.title}
                     onChange={e => setNewCard(prev => prev ? { ...prev, title: e.target.value } : null)}
                     placeholder="Název karty..."
-                    className="w-full text-sm field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all"
+                    className="w-full text-sm field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition"
                   />
                   <textarea
                     value={newCard.description}
                     onChange={e => setNewCard(prev => prev ? { ...prev, description: e.target.value } : null)}
                     placeholder="Popis (volitelné)"
                     rows={2}
-                    className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition-all resize-none"
+                    className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition resize-none"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition-all">
+                    <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition">
                       {adding ? 'Přidávám…' : 'Přidat'}
                     </button>
-                    <button onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition-all">
+                    <button onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition">
                       Zrušit
                     </button>
                   </div>
@@ -283,7 +282,7 @@ export default function PlanningBoard() {
               ) : (
                 <button
                   onClick={() => setNewCard({ column: col.id, title: '', description: '' })}
-                  className="w-full py-2.5 border border-dashed border-black/10 rounded-2xl text-xs text-black/30 hover:border-[#C8F542]/40 hover:text-[#5B7A08] transition-all duration-300"
+                  className="w-full py-2.5 border border-dashed border-black/10 rounded-2xl text-xs text-black/30 hover:border-[#C8F542]/40 hover:text-[#5B7A08] transition duration-300"
                 >
                   + Přidat kartu
                 </button>
@@ -294,25 +293,18 @@ export default function PlanningBoard() {
         </div>
       )}
       {editCard && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditCard(null)}>
-          <div ref={cardModal.ref} {...cardModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Upravit kartu</h3>
-            <div className="space-y-3">
-              <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
-                placeholder="Název" maxLength={200}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-              <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
-                placeholder="Popis (nepovinný)" rows={3}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none resize-none" />
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setEditCard(null)} className="btn btn-secondary flex-1">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit || !editCard.title.trim()} className="btn btn-primary flex-1 disabled:opacity-50">
-                {savingEdit ? 'Ukládám…' : 'Uložit'}
-              </button>
-            </div>
+        <Modal open onClose={() => setEditCard(null)} title="Upravit kartu" size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditCard(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" loading={savingEdit} disabled={!editCard.title.trim()} onClick={saveEdit}>Uložit</Button>
+          </>}>
+          <div className="space-y-3">
+            <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
+              placeholder="Název" maxLength={200} className="field" />
+            <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
+              placeholder="Popis (nepovinný)" rows={3} className="field resize-none" />
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>

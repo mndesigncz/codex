@@ -15,7 +15,7 @@ import { useModal } from '@/lib/useModal';
 type Ev = any;
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all';
+  'w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition';
 
 export default function EventsView({ user }: { user: { id?: string } }) {
   const money = useMoney();

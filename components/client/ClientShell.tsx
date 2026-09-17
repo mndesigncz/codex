@@ -95,7 +95,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               { href: '/client/me', label: 'Moje', icon: 'card', on: !!path?.startsWith('/client/me') },
             ] as const).map(i => (
               <Link key={i.href} href={i.href} title={i.label}
-                className={`flex flex-col items-center gap-1 rounded-2xl px-6 py-1.5 transition-all duration-200 ${i.on ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
+                className={`flex flex-col items-center gap-1 rounded-2xl px-6 py-1.5 transition duration-200 ${i.on ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
                 <Icon key={i.on ? 'on' : 'off'} name={i.icon} size={22} strokeWidth={i.on ? 2 : 1.7} className="i-lead" motion={i.on ? 'pop' : undefined} />
                 <span className={`text-[11px] leading-none font-medium ${i.on ? 'text-[#16181A]' : 'text-black/40'}`}>{i.label}</span>
               </Link>

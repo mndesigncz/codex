@@ -52,7 +52,7 @@ interface Invitation {
 }
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
 function roleChip(role: string) {
   return role === 'employer'
@@ -485,7 +485,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <input value={teamName} onChange={e => setTeamName(e.target.value)} className={inputClass} />
             <div className="flex gap-2">
               <button onClick={saveName} disabled={savingName}
-                className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50 whitespace-nowrap">
+                className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50 whitespace-nowrap">
                 {savingName ? 'Ukládám…' : 'Uložit'}
               </button>
               <button onClick={() => { setEditingName(false); setTeamName(team.name); }}
@@ -515,7 +515,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <div className="flex-1 min-w-0 well border border-black/[0.08] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.25em] sm:tracking-[0.3em] text-[#5B7A08] break-all min-w-0">{team.join_code}</span>
             <button onClick={copyCode} title="Kopírovat"
-              className="w-full sm:w-auto rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">
+              className="w-full sm:w-auto rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition whitespace-nowrap flex-shrink-0">
               {copied ? 'Zkopírováno ✓' : 'Kopírovat'}
             </button>
           </div>
@@ -548,7 +548,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               ))}
             </div>
             <button type="submit" disabled={inviting}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50 whitespace-nowrap ml-auto">
+              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50 whitespace-nowrap ml-auto">
               {inviting ? 'Odesílám…' : 'Odeslat pozvánku'}
             </button>
           </div>
@@ -662,16 +662,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     <div className="flex items-center gap-2 flex-wrap min-w-0 basis-full sm:basis-auto sm:ml-auto">
                       {m.role === 'employee' && (
                         <button onClick={() => setProfileId(m.id)}
-                          className="btn btn-primary transition-all whitespace-nowrap">
+                          className="btn btn-primary transition whitespace-nowrap">
                           Profil
                         </button>
                       )}
                       <button onClick={() => startEdit(m)}
-                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition-all whitespace-nowrap">
+                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition whitespace-nowrap">
                         Upravit
                       </button>
                       <button onClick={() => setRemoveTarget(m)}
-                        className="rounded-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition-all whitespace-nowrap">
+                        className="rounded-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition whitespace-nowrap">
                         Odebrat
                       </button>
                     </div>
@@ -704,7 +704,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     </div>
                     <div className="sm:col-span-2 flex gap-2">
                       <button onClick={saveMember} disabled={savingMember}
-                        className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
+                        className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50">
                         {savingMember ? 'Ukládám…' : 'Uložit'}
                       </button>
                       <button onClick={() => setEditMemberId(null)}
@@ -926,7 +926,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </p>
             <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
               <button onClick={confirmRemove} disabled={removing}
-                className="rounded-full bg-red-500 text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition-all disabled:opacity-50">
+                className="rounded-full bg-red-500 text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50">
                 {removing ? 'Odebírám…' : 'Odebrat'}
               </button>
               <button onClick={() => setRemoveTarget(null)} disabled={removing}

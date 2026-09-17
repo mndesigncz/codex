@@ -15,7 +15,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
 const today = () => pragueToday();
 
@@ -200,7 +200,7 @@ function Step({
   return (
     <section
       ref={refCb}
-      className={`relative rounded-3xl border p-3.5 min-[400px]:p-5 sm:p-6 space-y-4 sm:space-y-5 transition-all ${
+      className={`relative rounded-3xl border p-3.5 min-[400px]:p-5 sm:p-6 space-y-4 sm:space-y-5 transition ${
         climax
           ? 'bg-[#C8F542]/[0.07] border-[#C8F542]/40 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset]'
           : 'bg-black/[0.025] border-black/[0.06]'
@@ -1214,7 +1214,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </div>
 
         <button type="submit" disabled={submitting}
-          className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-7 py-3.5 text-sm hover:bg-black disabled:opacity-50 transition-all inline-flex items-center justify-center gap-2">
+          className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-7 py-3.5 text-sm hover:bg-black disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
           {submitting ? 'Odesílám…' : <>Odeslat uzávěrku <Icon name="check" size={17} /></>}
         </button>
       </form>

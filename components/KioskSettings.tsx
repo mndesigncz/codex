@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
+import { EmptyState } from './ui';
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
 interface Member { id: number; name: string; avatar?: string; hasPin: boolean }
 
@@ -100,7 +101,8 @@ export default function KioskSettings() {
             <p className="t-label">PIN pro odpíchnutí (nepovinné)</p>
             <p className="text-xs text-black/45 -mt-1">Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu — nikdo se nepodepíše za něj.</p>
             {members.length === 0 ? (
-              <p className="text-sm text-black/40">Zatím žádní zaměstnanci.</p>
+              <EmptyState icon="users" compact title="Zatím nikdo v týmu"
+                hint="Na tabletu se odpíchnou lidé, které pozveš v Nastavení týmu." />
             ) : members.map(m => (
               <div key={m.id} className="flex items-center gap-2 flex-wrap">
                 <span className="flex items-center gap-2 min-w-0 flex-1">

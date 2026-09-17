@@ -107,7 +107,7 @@ export function ProduceModal({ entry, onClose, onDone }: { entry: ToMake; onClos
         {err && <p className="note note-danger">{err}</p>}
         <div className="flex gap-2">
           <button type="button" onClick={confirm} disabled={busy} className="btn btn-accent flex-1">{busy ? 'Zapisuji…' : 'Vyrobeno, naskladnit'}</button>
-          <button type="button" onClick={onClose} className="btn btn-secondary">Zpět</button>
+          <button type="button" onClick={onClose} className="btn btn-secondary">Zrušit</button>
         </div>
       </div>
     </div>

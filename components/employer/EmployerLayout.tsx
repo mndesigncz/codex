@@ -142,7 +142,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} />;
       case 'shifts':    return (
         <div>
-          <ScheduleBuilder user={user as any} />
+          <ScheduleBuilder user={user as any} onNavigate={navigate} />
           {/* Same horizontal rhythm as ScheduleBuilder's p-6 shell, so nothing
               inside the tab looks wider than its neighbour. */}
           <div className="px-6 pb-6 w-full space-y-4">
@@ -233,7 +233,7 @@ export default function EmployerLayout({ user }: Props) {
     <ProfileLinkProvider>
     <div className="flex h-[100dvh] overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-all duration-300 flex-shrink-0`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-3.5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
           <LogoMark size={40} />
           {sidebarOpen && (
@@ -262,7 +262,7 @@ export default function EmployerLayout({ user }: Props) {
                 <div className="space-y-px">
                   {items.map(item => (
                     <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
-                      className={`w-full flex items-center gap-3 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
+                      className={`w-full flex items-center gap-3 py-2 rounded-2xl text-sm font-medium transition duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
                         currentView === item.id ? 'seg-on' : 'seg-off'
                       }`}>
                       <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
@@ -371,7 +371,7 @@ export default function EmployerLayout({ user }: Props) {
         <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
+              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
                 currentView === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
               <Icon key={currentView === item.id ? 'on' : 'off'} name={item.icon} size={22}
                 strokeWidth={currentView === item.id ? 2 : 1.7}
@@ -380,7 +380,7 @@ export default function EmployerLayout({ user }: Props) {
             </button>
           ))}
           <button onClick={() => setMoreOpen(v => !v)} title="Více"
-            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200 ${moreOpen || currentView === 'settings' || currentView === 'team-settings' || mobileSecondary.some(n => n.id === currentView) ? 'text-[#16181A]' : 'text-black/40'}`}>
+            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-200 ${moreOpen || currentView === 'settings' || currentView === 'team-settings' || mobileSecondary.some(n => n.id === currentView) ? 'text-[#16181A]' : 'text-black/40'}`}>
             <Icon name="menu" size={22} />
             <span className="text-[11px] leading-none font-medium">Více</span>
           </button>

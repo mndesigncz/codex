@@ -116,6 +116,36 @@ Před pushem: `npm run typecheck && npm test && npm run build` + skripty
 obrazovek (desktop 1280, mobil 390, úzký 320) a sweep přetečení, dotykových
 cílů, duplicitních id a vnořených klikatelných prvků — vše 0.
 
+## Texty tlačítek
+
+**„Zrušit" opouští rozdělanou akci, „Zavřít" zavírá náhled.** Kde je
+formulář nebo se něco chystá provést, patří *Zrušit* — člověk přichází
+o to, co zadal. Kde se jen dívá (QR k tisku, nabídka na vyšší plán,
+panel hledání), patří *Zavřít*, protože se neruší nic.
+
+„Zpět" je na krok v posloupnosti, ne na zavření okna.
+
+Potvrzení pojmenuje, co udělá: *Přidat stůl*, *Uložit*, *Zkopírovat* —
+ne *OK*. Člověk pak nemusí luštit z nadpisu, co se stane.
+
+## Okna
+
+Jedna komponenta — `Modal` z `components/ui` — a **tři velikosti**:
+
+- `sm` — potvrzení a krátký formulář (dvě tři pole)
+- `md` — běžné okno, výchozí
+- `lg` — tabulka, náhled nebo editor
+
+Nic mezi tím. Dokud si každé okno šířku odhadlo samo, bylo jich v aplikaci
+šest a „potvrdit smazání" vypadalo pokaždé jinak.
+
+Dlouhý obsah, kde je palec u spodní hrany (detail uzávěrky, výběr
+z dlouhého seznamu), dostane `sheet`: na telefonu vyjede zdola a drží se
+spodního kraje, na monitoru zůstává vystředěné okno.
+
+Okna se převádějí postupně; `scripts/check-modals.mjs` je ráčna, která
+hlídá, aby ručně psaných nepřibývalo.
+
 ## Barvy: stav versus kategorie
 
 Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —
