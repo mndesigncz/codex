@@ -113,7 +113,10 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
     allow_promotion_codes: true,
     payment_method_collection: 'always',
     billing_address_collection: 'auto',
+    // DIČ na faktuře: Stripe si k tomu musí smět přepsat jméno a adresu
+    // zákazníka podle toho, co člověk vyplní v pokladně.
     tax_id_collection: { enabled: true },
+    customer_update: { name: 'auto', address: 'auto' },
     locale: 'cs',
     subscription_data: {
       metadata: { teamId: String(teamId), plan },
