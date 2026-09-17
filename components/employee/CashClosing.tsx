@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState, PageHeader } from '../ui';
+import { EmptyState, PageHeader, Modal, Button } from '../ui';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
@@ -290,7 +290,6 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [form, setForm] = useState<FormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const confirmModal = useModal(showConfirm, () => setShowConfirm(false), 'Odeslat uzávěrku');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [coworkers, setCoworkers] = useState<Coworker[]>([]);
@@ -1326,25 +1325,18 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       {/* Off-shift confirmation — closing a day the employee wasn't scheduled
           goes to management for approval. */}
       {showConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowConfirm(false)}>
-          <div ref={confirmModal.ref} {...confirmModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-2xl"><Icon name="warning" size={15} /></div>
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-3">Nejsi na směně v tento den</h3>
-            <p className="text-sm text-black/55 mt-1.5">
-              Uzávěrku můžeš odeslat, ale půjde vedení ke schválení. Opravdu ji chceš odeslat?
-            </p>
-            <div className="flex gap-2 mt-5">
-              <button type="button" onClick={() => setShowConfirm(false)}
-                className="btn btn-secondary flex-1">
-                Zpět
-              </button>
-              <button type="button" onClick={doSubmit} disabled={submitting}
-                className="btn btn-primary flex-1 disabled:opacity-50">
-                Odeslat ke schválení
-              </button>
-            </div>
+        <Modal open onClose={() => setShowConfirm(false)} size="sm"
+          title="Nejsi na směně v tento den"
+          subtitle="Uzávěrku můžeš odeslat, ale půjde vedení ke schválení."
+          footer={<>
+            <Button variant="secondary" onClick={() => setShowConfirm(false)}>Zrušit</Button>
+            <Button variant="primary" icon="send" loading={submitting} onClick={doSubmit}>Odeslat ke schválení</Button>
+          </>}>
+          <div className="flex items-start gap-3 note note-wait">
+            <Icon name="warning" size={17} className="shrink-0 mt-0.5" />
+            <p className="text-sm">Vedení uvidí, že uzávěrku poslal někdo mimo rozpis, a potvrdí ji.</p>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

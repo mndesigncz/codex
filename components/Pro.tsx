@@ -6,7 +6,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, MAX_EXTRAS, type PlanInfo } from '@/lib/plan';
 import { Icon } from './Icons';
-import { useModal } from '@/lib/useModal';
+import { Modal, Button } from './ui';
 
 const PlanCtx = createContext<{ plan: PlanInfo | null; loaded: boolean }>({ plan: null, loaded: false });
 
@@ -115,24 +115,17 @@ export function ProGate({ feature, children, benefit, employer = true }: {
 
 /** Small modal for inline locked actions (e.g. a CSV button on Free). */
 export function UpgradeModal({ feature, onClose }: { feature: string; onClose: () => void }) {
-  const m = useModal(true, onClose, 'Přejít na Pro');
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center space-y-3" onClick={e => e.stopPropagation()}>
+    <Modal open onClose={onClose} size="sm"
+      title={<span className="flex items-center gap-2">{feature} <ProBadge /></span>}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>Zavřít</Button>
+        <Button variant="accent" icon="sparkle" onClick={() => { window.location.href = '/employer/overview?view=settings'; }}>Zjistit víc</Button>
+      </>}>
+      <div className="text-center space-y-3">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={20} /></div>
-        <div className="flex items-center justify-center gap-2">
-          <h3 className="t-card">{feature}</h3>
-          <ProBadge />
-        </div>
         <p className="text-sm text-black/55">Tuhle funkci odemyká plán Pro ({PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}).</p>
-        <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="btn btn-secondary flex-1">Zavřít</button>
-          <button onClick={() => { window.location.href = '/employer/overview?view=settings'; }}
-            className="flex-1 rounded-full bg-[#C8F542] on-accent font-semibold px-5 py-3 text-sm hover:brightness-105 transition">
-            Zjistit víc
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
