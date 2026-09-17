@@ -168,7 +168,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'pravidla', label: 'Pravidla' },
 ];
 
-export default function ScheduleBuilder({ user }: Props) {
+export default function ScheduleBuilder({ user, onNavigate }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
   const now = new Date();
   const currentMonth = ym(now);
   const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
@@ -751,6 +751,7 @@ export default function ScheduleBuilder({ user }: Props) {
         <OpeningHoursEditor value={openingHours} onSaved={(v) => setOpeningHours(v)} />
       ) : tab === 'pevne' ? (
         <FixedAssignmentsManager
+          onNavigate={onNavigate}
           employees={assignable}
           shiftTypes={shiftTypes}
           assignments={fixed}
@@ -1356,6 +1357,7 @@ export default function ScheduleBuilder({ user }: Props) {
       {/* Day modal */}
       {dayModal && (
         <DayModal
+          onNavigate={onNavigate}
           date={dayModal}
           employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
@@ -1843,7 +1845,9 @@ function FixedAssignmentsManager({
   shiftTypes,
   assignments,
   onReload,
+  onNavigate,
 }: {
+  onNavigate?: (view: string, arg?: string) => void;
   employees: Member[];
   shiftTypes: ShiftType[];
   assignments: FixedAssignment[];
@@ -1906,7 +1910,11 @@ function FixedAssignmentsManager({
         </p>
 
         {employees.length === 0 ? (
-          <p className="text-black/45 text-sm">Žádní zaměstnanci v týmu.</p>
+          /* Holá věta je slepá ulička: člověk se dozví, že nikoho nemá,
+             ale ne co s tím. Prázdný stav má vést tam, kde se to spraví. */
+          <EmptyState icon="users" compact title="Zatím nikdo v týmu"
+            hint="Pevné dny se přiřazují lidem — nejdřív je pozvi do týmu."
+            action={onNavigate ? <Button variant="accent" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -2032,6 +2040,7 @@ function FixedAssignmentsManager({
 // ---- Day modal for assigning shifts ----
 function DayModal({
   date,
+  onNavigate,
   employees,
   shifts,
   proposed = [],
@@ -2045,6 +2054,7 @@ function DayModal({
   onRemoveProposed,
   events = [],
 }: {
+  onNavigate?: (view: string, arg?: string) => void;
   date: string;
   employees: Member[];
   shifts: Shift[];
@@ -2240,7 +2250,9 @@ function DayModal({
           <div>
             <label className="block text-sm font-medium text-black/70 mb-2">Zaměstnanec</label>
             {employees.length === 0 ? (
-              <p className="text-black/45 text-sm">Žádní zaměstnanci v týmu.</p>
+              <EmptyState icon="users" compact title="Zatím nikdo v týmu"
+                hint="Směnu je komu přiřadit, až budou v týmu lidé."
+                action={onNavigate ? <Button variant="accent" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
             ) : (
               <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto">
                 {employees.map((e) => {

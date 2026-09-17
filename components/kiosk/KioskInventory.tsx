@@ -3,6 +3,7 @@ import { SearchField } from '../ui';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
+import { EmptyState } from '../ui';
 import KioskPackagedStock from './KioskPackagedStock';
 import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
@@ -201,7 +202,8 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
               <button onClick={() => { setLoading(true); reload(); }} className="rounded-2xl bg-[#16181A] text-white px-5 py-3 text-sm font-bold min-h-[48px] active:scale-[0.99] transition">Zkusit znovu</button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="glass-card p-8 text-center text-black/45">Žádné položky.</div>
+            <div className="glass-card p-4"><EmptyState icon="box" compact title="Žádné položky"
+              hint="V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu." /></div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filtered.map(i => {

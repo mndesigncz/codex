@@ -142,7 +142,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} />;
       case 'shifts':    return (
         <div>
-          <ScheduleBuilder user={user as any} />
+          <ScheduleBuilder user={user as any} onNavigate={navigate} />
           {/* Same horizontal rhythm as ScheduleBuilder's p-6 shell, so nothing
               inside the tab looks wider than its neighbour. */}
           <div className="px-6 pb-6 w-full space-y-4">

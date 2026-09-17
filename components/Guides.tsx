@@ -1037,7 +1037,8 @@ function ManageCategories({
         </div>
 
         <div className="space-y-2 mb-6">
-          {items.length === 0 && <p className="text-black/45 text-sm">Zatím žádné kategorie.</p>}
+          {items.length === 0 && <EmptyState icon="book" compact title="Zatím žádné kategorie"
+            hint="Kategorie třídí návody podle toho, čeho se týkají — příprava, úklid, provoz." />}
           {items.map((c) => (
             <div key={c.id} className="flex items-center gap-2 well border border-black/[0.08] px-3 py-2">
               <span className="text-black/55">
