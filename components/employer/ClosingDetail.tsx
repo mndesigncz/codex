@@ -21,6 +21,7 @@ import {
   movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS,
 } from '@/lib/closing';
 import { dbTimeHM, dbTimeDayHM } from '@/lib/pragueTime';
+import { useModal } from '@/lib/useModal';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -83,6 +84,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
   id: number; onClose: () => void; onChanged?: () => void; payDailyCash?: boolean;
 }) {
   const money = useMoney();
+  // Jediné okno v aplikaci, které si překryv skládalo samo. Mělo sice
+  // `role="dialog"`, ale Escape ho nezavřel, Tab z něj utekl na stránku pod
+  // ním a pozadí se scrollovalo — a je to zrovna to okno, ve kterém se čte
+  // nejvíc čísel. `useModal` řeší fokus, Escape i zámek posouvání.
+  const modal = useModal<HTMLDivElement>(true, onClose, 'Detail uzávěrky');
   const [d, setD] = useState<Detail | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -169,8 +175,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4"
-      onClick={onClose} role="dialog" aria-modal="true" aria-label="Detail uzávěrky">
-      <div className="modal-sheet w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[94vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
+      onClick={onClose}>
+      <div ref={modal.ref} {...modal.dialogProps}
+        className="modal-sheet w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[94vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}>
 
         {/* Hlavička drží datum a rozdíl pořád na očích, i když se scrolluje. */}

@@ -10,6 +10,7 @@ import { signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
 import { useTheme } from '../ThemeProvider';
+import { usePopover } from '@/lib/usePopover';
 
 export interface ClientUser { id: number; name: string; email: string }
 
@@ -29,6 +30,9 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
   useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  // Účet se nezavíral vůbec: ani Escapem, ani kliknutím vedle. Jednou
+  // otevřený zůstal viset přes stránku, dokud se na něj neklikalo znovu.
+  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
   const active = (p: string) => path === p || (p !== '/client' && path?.startsWith(p));
   return (
     <div className="min-h-[100dvh] flex flex-col" style={{ background: 'var(--bg)', color: '#16181A' }}>
@@ -53,14 +57,17 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                   className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'seg-on' : 'seg-off'}`}>Moje</Link>
               )}
               {me ? (
-                <div className="relative ml-1">
-                  <button onClick={() => setOpen(v => !v)} aria-haspopup="menu" aria-expanded={open} title={me.name}
+                <div className="relative ml-1" ref={pop.ref}>
+                  <button ref={pop.triggerRef} onClick={() => setOpen(v => !v)}
+                    onKeyDown={pop.onTriggerKeyDown}
+                    aria-haspopup="menu" aria-expanded={open} title={me.name}
                     className="tap-target flex items-center gap-1.5 rounded-full p-1 sm:pr-2.5 hover:bg-black/[0.05] transition">
                     <Initials name={me.name} size={30} />
                     <Icon name="chevron" size={14} className={`hidden sm:block text-black/45 transition-transform ${open ? 'rotate-180' : ''}`} />
                   </button>
                   {open && (
-                    <div role="menu" className="absolute right-0 mt-2 w-56 glass-strong rounded-2xl border border-black/[0.08] p-1.5 shadow-lg">
+                    <div role="menu" ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown}
+                      className="absolute right-0 mt-2 w-56 glass-strong rounded-2xl border border-black/[0.08] p-1.5 shadow-lg">
                       <div className="px-3 py-2">
                         <p className="text-sm font-semibold truncate">{me.name}</p>
                         <p className="text-xs text-black/50 truncate">{me.email}</p>

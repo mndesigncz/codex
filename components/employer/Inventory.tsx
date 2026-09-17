@@ -22,6 +22,7 @@ import ProductionRecipe from '../inventory/ProductionRecipe';
 import ProductionBoard from '../inventory/ProductionBoard';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useModal } from '@/lib/useModal';
+import { usePopover } from '@/lib/usePopover';
 
 interface Item {
   id: number;
@@ -1519,26 +1520,22 @@ function MoreMenu({
   archivedCount: number; showArchived: boolean; onToggleArchived: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
+  // Escape, kliknutí mimo, šipky i návrat fokusu drží společný `usePopover`
+  // — stejně jako sdílené menu „···", zvonek a účet.
+  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
 
   const row = 'w-full text-left px-3 py-2.5 rounded-xl text-sm flex items-center gap-2.5 transition-colors text-[#16181A] hover:bg-black/[0.04]';
 
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} title="Další"
+    <div ref={pop.ref} className="relative shrink-0">
+      <button ref={pop.triggerRef} type="button" onClick={() => setOpen(o => !o)}
+        onKeyDown={pop.onTriggerKeyDown} aria-haspopup="menu" aria-expanded={open} title="Další"
         className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] w-11 h-11 flex items-center justify-center">
         <Icon name="menu" size={17} className="text-black/50" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
+        <div role="menu" ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown}
+          className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
           <button className={row} onClick={() => { onSelect(); setOpen(false); }} disabled={selecting}>
             <Icon name="check" size={16} className="text-black/40" /> Vybrat více položek
           </button>
@@ -1581,26 +1578,22 @@ function MoreMenu({
 /* ---------- Sort dropdown (custom popover) ---------- */
 function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
+  // Escape, kliknutí mimo, šipky i návrat fokusu drží společný `usePopover`
+  // — stejně jako sdílené menu „···", zvonek a účet.
+  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
   const current = SORTS.find(s => s.key === sort) ?? SORTS[0];
   return (
-    <div ref={ref} className="relative min-w-0">
-      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}
+    <div ref={pop.ref} className="relative min-w-0">
+      <button ref={pop.triggerRef} type="button" onClick={() => setOpen(o => !o)}
+        onKeyDown={pop.onTriggerKeyDown} aria-haspopup="listbox" aria-expanded={open}
         className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 text-sm flex items-center gap-2 font-medium min-w-0 max-w-full">
         <Icon name="swap" size={15} className="text-black/40 shrink-0" />
         <span className="truncate min-w-0">{current.label}</span>
         <Icon name="chevron" size={14} className={`text-black/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div role="listbox" className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
+        <div role="listbox" ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown}
+          className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
           {SORTS.map(s => {
             const active = s.key === sort;
             return (

@@ -9,6 +9,7 @@ import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import { useModal } from '@/lib/useModal';
+import { clickable } from '@/lib/clickable';
 
 interface User {
   id: number;
@@ -347,7 +348,7 @@ export default function Guides({ user }: { user: User }) {
                 return (
                   <div
                     key={g.id}
-                    onClick={() => openReader(g.id)}
+                    {...clickable(() => openReader(g.id), { label: `Otevřít návod ${g.title}` })}
                     className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition duration-300 flex flex-col group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">

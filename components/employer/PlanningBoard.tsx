@@ -255,7 +255,8 @@ export default function PlanningBoard() {
               </div>
 
               {newCard?.column === col.id ? (
-                <div className="bg-black/[0.04] border border-[#C8F542]/30 rounded-2xl p-3 space-y-2">
+                <form onSubmit={e => { e.preventDefault(); if (!adding && newCard.title.trim()) handleAddCard(); }}
+                  className="bg-black/[0.04] border border-[#C8F542]/30 rounded-2xl p-3 space-y-2">
                   <input
                     autoFocus
                     value={newCard.title}
@@ -271,14 +272,14 @@ export default function PlanningBoard() {
                     className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition resize-none"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleAddCard} disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition">
+                    <button type="submit" disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition">
                       {adding ? 'Přidávám…' : 'Přidat'}
                     </button>
-                    <button onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition">
+                    <button type="button" onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition">
                       Zrušit
                     </button>
                   </div>
-                </div>
+                </form>
               ) : (
                 <button
                   onClick={() => setNewCard({ column: col.id, title: '', description: '' })}

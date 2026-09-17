@@ -58,6 +58,10 @@ function itemFactor(item: any): number {
   return UNITS[fam].find(o => o.label === u)?.toBase ?? 1;
 }
 
+// Kolik položek menu se vykreslí najednou. Strop je kvůli výkonu, ale
+// musí být vidět — tiché oříznutí je ztráta dat bez upozornění.
+const LIMIT = 200;
+
 export default function RecipesView({ openProductId, onNavigate }: {
   openProductId?: string;
   onNavigate?: (view: string, arg?: string) => void;
@@ -376,7 +380,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
                 {onlyMissing ? 'Všechno v téhle kategorii má recepturu. 👌' : 'Nic nenalezeno.'}
               </p>
             )}
-            {shown.slice(0, 200).map(p => {
+            {shown.slice(0, LIMIT).map(p => {
               const r = recipeByProduct.get(p.productId);
               const sold = soldByProduct.get(p.productId) ?? 0;
               return (
@@ -414,6 +418,15 @@ export default function RecipesView({ openProductId, onNavigate }: {
                 </button>
               );
             })}
+            {/* Strop tu byl vždycky, jen o něm nikdo nevěděl: podnik s 250
+                položkami menu jich padesát nikdy neuviděl a nikde se to
+                nedozvěděl. Řádek to říká nahlas a rovnou nabídne hledání. */}
+            {shown.length > LIMIT && (
+              <p className="px-4 py-3 text-sm text-black/55 border-t border-black/[0.06] text-pretty">
+                Zobrazeno prvních {LIMIT} z {shown.length} položek.
+                Zbytek najdete přes hledání nahoře, nebo si vyberte kategorii.
+              </p>
+            )}
           </div>
         </>
       )}

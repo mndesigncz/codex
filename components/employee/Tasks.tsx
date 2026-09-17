@@ -206,7 +206,7 @@ export default function Tasks({ user }: Props) {
               </button>
             )
           )}
-          {section('Hotové', done)}
+          {section('Hotové — posledních 20', done)}
           {overdue.length + todayTasks.length + upcomingSoon.length + upcomingLater.length === 0 && (
             <div className="glass-card p-8 text-center"><p className="text-black/45">Vše hotovo. 🎉</p></div>
           )}

@@ -73,3 +73,7 @@ jobs:
       # `transition-all` animuje i rozvržení; na tabletu u kasy to poskakuje.
       - name: Přechody
         run: node scripts/check-transitions.mjs
+      # Tlačítko bez `type` uvnitř <form> formulář odesílá — „Zrušit"
+      # by uložilo místo zahození.
+      - name: Formuláře
+        run: node scripts/check-forms.mjs

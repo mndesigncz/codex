@@ -179,7 +179,7 @@ export default function KioskTasks() {
           {section('Dnes', todayTasks, 'text-[#5B7A08]')}
           {section('Tento týden', thisWeek)}
           {section('Později', later)}
-          {(filter === 'done' || filter === 'all') && section('Hotové', done)}
+          {(filter === 'done' || filter === 'all') && section('Hotové — posledních 30', done)}
         </>
       )}
     </div>

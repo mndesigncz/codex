@@ -56,10 +56,27 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
+  // Kam vrátit fokus po zavření.
+  //
+  // Dřív se to četlo až v efektu, tedy po vykreslení okna — jenže pole
+  // s `autoFocus` si fokus vezme dřív, takže se jako „místo návratu"
+  // uložilo pole uvnitř okna. To se zavřením zmizelo a fokus spadl na
+  // <body>: po Escape začínal další Tab od začátku stránky. Čte se proto
+  // už během vykreslování, kdy okno v DOM ještě není a fokus drží pořád
+  // to tlačítko, kterým se okno otevřelo.
+  //
+  // Pozor na pořadí: zavření okna nejdřív překreslí komponentu a teprve
+  // potom uklidí efekt. Kdyby se uložený prvek mazal při vykreslování,
+  // byl by v okamžiku úklidu už pryč — proto se maže až v úklidu samotném,
+  // hned po tom, co se fokus vrátí.
+  const restoreRef = useRef<HTMLElement | null>(null);
+  if (typeof document !== 'undefined' && open && restoreRef.current === null) {
+    restoreRef.current = document.activeElement as HTMLElement | null;
+  }
+
   useEffect(() => {
     if (!open) return;
     const panel = ref.current;
-    const restoreTo = document.activeElement as HTMLElement | null;
     lockScroll();
 
     const visible = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
@@ -97,7 +114,11 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
       clearTimeout(t);
       document.removeEventListener('keydown', onKey, true);
       unlockScroll();
-      restoreTo?.focus?.({ preventScroll: true });
+      const back = restoreRef.current;
+      restoreRef.current = null;
+      // Prvek, který se mezitím odmontoval (řádek smazaný v okně), fokus
+      // nepřijme — pak je lepší nedělat nic než skočit na <body>.
+      if (back && back.isConnected) back.focus?.({ preventScroll: true });
     };
   }, [open]);
 
