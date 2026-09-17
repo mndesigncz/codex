@@ -640,6 +640,47 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`UPDATE teams SET plan = 'pro' WHERE plan IS NULL`);
+
+    // ---- Stripe předplatné (lib/billing.ts) ----
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS subscription_status TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS subscription_interval TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS subscription_price TEXT`);      // lookup_key ceny
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS trial_end TIMESTAMP`);           // trial ve Stripe (s kartou)
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS had_subscription BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_offer_until TIMESTAMP`);    // Max −30 % po koupi Pro
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS billing_synced_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS referral_code TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS referred_by_team_id INTEGER`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS referral_rewarded BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS teams_referral_code ON teams (referral_code) WHERE referral_code IS NOT NULL`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS teams_stripe_customer ON teams (stripe_customer_id)`);
+    // Týmy z doby před platbami měly Pro se vším (client, pokladna, výroba) —
+    // to je dnes Max. Bez předplatného ve Stripe zůstávají na Max napořád.
+    await ddl(sql`UPDATE teams SET plan = 'max' WHERE plan = 'pro' AND stripe_subscription_id IS NULL AND had_subscription IS NOT TRUE`);
+    // Zpracované události Stripe — webhook je idempotentní.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS billing_events (
+        id TEXT PRIMARY KEY,
+        type TEXT,
+        team_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    // Měsíc zdarma za doporučený podnik, který poprvé zaplatil.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS referral_rewards (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        referred_team_id INTEGER NOT NULL,
+        month TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (referred_team_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS referral_rewards_team ON referral_rewards (team_id, month)`);
     // end-of-shift removal: cash carried out AFTER the drawer was counted
     await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS final_removal INTEGER NOT NULL DEFAULT 0`);
 

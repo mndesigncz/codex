@@ -35,7 +35,7 @@ import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
-import { usePlan } from '../Pro';
+import { usePlan, MaxGate } from '../Pro';
 import { czDays } from '@/lib/plan';
 import { useModal } from '@/lib/useModal';
 
@@ -204,9 +204,11 @@ export default function EmployerLayout({ user }: Props) {
 
   if (appMode === 'client') {
     return (
-      <ProfileLinkProvider>
-        <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} user={user as any} />
-      </ProfileLinkProvider>
+      <MaxGate feature="Managero client" benefit="Věrnost, rezervace a objednávky od stolu pro vaše hosty patří do plánu Max.">
+        <ProfileLinkProvider>
+          <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} user={user as any} />
+        </ProfileLinkProvider>
+      </MaxGate>
     );
   }
 
@@ -321,12 +323,25 @@ export default function EmployerLayout({ user }: Props) {
           <NotificationBell />
         </header>
 
-        {plan?.trialing && (
+        {plan?.pastDue ? (
+          <button onClick={() => setCurrentView('settings')}
+            className="mx-4 mt-3 note note-danger text-left font-medium hover:brightness-95 transition">
+            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />Platba předplatného se nezdařila. Zkontrolujte kartu v Nastavení → Předplatné.
+          </button>
+        ) : plan?.trialing ? (
           <button onClick={() => setCurrentView('settings')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
-            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Zkoušíte Pro — zbývá {czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />
+            {plan.subscriptionStatus === 'trialing'
+              ? `Zkoušíte ${plan.effective === 'max' ? 'Max' : 'Pro'} — zbývá ${czDays(plan.trialDaysLeft)}, potom se strhne první platba.`
+              : `Zkoušíte Pro — zbývá ${czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.`}
           </button>
-        )}
+        ) : plan && plan.effective === 'free' && !plan.hadSubscription ? (
+          <button onClick={() => setCurrentView('settings')}
+            className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Vyzkoušejte Pro 30 dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.
+          </button>
+        ) : null}
         <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-3xl' : 'overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? renderView() : (
             <div className="mx-auto w-full max-w-7xl">{renderView()}</div>

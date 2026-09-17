@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 // a join code (/api/teams/join) or an email invitation (/api/invitations/accept).
 export async function POST(request: Request) {
   try {
-    const { name, email, password, teamName } = await request.json();
+    const { name, email, password, teamName, ref } = await request.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Všechna pole jsou povinná' }, { status: 400 });
@@ -40,19 +40,35 @@ export async function POST(request: Request) {
       if (clash.length === 0) break;
       joinCode = generateJoinCode();
     }
-    // New teams start on the free plan with a full-featured trial.
+    // Nový podnik začíná na plánu Zdarma; 30 dní Pro/Max zdarma si zapne
+    // v Nastavení → Předplatné s kartou (trial ve Stripe). Odkaz ?ref=KÓD
+    // zapíše, kdo ho doporučil — měsíc zdarma dostane, až podnik poprvé zaplatí.
+    let referredBy: number | null = null;
+    if (ref) {
+      try {
+        const { teamByReferralCode } = await import('@/lib/billing');
+        referredBy = await teamByReferralCode(String(ref));
+      } catch { /* před migrací */ }
+    }
     let team: any;
     try {
       [team] = await sql`
-        INSERT INTO teams (name, owner_id, join_code, plan, trial_ends_at)
-        VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode}, 'free', NOW() + INTERVAL '30 days')
+        INSERT INTO teams (name, owner_id, join_code, plan, referred_by_team_id)
+        VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode}, 'free', ${referredBy})
         RETURNING id, join_code`;
     } catch {
+     try {
+      [team] = await sql`
+        INSERT INTO teams (name, owner_id, join_code, plan)
+        VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode}, 'free')
+        RETURNING id, join_code`;
+     } catch {
       // plan columns not migrated yet
       [team] = await sql`
         INSERT INTO teams (name, owner_id, join_code)
         VALUES (${teamName || `Podnik ${name}`}, ${user.id}, ${joinCode})
         RETURNING id, join_code`;
+     }
     }
 
     // Link owner to team

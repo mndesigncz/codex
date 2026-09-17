@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { getConnection, verifyConnection } from '@/lib/storyous';
 import { runFullSync, rememberStock } from '@/lib/posMirror';
 import { audit } from '@/lib/audit';
+import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -40,6 +41,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
   const b = await req.json().catch(() => ({}));
   const clientId = String(b.clientId ?? '').trim();
   const clientSecret = String(b.clientSecret ?? '').trim();

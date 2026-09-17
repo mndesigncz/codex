@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, employer, ensureProfile, slugify, publicProfile } from '@/lib/client';
 import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
+import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
   const b = await req.json().catch(() => ({}));
   const cur = await ensureProfile(u.team_id);
   const slug = b.slug != null ? slugify(b.slug) : cur.slug;

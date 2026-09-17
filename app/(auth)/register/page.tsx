@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -18,7 +18,16 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [ref, setRef] = useState('');
   const router = useRouter();
+  // Affiliate odkaz /register?ref=KÓD — kód si pamatujeme i přes obnovení stránky.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('ref');
+      if (q) { localStorage.setItem('managero-ref', q); setRef(q); }
+      else setRef(localStorage.getItem('managero-ref') ?? '');
+    } catch { /* ignore */ }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +40,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, teamName }),
+        body: JSON.stringify({ name, email, password, teamName, ref: ref || undefined }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Chyba při registraci.'); setIsLoading(false); return; }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LogoMark, Icon } from '@/components/Icons';
-import { PLAN_FEATURES, PRO_PRICE, TRIAL_DAYS } from '@/lib/plan';
+import { TRIAL_DAYS } from '@/lib/plan';
+import Pricing from './Pricing';
 
 // Public storefront for logged-out visitors — what Managero is, what it does,
 // and what it will cost. Signed-in users never see this (they're redirected
@@ -15,11 +16,6 @@ const FEATURES: { icon: string; title: string; text: string }[] = [
   { icon: 'leaf', title: 'Sdílené menu pro zákazníky', text: 'Odkaz s aktuální nabídkou ve vašich barvách a s logem — bez cen a stavů skladu.' },
 ];
 
-function Cell({ v }: { v: string | boolean }) {
-  if (v === true) return <Icon name="check" size={16} className="text-[#5B7A08] inline-block" />;
-  if (v === false) return <span className="text-black/25">—</span>;
-  return <>{v}</>;
-}
 
 export default function Landing() {
   return (
@@ -115,59 +111,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section id="cenik" className="max-w-4xl mx-auto px-5 sm:px-8 pb-16">
-        {/* Nadpis vlevo nad souměrnými kartami — stránka drží těžiště vlevo od
-            hero až dolů, ceník se nevrací do středu jako u šablon. */}
-        <div className="max-w-xl">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A]">Jednoduchý ceník</h2>
-          <p className="mt-2 text-sm text-black/55 text-pretty">
-            Během beta období je všechno odemčené zdarma. Nový podnik navíc dostane {TRIAL_DAYS} dní plné verze.
-          </p>
-        </div>
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-          <div className="glass-card p-7 flex flex-col">
-            <h3 className="t-card">Zdarma</h3>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">0 Kč</p>
-            <p className="text-xs text-black/40 mt-1">navždy</p>
-            <p className="mt-4 text-sm text-black/55">Základ pro malý tým: směny, úkoly, chat, uzávěrky a sklad.</p>
-            <Link href="/register" className="mt-6 rounded-full glass border border-black/[0.08] px-6 py-3 text-sm font-semibold text-black/70 hover:text-black transition-colors text-center">
-              Začít zdarma
-            </Link>
-          </div>
-          <div className="glass-card p-7 flex flex-col relative overflow-hidden border-2 !border-[#C8F542]/60">
-            <span className="absolute top-4 right-4 rounded-full bg-[#C8F542] text-black text-[11px] font-bold uppercase tracking-wider px-2.5 py-1">Doporučeno</span>
-            <h3 className="t-card">Pro</h3>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">{PRO_PRICE.monthly} {PRO_PRICE.currency}</p>
-            <p className="text-xs text-black/40 mt-1">{PRO_PRICE.per}</p>
-            <p className="mt-4 text-sm text-black/55">Všechno bez limitů: neomezený tým, kiosk pro tablet, odměny, exporty a sdílené menu ve vašich barvách.</p>
-            <Link href="/register" className="mt-6 btn btn-primary hover:bg-black transition-colors text-center">
-              Vyzkoušet {TRIAL_DAYS} dní zdarma
-            </Link>
-          </div>
-        </div>
-
-        {/* Comparison */}
-        <div className="glass-card p-6 mt-6 overflow-x-auto">
-          <table className="w-full text-sm min-w-[440px]">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-black/40">
-                <th className="py-2 pr-3 font-semibold">Funkce</th>
-                <th className="py-2 px-3 font-semibold w-28">Zdarma</th>
-                <th className="py-2 pl-3 font-semibold w-44 text-[#5B7A08]">Pro</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/[0.06]">
-              {PLAN_FEATURES.map(f => (
-                <tr key={f.label}>
-                  <td className="py-2.5 pr-3 text-[#16181A]">{f.label}</td>
-                  <td className="py-2.5 px-3 text-black/55"><Cell v={f.free} /></td>
-                  <td className="py-2.5 pl-3 text-black/70"><Cell v={f.pro} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <Pricing />
 
       {/* Footer */}
       <footer className="border-t border-black/[0.06]">
