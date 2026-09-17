@@ -105,7 +105,10 @@ function KioskShell({ user }: { user: KioskUser }) {
       </header>
 
       {/* Tabs — big touch targets for a shared tablet */}
-      <nav className="mt-5 flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+      {/* Na tabletu se záložky zalomí místo scrollování: 882 px pásu se do
+          712 px nevešlo a poslední („Uzávěrka") byla uříznutá bez jakéhokoli
+          náznaku, že tam ještě něco je. U baru se nehledá posuvník. */}
+      <nav className="mt-5 flex gap-1.5 flex-wrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-thin -mx-1 px-1">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
@@ -253,7 +256,10 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
         </div>
       )}
       {roster.length > 0 && (
-        <div className="glass-card p-5">
+        /* Všechny ostatní karty téhle mřížky mají md:col-span-2, takže je
+           fakticky jednosloupcová. Bez toho zůstaly „Dnešní směny" na
+           tabletu poloviční a vedle nich díra. */
+        <div className="md:col-span-2 glass-card p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Dnešní směny</p>
           <div className="space-y-2">
             {roster.map((r: any) => (
