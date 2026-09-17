@@ -813,9 +813,13 @@ export default function ScheduleBuilder({ user }: Props) {
                       <span className="text-lg opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{e.name}</span>
-                        <span className="block text-[11px] uppercase tracking-wide text-black/30">
-                          {e.role === 'employer' ? 'vedení · ' : ''}čeká na vyplnění · vyplnit za něj
+                        {/* Verzálky jsou na krátký štítek, ne na větu. Tahle
+                            se na 1280 px lámala na dva řádky a četla se jako
+                            křik. Stav zůstává štítkem, výzva k akci je věta. */}
+                        <span className="block t-meta truncate">
+                          {e.role === 'employer' ? 'Vedení · ' : ''}Čeká na vyplnění
                         </span>
+                        <span className="block text-[11px] text-[#5B7A08] font-semibold">Vyplnit za něj</span>
                       </span>
                     </button>
                   ))}
@@ -2202,7 +2206,8 @@ function DayModal({
         {/* Auto-generated proposal for this day — the review the calendar icons can't give. */}
         {proposed.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#5B7A08] font-semibold"><Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Navržené směny (náhled — zatím neuloženo)</p>
+            {/* Věta v závorce není štítek — verzálky z ní dělají křik. */}
+          <p className="text-[13px] text-[#5B7A08] font-semibold"><Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />Navržené směny <span className="font-medium text-black/50">— náhled, zatím neuloženo</span></p>
             {proposed.map((p, idx) => (
               <div key={`prop-${idx}`} className="flex items-center gap-3 rounded-2xl border border-dashed border-[#5B7A08]/50 bg-[#C8F542]/[0.08] px-3 py-2">
                 <span className="text-lg flex-shrink-0">{p.employeeAvatar}</span>
