@@ -55,3 +55,7 @@ jobs:
       # Kontrast se měří v prohlížeči; tohle hlídá jen to, co je vidět ze zdroje.
       - name: Čitelnost textu
         run: node scripts/check-contrast-classes.mjs
+      # Tichý catch u načítání = obrazovka zaseknutá na skeletonu napořád.
+      # Po výpadku sítě to vypadá jako rozbitá aplikace, i když jde o vteřinu.
+      - name: Poctivé načítání
+        run: node scripts/check-silent-load.mjs

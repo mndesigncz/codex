@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Segmented, EmptyState, Skeleton } from '../ui';
+import { Button, Segmented, EmptyState, Skeleton, ErrorState } from '../ui';
 import { Initials } from './ClientShell';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
@@ -34,9 +34,19 @@ async function j(url: string, init?: RequestInit) {
 /** Společný háček na profil: pravidla věrnosti se nastavují na víc místech. */
 function useProfile() {
   const [p, setP] = useState<any | null>(null);
-  const load = useCallback(() => fetch('/api/client/admin/profile').then(r => r.json()).then(d => setP(d.profile)).catch(() => {}), []);
+  // Bez `error` tu mlčky selhalo načtení profilu a celá Věrnost zůstala
+  // viset na skeletonu — obrazovka, která se nikdy nedonačte, vypadá
+  // hůř než obrazovka, která přizná chybu.
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setError(null);
+    return fetch('/api/client/admin/profile')
+      .then(r => { if (!r.ok) throw new Error(`Server odpověděl ${r.status}`); return r.json(); })
+      .then(d => { if (!d?.profile) throw new Error('Profil podniku se nepodařilo přečíst'); setP(d.profile); })
+      .catch((e: any) => setError(e?.message || 'Načtení se nepovedlo'));
+  }, []);
   useEffect(() => { load(); }, [load]);
-  return { p, setP, reload: load };
+  return { p, setP, reload: load, error };
 }
 
 function Tile({ icon, label: lb, value, unit, tone = 'ok' }: { icon: string; label: string; value: number | string; unit?: string; tone?: 'ok' | 'muted' | 'wait' }) {
@@ -89,7 +99,7 @@ function Spark({ title, data, days }: { title: string; data: number[]; days: str
 
 function Overview({ go }: { go: (s: LoyaltySub) => void }) {
   const [d, setD] = useState<any | null>(null);
-  const { p, setP } = useProfile();
+  const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
   useEffect(() => { fetch('/api/client/admin/loyalty').then(r => r.json()).then(setD).catch(() => setD({ summary: null, recent: [] })); }, []);
   const toggle = async () => {
@@ -97,6 +107,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
     try { const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: !p.loyalty_on }) }); setP(r.profile); } catch { /* tichá chyba, stav se nezmění */ }
     setBusy(false);
   };
+  if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
   if (!d || !p) return <Skeleton className="h-64 rounded-3xl" />;
   const s = d.summary ?? {};
   return (
@@ -169,8 +180,9 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
 // ---- Body -----------------------------------------------------------------------
 
 function Points({ toast }: { toast: (m: string) => void }) {
-  const { p, setP } = useProfile();
+  const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
+  if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
   if (!p) return <Skeleton className="h-64 rounded-3xl" />;
   const save = async () => {
     setBusy(true);
@@ -702,8 +714,9 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
 // ---- Slevy a úrovně -------------------------------------------------------------
 
 function Tiers({ toast }: { toast: (m: string) => void }) {
-  const { p, setP } = useProfile();
+  const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
+  if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
   if (!p) return <Skeleton className="h-64 rounded-3xl" />;
   const save = async () => {
     setBusy(true);

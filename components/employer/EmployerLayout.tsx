@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar } from '../ui';
+import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
 import ChatView from '../chat/ChatView';
 import MessengerDock from '../chat/MessengerDock';
@@ -343,8 +343,12 @@ export default function EmployerLayout({ user }: Props) {
           </button>
         ) : null}
         <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-3xl' : 'overflow-y-auto scrollbar-thin'}`}>
-          {currentView === 'chat' ? renderView() : (
-            <div className="mx-auto w-full max-w-7xl">{renderView()}</div>
+          {currentView === 'chat' ? (
+            <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
+          ) : (
+            <div className="mx-auto w-full max-w-7xl">
+              <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
+            </div>
           )}
         </main>
       </div>
