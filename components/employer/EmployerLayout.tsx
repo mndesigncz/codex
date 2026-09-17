@@ -362,7 +362,9 @@ export default function EmployerLayout({ user }: Props) {
         </main>
       </div>
 
-      <MessengerDock user={user as any} />
+      {/* Na obrazovce Chatu plovoucí tlačítko nedává smysl — otevírá
+          přesně to, co má člověk otevřené pod ním. */}
+      {currentView !== 'chat' && <MessengerDock user={user as any} />}
 
       {/* Mobile bottom dock */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">

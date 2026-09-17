@@ -197,7 +197,9 @@ export default function EmployeeLayout({ user }: Props) {
         </main>
       </div>
 
-      <MessengerDock user={user as any} />
+      {/* Na obrazovce Chatu plovoucí tlačítko nedává smysl — otevírá
+          přesně to, co má člověk otevřené pod ním. */}
+      {currentView !== 'chat' && <MessengerDock user={user as any} />}
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
         <nav className="glass-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">

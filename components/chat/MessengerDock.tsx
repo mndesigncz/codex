@@ -159,7 +159,9 @@ function ConversationPopover({
                 </span>
               </div>
               <span className="text-sm text-black/45 truncate block">
-                {c.lastMessage ?? 'Zatím žádné zprávy'}
+                {c.lastMessage === 'Příloha'
+              ? <span className="inline-flex items-center gap-1"><Icon name="clipboard" size={13} className="shrink-0 opacity-70" />Příloha</span>
+              : (c.lastMessage ?? 'Zatím žádné zprávy')}
               </span>
             </div>
             {c.unreadCount > 0 && (

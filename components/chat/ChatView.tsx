@@ -121,7 +121,9 @@ function ConversationRow({
             takže náhled dostal řádky dva. */}
         <div className="flex items-start justify-between gap-2">
           <span className="min-w-0 flex-1 text-sm text-black/45 line-clamp-2">
-            {conv.lastMessage ?? 'Zatím žádné zprávy'}
+            {conv.lastMessage === 'Příloha'
+              ? <span className="inline-flex items-center gap-1"><Icon name="clipboard" size={13} className="shrink-0 opacity-70" />Příloha</span>
+              : (conv.lastMessage ?? 'Zatím žádné zprávy')}
           </span>
           {conv.unreadCount > 0 && (
             <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-[#C8F542] text-black text-[11px] font-semibold flex items-center justify-center">
