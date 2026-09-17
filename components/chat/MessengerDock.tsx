@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/Icons';
-import { EmptyState } from '../ui';
+import { EmptyState, Button } from '../ui';
 import { MessageBubble } from './ChatView';
+import NewConversation from './NewConversation';
 import {
   Conversation,
   useConversations,
@@ -26,6 +27,7 @@ export default function MessengerDock({ user }: Props) {
   const { conversations, refresh, setConversations } = useConversations();
   const [openIds, setOpenIds] = useState<number[]>([]);
   const [listOpen, setListOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
 
   const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0);
 
@@ -78,6 +80,7 @@ export default function MessengerDock({ user }: Props) {
             <ConversationPopover
               conversations={conversations}
               onPick={openWindow}
+              onNew={() => { setListOpen(false); setNewOpen(true); }}
               onClose={() => setListOpen(false)}
             />
           )}
@@ -95,6 +98,14 @@ export default function MessengerDock({ user }: Props) {
           </button>
         </div>
       </div>
+
+      <NewConversation
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        meId={meId}
+        conversations={conversations}
+        onOpened={(id) => { refresh(); openWindow(id); }}
+      />
     </div>
   );
 }
@@ -123,28 +134,41 @@ function ConvAvatar({ conv, size = 40 }: { conv: Conversation; size?: number }) 
 function ConversationPopover({
   conversations,
   onPick,
+  onNew,
   onClose,
 }: {
   conversations: Conversation[];
   onPick: (id: number) => void;
+  onNew: () => void;
   onClose: () => void;
 }) {
   return (
     <div className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(70vh,calc(100dvh-200px))] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]">
       <div className="px-4 py-3 flex items-center justify-between border-b border-black/[0.06]">
         <span className="font-semibold text-[#16181A]">Zprávy</span>
-        <button
-          onClick={onClose}
-          className="text-black/55 hover:text-black p-1"
-          aria-label="Zavřít"
-        >
-          <CloseIcon />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onNew}
+            className="btn-icon"
+            aria-label="Nová zpráva"
+            title="Nová zpráva"
+          >
+            <Icon name="plus" size={16} />
+          </button>
+          <button
+            onClick={onClose}
+            className="text-black/55 hover:text-black p-1"
+            aria-label="Zavřít"
+          >
+            <CloseIcon />
+          </button>
+        </div>
       </div>
       <div className="overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
         {conversations.length === 0 && (
           <div className="p-2"><EmptyState icon="chat" compact title="Žádné konverzace"
-            hint="Napiš celému týmu, nebo si vyber člověka a začni konverzaci." /></div>
+            hint="Vyberte kolegu a napište mu — vlákno vznikne samo."
+            action={<Button icon="plus" onClick={onNew}>Nová zpráva</Button>} /></div>
         )}
         {conversations.map((c) => (
           <button

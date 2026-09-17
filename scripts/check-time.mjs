@@ -24,9 +24,16 @@ const BAD = /new Date\(\s*(?:Date\.now\(\)[^)]*)?\)\s*\.toISOString\(\)\s*\.(?:s
 // do formuláře a uloží, posune se záznam o dvě hodiny při každé editaci.
 //
 // Použij parseDbTime() / dbTimeHM() / dbTimeDayHM() z lib/pragueTime.
-const BAD_TZ = /new Date\([^)]*\)\s*\.toLocale(?:Time)?String\(/;
+// Nejen `new Date(x).toLocale…`, ale i proměnná, která Date drží: právě takhle
+// vypadal čas u zprávy v chatu — `const d = new Date(iso)` o řádek výš, takže
+// starší, užší podoba téhle kontroly to neviděla.
+const BAD_TZ = /(?:new Date\([^)]*\)|\b[A-Za-z_$][\w$]*)\s*\.toLocale(?:Time)?String\(/;
 const HAS_HOUR = /hour:\s*'2-digit'/;
 const HAS_TZ = /timeZone:/;
+// Třetí rodina: porovnávání dnů přes toDateString(). Je to den podle hodin
+// prohlížeče, takže po půlnoci v Praze (ještě včerejšek v UTC) vyjde jiný
+// den než ze `pragueToday()` — a obrazovka si pak sama sobě odporuje.
+const BAD_DAY = /\.toDateString\(\)/;
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -38,6 +45,7 @@ function* walk(dir) {
 
 const hits = [];
 const tzHits = [];
+const dayHits = [];
 for (const root of ROOTS) {
   for (const file of walk(root)) {
     const rel = relative('.', file);
@@ -49,6 +57,7 @@ for (const root of ROOTS) {
           && !/new Date\(\s*\)/.test(line)) {
         tzHits.push(`${rel}:${i + 1}  ${line.trim().slice(0, 110)}`);
       }
+      if (BAD_DAY.test(line)) dayHits.push(`${rel}:${i + 1}  ${line.trim().slice(0, 110)}`);
     });
   }
 }
@@ -65,6 +74,13 @@ if (tzHits.length) {
   console.error('Postgres posílá TIMESTAMP bez značky zóny, takže prohlížeč UTC hodnotu vezme jako místní čas.\n');
   for (const h of tzHits) console.error('  ' + h);
   console.error(`\n${tzHits.length} ${tzHits.length === 1 ? 'místo' : 'míst'} k opravě.\n`);
+  process.exit(1);
+}
+if (dayHits.length) {
+  console.error('\nDen se nesmí porovnávat přes toDateString() — je to den podle hodin prohlížeče.');
+  console.error('Použij pragueToday()/pragueDaySafe() z lib/pragueTime, ať obrazovka neříká dvě věci najednou.\n');
+  for (const h of dayHits) console.error('  ' + h);
+  console.error(`\n${dayHits.length} ${dayHits.length === 1 ? 'místo' : 'míst'} k opravě.\n`);
   process.exit(1);
 }
 console.log('check-time: v pořádku — obchodní den i zobrazený čas drží pražskou zónu.');

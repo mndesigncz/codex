@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 
 export interface ChatUser {
   id: number;
@@ -67,6 +68,24 @@ export async function sendMessage(
   return data.message ?? null;
 }
 
+/**
+ * Najde nebo založí přímou konverzaci s kolegou.
+ *
+ * Endpoint tu byl od začátku, ale nic v aplikaci ho nevolalo — chat se tím
+ * scvrkl na jediný týmový kanál a „napsat Petrovi" nešlo odnikud. Tohle je
+ * ta chybějící polovina.
+ */
+export async function startDirect(otherUserId: number): Promise<number | null> {
+  const res = await fetch('/api/conversations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ otherUserId }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return typeof data?.id === 'number' ? data.id : null;
+}
+
 export async function markRead(conversationId: number): Promise<void> {
   try {
     await fetch(`/api/conversations/${conversationId}/read`, { method: 'POST' });
@@ -87,18 +106,52 @@ export async function uploadFile(file: File): Promise<UploadResult | null> {
   return (await res.json()) as UploadResult;
 }
 
+/**
+ * Čas u zprávy — vždy podle pražských hodin na zdi.
+ *
+ * Dřív se den i hodina braly z hodin prohlížeče. U uzávěrky po půlnoci to
+ * znamenalo, že zpráva z 23:50 dostala u bubliny „dnešní" hodinu a nad ní
+ * oddělovač „Včera" — dvě různé odpovědi na tutéž otázku v jedné obrazovce.
+ * Zbytek aplikace kvůli tomu má `lib/pragueTime`; chat na něj byl zapomenutý.
+ */
 export function formatTime(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) {
-    return d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  if (Number.isNaN(d.getTime())) return '';
+  const key = pragueDaySafe(d);
+  if (key === pragueToday()) {
+    return d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
   }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Včera';
-  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+  if (key === pragueToday(-1)) return 'Včera';
+  return d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric' });
+}
+
+/** Jen hodina a minuta, pražsky. Ve vlákně s oddělovači dnů den říká čára. */
+export function formatClock(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+}
+
+/** Den zprávy jako klíč — pro oddělovače ve vlákně. Pražský, jako všude. */
+export function dayKey(iso: string): string {
+  return pragueDaySafe(iso);
+}
+
+/** „Dnes" / „Včera" / „pondělí 14. 4." — hlavička dne ve vlákně. */
+export function dayLabel(iso: string): string {
+  const key = dayKey(iso);
+  if (key === pragueToday()) return 'Dnes';
+  if (key === pragueToday(-1)) return 'Včera';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const sameYear = key.slice(0, 4) === pragueToday().slice(0, 4);
+  return d.toLocaleDateString('cs-CZ', {
+    timeZone: 'Europe/Prague',
+    weekday: 'long', day: 'numeric', month: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
 }
 
 // Hook: load conversation list and poll it.

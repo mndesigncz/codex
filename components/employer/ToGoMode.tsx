@@ -12,6 +12,7 @@ import { useMoney } from '../CurrencyProvider';
 import { useTheme } from '../ThemeProvider';
 import ReceiptsPanel from './ReceiptsPanel';
 import ProductionBoard from '../inventory/ProductionBoard';
+import { useConversations } from '../chat/useChat';
 
 function pragueToday(offset = 0): string {
   return new Date(Date.now() + offset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
@@ -21,8 +22,8 @@ const DAY_LETTERS = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
 export default function ToGoMode({ user, onExit, onOpenView }: {
   user: { name?: string };
   onExit: () => void;
-  /** Jump straight to a view in the full administration. */
-  onOpenView: (view: string) => void;
+  /** Jump straight to a view in the full administration; `arg` upřesní cíl (id konverzace…). */
+  onOpenView: (view: string, arg?: string) => void;
 }) {
   const money = useMoney();
   // TO GO je nakreslené natvrdo ve světlých barvách (bg-[#F1F4EC], text-[#16181A]).
@@ -90,7 +91,19 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const greeting = hour < 10 ? 'Dobré ráno' : hour < 18 ? 'Hezký den' : 'Dobrý večer';
   const firstName = (user?.name ?? '').split(' ')[0];
 
+  // Chat v režimu TO GO úplně chyběl — a přitom je to ten režim, který se
+  // otevírá na telefonu. Šest dlaždic hlásilo, co potřebuje pozornost,
+  // jen zprávy ne.
+  const { conversations: chatConvs } = useConversations();
+  const unreadChat = chatConvs.reduce((n, c) => n + (c.unreadCount || 0), 0);
+  const newestUnread = chatConvs.filter(c => (c.unreadCount || 0) > 0)
+    .sort((a, b) => String(b.lastTime ?? '').localeCompare(String(a.lastTime ?? '')))[0] ?? null;
+
+  // Zprávy jdou první. Sedm dlaždic ve třech sloupcích nechá jednu samotnou
+  // na posledním řádku; ať je to Finance, na které se kouká jednou za měsíc,
+  // a ne chat, kvůli kterému člověk telefon vytáhl.
   const tiles = [
+    { view: 'chat', icon: 'chat', label: 'Zprávy', badge: unreadChat || null, badgeTone: 'seg-on' },
     { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'seg-on' },
     { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' }, // zásoby jsou varování, ne počet
     { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
@@ -227,6 +240,41 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             </button>
           ))}
         </div>
+
+        {/* Poslední nepřečtená — dlaždice řekne „3", tohle řekne od koho a co.
+            Na telefonu je to jediné místo, kde se člověk dozví obsah zprávy,
+            aniž by musel chat otevřít a vlákno v něm hledat. */}
+        {newestUnread && (
+          <button onClick={() => onOpenView('chat', String(newestUnread.id))}
+            className="w-full glass-card rounded-3xl p-4 text-left active:scale-[0.99] transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="t-label text-[#5B7A08] flex items-center gap-1.5">
+                <Icon name="chat" size={14} strokeWidth={2} /> Nepřečtená zpráva
+              </p>
+              <span className="text-[11px] font-bold text-black/35">
+                {unreadChat > 1 ? `${unreadChat} celkem →` : 'Otevřít →'}
+              </span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              {newestUnread.type === 'team' ? (
+                <span className="h-9 w-9 shrink-0 rounded-full bg-[#C8F542]/25 text-[#5B7A08] flex items-center justify-center">
+                  <Icon name="users" size={18} />
+                </span>
+              ) : (
+                <Avatar emoji={newestUnread.avatar} size="sm" />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-[#16181A] truncate">{newestUnread.name}</span>
+                <span className="block text-[13px] text-black/50 line-clamp-2">
+                  {newestUnread.lastMessage ?? 'Nová zpráva'}
+                </span>
+              </span>
+              <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-[#C8F542] text-black text-[11px] font-extrabold flex items-center justify-center tabular-nums">
+                {newestUnread.unreadCount}
+              </span>
+            </div>
+          </button>
+        )}
 
         {/* Low stock — the three most urgent, actionable */}
         {lowItems.length > 0 && (

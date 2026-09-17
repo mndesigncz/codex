@@ -184,11 +184,39 @@ horizontálních přetečení a chyb v konzoli na všech obrazovkách.
 - **Tablet (768–1024)**: postranní menu se zužuje na ikony, obsah drží
   dvousloupcové karty; kiosk běží na plné šířce s pilulkovou navigací.
 
+## Oznámení a odznaky
+
+Když něco čeká, musí to být vidět tam, kam se člověk dívá — ne až uvnitř
+té sekce. Chat byl toho opakem: nepřečtené zprávy se počítaly jen ve svém
+vlastním seznamu, takže jediný způsob, jak se o nich dozvědět, bylo chat
+otevřít.
+
+- **Odznak patří na navigaci, ne jen dovnitř.** Dolní dok i dlaždice
+  v TO GO nesou počet u ikony; sekce bez odznaku znamená „nic nečeká".
+- **Tvar odznaku je jeden.** Kulatý, tmavý s limetkovým číslem, prstenec
+  v barvě pozadí, `tabular-nums`, nejmíň 11 px; přes devět `9+`.
+  Oranžový odznak je vyhrazen varování (dochází zásoba), ne počtu.
+- **Odznak sám nestačí, když jde o text.** Číslo řekne „tři", ale ne
+  „od koho a co". Kde se to vejde, doplní ho karta s odesílatelem
+  a úryvkem, která klepnutím otevře přímo tu věc — ne jen její seznam.
+- **Proklik míří na konkrétní položku.** `navigate('chat', id)` otevře to
+  vlákno; vysypat člověka na seznam, ve kterém musí hledat znovu, je
+  polovina prokliku.
+
+## Čas ve vláknech a záznamech
+
+- **Den říká oddělovač, bublina říká hodinu.** Dlouhé vlákno dostane nad
+  každým dnem čáru (`Dnes`, `Včera`, `pondělí 14. 4.`); zpráva pod ní pak
+  píše jen `HH:MM`. Datum v obojím je totéž řečené dvakrát.
+- **Všechno přes `lib/pragueTime`.** Den z hodin prohlížeče a den z Prahy
+  se mezi půlnocí a druhou ranní liší — a obrazovka si pak sama odporuje
+  („17:40" v bublině pod čarou „Včera"). Hlídá `check-time`.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
 pilulky, panely a štítky místo `.btn`/`.note`/`.t-label`; nové rádiusy
 mimo tři tokeny; nové barvy mimo paletu; Title Case v češtině; `capitalize`
-na datech; `String(date).slice` místo pragueTime; písmo pod 11 px;
+na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod 11 px;
 `transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
 blur mimo plovoucí lištu, dock a topbar.
