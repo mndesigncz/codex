@@ -65,7 +65,7 @@ export function ProduceModal({ entry, onClose, onDone }: { entry: ToMake; onClos
             <h3 className="t-card truncate">Vyrobeno: {entry.item.name}</h3>
             <p className="t-meta">Naskladní se dávka a suroviny se odepíšou.</p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="well p-4 flex items-center justify-between gap-3">

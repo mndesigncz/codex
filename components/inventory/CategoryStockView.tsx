@@ -44,12 +44,12 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
       {onStep ? (
         <div className="flex items-center gap-1.5">
           <button onClick={() => onStep(item, -1)} disabled={item.quantity <= 0} title="Ubrat zavřené balení"
-            className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none disabled:opacity-30">−</button>
+            className="tap-target btn-icon disabled:opacity-30">−</button>
           <span className="text-base font-bold text-[#16181A] tabular-nums min-w-[3.5rem] text-center">
             {item.quantity} <span className="text-[11px] font-medium text-black/45">{item.unit}</span>
           </span>
           <button onClick={() => onStep(item, 1)} title="Přidat zavřené balení"
-            className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+            className="tap-target btn-icon">+</button>
         </div>
       ) : <span />}
       <div className="flex items-center gap-1">
@@ -59,11 +59,11 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
         )}
         {onEditItem && (
           <button onClick={() => onEditItem(item)} title="Upravit položku"
-            className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
+            className="tap-target btn-icon text-sm"><Icon name="pencil" size={15} /></button>
         )}
         {onRemoveItem && (
           <button onClick={() => onRemoveItem(item)} title="Smazat položku"
-            className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
+            className="tap-target btn-icon btn-icon-danger text-sm"><Icon name="close" size={15} /></button>
         )}
       </div>
     </div>
@@ -215,7 +215,7 @@ export default function CategoryStockView({
             <button key={m} onClick={() => setMode(m)}
               disabled={m === 'edit' && !canEdit}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition disabled:opacity-40 ${
-                mode === m ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                mode === m ? 'seg-on' : 'seg-off'
               }`}>
               {label}
             </button>
@@ -230,7 +230,7 @@ export default function CategoryStockView({
           {(parkedCount > 0 || showParked) && (
             <button onClick={() => setShowParked(v => !v)}
               className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition ${
-                showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                showParked ? 'seg-on' : 'seg-off glass'
               }`}>
               {showParked ? 'Zpět na skladem' : `Nevedeme (${parkedCount})`}
             </button>

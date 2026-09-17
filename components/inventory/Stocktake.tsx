@@ -148,7 +148,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="t-card"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Inventura skladu</h3>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
@@ -156,7 +156,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
 
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+            <div className="spinner" />
           </div>
         ) : !open ? (
           <div className="mt-4 space-y-5">

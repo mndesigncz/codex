@@ -196,11 +196,11 @@ export default function FinanceView() {
         primary={<Button onClick={() => (pro ? setExportOpen(true) : setUpgradeFor('Export pro účetní'))} variant="accent" icon="download">Export pro účetní</Button>}
         aside={
           <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-fit">
-            <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
+            <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="tap-target btn-icon">
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
             <span className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold cz-sentence text-[#16181A] truncate">{monthLabel(month)}</span>
-            <button onClick={() => shiftMonth(1)} aria-label="Další měsíc" className="tap-target h-9 w-9 grid place-items-center rounded-full text-black/55 hover:text-black hover:bg-black/[0.06] transition">
+            <button onClick={() => shiftMonth(1)} aria-label="Další měsíc" className="tap-target btn-icon">
               <Icon name="chevron" size={16} className="-rotate-90" />
             </button>
           </div>
@@ -209,7 +209,7 @@ export default function FinanceView() {
 
       {loading ? (
         <div className="flex items-center justify-center h-56">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : !s ? (
         <div className="glass-card p-8 text-center text-black/45">Data se nepodařilo načíst.</div>
@@ -388,7 +388,7 @@ export default function FinanceView() {
                 {[['all', 'Vše'], ['receipt', 'Účtenky'], ['order', 'Objednávky'], ['expense', 'Z kasy'], ['wage', 'Výplaty']].map(([id, label]) => (
                   <button key={id} onClick={() => setFilter(id)}
                     className={`tap-target-sm shrink-0 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${
-                      filter === id ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                      filter === id ? 'seg-on' : 'seg-off'
                     }`}>{label}</button>
                 ))}
               </div>
@@ -435,7 +435,7 @@ export default function FinanceView() {
               <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> {detail.label}
               </h3>
-              <button aria-label="Zavřít" onClick={() => setDetail(null)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" onClick={() => setDetail(null)} className="btn-icon"><Icon name="close" size={15} /></button>
             </div>
             <p className="text-sm text-black/50">
               {new Date(detail.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}

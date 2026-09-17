@@ -47,10 +47,10 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                   aplikace; nahoře zůstává jen značka a účet. Nepřihlášený
                   dock nemá, tak mu odkaz Podniky zůstává i na telefonu. */}
               <Link href="/client" aria-current={active('/client') && path === '/client' ? 'page' : undefined}
-                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>Podniky</Link>
+                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'seg-on' : 'seg-off'}`}>Podniky</Link>
               {me && (
                 <Link href="/client/me" aria-current={active('/client/me') ? 'page' : undefined}
-                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'bg-[#16181A] text-white' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'}`}>Moje</Link>
+                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'seg-on' : 'seg-off'}`}>Moje</Link>
               )}
               {me ? (
                 <div className="relative ml-1">

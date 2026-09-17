@@ -43,7 +43,7 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
     return (
       <button key={item.id} onClick={() => { onSelect(item.id); onClose(); }}
         className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl py-2.5 px-1 transition active:scale-[0.96] ${
-          active ? 'bg-[#16181A] text-white' : 'text-[#16181A] hover:bg-black/[0.04]'
+          active ? 'seg-on' : 'seg-off'
         }`}>
         <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
           <Icon name={item.icon} size={20} className={active ? 'text-[#C8F542]' : 'text-[#16181A]'} />

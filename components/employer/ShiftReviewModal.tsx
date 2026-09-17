@@ -274,7 +274,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {shiftDates.map(d => (
-                  <button key={d} onClick={() => setDate(d)} className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium transition ${date === d ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/55 hover:bg-black/[0.09]'}`}>
+                  <button key={d} onClick={() => setDate(d)} className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium transition ${date === d ? 'seg-on' : 'seg-off bg-black/[0.05]'}`}>
                     {fmtChip(d)}
                   </button>
                 ))}
@@ -288,11 +288,11 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               <label className="block text-xs uppercase tracking-wider text-black/50 mb-2">Koho hodnotíš</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 rounded-full glass border border-black/[0.07] p-1">
                 <button onClick={() => setWholeShift(true)}
-                  className={`px-3 py-2 rounded-full text-xs font-semibold truncate transition ${wholeShift ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  className={`px-3 py-2 rounded-full text-xs font-semibold truncate transition ${wholeShift ? 'seg-on' : 'seg-off'}`}>
                   Celou směnu ({targetNames.length} lidi)
                 </button>
                 <button onClick={() => setWholeShift(false)}
-                  className={`px-3 py-2 rounded-full text-xs font-semibold transition ${!wholeShift ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  className={`px-3 py-2 rounded-full text-xs font-semibold transition ${!wholeShift ? 'seg-on' : 'seg-off'}`}>
                   Jen {employee.name.split(' ')[0]}
                 </button>
               </div>

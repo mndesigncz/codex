@@ -67,7 +67,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
   const claimedByMe = offers.filter(o => o.claimedBy === userId && o.status === 'claimed');
 
   if (loading) {
-    return <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-40"><div className="spinner" /></div>;
   }
 
   return (

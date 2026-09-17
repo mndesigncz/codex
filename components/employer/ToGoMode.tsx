@@ -91,10 +91,10 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const firstName = (user?.name ?? '').split(' ')[0];
 
   const tiles = [
-    { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'bg-[#16181A] text-white' },
+    { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'seg-on' },
     { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' }, // zásoby jsou varování, ne počet
     { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
-    { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'bg-[#16181A] text-white' },
+    { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'seg-on' },
     { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
     { view: 'finance', icon: 'coins', label: 'Finance', badge: null, badgeTone: '' },
   ];

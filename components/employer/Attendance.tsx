@@ -377,7 +377,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : (
         <>
@@ -563,8 +563,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               </div>
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setAddOpen(false)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
-              <button onClick={saveAdd} disabled={savingAdd} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+              <button onClick={() => setAddOpen(false)} className="btn btn-secondary flex-1">Zrušit</button>
+              <button onClick={saveAdd} disabled={savingAdd} className="btn btn-primary flex-1 disabled:opacity-50">
                 {savingAdd ? 'Ukládám…' : 'Uložit'}
               </button>
             </div>
@@ -596,8 +596,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
               </div>
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setEditEntry(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+              <button onClick={() => setEditEntry(null)} className="btn btn-secondary flex-1">Zrušit</button>
+              <button onClick={saveEdit} disabled={savingEdit} className="btn btn-primary flex-1 disabled:opacity-50">
                 {savingEdit ? 'Ukládám…' : 'Uložit'}
               </button>
             </div>

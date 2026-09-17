@@ -148,7 +148,7 @@ export default function PlanningBoard() {
       )}
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : (
         <div className="space-y-4">
@@ -301,8 +301,8 @@ export default function PlanningBoard() {
                 className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setEditCard(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit || !editCard.title.trim()} className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+              <button onClick={() => setEditCard(null)} className="btn btn-secondary flex-1">Zrušit</button>
+              <button onClick={saveEdit} disabled={savingEdit || !editCard.title.trim()} className="btn btn-primary flex-1 disabled:opacity-50">
                 {savingEdit ? 'Ukládám…' : 'Uložit'}
               </button>
             </div>

@@ -361,7 +361,7 @@ export default function Settings({ user, initialTab }: Props) {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#16181A]">Nastavení</h1>
+        <h1 className="t-page">Nastavení</h1>
         <p className="text-black/45 text-sm mt-1">Spravujte svůj profil, aplikaci, oznámení a zabezpečení.</p>
       </div>
 
@@ -383,7 +383,7 @@ export default function Settings({ user, initialTab }: Props) {
           {sections.map(s => (
             <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
               className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
-                section === s.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/60 hover:text-black hover:bg-black/[0.05]'
+                section === s.id ? 'seg-on' : 'seg-off'
               }`}>
               <Icon name={s.icon} size={20} className="flex-shrink-0" />
               <span className="min-w-0 flex-1">
@@ -403,7 +403,7 @@ export default function Settings({ user, initialTab }: Props) {
         <div className="flex-1 min-w-0">
           {loading ? (
             <div className="flex items-center justify-center h-48">
-              <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+              <div className="spinner" />
             </div>
           ) : section === 'account' ? (
             <form onSubmit={saveProfile} className="glass-card p-6 space-y-6">
@@ -569,7 +569,7 @@ export default function Settings({ user, initialTab }: Props) {
 
               {notifsLoading ? (
                 <div className="flex items-center justify-center h-40">
-                  <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+                  <div className="spinner" />
                 </div>
               ) : notifs.length === 0 ? (
                 <div className="py-14 text-center">
@@ -767,7 +767,7 @@ export default function Settings({ user, initialTab }: Props) {
               <p className="text-black/45 text-sm mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
               {auditEntries === null ? (
                 <div className="flex items-center justify-center h-24">
-                  <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+                  <div className="spinner" />
                 </div>
               ) : auditEntries.length === 0 ? (
                 <EmptyState icon="clock" title="Zatím žádný záznam" hint="Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen." compact />

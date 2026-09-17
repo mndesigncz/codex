@@ -734,11 +734,11 @@ export default function ClosingsOverview() {
           {topLevel.length > 0 && (
             <>
               <button onClick={exportCsv}
-                className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
+                className="btn btn-secondary">
                 Export CSV ↓
               </button>
               <button onClick={exportAccountant}
-                className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
+                className="btn btn-secondary">
                 <Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro účetní ↓
               </button>
             </>
@@ -770,12 +770,12 @@ export default function ClosingsOverview() {
       {months.length > 1 && !selectedDate && (
         <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
           <button onClick={() => setMonth('all')}
-            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${month === 'all' ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all ${month === 'all' ? 'seg-on' : 'seg-off glass'}`}>
             Vše
           </button>
           {months.map(m => (
             <button key={m} onClick={() => setMonth(m)}
-              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all cz-sentence ${month === m ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'}`}>
+              className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-all cz-sentence ${month === m ? 'seg-on' : 'seg-off glass'}`}>
               {monthLabel(m)}
             </button>
           ))}
@@ -784,7 +784,7 @@ export default function ClosingsOverview() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+          <div className="spinner" />
         </div>
       ) : topLevel.length === 0 ? (
         <div className="glass-card">

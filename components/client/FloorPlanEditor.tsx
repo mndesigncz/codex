@@ -207,7 +207,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
       <div className="flex items-center gap-1.5 flex-wrap">
         {TOOLS.map(t => (
           <button key={t.id} type="button" onClick={() => { setTool(t.id); setSel(null); }} aria-pressed={tool === t.id}
-            className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${tool === t.id ? 'bg-[#16181A] text-white' : 'bg-black/[0.05] text-black/65 hover:bg-black/[0.09]'}`}>
+            className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${tool === t.id ? 'seg-on' : 'seg-off bg-black/[0.05]'}`}>
             <Icon name={t.icon} size={13} />{t.label}
           </button>
         ))}

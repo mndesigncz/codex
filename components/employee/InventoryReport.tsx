@@ -357,7 +357,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
       ) : (
         <>
           {/* Prominent low / critical items on top */}
@@ -404,7 +404,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
               {(parkedCount > 0 || showParked) && (
                 <button onClick={() => setShowParked(v => !v)}
                   className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                    showParked ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                    showParked ? 'seg-on' : 'seg-off glass'
                   }`}>
                   {showParked ? 'Zpět na to, co máme' : `Nevedeme (${parkedCount})`}
                 </button>

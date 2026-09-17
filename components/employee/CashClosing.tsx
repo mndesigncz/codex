@@ -148,7 +148,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
                 </span>
                 <button type="button" onClick={() => setMovements(movements.filter((_, idx) => idx !== i))}
                   title="Odebrat"
-                  className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600"><Icon name="close" size={15} /></button>
+                  className="shrink-0 btn-icon btn-icon-danger"><Icon name="close" size={15} /></button>
               </div>
             );
           })}
@@ -160,7 +160,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
           <button key={k.kind} type="button" onClick={() => setKind(k.kind)}
             title={k.hint}
             className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              kind === k.kind ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+              kind === k.kind ? 'seg-on' : 'seg-off glass'
             }`}>
             {k.label}
           </button>
@@ -721,7 +721,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button type="button" role="radio" aria-checked={eventId === ''} onClick={() => setEventId('')}
-                  className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === '' ? 'bg-[#16181A] text-white' : 'bg-white/70 border border-black/10 text-black/60 hover:text-black'}`}>
+                  className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === '' ? 'seg-on' : 'seg-off glass'}`}>
                   Uzávěrka podniku
                 </button>
                 {evsToday.map(ev => (
@@ -1013,7 +1013,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     <button key={String(mode)} type="button"
                       onClick={() => setCountMode(mode)}
                       className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-                        countMode === mode ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                        countMode === mode ? 'seg-on' : 'seg-off'
                       }`}>
                       {lbl}
                     </button>
@@ -1085,7 +1085,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   <button key={r.id} type="button" title={r.hint}
                     onClick={() => setDiffReason(diffReason === r.id ? '' : r.id)}
                     className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      diffReason === r.id ? 'bg-[#16181A] text-white' : 'glass text-black/55 hover:text-black'
+                      diffReason === r.id ? 'seg-on' : 'seg-off glass'
                     }`}>
                     {r.label}
                   </button>
@@ -1227,7 +1227,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </h3>
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+            <div className="spinner" />
           </div>
         ) : closings.length === 0 ? (
           <div className="glass-card"><EmptyState illustration="uzaverka" title="Zatím žádná uzávěrka" hint="Po směně spočítej kasu a vyplň ji tady — vedení ji pak schválí." compact /></div>
@@ -1335,11 +1335,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </p>
             <div className="flex gap-2 mt-5">
               <button type="button" onClick={() => setShowConfirm(false)}
-                className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">
+                className="btn btn-secondary flex-1">
                 Zpět
               </button>
               <button type="button" onClick={doSubmit} disabled={submitting}
-                className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
+                className="btn btn-primary flex-1 disabled:opacity-50">
                 Odeslat ke schválení
               </button>
             </div>

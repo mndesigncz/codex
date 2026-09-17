@@ -112,7 +112,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
         {(parkedCount > 0 || showParked) && (
           <button onClick={() => setShowParked(v => !v)}
             className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
-              showParked ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/55'
+              showParked ? 'seg-on' : 'seg-off glass'
             }`}>
             {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
           </button>

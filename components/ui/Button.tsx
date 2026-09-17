@@ -71,7 +71,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       {...rest}
     >
       {loading ? (
-        <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden />
+        <span className="spinner spinner-sm" aria-hidden />
       ) : icon ? (
         <Icon name={icon} size={iconSize} className="shrink-0" />
       ) : null}

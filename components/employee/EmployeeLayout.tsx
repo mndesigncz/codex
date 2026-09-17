@@ -132,7 +132,7 @@ export default function EmployeeLayout({ user }: Props) {
                   {items.map(item => (
                     <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
                       className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
-                        currentView === item.id ? 'bg-[#16181A] text-white shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.05]'
+                        currentView === item.id ? 'seg-on' : 'seg-off'
                       }`}>
                       <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
                         motion={currentView === item.id ? 'pop' : undefined}

@@ -426,7 +426,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+        <div className="spinner" />
       </div>
     );
   }
@@ -489,7 +489,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 {savingName ? 'Ukládám…' : 'Uložit'}
               </button>
               <button onClick={() => { setEditingName(false); setTeamName(team.name); }}
-                className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
+                className="btn btn-secondary">
                 Zrušit
               </button>
             </div>
@@ -498,7 +498,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 line-clamp-2">{team.name}</p>
             <button onClick={() => setEditingName(true)}
-              className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all flex-shrink-0 whitespace-nowrap">
+              className="btn btn-secondary flex-shrink-0 whitespace-nowrap">
               Přejmenovat
             </button>
           </div>
@@ -520,7 +520,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </button>
           </div>
           <button onClick={regenerate} disabled={regenerating}
-            className="w-full sm:w-auto rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all disabled:opacity-50 whitespace-nowrap flex-shrink-0">
+            className="w-full sm:w-auto btn btn-secondary disabled:opacity-50 whitespace-nowrap flex-shrink-0">
             {regenerating ? 'Generuji…' : 'Vygenerovat nový'}
           </button>
         </div>
@@ -542,7 +542,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <div className="flex gap-1 glass rounded-full p-1">
               {[['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']].map(([val, label]) => (
                 <button key={val} type="button" onClick={() => setInviteRole(val)}
-                  className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${inviteRole === val ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'}`}>
+                  className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${inviteRole === val ? 'seg-on' : 'seg-off'}`}>
                   {label}
                 </button>
               ))}
@@ -708,7 +708,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         {savingMember ? 'Ukládám…' : 'Uložit'}
                       </button>
                       <button onClick={() => setEditMemberId(null)}
-                        className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
+                        className="btn btn-secondary">
                         Zrušit
                       </button>
                     </div>
@@ -930,7 +930,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 {removing ? 'Odebírám…' : 'Odebrat'}
               </button>
               <button onClick={() => setRemoveTarget(null)} disabled={removing}
-                className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-5 py-2.5 text-sm font-medium transition-all">
+                className="btn btn-secondary">
                 Zrušit
               </button>
             </div>

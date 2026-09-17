@@ -180,10 +180,10 @@ export default function AnnouncementsManager() {
             <textarea rows={4} value={editText} maxLength={1000} onChange={(e) => setEditText(e.target.value)}
               className="w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none" />
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setEditing(null)} className="flex-1 rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-3 text-sm hover:bg-black/[0.08] transition">Zrušit</button>
+              <button onClick={() => setEditing(null)} className="btn btn-secondary flex-1">Zrušit</button>
               <button onClick={async () => { if (await patch(editing.id, { content: editText.trim() })) setEditing(null); }}
                 disabled={!editText.trim()}
-                className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">Uložit</button>
+                className="btn btn-primary flex-1 disabled:opacity-50">Uložit</button>
             </div>
           </div>
         </div>

@@ -397,7 +397,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
       ) : view === 'week' ? (
         <TaskWeekBoard tasks={tasks} weekStart={weekStart}
           onComplete={(t, done) => completeTask(t as Task, done)}

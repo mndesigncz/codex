@@ -174,7 +174,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
           {(parkedCount > 0 || showParked) && (
             <button onClick={() => setShowParked(v => !v)}
               className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
-                showParked ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/55'
+                showParked ? 'seg-on' : 'seg-off glass'
               }`}>
               {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
             </button>
@@ -182,7 +182,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
           <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
             {cats.map(c => (
               <button key={c} onClick={() => setCat(c)}
-                className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition ${cat === c ? 'bg-[#16181A] text-white' : 'glass text-black/55'}`}>
+                className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
                 {c}
               </button>
             ))}
@@ -194,7 +194,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             </div>
           )}
           {loading ? (
-            <div className="flex items-center justify-center h-40"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+            <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
           ) : loadErr ? (
             <div className="glass-card p-8 text-center space-y-3">
               <p className="text-base font-semibold text-red-700">Sklad se nepodařilo načíst.</p>

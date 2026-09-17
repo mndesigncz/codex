@@ -748,7 +748,7 @@ function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose
                 {czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}${e.end_time ? `–${e.end_time}` : ''}` : ''}
               </p>
             </div>
-            <button onClick={onClose} className="tap-target-sm shrink-0 rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+            <button onClick={onClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
           </div>
 
           {place && (

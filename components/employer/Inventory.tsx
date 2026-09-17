@@ -825,7 +825,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         <div role="alert" className="note note-danger px-4 py-3 text-sm font-semibold">{consumeErr}</div>
       )}
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" /></div>
+        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center text-black/45">{items.length === 0 ? 'Žádné položky. Přidejte první.' : 'Žádné položky neodpovídají filtru.'}</div>
       ) : packagedCat ? (
@@ -860,7 +860,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   <p className="text-xs text-black/45 truncate">{editing ? editing.name : 'Přidejte novou zásobu do skladu'}</p>
                 </div>
               </div>
-              <button aria-label="Zavřít" type="button" onClick={() => setShowForm(false)} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" type="button" onClick={() => setShowForm(false)} className="shrink-0 btn-icon"><Icon name="close" size={15} /></button>
             </div>
 
             <div className="p-6 space-y-4">
@@ -1122,7 +1122,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   {([['', 'Nic'], ['new', 'Novinka'], ['tip', '👍 Tip']] as const).map(([v, lbl]) => (
                     <button key={v} type="button" onClick={() => setForm(f => ({ ...f, highlight: v }))}
                       className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                        form.highlight === v ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+                        form.highlight === v ? 'seg-on' : 'seg-off glass'
                       }`}>
                       {lbl}
                     </button>
@@ -1270,7 +1270,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           <div ref={reportsModal.ref} {...reportsModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
-              <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+              <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="btn-icon"><Icon name="close" size={15} /></button>
             </div>
             {reports.length === 0 ? (
               <p className="text-black/45 text-sm text-center py-8">Žádná hlášení od zaměstnanců.</p>
@@ -1416,7 +1416,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
             <h3 className="t-card">Hromadná úprava</h3>
             <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="space-y-2">
@@ -1558,7 +1558,7 @@ function MoreMenu({
               {([['grid', 'Karty', 'trend'], ['list', 'Seznam', 'box']] as const).map(([v, label, icon]) => (
                 <button key={v} onClick={() => { setView(v); setOpen(false); }}
                   className={`flex-1 rounded-xl px-3 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition ${
-                    view === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:bg-black/[0.04]'
+                    view === v ? 'seg-on' : 'seg-off'
                   }`}>
                   <Icon name={icon} size={14} /> {label}
                 </button>
@@ -1670,9 +1670,9 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 {Number(i.packageSize) > 0 && (
                   <ConsumeControl itemId={i.id} unit={itemContentUnit(i, pk(i))} onDone={onConsumed} onFail={onConsumeFail} />
                 )}
-                <button onClick={() => step(i, -1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">−</button>
+                <button onClick={() => step(i, -1)} className="tap-target btn-icon">−</button>
                 <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
-                <button onClick={() => step(i, 1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black text-base leading-none">+</button>
+                <button onClick={() => step(i, 1)} className="tap-target btn-icon">+</button>
                 {i.archived ? (
                   <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
                     className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
@@ -1680,9 +1680,9 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
                 <button onClick={() => openEdit(i)} title="Upravit" aria-label="Upravit"
-                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black"><Icon name="pencil" size={15} /></button>
+                  className="btn-icon"><Icon name="pencil" size={15} /></button>
                 <button onClick={() => remove(i)} title="Smazat" aria-label="Smazat"
-                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600"><Icon name="trash" size={15} /></button>
+                  className="btn-icon btn-icon-danger"><Icon name="trash" size={15} /></button>
               </div>
             </div>
           );
@@ -1744,9 +1744,9 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
             })()}
             <div className={`mt-auto pt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
-                <button onClick={() => step(i, -1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">−</button>
+                <button onClick={() => step(i, -1)} className="tap-target btn-icon">−</button>
                 <span className="text-lg font-bold text-[#16181A] w-16 text-center tabular-nums">{i.quantity} <span className="text-xs text-black/45">{i.unit}</span></span>
-                <button onClick={() => step(i, 1)} className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/70 hover:text-black">+</button>
+                <button onClick={() => step(i, 1)} className="tap-target btn-icon">+</button>
               </div>
               <div className="flex items-center gap-1">
                 {i.archived ? (
@@ -1756,9 +1756,9 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                   <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
                 ) : null}
                 <button onClick={() => openEdit(i)} title="Upravit" aria-label="Upravit"
-                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/60 hover:text-black"><Icon name="pencil" size={15} /></button>
+                  className="btn-icon"><Icon name="pencil" size={15} /></button>
                 <button onClick={() => remove(i)} title="Smazat" aria-label="Smazat"
-                  className="rounded-full glass w-9 h-9 flex items-center justify-center text-red-600/70 hover:text-red-600"><Icon name="trash" size={15} /></button>
+                  className="btn-icon btn-icon-danger"><Icon name="trash" size={15} /></button>
               </div>
             </div>
             <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
@@ -2076,7 +2076,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       <div ref={sm.ref} {...sm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between gap-3">
           <h3 className="t-card">Nákupní seznam</h3>
-          <button onClick={onClose} className="shrink-0 rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
 
@@ -2128,7 +2128,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
           </button>
           <a
             href={`mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`}
-            className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] whitespace-nowrap inline-flex items-center gap-1.5"
+            className="btn btn-secondary"
             title="Otevře e-mail s předvyplněným seznamem — doplň adresu dodavatele">
             <Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Poslat e-mailem
           </a>
@@ -2308,7 +2308,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
       <div ref={cm.ref} {...cm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between">
           <h3 className="t-card">Kategorie</h3>
-          <button onClick={onClose} className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="flex gap-2">
@@ -2395,19 +2395,19 @@ function CategoryRow({
         )}
         {canMove && (
           <button onClick={toggleMove} title="Přesunout pod jinou kategorii"
-            className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${moveOpen ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'}`}>
+            className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${moveOpen ? 'seg-on' : 'seg-off glass'}`}>
             <Icon name="swap" size={14} />
           </button>
         )}
         <button onClick={onToggleHide} title={c.hideFromOverview ? 'Kategorie je skrytá z přehledu „Vše" — kliknutím zobrazíš' : 'Skrýt obsah kategorie z přehledu „Vše"'}
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            c.hideFromOverview ? 'bg-[#16181A] text-white' : 'glass text-black/50 hover:text-black'
+            c.hideFromOverview ? 'seg-on' : 'seg-off glass'
           }`}>
           {c.hideFromOverview ? '🙈' : '👁'}
         </button>
         <button onClick={togglePrefill} title="Předvyplnění nových položek"
           className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            prefillOpen ? 'bg-[#16181A] text-white' : hasPrefill ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
+            prefillOpen ? 'seg-on' : hasPrefill ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
           }`}>
           <Icon name="clipboard" size={14} />
         </button>
@@ -2602,7 +2602,7 @@ function PackagingEditor({ category, onSaved }: {
               {([['package', 'Balení'], ['content', unit ? `Obsahu (${unit})` : 'Obsahu']] as const).map(([v, lbl]) => (
                 <button key={v} type="button" onClick={() => setThresholdUnit(v)}
                   className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
-                    thresholdUnit === v ? 'bg-[#16181A] text-white' : 'text-black/55 hover:text-black'
+                    thresholdUnit === v ? 'seg-on' : 'seg-off'
                   }`}>
                   {lbl}
                 </button>
@@ -2634,7 +2634,7 @@ function PackagingEditor({ category, onSaved }: {
                     <span className="text-xs text-black/40">%</span>
                   </div>
                   <button aria-label="Zavřít" onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))}
-                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/35 hover:text-red-600"><Icon name="close" size={15} /></button>
+                    className="shrink-0 btn-icon btn-icon-danger"><Icon name="close" size={15} /></button>
                 </div>
               ))}
             </div>
@@ -2693,7 +2693,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
       <div ref={pm.ref} {...pm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
-          <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center glass text-black/50 hover:text-black" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}

@@ -333,7 +333,7 @@ export default function Guides({ user }: { user: User }) {
 
           {loading ? (
             <div className="flex items-center justify-center h-48">
-              <div className="h-8 w-8 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+              <div className="spinner" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="glass-card">
@@ -549,7 +549,7 @@ export default function Guides({ user }: { user: User }) {
 
             {readerLoading ? (
               <div className="flex items-center justify-center h-32">
-                <div className="h-7 w-7 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+                <div className="spinner" />
               </div>
             ) : (
               <>
@@ -799,7 +799,7 @@ function GuideEditor({
       >
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="t-section min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
@@ -1038,7 +1038,7 @@ function ManageCategories({
       >
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="t-section min-w-0 truncate">Kategorie</h2>
-          <button onClick={onClose} className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all flex-shrink-0" aria-label="Zavřít">
+          <button onClick={onClose} className="btn-icon" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
