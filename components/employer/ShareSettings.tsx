@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { Icon } from '../Icons';
+import { Modal, Button } from '../ui';
 import { usePlan, ProBadge, UpgradeModal } from '../Pro';
 import {
   type ShareLink, type ShareTheme, DEFAULT_THEME, THEME_PRESETS, normalizeTheme,
@@ -26,7 +27,6 @@ export default function ShareSettings() {
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
   // QR of a link, rendered on demand — print it and put it on the counter.
   const [qrFor, setQrFor] = useState<{ url: string; title: string } | null>(null);
-  const qrModal = useModal(!!qrFor, () => setQrFor(null), 'QR kód odkazu');
   const [qrData, setQrData] = useState('');
   useEffect(() => {
     if (!qrFor) { setQrData(''); return; }
@@ -303,26 +303,22 @@ export default function ShareSettings() {
       </div>
       )}
       {qrFor && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setQrFor(null)}>
-          <div ref={qrModal.ref} {...qrModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">{qrFor.title}</h3>
-            <p className="text-sm text-black/45 mb-4">Vytiskni a polož na pult — zákazník načte mobilem.</p>
-            {qrData ? (
-              <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
-            ) : (
-              <div className="mx-auto w-64 h-64 well animate-pulse" />
+        <Modal open onClose={() => setQrFor(null)} title={qrFor.title} size="sm"
+          subtitle="Vytiskni a polož na pult — zákazník načte mobilem."
+          footer={<>
+            <Button variant="secondary" onClick={() => setQrFor(null)}>Zavřít</Button>
+            {qrData && (
+              <a href={qrData} download="qr-nabidka.png" className="btn btn-primary">
+                <Icon name="download" size={17} />Stáhnout PNG
+              </a>
             )}
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setQrFor(null)} className="btn btn-secondary flex-1">Zavřít</button>
-              {qrData && (
-                <a href={qrData} download="qr-nabidka.png"
-                  className="flex-1 rounded-full bg-[#16181A] text-white font-semibold px-5 py-3 text-sm hover:bg-black transition">
-                  Stáhnout PNG
-                </a>
-              )}
-            </div>
+          </>}>
+          <div className="text-center">
+            {qrData
+              ? <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
+              : <div className="mx-auto w-64 h-64 well animate-pulse" />}
           </div>
-        </div>
+        </Modal>
       )}
 
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}

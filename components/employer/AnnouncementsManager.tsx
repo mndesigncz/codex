@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { dbTimeDayHM } from '@/lib/pragueTime';
-import { useModal } from '@/lib/useModal';
+import { Modal, Button } from '../ui';
 
 interface Announcement {
   id: number;
@@ -69,7 +69,6 @@ export default function AnnouncementsManager() {
 
   // Edit in place + unpin instead of delete — unpinned stays here, hidden from the team.
   const [editing, setEditing] = useState<Announcement | null>(null);
-  const editModal = useModal(!!editing, () => setEditing(null), 'Upravit oznámení');
   const [editText, setEditText] = useState('');
   const patch = async (id: number, body: any) => {
     const r = await fetch('/api/announcements', {
@@ -174,19 +173,15 @@ export default function AnnouncementsManager() {
       )}
 
       {editing && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditing(null)}>
-          <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit oznámení</h3>
-            <textarea rows={4} value={editText} maxLength={1000} onChange={(e) => setEditText(e.target.value)}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none" />
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setEditing(null)} className="btn btn-secondary flex-1">Zrušit</button>
-              <button onClick={async () => { if (await patch(editing.id, { content: editText.trim() })) setEditing(null); }}
-                disabled={!editText.trim()}
-                className="btn btn-primary flex-1 disabled:opacity-50">Uložit</button>
-            </div>
-          </div>
-        </div>
+        <Modal open onClose={() => setEditing(null)} title="Upravit oznámení" size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditing(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" disabled={!editText.trim()}
+              onClick={async () => { if (await patch(editing.id, { content: editText.trim() })) setEditing(null); }}>Uložit</Button>
+          </>}>
+          <textarea rows={4} value={editText} maxLength={1000} autoFocus
+            onChange={(e) => setEditText(e.target.value)} className="field resize-none" />
+        </Modal>
       )}
     </div>
   );

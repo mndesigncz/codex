@@ -12,7 +12,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const BASELINE = 40;
+const BASELINE = 37;
 
 const hits = [];
 const walk = (dir) => {

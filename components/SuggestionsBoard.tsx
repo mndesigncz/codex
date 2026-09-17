@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 
-import { EmptyState, PageHeader, Button } from './ui';
+import { EmptyState, PageHeader, Button, Modal } from './ui';
 import { useModal } from '@/lib/useModal';
 type Suggestion = {
   id: number;
@@ -130,7 +130,6 @@ export default function SuggestionsBoard() {
 
   // Author edits their own idea in place.
   const [editing, setEditing] = useState<Suggestion | null>(null);
-  const editModal = useModal(!!editing, () => setEditing(null), 'Upravit podnět');
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -322,23 +321,16 @@ export default function SuggestionsBoard() {
         </div>
       )}
       {editing && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setEditing(null)}>
-          <div ref={editModal.ref} {...editModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-3">Upravit podnět</h3>
-            <div className="space-y-3">
-              <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
-              <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none resize-none" />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setEditing(null)} className="btn btn-secondary flex-1">Zrušit</button>
-              <button onClick={saveEdit} disabled={savingEdit || !editTitle.trim()} className="btn btn-primary flex-1 disabled:opacity-50">
-                {savingEdit ? 'Ukládám…' : 'Uložit'}
-              </button>
-            </div>
+        <Modal open onClose={() => setEditing(null)} title="Upravit podnět" size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setEditing(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" loading={savingEdit} disabled={!editTitle.trim()} onClick={saveEdit}>Uložit</Button>
+          </>}>
+          <div className="space-y-3">
+            <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200} autoFocus className="field" />
+            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000} className="field resize-none" />
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>
