@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
-import { EmptyState, Button, PageHeader } from './ui';
+import { EmptyState, Button, PageHeader , SearchField } from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
@@ -320,15 +320,8 @@ export default function Guides({ user }: { user: User }) {
         {/* Main */}
         <main className="flex-1 min-w-0">
           <div className="relative mb-5">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30">
-              <Icon name="search" size={18} />
-            </span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Hledat návody…"
-              className="w-full field border border-black/[0.08] !pl-11 pr-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
-            />
+            <SearchField value={search} onChange={setSearch} placeholder="Hledat návody…" storageKey="guides"
+              suggestions={categories.map(c => ({ label: c.name, hint: 'kategorie' }))} />
           </div>
 
           {loading ? (

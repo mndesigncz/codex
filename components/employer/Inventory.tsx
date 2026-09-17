@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, EmptyState } from '../ui';
+import { Button, PageHeader, EmptyState, SearchField } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
@@ -766,12 +766,17 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         stuck ? 'py-2 space-y-2 shadow-sm shadow-black/[0.04]' : 'py-3 space-y-3'
       }`}>
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
-          <div className="relative flex-1 min-w-0">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={16} /></span>
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Hledat položku nebo dodavatele..."
-              className={`${inputClass} !pl-10 transition-[padding] ${stuck ? 'py-2' : ''}`} />
-          </div>
+          <SearchField
+            className="flex-1 min-w-0"
+            value={search} onChange={setSearch}
+            placeholder="Hledat položku nebo dodavatele…"
+            storageKey="inventory"
+            suggestions={[
+              ...categories.map(c => ({ label: c.name, hint: 'kategorie' })),
+              ...Array.from(new Set(items.map(i => (i.supplier ?? '').trim()).filter(Boolean))).slice(0, 6).map(sp => ({ label: sp, hint: 'dodavatel' })),
+            ]}
+            inputClassName={stuck ? '!py-2' : ''}
+          />
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
             {selecting && (
               <button onClick={exitSelection}

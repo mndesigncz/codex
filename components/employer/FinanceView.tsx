@@ -12,7 +12,7 @@ import { usePlan, UpgradeModal } from '../Pro';
 import ShrinkageReport from '../inventory/ShrinkageReport';
 import LiveRevenue from './LiveRevenue';
 import FinanceAdvice from './FinanceAdvice';
-import { PageHeader, Button } from '../ui';
+import { PageHeader, Button , SearchField } from '../ui';
 import { useModal } from '@/lib/useModal';
 
 interface Row {
@@ -379,11 +379,9 @@ export default function FinanceView() {
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="t-label">Výdaje ({filtered.length}{filtered.length !== ledger.length ? ` z ${ledger.length}` : ''}) · {money(filteredSum)}</h3>
               <div className="flex items-center gap-2 flex-wrap min-w-0 w-full sm:w-auto">
-              <div className="relative min-w-0 flex-1 sm:flex-none">
-                <Icon name="search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/35" />
-                <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat v popisu" aria-label="Hledat ve výdajích"
-                  className="w-full sm:w-44 rounded-full bg-white/70 border border-black/[0.08] pl-9 pr-3 py-2 text-xs placeholder-black/35 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition" />
-              </div>
+              <SearchField className="min-w-0 flex-1 sm:flex-none sm:w-52" value={q} onChange={setQ}
+                placeholder="Hledat v popisu" ariaLabel="Hledat ve výdajích" storageKey="finance"
+                inputClassName="!py-2 text-xs" />
               <div className="flex gap-1 glass rounded-full p-1 overflow-x-auto scrollbar-none min-w-0 basis-full sm:basis-auto">
                 {[['all', 'Vše'], ['receipt', 'Účtenky'], ['order', 'Objednávky'], ['expense', 'Z kasy'], ['wage', 'Výplaty']].map(([id, label]) => (
                   <button key={id} onClick={() => setFilter(id)}

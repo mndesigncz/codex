@@ -1,4 +1,5 @@
 'use client';
+import { SearchField } from '../ui';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
@@ -166,11 +167,9 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
               Zapsáno do skladu ✓ Vedení to potvrdí.
             </div>
           )}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="search" size={17} /></span>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Hledat položku…"
-              className="w-full rounded-2xl bg-white/70 border border-black/[0.08] pl-11 pr-4 py-3.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-base" />
-          </div>
+          <SearchField value={search} onChange={setSearch} placeholder="Hledat položku…" storageKey="inventory-kiosk"
+            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))}
+            inputClassName="!py-3.5 text-base" />
           {(parkedCount > 0 || showParked) && (
             <button onClick={() => setShowParked(v => !v)}
               className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${

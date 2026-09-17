@@ -1,4 +1,5 @@
 'use client';
+import { SearchField } from '../ui';
 
 // A packaged category (tobacco tins, bottles…) in two modes:
 //  • Přehled — read-only, for staff serving a customer: what do we have and
@@ -239,12 +240,8 @@ export default function CategoryStockView({
       </div>
 
       {items.length > 6 && (
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={`Hledat v ${category}…`}
-          className="w-full field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
-        />
+        <SearchField value={search} onChange={setSearch} placeholder={`Hledat v ${category}…`}
+          storageKey={`stock-${category}`} inputClassName="!py-2.5 text-sm" />
       )}
 
       {list.length === 0 ? (

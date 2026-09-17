@@ -1,4 +1,5 @@
 'use client';
+import { SearchField } from '../ui';
 
 // Receptury: co ze skladu zmizí, když se na pokladně prodá jedna položka.
 //
@@ -336,14 +337,8 @@ export default function RecipesView({ openProductId, onNavigate }: {
           {/* Procházení menu — kategorie, hledání, jen chybějící */}
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none">
-                  <Icon name="search" size={16} />
-                </span>
-                <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder={`Hledat mezi ${products.length} položkami menu…`}
-                  className={`${inputCls} w-full pl-10`} />
-              </div>
+              <SearchField className="flex-1 min-w-[200px]" value={search} onChange={setSearch}
+                placeholder={`Hledat mezi ${products.length} položkami menu…`} storageKey="recipes" />
               <button onClick={() => setOnlyMissing(v => !v)}
                 className={`rounded-full px-4 py-2.5 text-sm font-semibold transition active:scale-95 ${
                   onlyMissing ? 'seg-on' : 'seg-off glass'

@@ -764,3 +764,10 @@ span.cz-sentence { display: inline-block; max-width: 100%; }
   :root:not([data-theme="light"]) .nav-fade { background: linear-gradient(to bottom, rgba(18,20,22,0), rgba(18,20,22,0.85)); }
 }
 :root[data-theme="dark"] .nav-fade { background: linear-gradient(to bottom, rgba(18,20,22,0), rgba(18,20,22,0.85)); }
+
+/* Nativní křížek prohlížeče u type="search" — máme vlastní tlačítko v SearchField */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}

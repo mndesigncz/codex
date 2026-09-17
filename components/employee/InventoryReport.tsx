@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
-import { PageHeader } from '../ui';
+import { PageHeader , SearchField } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
@@ -388,12 +388,9 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
           {/* Full list with steppers */}
           <div>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Hledat položku..."
-              className="w-full max-w-sm field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-all text-sm"
-            />
+            <SearchField className="max-w-sm" value={search} onChange={setSearch}
+              placeholder="Hledat položku…" storageKey="inventory-employee"
+              suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))} />
           </div>
 
           <div className="glass-card overflow-hidden">
