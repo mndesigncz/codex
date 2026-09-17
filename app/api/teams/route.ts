@@ -103,8 +103,14 @@ export async function GET() {
     // Plan & trial — resolved server-side so every client agrees on the label.
     let planRow: any = null;
     try {
-      [planRow] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
-    } catch { /* columns not migrated yet ⇒ grandfathered pro */ }
+      [planRow] = await sql`
+        SELECT plan, trial_ends_at, subscription_status, subscription_interval, current_period_end,
+               cancel_at_period_end, trial_end, max_offer_until, stripe_subscription_id, had_subscription
+        FROM teams WHERE id = ${teamId}`;
+    } catch {
+      try { [planRow] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`; }
+      catch { /* columns not migrated yet ⇒ grandfathered pro */ }
+    }
     const planInfo = planInfoOf(planRow);
 
     // The link pinned to every dashboard (employer, employees, kiosk).

@@ -34,11 +34,21 @@ První a referenční zákazník: Čajovna Pangea (Brno), pokladna Storyous.
   polohou; ověřená smí rovnou do pokladny.
 - Hostovská část je vždy světlá; tmavý motiv patří administraci.
 
-## Platby a peněženky
+## Předplatné a platby (Stripe)
 
-Mimo rozsah (předpoklad: zatím záměrně): platby v aplikaci vyžadují smlouvu
-s platební bránou, karta v Apple/Google peněžence vývojářské účty a
-certifikáty. Host platí u obsluhy jako obvykle.
+Tarify Zdarma (napořád, do 3 lidí), Pro 499 Kč/měs nebo 3 990 Kč/rok a Max
+999 Kč/měs nebo 7 990 Kč/rok (Pro + Managero client, pokladna Storyous,
+výroba). Nový podnik zkouší Pro nebo Max 30 dní zdarma s kartou (trial ve
+Stripe, po měsíci se karta strhne sama). Platba běží ve Stripe Checkout,
+správa karty, faktur, změny tarifu a zrušení ve Stripe Customer Portal;
+stav do aplikace zrcadlí webhook (`/api/billing/webhook`) a denní cron
+(`/api/billing/cron`). Po koupi Pro 7 dní platí nabídka Max −30 % (kupon
+MAX30). Affiliate: odkaz `/register?ref=KÓD`; když doporučený podnik poprvé
+zaplatí, doporučitel dostane měsíc zdarma jako kredit na další fakturu,
+nejvýš tři za měsíc. Ceny hledáme podle `lookup_key` (pro_monthly…), env:
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Týmy z doby před platbami jsou
+na Max napořád. Platby hostů v Managero client zůstávají mimo rozsah — host
+platí u obsluhy.
 
 ## Jak se měří kvalita
 

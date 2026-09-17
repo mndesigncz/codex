@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { recipeOf, saveRecipe } from '@/lib/production';
+import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const c = await me();
   if (!c?.teamId) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (c.role !== 'employer') return NextResponse.json({ error: 'Recepturu nastavuje vedení' }, { status: 403 });
+  if (!(await teamIsMax(c.teamId))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
   const b = await req.json().catch(() => ({}));
