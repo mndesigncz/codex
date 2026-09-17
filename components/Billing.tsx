@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icons';
 import { Button, Segmented } from './ui';
+import CheckoutModal from './CheckoutModal';
 import {
   PLAN_FEATURES, PLAN_NAMES, PRICES, MAX_EXTRAS, MAX_OFFER_PCT, TRIAL_DAYS, REFERRALS_PER_MONTH,
   planLabel, czDays, type PlanInfo, type Interval,
@@ -35,6 +36,7 @@ export default function Billing() {
   const [interval, setInterval_] = useState<Interval>('month');
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState('');
+  const [checkout, setCheckout] = useState<{ plan: 'pro' | 'max'; interval: Interval } | null>(null);
 
   const load = () => fetch('/api/billing/status').then(r => r.json()).then(d => { if (d?.plan) setSt(d); else setErr(d?.error || 'Nepodařilo se načíst.'); }).catch(() => setErr('Nepodařilo se načíst.'));
   useEffect(() => {
@@ -99,7 +101,7 @@ export default function Billing() {
               {p === 'max' ? (offerLeft ? `Přejít na Max se slevou ${MAX_OFFER_PCT} %` : 'Přejít na Max') : 'Změnit na Pro'}
             </Button>
           ) : (
-            <Button variant={p === 'pro' ? 'accent' : 'primary'} onClick={() => go('/api/billing/checkout', { plan: p, interval })} loading={busy === '/api/billing/checkout'}>
+            <Button variant={p === 'pro' ? 'accent' : 'primary'} onClick={() => setCheckout({ plan: p, interval })}>
               {canTrial ? `Vyzkoušet ${TRIAL_DAYS} dní zdarma` : `Předplatit ${PLAN_NAMES[p]}`}
             </Button>
           )}
@@ -111,6 +113,11 @@ export default function Billing() {
 
   return (
     <div className="space-y-4">
+      {checkout && (
+        <CheckoutModal plan={checkout.plan} interval={checkout.interval} trial={canTrial}
+          onClose={() => setCheckout(null)}
+          onDone={() => { setCheckout(null); setNotice('Díky! Předplatné je nastavené — stav se propíše během chvíle.'); setTimeout(load, 1500); setTimeout(load, 6000); }} />
+      )}
       {notice && <p className="note note-ok">{notice}</p>}
       {err && <p className="note note-danger">{err}</p>}
       {st && !st.configured && <p className="note note-wait">Platby ještě nejsou zapnuté — chybí klíče Stripe v nastavení serveru.</p>}
