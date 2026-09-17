@@ -14,7 +14,9 @@ const nextConfig = {
           // Adresa s tokenem sdílené stránky se nemá odeslat cizímu webu
           // v hlavičce Referer.
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=()' },
+          // payment: vložená pokladna Stripe nabízí Apple Pay / Google Pay
+          // přes Payment Request API ze svého rámu.
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(self "https://js.stripe.com" "https://checkout.stripe.com")' },
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
           // Poslední pojistka, kdyby se do stránky přece jen dostal cizí
           // skript: nemá odkud se načíst a nemá kam odeslat data.
@@ -25,11 +27,14 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // Stripe: vložená pokladna (js.stripe.com) běží v rámu na naší
+              // stránce, karta nikdy neprojde naším kódem.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://api.storyous.com https://login.storyous.com https://blob.vercel-storage.com",
+              "connect-src 'self' https://api.storyous.com https://login.storyous.com https://blob.vercel-storage.com https://api.stripe.com https://checkout.stripe.com https://merchant-ui-api.stripe.com https://r.stripe.com",
+              "frame-src https://js.stripe.com https://checkout.stripe.com https://hooks.stripe.com",
               "frame-ancestors 'none'",
               "object-src 'none'",
               "base-uri 'self'",

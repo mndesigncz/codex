@@ -94,7 +94,11 @@ export async function ensureCustomer(teamId: number): Promise<string> {
 }
 
 // ---- Checkout ----
-export async function createCheckout(teamId: number, plan: PaidPlan, interval: Interval): Promise<string> {
+// hosted = přesměrování na stránku Stripe; embedded = pokladna Stripe vložená
+// do našeho okna (components/CheckoutModal.tsx). Karta ani v jednom případě
+// neprojde naším kódem.
+export type CheckoutMode = 'hosted' | 'embedded';
+export async function createCheckout(teamId: number, plan: PaidPlan, interval: Interval, mode: CheckoutMode = 'hosted'): Promise<{ url?: string; clientSecret?: string }> {
   const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
   const t = await teamRow(teamId);
   if (!t) throw new Error('Tým nenalezen');
@@ -125,12 +129,23 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
         trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
       } : {}),
     },
-    success_url: `${appUrl()}/employer/overview?view=settings&billing=success`,
-    cancel_url: `${appUrl()}/employer/overview?view=settings&billing=cancel`,
     metadata: { teamId: String(teamId), plan, interval },
+    ...(mode === 'embedded' ? {
+      ui_mode: 'embedded' as const,
+      // Zůstat v aplikaci; přesměruje se jen když to banka po 3D Secure vyžaduje.
+      redirect_on_completion: 'if_required' as const,
+      return_url: `${appUrl()}/employer/overview?view=settings&billing=success`,
+    } : {
+      success_url: `${appUrl()}/employer/overview?view=settings&billing=success`,
+      cancel_url: `${appUrl()}/employer/overview?view=settings&billing=cancel`,
+    }),
   });
+  if (mode === 'embedded') {
+    if (!session.client_secret) throw new Error('Stripe nevrátil klíč pokladny.');
+    return { clientSecret: session.client_secret };
+  }
   if (!session.url) throw new Error('Stripe nevrátil adresu pokladny.');
-  return session.url;
+  return { url: session.url };
 }
 
 // ---- Zákaznický portál (karta, faktury, změna tarifu, zrušení) ----
