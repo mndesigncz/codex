@@ -357,17 +357,25 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   <PersonLink id={Number(r.id)}><p className="font-semibold text-[#16181A] truncate">{r.name}</p></PersonLink>
                   <p className="text-xs text-[#5B7A08]">od {fmtTime(r.openSince as string)}</p>
                 </div>
-                <span className="shrink-0 whitespace-nowrap tabular-nums font-bold text-[#16181A] text-lg">
+                {/* Stopky a tlačítko mají každé svůj sloupec. Dokud se
+                    tlačítko jen vynechalo, sjely stopky u člověka bez
+                    otevřeného záznamu úplně doprava — dvě stejné karty
+                    vedle sebe pak měly čas každá jinde. */}
+                <span className="shrink-0 whitespace-nowrap tabular-nums font-bold text-[#16181A] text-lg ml-auto">
                   {hms(now - new Date(r.openSince as string).getTime())}
                 </span>
                 {(() => {
                   const openEntry = entries.find(e => String(e.employeeId) === String(r.id) && !e.clockOut);
-                  return openEntry ? (
-                    <button onClick={() => closeEntry(openEntry)} title="Ukončit směnu a nastavit čas odchodu"
-                      className="tap-target-sm shrink-0 rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
-                      Ukončit
-                    </button>
-                  ) : null;
+                  return (
+                    <span className="shrink-0 w-[5.5rem] flex justify-end">
+                      {openEntry && (
+                        <button onClick={() => closeEntry(openEntry)} title="Ukončit směnu a nastavit čas odchodu"
+                          className="tap-target-sm rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3 py-1.5 hover:bg-black/[0.05] transition whitespace-nowrap">
+                          Ukončit
+                        </button>
+                      )}
+                    </span>
+                  );
                 })()}
               </div>
             ))}
