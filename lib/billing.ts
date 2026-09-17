@@ -131,7 +131,8 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
     },
     metadata: { teamId: String(teamId), plan, interval },
     ...(mode === 'embedded' ? {
-      ui_mode: 'embedded' as const,
+      // Stripe hodnotu přejmenoval: „embedded“ už neexistuje, platí „embedded_page“.
+      ui_mode: 'embedded_page' as const,
       // Zůstat v aplikaci; přesměruje se jen když to banka po 3D Secure vyžaduje.
       redirect_on_completion: 'if_required' as const,
       return_url: `${appUrl()}/employer/overview?view=settings&billing=success`,
