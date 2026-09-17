@@ -85,7 +85,8 @@ export async function GET() {
       }
       let lastMessage: string | null = null;
       if (r.last_content) lastMessage = r.last_content;
-      else if (r.last_attachment_type) lastMessage = '📎 Příloha';
+      // Bez emoji: seznam konverzací si ikonu přílohy vykreslí ze své sady.
+      else if (r.last_attachment_type) lastMessage = 'Příloha';
 
       return {
         id: r.id,
