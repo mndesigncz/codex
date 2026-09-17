@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
-import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, ErrorBoundary, ErrorState, useLoad } from '../ui';
+import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, type MenuItem, ErrorBoundary, ErrorState, useLoad, ListRow } from '../ui';
 import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
@@ -367,11 +367,29 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
                         {(d.tables ?? []).map((t: any) => <option key={t.id} value={t.id}>{t.name} · {t.seats} m.</option>)}
                       </select>
                     </div>
-                    <div className="col-span-2 md:col-span-1 flex flex-wrap gap-1.5 justify-start md:justify-end">
-                      {can('confirmed') && <Button size="sm" variant="accent" loading={busy === r.id} onClick={() => act(r.id, { status: 'confirmed' })}>Potvrdit</Button>}
-                      {can('seated') && <Button size="sm" variant="primary" loading={busy === r.id} onClick={() => act(r.id, { status: 'seated' })}>Usadit</Button>}
-                      {can('done') && <Button size="sm" variant="secondary" loading={busy === r.id} onClick={() => act(r.id, { status: 'done' })}>Hotovo</Button>}
-                      {can('declined') && <Button size="sm" variant="ghost" loading={busy === r.id} onClick={() => { if (confirm('Rezervaci odmítnout? Host dostane zprávu.')) act(r.id, { status: 'declined' }); }}>Odmítnout</Button>}
+                    {/* Jedna hlavní akce, zbytek v „···" — stejné pravidlo jako
+                        v Rozvrhu. Dřív tu vedle sebe stála čtyři tlačítka ve
+                        čtyřech různých podobách (Potvrdit, Usadit, Hotovo,
+                        Odmítnout) a nešlo poznat, co je krok vpřed a co je
+                        odmítnutí hosta. Sloupec má pevnou šířku, aby výběr
+                        stolu začínal na každém řádku na stejné svislici. */}
+                    <div className="col-span-2 md:col-span-1 flex items-center gap-1.5 justify-start md:justify-end md:w-44">
+                      {(() => {
+                        const step = can('confirmed') ? { s: 'confirmed', label: 'Potvrdit' }
+                          : can('seated') ? { s: 'seated', label: 'Usadit' }
+                          : can('done') ? { s: 'done', label: 'Hotovo' } : null;
+                        const more: MenuItem[] = [];
+                        if (step?.s === 'seated' && can('done')) more.push({ label: 'Rovnou hotovo', icon: 'check', onClick: () => act(r.id, { status: 'done' }) });
+                        if (can('declined')) more.push({ label: 'Odmítnout rezervaci…', icon: 'close', danger: true,
+                          hint: 'Host dostane zprávu, že se to nepovedlo.',
+                          onClick: () => { if (confirm('Rezervaci odmítnout? Host dostane zprávu.')) act(r.id, { status: 'declined' }); } });
+                        return (<>
+                          {step
+                            ? <Button size="sm" variant="accent" loading={busy === r.id} onClick={() => act(r.id, { status: step.s })} className="flex-1 md:flex-none justify-center">{step.label}</Button>
+                            : <span className="flex-1" />}
+                          {more.length > 0 && <Menu size="sm" label={`Další akce s rezervací ${r.customer_name}`} items={more} />}
+                        </>);
+                      })()}
                     </div>
                   </li>
                 );
@@ -490,25 +508,23 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
       </div>
       {d === null ? <PageSkel /> : d.customers.length === 0
         ? <EmptyState icon="users" title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? '' : 'Přidají se sami na tvé stránce pro hosty.'} compact />
-        : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">
+        : <ul className="glass-card p-3 sm:p-4 list">
             {d.customers.map((c: any) => (
-              <li key={c.id} className="py-3">
-                <div className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center">
-                  <Initials name={c.name} size={36} />
-                  <div className="min-w-0">
-                    <p className="font-semibold truncate flex items-center gap-2">{c.name}{levelFor(Number(c.visits)).id !== 'bronze' && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${levelFor(Number(c.visits)).id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{levelFor(Number(c.visits)).label}</span>}</p>
-                    <p className="text-xs text-black/55 break-words md:truncate">{c.email} · člen od {new Date(c.joined_at).toLocaleDateString('cs-CZ')}{c.last_visit_at ? ` · naposledy ${new Date(c.last_visit_at).toLocaleDateString('cs-CZ')}` : ''}</p>
-                  </div>
-                  <div className="text-right tabular-nums">
-                    <p className="font-bold">{c.points} <span className="text-xs font-medium text-black/50">b.</span></p>
-                    <p className="text-xs text-black/55">{c.stamps} raz. · {c.visits} návšt.</p>
-                  </div>
-                  <span className="hidden md:inline text-xs text-black/55">{c.reservations} rez.{c.open_coupons ? ` · ${c.open_coupons} kupon` : ''}</span>
-                  <div className="col-span-3 md:col-span-1 flex gap-1.5 justify-end">
+              <li key={c.id} className="py-1">
+                <ListRow
+                  as="div"
+                  className="flex-wrap sm:flex-nowrap"
+                  lead={<Initials name={c.name} size={36} />}
+                  title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{c.name}</span>{levelFor(Number(c.visits)).id !== 'bronze' && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${levelFor(Number(c.visits)).id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{levelFor(Number(c.visits)).label}</span>}</span>}
+                  meta={`${c.email} · člen od ${new Date(c.joined_at).toLocaleDateString('cs-CZ')}${c.last_visit_at ? ` · naposledy ${new Date(c.last_visit_at).toLocaleDateString('cs-CZ')}` : ''}`}
+                  value={<>{c.points} <span className="text-xs font-medium text-black/50">b.</span></>}
+                  valueMeta={`${c.stamps} raz. · ${c.visits} návšt.`}
+                  aside={<>{c.reservations} rez.{c.open_coupons ? ` · ${c.open_coupons} kupon` : ''}</>}
+                  actions={<>
                     <Button size="sm" variant="secondary" onClick={() => adjust(c.id, c.name)}>Body ±</Button>
                     <Button size="sm" variant="ghost" onClick={() => showLedger(c.id)}>{openId === c.id ? 'Skrýt' : 'Deník'}</Button>
-                  </div>
-                </div>
+                  </>}
+                />
                 {openId === c.id && (
                   <div className="mt-2 ml-0 md:ml-12 well border border-black/[0.06] p-3 text-xs space-y-3">
                     <MemberGroups customerId={c.id} toast={toast} />

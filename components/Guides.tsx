@@ -675,7 +675,7 @@ function CatButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm transition-all flex-shrink-0 whitespace-nowrap lg:w-full ${
+      className={`tap-target-sm flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm transition-all flex-shrink-0 whitespace-nowrap lg:w-full ${
         active ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'text-black/60 hover:bg-black/[0.04] hover:text-black'
       }`}
     >

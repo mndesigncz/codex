@@ -255,10 +255,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           </div>
           {!compact && (
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={() => openEdit(t)} title="Upravit" className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-[#16181A]">
+              <button onClick={() => openEdit(t)} title="Upravit" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-[#16181A]">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
               </button>
-              <button onClick={() => remove(t)} title="Smazat" className="rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-red-600">
+              <button onClick={() => remove(t)} title="Smazat" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-red-600">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
               </button>
             </div>

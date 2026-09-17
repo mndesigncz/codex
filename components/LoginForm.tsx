@@ -83,7 +83,7 @@ export default function LoginForm() {
               <label className="block text-sm font-medium text-[#16181A] mb-1.5">Heslo</label>
               <div className="relative">
                 <input type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Zadejte heslo" required className={`${inputClass} pr-12`} />
-                <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-black/35 hover:text-black/60 text-sm">
+                <button type="button" onClick={() => setShowPwd(v => !v)} aria-pressed={showPwd} className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-black/35 hover:text-black/60 text-sm">
                   {showPwd ? 'skrýt' : 'zobrazit'}
                 </button>
               </div>
@@ -97,8 +97,8 @@ export default function LoginForm() {
           </form>
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
-            <p className="text-black/50">Provozujete podnik? <Link href="/register" className="text-[#5B7A08] hover:underline font-semibold">Vytvořit účet</Link></p>
-            <p className="text-black/50">Máte kód týmu nebo pozvánku? <Link href="/join" className="text-[#5B7A08] hover:underline font-semibold">Připojit se</Link></p>
+            <p className="text-black/50">Provozujete podnik? <Link href="/register" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Vytvořit účet</Link></p>
+            <p className="text-black/50">Máte kód týmu nebo pozvánku? <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Připojit se</Link></p>
           </div>
         </div>
       </div>
