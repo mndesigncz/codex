@@ -390,7 +390,7 @@ export default function Guides({ user }: { user: User }) {
                             className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition-all text-xs"
                             title="Upravit"
                           >
-                            ✎
+                            <Icon name="pencil" size={13} />
                           </button>
                           <button
                             onClick={(e) => {

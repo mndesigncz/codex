@@ -154,7 +154,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
             <ul className="mt-2.5 space-y-1.5">
               {test.map((k, i) => (
                 <li key={i} className="flex gap-2 text-[13px]">
-                  <span className={`shrink-0 mt-0.5 ${k.ok ? 'text-[#5B7A08]' : 'text-red-600'}`} aria-hidden>{k.ok ? '✓' : '✕'}</span>
+                  <span className={`shrink-0 mt-0.5 ${k.ok ? 'text-[#5B7A08]' : 'text-red-600'}`} aria-hidden><Icon name={k.ok ? 'check' : 'close'} size={13} /></span>
                   <span className="min-w-0">
                     <span className="font-semibold text-[#16181A]">{k.krok}:</span> <span className="text-black/70">{k.detail}</span>
                     {k.kde && <span className="block text-[11px] text-black/45 mt-0.5">→ {k.kde}</span>}

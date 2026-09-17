@@ -582,7 +582,9 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   )}
                   <button type="button" onClick={() => setEditingItem(editingItem === ing.itemId ? null : ing.itemId)}
                     className="font-bold text-[#5B7A08] hover:brightness-110 transition">
-                    {editingItem === ing.itemId ? '− zavřít úpravu' : '✎ upravit položku / díly'}
+                    {editingItem === ing.itemId
+                      ? <><Icon name="close" size={13} className="inline -mt-0.5 mr-1" />zavřít úpravu</>
+                      : <><Icon name="pencil" size={13} className="inline -mt-0.5 mr-1" />upravit položku / díly</>}
                   </button>
                 </p>
               )}

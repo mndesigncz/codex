@@ -198,7 +198,10 @@ export default function ScheduleBuilder({ user }: Props) {
   const [copySrc, setCopySrc] = useState('');
   const [copyDst, setCopyDst] = useState('');
   const [copying, setCopying] = useState(false);
-  const [copyMsg, setCopyMsg] = useState('');
+  // Zpráva o kopírování si nese vlastní příznak úspěchu. Dřív se barva
+  // odvozovala z toho, jestli text obsahoval znak ✓ — takže stačilo
+  // přeformulovat hlášku a úspěch se obarvil červeně.
+  const [copyMsg, setCopyMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const mondayOf = (d: Date) => {
     const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(12, 0, 0, 0);
     return x;
@@ -218,8 +221,8 @@ export default function ScheduleBuilder({ user }: Props) {
     return out;
   };
   const copyWeek = async () => {
-    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg('Vyber dva různé týdny.'); return; }
-    setCopying(true); setCopyMsg('');
+    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg({ text: 'Vyber dva různé týdny.', ok: false }); return; }
+    setCopying(true); setCopyMsg(null);
     try {
       // Source shifts may live outside the loaded month — fetch both weeks' months.
       const months = new Set([copySrc.slice(0, 7), iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000)).slice(0, 7)]);
@@ -237,19 +240,19 @@ export default function ScheduleBuilder({ user }: Props) {
           const nd = new Date(sh.date + 'T12:00:00'); nd.setDate(nd.getDate() + offsetDays);
           return { employeeId: sh.employeeId, date: iso(nd), startTime: sh.startTime, endTime: sh.endTime, type: sh.type };
         });
-      if (toCreate.length === 0) { setCopyMsg('Ve zdrojovém týdnu nejsou žádné směny.'); setCopying(false); return; }
+      if (toCreate.length === 0) { setCopyMsg({ text: 'Ve zdrojovém týdnu nejsou žádné směny.', ok: false }); setCopying(false); return; }
       const res = await fetch('/api/schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shifts: toCreate }),
       });
       if (res.ok) {
-        setCopyMsg(`Hotovo — zkopírováno ${toCreate.length} směn. ✓`);
+        setCopyMsg({ text: `Hotovo — zkopírováno ${toCreate.length} směn.`, ok: true });
         await load();
       } else {
         const d = await res.json().catch(() => ({}));
-        setCopyMsg(d.error || 'Kopírování se nepodařilo.');
+        setCopyMsg({ text: d.error || 'Kopírování se nepodařilo.', ok: false });
       }
-    } catch { setCopyMsg('Kopírování se nepodařilo.'); }
+    } catch { setCopyMsg({ text: 'Kopírování se nepodařilo.', ok: false }); }
     setCopying(false);
   };
   const [publishing, setPublishing] = useState(false);
@@ -948,7 +951,7 @@ export default function ScheduleBuilder({ user }: Props) {
               items={[
                 { label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: adjusting || shifts.length === 0,
                   hint: 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' },
-                { label: 'Kopírovat týden', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(''); setCopySrc(''); setCopyDst(''); } },
+                { label: 'Kopírovat týden', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } },
                 { label: 'Import CSV', icon: 'upload', onClick: () => fileRef.current?.click() },
                 { label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 },
                 { label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
@@ -1002,7 +1005,11 @@ export default function ScheduleBuilder({ user }: Props) {
                       {weekOptions(0, 5).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                     </select>
                   </div>
-                  {copyMsg && <p className={`text-sm ${copyMsg.includes('✓') ? 'text-[#5B7A08]' : 'text-red-600'}`}>{copyMsg}</p>}
+                  {copyMsg && (
+                    <p className={`text-sm flex items-center gap-1.5 ${copyMsg.ok ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+                      <Icon name={copyMsg.ok ? 'check' : 'warning'} size={14} className="shrink-0" />{copyMsg.text}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 mt-5">
                   <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zavřít</button>

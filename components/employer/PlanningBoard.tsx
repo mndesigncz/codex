@@ -234,7 +234,7 @@ export default function PlanningBoard() {
                             onClick={() => { setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }); setMenuId(null); }}
                             className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] flex items-center gap-2 transition-colors"
                           >
-                            ✎ Upravit kartu
+                            <Icon name="pencil" size={15} /> Upravit kartu
                           </button>
                           <div className="h-px bg-black/[0.08] my-1" />
                           <button

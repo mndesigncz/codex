@@ -241,7 +241,7 @@ function ReviewPrompt({ p, onDone }: { p: any; onDone: () => void }) {
       <div className="mt-2 flex items-center gap-1" role="radiogroup" aria-label="Hodnocení">
         {[1, 2, 3, 4, 5].map(n => (
           <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} z 5`} onClick={() => setRating(n)}
-            className={`tap-target-sm h-10 w-10 rounded-full text-2xl leading-none transition ${n <= rating ? 'text-[#16181A]' : 'text-black/20 hover:text-black/40'}`}>★</button>
+            className={`tap-target-sm h-10 w-10 rounded-full grid place-items-center transition ${n <= rating ? 'text-[#16181A]' : 'text-black/20 hover:text-black/40'}`}><Icon name="star" size={24} /></button>
         ))}
       </div>
       <div className="mt-2 flex gap-2 flex-wrap">

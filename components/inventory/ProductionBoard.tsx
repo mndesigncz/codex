@@ -160,7 +160,7 @@ export default function ProductionBoard({ compact = false, onOpenTasks, onChange
                     <div className="space-y-1">
                       {e.lines.map(l => (
                         <p key={l.ingredientId} className="text-[13px] flex items-center gap-2">
-                          <span className={`shrink-0 ${l.missing > 0 ? 'text-red-600' : 'text-[#5B7A08]'}`}>{l.missing > 0 ? '✗' : '✓'}</span>
+                          <span className={`shrink-0 ${l.missing > 0 ? 'text-red-600' : 'text-[#5B7A08]'}`}><Icon name={l.missing > 0 ? 'close' : 'check'} size={14} /></span>
                           <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name} {fmt(l.need)} {l.unit}</span>
                           <span className="shrink-0 text-black/45 tabular-nums">ve skladu {fmt(l.available)} {l.unit}</span>
                         </p>
