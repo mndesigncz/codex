@@ -651,7 +651,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
           </div>
           <div className="grid gap-2">
             <label htmlFor="o-note" className={label}>Poznámka pro obsluhu</label>
-            <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Bez cukru, vyšší konvička…" className={input} maxLength={300} />
+            <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Bez cukru, mléko zvlášť…" className={input} maxLength={300} />
           </div>
           {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
           <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Objednat' : 'Přihlásit se a objednat'}</button>

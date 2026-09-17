@@ -190,7 +190,7 @@ export default function FinanceView() {
           přepínač měsíce pod ní. Dřív si ji tahle obrazovka kreslila sama —
           měla h2 místo h1 a hlavní akci v tmavé, takže vypadala jako z jiné
           aplikace. */}
-      <PageHeader
+      <PageHeader hintId="financeview"
         title="Finance"
         subtitle="Tržby, nákupy a mzdy měsíce pohromadě."
         primary={<Button onClick={() => (pro ? setExportOpen(true) : setUpgradeFor('Export pro účetní'))} variant="accent" icon="download">Export pro účetní</Button>}

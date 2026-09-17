@@ -107,7 +107,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
 
   return (
     <form onSubmit={save} className="space-y-6 max-w-3xl">
-      <PageHeader title="Vzhled" subtitle="Čím se podnik hostům představí: logo, fotky a pár vět o sobě."
+      <PageHeader hintId="brandtab" title="Vzhled" subtitle="Čím se podnik hostům představí: logo, fotky a pár vět o sobě."
         primary={<Button type="submit" variant="accent" loading={busy === 'save'}>Uložit</Button>}
         secondary={<Button type="button" variant="secondary" icon="external" onClick={() => url && window.open(url, '_blank')} disabled={!url}>Zobrazit</Button>} />
 
@@ -166,7 +166,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       <section className="glass-card p-5 grid gap-4">
         <h2 className="t-section">O podniku</h2>
         <div><label htmlFor="b-tag" className={label}>Motto</label><input id="b-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." className={input} maxLength={120} /></div>
-        <div><label htmlFor="b-desc" className={label}>Pár vět</label><textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malá čajovna v přízemí starého domu. Sedí se na zemi i u stolů." className={input} maxLength={1200} /></div>
+        <div><label htmlFor="b-desc" className={label}>Pár vět</label><textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malý podnik v přízemí starého domu. Sedí se u stolů i na baru." className={input} maxLength={1200} /></div>
         <div><label htmlFor="b-addr" className={label}>Adresa</label><input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" className={input} /></div>
       </section>
     </form>

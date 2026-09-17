@@ -142,7 +142,7 @@ export default function PlanningBoard() {
     <div className="p-6 space-y-5">
       {/* Nadpis obrazovky: bez něj tabule začínala rovnou sloupci a nedalo se
           poznat, kde je člověk — horní lišta je malá a při rolování zmizí. */}
-      <PageHeader title="Plánování" subtitle="Nápady a úkoly, které čekají na svůj čas." />
+      <PageHeader hintId="planningboard" title="Plánování" subtitle="Nápady a úkoly, které čekají na svůj čas." />
       {flash && (
         <div className="mb-4 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-3 text-[#5B7A08] text-sm">{flash}</div>
       )}
@@ -234,7 +234,7 @@ export default function PlanningBoard() {
                             onClick={() => { setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }); setMenuId(null); }}
                             className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] flex items-center gap-2 transition-colors"
                           >
-                            ✎ Upravit kartu
+                            <Icon name="pencil" size={15} /> Upravit kartu
                           </button>
                           <div className="h-px bg-black/[0.08] my-1" />
                           <button

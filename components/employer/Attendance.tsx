@@ -322,7 +322,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader
+      <PageHeader hintId="attendance"
         title="Docházka"
         subtitle="Kdo je na směně, odpracované hodiny a mzdy za období."
         secondary={<Segmented size="sm" ariaLabel="Období" value={String(days)} onChange={v => setDays(Number(v) as typeof PERIODS[number])}
@@ -502,16 +502,17 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${open ? 'text-[#5B7A08]' : 'text-[#16181A]'}`}>
                               {open ? hms(end - start) : humanDuration(end - start)}
                             </span>
+                            {/* Ikony ze sady, ne ručně kreslené cesty: stejná
+                                tloušťka linky jako všude jinde. A zvětšená
+                                dotyková plocha — 32 px se palcem míjí. */}
                             <button onClick={() => openEdit(e)} aria-label="Upravit čas"
-                              className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-[#16181A] hover:bg-black/[0.05] transition-colors">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                              className="tap-target shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-[#16181A] hover:bg-black/[0.05] transition-colors">
+                              <Icon name="pencil" size={15} />
                             </button>
                             <button onClick={() => remove(e)} disabled={deleting === e.id}
                               aria-label="Smazat záznam"
-                              className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-red-600 hover:bg-red-500/[0.08] transition-colors disabled:opacity-40">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6" />
-                              </svg>
+                              className="tap-target shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-red-600 hover:bg-red-500/[0.08] transition-colors disabled:opacity-40">
+                              <Icon name="trash" size={16} />
                             </button>
                           </div>
                           {e.note && (

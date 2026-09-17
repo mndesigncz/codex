@@ -463,7 +463,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto w-full">
-      <PageHeader title="Nastavení týmu" subtitle="Lidé, role, pozvánky a pravidla podniku." />
+      <PageHeader hintId="teammanagement" title="Nastavení týmu" subtitle="Lidé, role, pozvánky a pravidla podniku." />
       {notice && (
         <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
           <Icon name="check" size={16} /> {notice}

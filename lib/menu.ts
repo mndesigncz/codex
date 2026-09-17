@@ -94,7 +94,7 @@ export const SEED_BOARD = {
   eyebrow: 'Venkovní akce',
   title: 'Speciální nabídka',
   note: '*Alergeny a složení na vyžádání u obsluhy',
-  wifiSsid: 'Pangea',
+  wifiSsid: 'WiFi podniku',
   wifiPassword: 'heslojeheslo',
   sections: [
     {

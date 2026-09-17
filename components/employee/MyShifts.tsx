@@ -113,7 +113,7 @@ export default function MyShifts({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto w-full">
-      <PageHeader title="Moje směny" subtitle="Co tě čeká a co už máš odpracované." />
+      <PageHeader hintId="myshifts" title="Moje směny" subtitle="Co tě čeká a co už máš odpracované." />
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="glass-card p-6 hover:bg-black/[0.05] transition-all duration-300">

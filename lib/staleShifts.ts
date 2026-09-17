@@ -1,7 +1,7 @@
 // Zapomenuté odpíchnutí — a hlavně to, co zapomenutí NENÍ.
 //
 // Původní pravidlo znělo „otevřeno přes 12 hodin ⇒ zavřít, a to v čase, kdy
-// měla směna podle plánu skončit". V čajovně, která otevírá v osm a zavírá po
+// měla směna podle plánu skončit". V podniku, který otevírá v osm a zavírá po
 // půlnoci, to znamenalo tohle: člověk, který si v osm ráno píchl příchod a ve
 // tři čtvrtě na dvanáct večer ještě obsluhoval, dostal směnu ukončenou —
 // a zpětně posunutou na plánovaných šestnáct hodin. Přišel o skoro šest
@@ -36,7 +36,7 @@ const NIGHT_MIN_OPEN_MS = 3 * 3600 * 1000;
  * Je otevřený záznam zapomenuté odpíchnutí, nebo se pořád pracuje?
  *
  * Jediná spolehlivá odpověď na „zapomněl, nebo tam ještě je" je denní doba.
- * Ve tři čtvrtě na dvanáct večer se v čajovně pracuje; v šest ráno ne.
+ * Ve tři čtvrtě na dvanáct večer se v podniku pracuje; v šest ráno ne.
  */
 export function isForgottenClockOut(clockIn: Date | string, now: Date = new Date()): boolean {
   const inTs = new Date(clockIn);

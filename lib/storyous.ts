@@ -158,7 +158,7 @@ export interface OrderLine { itemId: string; count: number; unitPriceWithVat: nu
  *
  *   `timing.autoDeclineAfter` — „by default, the order is declined
  *   automatically if the staff does not confirm it in 5 minutes". Pět minut je
- *   na čajovnu málo: než si toho někdo všimne, objednávka je po smrti. Proto
+ *   na provoz málo: než si toho někdo všimne, objednávka je po smrti. Proto
  *   se posílá delší lhůta.
  */
 export async function createTableOrder(conn: PosConnection, o: { externalId: string; deskId: string; items: OrderLine[]; note?: string | null; customerName?: string | null; notification?: { confirm: string; dispatch: string; decline: string } }): Promise<{ orderId: string; state: string; raw: any }> {

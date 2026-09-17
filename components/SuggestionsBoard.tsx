@@ -164,7 +164,7 @@ export default function SuggestionsBoard() {
       {/* Hlavička jako u ostatních obrazovek. Dřív tu byla uvítací karta s
           h3 a pod ní tmavé tlačítko: obrazovka neměla hlavní nadpis a hlavní
           akce se barvou lišila od zbytku aplikace. */}
-      <PageHeader
+      <PageHeader hintId="suggestionsboard"
         title="Nápady"
         subtitle={isEmployer
           ? 'Podněty od týmu — co by lidem usnadnilo práci. Přidej se hlasem nebo posuň nápad dál.'

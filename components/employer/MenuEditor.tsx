@@ -425,7 +425,7 @@ export default function MenuEditor() {
       {/* Nadpis obrazovky. Uvnitř karty byl h2 „Menu pro hosty" — vypadal
           jako nadpis sekce, ne obrazovky, takže Menu jako jediná položka
           navigace neřeklo, kde jsi. */}
-      <PageHeader title="Menu" subtitle="Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky." />
+      <PageHeader hintId="menueditor" title="Menu" subtitle="Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky." />
       <div className="glass-card p-6 space-y-4">
 
         {/* Všechna menu jako dlaždice — na první pohled je vidět, co existuje,

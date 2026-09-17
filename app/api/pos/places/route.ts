@@ -1,5 +1,5 @@
 // Provozovny (places) merchanta ve Storyous. Jeden podnik jich může mít víc —
-// třeba stálou čajovnu a mobilní stánek. Výjezdová akce si pak přiřadí svoji
+// třeba stálou provozovnu a mobilní stánek. Výjezdová akce si pak přiřadí svoji
 // kasu a tržby dvou provozoven se nemíchají.
 
 import { NextResponse } from 'next/server';

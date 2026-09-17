@@ -1,6 +1,6 @@
 // Vzhled zákaznického menu.
 //
-// Stránka /menu-akce.html má vzhled Čajbaru Pangea zapečený v sobě (barvy,
+// Stránka /menu-akce.html má jeden vzhled zapečený v sobě (barvy,
 // písma Nayuki a Poppins, logo, listy na pozadí). To je fajn pro ně, ale
 // pro jiný podnik je to cizí design — tenhle soubor z toho dělá nastavení.
 //

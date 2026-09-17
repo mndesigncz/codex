@@ -5,7 +5,7 @@ označené (předpoklad) jsou odvozené, ne potvrzené.
 
 ## Co to je
 
-Managero je správa malého pohostinského podniku (čajovna, kavárna, bistro)
+Managero je správa malého pohostinského podniku (kavárna, restaurace, bistro, čajovna)
 v jedné webové aplikaci: směny a docházka, uzávěrky a finance, sklad a
 receptury, menu, úkoly a postupy, tým a odměny. **Managero client** je druhé
 prostředí téže aplikace pro hosty: členství, kartička s QR, rezervace,

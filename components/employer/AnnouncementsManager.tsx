@@ -143,8 +143,8 @@ export default function AnnouncementsManager() {
               key={a.id}
               className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-[#FFD60A]/[0.12] border-[#FFD60A]/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
             >
-              <span className="shrink-0 text-lg leading-6" aria-hidden>
-                {a.pinned ? '📌' : '📄'}
+              <span className={`shrink-0 mt-0.5 ${a.pinned ? 'text-[#8A6A00]' : 'text-black/35'}`} aria-hidden>
+                <Icon name={a.pinned ? 'pin' : 'book'} size={17} />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-[#16181A] whitespace-pre-wrap break-words">
@@ -160,13 +160,13 @@ export default function AnnouncementsManager() {
               <div className="shrink-0 flex items-center gap-1">
                 <button type="button" onClick={() => { setEditing(a); setEditText(a.content); }}
                   aria-label="Upravit" title="Upravit"
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm"><Icon name="pencil" size={15} /></button>
+                  className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="pencil" size={15} /></button>
                 <button type="button" onClick={() => patch(a.id, { pinned: !a.pinned })}
                   aria-label={a.pinned ? 'Odepnout' : 'Připnout'} title={a.pinned ? 'Odepnout (tým ho přestane vidět)' : 'Znovu připnout'}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-xs">{a.pinned ? '⤓' : '📌'}</button>
+                  className={`tap-target-sm w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/[0.06] transition ${a.pinned ? 'text-[#8A6A00]' : 'text-black/40 hover:text-black/70'}`}><Icon name="pin" size={15} /></button>
                 <button type="button" onClick={() => remove(a.id)}
                   aria-label="Odstranit oznámení"
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm"><Icon name="close" size={15} /></button>
+                  className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="close" size={15} /></button>
               </div>
             </div>
           ))}

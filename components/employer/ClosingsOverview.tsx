@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState, PageHeader } from '../ui';
+import { EmptyState, PageHeader, Button, Menu } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { usePlan, UpgradeModal, ProBadge } from '../Pro';
 import {
@@ -314,12 +314,12 @@ export default function ClosingsOverview() {
       {/* Nadpis obrazovky — dřív začínala rovnou červenou kartou „Chybí
           uzávěrka" a nebylo poznat, kde je člověk, jakmile horní lišta
           odrolovala. */}
-      <PageHeader title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
+      <PageHeader hintId="closingsoverview" title="Uzávěrky" subtitle="Denní tržby, rozdíly proti kase a co čeká na schválení." />
       {/* Chybějící uzávěrky — dny, kdy někdo měl směnu, ale uzávěrka není */}
       {missing.length > 0 && (
         <div className="card card-danger p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg" aria-hidden>🚨</span>
+            <Icon name="warning" size={17} className="text-[#B23A15] shrink-0" />
             <h3 className="t-card">Chybí uzávěrka</h3>
             <span className="rounded-full bg-red-500/15 text-red-600 px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
           </div>
@@ -330,7 +330,7 @@ export default function ClosingsOverview() {
                 <p className="font-bold tracking-tight text-[#16181A] cz-sentence">{fmtMissing(m.date)}</p>
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span className="text-xs text-black/45">Na směně:</span>
-                  {m.employees.map(e => (
+                  {(m.employees ?? []).map(e => (
                     <span key={e.id} className="inline-flex items-center gap-1 rounded-full bg-black/[0.04] px-2 py-0.5 text-xs text-black/60">
                       <span>{e.avatar ?? '👤'}</span> {e.name}
                     </span>
@@ -371,15 +371,16 @@ export default function ClosingsOverview() {
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                 </div>
                 <p className="text-xs text-black/45">Odesláno bez směny — zkontroluj a schval.</p>
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={() => approve(c)} disabled={approving === c.id}
-                    className="rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 disabled:opacity-50 shrink-0">
-                    {approving === c.id ? 'Schvaluji…' : 'Schválit'}
-                  </button>
-                  <button onClick={() => remove(c)} disabled={deleting === c.id}
-                    className="rounded-full bg-black/[0.05] border border-black/10 text-red-600 text-sm px-4 py-2 disabled:opacity-50 shrink-0">
-                    {deleting === c.id ? 'Mažu…' : 'Smazat'}
-                  </button>
+                {/* Schválit je jediná hlavní akce; smazání uzávěrky je
+                    nevratné a nepatří vedle ní jako druhé stejně velké
+                    tlačítko. Stejné pravidlo jako u rezervací a v Rozvrhu. */}
+                <div className="flex items-center gap-2">
+                  <Button variant="accent" icon="check" onClick={() => approve(c)} loading={approving === c.id}
+                    className="flex-1 sm:flex-none justify-center">Schválit</Button>
+                  <Menu size="sm" label={`Další akce s uzávěrkou od ${c.author_name ?? 'neznámého'}`}
+                    items={[{ label: 'Smazat uzávěrku…', icon: 'trash', danger: true,
+                      hint: 'Nenávratně smaže odeslané hodnoty.',
+                      onClick: () => remove(c), disabled: deleting === c.id }]} />
                 </div>
               </div>
             );

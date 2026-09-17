@@ -202,7 +202,7 @@ export default function AvailabilitySubmit({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
-      <PageHeader title="Dostupnost"
+      <PageHeader hintId="availabilitysubmit" title="Dostupnost"
         subtitle={<>Klepnutím na den cyklicky nastav:{' '}
           <span className="text-black/70 font-medium">{stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}</span>.</>} />
 

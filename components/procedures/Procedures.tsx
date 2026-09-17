@@ -188,7 +188,7 @@ export default function Procedures({ user }: Props) {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
       {/* Header */}
-      <PageHeader className="pb-5" title="Postupy" subtitle="Krok za krokem — otevírání, zavírání a další rutiny."
+      <PageHeader hintId="procedures" className="pb-5" title="Postupy" subtitle="Krok za krokem — otevírání, zavírání a další rutiny."
         primary={isEmployer && procedures.length > 0 && (
           <Button variant="accent" icon="plus" onClick={openNew}>Nový postup</Button>
         )} />

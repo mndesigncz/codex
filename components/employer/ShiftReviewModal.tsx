@@ -419,7 +419,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                             {(p.item?.note || p.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
                             <span className="text-[11px] tabular-nums shrink-0 text-[#5B7A08]">{p.done}/{count}</span>
                             {p.skippedCount > 0 && <span className="text-[11px] text-amber-600 shrink-0">{p.skippedCount}⤳</span>}
-                            {p.missing.length > 0 && <span className="text-[11px] text-red-600 shrink-0">{p.missing.length}✕</span>}
+                            {p.missing.length > 0 && <span className="text-[11px] text-red-600 shrink-0">{p.missing.length}<Icon name="close" size={10} className="inline -mt-0.5" /></span>}
                             {chev(!!expanded[key])}
                           </button>
                           {expanded[key] && (

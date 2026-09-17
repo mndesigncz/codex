@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Icon } from '../Icons';
 import { Menu, type MenuItem } from './Menu';
 
 // Hlavička obrazovky — jedna pro všechny.
@@ -10,9 +11,16 @@ import { Menu, type MenuItem } from './Menu';
 // hlavní akce. Na telefonu jdou vedlejší akce do menu a hlavní zůstane.
 // Dřív měla každá obrazovka svůj nadpis (osm variant) a svou řadu tlačítek.
 
-export function PageHeader({ title, subtitle, primary, secondary, menu, aside, className = '' }: {
+export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, aside, className = '' }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  /**
+   * Klíč, pod kterým si pamatujeme, že člověk tenhle vysvětlující řádek
+   * zavřel. Název obrazovky zůstává vždycky — ten je orientace. Vysvětlení
+   * „co se tu dělá" ale po roce používání nikdo nečte, jen zabírá první
+   * obrazovku. S klíčem jde zavřít křížkem a vrátit v Nastavení → Vzhled.
+   */
+  hintId?: string;
   /** Jedna hlavní akce — typicky <Button variant="accent">. */
   primary?: React.ReactNode;
   /** Nejvýš dvě vedlejší akce; na telefonu se schovají do menu (viz `menu`). */
@@ -23,12 +31,43 @@ export function PageHeader({ title, subtitle, primary, secondary, menu, aside, c
   aside?: React.ReactNode;
   className?: string;
 }) {
+  // Server localStorage nezná, tak se první vykreslení tváří „ukaž"
+  // a schová se až v prohlížeči — jinak by neseděla hydratace.
+  const [subtitleHidden, setSubtitleHidden] = useState(false);
+  useEffect(() => {
+    if (!hintId) return;
+    const read = () => {
+      try {
+        setSubtitleHidden(localStorage.getItem('managero-hint-' + hintId) === '1'
+          || localStorage.getItem('managero-hints-off') === '1');
+      } catch { setSubtitleHidden(false); }
+    };
+    read();
+    window.addEventListener('managero-hints-changed', read);
+    return () => window.removeEventListener('managero-hints-changed', read);
+  }, [hintId]);
+
+  const showSubtitle = subtitle && !(hintId && subtitleHidden);
+
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1 basis-[14rem]">
           <h1 className="t-page text-balance">{title}</h1>
-          {subtitle && <p className="t-meta mt-1.5 max-w-[70ch] text-pretty">{subtitle}</p>}
+          {showSubtitle && (
+            <p className="t-meta mt-1.5 max-w-[70ch] text-pretty group">
+              {subtitle}
+              {hintId && (
+                <button type="button"
+                  onClick={() => { try { localStorage.setItem('managero-hint-' + hintId, '1'); } catch { /* soukromý režim */ } setSubtitleHidden(true); }}
+                  aria-label="Skrýt tenhle popis"
+                  title="Skrýt tenhle popis (vrátit jde v Nastavení → Vzhled)"
+                  className="tap-target-sm ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full align-[-2px] opacity-0 focus-visible:opacity-100 group-hover:opacity-50 hover:!opacity-100 transition">
+                  <Icon name="close" size={11} />
+                </button>
+              )}
+            </p>
+          )}
         </div>
         {(primary || secondary || (menu && menu.length > 0)) && (
           <div className="flex items-center gap-2 shrink-0 ml-auto">
