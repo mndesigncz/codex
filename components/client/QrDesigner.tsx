@@ -86,12 +86,18 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
     window.open(`/api/client/admin/tables/qr?${qs}&design=${encodeURIComponent(JSON.stringify(d))}`, '_blank');
   };
 
+  // Sourozenecké sekce (tahle a Plánek podniku) musí vypadat stejně: dřív
+  // měla jedna verzálkový štítek a druhá nadpis sekce, takže to vypadalo,
+  // že patří do jiných úrovní.
   return (
-    <section aria-labelledby="h-qr" className="glass-card p-4 sm:p-5 space-y-4 max-w-4xl">
+    <section aria-labelledby="h-qr" className="glass-card p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h3 id="h-qr" className="text-sm font-bold uppercase tracking-wider text-black/55 flex items-center gap-2">
-          <Icon name="print" size={16} className="text-black/40" />Vzhled QR na stůl
-        </h3>
+        <div className="min-w-0">
+          <h2 id="h-qr" className="t-section flex items-center gap-2.5">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name="print" size={15} /></span>
+            Vzhled QR na stůl
+          </h2>
+        </div>
         <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
           className="tap-target-sm ml-auto text-xs font-semibold text-black/55 hover:text-black flex items-center gap-1">
           {open ? 'Skrýt' : 'Upravit a vytisknout'}<Icon name="chevron" size={14} className={open ? 'rotate-180 transition' : 'transition'} />

@@ -172,19 +172,20 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       )}
       {!compact && vady.length === 0 && !test && (
         <p className="px-1">
-          <button type="button" onClick={zkouska} disabled={testuji}
-            className="tap-target-sm text-xs font-semibold text-black/50 hover:text-black underline underline-offset-2 disabled:opacity-50">
+          <Button size="sm" variant="ghost" icon="refresh" loading={testuji} onClick={zkouska}>
             {testuji ? 'Zkouším spojení s kasou…' : 'Vyzkoušet spojení s kasou'}
-          </button>
+          </Button>
         </p>
       )}
       {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
-      {compact ? (
-        <details className="group">
-          <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none"><Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" /></summary>
-          <div className="mt-2"><CardScan onToast={toast} /></div>
-        </details>
-      ) : <CardScan onToast={toast} onChange={reload} />}
+      {/* Vyhledání kartičky je nástroj pro obsluhu u kasy, ne obsah
+          obrazovky. Dřív stálo jako velká karta nad objednávkami a bralo
+          jim první pohled; teď je to jeden řádek, který se rozbalí, když
+          někdo kartičku opravdu drží v ruce. */}
+      <details className="group">
+        <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none"><Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" /></summary>
+        <div className="mt-2"><CardScan onToast={toast} onChange={compact ? undefined : reload} /></div>
+      </details>
       {news.length > 0 && (
         <section className="rounded-3xl bg-amber-500/[0.10] border border-amber-500/40 p-4 space-y-3">
           <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-amber-800" />{news.length === 1 ? 'Nová objednávka od stolu' : `${news.length} nové objednávky od stolu`}</h2>

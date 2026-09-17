@@ -42,6 +42,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
   const [grid, setGrid] = useState(true);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const drag = useRef<{ mode: 'move' | 'resize' | 'draw'; ox: number; oy: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -188,21 +189,29 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
   const selTable = sel?.kind === 'table' ? tables.find(t => t.id === sel.id) : null;
   const hint = TOOLS.find(t => t.id === tool)!.hint;
 
+  // Kreslení půdorysu je nástroj, ke kterému se člověk vrací jednou za
+  // čas — ne obsah, který má pod seznamem stolů viset pořád otevřený.
+  // Sbalený vypadá stejně jako sousední „Vzhled QR na stůl".
   return (
     <section className="glass-card p-4 sm:p-5 space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
+        <div className="min-w-0">
           <h2 className="t-section flex items-center gap-2.5">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name="location" size={15} /></span>
             Plánek podniku
           </h2>
-          <p className="text-xs text-black/55 mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>
+          {open && <p className="text-xs text-black/55 mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto">
           {dirty && <span className="text-xs text-amber-800">Neuloženo</span>}
-          <Button size="sm" variant="accent" loading={busy} disabled={!dirty} onClick={save}>Uložit plánek</Button>
+          {open && <Button size="sm" variant="accent" loading={busy} disabled={!dirty} onClick={save}>Uložit plánek</Button>}
+          <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
+            className="tap-target-sm text-xs font-semibold text-black/55 hover:text-black flex items-center gap-1">
+            {open ? 'Skrýt' : 'Upravit plánek'}<Icon name="chevron" size={14} className={open ? 'rotate-180 transition' : 'transition'} />
+          </button>
         </div>
       </div>
+      {!open ? null : (<>
 
       <div className="flex items-center gap-1.5 flex-wrap">
         {TOOLS.map(t => (
@@ -339,6 +348,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
           </div>
         )}
       </div>
+    </>)}
     </section>
   );
 }

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
-import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, type MenuItem, ErrorBoundary, ErrorState, useLoad, ListRow } from '../ui';
+import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, type MenuItem, ErrorBoundary, ErrorState, useLoad, ListRow, Modal } from '../ui';
 import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
@@ -34,6 +34,21 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'brand', label: 'Vzhled', icon: 'sparkle' },
   { id: 'settings', label: 'Nastavení', icon: 'settings' },
 ];
+
+// Deset sourozenců v jedné řadě je seznam, ne navigace: nedá se z něj
+// poznat, co k čemu patří, a na 1280 px se pilulky rozlézají přes půl
+// obrazovky. Zbytek aplikace to má dávno vyřešené seskupeným panelem —
+// tady se jen používá totéž. Skupiny už existovaly v mobilním „Více",
+// jen na počítači se ignorovaly (a byly popsané naopak: „Provoz"
+// obsahoval stoly a menu, „Podnik" nastavení).
+const NAV_SECTIONS: { title: string | null; ids: Tab[] }[] = [
+  { title: null,       ids: ['overview'] },
+  { title: 'Dnešek',   ids: ['reservations', 'orders'] },
+  { title: 'Podnik',   ids: ['tables', 'menu', 'events'] },
+  { title: 'Hosté',    ids: ['customers', 'loyalty'] },
+  { title: 'Nastavení', ids: ['brand', 'settings'] },
+];
+const BY_ID = Object.fromEntries(TABS.map(t => [t.id, t])) as Record<Tab, typeof TABS[number]>;
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -120,11 +135,36 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         {summary?.attention > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-1 text-[11px] font-bold tabular-nums">{summary.attention} k vyřízení</span>}
         <div className="ml-auto hidden sm:block"><Button variant="secondary" size="sm" icon="external" onClick={() => summary?.slug && window.open(`/client/${summary.slug}`, '_blank')} disabled={!summary?.slug}>Stránka pro hosty</Button></div>
       </header>
-      <div className="shrink-0 hidden md:block px-4 sm:px-6 pb-2">
-        <Segmented options={TABS.map(t => ({ id: t.id, label: t.label }))} value={tab} onChange={setTab} size="sm" ariaLabel="Části režimu Client" wrap />
-      </div>
+
       {toast && <p role="status" className="toast-in shrink-0 mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
-      <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-36 md:pb-8">
+
+      <div className="flex-1 flex min-h-0">
+        {/* Postranní panel se skupinami — stejný jazyk jako administrace.
+            Na telefonu ho nahrazuje spodní dock a list „Více". */}
+        <aside className="hidden md:block shrink-0 w-56 overflow-y-auto scrollbar-thin px-3 pb-6">
+          <nav className="space-y-1" aria-label="Části režimu Client">
+            {NAV_SECTIONS.map((sec, si) => (
+              <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-1.5' : ''}>
+                {sec.title && <p className="px-3.5 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>}
+                <div className="space-y-px">
+                  {sec.ids.map(id => BY_ID[id]).filter(Boolean).map(item => (
+                    <button key={item.id} onClick={() => setTab(item.id)} title={item.label}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
+                        tab === item.id ? 'seg-on' : 'seg-off'
+                      }`}>
+                      <Icon name={item.icon} size={21} className="flex-shrink-0 i-lead"
+                        motion={tab === item.id ? 'pop' : undefined}
+                        key={tab === item.id ? 'on' : 'off'} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="flex-1 min-w-0 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-36 md:pb-8">
         <ErrorBoundary resetKey={tab} title={`${TABS.find(t => t.id === tab)?.label ?? 'Tahle část'} se nenačetla`}>
         {tab === 'overview' && (summaryError
           ? <ErrorState title="Přehled se nenačetl" onRetry={refreshSummary} detail={summaryError} />
@@ -153,7 +193,8 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         {tab === 'brand' && <BrandTab toast={setToast} onChange={refreshSummary} />}
         {tab === 'settings' && <SettingsTab toast={setToast} onChange={refreshSummary} />}
         </ErrorBoundary>
-      </main>
+        </main>
+      </div>
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace a zaměstnanec. */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
@@ -177,9 +218,9 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         onClose={() => setMoreOpen(false)}
         title="Managero client"
         groups={[
-          { title: 'Provoz', items: TABS.filter(t => t.id === 'tables' || t.id === 'menu' || t.id === 'events') },
+          { title: 'Podnik', items: TABS.filter(t => t.id === 'tables' || t.id === 'menu' || t.id === 'events') },
           { title: 'Hosté', items: TABS.filter(t => t.id === 'customers' || t.id === 'loyalty') },
-          { title: 'Podnik', items: TABS.filter(t => t.id === 'brand' || t.id === 'settings') },
+          { title: 'Nastavení', items: TABS.filter(t => t.id === 'brand' || t.id === 'settings') },
         ]}
         activeId={tab}
         onSelect={id => { setTab(id as Tab); setMoreOpen(false); }}
@@ -411,9 +452,16 @@ function Tables({ toast }: { toast: (m: string) => void }) {
     raw => ({ tables: Array.isArray(raw?.tables) ? raw.tables : [], posConnected: !!raw?.posConnected }),
   );
   const [name, setName] = useState(''); const [seats, setSeats] = useState(2); const [busy, setBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [edit, setEdit] = useState<{ id: number; name: string; seats: number } | null>(null);
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); if (!name.trim()) return; setBusy(true);
-    try { await j('/api/client/admin/tables', { method: 'POST', body: JSON.stringify({ name, seats }) }); setName(''); await load(); } catch (e: any) { toast(e.message); }
+    try { await j('/api/client/admin/tables', { method: 'POST', body: JSON.stringify({ name, seats }) }); setName(''); setAddOpen(false); await load(); } catch (e: any) { toast(e.message); }
+    setBusy(false);
+  };
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!edit || !edit.name.trim()) return; setBusy(true);
+    try { await j('/api/client/admin/tables', { method: 'PATCH', body: JSON.stringify({ id: edit.id, name: edit.name, seats: edit.seats }) }); setEdit(null); await load(); } catch (e: any) { toast(e.message); }
     setBusy(false);
   };
   const imp = async () => {
@@ -426,30 +474,74 @@ function Tables({ toast }: { toast: (m: string) => void }) {
   return (
     <div className="space-y-5">
       <PageHeader hintId="clientadmin-6" title="Stoly" subtitle="Ke stolům se vážou rezervace i objednávky. S napojenou pokladnou je vezmi odtamtud, ať sedí čísla. Ikona tiskárny vytiskne QR na stůl, ze kterého host objedná."
-        primary={d?.posConnected ? <Button variant="accent" icon="download" loading={busy} onClick={imp}>Načíst z pokladny</Button> : undefined} />
-      <form onSubmit={add} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end max-w-md">
-        <div><label htmlFor="t-name" className={label}>Název stolu</label><input id="t-name" value={name} onChange={e => setName(e.target.value)} placeholder="U okna" className={input} /></div>
-        <div><label htmlFor="t-seats" className={label}>Míst</label><input id="t-seats" type="number" min={1} max={40} value={seats} onChange={e => setSeats(parseInt(e.target.value || '2', 10))} className={`${input} !w-20 text-center`} /></div>
-        <Button type="submit" variant="primary" icon="plus" loading={busy}>Přidat</Button>
-      </form>
+        primary={<Button variant="accent" icon="plus" onClick={() => setAddOpen(true)}>Přidat stůl</Button>}
+        menu={d?.posConnected ? [{ label: 'Načíst stoly z pokladny', icon: 'download', onClick: imp,
+          hint: 'Převezme čísla stolů z kasy, ať sedí s účty.' }] : undefined} />
+      {/* Seznam je seznam, ne formulář.
+          Dřív byl každý řádek řadou vstupních polí s rámečky: čtyři stoly
+          vypadaly jako čtyřřádkový formulář a nešlo je očima přejet. Název
+          a počet míst se teď čtou jako text a upravují se v okně; v řádku
+          zůstává jedna hlavní akce (tisk QR) a zbytek v „···". */}
       {error ? <ErrorState title="Stoly se nenačetly" onRetry={load} detail={error} />
         : d === null ? <PageSkel /> : d.tables.length === 0
-        ? <EmptyState icon="location" title="Zatím žádné stoly" hint={d.posConnected ? 'Načti je z pokladny, nebo přidej ručně.' : 'Přidej první stůl výš.'} compact />
-        : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06] max-w-2xl">
+        ? <EmptyState icon="location" title="Zatím žádné stoly"
+            hint={d.posConnected ? 'Načti je z pokladny, nebo přidej ručně.' : 'Ke stolu se váže rezervace i objednávka od hosta.'}
+            action={<Button variant="accent" icon="plus" onClick={() => setAddOpen(true)}>Přidat stůl</Button>} />
+        : <ul className="glass-card p-3 sm:p-4 list max-w-3xl">
             {d.tables.map((t: any) => (
-              <li key={t.id} className={`py-2.5 flex items-center gap-3 ${t.active ? '' : 'opacity-50'}`}>
-                <input aria-label={`Název stolu ${t.name}`} defaultValue={t.name} onBlur={e => e.target.value !== t.name && patch(t.id, { name: e.target.value })} className={`${input} py-1.5 flex-1 min-w-0`} />
-                <input aria-label="Počet míst" type="number" min={1} max={40} defaultValue={t.seats} onBlur={e => Number(e.target.value) !== t.seats && patch(t.id, { seats: Number(e.target.value) })} className={`${input} py-1.5 !w-16 text-center`} />
-                <span className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium w-24 truncate ${t.storyous_desk_id ? 'bg-[#C8F542]/15 text-[#4F6A07]' : 'bg-black/[0.05] text-black/50'}`}><Icon name={t.storyous_desk_id ? 'receipt' : 'location'} size={11} />{t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}</span>
-                <button onClick={() => window.open(`/api/client/admin/tables/qr?tableId=${t.id}`, '_blank')} aria-label={`Vytisknout QR stolu ${t.name}`} title="QR na stůl k tisku" className="tap-target-sm rounded-full p-2 text-black/55 hover:text-black hover:bg-black/[0.05] transition"><Icon name="print" size={16} /></button>
-                <button onClick={() => { if (confirm(`Vygenerovat nový QR kód pro stůl ${t.name}? Starý vytištěný kód přestane platit.`)) patch(t.id, { rotate_token: true }); }} aria-label={`Nový QR kód stolu ${t.name}`} title="Nový QR kód (starý přestane platit)" className="tap-target-sm rounded-full p-2 text-black/40 hover:text-black hover:bg-black/[0.05] transition hidden sm:inline-grid"><Icon name="refresh" size={16} /></button>
-                <button onClick={() => patch(t.id, { active: !t.active })} aria-pressed={!!t.active} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${t.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{t.active ? 'Aktivní' : 'Skrytý'}</button>
-                <button onClick={() => del(t.id)} aria-label="Smazat stůl" className="tap-target-sm rounded-full p-2 text-black/40 hover:text-red-700 hover:bg-red-500/10 transition"><Icon name="trash" size={16} /></button>
-              </li>
+              <ListRow key={t.id} className={t.active ? '' : 'opacity-55'}
+                lead={<span className={`grid h-9 w-9 place-items-center rounded-full ${t.active ? 'bg-[#C8F542]/20 text-[#4F6A07]' : 'bg-black/[0.05] text-black/40'}`}><Icon name="location" size={17} /></span>}
+                title={t.name}
+                meta={<>{t.seats} {t.seats === 1 ? 'místo' : t.seats < 5 ? 'místa' : 'míst'} · {t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}{t.active ? '' : ' · skrytý'}</>}
+                actions={<>
+                  <Button size="sm" variant="secondary" icon="print"
+                    onClick={() => window.open(`/api/client/admin/tables/qr?tableId=${t.id}`, '_blank')}>QR na stůl</Button>
+                  <Menu size="sm" label={`Další akce se stolem ${t.name}`} items={[
+                    { label: 'Upravit název a místa…', icon: 'pencil', onClick: () => setEdit({ id: t.id, name: t.name, seats: Number(t.seats) || 2 }) },
+                    { label: t.active ? 'Skrýt hostům' : 'Zobrazit hostům', icon: t.active ? 'close' : 'check', onClick: () => patch(t.id, { active: !t.active }) },
+                    { label: 'Nový QR kód…', icon: 'refresh', hint: 'Starý vytištěný kód přestane platit.',
+                      onClick: () => { if (confirm(`Vygenerovat nový QR kód pro stůl ${t.name}? Starý vytištěný kód přestane platit.`)) patch(t.id, { rotate_token: true }); } },
+                    { label: 'Smazat stůl…', icon: 'trash', danger: true, onClick: () => del(t.id) },
+                  ]} />
+                </>}
+              />
             ))}
           </ul>}
-      {d !== null && d.tables.length > 0 && <QrDesigner toast={toast} tables={d.tables} />}
-      {d !== null && d.tables.length > 0 && <FloorPlanEditor toast={toast} onSaved={load} />}
+
+      {/* Tisk QR a plánek jsou samostatné nástroje, ne pokračování seznamu —
+          proto sbalené. Rozbalí je, kdo je zrovna potřebuje. */}
+      {d !== null && d.tables.length > 0 && (
+        <div className="space-y-3 max-w-3xl">
+          <QrDesigner toast={toast} tables={d.tables} />
+          <FloorPlanEditor toast={toast} onSaved={load} />
+        </div>
+      )}
+
+      {/* Přidání i úprava v okně: seznam zůstává čitelný. */}
+      {(addOpen || edit) && (
+        <Modal open onClose={() => { setAddOpen(false); setEdit(null); }} title={edit ? 'Upravit stůl' : 'Nový stůl'} size="sm">
+          <form onSubmit={edit ? saveEdit : add} className="space-y-4">
+            <div>
+              <label htmlFor="t-name" className={label}>Název stolu</label>
+              <input id="t-name" autoFocus value={edit ? edit.name : name}
+                onChange={e => edit ? setEdit({ ...edit, name: e.target.value }) : setName(e.target.value)}
+                placeholder="U okna" className={input} />
+            </div>
+            <div>
+              <label htmlFor="t-seats" className={label}>Kolik míst</label>
+              <input id="t-seats" type="number" min={1} max={40} value={edit ? edit.seats : seats}
+                onChange={e => { const v = parseInt(e.target.value || '2', 10); edit ? setEdit({ ...edit, seats: v }) : setSeats(v); }}
+                className={`${input} !w-24 text-center`} />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button type="submit" variant="accent" icon={edit ? 'check' : 'plus'} loading={busy} className="flex-1 justify-center">
+                {edit ? 'Uložit' : 'Přidat stůl'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => { setAddOpen(false); setEdit(null); }}>Zpět</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
