@@ -927,13 +927,14 @@ export default function ScheduleBuilder({ user }: Props) {
               tlačítek vedle sebe neříkalo, čím začít. Postup je vygenerovat →
               zkontrolovat → publikovat; vygenerovat je limetkové, publikovat
               tmavé, všechno ostatní čeká v menu. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="accent" icon="bulb" onClick={generate} loading={generating}>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+            <Button variant="accent" icon="bulb" onClick={generate} loading={generating} className="w-full sm:w-auto justify-center">
               Vygenerovat rozvrh
             </Button>
-            <Button variant="primary" icon="check" onClick={publish} loading={publishing}>
-              Publikovat rozvrh
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button variant="primary" icon="check" onClick={publish} loading={publishing} className="flex-1 sm:flex-none justify-center">
+                Publikovat rozvrh
+              </Button>
             <Button
               variant="secondary" icon="swap" onClick={runAdjust} loading={adjusting}
               disabled={shifts.length === 0}
@@ -954,6 +955,7 @@ export default function ScheduleBuilder({ user }: Props) {
                   hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' },
               ]}
             />
+            </div>
             <input
               ref={fileRef}
               type="file"
