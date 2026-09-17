@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Icon } from '../Icons';
-import { EmptyState } from '../ui';
+import { EmptyState, BulkBar, SelectBox, useSelection, runBulk } from '../ui';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -74,19 +74,45 @@ export default function TimeOffApprovals() {
     };
   }, []);
 
+  const sel = useSelection<number>();
+  const [bulkNote, setBulkNote] = useState('');
+
+  const patch = async (id: number, status: 'approved' | 'rejected') => {
+    const res = await fetch('/api/timeoff', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    });
+    if (!res.ok) throw new Error('nepovedlo se');
+  };
+
   const decide = async (id: number, status: 'approved' | 'rejected') => {
     const prev = requests;
     setRequests((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
     try {
-      const res = await fetch('/api/timeoff', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
-      });
-      if (!res.ok) setRequests(prev);
+      await patch(id, status);
     } catch {
       setRequests(prev);
     }
+  };
+
+  // Po sezóně dovolených leží ve frontě dvacet žádostí a dvacet kliknutí
+  // je dvacet čekání. Tohle je pustí naráz a řekne, kolik z nich prošlo.
+  const decideMany = async (status: 'approved' | 'rejected') => {
+    const ids = Array.from(sel.selected);
+    if (ids.length === 0) return;
+    setBulkNote('');
+    const prev = requests;
+    setRequests((rs) => rs.map((r) => (sel.has(r.id) ? { ...r, status } : r)));
+    const { failed } = await runBulk(ids, (id) => patch(id, status));
+    if (failed.length) {
+      setRequests(prev);
+      setBulkNote(failed.length === ids.length
+        ? 'Nepodařilo se to uložit. Zkuste to znovu.'
+        : `${failed.length} z ${ids.length} se neuložilo — zkuste to znovu.`);
+      return;
+    }
+    sel.exit();
   };
 
   // Edit dates / cancel — an approved holiday must stay fixable without
@@ -126,6 +152,12 @@ export default function TimeOffApprovals() {
             {pending.length}
           </span>
         )}
+        {pending.length > 1 && !sel.selecting && (
+          <button type="button" onClick={sel.start}
+            className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+            <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
+          </button>
+        )}
       </div>
 
       {requests.length === 0 ? (
@@ -143,6 +175,10 @@ export default function TimeOffApprovals() {
                   className="flex flex-wrap items-center gap-x-3 gap-y-2 well px-4 py-3"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
+                    {sel.selecting && (
+                      <SelectBox checked={sel.has(r.id)} onChange={() => sel.toggle(r.id)}
+                        label={`Vybrat žádost — ${r.employeeName || 'zaměstnanec'}`} />
+                    )}
                     <span className="h-9 w-9 shrink-0 rounded-full bg-[#C8F542]/25 flex items-center justify-center text-base">
                       {r.employeeAvatar || '🙂'}
                     </span>
@@ -158,25 +194,41 @@ export default function TimeOffApprovals() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => decide(r.id, 'approved')}
-                      className="rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 whitespace-nowrap hover:brightness-105 transition"
-                    >
-                      Schválit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => decide(r.id, 'rejected')}
-                      className="rounded-full bg-black/[0.05] border border-black/10 text-red-600 text-sm px-4 py-2 whitespace-nowrap hover:bg-black/[0.08] transition"
-                    >
-                      Zamítnout
-                    </button>
-                  </div>
+                  {!sel.selecting && (
+                    <div className="flex items-center gap-2 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => decide(r.id, 'approved')}
+                        className="rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 whitespace-nowrap hover:brightness-105 transition"
+                      >
+                        Schválit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => decide(r.id, 'rejected')}
+                        className="rounded-full bg-black/[0.05] border border-black/10 text-red-600 text-sm px-4 py-2 whitespace-nowrap hover:bg-black/[0.08] transition"
+                      >
+                        Zamítnout
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
+          )}
+
+          {sel.selecting && (
+            <BulkBar
+              count={sel.count}
+              totalLabel={`Vybrat vše (${pending.length})`}
+              onSelectAll={() => sel.selectAll(pending.map(r => r.id))}
+              onExit={() => { sel.exit(); setBulkNote(''); }}
+              note={bulkNote}
+              actions={[
+                { label: 'Schválit', primary: true, onClick: () => decideMany('approved') },
+                { label: 'Zamítnout', danger: true, onClick: () => decideMany('rejected') },
+              ]}
+            />
           )}
 
           {(() => {

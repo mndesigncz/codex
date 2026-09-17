@@ -20,4 +20,6 @@ export { ErrorState } from './ErrorState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { useLoad } from './useLoad';
 export { Modal } from './Modal';
+export { BulkBar, SelectBox, type BulkAction } from './BulkBar';
+export { useSelection, runBulk, type Id } from './useSelection';
 export { Hint, hintsEnabled, setHintsEnabled, resetHints, dismissedCount, type HintTone } from './Hint';

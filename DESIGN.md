@@ -243,6 +243,25 @@ Strop kvůli výkonu je v pořádku. Tichý strop není.
 - **Výběr se pozná z nadpisu.** „Hotové — posledních 20", ne „Hotové (20)":
   počet po oříznutí vypadá jako úplný.
 
+## Hromadné akce
+
+Když má obrazovka frontu a u každého řádku stejné tlačítko, musí jít
+vyřídit víc řádků najednou. Po sezóně dovolených leží ve frontě dvacet
+žádostí a dvacet kliknutí je dvacet čekání.
+
+- **Jedna lišta pro všechny.** `BulkBar` + `useSelection` z `components/ui`.
+  Tmavá pilulka plave u spodní hrany (na telefonu nad dokem), ne `sticky`
+  uvnitř sekce — sekce bývá vyšší než obrazovka a lišta pak visí uprostřed
+  seznamu a zakrývá řádky.
+- **„Vybrat víc" se ukáže, až když je co vybírat** — u jednoho řádku je
+  výběr práce navíc.
+- **Ve výběru zmizí akce u řádků.** Dvě cesty k téže věci na jedné
+  obrazovce jsou o jednu moc.
+- **Jedna limetková akce i na liště.** Zbytek jsou tlumené pilulky,
+  destruktivní až za nimi a červeně.
+- **Požadavky jdou naráz, ne za sebou** (`runBulk`), a co se nepovede, se
+  řekne: „3 z 12 se neuložilo" je jiná zpráva než „hotovo".
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
@@ -251,4 +270,5 @@ mimo tři tokeny; nové barvy mimo paletu; Title Case v češtině; `capitalize`
 na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod 11 px;
 `transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
 blur mimo plovoucí lištu, dock a topbar; `<div onClick>` bez `role`
-a `tabIndex`; tlačítko bez `type` uvnitř `<form>`; tiše oříznutý seznam.
+a `tabIndex`; tlačítko bez `type` uvnitř `<form>`; tiše oříznutý seznam; fronta
+ke schválení, kde jde schvalovat jen po jednom.
