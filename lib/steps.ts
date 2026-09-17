@@ -90,7 +90,7 @@ export function fmtMinutes(min: number): string {
 
 // "9:00 – 9:42" style range from a start Date plus total minutes.
 export function timeRange(start: Date, min: number): string {
-  const fmt = (d: Date) => d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  const fmt = (d: Date) => d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
   const end = new Date(start.getTime() + min * 60000);
   return `${fmt(start)} – ${fmt(end)}`;
 }

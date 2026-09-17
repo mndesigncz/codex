@@ -7,6 +7,7 @@ import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
 import ChatView from '../chat/ChatView';
 import MessengerDock from '../chat/MessengerDock';
+import { useConversations } from '../chat/useChat';
 import Guides from '../Guides';
 import Settings from '../Settings';
 import TeamManagement from '../TeamManagement';
@@ -116,9 +117,14 @@ export default function EmployerLayout({ user }: Props) {
   // Proklik ze skladu do konkrétní receptury: „tahle surovina se používá v
   // Blue Lagoon" → jedno kliknutí a jsi v jeho receptuře.
   const [recipeProduct, setRecipeProduct] = useState<string | undefined>();
+  // Proklik do konkrétní konverzace — z dlaždice v TO GO nebo z karty
+  // s poslední nepřečtenou zprávou. Bez toho vedl každý proklik jen na
+  // seznam a člověk musel vlákno najít znovu sám.
+  const [chatConvId, setChatConvId] = useState<number | null>(null);
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
+    setChatConvId(view === 'chat' && arg ? Number(arg) : null);
     // Rada, která říká „nastav to v Nastavení → Pokladna", musí umět
     // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
     // hledal dál sám.
@@ -131,6 +137,11 @@ export default function EmployerLayout({ user }: Props) {
     if (v && (byId[v] || v === 'settings' || v === 'team-settings')) setCurrentView(v);
   }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Chat byl na telefonu jediná ikona v docku, která nikdy nedala vědět,
+  // že něco přišlo. Sklad hlásil „3", Docházka „2", chat mlčel — takže
+  // nebyl důvod na něj ťuknout.
+  const { conversations: chatConvs } = useConversations();
+  const unreadChat = chatConvs.reduce((n, c) => n + (c.unreadCount || 0), 0);
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -154,7 +165,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} onNavigate={navigate} />;
       case 'menu':      return <div className="px-6 pb-6 w-full max-w-3xl mx-auto"><MenuEditor /></div>;
       case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
-      case 'chat':      return <ChatView user={user as any} />;
+      case 'chat':      return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'procedures': return <Procedures user={user as any} />;
       case 'guides':    return <Guides user={user as any} />;
       case 'planning':  return <PlanningBoard />;
@@ -223,7 +234,7 @@ export default function EmployerLayout({ user }: Props) {
         <ToGoMode
           user={user as any}
           onExit={() => switchMode('full')}
-          onOpenView={(v) => { switchMode('full'); navigate(v); }}
+          onOpenView={(v, arg) => { switchMode('full'); navigate(v, arg); }}
         />
       </ProfileLinkProvider>
     );
@@ -351,7 +362,12 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Vyzkoušejte Pro 30 dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.
           </button>
         ) : null}
-        <main className={`flex-1 pb-36 md:pb-4 ${currentView === 'chat' ? 'overflow-hidden flex flex-col m-4 mt-4 glass rounded-3xl' : 'overflow-y-auto scrollbar-thin'}`}>
+        <main className={`flex-1 ${currentView === 'chat'
+            // Chat se na telefonu nescrolluje, takže odsazení pro dok
+            // jen ukusovalo z plochy na zprávy: z 844px displeje zbývalo
+            // na vlákno 467, a pod psacím polem bylo 80px prázdna.
+            ? 'pb-[84px] md:pb-4 overflow-hidden flex flex-col mx-2 my-2 md:m-4 glass rounded-3xl'
+            : 'pb-36 md:pb-4 overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? (
             <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
           ) : (
@@ -371,11 +387,17 @@ export default function EmployerLayout({ user }: Props) {
         <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
           {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
-              className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
+              className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
                 currentView === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
               <Icon key={currentView === item.id ? 'on' : 'off'} name={item.icon} size={22}
                 strokeWidth={currentView === item.id ? 2 : 1.7}
                 className="i-lead" motion={currentView === item.id ? 'pop' : undefined} />
+              {item.id === 'chat' && unreadChat > 0 && currentView !== 'chat' && (
+                <span aria-label={`${unreadChat} nepřečtených zpráv`}
+                  className="absolute top-0 right-1 min-w-[19px] h-[19px] px-1 rounded-full bg-[#16181A] text-[#C8F542] text-[11px] font-bold leading-none tabular-nums grid place-items-center ring-2 ring-[var(--bg)]">
+                  {unreadChat > 9 ? '9+' : unreadChat}
+                </span>
+              )}
               <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{item.label}</span>
             </button>
           ))}
