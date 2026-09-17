@@ -236,25 +236,33 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
                 </div>
               )}
             </div>
+            {/* Akce řádku nesmí být limetková: na obrazovce se třemi lidmi
+                by byly tři „hlavní" akce a DESIGN.md má jednu. Limetka je
+                vyhrazená hlavní akci obrazovky. */}
             <button onClick={e => { e.stopPropagation(); onRate(s); }}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 transition whitespace-nowrap shrink-0 ml-auto">
+              className="btn btn-secondary btn-sm whitespace-nowrap shrink-0 ml-auto">
               Ohodnotit
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          {/* Rozpad bodů je jedna informace, ne šest stavů. Jako řada
+              pilulek se každá sázela na šířku svého textu, takže „Úkoly: 180"
+              u jednoho člověka a „Úkoly: 120" u druhého končily jinde a
+              sloupec se nedal přečíst. Mřížka o pevných sloupcích to srovná. */}
+          <dl className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-2 border-t border-black/[0.06] pt-2.5">
             {([
               ['Úkoly', s.breakdown.tasks],
               ['Postupy', s.breakdown.procedures],
               ['Uzávěrky', s.breakdown.closings],
-              ['Body z hodnocení', s.breakdown.reviewPoints],
-              ...(s.breakdown.autoPoints ? [['Automatické body', s.breakdown.autoPoints]] as [string, number][] : []),
-              ...(s.breakdown.itemPoints ? [['Body u položek', s.breakdown.itemPoints]] as [string, number][] : []),
+              ['Z hodnocení', s.breakdown.reviewPoints],
+              ['Automatické', s.breakdown.autoPoints ?? 0],
+              ['U položek', s.breakdown.itemPoints ?? 0],
             ] as [string, number][]).map(([label, val]) => (
-              <span key={label as string} className="inline-flex items-center gap-1 rounded-full bg-black/[0.04] px-2.5 py-1 text-[11px] font-medium text-black/55 tabular-nums">
-                {label}: <strong className="text-[#16181A]">{val}</strong>
-              </span>
+              <div key={label as string} className="min-w-0">
+                <dt className="t-label truncate">{label}</dt>
+                <dd className={`text-[15px] font-bold tabular-nums leading-tight ${val ? 'text-[#16181A]' : 'text-black/25'}`}>{val}</dd>
+              </div>
             ))}
-          </div>
+          </dl>
         </div>
       ))}
     </div>
