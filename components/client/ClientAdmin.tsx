@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
-import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu } from '../ui';
+import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, ErrorBoundary, ErrorState, useLoad } from '../ui';
 import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
@@ -91,7 +91,14 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
   // Mobil: spodní dock jako ve zbytku aplikace; horní záložky jen na počítači.
   const [moreOpen, setMoreOpen] = useState(false);
   const dockIds: Tab[] = ['overview', 'reservations', 'orders'];
-  const refreshSummary = useCallback(() => { fetch('/api/client/admin/summary').then(r => r.json()).then(setSummary).catch(() => {}); }, []);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const refreshSummary = useCallback(() => {
+    setSummaryError(null);
+    fetch('/api/client/admin/summary')
+      .then(r => { if (!r.ok) throw new Error(`Server odpověděl ${r.status}`); return r.json(); })
+      .then(setSummary)
+      .catch((e: any) => setSummaryError(e?.message || 'Načtení se nepovedlo'));
+  }, []);
   useEffect(() => { refreshSummary(); }, [refreshSummary, tab]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 4500); return () => clearTimeout(t); } }, [toast]);
 
@@ -118,7 +125,10 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
       </div>
       {toast && <p role="status" className="toast-in shrink-0 mx-4 sm:mx-6 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{toast}</p>}
       <main className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-4 pb-36 md:pb-8">
-        {tab === 'overview' && <Overview summary={summary} go={setTab} onCustomer={openCustomer} />}
+        <ErrorBoundary resetKey={tab} title={`${TABS.find(t => t.id === tab)?.label ?? 'Tahle část'} se nenačetla`}>
+        {tab === 'overview' && (summaryError
+          ? <ErrorState title="Přehled se nenačetl" onRetry={refreshSummary} detail={summaryError} />
+          : <Overview summary={summary} go={setTab} onCustomer={openCustomer} />)}
         {tab === 'reservations' && <Reservations toast={setToast} onChange={refreshSummary} onCustomer={openCustomer} />}
         {tab === 'orders' && (
           <div className="space-y-5 max-w-3xl">
@@ -127,24 +137,22 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           </div>
         )}
         {tab === 'tables' && <Tables toast={setToast} />}
-        {/* Menu i Akce si nesou vlastní nadpis, tak jim tu druhý nepřidáváme —
-            jen jednou větou řekneme, co to v Client znamená. */}
+        {/* Každá záložka začíná stejně: PageHeader s názvem a jednou větou.
+            Akce si hlavičku nesou samy (sdílí se s administrací), zbytek ji
+            dostává tady. Dřív měla polovina záložek holý odstavec bez
+            nadpisu a člověk nepoznal, kde je. */}
         {tab === 'menu' && (
-          <div className="space-y-3">
-            <p className="text-sm text-black/55 max-w-[70ch]">Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek.</p>
+          <div className="space-y-5 max-w-3xl">
+            <PageHeader title="Menu" subtitle="Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek." />
             <MenuEditor />
           </div>
         )}
-        {tab === 'events' && (
-          <div className="space-y-3">
-            <p className="text-sm text-black/55 max-w-[70ch]">Co se v podniku koná. Akce označená jako veřejná se ukáže hostům na stránce podniku.</p>
-            <EventsView user={(user ?? {}) as any} />
-          </div>
-        )}
+        {tab === 'events' && <EventsView user={(user ?? {}) as any} />}
         {tab === 'customers' && <Customers toast={setToast} initialQuery={custQ} />}
         {tab === 'loyalty' && <Loyalty toast={setToast} />}
         {tab === 'brand' && <BrandTab toast={setToast} onChange={refreshSummary} />}
         {tab === 'settings' && <SettingsTab toast={setToast} onChange={refreshSummary} />}
+        </ErrorBoundary>
       </main>
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace a zaměstnanec. */}
@@ -378,10 +386,13 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
 // ---- Stoly ----------------------------------------------------------------------
 
 function Tables({ toast }: { toast: (m: string) => void }) {
-  const [d, setD] = useState<any | null>(null);
+  // Tvar odpovědi se ověří tady, ne až v JSX nad `undefined.length` —
+  // jedna nečekaná odpověď API dřív shodila celou záložku na bílo.
+  const { data: d, error, reload: load } = useLoad<{ tables: any[]; posConnected?: boolean }>(
+    '/api/client/admin/tables',
+    raw => ({ tables: Array.isArray(raw?.tables) ? raw.tables : [], posConnected: !!raw?.posConnected }),
+  );
   const [name, setName] = useState(''); const [seats, setSeats] = useState(2); const [busy, setBusy] = useState(false);
-  const load = useCallback(() => fetch('/api/client/admin/tables').then(r => r.json()).then(setD).catch(() => setD({ tables: [] })), []);
-  useEffect(() => { load(); }, [load]);
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); if (!name.trim()) return; setBusy(true);
     try { await j('/api/client/admin/tables', { method: 'POST', body: JSON.stringify({ name, seats }) }); setName(''); await load(); } catch (e: any) { toast(e.message); }
@@ -403,7 +414,8 @@ function Tables({ toast }: { toast: (m: string) => void }) {
         <div><label htmlFor="t-seats" className={label}>Míst</label><input id="t-seats" type="number" min={1} max={40} value={seats} onChange={e => setSeats(parseInt(e.target.value || '2', 10))} className={`${input} !w-20 text-center`} /></div>
         <Button type="submit" variant="primary" icon="plus" loading={busy}>Přidat</Button>
       </form>
-      {d === null ? <PageSkel /> : d.tables.length === 0
+      {error ? <ErrorState title="Stoly se nenačetly" onRetry={load} detail={error} />
+        : d === null ? <PageSkel /> : d.tables.length === 0
         ? <EmptyState icon="location" title="Zatím žádné stoly" hint={d.posConnected ? 'Načti je z pokladny, nebo přidej ručně.' : 'Přidej první stůl výš.'} compact />
         : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06] max-w-2xl">
             {d.tables.map((t: any) => (
@@ -551,9 +563,15 @@ function Loyalty({ toast }: { toast: (m: string) => void }) {
 }
 
 function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange: () => void }) {
-  const [d, setD] = useState<any | null>(null); const [p, setP] = useState<any | null>(null); const [busy, setBusy] = useState(false);
+  const { data: d, error, reload, set: setD } = useLoad<any>('/api/client/admin/profile', raw => {
+    if (!raw || typeof raw !== 'object' || !raw.profile) throw new Error('Profil podniku se nepodařilo přečíst');
+    return raw;
+  });
+  const [pOverride, setP] = useState<any | null>(null);
+  const [busy, setBusy] = useState(false);
   const [locating, setLocating] = useState(false);
-  useEffect(() => { fetch('/api/client/admin/profile').then(r => r.json()).then(x => { setD(x); setP(x.profile); }).catch(() => {}); }, []);
+  const p = pOverride ?? d?.profile ?? null;
+  if (error) return <ErrorState title="Nastavení se nenačetlo" onRetry={reload} detail={error} />;
   if (!d || !p) return <PageSkel />;
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true);

@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, Skeleton } from '../ui';
+import { Button, PageHeader, Skeleton, ErrorState } from '../ui';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -58,9 +58,17 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
   const [p, setP] = useState<any | null>(null);
   const [busy, setBusy] = useState<string>('');
   const [url, setUrl] = useState('');
+  // Prázdný catch tu dřív znamenal věčný skeleton: po výpadku sítě
+  // zůstalo `p === null` a člověk koukal na pulzující obdélník, dokud
+  // stránku neobnovil. Teď se to přizná a nabídne další pokus.
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    fetch('/api/client/admin/profile').then(r => r.json()).then(d => { setP(d.profile); setUrl(d.url); }).catch(() => {});
+    setError(null);
+    fetch('/api/client/admin/profile')
+      .then(r => { if (!r.ok) throw new Error(`Server odpověděl ${r.status}`); return r.json(); })
+      .then(d => { if (!d?.profile) throw new Error('Profil podniku se nepodařilo přečíst'); setP(d.profile); setUrl(d.url); })
+      .catch((e: any) => setError(e?.message || 'Načtení se nepovedlo'));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -93,6 +101,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
     setBusy('');
   };
 
+  if (error) return <ErrorState title="Vzhled se nenačetl" onRetry={load} detail={error} />;
   if (!p) return <div className="space-y-4"><Skeleton className="h-10 w-56 rounded-full" /><Skeleton className="h-64 rounded-3xl" /></div>;
   const gallery: string[] = p.gallery ?? [];
 
