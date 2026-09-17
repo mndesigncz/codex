@@ -218,6 +218,36 @@ body::after {
 :root[data-theme="dark"] .btn-ghost { color: rgba(237,242,228,0.66); }
 }
 
+/* ---------- Kategoriální paleta ----------
+   Stavy mají v paletě pět tónů (ok, wait, bad, info, muted) a ty se nesmí
+   používat na nic jiného — červená znamená „problém", ne „třetí typ směny".
+   Jenže rozvrh potřebuje odlišit šest typů směn a dostupností, a na to
+   stavové tóny nestačí. Proto tahle samostatná řada: jen k rozlišení
+   kategorií, nikdy ke sdělení stavu.
+
+   Dřív si každá obrazovka psala vlastní pole odstínů inline (indigo tady,
+   teal onde) a dvě obrazovky pro stejnou věc používaly jiné barvy. */
+.cat-1 { background: rgba(200,245,66,0.22); border-color: rgba(200,245,66,0.50); color: #4F6A07; }
+.cat-2 { background: rgba(10,132,255,0.16);  border-color: rgba(10,132,255,0.40);  color: #0A5FC0; }
+.cat-3 { background: rgba(139,92,246,0.16);  border-color: rgba(139,92,246,0.40);  color: #6D3FC4; }
+.cat-4 { background: rgba(245,158,11,0.18);  border-color: rgba(245,158,11,0.42);  color: #92600A; }
+.cat-5 { background: rgba(20,184,166,0.16);  border-color: rgba(20,184,166,0.40);  color: #0E6E63; }
+.cat-6 { background: rgba(236,72,153,0.14);  border-color: rgba(236,72,153,0.38);  color: #A4246C; }
+.cat-dot-1 { background: #C8F542; }
+.cat-dot-2 { background: #0A84FF; }
+.cat-dot-3 { background: #8B5CF6; }
+.cat-dot-4 { background: #F59E0B; }
+.cat-dot-5 { background: #14B8A6; }
+.cat-dot-6 { background: #EC4899; }
+@media (hover: hover) {
+  .cat-1:hover { background: rgba(200,245,66,0.32); }
+  .cat-2:hover { background: rgba(10,132,255,0.24); }
+  .cat-3:hover { background: rgba(139,92,246,0.24); }
+  .cat-4:hover { background: rgba(245,158,11,0.26); }
+  .cat-5:hover { background: rgba(20,184,166,0.24); }
+  .cat-6:hover { background: rgba(236,72,153,0.22); }
+}
+
 /* ---------- Seznamy ----------
    Řádky dělí linka, kterou kreslí seznam; řádek sám je jen obsah. */
 .list > * + * { border-top: 1px solid var(--surface-line); }

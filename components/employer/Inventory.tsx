@@ -739,12 +739,12 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       )}
 
       {(critical.length > 0 || low.length > 0) && (
-        <div className="glass-card border-orange-500/20 bg-orange-500/[0.06] p-5">
-          <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-orange-700">
+        <div className="glass-card border-amber-500/20 bg-amber-500/[0.06] p-5">
+          <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-amber-800">
             <Icon name="warning" size={16} />
             {critical.length > 0 && <span className="text-red-600">{critical.length} kriticky málo</span>}
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
-            {low.length > 0 && <span className="text-orange-600">{low.length} dochází</span>}
+            {low.length > 0 && <span className="text-amber-700">{low.length} dochází</span>}
             {toMake.length > 0 && <span className="text-black/30">·</span>}
             {toMake.length > 0 && <span className="text-[#0A5CC0]">{toMake.length} k výrobě</span>}
           </p>
@@ -1053,15 +1053,15 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               {/* Section: upozornění */}
               <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-                  <Icon name="warning" size={14} className="text-orange-500" /> Hlídání zásob
+                  <Icon name="warning" size={14} className="text-amber-600" /> Hlídání zásob
                   <span className="normal-case tracking-normal text-black/35 font-normal">
                     · v {thresholdUnitLabel(pk(form), form.unit || 'ks')}
                   </span>
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-600/70 mb-1.5">
-                      <span className="w-2 h-2 rounded-full bg-orange-400" /> Upozornit při
+                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-amber-700/70 mb-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Upozornit při
                     </label>
                     <div className="relative">
                       <input type="number" inputMode="numeric" aria-label="Minimální množství" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
@@ -1288,7 +1288,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   try { list = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items ?? []); } catch {}
                   const done = r.status === 'done';
                   return (
-                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-orange-500/25 bg-orange-500/[0.04]'}`}>
+                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-amber-500/25 bg-amber-500/[0.04]'}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                         <p className="text-sm font-semibold text-[#16181A] min-w-0">
                           {r.author_avatar ?? '👤'} {r.author_name ?? 'Zaměstnanec'}
@@ -1638,8 +1638,8 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
         {items.map(i => {
           const st = statusOf(i, pk);
           const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
-          const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#C8F542]';
-          const bar = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-orange-400' : 'bg-[#C8F542]';
+          const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#C8F542]';
+          const bar = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-amber-400' : 'bg-[#C8F542]';
           return (
             <div key={i.id}
               onClick={selecting ? () => onToggle(i.id) : undefined}
@@ -1711,8 +1711,8 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
       {items.map(i => {
         const st = statusOf(i, pk);
         const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
-        const barColor = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-orange-400' : 'bg-[#C8F542]';
-        const chip = st === 'critical' ? 'bg-red-500/15 text-red-600' : st === 'low' ? 'bg-orange-500/15 text-orange-600' : 'bg-[#C8F542]/15 text-[#5B7A08]';
+        const barColor = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-amber-400' : 'bg-[#C8F542]';
+        const chip = st === 'critical' ? 'bg-red-500/15 text-red-600' : st === 'low' ? 'bg-amber-500/15 text-amber-700' : 'bg-[#C8F542]/15 text-[#5B7A08]';
         return (
           <div key={i.id}
             onClick={selecting ? () => onToggle(i.id) : undefined}
@@ -2106,7 +2106,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   const st = statusOf(i, pk);
                   return (
                     <div key={i.id} className="flex items-center gap-2.5 py-2.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
                       <span className="flex-1 min-w-0">
                         <span className="block truncate text-sm font-medium text-[#16181A]">{i.name}</span>
                         {(i.buyFor?.length ?? 0) > 0 && (

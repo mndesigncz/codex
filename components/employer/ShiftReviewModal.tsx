@@ -201,7 +201,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   };
 
   const fmtChip = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
-  const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
+  const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
 
   // Shared per-item review controls: points stepper + flag + note.
   const itemControls = (kind: ItemKind, id: number, mark: ItemMark | null, legacyNote: string | null) => {

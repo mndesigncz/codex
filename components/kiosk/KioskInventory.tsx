@@ -206,7 +206,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filtered.map(i => {
                 const st = statusOf(i);
-                const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#C8F542]';
+                const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#C8F542]';
                 return (
                   // Ovládání zabere 226 px (čtyři tlačítka 48 px a počítadlo).
                   // Na telefonu tak na název zbylo 56 px z potřebných 176 —

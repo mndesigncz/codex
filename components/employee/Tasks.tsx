@@ -86,7 +86,7 @@ export default function Tasks({ user }: Props) {
     } catch { setTasks(prev); }
   };
 
-  const priorityColor = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
+  const priorityColor = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
   const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 
   // Rozdělení podle dne. Šest filtrů a tři řazení se přepočítávají jen když se

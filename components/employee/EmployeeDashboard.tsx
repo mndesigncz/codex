@@ -340,7 +340,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lowStock.slice(0, 8).map(i => (
-                    <span key={i.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-orange-500/15 text-orange-600">{i.name} · {i.quantity} {i.unit}</span>
+                    <span key={i.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-amber-500/15 text-amber-700">{i.name} · {i.quantity} {i.unit}</span>
                   ))}
                 </div>
               </div>

@@ -15,8 +15,8 @@ interface PlanningCard {
 
 const COLUMNS = [
   { id: 'ideas', label: 'Nápady', dot: 'bg-[#0A84FF]', chip: 'bg-[#0A84FF]/15 text-[#0A6FE0]' },
-  { id: 'in_progress', label: 'Rozpracováno', dot: 'bg-orange-400', chip: 'bg-orange-500/15 text-orange-600' },
-  { id: 'review', label: 'Ke schválení', dot: 'bg-yellow-400', chip: 'bg-yellow-500/15 text-yellow-600' },
+  { id: 'in_progress', label: 'Rozpracováno', dot: 'bg-amber-400', chip: 'bg-amber-500/15 text-amber-700' },
+  { id: 'review', label: 'Ke schválení', dot: 'bg-amber-400', chip: 'bg-amber-500/15 text-amber-700' },
   { id: 'done', label: 'Hotovo', dot: 'bg-[#C8F542]', chip: 'bg-[#C8F542]/15 text-[#5B7A08]' },
 ];
 

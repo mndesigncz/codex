@@ -18,7 +18,7 @@ export type BoardTask = {
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const WD = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
-const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-orange-400' : 'bg-[#C8F542]';
+const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
 
 // A weekly kanban styled exactly like the Planning board — glass columns and
 // draggable cards — but the columns are the days of the week. Dragging a card

@@ -116,6 +116,22 @@ Před pushem: `npm run typecheck && npm test && npm run build` + skripty
 obrazovek (desktop 1280, mobil 390, úzký 320) a sweep přetečení, dotykových
 cílů, duplicitních id a vnořených klikatelných prvků — vše 0.
 
+## Barvy: stav versus kategorie
+
+Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —
+a limetku jako jediný akcent. Stav se nesmí sdělovat ničím jiným: dokud
+bylo „Ke schválení" na jedné obrazovce oranžové a na druhé žluté, hledal
+v tom člověk rozdíl, který tam nebyl.
+
+Na odlišení **kategorií** (typy směn, dostupnosti) stavové tóny nestačí
+a nesmí se na to používat — červená znamená problém, ne „třetí typ
+směny". Proto je v `globals.css` samostatná řada `.cat-1` až `.cat-6`
+plus `.cat-dot-1..6` na tečky. Používá se **jen k rozlišení**, nikdy ke
+sdělení stavu, a je společná pro všechny obrazovky: „druhý typ směny"
+vypadá v Rozvrhu stejně jako v Dostupnosti.
+
+Hlídá `scripts/check-palette.mjs`.
+
 ## Responzivní pravidla (mobil / tablet / desktop)
 
 Ověřováno na šířkách 320, 390, 768, 1024, 1280 a 1440 px — nula

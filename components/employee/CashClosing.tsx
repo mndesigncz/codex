@@ -626,7 +626,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
       {/* Missing-closing nudge: shifts the employee worked but never closed. */}
       {isSelf && eligible.length > 0 && (
-        <div className="p-4 rounded-2xl bg-orange-500/[0.09] border border-orange-500/30 space-y-2.5">
+        <div className="p-4 rounded-2xl bg-amber-500/[0.09] border border-amber-500/30 space-y-2.5">
           <p className="flex items-center gap-2 font-semibold text-[#16181A] text-sm">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
             {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${eligible.length} uzávěrky za dny, kdy jsi měl/a směnu`}
@@ -641,8 +641,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <button key={s.id} type="button" onClick={() => pickShift(s)}
                 className={`rounded-full border px-3.5 py-2 text-xs font-semibold cz-sentence transition ${
                   form.date === s.date
-                    ? 'bg-orange-500 text-white border-orange-500'
-                    : 'bg-white border-orange-500/30 text-orange-700 hover:border-orange-500/60'
+                    ? 'bg-amber-500 text-white border-amber-500'
+                    : 'bg-white border-amber-500/30 text-amber-800 hover:border-amber-500/60'
                 } cz-sentence`}>
                 {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                 <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
@@ -744,7 +744,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   : 'Počáteční stav hotovosti v kase.',
               })}
               {closings.some(c => c.date === form.date) && (
-                <p className="text-[11px] font-medium text-orange-700 bg-orange-500/[0.1] border border-orange-500/25 rounded-xl px-3 py-2">
+                <p className="text-[11px] font-medium text-amber-800 bg-amber-500/[0.1] border border-amber-500/25 rounded-xl px-3 py-2">
                   Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
                 </p>
               )}
@@ -964,7 +964,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                           <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
                           {cw.hadShift
                             ? <span className="block text-xs text-black/45 tabular-nums">{cw.startTime}–{cw.endTime}</span>
-                            : <span className="block text-xs text-orange-600">bez naplánované směny — přidá se</span>}
+                            : <span className="block text-xs text-amber-700">bez naplánované směny — přidá se</span>}
                         </span>
                       </button>
                       {on && payDailyCash && (
@@ -1180,7 +1180,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   const running = r.status === 'running';
                   return (
                     <span key={r.id} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                      running ? 'bg-orange-500/12 text-orange-600'
+                      running ? 'bg-amber-500/12 text-amber-700'
                       : missing > 0 ? 'bg-amber-500/12 text-amber-700'
                       : 'bg-[#C8F542]/15 text-[#5B7A08]'
                     }`}>
@@ -1191,7 +1191,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 })}
               </div>
               {todayRuns.some((r: any) => r.status === 'running') && (
-                <p className="text-[12px] text-orange-600 mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
+                <p className="text-[12px] text-amber-700 mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
               )}
             </div>
           )}
@@ -1245,7 +1245,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </p>
                   <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
                   {pending && (
-                    <span className="tap-target-sm rounded-full bg-orange-500/15 text-orange-600 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                    <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
                   <button aria-label="Smazat uzávěrku"
                     type="button"
@@ -1328,7 +1328,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       {showConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowConfirm(false)}>
           <div ref={confirmModal.ref} {...confirmModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/15 text-2xl"><Icon name="warning" size={15} /></div>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-2xl"><Icon name="warning" size={15} /></div>
             <h3 className="text-lg font-bold tracking-tight text-[#16181A] mt-3">Nejsi na směně v tento den</h3>
             <p className="text-sm text-black/55 mt-1.5">
               Uzávěrku můžeš odeslat, ale půjde vedení ke schválení. Opravdu ji chceš odeslat?

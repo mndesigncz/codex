@@ -362,8 +362,8 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         <>
           {/* Prominent low / critical items on top */}
           {lowItems.length > 0 && (
-            <div className="glass-card border-orange-500/20 bg-orange-500/[0.06] p-5 space-y-3">
-              <p className="font-semibold text-sm flex items-center gap-2 text-orange-700"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dochází — uprav stav</p>
+            <div className="glass-card border-amber-500/20 bg-amber-500/[0.06] p-5 space-y-3">
+              <p className="font-semibold text-sm flex items-center gap-2 text-amber-800"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dochází — uprav stav</p>
               <div className="space-y-2">
                 {lowItems.map(i => {
                   const st = statusOf(i);
@@ -372,7 +372,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-[#16181A] truncate">
                           {i.name}
-                          <span className={`ml-2 text-xs font-semibold ${st === 'critical' ? 'text-red-600' : 'text-orange-600'}`}>
+                          <span className={`ml-2 text-xs font-semibold ${st === 'critical' ? 'text-red-600' : 'text-amber-700'}`}>
                             {st === 'critical' ? 'kriticky' : 'dochází'}
                           </span>
                         </p>
@@ -410,7 +410,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             <div className="divide-y divide-black/[0.06]">
               {filtered.map(item => {
                 const st = statusOf(item);
-                const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-orange-500' : 'bg-[#C8F542]';
+                const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#C8F542]';
                 return (
                   <div key={item.id} className="flex items-center justify-between gap-3 flex-wrap px-5 py-4 hover:bg-black/[0.02] transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
@@ -467,7 +467,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                           <p className="text-xs text-black/45 truncate">{item.category}</p>
                         </div>
                         <span className={`text-xs font-medium shrink-0 whitespace-nowrap ${isLow ? 'text-red-600' : 'text-black/55'}`}>
-                          {item.quantity} {item.unit}{isLow && <Icon name="warning" size={13} className="inline ml-1 -mt-0.5 text-orange-600" />}
+                          {item.quantity} {item.unit}{isLow && <Icon name="warning" size={13} className="inline ml-1 -mt-0.5 text-amber-700" />}
                         </span>
                       </label>
                     );

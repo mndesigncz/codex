@@ -34,7 +34,7 @@ const inputClass =
 
 const PRIORITIES = [
   { value: 'low', label: 'Nízká', dot: 'bg-[#C8F542]' },
-  { value: 'medium', label: 'Střední', dot: 'bg-orange-400' },
+  { value: 'medium', label: 'Střední', dot: 'bg-amber-400' },
   { value: 'high', label: 'Vysoká', dot: 'bg-red-500' },
 ];
 const statusLabel = (s: string) => s === 'done' ? 'Hotovo' : s === 'in_progress' ? 'Probíhá' : 'Čeká';
