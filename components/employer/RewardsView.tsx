@@ -8,6 +8,7 @@ import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
 import EmployeeProfile from './EmployeeProfile';
 import { ProGate } from '../Pro';
+import { clickable } from '@/lib/clickable';
 
 interface Standing {
   id: number; name: string; avatar?: string;
@@ -207,7 +208,8 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
   return (
     <div className="space-y-3">
       {standings.map((s, i) => (
-        <div key={s.id} className="glass-card p-4 cursor-pointer hover:bg-black/[0.02] transition" onClick={() => onOpen(s)} title="Otevřít profil">
+        <div key={s.id} className="glass-card p-4 cursor-pointer hover:bg-black/[0.02] transition"
+          {...clickable(() => onOpen(s), { label: `Otevřít profil — ${s.name}` })} title="Otevřít profil">
           <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
             <span className="w-7 text-center text-sm font-bold text-black/50 tabular-nums shrink-0">{medal(i)}</span>
             <span className="text-xl flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{s.avatar || '👤'}</span>

@@ -11,6 +11,7 @@ import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn } from '@/lib/dashboardW
 import { useSymbol } from './CurrencyProvider';
 import ShareSettings from './employer/ShareSettings';
 import { useModal } from '@/lib/useModal';
+import { clickable } from '@/lib/clickable';
 
 interface Member {
   id: number;
@@ -637,7 +638,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               <div key={m.id} className="py-4">
                 <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                   <div
-                    onClick={() => m.role === 'employee' && setProfileId(m.id)}
+                    {...clickable(() => setProfileId(m.id), { disabled: m.role !== 'employee', label: `Zobrazit profil — ${m.name}` })}
                     className={`w-11 h-11 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/20 flex items-center justify-center text-xl flex-shrink-0 ${m.role === 'employee' ? 'cursor-pointer hover:brightness-105' : ''}`}
                     title={m.role === 'employee' ? 'Zobrazit profil' : undefined}
                   >

@@ -131,7 +131,10 @@ export default function NewStockEntry({
   const label = `block font-semibold text-black/55 mb-1.5 ${big ? 'text-sm' : 'text-xs'}`;
 
   return (
-    <div className={`space-y-${big ? '5' : '4'}`}>
+    // Naskladnění se vyplňuje jednou rukou u regálu; Enter po posledním poli
+    // musí položku zapsat, ne čekat, až se trefíš do tlačítka.
+    <form onSubmit={e => { e.preventDefault(); if (!saving && !uploading && name.trim()) save(); }}
+      className={`space-y-${big ? '5' : '4'}`}>
       {/* What it is — photo first, because a picture beats a description of a
           bottle nobody at the office has seen. */}
       <div className="flex items-start gap-3">
@@ -241,22 +244,22 @@ export default function NewStockEntry({
       {err && <p className={`text-red-600 ${big ? 'text-base' : 'text-sm'}`}>{err}</p>}
 
       <div className="flex items-center gap-2">
-        <button onClick={save} disabled={saving || uploading || !name.trim()}
+        <button type="submit" disabled={saving || uploading || !name.trim()}
           className={`flex-1 rounded-full bg-[#16181A] text-white font-bold hover:bg-black disabled:opacity-40 transition ${
             big ? 'px-6 py-4 text-lg' : 'px-5 py-3 text-sm'}`}>
           {saving ? 'Zapisuji…' : 'Zapsat do skladu'}
         </button>
         {onCancel && (
-          <button onClick={onCancel} disabled={saving}
+          <button type="button" onClick={onCancel} disabled={saving}
             className={`rounded-full glass text-black/55 font-semibold hover:text-[#16181A] transition ${
               big ? 'px-6 py-4 text-lg' : 'px-5 py-3 text-sm'}`}>
-            Zpět
+            Zrušit
           </button>
         )}
       </div>
       <p className={`text-black/40 ${big ? 'text-sm' : 'text-xs'}`}>
         Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a. Vedení ji jen potvrdí.
       </p>
-    </div>
+    </form>
   );
 }

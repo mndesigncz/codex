@@ -202,6 +202,10 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Nová akce</h3>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
+        {/* Opravdový <form>, ne jen tlačítko s onClick: po vyplnění názvu
+            a data se čeká, že Enter akci založí. Bez něj se musí sáhnout
+            po myši uprostřed psaní. */}
+        <form onSubmit={e => { e.preventDefault(); if (!busy && title.trim() && date) save(); }}>
         <div className="space-y-3">
           {/* Základní rozcestí: akce u nás (obsluha = kdo je na směně), nebo
               výjezd ven (vlastní směna k akci, balení skladu, uzávěrka za akci). */}
@@ -239,12 +243,13 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
           </p>
         </div>
         <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="btn btn-secondary flex-1">Zrušit</button>
-          <button onClick={save} disabled={busy || !title.trim() || !date}
+          <button type="button" onClick={onClose} className="btn btn-secondary flex-1">Zrušit</button>
+          <button type="submit" disabled={busy || !title.trim() || !date}
             className="btn btn-primary flex-1 disabled:opacity-50">
             {busy ? 'Zakládám…' : 'Založit akci'}
           </button>
         </div>
+        </form>
       </div>
     </div>
   );

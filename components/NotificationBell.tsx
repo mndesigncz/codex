@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
 import { dbTimeDayHM } from '@/lib/pragueTime';
+import { usePopover } from '@/lib/usePopover';
 
 interface Notif {
   id: number;
@@ -27,7 +28,6 @@ export default function NotificationBell() {
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
   const [flaggedFeedback, setFlaggedFeedback] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     try {
@@ -62,20 +62,18 @@ export default function NotificationBell() {
     return () => clearInterval(t);
   }, [role, loadFeedback]);
 
-  // Latest open/unread for the outside-click closer (registered once).
-  const stateRef = useRef({ open: false, unread: 0 });
-  stateRef.current = { open, unread };
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        if (stateRef.current.open && stateRef.current.unread) markAllRead();
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Zavírání panelu drží společný `usePopover`: Escape, kliknutí mimo,
+  // návrat fokusu na zvonek a šipky po oznámeních. Dřív uměl jen kliknutí
+  // mimo — Escape nefungoval a klávesnicí se z panelu nedalo odejít.
+  // `onDismiss` zachovává původní chování: odchod mimo panel značí
+  // nepřečtená jako přečtená.
+  const unreadRef = useRef(unread);
+  unreadRef.current = unread;
+  const pop = usePopover(open, setOpen, {
+    focusFirst: true,
+    arrowKeys: true,
+    onDismiss: () => { if (unreadRef.current) markAllRead(); },
+  });
 
   const markAllRead = async () => {
     await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
@@ -95,8 +93,11 @@ export default function NotificationBell() {
   const badge = unread + (flaggedFeedback > 0 ? 1 : 0);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={pop.ref}>
       <button
+        ref={pop.triggerRef}
+        onKeyDown={pop.onTriggerKeyDown}
+        aria-haspopup="menu" aria-expanded={open}
         onClick={() => {
           if (!open) loadFeedback();
           else if (unread) markAllRead();
@@ -115,7 +116,8 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
+        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="menu"
+          className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
           <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
             <span className="font-bold text-[#16181A] text-sm">Notifikace</span>
             {notifs.some(n => !n.is_read) && (

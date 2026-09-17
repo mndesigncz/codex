@@ -212,6 +212,37 @@ otevřít.
   se mezi půlnocí a druhou ranní liší — a obrazovka si pak sama odporuje
   („17:40" v bublině pod čarou „Včera"). Hlídá `check-time`.
 
+## Klávesnice
+
+Aplikace se ovládá u pultu jednou rukou, ale ve vedení na notebooku
+klávesnicí. Když se uprostřed psaní musí sáhnout po myši, je to chyba.
+
+- **Enter odesílá formulář.** Dialog s poli je `<form onSubmit>`, ne `<div>`
+  s tlačítkem na `onClick`. Uvnitř `<form>` má každé tlačítko napsáno, čím
+  je (`type="submit"` / `type="button"`) — jinak „Zrušit" formulář odešle.
+  Hlídá `check-forms`.
+- **Escape zavírá a vrací fokus.** Okno řeší `useModal`, rozbalovací panel
+  `usePopover`. Obojí vrátí fokus na prvek, kterým se otevřelo; fokus na
+  `<body>` znamená, že další Tab začíná od začátku stránky.
+- **Šipky chodí po nabídce.** Menu, řazení a panel oznámení: ↓ ↑ po
+  položkách, Home/End na kraje, ↓ na zavřeném tlačítku panel otevře.
+- **Co se dá kliknout, musí jít i Tabem.** Nejlépe `<button>`. Když karta
+  nese uvnitř další odkazy (a tlačítko v tlačítku je neplatné), použij
+  `clickable()` z `lib/clickable` — dá `role="button"`, `tabIndex`
+  a obsluhu Enteru i mezerníku.
+- **Skrytá akce na pravé tlačítko myši není akce.** Co jde přes
+  `onContextMenu`, musí mít i klávesu a viditelné tlačítko.
+
+## Ořezané seznamy
+
+Strop kvůli výkonu je v pořádku. Tichý strop není.
+
+- **Oříznutý seznam to musí říct.** „Zobrazeno prvních 200 z 247" nebo
+  „…a dalších 12". Podnik s 250 položkami menu jich padesát nikdy neviděl
+  a nikde se to nedozvěděl.
+- **Výběr se pozná z nadpisu.** „Hotové — posledních 20", ne „Hotové (20)":
+  počet po oříznutí vypadá jako úplný.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
@@ -219,4 +250,5 @@ pilulky, panely a štítky místo `.btn`/`.note`/`.t-label`; nové rádiusy
 mimo tři tokeny; nové barvy mimo paletu; Title Case v češtině; `capitalize`
 na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod 11 px;
 `transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
-blur mimo plovoucí lištu, dock a topbar.
+blur mimo plovoucí lištu, dock a topbar; `<div onClick>` bez `role`
+a `tabIndex`; tlačítko bez `type` uvnitř `<form>`; tiše oříznutý seznam.

@@ -1,6 +1,7 @@
 'use client';
 
 import { Step, fmtMinutes } from '@/lib/steps';
+import { clickable } from '@/lib/clickable';
 
 type Status = 'pending' | 'done' | 'skipped';
 
@@ -49,8 +50,24 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
             {/* Card */}
             <div className={`flex-1 min-w-0 ${compact ? 'mb-2' : 'mb-3'}`}>
               <div
-                onClick={() => interactive && onToggle?.(i)}
+                {...clickable(() => onToggle?.(i), {
+                  disabled: !interactive,
+                  label: `${done ? 'Zrušit splnění' : 'Označit jako hotové'} — ${s.text}`,
+                })}
+                // Přeskočení krok viselo jen na pravém tlačítku myši, takže
+                // klávesnicí ani na tabletu nešlo vůbec. Pravé tlačítko
+                // zůstává jako zkratka; „S" dělá totéž z klávesnice a pod
+                // kartou je na to i tlačítko.
                 onContextMenu={(e) => { if (interactive && onSkip) { e.preventDefault(); onSkip(i); } }}
+                onKeyDown={(e) => {
+                  if (!interactive) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.target !== e.currentTarget) return;
+                    e.preventDefault(); onToggle?.(i);
+                  } else if (onSkip && (e.key === 's' || e.key === 'S')) {
+                    e.preventDefault(); onSkip(i);
+                  }
+                }}
                 className={`rounded-3xl px-3.5 ${compact ? 'py-2.5' : 'py-3'} border transition ${
                   done
                     ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/30'

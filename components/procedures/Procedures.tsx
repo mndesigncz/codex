@@ -10,6 +10,7 @@ import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, timeRange, STEP_WEIGHTS, weightSpec, stepPenalty, stepPlus, type Step } from '@/lib/steps';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { clickable } from '@/lib/clickable';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -210,7 +211,7 @@ export default function Procedures({ user }: Props) {
             return (
               <div
                 key={p.id}
-                onClick={() => setDetail(p)}
+                {...clickable(() => setDetail(p), { label: `Otevřít postup ${p.name}` })}
                 className="glass-card rounded-3xl p-5 flex flex-col group cursor-pointer hover:border-black/15 transition"
               >
                 <div className="flex items-start justify-between">
@@ -319,7 +320,7 @@ export default function Procedures({ user }: Props) {
                 const missing = Math.max(0, (r.total_items ?? 0) - checkedCount);
                 return (
                   <div key={r.id}
-                    onClick={() => done && setRunDetail(r)}
+                    {...clickable(() => setRunDetail(r), { disabled: !done, label: 'Otevřít proběhlý postup' })}
                     className={`flex items-center gap-3 px-4 py-3 ${done ? 'cursor-pointer hover:bg-black/[0.03] transition-colors' : ''}`}>
                     <PersonLink id={r.user_id} className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{r.user_avatar || '👤'}</PersonLink>
                     <div className="min-w-0 flex-1">
