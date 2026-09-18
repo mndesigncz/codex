@@ -9,6 +9,8 @@ import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { openPrint, esc } from '@/lib/printDoc';
+import { czCount, SMENA, DEN } from '@/lib/czech';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -281,6 +283,9 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   const [confirmClear, setConfirmClear] = useState(false);
   // Surfaced when an action on the board didn't reach the server.
   const [boardError, setBoardError] = useState('');
+  // Blokovač vyskakovacích oken tiskové okno zavře a bez tohohle by se
+  // po kliknutí nestalo vůbec nic.
+  const [printFailed, setPrintFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const seededRef = useRef(false);
   // Hlídá závod při přepnutí měsíce: odpověď starého měsíce nesmí přepsat nový.
@@ -593,6 +598,46 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     URL.revokeObjectURL(url);
   };
 
+  // ---- Tisk na zeď ----
+  //
+  // Rozvrh visí u baru na papíře; kdo zrovna nemá telefon v ruce, kouká
+  // tam. Papír je černobílý, takže typ směny musí být napsaný slovem —
+  // barevná tečka, podle které se to pozná na obrazovce, je na výtisku
+  // neviditelná.
+  const printSchedule = () => {
+    const byDate = new Map<string, typeof shifts>();
+    for (const sh of shifts) {
+      const arr = byDate.get(sh.date);
+      if (arr) arr.push(sh); else byDate.set(sh.date, [sh]);
+    }
+    const days = Array.from(byDate.keys()).sort();
+    const rows = days.map(d => {
+      const list = byDate.get(d)!.slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const dt = new Date(d + 'T00:00:00');
+      const weekend = dt.getDay() === 0 || dt.getDay() === 6;
+      return `<tr>
+        <td style="white-space:nowrap${weekend ? ';font-weight:700' : ''}">
+          ${esc(dt.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }))}
+          <div class="note">${esc(dt.toLocaleDateString('cs-CZ', { weekday: 'long' }))}</div>
+        </td>
+        <td>${list.map(x => `<div>${esc(x.employeeName || 'Neobsazeno')} — ${esc(x.startTime)}–${esc(x.endTime)}`
+          + `${x.type ? ` · ${esc(x.type)}` : ''}</div>`).join('')}</td>
+        <td class="num">${list.length}</td>
+      </tr>`;
+    }).join('');
+    const monthName = new Date(month + '-01T00:00:00')
+      .toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+    const ok = openPrint({
+      title: `Rozvrh — ${monthName}`,
+      subtitle: `${czCount(shifts.length, SMENA)} · ${czCount(days.length, DEN)} se směnou`,
+      body: `<table>
+        <thead><tr><th style="width:26mm">Den</th><th>Kdo a kdy</th><th class="num">Lidí</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`,
+    });
+    setPrintFailed(!ok);
+  };
+
   // ---- CSV import ----
   const splitLine = (line: string) => {
     const out: string[] = [];
@@ -679,6 +724,14 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
         {/* Month selector — arrows for any month, chips for the usual ones.
             Only the schedule grid is month-scoped; the calendar and the
             settings tabs bring their own navigation. */}
+        {printFailed && (
+          <div className="w-full note note-wait px-4 py-3 text-sm flex items-center justify-between gap-3">
+            <span className="cz-sentence">Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.</span>
+            <button type="button" aria-label="Zavřít" onClick={() => setPrintFailed(false)}
+              className="shrink-0 text-black/40 hover:text-black"><Icon name="close" size={15} /></button>
+          </div>
+        )}
+
         {boardError && (
           <div className="w-full note note-danger px-4 py-3 text-sm font-medium flex items-center justify-between gap-3">
             <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
@@ -974,6 +1027,8 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                 { label: 'Kopírovat týden', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } },
                 { label: 'Import CSV', icon: 'upload', onClick: () => fileRef.current?.click() },
                 { label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 },
+                { label: 'Vytisknout rozvrh', icon: 'print', onClick: printSchedule, disabled: shifts.length === 0,
+                  hint: 'Na papír k baru — černobíle, s typem směny slovem.' },
                 { label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
                   hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' },
               ]}
