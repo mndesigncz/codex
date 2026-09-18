@@ -288,6 +288,39 @@ white background") a pak výsledek ověřit, ne odhadnout: zdejší headless
 prohlížeč H.264 nepřehraje, takže obsah smyček se kontroluje strojovým
 popisem scény.
 
+### Rozepsané přežije i odchod na jinou záložku
+
+Kolo 34 ohlídalo okna. Formulářů, které sedí přímo na stránce, je ale 29
+a ty zůstaly po staru: záložky v aplikaci jsou `?view=`, takže přechod
+komponentu odmontuje. Napsat úkol, mrknout na rozvrh, vrátit se — a psát
+znovu. Naměřeno 2 ze 2 dosažitelných cílů.
+
+Koncept se drží v `sessionStorage` (`lib/useDraft.ts`, rozhodování zvlášť
+v `lib/draft.ts`): přežije přechod i obnovení stránky, ale ne zavření
+prohlížeče. Koncept z minulého týdne, který vyskočí v úplně jiné situaci,
+je horší než žádný.
+
+Tři věci, na kterých to stojí — všechny tři přišly z měření, ne z úvahy:
+
+- **Koncept, který není vidět, je totéž co ztracený.** První verze ho
+  poctivě uložila, jenže formulář po návratu zůstal zavřený. Uživatel
+  nevidí stopu po tom, co napsal, a napíše to znovu. Proto hook hlásí
+  `cekaKoncept` a formulář se otevře sám.
+- **Obnovení se přizná.** Tiše předvyplněný formulář je vlastní malá lež:
+  uživatel nepozná, jestli to napsal on, nebo se to vzalo odjinud. Nad
+  formulářem je `<DraftNote>` s jednou větou a tlačítkem *Zahodit*.
+- **Výchozí hodnota není rozepsaný text.** Formulář má předvolby (priorita
+  `medium`, typ volna `vacation`) a ty jsou neprázdné samy o sobě. První
+  verze se ptala „nese to obsah?", takže i po zahození zůstal v úložišti
+  prázdný koncept navěky. Správná otázka je „liší se to od prázdného
+  formuláře?".
+
+Uložený koncept se navíc skládá **na** výchozí tvar, ne naopak: formulář se
+během vývoje mění a koncept z minulého týdne o tom neví. Berou se jen
+klíče, které výchozí tvar zná, a jen když sedí typ.
+
+Měří `probe-koncept.mjs` — a měří celý průchod, ne jen uložení.
+
 ## Barvy: stav versus kategorie
 
 Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —

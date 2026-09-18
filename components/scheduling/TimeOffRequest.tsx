@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { EmptyState } from '../ui';
 import { Icon } from '../Icons';
+import { useDraft } from '@/lib/useDraft';
+import { DraftNote } from '../ui/DraftNote';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -68,6 +70,11 @@ export default function TimeOffRequest() {
   const [toDate, setToDate] = useState('');
   const [type, setType] = useState<TimeOffType>('vacation');
   const [note, setNote] = useState('');
+  // Žádost o volno se vyplňuje mezi prací: kouknout do rozvrhu, kdo má
+  // směnu, a vrátit se. Do kola 37 to znamenalo vyplňovat znovu.
+  const koncept = useDraft('volno', { fromDate, toDate, type, note },
+    (v) => { setFromDate(v.fromDate); setToDate(v.toDate); setType(v.type); setNote(v.note); },
+    { vychozi: { fromDate: '', toDate: '', type: 'vacation' as TimeOffType, note: '' } });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -109,6 +116,7 @@ export default function TimeOffRequest() {
         setError('Žádost se nepodařilo odeslat. Zkus to prosím znovu.');
         return;
       }
+      koncept.hotovo();
       setFromDate('');
       setToDate('');
       setType('vacation');
@@ -143,6 +151,7 @@ export default function TimeOffRequest() {
 
       {/* Form */}
       <div className="space-y-3">
+        <DraftNote koncept={koncept} co="rozepsanou žádost" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="min-w-0">
             <label className="block text-sm font-medium text-black/70 mb-1.5">Od</label>

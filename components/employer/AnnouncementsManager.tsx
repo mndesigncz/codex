@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { Modal, Button } from '../ui';
+import { useDraft } from '@/lib/useDraft';
+import { DraftNote } from '../ui/DraftNote';
 
 interface Announcement {
   id: number;
@@ -24,6 +26,11 @@ export default function AnnouncementsManager() {
   const [saving, setSaving] = useState(false);
   const [alsoChat, setAlsoChat] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Oznámení jde celému týmu, takže bývá rozmyšlené a dlouhé. Odejít
+  // na jinou záložku a přijít o něj bolí víc než u krátkého pole.
+  const koncept = useDraft('oznameni', { content, alsoChat }, (v) => { setContent(v.content); setAlsoChat(v.alsoChat); }, {
+    vychozi: { content: '', alsoChat: false },
+  });
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +64,7 @@ export default function AnnouncementsManager() {
       if (!r.ok || !d?.ok) {
         setError(d?.error ?? 'Oznámení se nepodařilo připnout.');
       } else {
+        koncept.hotovo();
         setContent('');
         await load();
       }
@@ -142,6 +150,7 @@ export default function AnnouncementsManager() {
       </div>
 
       <div className="space-y-2">
+        <DraftNote koncept={koncept} co="rozepsané oznámení" />
         <textarea
           rows={2}
           value={content}

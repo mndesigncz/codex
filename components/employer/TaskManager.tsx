@@ -9,6 +9,8 @@ import TaskWeekBoard from '../TaskWeekBoard';
 import { PersonLink } from './ProfileLinkProvider';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson } from '@/lib/api';
+import { useDraft } from '@/lib/useDraft';
+import { DraftNote } from '../ui/DraftNote';
 
 interface Task {
   id: number;
@@ -56,6 +58,15 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingSeries, setEditingSeries] = useState(false);
+  // Záložky v aplikaci jsou `?view=`, takže odchod na Rozvrh formulář
+  // odmontuje. Do kola 37 to znamenalo psát úkol znovu.
+  const koncept = useDraft('ukoly', form, setForm, {
+    vychozi: emptyForm(), aktivni: showForm, upravujeSe: editingId != null,
+  });
+  // Rozepsaný úkol otevře formulář sám. Koncept, který není vidět, je
+  // totéž co ztracený — uživatel by ho nehledal a psal znovu.
+  useEffect(() => { if (koncept.cekaKoncept) setShowForm(true); }, [koncept.cekaKoncept]);
+
   const [view, setView] = useState<'list' | 'week'>('list');
   const [showLater, setShowLater] = useState(false);
   const { weekStart } = useCurrency();
@@ -119,7 +130,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           }),
         });
         const d = await res.json();
-        if (res.ok) { closeForm(); load(); }
+        if (res.ok) { koncept.hotovo(); closeForm(); load(); }
         else setError(d.error || 'Úkol se nepodařilo upravit.');
       } else {
         const res = await fetch('/api/tasks', {
@@ -133,7 +144,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           }),
         });
         const d = await res.json();
-        if (res.ok) { closeForm(); load(); } // reload to include generated upcoming occurrences
+        if (res.ok) { koncept.hotovo(); closeForm(); load(); } // reload to include generated upcoming occurrences
         else setError(d.error || 'Úkol se nepodařilo vytvořit.');
       }
     } catch { setError('Chyba serveru.'); }
@@ -328,6 +339,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       {showForm && (
         <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">
           <h3 className="t-card">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
+          <DraftNote koncept={koncept} co="rozepsaný úkol" />
           <div>
             <label className="field-label">Název úkolu</label>
             <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Např. Umýt okna" className={inputClass} autoFocus />
