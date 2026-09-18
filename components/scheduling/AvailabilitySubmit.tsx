@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 
-import { PageHeader } from '../ui';
+import { PageHeader, ErrorState } from '../ui';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
 }
@@ -74,6 +74,15 @@ export default function AvailabilitySubmit({ user }: Props) {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [existing, setExisting] = useState(false);
+  // Načtení uložené dostupnosti selhalo.
+  //
+  // Bez tohohle příznaku byl tichý `catch` ztrátou dat, ne jen prázdnou
+  // obrazovkou: mřížka zůstala prázdná, což znamená „můžu všechny dny",
+  // a odeslání tím přepsalo dřív poslanou dostupnost. Člověk si myslel,
+  // že jen potvrzuje, co už poslal.
+  const [loadFailed, setLoadFailed] = useState(false);
+  /** Zvýšením se načtení pustí znovu — `setMonth(m => m)` by efekt nespustil. */
+  const [reloadKey, setReloadKey] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
 
   const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
@@ -109,8 +118,14 @@ export default function AvailabilitySubmit({ user }: Props) {
     let active = true;
     setLoading(true);
     setConfirmed(false);
+    setLoadFailed(false);
     fetch(`/api/availability?mine=1&month=${month}`)
-      .then((r) => r.json())
+      .then((r) => {
+        // Bez tohohle je odpověď 500 k nerozeznání od „ještě jsi nic
+        // neposlal" — a právě ta záměna přepisovala odeslanou dostupnost.
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((data) => {
         if (!active) return;
         if (data && data.id) {
@@ -135,12 +150,12 @@ export default function AvailabilitySubmit({ user }: Props) {
           setNote('');
         }
       })
-      .catch(() => {})
+      .catch(() => { if (active) setLoadFailed(true); })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [month]);
+  }, [month, reloadKey]);
 
   const stateOf = (date: string): DayState => dayStates[date] ?? 'available';
 
@@ -241,6 +256,15 @@ export default function AvailabilitySubmit({ user }: Props) {
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="spinner" />
+        </div>
+      ) : loadFailed ? (
+        // Raději nic než prázdná mřížka, která vypadá jako „můžu všechny dny".
+        <div className="glass-card">
+          <ErrorState
+            title="Dostupnost se nenačetla"
+            hint="Dokud nevíme, co jsi poslal/a dřív, nejde to odeslat znovu — přepsalo by to původní dostupnost prázdnou."
+            onRetry={() => setReloadKey(k => k + 1)}
+          />
         </div>
       ) : (
         <>
@@ -358,7 +382,8 @@ export default function AvailabilitySubmit({ user }: Props) {
             )}
             <button
               onClick={submit}
-              disabled={saving}
+              disabled={saving || loadFailed}
+              title={loadFailed ? 'Nejdřív je potřeba načíst, co jsi poslal/a dřív.' : undefined}
               className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
             >
               {saving ? 'Ukládám…' : existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}

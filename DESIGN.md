@@ -361,6 +361,30 @@ takže se ten rozdíl v kódu snadno ztratí — a vzniknou věty jako
 - **Dva tvary stačí, když u nich není číslo.** „Dokonči povinné postupy"
   je správně pro dva i pro pět; „2 postupů" ne.
 
+## Když selže síť
+
+Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrdí,
+že se něco stalo, ačkoli se nestalo.
+
+- **Konfety jen za to, co se uložilo.** Zavírací postup hlásil „Hotovo!"
+  i při chybě serveru a zavřel se — vedení ho druhý den vidělo jako
+  neudělaný. Nejdřív `res.ok`, teprve pak oslava; při selhání běh zůstává
+  otevřený, ať jde zkusit znovu.
+- **`res.ok` se musí kontrolovat zvlášť.** `fetch` vyhodí výjimku jen když
+  spojení vůbec nevznikne; odpověď 500 se doručí úspěšně a bez kontroly
+  vypadá jako platná data — typicky jako prázdný seznam. Samotný `catch`
+  tenhle případ nechytí.
+- **Prázdno z výpadku není prázdno v datech.** „Zatím tu nikdo není —
+  zaměstnance přidá vedení" na kiosku byla lež, která posílala obsluhu
+  volat šéfovi místo zkontrolovat wifi. Nenačteno ≠ nic tam není.
+- **Nenačteno znamená neodesílat.** Když se nenačetlo, co člověk poslal
+  dřív, formulář se nesmí tvářit jako prázdný a nechat to odeslat —
+  přepsal by původní data. Raději chyba a zamčené tlačítko.
+- **Výpadek nesmí nic zdražit ani zamknout.** Nenačtený tarif je
+  nenačtený, ne „nemáš zaplaceno".
+- **Odhlášení sdíleného zařízení se potvrzuje.** Obsluha nezná heslo
+  tabletu; jedno ťuknutí = tablet mimo provoz do příchodu vedení.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
@@ -370,4 +394,5 @@ na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod
 `transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
 blur mimo plovoucí lištu, dock a topbar; `<div onClick>` bez `role`
 a `tabIndex`; tlačítko bez `type` uvnitř `<form>`; tiše oříznutý seznam; fronta
-ke schválení, kde jde schvalovat jen po jednom; dva tvary po číslovce.
+ke schválení, kde jde schvalovat jen po jednom; dva tvary po číslovce;
+oslava akce, u které se nezkontrolovalo `res.ok`.

@@ -16,9 +16,27 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   const [plan, setPlan] = useState<PlanInfo | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    fetch('/api/teams').then(r => r.json())
-      .then(d => { setPlan(d?.planInfo ?? planInfoOf(null)); setLoaded(true); })
-      .catch(() => { setPlan(planInfoOf(null)); setLoaded(true); });
+    let alive = true;
+    const load = (attempt = 0) => {
+      fetch('/api/teams').then(r => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+        .then(d => { if (alive) { setPlan(d?.planInfo ?? planInfoOf(null)); setLoaded(true); } })
+        .catch(() => {
+          // Výpadek sítě nesmí znamenat „nemáš Pro".
+          //
+          // Dřív se při chybě nastavil volný tarif a `loaded = true`, takže
+          // zaplacenému podniku vyskočila na tabletu zeď „Kiosk režim patří
+          // do plánu Pro" — bez tlačítka, bez rady, jen kvůli vypadlé wifi.
+          // Dokud nevíme, co má zaplaceno, radši to necháme nenačtené:
+          // `usePlan` pak vrací `pro: true` a nic se nezamkne.
+          if (!alive) return;
+          if (attempt < 4) setTimeout(() => load(attempt + 1), 2000 * (attempt + 1));
+        });
+    };
+    load();
+    return () => { alive = false; };
   }, []);
   return <PlanCtx.Provider value={{ plan, loaded }}>{children}</PlanCtx.Provider>;
 }

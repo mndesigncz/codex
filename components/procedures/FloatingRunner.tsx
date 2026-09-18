@@ -170,9 +170,12 @@ export default function FloatingRunner() {
           {/* The ticks live on this device but never reached the server, so the
               employer wouldn't see the run at all. */}
           {syncFailed && (
-            <p className="flex items-start gap-1.5 bg-amber-500/[0.12] px-4 py-2 text-[11px] font-medium leading-snug text-amber-800">
-              <span aria-hidden className="mt-px shrink-0"><Icon name="warning" size={15} /></span>
-              Odškrtnuté kroky se neukládají na server — zkontroluj připojení, ať se postup nezapíše jako neudělaný.
+            // 13 px, ne 11: je to nejdůležitější věta v celém okně a na
+            // tabletu za barem se čte na délku paže.
+            <p className="flex items-start gap-1.5 bg-amber-500/[0.12] px-4 py-2 text-[13px] font-medium leading-snug text-amber-800">
+              <span aria-hidden className="mt-px shrink-0"><Icon name="warning" size={16} /></span>
+              Neukládá se na server — zkontroluj připojení a zkus to znovu.
+              Postup zůstane otevřený, dokud se odeslání nepovede.
             </p>
           )}
 
