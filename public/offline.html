@@ -12,6 +12,17 @@
   stáhnout ani styl, ani písmo. Kdyby si stránka o cokoliv říkala ven,
   skončila by prázdná — a prázdná obrazovka je horší než dinosaurus
   z prohlížeče, protože nevysvětlí vůbec nic.
+
+  KAŽDÁ ZMĚNA TEXTU TADY MUSÍ ZVEDNOUT VERZI CACHE V `public/sw.js`.
+  Stránka se předcachuje při instalaci workeru; bez zvýšení verze by
+  zařízení, která ji už mají, ukazovala starý text napořád.
+
+  Tři odrážky níž jsou přeměřené, ne odhadnuté:
+   - odeslání při výpadku ukáže chybu a text nechá v poli,
+   - koncept drží `sessionStorage`, takže přežije obnovení, ne zavření
+     záložky (je to záměr, viz `lib/useDraft.ts`).
+  Dřív tu stálo „nic, co jsi odeslal, se neztratilo" a „rozepsané zůstává
+  uložené v tomhle zařízení". Obojí slibovalo víc, než aplikace dělá.
 -->
 <style>
   :root {
@@ -80,9 +91,9 @@
     <h1>Nejsi připojený</h1>
     <p>Spojení se ztratilo, takže se Managero nedá načíst. Není to chyba aplikace ani tvoje.</p>
     <ul>
-      <li>Nic, co jsi odeslal, se neztratilo.</li>
-      <li>Rozepsané zůstává uložené v tomhle zařízení.</li>
-      <li>Jakmile se wifi vrátí, pokračuješ tam, kde jsi skončil.</li>
+      <li>Nic se neztratilo potichu: co neprošlo, to ti aplikace řekla.</li>
+      <li>Rozepsané zůstává, dokud tuhle záložku nezavřeš.</li>
+      <li>Jakmile se spojení vrátí, pokračuješ tam, kde jsi skončil.</li>
     </ul>
 
     <button type="button" id="znovu">Zkusit znovu</button>

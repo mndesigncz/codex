@@ -139,3 +139,7 @@ jobs:
       # to dvě třídy v globals.css; vlastní překryv bez nich visí uprostřed.
       - name: Okna vyjíždějí zdola
         run: node scripts/check-sheet.mjs
+      # Offline stránka se předcachuje. Když se změní její text, ale ne název
+      # cache, tablet za barem ukazuje starou verzi napořád.
+      - name: Otisk offline stránky
+        run: node scripts/check-offline-cache.mjs

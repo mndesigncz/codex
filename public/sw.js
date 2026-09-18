@@ -12,7 +12,11 @@
 // vysvětlení, co se stalo.
 
 const PREDPONA = 'managero-skorapka-';
-const CACHE = PREDPONA + 'v1';
+// Ve verzi je otisk obsahu `offline.html`. Stránka se předcachuje při
+// instalaci, takže beze změny názvu by zařízení, která ji už mají, ukazovala
+// starý text napořád — a spoléhat se na to, že si na zvýšení někdo vzpomene,
+// je horší než to nechat spočítat. Otisk hlídá `check-offline-cache`.
+const CACHE = PREDPONA + '2f348bba';
 const OFFLINE = '/offline.html';
 
 self.addEventListener('install', (event) => {
