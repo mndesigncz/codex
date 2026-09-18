@@ -122,7 +122,7 @@ function renderInline(text: string) {
   });
 }
 
-export default function Guides({ user }: { user: User }) {
+export default function Guides({ user, ticksFor }: { user: User; ticksFor?: number | null }) {
   const isEmployer = user.role === 'employer';
   const [approvingAll, setApprovingAll] = useState(false);
   const [approveNote, setApproveNote] = useState('');
@@ -584,7 +584,7 @@ export default function Guides({ user }: { user: User }) {
             ) : (
               <>
                 <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
-                {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} guideId={reader.id} />}
+                {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} guideId={reader.id} ticksFor={ticksFor ?? user.id} />}
               </>
             )}
           </div>
@@ -619,8 +619,12 @@ export default function Guides({ user }: { user: User }) {
 // Interactive tick list for the reader. Progress survives closing the reader —
 // it lives in localStorage per guide on this device, and clears itself once
 // the list is completed (next open starts fresh).
-function ReaderChecklist({ steps, guideId }: { steps: GuideStep[]; guideId?: number }) {
-  const storageKey = guideId ? `managero-guide-ticks-${guideId}` : null;
+//
+// Klíč nese i toho, kdo čte. Na sdíleném tabletu se dřív odškrtané kroky
+// přenesly na dalšího člověka: ten otevřel návod na čištění kávovaru a viděl
+// polovinu hotovou, aniž by na ni sáhl — a klidně ji přeskočil.
+function ReaderChecklist({ steps, guideId, ticksFor }: { steps: GuideStep[]; guideId?: number; ticksFor?: number | null }) {
+  const storageKey = guideId ? `managero-guide-ticks-${ticksFor ?? 0}-${guideId}` : null;
   const [done, setDone] = useState<boolean[]>(() => {
     if (storageKey) {
       try {

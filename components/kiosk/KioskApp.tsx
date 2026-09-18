@@ -142,15 +142,21 @@ function KioskShell({ user }: { user: KioskUser }) {
       {tab !== 'shift' && (
         <KioskShiftGate>
           {tab === 'tasks' && <main className="flex-1 mt-5"><KioskTasks /></main>}
-          {tab === 'procedures' && <main className="flex-1 mt-2 -mx-1"><Procedures user={actingUser} /></main>}
+          {tab === 'procedures' && (
+            <WhoFirst>
+              <main className="flex-1 mt-2 -mx-1"><Procedures user={actingUser} /></main>
+            </WhoFirst>
+          )}
           {tab === 'inventory' && (
-            <main className="flex-1 mt-5">
-              <KioskInventory autoOpenEntry={wantStockEntry} onEntryOpened={() => setWantStockEntry(false)} />
-            </main>
+            <WhoFirst>
+              <main className="flex-1 mt-5">
+                <KioskInventory autoOpenEntry={wantStockEntry} onEntryOpened={() => setWantStockEntry(false)} />
+              </main>
+            </WhoFirst>
           )}
           {tab === 'orders' && <main className="flex-1 mt-5"><StaffInbox /></main>}
           {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
-          {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} /></main>}
+          {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} ticksFor={active?.id ?? null} /></main>}
         </KioskShiftGate>
       )}
 
@@ -167,6 +173,35 @@ function KioskShell({ user }: { user: KioskUser }) {
           Tohle není konec směny — na ten je tlačítko u jména nahoře.
         </p>
       </Modal>
+    </div>
+  );
+}
+
+/**
+ * Záložky, kde se zapisuje práce, se neotevřou dřív, než tablet ví, kdo u něj
+ * stojí. Bez toho běžel zavírací postup pod účtem tabletu — a v uzávěrce pak
+ * stálo, že ho odklikal „iPad na baru".
+ *
+ * Když je na směně jeden člověk, není co splést a tohle se nikdy neukáže.
+ */
+function WhoFirst({ children }: { children: React.ReactNode }) {
+  const { active, onShift, requireActive } = useKioskShift();
+  if (active || onShift.length === 0) return <>{children}</>;
+  return (
+    <div className="flex-1 flex items-start justify-center pt-10 pb-10">
+      <div className="glass-card w-full max-w-lg p-8 text-center">
+        <div className="mx-auto h-16 w-16 rounded-3xl bg-[#FFD60A]/20 text-[#8A6D00] grid place-items-center">
+          <Icon name="user" size={30} />
+        </div>
+        <h2 className="t-page mt-5">Kdo teď u tabletu stojí?</h2>
+        <p className="text-black/50 mt-2.5 max-w-sm mx-auto text-pretty">
+          Na směně je vás víc. Ať se práce zapíše pod správné jméno, ťukni na sebe.
+        </p>
+        <button type="button" onClick={() => { void requireActive(); }}
+          className="mt-7 inline-flex items-center gap-2.5 rounded-full bg-[#C8F542] text-black font-semibold px-8 py-4 text-lg hover:brightness-110 active:scale-[0.98] transition">
+          <Icon name="user" size={20} /> Vybrat sebe
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,10 +1,11 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, EmptyState, ErrorState } from '../ui';
+import { Avatar, EmptyState, ErrorState, Modal } from '../ui';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { nextActiveId, IDLE_MS } from '@/lib/kioskIdentity';
 
 export interface RosterMember {
   id: number;
@@ -29,7 +30,13 @@ const LS_ACTIVE_OLD = 'pangea-kiosk-active';
 // (the procedure runner, for example). Server side it is only ever honoured for
 // a kiosk session whose target is clocked in — see app/api/tasks/route.ts.
 const ACTING_COOKIE = 'managero-kiosk-acting';
-const ACTING_MAX_AGE = 16 * 60 * 60; // one long shift
+// Šestnáct hodin tu bývalo „jedna dlouhá směna". Jenže tablet u baru není
+// něčí telefon: identita v něm nedrží proto, že ji člověk potvrdil, ale
+// proto, že nikdo nesáhl na tlačítko. Hodina, obnovovaná každým dotykem,
+// odpovídá tomu, jak dlouho u tabletu opravdu někdo stojí.
+const ACTING_MAX_AGE = 60 * 60;
+// Práh nečinnosti a celé pravidlo „kdo se zapisuje" žijí v `lib/kioskIdentity`,
+// ať se dají otestovat bez prohlížeče.
 
 function writeActingCookie(id: number | null) {
   try {
@@ -79,6 +86,14 @@ interface KioskShiftValue {
   loadFailed: boolean;
   activeId: number | null;
   active: ActivePerson | null;
+  /**
+   * Kdo si tuhle práci připíše. Když to tablet neví, zeptá se a počká;
+   * `null` znamená „člověk výběr zavřel" — pak se nesmí zapsat nic.
+   *
+   * Práce se na sdíleném tabletu nikdy nepřipisuje odhadem: mzdy i podpisy
+   * pod zavíracím postupem stojí na tom, že tam je jméno toho, kdo to udělal.
+   */
+  requireActive: () => Promise<ActivePerson | null>;
   selectPerson: (id: number) => void;
   punch: (member: RosterMember) => void;
   reload: () => Promise<void>;
@@ -101,6 +116,8 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   const [flash, setFlash] = useState('');
   const now = useNow();
   const [loadFailed, setLoadFailed] = useState(false);
+  /** Kdy se naposled někdo tabletu dotkl — podle toho se pozná nečinnost. */
+  const touchedAt = useRef(0);
 
   const reload = useCallback(async () => {
     try {
@@ -142,12 +159,44 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
     setHydrated(true);
   }, []);
 
-  // The active person must always be someone who is actually clocked in.
+  // Kdo se zapisuje, musí být někdo, kdo je opravdu na směně — a nesmí to
+  // být odhad. Dřív se tady sahalo po `onShift[0]`, tedy po tom, kdo byl
+  // v rozpisu první: když Anně skončila směna, tablet se tiše stal Bobem
+  // a všechno, co kdokoli dál odklikal, šlo na Bobovo jméno.
+  //
+  // Jeden člověk na směně odhad není, to je fakt. Dva a víc znamená, že se
+  // tablet musí zeptat.
   useEffect(() => {
     if (!hydrated || loading) return;
-    if (activeId != null && onShift.some(m => m.id === activeId)) return;
-    setActiveId(onShift[0]?.id ?? null);
+    const next = nextActiveId({
+      prev: activeId,
+      onShift: onShift.map(m => m.id),
+      idleFor: touchedAt.current ? Date.now() - touchedAt.current : 0,
+    });
+    if (next !== activeId) setActiveId(next);
   }, [hydrated, loading, onShift, activeId]);
+
+  // Nečinnost identitu zahodí. Tablet za barem drží jméno jen proto, že na
+  // něj nikdo nesáhl — ne proto, že by ho někdo potvrdil. Po deseti minutách
+  // je pravděpodobnější, že u něj stojí někdo jiný.
+  useEffect(() => {
+    const bump = () => { touchedAt.current = Date.now(); };
+    bump();
+    window.addEventListener('pointerdown', bump, true);
+    window.addEventListener('keydown', bump, true);
+    return () => {
+      window.removeEventListener('pointerdown', bump, true);
+      window.removeEventListener('keydown', bump, true);
+    };
+  }, []);
+  useEffect(() => {
+    if (onShift.length < 2 || activeId == null) return;
+    const t = setInterval(() => {
+      if (Date.now() - touchedAt.current > IDLE_MS) setActiveId(null);
+    }, 30000);
+    return () => clearInterval(t);
+  }, [onShift.length, activeId]);
+
 
   useEffect(() => {
     if (!hydrated) return;
@@ -163,21 +212,52 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
     return m ? { id: m.id, name: m.name, avatar: m.avatar || '👤' } : null;
   }, [onShift, activeId]);
 
+  // `requireActive` se volá z obslužné funkce, kde by `active` z closure už
+  // mohlo být staré — držíme ho v refu.
+  const activeRef = useRef<ActivePerson | null>(null);
+  const [asking, setAsking] = useState<((who: ActivePerson | null) => void) | null>(null);
+  const requireActive = useCallback((): Promise<ActivePerson | null> => {
+    const now = activeRef.current;
+    if (now) { touchedAt.current = Date.now(); return Promise.resolve(now); }
+    return new Promise<ActivePerson | null>(resolve => setAsking(() => resolve));
+  }, []);
+
   const showFlash = useCallback((msg: string) => {
     setFlash(msg);
     setTimeout(() => setFlash(''), 8000);
   }, []);
 
+  useEffect(() => { activeRef.current = active; }, [active]);
+
   const value: KioskShiftValue = {
     roster, onShift, offShift, loading, loadFailed, activeId, active,
+    requireActive,
     selectPerson: setActiveId,
     punch: setPunching,
     reload,
   };
 
+  const answer = (who: ActivePerson | null) => {
+    if (who) { setActiveId(who.id); touchedAt.current = Date.now(); }
+    asking?.(who);
+    setAsking(null);
+  };
+
   return (
     <Ctx.Provider value={value}>
       {children}
+      {/* Tablet se ptá místo aby hádal. Zavřít jde — ale pak se nic nezapíše,
+          protože zápis pod cizí jméno je horší než žádný zápis. */}
+      {asking && (
+        <Modal open onClose={() => answer(null)} title="Kdo teď u tabletu stojí?"
+          subtitle="Pod tímhle jménem se práce zapíše." size="lg">
+          <PersonPicker
+            members={onShift}
+            onPick={m => answer({ id: m.id, name: m.name, avatar: m.avatar || '👤' })}
+            emptyText="Nikdo není na směně. Nejdřív se odpíchni."
+          />
+        </Modal>
+      )}
       {flash && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-[92vw] px-5 py-3.5 rounded-2xl glass-strong border border-[#C8F542]/40 text-[#5B7A08] font-medium text-center shadow-lg">
           {flash}
@@ -190,10 +270,16 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
           onClose={() => setPunching(null)}
           onDone={(action, member, msg) => {
             setPunching(null);
-            // Whoever just arrived is the person now using the tablet.
-            if (action === 'in') setActiveId(member.id);
+            // Kdo právě přišel, ten teď u tabletu stojí. Jenže tohle je
+            // přepnutí cizí identity — když předtím byl vybraný někdo jiný,
+            // musí to být vidět, ne se stát potichu za jeho zády.
+            const switchedFrom = action === 'in' && activeId != null && activeId !== member.id
+              ? (onShift.find(m => m.id === activeId)?.name ?? null)
+              : null;
+            if (action === 'in') { setActiveId(member.id); touchedAt.current = Date.now(); }
             reload();
             if (msg) showFlash(msg);
+            if (switchedFrom) showFlash(`Zapisuje se teď jako ${member.name}, ne ${switchedFrom}. Přepni nahoře u jména, jestli to není tak.`);
           }}
         />
       )}
@@ -387,10 +473,25 @@ export function WhoIsWorking() {
 
 /** Header chip: who the tablet is recording as, plus a one-tap switcher. */
 export function ActivePersonChip() {
-  const { active, onShift, selectPerson } = useKioskShift();
+  const { active, onShift, selectPerson, requireActive } = useKioskShift();
   const [open, setOpen] = useState(false);
 
-  if (!active) return null;
+  // Bez vybraného člověka se dřív odznak prostě nevykreslil — u baru to
+  // vypadalo, že tablet nikoho nezapisuje, a přitom stačilo ťuknout na úkol
+  // a zapsal se pod tablet. Místo prázdna se tedy ptáme.
+  if (!active) {
+    if (onShift.length === 0) return null;
+    return (
+      <button type="button" onClick={() => { void requireActive(); }}
+        className="flex items-center gap-2.5 rounded-full glass border border-[#FFD60A]/50 bg-[#FFD60A]/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-[#FFD60A]/20 transition">
+        <Icon name="warning" size={17} className="text-[#8A6D00] shrink-0" />
+        <span className="text-left leading-tight">
+          <span className="hidden sm:block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">Zapisuje se jako</span>
+          <span className="block font-bold text-[#16181A] text-sm">Kdo jsi?</span>
+        </span>
+      </button>
+    );
+  }
   const canSwitch = onShift.length > 1;
 
   return (
