@@ -47,7 +47,7 @@ function Picker({ id, title, hint, value, onChange, tall, busy }: {
         <input ref={ref} id={id} type="file" accept="image/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f as any); e.target.value = ''; }} />
         <Button type="button" size="sm" variant="secondary" icon="upload" loading={busy} onClick={() => ref.current?.click()}>{value ? 'Změnit' : 'Nahrát'}</Button>
-        {value && <button type="button" onClick={() => onChange('')} className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-red-700 hover:bg-red-500/10 transition">Odebrat</button>}
+        {value && <button type="button" onClick={() => onChange('')} className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-bad-ink hover:bg-bad/10 transition">Odebrat</button>}
         <span className="text-xs text-black/45">{hint}</span>
       </div>
     </div>

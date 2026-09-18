@@ -63,7 +63,7 @@ export default function NoisiumConnect() {
       {connected ? (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-black/60 min-w-0 flex-1 basis-52">Projekt v Noisium je propojený{projectId ? ` (ID ${projectId})` : ''}. V Plánování teď máš u karet tlačítko „Publikovat".</p>
-          <button onClick={disconnect} disabled={busy} className="rounded-full glass border border-black/10 text-red-600 px-4 py-2 text-sm font-medium hover:bg-red-500/[0.06] disabled:opacity-50 whitespace-nowrap flex-shrink-0">Odpojit</button>
+          <button onClick={disconnect} disabled={busy} className="rounded-full glass border border-black/10 text-bad-ink px-4 py-2 text-sm font-medium hover:bg-bad/[0.06] disabled:opacity-50 whitespace-nowrap flex-shrink-0">Odpojit</button>
         </div>
       ) : (
         <form onSubmit={connect} className="space-y-3">

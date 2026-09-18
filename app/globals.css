@@ -43,6 +43,31 @@
   --bad-bg: rgba(220,38,38,0.10);   --bad-ink: #991B1B;
   --info-bg: rgba(10,132,255,0.10); --info-ink: #0A5CC0;
   --muted-bg: rgba(22,24,26,0.06);  --muted-ink: rgba(22,24,26,0.62);
+
+  /* Tytéž tóny ještě jednou, v holých kanálech. Tailwind si k nim umí
+     domíchat průhlednost (`bg-bad/15`), takže plná tečka, patnáctiprocentní
+     podklad i obrys vycházejí z jedné hodnoty.
+
+     Bez nich měla paleta u každého stavu jen podklad a text — plný odstín
+     ani střední alfa v ní nebyly, a tak si je každé místo vymyslelo
+     z Tailwindu. Naměřeno napříč aplikací: dvanáct různých červených
+     a deset jantarových pro dva významy. „Zamítnuto" tak bylo na jedné
+     obrazovce #DC2626, na druhé #EF4444 a na třetí #B91C1C. */
+  --ok-rgb: 200 245 66;
+  --wait-rgb: 245 158 11;
+  --bad-rgb: 220 38 38;
+  --info-rgb: 10 132 255;
+  /* Text stavu. V tmavém režimu se převrací (níž), takže třída postavená
+     nad tímhle tokenem je čitelná v obou motivech sama od sebe — což
+     tailwindové `text-red-600` nikdy nebylo. */
+  --ok-ink-rgb: 62 84 6;
+  --wait-ink-rgb: 146 64 14;
+  --bad-ink-rgb: 153 27 27;
+  --info-ink-rgb: 10 92 192;
+  /* Zesvětlený tón pro plochy, které jsou tmavé v obou motivech (hromadný
+     pruh, pás režimu s sebou). Tentýž odstín, jen posazený výš — proto se
+     v tmavém režimu nepřevrací. */
+  --bad-lift-rgb: 255 138 128;
 }
 
 * { box-sizing: border-box; padding: 0; margin: 0; }
@@ -597,6 +622,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   --wait-bg: rgba(245,158,11,0.18); --wait-ink: #F5C46A;
   --bad-bg: rgba(220,38,38,0.18);   --bad-ink: #FF8A80;
   --info-bg: rgba(10,132,255,0.18); --info-ink: #7EB8FF;
+  /* Text stavu v tmavém: světlejší, aby seděl na tmavém podkladu. */
+  --ok-ink-rgb: 200 245 66;
+  --wait-ink-rgb: 245 196 106;
+  --bad-ink-rgb: 255 138 128;
+  --info-ink-rgb: 126 184 255;
   --muted-bg: rgba(255,255,255,0.08); --muted-ink: rgba(237,242,228,0.66);
 }
 :root[data-theme="dark"] .glass{ background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.10); }

@@ -42,15 +42,15 @@ const stateOf = (day: Day | undefined, date: string, today: string): State => {
 
 const TONE: Record<State, string> = {
   done: 'bg-[#C8F542]/[0.14] border-[#C8F542]/45 hover:brightness-95',
-  missing: 'bg-red-500/[0.08] border-red-500/30 hover:brightness-95',
-  pending: 'bg-amber-500/[0.10] border-amber-500/30 hover:brightness-95',
+  missing: 'bg-bad/[0.08] border-bad/30 hover:brightness-95',
+  pending: 'bg-wait/[0.10] border-wait/30 hover:brightness-95',
   idle: 'bg-black/[0.015] border-transparent',
 };
 
 const DOT: Record<State, string> = {
   done: 'bg-[#8FB811]',
-  missing: 'bg-red-500',
-  pending: 'bg-amber-500',
+  missing: 'bg-bad',
+  pending: 'bg-wait',
   idle: 'bg-transparent',
 };
 
@@ -122,14 +122,14 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
 
       <p className="text-center text-[11px] text-black/45 mb-3 tabular-nums">
         {czCount(doneCount, { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' })}
-        {missingCount > 0 && <span className="text-red-600 font-semibold"> · {missingCount} chybí</span>}
+        {missingCount > 0 && <span className="text-bad-ink font-semibold"> · {missingCount} chybí</span>}
         {monthRevenue > 0 && <span> · tržba {money(monthRevenue)}</span>}
       </p>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-[11px] text-black/50">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#C8F542]" /> Hotová</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Chybí</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Čeká</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Chybí</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-wait" /> Čeká</span>
       </div>
 
       {loading ? (

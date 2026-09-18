@@ -126,7 +126,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
               <span className="shrink-0 text-[11px] text-black/40 w-8">{unitLabel}</span>
               <button type="button" onClick={() => send(l.productId, l.productName, 0)}
                 disabled={busy === l.productId} title="Odebrat z receptury" aria-label="Odebrat z receptury"
-                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/30 hover:text-red-600 transition">
+                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/30 hover:text-bad-ink transition">
                 <Icon name="close" size={13} />
               </button>
             </div>
@@ -187,7 +187,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
         </div>
       )}
 
-      {err && <p className="text-xs text-red-600">{err}</p>}
+      {err && <p className="text-xs text-bad-ink">{err}</p>}
 
       {links.length > 0 && (
         <p className="text-[11px] text-black/45">

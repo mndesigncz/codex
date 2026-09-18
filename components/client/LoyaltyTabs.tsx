@@ -55,7 +55,7 @@ function useProfile() {
 }
 
 function Tile({ icon, label: lb, value, unit, tone = 'ok' }: { icon: string; label: string; value: number | string; unit?: string; tone?: 'ok' | 'muted' | 'wait' }) {
-  const ring = tone === 'wait' ? 'bg-amber-500/15 border-amber-500/25 text-amber-800' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
+  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
   return (
     <div className="glass-card p-4 sm:p-5">
       <div className="flex items-start justify-between gap-2">
@@ -126,7 +126,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
     <div className="space-y-5">
       {!p.loyalty_on && (
         <div className="card card-wait p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
-          <p className="font-semibold text-[#16181A] flex items-center gap-2"><Icon name="warning" size={17} className="text-amber-700" />Věrnost je pro hosty vypnutá.</p>
+          <p className="font-semibold text-[#16181A] flex items-center gap-2"><Icon name="warning" size={17} className="text-wait-ink" />Věrnost je pro hosty vypnutá.</p>
           <Button size="sm" variant="accent" loading={busy} onClick={toggle}>Zapnout</Button>
         </div>
       )}
@@ -162,7 +162,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
                     <p className="font-medium truncate text-sm">{l.customer_name}</p>
                     <p className="text-xs text-black/50 truncate">{l.note || l.kind}</p>
                   </div>
-                  <span className={`shrink-0 font-semibold tabular-nums text-sm ${(l.delta || l.credit_delta) > 0 ? 'text-[#3E5406]' : 'text-red-700'}`}>
+                  <span className={`shrink-0 font-semibold tabular-nums text-sm ${(l.delta || l.credit_delta) > 0 ? 'text-[#3E5406]' : 'text-bad-ink'}`}>
                     {l.delta ? `${l.delta > 0 ? '+' : ''}${l.delta} b.` : `${l.credit_delta > 0 ? '+' : ''}${money(l.credit_delta)}`}
                   </span>
                   <span className="shrink-0 text-xs text-black/40 w-24 text-right hidden sm:block">{dbTimeDayHM(l.created_at)}</span>
@@ -316,14 +316,14 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
                 className="w-full text-left px-3.5 py-2 hover:bg-[#C8F542]/15 transition flex items-center gap-2">
                 <span className="text-sm font-medium min-w-0 flex-1 truncate">{i.name}</span>
                 <span className="text-[11px] text-black/45 shrink-0">{i.board}</span>
-                {!i.paired && <span className="shrink-0 text-[11px] font-semibold rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5">bez pokladny</span>}
+                {!i.paired && <span className="shrink-0 text-[11px] font-semibold rounded-full bg-wait/15 text-wait-ink px-2 py-0.5">bez pokladny</span>}
               </button>
             </li>
           ))}
         </ul>
       )}
       {hint && <p className="text-xs text-black/50 mt-1.5">{hint}</p>}
-      {unpaired && <p className="text-xs text-amber-800 mt-1.5">Některé vybrané položky nejsou spárované s pokladnou — z účtenky se za ně razítko nepřipíše, jen ručně.</p>}
+      {unpaired && <p className="text-xs text-wait-ink mt-1.5">Některé vybrané položky nejsou spárované s pokladnou — z účtenky se za ně razítko nepřipíše, jen ručně.</p>}
     </div>
   );
 }

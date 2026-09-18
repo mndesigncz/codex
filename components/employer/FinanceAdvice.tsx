@@ -38,7 +38,7 @@ const GROUPS: { id: Group; label: string; icon: string; hint: string }[] = [
 
 const TONES = {
   good: { card: 'border-[#C8F542]/40 bg-[#C8F542]/[0.09]', icon: 'text-[#5B7A08]', title: 'text-[#3E5406]' },
-  warn: { card: 'border-amber-500/30 bg-amber-500/[0.07]', icon: 'text-amber-700', title: 'text-amber-900' },
+  warn: { card: 'border-wait/30 bg-wait/[0.07]', icon: 'text-wait-ink', title: 'text-wait-ink' },
   info: { card: 'border-[#0A84FF]/22 bg-[#0A84FF]/[0.05]', icon: 'text-[#0A6FE0]', title: 'text-[#0A5FC4]' },
 } as const;
 

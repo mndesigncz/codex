@@ -743,7 +743,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
         {boardError && (
           <div className="w-full note note-danger px-4 py-3 text-sm font-medium flex items-center justify-between gap-3">
             <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
-            <button aria-label="Zavřít" onClick={() => setBoardError('')} className="shrink-0 text-red-600/60 hover:text-red-600"><Icon name="close" size={15} /></button>
+            <button aria-label="Zavřít" onClick={() => setBoardError('')} className="shrink-0 text-bad-ink/60 hover:text-bad-ink"><Icon name="close" size={15} /></button>
           </div>
         )}
 
@@ -924,7 +924,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                           ) : (
                             <span className="flex flex-wrap gap-1 mt-1">
                               {(s.unavailableDates ?? []).sort().map((d) => (
-                                <span key={d} className="rounded-md bg-red-500/15 text-red-500 px-1.5 py-0.5 text-xs">
+                                <span key={d} className="rounded-md bg-bad/15 text-bad-ink px-1.5 py-0.5 text-xs">
                                   {parseInt(d.split('-')[2])}.{parseInt(d.split('-')[1])}.
                                 </span>
                               ))}
@@ -1055,9 +1055,9 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
             />
           </div>
           {confirmClear && (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-red-500/[0.08] border border-red-500/30 px-4 py-3 rise-in">
-              <Icon name="warning" size={18} className="text-red-600 shrink-0" />
-              <p className="text-sm text-red-700 font-medium flex-1 min-w-[12rem]">Opravdu vymazat všechny směny za {monthLabel(month)}? Nejde to vzít zpět.</p>
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-bad/[0.08] border border-bad/30 px-4 py-3 rise-in">
+              <Icon name="warning" size={18} className="text-bad-ink shrink-0" />
+              <p className="text-sm text-bad-ink font-medium flex-1 min-w-[12rem]">Opravdu vymazat všechny směny za {monthLabel(month)}? Nejde to vzít zpět.</p>
               <div className="flex items-center gap-2 ml-auto">
                 <Button variant="ghost" size="sm" onClick={() => setConfirmClear(false)}>Zrušit</Button>
                 <Button variant="danger-solid" size="sm" icon="trash" onClick={clearMonth}>Vymazat měsíc</Button>
@@ -1090,7 +1090,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                     </select>
                   </div>
                   {copyMsg && (
-                    <p className={`text-sm flex items-center gap-1.5 ${copyMsg.ok ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+                    <p className={`text-sm flex items-center gap-1.5 ${copyMsg.ok ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
                       <Icon name={copyMsg.ok ? 'check' : 'warning'} size={14} className="shrink-0" />{copyMsg.text}
                     </p>
                   )}
@@ -1153,14 +1153,14 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                             </span>
                           </>
                         ) : (
-                          <span className="rounded-full bg-red-500/12 text-red-600 px-2.5 py-0.5 text-xs font-bold">zrušit — nikdo nemůže</span>
+                          <span className="rounded-full bg-bad/12 text-bad-ink px-2.5 py-0.5 text-xs font-bold">zrušit — nikdo nemůže</span>
                         )}
                         <span className="text-xs text-black/40 w-full sm:w-auto sm:ml-auto">({ch.reason})</span>
                       </div>
                     ))}
                   </div>
                   {adjust.warnings.length > 0 && (
-                    <ul className="text-xs text-amber-800 space-y-0.5">
+                    <ul className="text-xs text-wait-ink space-y-0.5">
                       {adjust.warnings.slice(0, 10).map((w, i) => <li key={i}>⚠ {w}</li>)}
                     </ul>
                   )}
@@ -1203,16 +1203,16 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
               </div>
 
               {preview.warnings.length > 0 && (
-                <div className="rounded-2xl bg-amber-500/10 border border-amber-500/25 p-3">
-                  <p className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1.5">
+                <div className="rounded-2xl bg-wait/10 border border-wait/25 p-3">
+                  <p className="text-sm font-medium text-wait-ink mb-1 flex items-center gap-1.5">
                     <Icon name="warning" size={16} /> Upozornění ({preview.warnings.length})
                   </p>
-                  <ul className="text-xs text-amber-800/90 space-y-0.5 max-h-40 overflow-y-auto">
+                  <ul className="text-xs text-wait-ink/90 space-y-0.5 max-h-40 overflow-y-auto">
                     {preview.warnings.slice(0, 40).map((w, i) => (
                       <li key={i}>• {w}</li>
                     ))}
                     {preview.warnings.length > 40 && (
-                      <li className="text-amber-800/60">…a dalších {preview.warnings.length - 40}</li>
+                      <li className="text-wait-ink/60">…a dalších {preview.warnings.length - 40}</li>
                     )}
                   </ul>
                 </div>
@@ -1249,12 +1249,12 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
           {/* Díry v obsazení — nejdřív jako seznam s konkrétními časy, protože
               do políčka v kalendáři se rozsah hodin na mobilu nevejde. */}
           {problemDates.length > 0 && (
-            <div className="glass-card p-4 sm:p-5 border border-red-500/40 bg-red-500/[0.06] space-y-3">
+            <div className="glass-card p-4 sm:p-5 border border-bad/40 bg-bad/[0.06] space-y-3">
               <div className="min-w-0">
-                <h3 className="font-bold text-red-700 flex items-center gap-2">
+                <h3 className="font-bold text-bad-ink flex items-center gap-2">
                   <Icon name="warning" size={18} /> Díry v obsazení ({problemDates.length})
                 </h3>
-                <p className="text-sm text-red-900/70 mt-0.5">
+                <p className="text-sm text-bad-ink/70 mt-0.5">
                   {preview ? 'V navrženém rozvrhu' : 'V uloženém rozvrhu'} jsou dny, kdy je otevřeno a není tam
                   dost lidí. Klikni na den a doplň směnu ručně.
                 </p>
@@ -1266,10 +1266,10 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                     <li key={date}>
                       <button
                         onClick={() => setDayModal(date)}
-                        className="w-full text-left rounded-2xl bg-white/60 border border-red-500/25 px-3.5 py-2.5 hover:bg-white/80 transition"
+                        className="w-full text-left rounded-2xl bg-white/60 border border-bad/25 px-3.5 py-2.5 hover:bg-white/80 transition"
                       >
                         <span className="block text-sm font-semibold text-[#16181A] cz-sentence">{dayLabel(date)}</span>
-                        <span className="block text-xs text-red-800/85 mt-0.5 leading-relaxed">
+                        <span className="block text-xs text-bad-ink/85 mt-0.5 leading-relaxed">
                           {pr.gaps.map((g) => `Nikdo v podniku ${g.from}–${g.to}.`).join(' ')}
                           {pr.gaps.length > 0 && pr.missing.length > 0 ? ' ' : ''}
                           {pr.missing.length > 0
@@ -1281,7 +1281,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                   );
                 })}
                 {problemDates.length > 14 && (
-                  <li className="text-xs text-red-800/60 px-1">…a dalších {problemDates.length - 14} dnů</li>
+                  <li className="text-xs text-bad-ink/60 px-1">…a dalších {problemDates.length - 14} dnů</li>
                 )}
               </ul>
             </div>
@@ -1305,8 +1305,8 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                   </span>
                 )}
                 {problemDates.length > 0 && (
-                  <span className="flex items-center gap-1.5 text-red-700">
-                    <span className="h-3 w-3 rounded-md bg-red-500/25 border border-red-500/60" /> Díra v obsazení
+                  <span className="flex items-center gap-1.5 text-bad-ink">
+                    <span className="h-3 w-3 rounded-md bg-bad/25 border border-bad/60" /> Díra v obsazení
                   </span>
                 )}
                 {Object.keys(demand).length > 0 && (
@@ -1346,16 +1346,16 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                     title={problemTitle}
                     className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition flex flex-col gap-1 overflow-hidden border ${
                       hole
-                        ? 'bg-red-500/12 border-red-500/60 hover:bg-red-500/[0.18]'
+                        ? 'bg-bad/12 border-bad/60 hover:bg-bad/[0.18]'
                         : problem
-                          ? 'bg-red-500/[0.06] border-red-500/35 hover:bg-red-500/10'
+                          ? 'bg-bad/[0.06] border-bad/35 hover:bg-bad/10'
                           : 'bg-black/[0.03] border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04]'
                     }`}
                   >
                     <span className="flex items-center gap-1 min-w-0">
-                      <span className={`text-[11px] sm:text-xs font-medium ${problem ? 'text-red-700' : 'text-black/55'}`}>{day}</span>
+                      <span className={`text-[11px] sm:text-xs font-medium ${problem ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
                       {problem && (
-                        <span className={`flex-shrink-0 rounded-full ${hole ? 'h-2 w-2 bg-red-600' : 'h-1.5 w-1.5 bg-red-500/70'}`} />
+                        <span className={`flex-shrink-0 rounded-full ${hole ? 'h-2 w-2 bg-bad' : 'h-1.5 w-1.5 bg-bad/70'}`} />
                       )}
                     </span>
                     <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
@@ -1505,10 +1505,10 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
 
             {importPreview.errors.length > 0 && (
               <div className="note note-danger p-3">
-                <p className="text-sm font-medium text-red-500 mb-1 flex items-center gap-1.5">
+                <p className="text-sm font-medium text-bad-ink mb-1 flex items-center gap-1.5">
                   <Icon name="warning" size={16} /> {importPreview.errors.length} problémů (přeskočeno)
                 </p>
-                <ul className="text-xs text-red-500/80 space-y-0.5 max-h-32 overflow-y-auto">
+                <ul className="text-xs text-bad-ink/80 space-y-0.5 max-h-32 overflow-y-auto">
                   {importPreview.errors.slice(0, 20).map((e, i) => (
                     <li key={i}>• {e}</li>
                   ))}
@@ -1610,7 +1610,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
 
   return (
     <div className="glass-card p-5 space-y-4">
-      {err && <p className="text-sm font-medium text-red-600">{err}</p>}
+      {err && <p className="text-sm font-medium text-bad-ink">{err}</p>}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="clock" size={20} className="text-black/70 flex-shrink-0" />
@@ -1664,7 +1664,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
               <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5 flex-shrink-0" title="Upravit">
                 <Icon name="settings" size={18} />
               </button>
-              <button onClick={() => remove(t.id)} className="text-black/30 hover:text-red-600 p-1.5 flex-shrink-0" title="Smazat">
+              <button onClick={() => remove(t.id)} className="text-black/30 hover:text-bad-ink p-1.5 flex-shrink-0" title="Smazat">
                 ×
               </button>
             </div>
@@ -1864,7 +1864,7 @@ function OpeningHoursEditor({
                 onClick={() => update(d, { closed: !day.closed })}
                 className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition ${
                   day.closed
-                    ? 'bg-red-500/15 border-red-500/30 text-red-600'
+                    ? 'bg-bad/15 border-bad/30 text-bad-ink'
                     : 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
                 }`}
               >
@@ -1970,7 +1970,7 @@ function FixedAssignmentsManager({
 
   return (
     <div className="space-y-6">
-      {err && <p className="text-sm font-medium text-red-600">{err}</p>}
+      {err && <p className="text-sm font-medium text-bad-ink">{err}</p>}
       <div className="glass-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Icon name="swap" size={20} className="text-black/70" />
@@ -2090,7 +2090,7 @@ function FixedAssignmentsManager({
                         </select>
                         <button
                           onClick={() => remove(a.id)}
-                          className="text-black/30 hover:text-red-600 pl-1 flex-shrink-0"
+                          className="text-black/30 hover:text-bad-ink pl-1 flex-shrink-0"
                           title="Odebrat"
                         >
                           ×
@@ -2230,10 +2230,10 @@ function DayModal({
 
         {(dayGaps.length > 0 || missingHere.length > 0) && (
           <div className="note note-danger p-3.5">
-            <p className="text-sm font-semibold text-red-700 flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-bad-ink flex items-center gap-1.5">
               <Icon name="warning" size={16} /> Díra v obsazení
             </p>
-            <ul className="text-xs text-red-900/80 mt-1 space-y-0.5">
+            <ul className="text-xs text-bad-ink/80 mt-1 space-y-0.5">
               {dayGaps.map((g, i) => (
                 <li key={`g-${i}`}>
                   Od {toHM(g.start)} do {toHM(g.end)} není v podniku nikdo, přitom je otevřeno.
@@ -2276,7 +2276,7 @@ function DayModal({
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: rt.color }} />
                   {rt.label}
                 </span>
-                <button onClick={() => onRemove(s.id)} className="text-black/30 hover:text-red-600 transition p-1 flex-shrink-0" title="Odebrat">
+                <button onClick={() => onRemove(s.id)} className="text-black/30 hover:text-bad-ink transition p-1 flex-shrink-0" title="Odebrat">
                   ×
                 </button>
               </div>
@@ -2303,7 +2303,7 @@ function DayModal({
                 </span>
                 {onRemoveProposed && (
                   <button onClick={() => onRemoveProposed(p)}
-                    className="text-black/30 hover:text-red-600 transition p-1 flex-shrink-0" title="Vyhodit z návrhu">
+                    className="text-black/30 hover:text-bad-ink transition p-1 flex-shrink-0" title="Vyhodit z návrhu">
                     ×
                   </button>
                 )}
@@ -2343,7 +2343,7 @@ function DayModal({
                       <span className="text-lg flex-shrink-0">{e.avatar ?? '👤'}</span>
                       <span className="flex-1 min-w-0 truncate text-sm text-[#16181A]">{e.name}</span>
                       {blocked && (
-                        <span className="flex items-center gap-1 text-xs text-amber-700 font-medium whitespace-nowrap flex-shrink-0">
+                        <span className="flex items-center gap-1 text-xs text-wait-ink font-medium whitespace-nowrap flex-shrink-0">
                           <Icon name="warning" size={14} /> nemůže
                         </span>
                       )}
@@ -2356,7 +2356,7 @@ function DayModal({
               </div>
             )}
             {employeeId !== '' && unavailable.has(Number(employeeId)) && (
-              <p className="mt-2 text-xs text-amber-700 flex items-center gap-1.5">
+              <p className="mt-2 text-xs text-wait-ink flex items-center gap-1.5">
                 <Icon name="warning" size={14} /> Tento zaměstnanec označil tento den jako nedostupný.
               </p>
             )}
@@ -2394,7 +2394,7 @@ function DayModal({
               </button>
             </div>
             {typeName !== '' && (shiftTypes.find(t => t.name === typeName)?.endsAtClose) && !dayClose && (
-              <p className="text-[11px] text-amber-700 mt-1.5">Tento den je zavřeno — použije se výchozí konec typu.</p>
+              <p className="text-[11px] text-wait-ink mt-1.5">Tento den je zavřeno — použije se výchozí konec typu.</p>
             )}
           </div>
 
@@ -2654,7 +2654,7 @@ function ScheduleRulesManager() {
         </div>
       </div>
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p className="text-sm text-bad-ink">{err}</p>}
       {msg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-2.5">{msg}</p>}
       <button onClick={save} disabled={saving}
         className="btn btn-primary disabled:opacity-50 transition">
@@ -2711,7 +2711,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
   // Dřív si obě obrazovky psaly vlastní pole a lišily se.
   const TYPE_TONES = ['cat-4 border', 'cat-2 border', 'cat-3 border', 'cat-5 border'];
   const toneOf = (v: string) => {
-    if (v === 'off') return 'bg-red-500/15 border-red-500/40 text-red-600';
+    if (v === 'off') return 'bg-bad/15 border-bad/40 text-bad-ink';
     if (v === 'morning') return TYPE_TONES[0];
     if (v === 'afternoon') return TYPE_TONES[1];
     const idx = shiftTypes.findIndex((t) => `type:${t.id}` === v);
@@ -2764,10 +2764,10 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
         </div>
 
         <p className="text-xs text-black/45">
-          Klikáním na den přepínáš: volno → <span className="text-red-600 font-medium">nemůže</span>
+          Klikáním na den přepínáš: volno → <span className="text-bad-ink font-medium">nemůže</span>
           {shiftTypes.length
             ? shiftTypes.map((t) => <span key={t.id}> → <span className="font-medium">jen {t.name}</span></span>)
-            : <> → <span className="text-amber-700 font-medium">jen ranní</span> → <span className="font-medium text-[#0A5FC0]">jen odpolední</span></>}
+            : <> → <span className="text-wait-ink font-medium">jen ranní</span> → <span className="font-medium text-[#0A5FC0]">jen odpolední</span></>}
           . Denní volby jsou pro generátor závazné — typy se berou z nastavení „Typy směn".
         </p>
 
@@ -2818,7 +2818,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
             className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
         </div>
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm text-bad-ink">{err}</p>}
         <div className="flex gap-2">
           <button onClick={onClose} className="btn btn-secondary flex-1">Zrušit</button>
           <button onClick={save} disabled={saving}

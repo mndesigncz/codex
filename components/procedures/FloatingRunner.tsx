@@ -100,7 +100,7 @@ export default function FloatingRunner() {
                   {justCompleted.done} {stepsWord(justCompleted.done)} splněno
                 </span>
                 {justCompleted.skipped > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-sm font-medium text-amber-700">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-3 py-1 text-sm font-medium text-wait-ink">
                     {justCompleted.skipped} přeskočeno
                   </span>
                 )}
@@ -172,7 +172,7 @@ export default function FloatingRunner() {
           {syncFailed && (
             // 13 px, ne 11: je to nejdůležitější věta v celém okně a na
             // tabletu za barem se čte na délku paže.
-            <p className="flex items-start gap-1.5 bg-amber-500/[0.12] px-4 py-2 text-[13px] font-medium leading-snug text-amber-800">
+            <p className="flex items-start gap-1.5 bg-wait/[0.12] px-4 py-2 text-[13px] font-medium leading-snug text-wait-ink">
               <span aria-hidden className="mt-px shrink-0"><Icon name="warning" size={16} /></span>
               Neukládá se na server — zkontroluj připojení a zkus to znovu.
               Postup zůstane otevřený, dokud se odeslání nepovede.
@@ -201,7 +201,7 @@ export default function FloatingRunner() {
             <button
               onClick={() => setConfirmClose(true)}
               title="Zrušit průběh"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-black/45 hover:bg-red-500/10 hover:text-red-600 transition"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-black/45 hover:bg-bad/10 hover:text-bad-ink transition"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
@@ -210,7 +210,7 @@ export default function FloatingRunner() {
           {confirmClose ? (
             /* Confirm cancel — replaces the card body cleanly (no foggy overlay) */
             <div className="px-5 pb-5 pt-4 text-center motion-safe:animate-[pr-pop_0.2s_ease-out]">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-500/12 text-red-600">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-bad/12 text-bad-ink">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </div>
               <p className="mt-3 text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
@@ -224,7 +224,7 @@ export default function FloatingRunner() {
                 </button>
                 <button
                   onClick={doCancel}
-                  className="flex-1 rounded-full bg-red-500 text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap"
+                  className="flex-1 rounded-full bg-bad text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap"
                 >
                   Zrušit
                 </button>
@@ -233,7 +233,7 @@ export default function FloatingRunner() {
           ) : confirmFinish ? (
             /* Confirm finishing with unfinished steps */
             <div className="px-5 pb-5 pt-4 text-center motion-safe:animate-[pr-pop_0.2s_ease-out]">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-wait/15 text-wait-ink">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
               </div>
               <p className="mt-3 text-sm font-semibold text-[#16181A]">Dokončit, i když není vše hotové?</p>
@@ -282,8 +282,8 @@ export default function FloatingRunner() {
 
               {skipFor != null && (
                 <div className="px-3.5 pb-2">
-                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-3 space-y-2">
-                    <p className="text-xs font-semibold text-amber-700">Proč krok přeskakuješ?</p>
+                  <div className="rounded-2xl border border-wait/30 bg-wait/[0.07] p-3 space-y-2">
+                    <p className="text-xs font-semibold text-wait-ink">Proč krok přeskakuješ?</p>
                     <div className="flex flex-wrap gap-1.5">
                       {SKIP_REASONS.map(r => (
                         <button key={r.id} type="button"
@@ -314,7 +314,7 @@ export default function FloatingRunner() {
                 {unfinished > 0 && (
                   <p className="text-center text-[11px] font-medium text-black/50">
                     <span className="text-[#5B7A08]">{done} hotovo</span>
-                    {skipped > 0 && <span className="text-amber-600"> · {skipped} přeskočeno</span>}
+                    {skipped > 0 && <span className="text-wait-ink"> · {skipped} přeskočeno</span>}
                     {remaining > 0 && <span className="text-black/45"> · {remaining} zbývá</span>}
                   </p>
                 )}

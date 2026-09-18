@@ -198,7 +198,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
           ) : loadErr ? (
             <div className="glass-card p-8 text-center space-y-3">
-              <p className="text-base font-semibold text-red-700">Sklad se nepodařilo načíst.</p>
+              <p className="text-base font-semibold text-bad-ink">Sklad se nepodařilo načíst.</p>
               <p className="text-sm text-black/50">Nejspíš vypadlo připojení. Data můžou být neúplná — nespoléhej na tenhle seznam, dokud se nenačte.</p>
               <button onClick={() => { setLoading(true); reload(); }} className="rounded-2xl bg-[#16181A] text-white px-5 py-3 text-sm font-bold min-h-[48px] active:scale-[0.99] transition">Zkusit znovu</button>
             </div>
@@ -209,13 +209,13 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filtered.map(i => {
                 const st = statusOf(i);
-                const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#C8F542]';
+                const dot = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
                 return (
                   // Ovládání zabere 226 px (čtyři tlačítka 48 px a počítadlo).
                   // Na telefonu tak na název zbylo 56 px z potřebných 176 —
                   // z „Sirup Monin Levandule" bylo vidět „Siru…". Název si
                   // proto bere celý řádek a tlačítka se zalomí pod něj.
-                  <div key={i.id} className={`glass-card p-3 min-[360px]:p-4 flex items-center gap-x-2 min-[360px]:gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-red-500/25' : ''}`}>
+                  <div key={i.id} className={`glass-card p-3 min-[360px]:p-4 flex items-center gap-x-2 min-[360px]:gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-bad/25' : ''}`}>
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
                     {/* Zlom podle šířky okna tady klame: od 520 px se karty
                         srovnají do dvou sloupců, takže karta je zase úzká a na
@@ -226,7 +226,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                         {(i as any).approved === false && (
-                          <span className="ml-1.5 rounded-full bg-amber-500/12 text-amber-700 px-2 py-0.5 text-[11px] font-semibold align-middle">
+                          <span className="ml-1.5 rounded-full bg-wait/12 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
                             čeká na potvrzení
                           </span>
                         )}

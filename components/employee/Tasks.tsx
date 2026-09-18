@@ -93,7 +93,7 @@ export default function Tasks({ user }: Props) {
   const toggleChecklistAll = (task: Task, done: boolean) =>
     saveChecklist(task, (task.checklist ?? []).map(it => ({ ...it, done })));
 
-  const priorityColor = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
+  const priorityColor = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
   const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
 
   // Rozdělení podle dne. Šest filtrů a tři řazení se přepočítávají jen když se
@@ -145,7 +145,7 @@ export default function Tasks({ user }: Props) {
             {task.description && <p className="text-sm text-black/55 mt-1.5 whitespace-pre-wrap">{task.description}</p>}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {task.dueDate && (
-                <p className={`text-xs ${task.dueDate < today && task.status !== 'done' ? 'text-red-600 font-medium' : 'text-black/45'}`}>
+                <p className={`text-xs ${task.dueDate < today && task.status !== 'done' ? 'text-bad-ink font-medium' : 'text-black/45'}`}>
                   {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                   {task.dueDate < today && task.status !== 'done' && ' · po termínu'}
                 </p>
@@ -199,7 +199,7 @@ export default function Tasks({ user }: Props) {
         <div className="glass-card"><EmptyState illustration="ukoly" title="Žádné úkoly" hint="Až ti vedení něco zadá, objeví se to tady i v přehledu." compact /></div>
       ) : (
         <>
-          {section('Po termínu', overdue, 'text-red-600')}
+          {section('Po termínu', overdue, 'text-bad-ink')}
           {section('Dnes', todayTasks, 'text-[#5B7A08]')}
           {section('Tento týden', upcomingSoon)}
           {upcomingLater.length > 0 && (

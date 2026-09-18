@@ -35,8 +35,8 @@ const inputClass =
 
 const PRIORITIES = [
   { value: 'low', label: 'Nízká', dot: 'bg-[#C8F542]' },
-  { value: 'medium', label: 'Střední', dot: 'bg-amber-400' },
-  { value: 'high', label: 'Vysoká', dot: 'bg-red-500' },
+  { value: 'medium', label: 'Střední', dot: 'bg-wait' },
+  { value: 'high', label: 'Vysoká', dot: 'bg-bad' },
 ];
 const statusLabel = (s: string) => s === 'done' ? 'Hotovo' : s === 'in_progress' ? 'Probíhá' : 'Čeká';
 const statusChip = (s: string) => s === 'done' ? 'bg-[#C8F542]/15 text-[#5B7A08]' : s === 'in_progress' ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-black/[0.05] text-black/55';
@@ -270,7 +270,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               <button onClick={() => openEdit(t)} title="Upravit" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-[#16181A]">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
               </button>
-              <button onClick={() => remove(t)} title="Smazat" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-red-600">
+              <button onClick={() => remove(t)} title="Smazat" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-bad-ink">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
               </button>
             </div>
@@ -394,7 +394,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
                         <input value={it.text} onChange={e => setChecklistLine(i, e.target.value)}
                           placeholder={`Bod ${i + 1}`} className={`${inputClass} !py-2.5`} />
                         <button type="button" onClick={() => removeChecklistLine(i)}
-                          className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/45 hover:text-red-600 shrink-0">
+                          className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/45 hover:text-bad-ink shrink-0">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
                         </button>
                       </div>
@@ -416,7 +416,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </div>
             </>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-bad-ink">{error}</p>}
           <div className="flex flex-wrap gap-2">
             <button type="submit" disabled={saving} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
               {saving ? 'Ukládám…' : editingId ? 'Uložit změny' : 'Vytvořit úkol'}
@@ -445,7 +445,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         </div>
       ) : (
         <div className="space-y-6">
-          {section('Po termínu', overdue, 'text-red-600')}
+          {section('Po termínu', overdue, 'text-bad-ink')}
           {section('Dnes', todayTasks, 'text-[#5B7A08]')}
           {section('Tento týden', upcomingSoon)}
           {upcomingLater.length > 0 && (

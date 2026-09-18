@@ -125,7 +125,7 @@ function KioskShell({ user }: { user: KioskUser }) {
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
             {t.id === 'orders' && newOrders > 0 && (
-              <span className={`ml-0.5 rounded-full px-2 min-w-[1.5rem] text-center text-xs font-bold tabular-nums ${tab === t.id ? 'bg-[#C8F542] on-accent' : 'bg-amber-500 text-white'}`}>{newOrders}</span>
+              <span className={`ml-0.5 rounded-full px-2 min-w-[1.5rem] text-center text-xs font-bold tabular-nums ${tab === t.id ? 'bg-[#C8F542] on-accent' : 'bg-wait text-white'}`}>{newOrders}</span>
             )}
           </button>
         ))}
@@ -193,7 +193,7 @@ function WhoFirst({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-1 flex items-start justify-center pt-10 pb-10">
       <div className="glass-card w-full max-w-lg p-8 text-center">
-        <div className="mx-auto h-16 w-16 rounded-3xl bg-[#FFD60A]/20 text-[#8A6D00] grid place-items-center">
+        <div className="mx-auto h-16 w-16 rounded-3xl bg-wait/20 text-wait-ink grid place-items-center">
           <Icon name="user" size={30} />
         </div>
         <h2 className="t-page mt-5">Kdo teď u tabletu stojí?</h2>
@@ -344,7 +344,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
       )}
 
       {procErr && (
-        <div role="alert" className="glass-card p-4 border border-amber-500/30 bg-amber-500/[0.06] text-sm text-amber-800">
+        <div role="alert" className="glass-card p-4 border border-wait/30 bg-wait/[0.06] text-sm text-wait-ink">
           Povinné postupy se nepodařilo načíst — nespoléhej, že dnes žádné nejsou. Otevři záložku Postupy.
         </div>
       )}
@@ -354,7 +354,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           <div className="flex flex-wrap gap-2">
             {required.map(p => (
               <span key={p.id} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium ${
-                p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-amber-500/12 text-amber-700'
+                p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-wait/12 text-wait-ink'
               }`}>
                 {p.icon ? <span>{p.icon}</span> : <Icon name="clipboard" size={15} className="shrink-0" />} {p.name} {p.done ? <Icon name="check" size={15} className="shrink-0" /> : '· čeká'}
               </span>

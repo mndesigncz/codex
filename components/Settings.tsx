@@ -689,7 +689,7 @@ export default function Settings({ user, initialTab }: Props) {
               <p className="text-black/45 text-sm mt-1 mb-4">
                 Jen čtení: appka si bere tržby z účtenek — nic do pokladny nezapisuje. Klíče se ukládají bezpečně na serveru.
               </p>
-              {posMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 mb-3 ${posMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-red-500/10 text-red-600 border border-red-500/25'}`}>{posMsg}</p>}
+              {posMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 mb-3 ${posMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-bad/10 text-bad-ink border border-bad/25'}`}>{posMsg}</p>}
               {posStatus?.connected ? (
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3">
@@ -765,7 +765,7 @@ export default function Settings({ user, initialTab }: Props) {
                           ))}
                           <p className="text-[11px] text-black/55">Metoda POST, data od dneška. Bez tajemství v hlavičce se požadavek zahodí.</p>
                           <button onClick={() => { if (confirm('Vypnout příjem změn? Staré tajemství přestane platit.')) posDo('webhook-off'); }}
-                            className="text-xs text-black/55 hover:text-red-600">Vypnout</button>
+                            className="text-xs text-black/55 hover:text-bad-ink">Vypnout</button>
                         </div>
                       ) : (
                         <button onClick={() => posDo('webhook-secret')} disabled={!!posAction}
@@ -780,7 +780,7 @@ export default function Settings({ user, initialTab }: Props) {
                     if (!confirm('Odpojit pokladnu? Tržby se přestanou načítat.')) return;
                     await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
                     setPosStatus({ connected: false }); setPosHealth(null); setPosMsg('Pokladna odpojena.');
-                  }} className="rounded-full glass text-black/55 hover:text-red-600 px-4 py-2.5 text-sm font-medium transition">
+                  }} className="rounded-full glass text-black/55 hover:text-bad-ink px-4 py-2.5 text-sm font-medium transition">
                     Odpojit pokladnu
                   </button>
                 </div>

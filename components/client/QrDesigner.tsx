@@ -149,7 +149,7 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
               <div><p className={label}>Barva podkladu</p><Swatches value={d.light} onChange={c => set({ light: c })} options={PAPERS} name="barva podkladu" /></div>
             </div>
             {ratio < 3 && (
-              <p role="alert" className="text-xs text-amber-800 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-3.5 py-2">
+              <p role="alert" className="text-xs text-wait-ink bg-wait/10 border border-wait/30 rounded-2xl px-3.5 py-2">
                 Takový kontrast ({ratio.toFixed(1)}:1) čtečka nepřečte. Při uložení se barva kódu vrátí na černou — zvol tmavší odstín.
               </p>
             )}

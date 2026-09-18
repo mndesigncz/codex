@@ -427,9 +427,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                   const over = pct != null && laborTargetPct != null && pct > laborTargetPct;
                   const tone = pct == null || laborTargetPct == null
                     ? 'text-[#16181A]'
-                    : over ? 'text-red-600' : 'text-[#5B7A08]';
+                    : over ? 'text-bad-ink' : 'text-[#5B7A08]';
                   return (
-                    <div className={`glass-card p-5 min-w-0 ${over ? 'ring-1 ring-red-500/30' : ''}`}>
+                    <div className={`glass-card p-5 min-w-0 ${over ? 'ring-1 ring-bad/30' : ''}`}>
                       <p className="text-xs font-semibold uppercase tracking-wider text-black/45 line-clamp-2">Podíl na tržbách</p>
                       <p className={`mt-1 text-xl font-bold tabular-nums whitespace-nowrap ${tone}`}>
                         {pct != null ? `${pct.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} %` : '—'}
@@ -541,7 +541,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                           </div>
                           {stale && (
                             <div className="flex items-center gap-2 flex-wrap min-w-0">
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 whitespace-nowrap">
                                 <Icon name="warning" size={12} /> Zapomenutý odchod?
                               </span>
                               <button onClick={() => closeEntry(e)}
@@ -551,7 +551,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </div>
                           )}
                           <div className="flex items-center gap-2 shrink-0 ml-auto">
-                            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : e.source === 'closing' ? 'bg-amber-500/15 text-amber-700' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
+                            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${e.source === 'kiosk' ? 'bg-black/[0.05] text-black/55' : e.source === 'closing' ? 'bg-wait/15 text-wait-ink' : 'bg-[#C8F542]/20 text-[#5B7A08]'}`}>
                               {e.source === 'kiosk' ? 'kiosk' : e.source === 'closing' ? 'z uzávěrky' : 'ručně'}
                             </span>
                             <span className={`text-sm font-semibold tabular-nums whitespace-nowrap ${open ? 'text-[#5B7A08]' : 'text-[#16181A]'}`}>
@@ -566,15 +566,15 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                             </button>
                             <button onClick={() => remove(e)} disabled={deleting === e.id}
                               aria-label="Smazat záznam"
-                              className="tap-target shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-red-600 hover:bg-red-500/[0.08] transition-colors disabled:opacity-40">
+                              className="tap-target shrink-0 h-8 w-8 flex items-center justify-center rounded-full text-black/35 hover:text-bad-ink hover:bg-bad/[0.08] transition-colors disabled:opacity-40">
                               <Icon name="trash" size={16} />
                             </button>
                           </div>
                           {e.note && (
-                            <div className="w-full flex items-center gap-1.5 rounded-xl bg-amber-500/[0.07] border border-amber-500/20 px-3 py-2 text-xs text-amber-800">
+                            <div className="w-full flex items-center gap-1.5 rounded-xl bg-wait/[0.07] border border-wait/20 px-3 py-2 text-xs text-wait-ink">
                               <Icon name="warning" size={13} className="shrink-0" />
                               <span className="min-w-0">{e.note}</span>
-                              <button onClick={() => openEdit(e)} className="tap-target-sm ml-auto shrink-0 font-semibold text-amber-800 hover:underline whitespace-nowrap">Zkontrolovat čas</button>
+                              <button onClick={() => openEdit(e)} className="tap-target-sm ml-auto shrink-0 font-semibold text-wait-ink hover:underline whitespace-nowrap">Zkontrolovat čas</button>
                             </div>
                           )}
                         </div>

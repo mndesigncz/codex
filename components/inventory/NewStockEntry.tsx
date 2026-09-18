@@ -264,7 +264,7 @@ export default function NewStockEntry({
           placeholder="Např. přivezl dodavatel navíc, zkoušíme" />
       </div>
 
-      {err && <p className={`text-red-600 ${big ? 'text-base' : 'text-sm'}`}>{err}</p>}
+      {err && <p className={`text-bad-ink ${big ? 'text-base' : 'text-sm'}`}>{err}</p>}
 
       {added.length > 0 && (
         <p className="note note-ok text-sm">

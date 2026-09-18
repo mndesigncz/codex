@@ -189,7 +189,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
           </div>
         )}
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm text-bad-ink">{err}</p>}
         <button onClick={save} disabled={saving || uploading}
           className="w-full rounded-full bg-[#16181A] text-white font-bold px-5 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
           {saving ? 'Ukládám…' : 'Uložit účtenku'}
@@ -222,7 +222,7 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
                   {r.note ? ` · ${r.note}` : ''}
                 </p>
               </div>
-              <button onClick={() => remove(r)} className="shrink-0 text-black/30 hover:text-red-600 transition p-1.5" title="Smazat"><Icon name="close" size={15} /></button>
+              <button onClick={() => remove(r)} className="shrink-0 text-black/30 hover:text-bad-ink transition p-1.5" title="Smazat"><Icon name="close" size={15} /></button>
             </div>
           ))}
         </div>

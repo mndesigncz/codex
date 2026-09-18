@@ -106,7 +106,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const tiles = [
     { view: 'chat', icon: 'chat', label: 'Zprávy', badge: unreadChat || null, badgeTone: 'seg-on' },
     { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'seg-on' },
-    { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-amber-500 text-white' }, // zásoby jsou varování, ne počet
+    { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-wait text-white' }, // zásoby jsou varování, ne počet
     { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
     { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'seg-on' },
     { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
@@ -150,7 +150,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
               </div>
               {trendPct != null && (
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold tabular-nums backdrop-blur-md ${
-                  trendPct >= 0 ? 'bg-[#C8F542]/20 text-[#D8FF6B]' : 'bg-red-400/15 text-red-300'
+                  trendPct >= 0 ? 'bg-[#C8F542]/20 text-[#D8FF6B]' : 'bg-bad/15 text-bad-lift'
                 }`}>
                   {trendPct >= 0 ? '↗' : '↘'} {Math.abs(trendPct)} %
                 </span>
@@ -282,7 +282,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
           <button onClick={() => onOpenView('inventory')}
             className="w-full glass-card rounded-3xl p-4 text-left active:scale-[0.99] transition">
             <div className="flex items-center justify-between mb-2">
-              <p className="t-label text-amber-700 flex items-center gap-1.5">
+              <p className="t-label text-wait-ink flex items-center gap-1.5">
                 <Icon name="box" size={14} strokeWidth={2} /> Dochází ve skladu
               </p>
               <span className="text-[11px] font-bold text-black/35">{lowItems.length} celkem →</span>
@@ -290,7 +290,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             <div className="space-y-1.5">
               {lowItems.slice(0, 3).map((i: any) => (
                 <div key={i.id} className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full shrink-0 ${i.status === 'critical' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${i.status === 'critical' ? 'bg-bad' : 'bg-wait'}`} />
                   <span className="text-sm font-semibold text-[#16181A] truncate flex-1">{i.name}</span>
                   <span className="text-xs text-black/45 tabular-nums shrink-0">{i.quantity} {i.unit}</span>
                 </div>

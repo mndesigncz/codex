@@ -635,7 +635,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
       {/* Missing-closing nudge: shifts the employee worked but never closed. */}
       {isSelf && eligible.length > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-500/[0.09] border border-amber-500/30 space-y-2.5">
+        <div className="p-4 rounded-2xl bg-wait/[0.09] border border-wait/30 space-y-2.5">
           <p className="flex items-center gap-2 font-semibold text-[#16181A] text-sm">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
             {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${czCount(eligible.length, { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' })} za dny, kdy jsi měl/a směnu`}
@@ -650,8 +650,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <button key={s.id} type="button" onClick={() => pickShift(s)}
                 className={`rounded-full border px-3.5 py-2 text-xs font-semibold cz-sentence transition ${
                   form.date === s.date
-                    ? 'bg-amber-500 text-white border-amber-500'
-                    : 'bg-white border-amber-500/30 text-amber-800 hover:border-amber-500/60'
+                    ? 'bg-wait text-white border-wait'
+                    : 'bg-white border-wait/30 text-wait-ink hover:border-wait/60'
                 } cz-sentence`}>
                 {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                 <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
@@ -707,7 +707,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
               {diff !== null && (
                 <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${
-                  diff === 0 ? 'bg-[#C8F542] text-black' : diff > 0 ? 'bg-[#0A84FF] text-white' : 'bg-red-500 text-white'
+                  diff === 0 ? 'bg-[#C8F542] text-black' : diff > 0 ? 'bg-[#0A84FF] text-white' : 'bg-bad text-white'
                 }`}>
                   {diff === 0 ? 'sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
                 </span>
@@ -753,7 +753,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   : 'Počáteční stav hotovosti v kase.',
               })}
               {closings.some(c => c.date === form.date) && (
-                <p className="text-[11px] font-medium text-amber-800 bg-amber-500/[0.1] border border-amber-500/25 rounded-xl px-3 py-2">
+                <p className="text-[11px] font-medium text-wait-ink bg-wait/[0.1] border border-wait/25 rounded-xl px-3 py-2">
                   Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
                 </p>
               )}
@@ -973,7 +973,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                           <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
                           {cw.hadShift
                             ? <span className="block text-xs text-black/45 tabular-nums">{cw.startTime}–{cw.endTime}</span>
-                            : <span className="block text-xs text-amber-700">bez naplánované směny — přidá se</span>}
+                            : <span className="block text-xs text-wait-ink">bez naplánované směny — přidá se</span>}
                         </span>
                       </button>
                       {on && payDailyCash && (
@@ -1065,7 +1065,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
                 : diff > 0
                   ? 'bg-[#0A84FF]/10 border-[#0A84FF]/25 text-[#0A6FE0]'
-                  : 'bg-red-500/10 border-red-500/25 text-red-600'
+                  : 'bg-bad/10 border-bad/25 text-bad-ink'
             }`}>
               <span className="flex items-center gap-2 font-semibold">
                 <Icon name={diff === 0 ? 'check' : diff > 0 ? 'trend' : 'warning'} size={18} />
@@ -1164,13 +1164,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
           )}
           {missingRequired.length > 0 && (
-            <div className="rounded-2xl bg-red-500/[0.07] border border-red-500/25 p-4 rise-in">
-              <p className="text-sm font-semibold text-red-600 flex items-center gap-2">
+            <div className="rounded-2xl bg-bad/[0.07] border border-bad/25 p-4 rise-in">
+              <p className="text-sm font-semibold text-bad-ink flex items-center gap-2">
                 <Icon name="warning" size={16} /> Před uzávěrkou je potřeba dokončit:
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {missingRequired.map(p => (
-                  <span key={p.id} className="rounded-full bg-white/70 border border-red-500/20 px-3 py-1.5 text-sm text-[#16181A]">
+                  <span key={p.id} className="rounded-full bg-white/70 border border-bad/20 px-3 py-1.5 text-sm text-[#16181A]">
                     {p.icon ?? '📋'} {p.name}
                   </span>
                 ))}
@@ -1190,8 +1190,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   const running = r.status === 'running';
                   return (
                     <span key={r.id} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                      running ? 'bg-amber-500/12 text-amber-700'
-                      : missing > 0 ? 'bg-amber-500/12 text-amber-700'
+                      running ? 'bg-wait/12 text-wait-ink'
+                      : missing > 0 ? 'bg-wait/12 text-wait-ink'
                       : 'bg-[#C8F542]/15 text-[#5B7A08]'
                     }`}>
                       {r.procedure_icon ?? '📋'} {r.procedure_name}
@@ -1201,7 +1201,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 })}
               </div>
               {todayRuns.some((r: any) => r.status === 'running') && (
-                <p className="text-[12px] text-amber-700 mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
+                <p className="text-[12px] text-wait-ink mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
               )}
             </div>
           )}
@@ -1258,7 +1258,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </p>
                   <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
                   {pending && (
-                    <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                    <span className="tap-target-sm rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                   )}
                   <button aria-label="Smazat uzávěrku"
                     type="button"
@@ -1269,10 +1269,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       if (res.ok) setClosings(prev => prev.filter(x => x.id !== c.id));
                       else { const d = await res.json().catch(() => ({})); setErr(d.error || 'Smazání se nepodařilo.'); }
                     }}
-                    className="tap-target rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-red-600 transition-colors"
+                    className="tap-target rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-bad-ink transition-colors"
                   ><Icon name="close" size={15} /></button>
                   <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 max-w-full ${
-                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
+                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
                 </div>
@@ -1322,8 +1322,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   </div>
                 )}
                 {(c.diff_reason || c.diff_note) && (
-                  <div className="mt-3 rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 p-3">
-                    <p className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold mb-1">Proč kasa nesedí</p>
+                  <div className="mt-3 rounded-2xl bg-wait/[0.08] border border-wait/25 p-3">
+                    <p className="text-[11px] uppercase tracking-wider text-wait-ink font-semibold mb-1">Proč kasa nesedí</p>
                     {c.diff_reason && <p className="text-sm font-medium text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
                     {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
                   </div>

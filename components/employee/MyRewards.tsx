@@ -47,7 +47,7 @@ const Stars = ({ n }: { n: number }) => (
 );
 
 const PointsBadge = ({ n }: { n: number }) => n === 0 ? null : (
-  <span className={`text-xs font-bold tabular-nums rounded-full px-2 py-0.5 shrink-0 ${n > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-red-500/15 text-red-600'}`}>
+  <span className={`text-xs font-bold tabular-nums rounded-full px-2 py-0.5 shrink-0 ${n > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-bad/15 text-bad-ink'}`}>
     {n > 0 ? '+' : ''}{n} b
   </span>
 );
@@ -56,14 +56,14 @@ function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
   const r = day.review;
   const auto = r?.autoPoints ?? 0;
   return (
-    <div className={`rounded-2xl p-3.5 border ${alert ? 'bg-white/60 border-red-500/25' : 'bg-black/[0.03] border-transparent'}`}>
+    <div className={`rounded-2xl p-3.5 border ${alert ? 'bg-white/60 border-bad/25' : 'bg-black/[0.03] border-transparent'}`}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="text-sm font-semibold text-[#16181A]">{fmtWhen(day.date)}</span>
         <div className="flex items-center gap-2 flex-wrap">
           {r && r.rating > 0 && <Stars n={r.rating} />}
           {r && <PointsBadge n={r.points ?? 0} />}
           {auto !== 0 && (
-            <span className={`text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5 bg-black/[0.05] ${auto > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+            <span className={`text-[11px] font-medium tabular-nums rounded-full px-2 py-0.5 bg-black/[0.05] ${auto > 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
               {auto > 0 ? '+' : ''}{auto} b automaticky
             </span>
           )}
@@ -81,9 +81,9 @@ function DayCard({ day, alert }: { day: DayFeedback; alert: boolean }) {
       {day.items.length > 0 && (
         <div className="mt-2.5 space-y-1.5">
           {day.items.map(it => (
-            <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-amber-500/[0.12] border border-amber-500/30' : 'bg-black/[0.03]'}`}>
+            <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-wait/[0.12] border border-wait/30' : 'bg-black/[0.03]'}`}>
               <div className="flex items-center gap-2 flex-wrap">
-                {it.flagged && <Icon name="warning" size={13} className="text-amber-600 shrink-0" />}
+                {it.flagged && <Icon name="warning" size={13} className="text-wait-ink shrink-0" />}
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? 'Hodnocení'}</span>
                 <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 basis-[calc(100%-1rem)] min-[420px]:basis-0">{it.label}</span>
                 <PointsBadge n={it.points ?? 0} />
@@ -204,9 +204,9 @@ function MyRewardsInner() {
 
       {/* Unacknowledged "fix this" feedback — first thing on the page */}
       {unseenFlagged > 0 && (
-        <div className="rounded-3xl bg-red-500/[0.08] border border-red-500/30 p-5">
+        <div className="rounded-3xl bg-bad/[0.08] border border-bad/30 p-5">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15 text-red-600 shrink-0"><Icon name="warning" size={19} /></span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-bad/15 text-bad-ink shrink-0"><Icon name="warning" size={19} /></span>
             <div className="flex-1 min-w-0">
               <p className="font-bold tracking-tight text-[#16181A]">Něco je potřeba napravit</p>
               <p className="text-sm text-black/60 mt-0.5">
@@ -284,7 +284,7 @@ function MyRewardsInner() {
                   </div>
                   <button onClick={() => redeem(rw)} disabled={!afford || pending || redeemingId !== null}
                     className={`tap-target-sm shrink-0 ml-auto rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition ${
-                      pending ? 'bg-amber-500/12 text-amber-700 cursor-default'
+                      pending ? 'bg-wait/12 text-wait-ink cursor-default'
                       : afford ? 'bg-[#16181A] text-white hover:bg-black'
                       : 'bg-black/[0.05] text-black/35 cursor-not-allowed'
                     }`}>
@@ -299,8 +299,8 @@ function MyRewardsInner() {
               {myRedemptions.slice(0, 6).map(r => (
                 <span key={r.id} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium ${
                   r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#5B7A08]'
-                  : r.status === 'declined' ? 'bg-red-500/10 text-red-600'
-                  : 'bg-amber-500/12 text-amber-700'
+                  : r.status === 'declined' ? 'bg-bad/10 text-bad-ink'
+                  : 'bg-wait/12 text-wait-ink'
                 }`}>
                   {r.title} · {r.status === 'approved' ? 'schváleno ✓' : r.status === 'declined' ? 'zamítnuto' : 'čeká'}
                 </span>
@@ -356,9 +356,9 @@ function MyRewardsInner() {
 
       {/* What needs fixing — always above the ordinary feedback */}
       {flaggedDays.length > 0 && (
-        <div className="rounded-3xl bg-red-500/[0.05] border border-red-500/25 p-5">
+        <div className="rounded-3xl bg-bad/[0.05] border border-bad/25 p-5">
           <div className="flex items-center gap-2.5 mb-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500/12 text-red-600 shrink-0"><Icon name="warning" size={17} /></span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bad/12 text-bad-ink shrink-0"><Icon name="warning" size={17} /></span>
             <div className="min-w-0">
               <h3 className="t-card">Něco je potřeba napravit</h3>
               <p className="text-xs text-black/50">Vedení u těchto směn označilo, co příště udělat jinak.</p>

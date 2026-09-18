@@ -42,8 +42,8 @@ const AVAILABLE_META = {
 };
 const OFF_META = {
   label: 'Nemůžu',
-  cls: 'bg-red-500/20 border-red-500/40 text-red-600 line-through hover:bg-red-500/30',
-  dot: 'bg-red-500 ring-1 ring-red-500/50',
+  cls: 'bg-bad/20 border-bad/40 text-bad-ink line-through hover:bg-bad/30',
+  dot: 'bg-bad ring-1 ring-bad/50',
 };
 
 function ym(d: Date) {
@@ -395,7 +395,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
           {/* Submit */}
           <div className="flex flex-wrap items-center gap-3">
             {err && (
-              <p className="w-full text-sm font-medium text-red-600 flex items-center gap-1.5 mb-2">
+              <p className="w-full text-sm font-medium text-bad-ink flex items-center gap-1.5 mb-2">
                 <Icon name="warning" size={15} /> {err}
               </p>
             )}

@@ -132,7 +132,7 @@ export default function ShareSettings() {
       )}
 
       {notMigrated && (
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-700 text-sm px-4 py-3">
+        <div className="rounded-2xl bg-wait/10 border border-wait/25 text-wait-ink text-sm px-4 py-3">
           Sdílení zatím není v databázi připravené — spusť <code>/api/init</code>.
         </div>
       )}
@@ -413,7 +413,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
                   <button key={e.id} onClick={() => toggle(e.id)}
                     style={{ marginLeft: e.depth * 10 }}
                     className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      off ? 'bg-red-500/15 text-red-600 line-through' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
+                      off ? 'bg-bad/15 text-bad-ink line-through' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
                     }`}>
                     {e.name}
                   </button>
@@ -425,7 +425,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
           </div>
 
           <button onClick={onRemove}
-            className="rounded-full glass border border-black/10 text-red-600/80 hover:text-red-600 px-4 py-2 text-xs font-medium">
+            className="rounded-full glass border border-black/10 text-bad-ink/80 hover:text-bad-ink px-4 py-2 text-xs font-medium">
             Smazat odkaz
           </button>
         </div>

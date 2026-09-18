@@ -30,7 +30,7 @@ const TYPE_LABELS: Record<TimeOffType, string> = {
 const STATUS_META: Record<TimeOffStatus, { label: string; cls: string }> = {
   pending: { label: 'Čeká', cls: 'bg-black/[0.05] text-black/55' },
   approved: { label: 'Schváleno', cls: 'bg-[#C8F542]/15 text-[#5B7A08]' },
-  rejected: { label: 'Zamítnuto', cls: 'bg-red-500/15 text-red-600' },
+  rejected: { label: 'Zamítnuto', cls: 'bg-bad/15 text-bad-ink' },
 };
 
 function parseDate(s: string): Date {
@@ -218,7 +218,7 @@ export default function TimeOffApprovals() {
                       <button
                         type="button"
                         onClick={() => decide(r.id, 'rejected')}
-                        className="rounded-full bg-black/[0.05] border border-black/10 text-red-600 text-sm px-4 py-2 whitespace-nowrap hover:bg-black/[0.08] transition"
+                        className="rounded-full bg-black/[0.05] border border-black/10 text-bad-ink text-sm px-4 py-2 whitespace-nowrap hover:bg-black/[0.08] transition"
                       >
                         Zamítnout
                       </button>
@@ -277,7 +277,7 @@ export default function TimeOffApprovals() {
                           <button onClick={() => startEdit(r)}
                             className="rounded-full glass border border-black/10 text-[#16181A] text-xs font-semibold px-3.5 py-2 hover:bg-black/[0.05] transition">✎ Upravit</button>
                           <button onClick={() => cancel(r)}
-                            className="rounded-full text-red-600 text-xs font-semibold px-3.5 py-2 hover:bg-red-500/[0.08] transition">Zrušit volno</button>
+                            className="rounded-full text-bad-ink text-xs font-semibold px-3.5 py-2 hover:bg-bad/[0.08] transition">Zrušit volno</button>
                         </div>
                       )}
                     </li>

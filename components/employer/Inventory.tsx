@@ -700,16 +700,16 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           && (!(Number(i.unitCost) > 0) || !(Number(i.packageSize) > 0)));
         if (!gaps.length) return null;
         return (
-          <div className="glass-card border-amber-500/25 bg-amber-500/[0.05] p-4 space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 flex items-center gap-1.5">
+          <div className="glass-card border-wait/25 bg-wait/[0.05] p-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-wait-ink flex items-center gap-1.5">
               <Icon name="warning" size={14} /> Používá se v recepturách, ale chybí údaje ({gaps.length})
             </p>
             <div className="flex flex-wrap gap-1.5">
               {gaps.slice(0, 12).map(i => (
                 <button key={i.id} onClick={() => openEdit(i)}
-                  className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
+                  className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-wait/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
                   {i.name}
-                  <span className="ml-1.5 font-normal text-amber-700">
+                  <span className="ml-1.5 font-normal text-wait-ink">
                     {!(Number(i.unitCost) > 0) && !(Number(i.packageSize) > 0) ? 'cena i balení'
                       : !(Number(i.unitCost) > 0) ? 'cena' : 'velikost balení'}
                   </span>
@@ -775,7 +775,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       if (!confirm(`Zamítnout a smazat návrh „${i.name}"?`)) return;
                       try { await rejectProposal(i.id); await load(); } catch { /* ignore */ }
                     }}
-                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold transition">
+                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-bad-ink px-3 py-1.5 text-xs font-semibold transition">
                     Zamítnout
                   </button>
                 </>)}
@@ -800,12 +800,12 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       )}
 
       {(critical.length > 0 || low.length > 0) && (
-        <div className="glass-card border-amber-500/20 bg-amber-500/[0.06] p-5">
-          <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-amber-800">
+        <div className="glass-card border-wait/20 bg-wait/[0.06] p-5">
+          <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-wait-ink">
             <Icon name="warning" size={16} />
-            {critical.length > 0 && <span className="text-red-600">{critical.length} kriticky málo</span>}
+            {critical.length > 0 && <span className="text-bad-ink">{critical.length} kriticky málo</span>}
             {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
-            {low.length > 0 && <span className="text-amber-700">{low.length} dochází</span>}
+            {low.length > 0 && <span className="text-wait-ink">{low.length} dochází</span>}
             {toMake.length > 0 && <span className="text-black/30">·</span>}
             {toMake.length > 0 && <span className="text-[#0A5CC0]">{toMake.length} k výrobě</span>}
           </p>
@@ -1100,7 +1100,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                           className={`${inputClass} !w-24 text-center`} />
                         <span className="text-xs text-black/40 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
                         <button aria-label="Zavřít" type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
-                          className="text-black/30 hover:text-red-600 transition px-1"><Icon name="close" size={15} /></button>
+                          className="text-black/30 hover:text-bad-ink transition px-1"><Icon name="close" size={15} /></button>
                       </div>
                     ))}
                     <button type="button"
@@ -1115,15 +1115,15 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
               {/* Section: upozornění */}
               <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-                  <Icon name="warning" size={14} className="text-amber-600" /> Hlídání zásob
+                  <Icon name="warning" size={14} className="text-wait-ink" /> Hlídání zásob
                   <span className="normal-case tracking-normal text-black/35 font-normal">
                     · v {thresholdUnitLabel(pk(form), form.unit || 'ks')}
                   </span>
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-amber-700/70 mb-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Upozornit při
+                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-wait-ink/70 mb-1.5">
+                      <span className="w-2 h-2 rounded-full bg-wait" /> Upozornit při
                     </label>
                     <div className="relative">
                       <input type="number" inputMode="numeric" aria-label="Minimální množství" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
@@ -1131,8 +1131,8 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                     </div>
                   </div>
                   <div>
-                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-red-600/70 mb-1.5">
-                      <span className="w-2 h-2 rounded-full bg-red-500" /> Kriticky málo při
+                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-bad-ink/70 mb-1.5">
+                      <span className="w-2 h-2 rounded-full bg-bad" /> Kriticky málo při
                     </label>
                     <div className="relative">
                       <input type="number" inputMode="numeric" aria-label="Kritické množství" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
@@ -1234,7 +1234,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       const tone = delta || openDelta;
                       return (
                         <div key={l.id} className="flex items-center gap-2.5 px-4 py-2.5 text-sm">
-                          <span className={`shrink-0 font-bold tabular-nums ${tone > 0 ? 'text-[#5B7A08]' : tone < 0 ? 'text-red-600' : 'text-black/40'}`}>
+                          <span className={`shrink-0 font-bold tabular-nums ${tone > 0 ? 'text-[#5B7A08]' : tone < 0 ? 'text-bad-ink' : 'text-black/40'}`}>
                             {label}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-black/55">
@@ -1252,7 +1252,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             )}
             <div className="sticky bottom-0 z-10 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06] space-y-2.5">
               {formErr && (
-                <p className="text-sm font-medium text-red-600 flex items-center gap-1.5">
+                <p className="text-sm font-medium text-bad-ink flex items-center gap-1.5">
                   <Icon name="warning" size={15} /> {formErr}
                 </p>
               )}
@@ -1340,7 +1340,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                   try { list = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items ?? []); } catch {}
                   const done = r.status === 'done';
                   return (
-                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-amber-500/25 bg-amber-500/[0.04]'}`}>
+                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-wait/25 bg-wait/[0.04]'}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                         <p className="text-sm font-semibold text-[#16181A] min-w-0">
                           {r.author_avatar ?? '👤'} {r.author_name ?? 'Zaměstnanec'}
@@ -1683,8 +1683,8 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
         {items.map(i => {
           const st = statusOf(i, pk);
           const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
-          const dot = st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#C8F542]';
-          const bar = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-amber-400' : 'bg-[#C8F542]';
+          const dot = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
+          const bar = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
           return (
             <div key={i.id}
               onClick={selecting ? () => onToggle(i.id) : undefined}
@@ -1756,8 +1756,8 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
       {items.map(i => {
         const st = statusOf(i, pk);
         const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
-        const barColor = st === 'critical' ? 'bg-red-400' : st === 'low' ? 'bg-amber-400' : 'bg-[#C8F542]';
-        const chip = st === 'critical' ? 'bg-red-500/15 text-red-600' : st === 'low' ? 'bg-amber-500/15 text-amber-700' : 'bg-[#C8F542]/15 text-[#5B7A08]';
+        const barColor = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
+        const chip = st === 'critical' ? 'bg-bad/15 text-bad-ink' : st === 'low' ? 'bg-wait/15 text-wait-ink' : 'bg-[#C8F542]/15 text-[#5B7A08]';
         return (
           <div key={i.id}
             onClick={selecting ? () => onToggle(i.id) : undefined}
@@ -1948,7 +1948,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                       <button
                         onClick={() => cancelOrder(o)}
                         disabled={busyId === o.id}
-                        className="rounded-full glass border border-black/10 text-black/50 hover:text-red-600 px-4 py-2 text-xs font-medium disabled:opacity-50 whitespace-nowrap shrink-0">
+                        className="rounded-full glass border border-black/10 text-black/50 hover:text-bad-ink px-4 py-2 text-xs font-medium disabled:opacity-50 whitespace-nowrap shrink-0">
                         Zrušit
                       </button>
                     </div>
@@ -1992,7 +1992,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                     <div key={o.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
                       <span className="text-xs text-black/45 tabular-nums whitespace-nowrap shrink-0">{fmtDate(o.receivedAt ?? o.createdAt)}</span>
                       <span className="text-sm text-[#16181A] min-w-0 flex-1 truncate">{o.supplier || 'Bez dodavatele'}</span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold shrink-0 whitespace-nowrap ${o.status === 'received' ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'}`}>
+                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold shrink-0 whitespace-nowrap ${o.status === 'received' ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-bad/10 text-bad-ink'}`}>
                         {o.status === 'received' ? 'Přijato' : 'Zrušeno'}
                       </span>
                       {typeof o.totalCost === 'number' && o.totalCost > 0 && (
@@ -2002,7 +2002,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
                         onClick={() => deleteOrder(o)}
                         disabled={busyId === o.id}
                         title="Smazat"
-                        className="rounded-full glass w-7 h-7 flex items-center justify-center text-red-600/60 hover:text-red-600 text-xs disabled:opacity-50 shrink-0">
+                        className="rounded-full glass w-7 h-7 flex items-center justify-center text-bad-ink/60 hover:text-bad-ink text-xs disabled:opacity-50 shrink-0">
                         <Icon name="trash" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
                       </button>
                     </div>
@@ -2159,7 +2159,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
           <h3 className="t-card">Nákupní seznam</h3>
           <button onClick={sm.guard.attemptClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
-        {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
+        {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-wait/10 text-wait-ink border border-wait/25'}`}>{emailMsg}</p>}
         {printFailed && (
           <p className="note note-wait">
             Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku,
@@ -2186,7 +2186,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
                   const st = statusOf(i, pk);
                   return (
                     <div key={i.id} className="flex items-center gap-2.5 py-2.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-red-500' : st === 'low' ? 'bg-amber-500' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
                       <span className="flex-1 min-w-0">
                         <span className="block truncate text-sm font-medium text-[#16181A]">{i.name}</span>
                         {(i.buyFor?.length ?? 0) > 0 && (
@@ -2420,7 +2420,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           <button onClick={add} disabled={busy || !newName.trim()} className="shrink-0 rounded-full bg-[#C8F542] text-black font-semibold px-5 text-sm hover:brightness-110 disabled:opacity-40">Přidat</button>
         </div>
 
-        {err && <p className="text-xs font-medium text-red-600">{err}</p>}
+        {err && <p className="text-xs font-medium text-bad-ink">{err}</p>}
 
         {categories.length === 0 ? (
           <div className="text-center space-y-3 py-4">
@@ -2508,7 +2508,7 @@ function CategoryRow({
           <Icon name="box" size={15} />
         </button>
         <button onClick={startEdit} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
-        <button onClick={onDelete} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+        <button onClick={onDelete} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-bad-ink/70 hover:text-bad-ink text-sm" aria-label="Zavřít"><Icon name="close" size={15} /></button>
       </div>
 
       {moveOpen && (
@@ -2607,7 +2607,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
           {busy ? 'Ukládám…' : 'Uložit'}
         </button>
         {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo</span>}
-        {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+        {err && <span className="text-xs font-medium text-bad-ink">{err}</span>}
       </div>
     </div>
   );
@@ -2706,7 +2706,7 @@ function PackagingEditor({ category, onSaved }: {
                 : 'Prahy se zadávají v balení; načaté balení se počítá jako část (půl krabičky = 0,5).'}
             </p>
             {thresholdUnit !== (category.thresholdUnit === 'content' ? 'content' : 'package') && (
-              <p className="text-[11px] text-amber-700 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 mt-1.5">
+              <p className="text-[11px] text-wait-ink bg-wait/10 border border-wait/25 rounded-xl px-3 py-2 mt-1.5">
                 Prahy u položek v této kategorii jsou zadané v {thresholdUnit === 'content' ? 'balení' : (unit || 'jednotkách obsahu')} — po uložení je bude potřeba přepsat, jinak budou hlásit nesmysl.
               </p>
             )}
@@ -2747,7 +2747,7 @@ function PackagingEditor({ category, onSaved }: {
           {busy ? 'Ukládám…' : 'Uložit'}
         </button>
         {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo</span>}
-        {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+        {err && <span className="text-xs font-medium text-bad-ink">{err}</span>}
       </div>
     </div>
   );
@@ -2789,7 +2789,7 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
           <button onClick={pm.guard.attemptClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
-        {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
+        {err && <p className="text-sm text-bad-ink mb-2">{err}</p>}
 
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Název dodavatele" maxLength={120}
@@ -2823,14 +2823,14 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
                   </span>
                 ) : (
                   <>
-                    <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-amber-700'}`}>{sp.email ?? 'bez e-mailu'}</span>
+                    <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-wait-ink'}`}>{sp.email ?? 'bez e-mailu'}</span>
                     <button onClick={() => { setEditId(sp.id); setEditEmail(sp.email ?? ''); }}
                       className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-black text-xs"><Icon name="pencil" size={15} /></button>
                     <button aria-label="Odebrat" onClick={async () => {
                       if (!confirm(`Smazat dodavatele „${sp.name}"?`)) return;
                       const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
                       if (res?.ok) await onChanged();
-                    }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs"><Icon name="close" size={15} /></button>
+                    }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-bad-ink text-xs"><Icon name="close" size={15} /></button>
                   </>
                 )}
               </div>

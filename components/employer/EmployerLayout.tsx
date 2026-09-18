@@ -214,7 +214,7 @@ export default function EmployerLayout({ user }: Props) {
       <button onClick={() => { setAccountOpen(false); switchMode('client'); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.05] transition-colors">
         <Icon name="gift" size={18} /> Managero client
       </button>
-      <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-600 hover:bg-red-500/[0.06] transition-colors">
+      <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-bad-ink hover:bg-bad/[0.06] transition-colors">
         <Icon name="logout" size={18} /> Odhlásit se
       </button>
     </div>

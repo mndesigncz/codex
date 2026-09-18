@@ -63,7 +63,7 @@ function StatCard({ icon, label, value, onClick, alert = false }: { icon: string
     <button onClick={onClick} className="text-left glass-card p-5 hover:bg-black/[0.05] transition duration-300">
       <div className="flex items-start justify-between">
         <p className="t-label">{label}</p>
-        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-red-500/10 border-red-500/20 text-red-600' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#5B7A08]'}`}>
+        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${alert ? 'bg-bad/10 border-bad/20 text-bad-ink' : 'bg-[#C8F542]/10 border-[#C8F542]/20 text-[#5B7A08]'}`}>
           <Icon name={icon} size={16} />
         </span>
       </div>
@@ -266,7 +266,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 </button>
               )}
               {(guests.reservations?.requested ?? 0) > 0 && (
-                <button onClick={() => go('reservations')} className="tap-target-sm rounded-full bg-amber-500/15 border border-amber-500/35 px-3 py-1.5 text-xs font-bold text-amber-900">
+                <button onClick={() => go('reservations')} className="tap-target-sm rounded-full bg-wait/15 border border-wait/35 px-3 py-1.5 text-xs font-bold text-wait-ink">
                   {guests.reservations.requested}× rezervace ke schválení
                 </button>
               )}
@@ -288,7 +288,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
             <button onClick={() => go('customers')} className="text-left px-3 py-1 rounded-xl hover:bg-black/[0.035] transition-colors">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold leading-tight">Hodnocení</p>
               <p className="text-2xl font-bold tabular-nums text-[#16181A] leading-tight mt-0.5 tracking-tight">{guests.reviews?.avg != null ? String(guests.reviews.avg).replace('.', ',') : '–'}</p>
-              <p className={`text-[11px] leading-snug ${(guests.reviews?.low7 ?? 0) > 0 ? 'text-amber-700 font-semibold' : 'text-black/40'}`}>
+              <p className={`text-[11px] leading-snug ${(guests.reviews?.low7 ?? 0) > 0 ? 'text-wait-ink font-semibold' : 'text-black/40'}`}>
                 {(guests.reviews?.low7 ?? 0) > 0 ? `${guests.reviews.low7} nízkých za týden` : `${guests.reviews?.new7 ?? 0} nových za týden`}
               </p>
             </button>
@@ -390,7 +390,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                         className={`tap-target-sm px-3 py-1.5 rounded-full text-xs font-medium transition ${activeDate === d ? 'seg-on' : 'seg-off'}`}>
                         {label}
                         {pending > 0 && (
-                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-amber-500/15 text-amber-700'}`}>{pending}</span>
+                          <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${activeDate === d ? 'bg-white/20 text-white' : 'bg-wait/15 text-wait-ink'}`}>{pending}</span>
                         )}
                       </button>
                     );
@@ -410,19 +410,19 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                     {dayRoster.map(r => {
                       const meta = rosterMeta(r);
                       return (
-                        <div key={r.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${r.flagged ? 'bg-amber-500/[0.1]' : 'bg-black/[0.03]'}`}>
+                        <div key={r.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${r.flagged ? 'bg-wait/[0.1]' : 'bg-black/[0.03]'}`}>
                           <PersonLink id={r.id} className="shrink-0"><Avatar emoji={r.avatar} size="sm" /></PersonLink>
                           <div className="flex-1 min-w-0">
                             <PersonLink id={r.id}><p className="text-sm font-medium text-[#16181A] truncate">{r.name}</p></PersonLink>
                             {meta && <p className="text-[11px] text-black/45 truncate">{meta}</p>}
                           </div>
-                          {r.flagged && <Icon name="warning" size={14} className="text-amber-600 shrink-0" />}
+                          {r.flagged && <Icon name="warning" size={14} className="text-wait-ink shrink-0" />}
                           {r.reviewed ? (
                             <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-1 text-xs font-medium shrink-0">
                               {r.rating > 0 && <><Icon name="star" size={12} className="shrink-0" />{r.rating}</>} Hodnoceno
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 text-amber-700 px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-wait/12 text-wait-ink px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
                           )}
                           <button onClick={() => setRating(r)} className="tap-target-sm btn btn-primary btn-sm transition shrink-0">
                             {r.reviewed ? 'Upravit' : 'Ohodnotit'}
@@ -475,7 +475,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                       return (
                         <div key={i.id} className="flex items-center justify-between p-3 well">
                           <span className="text-sm text-[#16181A]">{i.name}</span>
-                          <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-red-500/15 text-red-600' : 'bg-amber-500/15 text-amber-700'}`}>{i.quantity} {i.unit}</span>
+                          <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${isCritical ? 'bg-bad/15 text-bad-ink' : 'bg-wait/15 text-wait-ink'}`}>{i.quantity} {i.unit}</span>
                         </div>
                       );
                     })}
@@ -495,7 +495,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   <div className="space-y-2">
                     {todayShifts.map(s => (
                       <div key={s.id} className="flex items-center gap-3 p-3 well">
-                        <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-amber-600' : 'text-[#0A6FE0]'} /></span>
+                        <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-wait-ink' : 'text-[#0A6FE0]'} /></span>
                         <div>
                           <PersonLink id={s.employeeId ?? s.employee_id}><p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p></PersonLink>
                           <p className="text-xs text-black/45">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>

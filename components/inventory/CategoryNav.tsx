@@ -75,7 +75,7 @@ export default function CategoryNav<T extends CategoryNode>({
               className="tap-target-sm shrink-0 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs font-medium whitespace-nowrap text-black/60 hover:text-black transition">
               <Icon name="box" size={12} className="text-[#5B7A08]" />
               {c.name}
-              {alerts > 0 && <span className="text-amber-700 font-bold tabular-nums">{alerts}</span>}
+              {alerts > 0 && <span className="text-wait-ink font-bold tabular-nums">{alerts}</span>}
             </button>
           );
         })}
@@ -134,7 +134,7 @@ export default function CategoryNav<T extends CategoryNode>({
                   <span className="block text-[11px] text-black/40 line-clamp-2">
                     {count !== null && <>{count} {pluralPolozka(count)}</>}
                     {kids > 0 && <>{count !== null ? ' · ' : ''}{kids} podkat.</>}
-                    {alerts > 0 && <span className="text-amber-700 font-semibold"> · {alerts} dochází</span>}
+                    {alerts > 0 && <span className="text-wait-ink font-semibold"> · {alerts} dochází</span>}
                   </span>
                 </span>
                 <Icon name="chevron" size={touch ? 18 : 15} className="text-black/25 -rotate-90 shrink-0" />

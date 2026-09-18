@@ -99,12 +99,12 @@ export default function EventsView({ user }: { user: { id?: string } }) {
             <span className={`tap-target-sm rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
               e.status === 'confirmed' ? 'bg-[#C8F542]/20 text-[#5B7A08]'
               : e.status === 'done' ? 'bg-black/[0.06] text-black/50'
-              : e.status === 'cancelled' ? 'bg-red-500/10 text-red-600'
+              : e.status === 'cancelled' ? 'bg-bad/10 text-bad-ink'
               : 'bg-[#0A84FF]/10 text-[#0A6FE0]'
             }`}>{statusLabel(e.status)}</span>
             {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná{e.going > 0 ? ` · přijde ${e.going}` : ''}</span>}
             {result != null && (
-              <span className={`text-xs font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+              <span className={`text-xs font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
                 {result >= 0 ? '+' : ''}{money(result)}
               </span>
             )}
@@ -128,7 +128,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
       <PageHeader hintId="eventsview" title="Akce" subtitle="Koncerty, přednášky i výjezdy mimo podnik — se směnami, balením a vyúčtováním."
         primary={<Button variant="accent" icon="plus" onClick={() => setCreating(true)}>Nová akce</Button>} />
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p className="text-sm text-bad-ink">{err}</p>}
 
       {loading ? (
         <div className="flex items-center justify-center h-40">
@@ -204,7 +204,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <DiscardGuard guard={m.guard} />
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Nová akce</h3>
-        {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
+        {err && <p className="text-sm text-bad-ink mb-2">{err}</p>}
         {/* Opravdový <form>, ne jen tlačítko s onClick: po vyplnění názvu
             a data se čeká, že Enter akci založí. Bez něj se musí sáhnout
             po myši uprostřed psaní. */}
@@ -448,7 +448,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                   <span key={cid} className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#3E5406] border border-[#C8F542]/40 pl-3 pr-1.5 py-1.5 text-sm font-semibold">
                     {m.avatar ?? ''} {m.name}
                     <button type="button" aria-label={`Odebrat ${m.name} z akce`} onClick={() => toggleCrew(cid)}
-                      className="tap-target-sm rounded-full p-1 text-[#3E5406]/60 hover:text-red-600 transition"><Icon name="close" size={12} /></button>
+                      className="tap-target-sm rounded-full p-1 text-[#3E5406]/60 hover:text-bad-ink transition"><Icon name="close" size={12} /></button>
                   </span>
                 );
               })}
@@ -568,12 +568,12 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                       {l.itemId != null && (
                         l.pos
                           ? <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#C8F542]/15 text-[#4F6A07] px-2 py-0.5 text-[11px] font-semibold" title="Spárováno s pokladnou — dá se namarkovat a tiskne se"><Icon name="receipt" size={11} />kasa</span>
-                          : <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5 text-[11px] font-semibold" title="Bez párování s pokladnou — v kase nepůjde namarkovat. Spáruj v Menu.">bez kasy</span>
+                          : <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold" title="Bez párování s pokladnou — v kase nepůjde namarkovat. Spáruj v Menu.">bez kasy</span>
                       )}
                       {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
                       <button type="button" aria-label={`Vyřadit ${l.name} z menu akce`}
                         onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })}
-                        className="tap-target-sm shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                        className="tap-target-sm shrink-0 text-black/25 hover:text-bad-ink"><Icon name="close" size={15} /></button>
                     </li>
                   ))}
                 </ul>
@@ -651,7 +651,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 </button>
                 <button type="button" aria-label="Odebrat úkol"
                   onClick={() => patch(e.id, { checklist: e.checklist.filter((_: any, j: number) => j !== i) })}
-                  className="tap-target-sm shrink-0 text-black/25 hover:text-red-600 px-1"><Icon name="close" size={15} /></button>
+                  className="tap-target-sm shrink-0 text-black/25 hover:text-bad-ink px-1"><Icon name="close" size={15} /></button>
               </div>
             ))}
           </div>
@@ -689,12 +689,12 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                     <span className="shrink-0 text-xs text-black/45 tabular-nums">{p2.qty}×</span>
                     <span className="shrink-0 text-xs">
                       {p2.returned != null ? <span className="text-[#5B7A08]">vráceno {p2.returned} ✓</span>
-                       : p2.packed ? <span className="text-amber-700">vyskladněno</span>
+                       : p2.packed ? <span className="text-wait-ink">vyskladněno</span>
                        : <span className="text-black/35">čeká</span>}
                     </span>
                     {!p2.packed && (
                       <button aria-label={`Odebrat ${p2.name} z balení`} onClick={() => patch(e.id, { packing: e.packing.filter((_: any, j: number) => j !== i) })}
-                        className="tap-target-sm shrink-0 text-black/25 hover:text-red-600"><Icon name="close" size={15} /></button>
+                        className="tap-target-sm shrink-0 text-black/25 hover:text-bad-ink"><Icon name="close" size={15} /></button>
                     )}
                   </div>
                 ))}
@@ -763,7 +763,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                     <p className="text-[11px] text-black/40">Informativní pohled — do financí jde tržba dne přes běžnou uzávěrku, nic se tu nezapisuje.</p>
                   </div>
                 )}
-                {posErr && <p className="text-xs text-red-600 mt-1.5">{posErr}</p>}
+                {posErr && <p className="text-xs text-bad-ink mt-1.5">{posErr}</p>}
               </div>
             )}
             {e.closingsCount > 0 ? (
@@ -790,7 +790,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 onBlur={() => patch(e.id, { costs: costs === '' ? null : Number(costs) })} placeholder="0" className={inputClass} />
             </div>
             {result != null && (
-              <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+              <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
                 Výsledek: {result >= 0 ? '+' : ''}{money(result)}
               </p>
             )}
@@ -802,7 +802,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
             if (!confirm(`Smazat akci „${e.title}"? Odeberou se i směny z akce.`)) return;
             const res = await fetch(`/api/events/${e.id}`, { method: 'DELETE' }).catch(() => null);
             if (res?.ok) onDeleted();
-          }} className="rounded-full glass text-black/45 hover:text-red-600 px-4 py-2.5 text-sm font-medium transition">
+          }} className="rounded-full glass text-black/45 hover:text-bad-ink px-4 py-2.5 text-sm font-medium transition">
             Smazat akci
           </button>
           <button onClick={onClose} className="rounded-full bg-[#16181A] text-white font-semibold px-6 py-2.5 text-sm hover:bg-black transition">Hotovo</button>

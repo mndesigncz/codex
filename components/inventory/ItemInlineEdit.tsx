@@ -109,7 +109,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
               className={`${field} w-24 text-center`} />
             <span className="text-xs text-black/40 w-8">{contentUnit || item.unit}</span>
             <button aria-label="Zavřít" type="button" onClick={() => setPortions(list => list.filter((_, i) => i !== idx))}
-              className="text-black/30 hover:text-red-600 transition px-1"><Icon name="close" size={15} /></button>
+              className="text-black/30 hover:text-bad-ink transition px-1"><Icon name="close" size={15} /></button>
           </div>
         ))}
         <button type="button" onClick={() => setPortions(list => [...list, { name: '', amount: '' }])}
@@ -118,7 +118,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
         </button>
       </div>
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p className="text-sm text-bad-ink">{err}</p>}
 
       <div className="flex items-center gap-2">
         <button onClick={save} disabled={saving}

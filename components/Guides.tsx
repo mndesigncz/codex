@@ -411,7 +411,7 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
                         {g.title}
                         {g.approved === false && (
                           <span className="ml-2 align-middle inline-flex items-center gap-1.5">
-                            <span className="rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">Čeká na schválení</span>
+                            <span className="rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">Čeká na schválení</span>
                             {isEmployer && (
                               <button
                                 type="button"
@@ -450,7 +450,7 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
                               e.stopPropagation();
                               deleteGuide(g.id);
                             }}
-                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 transition"
+                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-bad-ink transition"
                             title="Smazat"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -468,7 +468,7 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
                       )}
                       {g.requireRead && (
                         <span className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-red-500/10 text-red-600'
+                          g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-bad/10 text-bad-ink'
                         }`}>
                           <Icon name="book" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {g.myRead ? 'přečteno' : 'povinné čtení'}
                           {isEmployer && <span className="font-normal opacity-70">· {g.readCount ?? 0}×</span>}
@@ -577,7 +577,7 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
                     </button>
                     <button
                       onClick={() => deleteGuide(reader.id)}
-                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-red-600 hover:bg-red-500/[0.06] transition"
+                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-bad-ink hover:bg-bad/[0.06] transition"
                       title="Smazat"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -968,7 +968,7 @@ function GuideEditor({
                     <button
                       type="button"
                       onClick={() => removeStep(i)}
-                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-red-600 transition flex-shrink-0"
+                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-bad-ink transition flex-shrink-0"
                       title="Odebrat krok"
                     >
                       <Icon name="close" size={14} />
@@ -1010,7 +1010,7 @@ function GuideEditor({
             )}
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-bad-ink">{error}</p>}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 mt-6">
@@ -1137,7 +1137,7 @@ function ManageCategories({
               />
               <button
                 onClick={() => remove(c.id)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-red-600 transition text-xs flex-shrink-0"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-bad-ink transition text-xs flex-shrink-0"
                 title="Smazat"
               >
                 <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />

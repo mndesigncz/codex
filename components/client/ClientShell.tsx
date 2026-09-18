@@ -73,7 +73,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                         <p className="text-xs text-black/50 truncate">{me.email}</p>
                       </div>
                       <button role="menuitem" onClick={() => signOut({ callbackUrl: '/client' })}
-                        className="w-full text-left rounded-xl px-3 py-2 text-sm text-red-700 hover:bg-red-500/10 transition flex items-center gap-2">
+                        className="w-full text-left rounded-xl px-3 py-2 text-sm text-bad-ink hover:bg-bad/10 transition flex items-center gap-2">
                         <Icon name="logout" size={16} /> Odhlásit se
                       </button>
                     </div>

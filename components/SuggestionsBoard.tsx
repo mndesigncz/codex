@@ -25,7 +25,7 @@ const inputClass =
 
 // Pipeline stages, in the order the employer moves an idea through.
 const STATUS_META: Record<string, { label: string; chip: string }> = {
-  new:      { label: 'Nový',        chip: 'bg-amber-500/15 text-amber-700' },
+  new:      { label: 'Nový',        chip: 'bg-wait/15 text-wait-ink' },
   planned:  { label: 'Naplánováno', chip: 'bg-[#0A84FF]/15 text-[#0A6FE0]' },
   done:     { label: 'Hotovo',      chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
   declined: { label: 'Zamítnuto',   chip: 'bg-black/[0.06] text-black/45' },
@@ -288,7 +288,7 @@ export default function SuggestionsBoard() {
                       </button>
                     )}
                     <button onClick={() => remove(s)}
-                      className="tap-target-sm text-xs text-black/35 hover:text-red-600 rounded-full px-2 py-1 transition">
+                      className="tap-target-sm text-xs text-black/35 hover:text-bad-ink rounded-full px-2 py-1 transition">
                       Smazat
                     </button>
                   </div>

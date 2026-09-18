@@ -219,7 +219,7 @@ function ItemRow({ item, packaging, onChanged }: {
       <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <p className="font-bold text-[#16181A] truncate">{item.name}</p>
-          <p className="text-sm text-amber-600 mt-1">Chybí velikost balení — doplní ji vedení ve skladu.</p>
+          <p className="text-sm text-wait-ink mt-1">Chybí velikost balení — doplní ji vedení ve skladu.</p>
         </div>
         <button onClick={() => apply({ archived: true })} disabled={busy}
           className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40">
@@ -249,7 +249,7 @@ function ItemRow({ item, packaging, onChanged }: {
         </div>
         {saved && <span className="text-sm font-bold text-[#5B7A08] shrink-0">Uloženo ✓</span>}
         {failed && (
-          <span className="text-sm font-bold text-red-600 shrink-0 flex items-center gap-1">
+          <span className="text-sm font-bold text-bad-ink shrink-0 flex items-center gap-1">
             <Icon name="warning" size={15} /> Neuloženo
           </span>
         )}
@@ -412,13 +412,13 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
         </div>
 
         {err && (
-          <p className="text-center text-red-600 text-sm font-semibold flex items-center justify-center gap-1.5">
+          <p className="text-center text-bad-ink text-sm font-semibold flex items-center justify-center gap-1.5">
             <Icon name="warning" size={16} /> {err}
           </p>
         )}
 
         {size <= 0 ? (
-          <p className="text-center text-amber-600 text-sm">
+          <p className="text-center text-wait-ink text-sm">
             Chybí velikost balení — tuhle položku zatím zapsat nejde.
           </p>
         ) : (

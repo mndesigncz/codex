@@ -328,7 +328,7 @@ export default function ClosingsOverview() {
           <div className="flex items-center gap-2">
             <Icon name="warning" size={17} className="text-[#B23A15] shrink-0" />
             <h3 className="t-card">Chybí uzávěrka</h3>
-            <span className="rounded-full bg-red-500/15 text-red-600 px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
+            <span className="rounded-full bg-bad/15 text-bad-ink px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
           </div>
           <p className="text-xs text-black/50">Tyto dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí, když ji vyplní jeden za všechny.</p>
           {missing.map(m => (
@@ -359,7 +359,7 @@ export default function ClosingsOverview() {
           <div className="flex items-center gap-2">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
             <h3 className="t-card">Uzávěrky ke schválení</h3>
-            <span className="rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
+            <span className="rounded-full bg-wait/15 text-wait-ink px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
           </div>
           {pending.map(c => {
             const d = cashDifference(c);
@@ -374,7 +374,7 @@ export default function ClosingsOverview() {
                     </p>
                   </div>
                   <span className={`tap-target-sm shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
-                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
+                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                 </div>
                 <p className="text-xs text-black/45">Odesláno bez směny — zkontroluj a schval.</p>
@@ -419,7 +419,7 @@ export default function ClosingsOverview() {
         )}
         <div className="glass-card p-5 min-w-0">
           <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Rozdíl kasy</p>
-          <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-red-600'}`}>
+          <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-bad-ink'}`}>
             {totals.diff > 0 ? '+' : ''}{money(totals.diff)}
           </p>
           <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
@@ -438,7 +438,7 @@ export default function ClosingsOverview() {
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">vs. minulý týden</p>
               <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${
-                trend.wow == null ? 'text-black/40' : trend.wow >= 0 ? 'text-[#5B7A08]' : 'text-red-600'
+                trend.wow == null ? 'text-black/40' : trend.wow >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'
               }`}>
                 {trend.wow == null ? '—' : `${trend.wow >= 0 ? '+' : ''}${trend.wow.toFixed(0)} %`}
               </p>
@@ -484,7 +484,7 @@ export default function ClosingsOverview() {
               <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Mzdové náklady</p>
               <p className="text-lg sm:text-xl font-bold tabular-nums text-[#16181A] mt-1 truncate">− {money(laborCost)}</p>
               {laborPct != null && (
-                <p className={`text-[11px] mt-0.5 truncate ${laborTargetPct != null && laborPct > laborTargetPct ? 'text-red-600 font-semibold' : 'text-black/40'}`}>
+                <p className={`text-[11px] mt-0.5 truncate ${laborTargetPct != null && laborPct > laborTargetPct ? 'text-bad-ink font-semibold' : 'text-black/40'}`}>
                   {laborPct.toFixed(0)} % z tržeb{laborTargetPct != null ? ` (cíl ${laborTargetPct} %)` : ''}
                 </p>
               )}
@@ -496,7 +496,7 @@ export default function ClosingsOverview() {
             </div>
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Provozní výsledek</p>
-              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${operating >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${operating >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
                 {operating >= 0 ? '+' : ''}{money(operating)}
               </p>
             </div>
@@ -543,7 +543,7 @@ export default function ClosingsOverview() {
             </div>
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Refundace / slevy</p>
-              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${posInsights.refunds.count > 0 ? 'text-amber-700' : 'text-[#16181A]'}`}>
+              <p className={`text-lg sm:text-xl font-bold tabular-nums mt-1 truncate ${posInsights.refunds.count > 0 ? 'text-wait-ink' : 'text-[#16181A]'}`}>
                 {posInsights.refunds.count}× ({money(posInsights.refunds.total)})
               </p>
               {posInsights.discounts > 0 && <p className="text-[11px] text-black/40 mt-0.5">slevy {money(posInsights.discounts)}</p>}
@@ -587,7 +587,7 @@ export default function ClosingsOverview() {
                   <div className="mt-3 space-y-2">
                     {posInsights.staffingAdvice.map((a: any, i: number) => (
                       <div key={i} className={`rounded-2xl border px-4 py-2.5 ${
-                        a.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                        a.tone === 'warn' ? 'bg-wait/10 border-wait/25 text-wait-ink'
                           : a.tone === 'good' ? 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]'
                           : 'bg-black/[0.03] border-black/[0.07] text-black/60'}`}>
                         <p className="text-sm font-semibold">{a.title}</p>
@@ -607,7 +607,7 @@ export default function ClosingsOverview() {
               <div className="space-y-2">
                 {(reconcile.insights ?? []).map((i: any, idx: number) => (
                   <div key={idx} className={`rounded-2xl border px-4 py-2.5 ${
-                    i.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                    i.tone === 'warn' ? 'bg-wait/10 border-wait/25 text-wait-ink'
                       : i.tone === 'good' ? 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]'
                       : 'bg-black/[0.03] border-black/[0.07] text-black/60'}`}>
                     <p className="text-sm font-semibold flex items-center gap-1.5">
@@ -646,7 +646,7 @@ export default function ClosingsOverview() {
                         </span>
                         <span className={`w-20 shrink-0 text-right text-xs font-bold tabular-nums ${
                           d.diff == null ? 'text-black/20'
-                            : Math.abs(d.diff) <= 50 ? 'text-[#5B7A08]' : 'text-amber-700'
+                            : Math.abs(d.diff) <= 50 ? 'text-[#5B7A08]' : 'text-wait-ink'
                         }`}>
                           {d.diff == null ? '—' : d.diff === 0 ? <Icon name="check" size={14} className="inline text-[#4F6A07]" /> : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
                         </span>
@@ -846,10 +846,10 @@ export default function ClosingsOverview() {
                       </span>
                     )}
                     {c.approved === false && (
-                      <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
+                      <span className="tap-target-sm rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                     )}
                     <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
-                      d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'
+                      d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'
                     }`}>
                       {d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}
                       {/* When the closer explained the difference, say so right in

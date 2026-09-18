@@ -67,7 +67,7 @@ export function BulkBar({ count, totalLabel, onSelectAll, onExit, actions, note 
         ))}
         {actions.filter(a => a.danger).map(a => (
           <button key={a.label} type="button" onClick={a.onClick} disabled={a.disabled}
-            className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/25 transition whitespace-nowrap disabled:opacity-40">
+            className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-bad-lift hover:bg-bad/25 transition whitespace-nowrap disabled:opacity-40">
             {a.icon && <Icon name={a.icon} size={14} className="inline -mt-0.5 mr-1" />}{a.label}
           </button>
         ))}
@@ -77,7 +77,7 @@ export function BulkBar({ count, totalLabel, onSelectAll, onExit, actions, note 
         </button>
       </div>
       {note && (
-        <p className="mt-2 rounded-full bg-white/95 px-3 py-1.5 text-center text-xs font-medium text-red-600 shadow">{note}</p>
+        <p className="mt-2 rounded-full bg-white/95 px-3 py-1.5 text-center text-xs font-medium text-bad-ink shadow">{note}</p>
       )}
       </div>
     </div>
@@ -110,7 +110,7 @@ export function ApproveAllBar({ count, noun, onApproveAll, busy, note }: {
       <span className="min-w-0 flex-1 text-sm font-medium">
         {czCount(count, noun)} {czVerb(count, 'čeká', 'čekají')} na schválení.
       </span>
-      {note && <span className="text-xs font-medium text-red-600">{note}</span>}
+      {note && <span className="text-xs font-medium text-bad-ink">{note}</span>}
       <button type="button" onClick={onApproveAll} disabled={busy}
         className="tap-target-sm btn btn-primary btn-sm disabled:opacity-50 whitespace-nowrap">
         {busy ? 'Schvaluji…' : `Schválit vše (${count})`}

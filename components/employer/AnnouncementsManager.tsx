@@ -102,7 +102,7 @@ export default function AnnouncementsManager() {
   const row = (a: Announcement) => (
             <div
               key={a.id}
-              className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-[#FFD60A]/[0.12] border-[#FFD60A]/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
+              className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-wait/[0.12] border-wait/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
             >
               <span className={`shrink-0 mt-0.5 ${a.pinned ? 'text-[#8A6A00]' : 'text-black/35'}`} aria-hidden>
                 <Icon name={a.pinned ? 'pin' : 'book'} size={17} />
@@ -167,7 +167,7 @@ export default function AnnouncementsManager() {
             {saving ? 'Připínám…' : 'Připnout oznámení'}
           </button>
         </div>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-bad-ink text-sm">{error}</p>}
       </div>
 
       {announcements.length === 0 ? (

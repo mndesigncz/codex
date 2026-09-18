@@ -63,7 +63,7 @@ export function Menu({ items, label = 'Další akce', size = 'md', align = 'righ
               disabled={it.disabled}
               onClick={() => { pop.close(false); it.onClick(); }}
               className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors disabled:opacity-40 ${
-                it.danger ? 'text-red-600 hover:bg-red-500/[0.07]' : 'text-[#16181A] hover:bg-black/[0.05]'
+                it.danger ? 'text-bad-ink hover:bg-bad/[0.07]' : 'text-[#16181A] hover:bg-black/[0.05]'
               }`}
             >
               {it.icon && <Icon name={it.icon} size={18} className={`shrink-0 mt-px ${it.danger ? '' : 'text-black/55'}`} />}

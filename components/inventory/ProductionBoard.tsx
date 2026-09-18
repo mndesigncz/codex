@@ -94,7 +94,7 @@ export function ProduceModal({ entry, onClose, onDone }: { entry: ToMake; onClos
                 <li key={l.ingredientId} className="list-row">
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-[#16181A] truncate">{l.name}</span>
-                    <span className={`block text-[13px] ${short ? 'text-red-600' : 'text-black/55'}`}>
+                    <span className={`block text-[13px] ${short ? 'text-bad-ink' : 'text-black/55'}`}>
                       odepíše se {fmt(need)} {l.unit} · ve skladu {fmt(l.available)} {l.unit}{short ? ' — nestačí, odepíše se, co je' : ''}
                     </span>
                   </span>
@@ -144,7 +144,7 @@ export default function ProductionBoard({ compact = false, onOpenTasks, onChange
           return (
             <li key={e.taskId} className="py-2.5 first:pt-0 last:pb-0">
               <div className="flex items-center gap-3">
-                <span className={`h-2 w-2 rounded-full shrink-0 ${e.item.status === 'critical' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                <span className={`h-2 w-2 rounded-full shrink-0 ${e.item.status === 'critical' ? 'bg-bad' : 'bg-wait'}`} />
                 <button type="button" onClick={() => setExpanded(isOpen ? null : e.taskId)} className="min-w-0 flex-1 text-left">
                   <span className="block text-sm font-semibold text-[#16181A] truncate">{e.title}</span>
                   <span className="block text-[13px] text-black/55 truncate">
@@ -163,7 +163,7 @@ export default function ProductionBoard({ compact = false, onOpenTasks, onChange
                     <div className="space-y-1">
                       {e.lines.map(l => (
                         <p key={l.ingredientId} className="text-[13px] flex items-center gap-2">
-                          <span className={`shrink-0 ${l.missing > 0 ? 'text-red-600' : 'text-[#5B7A08]'}`}><Icon name={l.missing > 0 ? 'close' : 'check'} size={14} /></span>
+                          <span className={`shrink-0 ${l.missing > 0 ? 'text-bad-ink' : 'text-[#5B7A08]'}`}><Icon name={l.missing > 0 ? 'close' : 'check'} size={14} /></span>
                           <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name} {fmt(l.need)} {l.unit}</span>
                           <span className="shrink-0 text-black/45 tabular-nums">ve skladu {fmt(l.available)} {l.unit}</span>
                         </p>

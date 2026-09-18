@@ -255,7 +255,7 @@ export default function Procedures({ user }: Props) {
                       <button onClick={(e) => { e.stopPropagation(); openEdit(p); }} title="Upravit" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-black/[0.06] hover:text-black transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-red-500/10 hover:text-red-600 transition">
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-bad/10 hover:text-bad-ink transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
                       </button>
                     </div>
@@ -264,7 +264,7 @@ export default function Procedures({ user }: Props) {
                 <h3 className="mt-4 text-lg font-bold tracking-tight text-[#16181A]">{p.name}</h3>
                 {p.approved === false && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
+                    <span className="tap-target-sm rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
                     {isEmployer && (
                       <button
                         type="button"
@@ -364,7 +364,7 @@ export default function Procedures({ user }: Props) {
                     {done ? (
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {missing > 0 && (
-                          <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 tabular-nums">
+                          <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-wait/15 px-2.5 py-1 text-xs font-medium text-wait-ink tabular-nums">
                             <Icon name="warning" size={12} /> {missing} nedokončeno
                           </span>
                         )}
@@ -391,7 +391,7 @@ export default function Procedures({ user }: Props) {
           <div ref={delModal.ref} {...delModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <DiscardGuard guard={delModal.guard} />
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-600">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-bad/15 text-bad-ink">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
               </div>
               <div className="min-w-0">
@@ -404,7 +404,7 @@ export default function Procedures({ user }: Props) {
               <button onClick={() => setConfirmDel(null)} disabled={deleting} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition disabled:opacity-50">
                 Zrušit
               </button>
-              <button onClick={doConfirmDelete} disabled={deleting} className="flex-1 rounded-full bg-red-500 text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition disabled:opacity-50">
+              <button onClick={doConfirmDelete} disabled={deleting} className="flex-1 rounded-full bg-bad text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition disabled:opacity-50">
                 {deleting ? 'Mažu…' : 'Smazat'}
               </button>
             </div>
@@ -469,7 +469,7 @@ export default function Procedures({ user }: Props) {
                       <div key={i} className={`rounded-2xl border px-3.5 py-2.5 ${
                         isDone ? 'border-[#C8F542]/30 bg-[#C8F542]/[0.07]'
                         : isSkip && excused ? 'border-black/[0.08] bg-black/[0.02]'
-                        : 'border-red-500/25 bg-red-500/[0.05]'
+                        : 'border-bad/25 bg-bad/[0.05]'
                       }`}>
                         <div className="flex items-start gap-2.5">
                           <span className="shrink-0 mt-0.5 text-sm">{isDone ? '✅' : isSkip ? '⏭️' : '❌'}</span>
@@ -479,13 +479,13 @@ export default function Procedures({ user }: Props) {
                               {st.weight === 'key' && <span className="ml-1.5 rounded-full bg-[#16181A] text-white px-1.5 py-0.5 text-[11px] font-bold align-middle">KLÍČOVÝ</span>}
                             </p>
                             {isSkip && (
-                              <p className={`text-xs mt-0.5 ${excused ? 'text-black/45' : 'text-red-600'}`}>
+                              <p className={`text-xs mt-0.5 ${excused ? 'text-black/45' : 'text-bad-ink'}`}>
                                 {skipReasonLabel(reason?.reason)}{reason?.note ? ` — „${reason.note}"` : ''}
                                 {excused ? ' · omluveno, bez bodové ztráty' : ` · −${stepPenalty(st)} b.`}
                               </p>
                             )}
                             {!isDone && !isSkip && (
-                              <p className="text-xs text-red-600 mt-0.5">Nedokončeno · −{stepPenalty(st)} b.</p>
+                              <p className="text-xs text-bad-ink mt-0.5">Nedokončeno · −{stepPenalty(st)} b.</p>
                             )}
                           </div>
                           {isDone && stepPlus(st) > 0 && (
@@ -784,7 +784,7 @@ function ProcedureEditor({
                         onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
                         placeholder={String(weightSpec(s.weight ?? 'normal').minus)}
                         className="tap-target-sm w-[64px] rounded-xl bg-white/60 border border-black/[0.07] pl-6 pr-2 py-1.5 text-xs tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-red-500/70">−</span>
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-bad-ink/70">−</span>
                     </div>
                     <input
                       value={s.note ?? ''}
@@ -800,7 +800,7 @@ function ProcedureEditor({
                       <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} title="Dolů" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                       </button>
-                      <button onClick={() => removeStep(i)} title="Odebrat" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-red-600 hover:bg-red-500/10 transition">
+                      <button onClick={() => removeStep(i)} title="Odebrat" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-bad-ink hover:bg-bad/10 transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                       </button>
                     </div>
@@ -900,7 +900,7 @@ function ProcedureEditor({
             )}
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-bad-ink">{error}</p>}
         </div>
 
         <div className="flex items-center gap-2 px-5 py-4 border-t border-black/[0.07]">
