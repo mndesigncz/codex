@@ -15,7 +15,14 @@ import { join, relative } from 'node:path';
 // Slova vázaná na jeden druh provozu. „Čaj" samo o sobě v pořádku je —
 // kavárna ho taky nalévá; problém je „čajovna" jako typ podniku
 // a konkrétní čajový sortiment v ukázkách.
-const WORDS = /(čajovn\w*|pangea|sencha\w*|gyokuro|pu-?erh|matcha\w*|matchu|matchy|oolong|gunpowder|darjeeling)/i;
+// Bez diakritiky taky: „cajovna.cz" v adrese e-mailu má stejnou váhu jako
+// „čajovna" ve větě, a právě takhle přežila v `lib/push.ts` celé jedno kolo.
+const WORDS = /([čc]ajovn\w*|pangea|sencha\w*|gyokuro|pu-?erh|matcha\w*|matchu|matchy|oolong|gunpowder|darjeeling)/i;
+
+// Konvička v předmětu uvítacího e-mailu je totéž co „čajovna" v textu —
+// nový člověk v pizzerii dostane do schránky čaj. Ostatní emoji jsou
+// v pořádku; tenhle jeden je pozůstatek po jednom provozu.
+const TEAPOT = /🍵/;
 // Řetězec v uvozovkách nebo v JSX textu.
 const STRING = /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g;
 
@@ -33,10 +40,19 @@ const walk = (dir) => {
       if (code.startsWith('//') || code.startsWith('*') || code.startsWith('/*')) return;
       // Klíče localStorage si nesou starý název kvůli zpětné kompatibilitě.
       if (/localStorage|COOKIE|LS_|_OLD/.test(line)) return;
+      // Vnitřní identifikátor není text. `id: 'pangea'` u barevné předlohy
+      // se jmenuje „Zlatá a krémová" a to `id` nikdo nevidí; přejmenovat by
+      // ho navíc znamenalo rozbít data podnikům, které si ji vybraly.
+      if (/\bid:\s*['"`]/.test(line)) return;
       let m;
       STRING.lastIndex = 0;
       while ((m = STRING.exec(line))) {
-        if (WORDS.test(m[2])) {
+        // Emoji, které si člověk vybírá jako avatara, je jeho volba, ne
+        // text aplikace — konvička vedle ☕ a 🧋 v kavárně nikomu nevadí.
+        // Hlídá se konvička ve větě, ne v nabídce obrázků.
+        const onlyEmoji = !/[\p{L}\p{N}]/u.test(m[2]);
+        if (onlyEmoji) continue;
+        if (WORDS.test(m[2]) || TEAPOT.test(m[2])) {
           hits.push(`${relative('.', file)}:${i + 1}  „${m[2].slice(0, 70)}"`);
           break;
         }
@@ -51,6 +67,12 @@ const walk = (dir) => {
 };
 walk('components');
 walk('app');
+// `lib/` se dlouho nehlídalo, a přitom právě tam žijí e-maily a push
+// notifikace — tedy text, který zákazníkovi dorazí do schránky a na telefon,
+// ne jen na obrazovku. Konvička v uvítacím e-mailu a `info@cajovna.cz`
+// jako kontakt v každé notifikaci tak přežily celé kolo o univerzálních
+// textech. Obrazovka není jediné místo, kde aplikace mluví.
+walk('lib');
 
 if (hits.length) {
   console.error('\nText mluví o jednom konkrétním typu podniku.');

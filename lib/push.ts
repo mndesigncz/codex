@@ -9,7 +9,9 @@ function ensureConfigured(): boolean {
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) return false;
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:info@cajovna.cz',
+    // Kontakt, který se posílá s každou push notifikací. Byla tu adresa
+    // jednoho konkrétního podniku; produkt prodávaný dál musí mít svou.
+    process.env.VAPID_SUBJECT || 'mailto:podpora@managero.app',
     pub,
     priv,
   );

@@ -567,13 +567,20 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   // ---- CSV export ----
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
-    const header = 'datum,zaměstnanec,od,do,typ';
+    // Středník, ne čárka.
+    //
+    // Český Excel čte čárku jako desetinnou a soubor oddělený čárkami
+    // naveze celý měsíc do jednoho sloupce: „2026-08-03,Anna,08:00,…".
+    // Ostatní čtyři exporty v aplikaci to takhle měly od začátku, tenhle
+    // jediný ne — a přitom je to ten, který jde účetní. Import si poradí
+    // s obojím (`splitLine` níž), takže staré soubory dál fungují.
+    const header = 'datum;zaměstnanec;od;do;typ';
     const lines = shifts
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
       .map((s) => {
-        const name = /[",\n]/.test(s.employeeName) ? `"${s.employeeName.replace(/"/g, '""')}"` : s.employeeName;
-        return `${s.date},${name},${s.startTime},${s.endTime},${s.type}`;
+        const name = /[";\n]/.test(s.employeeName) ? `"${s.employeeName.replace(/"/g, '""')}"` : s.employeeName;
+        return `${s.date};${name};${s.startTime};${s.endTime};${s.type}`;
       });
     const csv = [header, ...lines].join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -1393,7 +1400,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
             </div>
             <div className="well border border-black/[0.08] p-3 text-xs text-black/55">
               Očekávaný formát: <code className="text-black/80">datum,zaměstnanec,od,do,typ</code> — např.{' '}
-              <code className="text-black/80">2026-08-03,anna@cajovna.cz,08:00,14:00,morning</code>. Sloupec „zaměstnanec"
+              <code className="text-black/80">2026-08-03;anna@priklad.cz;08:00;14:00;morning</code>. Sloupec „zaměstnanec"
               může být e-mail nebo jméno. Typ: morning / afternoon / flexible.
             </div>
 
