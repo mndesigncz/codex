@@ -188,8 +188,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     } catch { setTasks(prev); }
   };
 
-  const toggleChecklistItem = async (t: Task, index: number) => {
-    const next = (t.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it);
+  const saveChecklist = async (t: Task, next: { text: string; done: boolean }[]) => {
     const prev = tasks;
     setTasks(ts => ts.map(x => x.id === t.id ? { ...x, checklist: next } : x));
     try {
@@ -200,6 +199,13 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       if (!res.ok) throw new Error();
     } catch { setTasks(prev); }
   };
+
+  const toggleChecklistItem = (t: Task, index: number) =>
+    saveChecklist(t, (t.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it));
+
+  /** Odškrtnout nebo odškrtnutí zrušit u celého seznamu jedním požadavkem. */
+  const toggleChecklistAll = (t: Task, done: boolean) =>
+    saveChecklist(t, (t.checklist ?? []).map(it => ({ ...it, done })));
 
   // Create-form checklist editing helpers.
   const addChecklistLine = () => setForm(f => ({ ...f, checklist: [...f.checklist, { text: '', done: false }] }));
@@ -254,7 +260,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               )}
             </p>
             {!compact && t.checklist && t.checklist.length > 0 && (
-              <TaskChecklist items={t.checklist} onToggle={i => toggleChecklistItem(t, i)} />
+              <TaskChecklist items={t.checklist} onToggle={i => toggleChecklistItem(t, i)}
+                onToggleAll={d => toggleChecklistAll(t, d)} />
             )}
           </div>
           {!compact && (

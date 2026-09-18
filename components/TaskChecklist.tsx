@@ -20,13 +20,20 @@ export function recurrenceLabel(r?: string | null): string | null {
 
 // A read/tick checklist rendered under a task. `onToggle(index)` flips one item;
 // the parent persists the whole list.
-export function TaskChecklist({ items, onToggle }: {
+export function TaskChecklist({ items, onToggle, onToggleAll }: {
   items: ChecklistItem[];
   onToggle?: (index: number) => void;
+  /**
+   * Odškrtnout celý seznam najednou. Dvanáctibodový zavírací postup se
+   * odklikával po jedné položce i ve chvíli, kdy je hotový celý — což je
+   * ten nejčastější případ, kdy se na checklist sahá naposled.
+   */
+  onToggleAll?: (done: boolean) => void;
 }) {
   if (!items || items.length === 0) return null;
   const done = items.filter(i => i.done).length;
   const pct = Math.round((done / items.length) * 100);
+  const allDone = done === items.length;
   return (
     <div className="mt-2.5 space-y-1.5">
       <div className="flex items-center gap-2">
@@ -34,6 +41,12 @@ export function TaskChecklist({ items, onToggle }: {
           <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${pct}%` }} />
         </div>
         <span className="text-[11px] font-medium tabular-nums text-black/45 shrink-0">{done}/{items.length}</span>
+        {onToggleAll && items.length > 2 && (
+          <button type="button" onClick={() => onToggleAll(!allDone)}
+            className="tap-target-sm shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-black/45 hover:text-[#16181A] hover:bg-black/[0.05] transition">
+            {allDone ? 'Zrušit vše' : 'Odškrtnout vše'}
+          </button>
+        )}
       </div>
       <div className="space-y-0.5">
         {items.map((it, i) => (
