@@ -14,6 +14,7 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import ItemInlineEdit from './ItemInlineEdit';
 import NewIngredientInline from './NewIngredientInline';
+import { okJson } from '@/lib/api';
 
 const inputCls =
   'field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -89,11 +90,11 @@ export default function RecipesView({ openProductId, onNavigate }: {
   const load = async () => {
     try {
       const [d, inv, cats] = await Promise.all([
-        fetch('/api/pos/products').then(r => r.json()),
-        fetch('/api/inventory').then(r => r.json()).catch(() => []),
-        fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
+        fetch('/api/pos/products').then(okJson),
+        fetch('/api/inventory').then(okJson).catch(() => []),
+        fetch('/api/inventory/categories').then(okJson).catch(() => []),
       ]);
-      fetch('/api/guides').then(r => r.json())
+      fetch('/api/guides').then(okJson)
         .then(g => setGuides(Array.isArray(g?.guides) ? g.guides.filter((x: any) => x.productId) : []))
         .catch(() => setGuides([]));
       setStockCategories(

@@ -8,6 +8,7 @@ import KioskPackagedStock from './KioskPackagedStock';
 import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
 import { useKioskShift } from './KioskShiftGate';
+import { okJson } from '@/lib/api';
 
 interface Item {
   id: number;
@@ -54,8 +55,8 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
 
   const reload = () =>
     Promise.all([
-      fetch('/api/inventory').then(r => r.json()).catch(() => null),
-      fetch('/api/inventory/categories').then(r => r.json()).catch(() => null),
+      fetch('/api/inventory').then(okJson).catch(() => null),
+      fetch('/api/inventory/categories').then(okJson).catch(() => null),
     ]).then(([d, c]) => {
       // Pole = data (klidně prázdný sklad). Cokoli jiného (null, {error}, 500)
       // je selhání načtení — to se nesmí tvářit jako „nic ve skladu".
@@ -69,7 +70,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
 
   // Běží inventura? Když ano, tablet ji nabídne — počítat může kdokoli z týmu.
   useEffect(() => {
-    fetch('/api/stocktake').then(r => r.json())
+    fetch('/api/stocktake').then(okJson)
       .then(d => setStocktakeOpen(!!d?.open))
       .catch(() => setStocktakeOpen(false));
   }, [counting]);

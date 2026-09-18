@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { okJson } from '@/lib/api';
 
 // Načítání, které umí i selhat.
 //
 // Vzorec, co byl po aplikaci rozsypaný, vypadal takhle:
 //
-//   fetch(url).then(r => r.json()).then(setD).catch(() => {});
+//   fetch(url).then(okJson).then(setD).catch(() => {});
 //
 // Prázdný catch znamená, že po výpadku sítě zůstane `d === null` navždy
 // a člověk kouká na pulzující skeleton, dokud stránku neobnoví. Tenhle

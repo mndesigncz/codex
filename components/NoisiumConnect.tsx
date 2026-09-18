@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
+import { okJson } from '@/lib/api';
 
 const inputClass = 'field';
 
@@ -16,7 +17,7 @@ export default function NoisiumConnect() {
 
   const load = async () => {
     try {
-      const d = await fetch('/api/noisium').then(r => r.json());
+      const d = await fetch('/api/noisium').then(okJson);
       setConnected(!!d.connected);
       setProjectId(d.projectId ?? null);
     } catch { setConnected(false); }

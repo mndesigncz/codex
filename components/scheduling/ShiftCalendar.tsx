@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { pragueToday } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 type Person = { id: number; name: string; avatar: string | null; startTime?: string; endTime?: string; hadClosing?: boolean };
 type Day = { onShift: Person[]; closedBy: Person[]; hasClosing: boolean; missing: boolean };
@@ -33,7 +34,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
     setLoading(true);
     try {
       const q = `month=${month}${scope === 'me' ? '&scope=me' : ''}`;
-      const d = await fetch(`/api/closings/calendar?${q}`).then(r => r.json());
+      const d = await fetch(`/api/closings/calendar?${q}`).then(okJson);
       if (req !== reqRef.current) return;
       setDays(d.days && typeof d.days === 'object' ? d.days : {});
     } catch { if (req === reqRef.current) setDays({}); }

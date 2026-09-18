@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import ShrinkageReport from './ShrinkageReport';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const fmt = (n: number) => round3(n).toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
@@ -39,7 +40,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
 
   const load = async () => {
     try {
-      const d = await fetch('/api/stocktake').then(r => r.json());
+      const d = await fetch('/api/stocktake').then(okJson);
       setOpen(d.open ?? null);
       setHistory(Array.isArray(d.history) ? d.history : []);
       if (d.notMigrated) setErr('Inventura bude dostupná po dokončení migrace (/api/init).');

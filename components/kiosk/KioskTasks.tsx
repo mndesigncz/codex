@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useKioskShift } from './KioskShiftGate';
 import { pragueToday } from '@/lib/pragueTime';
+import { okJson, apiMessage } from '@/lib/api';
+import { ErrorState } from '../ui/ErrorState';
 
 interface ChecklistItem { text: string; done: boolean }
 interface Task {
@@ -31,11 +33,19 @@ export default function KioskTasks() {
   const { active } = useKioskShift();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  // Když se úkoly nenačtou, nesmí to vypadat jako „žádné úkoly 🎉“ —
+  // na tabletu je tahle obrazovka jediné místo, kde se úkol dá vidět.
+  const [loadErr, setLoadErr] = useState('');
   const [filter, setFilter] = useState<Filter>('open');
 
   const load = () => {
-    fetch('/api/tasks').then(r => r.json()).then(d => { if (Array.isArray(d)) setTasks(d); setLoading(false); })
-      .catch(() => setLoading(false));
+    setLoadErr('');
+    fetch('/api/tasks').then(okJson)
+      .then(d => {
+        if (!Array.isArray(d)) throw new Error('Server poslal něco jiného než seznam úkolů.');
+        setTasks(d); setLoading(false);
+      })
+      .catch(e => { setLoadErr(apiMessage(e, 'Úkoly se nenačetly.')); setLoading(false); });
   };
   useEffect(load, []);
 
@@ -166,6 +176,8 @@ export default function KioskTasks() {
 
       {loading ? (
         <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
+      ) : loadErr ? (
+        <ErrorState title="Úkoly se nenačetly" hint={loadErr} onRetry={() => { setLoading(true); load(); }} />
       ) : filtered.length === 0 ? (
         <div className="glass-card p-8 text-center text-black/45">
           {filter === 'done' ? 'Zatím nic hotového.' : 'Žádné úkoly. 🎉'}

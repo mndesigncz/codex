@@ -13,13 +13,14 @@ import CardScan from './CardScan';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { czCount } from '@/lib/czech';
 import { useMoney } from '../CurrencyProvider';
+import { okJson, apiMessage } from '@/lib/api';
 
 const EVERY_MS = 20 * 1000;
 
 export function useStaffInbox(enabled = true) {
   const [d, setD] = useState<any | null>(null);
   const [err, setErr] = useState('');
-  const load = useCallback(() => fetch('/api/client/staff/inbox').then(r => r.json()).then(x => { if (!x.error) { setD(x); setErr(''); } else setErr(x.error); }).catch(() => setErr('Příjem se nenačetl.')), []);
+  const load = useCallback(() => fetch('/api/client/staff/inbox').then(okJson).then(x => { if (!x.error) { setD(x); setErr(''); } else setErr(x.error); }).catch(e => setErr(apiMessage(e, 'Příjem se nenačetl.'))), []);
   useEffect(() => {
     if (!enabled) return;
     load();

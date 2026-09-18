@@ -7,6 +7,7 @@ import { normalizePoints } from '@/lib/rewardLevels';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { czForm } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -91,14 +92,14 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
 
   // Rating-star weight for the suggested points.
   useEffect(() => {
-    fetch('/api/teams').then(r => r.json()).then(d => {
+    fetch('/api/teams').then(okJson).then(d => {
       const p = normalizePoints(d?.team?.points_config);
       setRatingStar(p.ratingStar);
     }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetch(`/api/shifts?employeeId=${employee.id}`).then(r => r.json()).then(d => {
+    fetch(`/api/shifts?employeeId=${employee.id}`).then(okJson).then(d => {
       const arr = Array.isArray(d?.shifts) ? d.shifts : Array.isArray(d) ? d : [];
       const today = todayStr();
       const dates = Array.from(new Set(arr.map((s: any) => s.date).filter((x: string) => x && x <= today)))
@@ -110,7 +111,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   const loadSummary = useCallback(() => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     setLoadingSummary(true);
-    fetch(`/api/shift-reviews?employeeId=${employee.id}&date=${date}`).then(r => r.json()).then((d: Summary) => {
+    fetch(`/api/shift-reviews?employeeId=${employee.id}&date=${date}`).then(okJson).then((d: Summary) => {
       if (d && !(d as any).error) {
         setSummary(d);
         setRating(d.review?.rating ?? 0);

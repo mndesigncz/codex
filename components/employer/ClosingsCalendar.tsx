@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { useCurrency, useMoney } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 type Person = { id: number; name: string; avatar: string | null; hadClosing?: boolean };
 type Day = {
@@ -73,7 +74,7 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
     (async () => {
       setLoading(true);
       try {
-        const d = await fetch(`/api/closings/calendar?month=${month}`).then(r => r.json());
+        const d = await fetch(`/api/closings/calendar?month=${month}`).then(okJson);
         if (!cancelled) setDays(d.days && typeof d.days === 'object' ? d.days : {});
       } catch { if (!cancelled) setDays({}); }
       if (!cancelled) setLoading(false);

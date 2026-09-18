@@ -14,6 +14,7 @@ import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { czCount } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -334,7 +335,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     // The team decides whether cash tips stay in the drawer — it changes the
     // expected-cash maths, so the form must start from the team's reality.
     try {
-      const t = await fetch('/api/teams').then(r => r.json());
+      const t = await fetch('/api/teams').then(okJson);
       const drawer = t?.team?.tips_in_drawer === true;
       setTeamTipsInDrawer(drawer);
       setTipsInDrawer(drawer);
@@ -346,17 +347,17 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       }
     } catch { /* keep the safe default: tips are kept aside */ }
     try {
-      const rd = await fetch('/api/procedures/runs?today=team').then(r => r.json());
+      const rd = await fetch('/api/procedures/runs?today=team').then(okJson);
       setTodayRuns(Array.isArray(rd?.runs) ? rd.runs : []);
     } catch { /* runs are a nice-to-have here */ }
     try {
-      const pd = await fetch('/api/procedures').then(r => r.json());
+      const pd = await fetch('/api/procedures').then(okJson);
       const list = Array.isArray(pd?.procedures) ? pd.procedures : [];
       setRequiredProcs(list.filter((p: any) => p.requireBeforeClosing === true)
         .map((p: any) => ({ id: p.id, name: p.name, icon: p.icon })));
     } catch { /* enforcement needs the list; without it nothing blocks */ }
     try {
-      const d = await fetch('/api/closings').then(r => r.json());
+      const d = await fetch('/api/closings').then(okJson);
       const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
       setClosings(list);
       // Closing a Friday night at 00:40 is still Friday's closing — the server
@@ -371,7 +372,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       // author's own — with alternating shifts my own last closing can be days
       // old (or a covered stub) and would manufacture a phantom manko.
       try {
-        const dd = await fetch('/api/closings/drawer').then(r => r.json());
+        const dd = await fetch('/api/closings/drawer').then(okJson);
         const prev = dd?.drawer;
         if (prev) {
           const left = Math.round(Number(prev.amount) || 0);
@@ -385,7 +386,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       // Events happening on the closing's date — an off-site stall keeps its
       // own drawer, so it gets its own closing.
       try {
-        const evd = await fetch('/api/events').then(r => r.json());
+        const evd = await fetch('/api/events').then(okJson);
         const evs = (Array.isArray(evd?.events) ? evd.events : [])
           .filter((e: any) => e.status !== 'cancelled')
           .map((e: any) => ({ id: e.id, title: e.title, date: e.date }));
@@ -441,7 +442,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const d = await fetch(`/api/closings/coworkers?date=${form.date}&exclude=${actorId}`).then(r => r.json());
+        const d = await fetch(`/api/closings/coworkers?date=${form.date}&exclude=${actorId}`).then(okJson);
         if (!cancelled) setCoworkers(Array.isArray(d.coworkers) ? d.coworkers : []);
       } catch { if (!cancelled) setCoworkers([]); }
     }, 300);
@@ -492,7 +493,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   useEffect(() => {
     if (!form.date) return;
     let alive = true;
-    fetch(`/api/pos/summary?date=${form.date}`).then(r => r.json())
+    fetch(`/api/pos/summary?date=${form.date}`).then(okJson)
       .then(d => { if (alive) setPos(d?.connected && d.bills != null ? d : null); })
       .catch(() => { if (alive) setPos(null); });
     return () => { alive = false; };

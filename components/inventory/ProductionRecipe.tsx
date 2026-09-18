@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { useResultKeys } from '@/lib/useResultKeys';
+import { okJson } from '@/lib/api';
 
 export interface RecipeLine {
   ingredientId: number; name: string; amount: number; unit: string;
@@ -49,7 +50,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/inventory/${item.id}/production`).then(r => r.json()).then(d => {
+    fetch(`/api/inventory/${item.id}/production`).then(okJson).then(d => {
       if (!alive || !d || d.error) return;
       setInfo(d);
       setOn(!!d.madeInHouse);

@@ -10,6 +10,7 @@ import { Icon } from './Icons';
 import {
   type LayoutEntry, type Widget, availableWidgets, moveEntry, parseTarget,
 } from '@/lib/dashboardWidgets';
+import { okJson } from '@/lib/api';
 
 type Role = 'employer' | 'employee';
 
@@ -140,7 +141,7 @@ function AddPanel({ spare, onAdd, onClose }: {
     const src = LINK_SOURCES.find(s => s.kind === source);
     if (!src?.url) { setOptions([]); return; }
     setLoading(true);
-    fetch(src.url).then(r => r.json()).then(d => {
+    fetch(src.url).then(okJson).then(d => {
       const rows = Array.isArray(d) ? d : (d?.procedures ?? d?.guides ?? []);
       setOptions(rows.map((r: any) => {
         const value = String(r[src.nameKey ?? 'name'] ?? '');

@@ -12,6 +12,7 @@ import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { useMoney, useSymbol } from '../CurrencyProvider';
+import { okJson } from '@/lib/api';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -112,7 +113,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
   const [d, setD] = useState<any | null>(null);
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
-  useEffect(() => { fetch('/api/client/admin/loyalty').then(r => r.json()).then(setD).catch(() => setD({ summary: null, recent: [] })); }, []);
+  useEffect(() => { fetch('/api/client/admin/loyalty').then(okJson).then(setD).catch(() => setD({ summary: null, recent: [] })); }, []);
   const toggle = async () => {
     setBusy(true);
     try { const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: !p.loyalty_on }) }); setP(r.profile); } catch { /* tichá chyba, stav se nezmění */ }
@@ -334,11 +335,11 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
   const [form, setForm] = useState<ReturnType<typeof blankCampaign> | null>(null);
   const [items, setItems] = useState<{ id: number; name: string; board: string; paired: boolean }[]>([]);
   const [busy, setBusy] = useState('');
-  const load = useCallback(() => fetch('/api/client/admin/stamps').then(r => r.json()).then(d => setList(d.campaigns ?? [])).catch(() => setList([])), []);
+  const load = useCallback(() => fetch('/api/client/admin/stamps').then(okJson).then(d => setList(d.campaigns ?? [])).catch(() => setList([])), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     // Položky nabídky pro výběr „za položky" — přes všechny desky najednou.
-    fetch('/api/menu').then(r => r.json()).then(d => {
+    fetch('/api/menu').then(okJson).then(d => {
       const flat: any[] = [];
       for (const b of d.boards ?? []) for (const s of b.sections ?? []) for (const i of s.items ?? []) {
         flat.push({ id: i.id, name: i.name, board: b.name, paired: !!i.posProductId });
@@ -559,7 +560,7 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
   const [form, setForm] = useState<ReturnType<typeof blankCoupon> | null>(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState('');
-  const load = useCallback(() => fetch('/api/client/admin/coupons').then(r => r.json()).then(d => { setList(d.coupons ?? []); setGroups(d.groups ?? []); }).catch(() => setList([])), []);
+  const load = useCallback(() => fetch('/api/client/admin/coupons').then(okJson).then(d => { setList(d.coupons ?? []); setGroups(d.groups ?? []); }).catch(() => setList([])), []);
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
@@ -782,7 +783,7 @@ function Groups({ toast }: { toast: (m: string) => void }) {
   const [list, setList] = useState<any[] | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState('');
-  const load = useCallback(() => fetch('/api/client/admin/groups').then(r => r.json()).then(d => setList(d.groups ?? [])).catch(() => setList([])), []);
+  const load = useCallback(() => fetch('/api/client/admin/groups').then(okJson).then(d => setList(d.groups ?? [])).catch(() => setList([])), []);
   useEffect(() => { load(); }, [load]);
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); if (!name.trim()) return; setBusy('add');

@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LogoMark } from '@/components/Icons';
+import { okJson } from '@/lib/api';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -26,7 +27,7 @@ function JoinForm() {
   useEffect(() => {
     if (!token) return;
     fetch(`/api/invitations/accept?token=${token}`)
-      .then(r => r.json())
+      .then(okJson)
       .then(data => {
         if (data.error) { setError(data.error); return; }
         setEmail(data.email);

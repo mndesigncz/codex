@@ -11,6 +11,7 @@ import { Skeleton, EmptyState } from '../ui';
 import { Initials } from './ClientShell';
 import { hoursLabel } from '@/lib/clientSlots';
 import { pragueToday } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 interface Biz { slug: string; name: string; tagline: string; address: string; coverUrl: string; hours: any; member: boolean; members: number; reservationsOn: boolean; orderingOn: boolean; loyaltyOn: boolean }
 
@@ -23,7 +24,7 @@ export default function ClientHome() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      fetch(`/api/client/businesses?q=${encodeURIComponent(q)}`).then(r => r.json())
+      fetch(`/api/client/businesses?q=${encodeURIComponent(q)}`).then(okJson)
         .then(d => { setList(d.businesses ?? []); setSignedIn(!!d.signedIn); })
         .catch(() => setErr('Seznam podniků se nenačetl. Zkus to za chvíli.'));
     }, q ? 250 : 0);

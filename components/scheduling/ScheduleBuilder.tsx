@@ -8,6 +8,7 @@ import { Button, Menu, EmptyState } from '../ui';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -228,7 +229,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
       const months = new Set([copySrc.slice(0, 7), iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000)).slice(0, 7)]);
       let source: Shift[] = [];
       for (const m of Array.from(months)) {
-        const d = await fetch(`/api/schedule?month=${m}`).then(r => r.json()).catch(() => ({}));
+        const d = await fetch(`/api/schedule?month=${m}`).then(okJson).catch(() => ({}));
         source = source.concat(Array.isArray(d?.shifts) ? d.shifts : []);
       }
       const srcStart = copySrc;
@@ -380,7 +381,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
       setFixed(faData.assignments ?? []);
       setOpeningHours(ohData.openingHours ?? {});
       setTimeOff(Array.isArray(toData?.requests) ? toData.requests.filter((r: any) => r.status === 'approved') : []);
-      fetch('/api/events').then(r => r.json())
+      fetch('/api/events').then(okJson)
         .then(d => setEvents((Array.isArray(d.events) ? d.events : []).filter((e: any) => e.status !== 'cancelled')))
         .catch(() => {});
     } catch (e) {
@@ -399,13 +400,11 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   }, [month]);
 
   const reloadTypes = async () => {
-    const r = await fetch('/api/shift-types');
-    const d = await r.json();
+    const d = await fetch('/api/shift-types').then(okJson);
     setShiftTypes(d.shiftTypes ?? []);
   };
   const reloadFixed = async () => {
-    const r = await fetch('/api/fixed-assignments');
-    const d = await r.json();
+    const d = await fetch('/api/fixed-assignments').then(okJson);
     setFixed(d.assignments ?? []);
   };
 
@@ -2385,7 +2384,7 @@ function ScheduleRulesManager() {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    fetch('/api/schedule/rules').then(r => r.json()).then(d => {
+    fetch('/api/schedule/rules').then(okJson).then(d => {
       if (d?.error) { setErr(d.error); return; }
       setTeamMax(d.teamMax != null ? String(d.teamMax) : '');
       setTeamMaxHours(d.teamMaxHours != null ? String(d.teamMaxHours) : '');

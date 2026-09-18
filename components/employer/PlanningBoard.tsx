@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 
 import { EmptyState, Button, PageHeader, Modal } from '../ui';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 interface PlanningCard {
   id: number;
   title: string;
@@ -54,7 +55,7 @@ export default function PlanningBoard() {
   const [flash, setFlash] = useState('');
 
   useEffect(() => {
-    fetch('/api/noisium').then(r => r.json()).then(d => setNoisium(!!d.connected)).catch(() => {});
+    fetch('/api/noisium').then(okJson).then(d => setNoisium(!!d.connected)).catch(() => {});
   }, []);
 
   const publishToNoisium = async (card: PlanningCard) => {
@@ -72,7 +73,7 @@ export default function PlanningBoard() {
 
   useEffect(() => {
     fetch('/api/planning')
-      .then(r => r.json())
+      .then(okJson)
       .then(data => { if (Array.isArray(data)) setCards(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);

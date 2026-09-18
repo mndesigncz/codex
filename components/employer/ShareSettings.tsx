@@ -14,6 +14,7 @@ import {
 } from '@/lib/share';
 import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -50,9 +51,9 @@ export default function ShareSettings() {
   const load = async () => {
     try {
       const [d, c, g] = await Promise.all([
-        fetch('/api/share').then(r => r.json()).catch(() => ({})),
-        fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
-        fetch('/api/guides/categories').then(r => r.json()).catch(() => ({})),
+        fetch('/api/share').then(okJson).catch(() => ({})),
+        fetch('/api/inventory/categories').then(okJson).catch(() => []),
+        fetch('/api/guides/categories').then(okJson).catch(() => ({})),
       ]);
       if (Array.isArray(d?.links)) setLinks(d.links);
       if (d?.theme) setTheme(normalizeTheme(d.theme));

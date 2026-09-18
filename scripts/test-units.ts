@@ -8,8 +8,11 @@ import { sanitizeSvg } from '../lib/svgSanitize.ts';
 import { batchesNeeded, planFor, recipeUnit, availableOf, taskTitleFor, checklistFor } from '../lib/productionPlan.ts';
 import { earnedFor, wagesTotal, MAX_SHIFT_HOURS } from '../lib/wages.ts';
 import { normalizeCurrency, formatMoney, currencySymbol } from '../lib/money.ts';
+import { okJson, okText, apiMessage, statusMessage, ApiError, isOffline } from '../lib/api.ts';
 
 let failed = 0;
+// Testy, co musí doběhnout, než se sáhne na návratový kód.
+const pending: Promise<unknown>[] = [];
 const eq = (name: string, got: unknown, want: unknown) => {
   const a = JSON.stringify(got), b = JSON.stringify(want);
   if (a !== b) { console.error(`✗ ${name}\n    dostal:  ${a}\n    čekáno: ${b}`); failed++; }
@@ -74,8 +77,6 @@ ok('svg: co není SVG, vyhodí chybu', threw);
 let threwBig = false; try { sanitizeSvg('<svg>' + 'a'.repeat(500000) + '</svg>'); } catch { threwBig = true; }
 ok('svg: příliš velký soubor vyhodí chybu', threwBig);
 
-if (failed) { console.error(`\n${failed} test(ů) selhalo.`); process.exit(1); }
-console.log('\nVšechny testy prošly.');
 
 // --- Výroba vlastních produktů: dávky, suroviny, co chybí (lib/productionPlan) ---
 {
@@ -150,3 +151,60 @@ console.log('\nVšechny testy prošly.');
     formatMoney(12500, 'Kč', 'cs-CZ').replace(/\s/g, ' '), '12 500 Kč');
   eq('měna: symbol pro popisek', currencySymbol('EUR', 'cs-CZ'), '€');
 }
+
+
+// --- Odpověď serveru, která není v pořádku ---
+{
+  // `fetch` nepadá na HTTP 500; bez tohohle se chybové tělo uloží jako data.
+  const res = (status: number, body: unknown): any => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+    text: async () => String(body),
+  });
+
+  const run = async () => {
+    eq('api: dobrá odpověď projde', await okJson(res(200, { tasks: [1, 2] })), { tasks: [1, 2] });
+
+    let caught: any = null;
+    try { await okJson(res(500, { error: 'Databáze nedostupná' })); } catch (e) { caught = e; }
+    ok('api: 500 se vyhodí jako chyba', caught instanceof ApiError);
+    eq('api: a nese zprávu ze serveru', caught?.message, 'Databáze nedostupná');
+    eq('api: i se stavem', caught?.status, 500);
+
+    // Chybová odpověď nemusí být JSON — třeba HTML stránka od proxy.
+    caught = null;
+    try { await okJson({ ...res(502, null), json: async () => { throw new Error('not json'); } } as any); }
+    catch (e) { caught = e; }
+    eq('api: nečitelné tělo = obecná věta', caught?.message, statusMessage(502));
+
+    caught = null;
+    try { await okJson(res(403, {})); } catch (e) { caught = e; }
+    eq('api: 403 mluví o oprávnění', caught?.message, 'Na tohle nemáš oprávnění.');
+
+    eq('api: okText vrátí text', await okText(res(200, '<svg/>')), '<svg/>');
+    caught = null;
+    try { await okText(res(404, '')); } catch (e) { caught = e; }
+    eq('api: okText na 404 spadne', caught?.message, 'Tohle už neexistuje.');
+  };
+
+  pending.push(run());
+
+  // Hláška do obrazovky: anglické „Failed to fetch" z prohlížeče nikomu nic neřekne.
+  eq('api: výpadek sítě má českou větu',
+    apiMessage(new TypeError('Failed to fetch'), 'Úkoly se nenačetly.'), 'Úkoly se nenačetly.');
+  eq('api: zpráva ze serveru se ukáže',
+    apiMessage(new ApiError(409, 'Směna už je obsazená.')), 'Směna už je obsazená.');
+  eq('api: neznámý objekt = záložní věta', apiMessage({}, 'Nepovedlo se.'), 'Nepovedlo se.');
+  ok('api: bez odpovědi serveru jsme offline', isOffline(new TypeError('Failed to fetch')));
+  ok('api: s odpovědí serveru offline nejsme', !isOffline(new ApiError(500, 'x')));
+}
+
+
+// Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
+// souboru — všechno pod ní se sice vypsalo, ale do návratového kódu se
+// nepromítlo, takže `npm test` mohl skončit nulou s křížky na obrazovce.
+Promise.all(pending).then(() => {
+  if (failed) { console.error(`\n${failed} test(ů) selhalo.`); process.exit(1); }
+  console.log('\nVšechny testy prošly.');
+});

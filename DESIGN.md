@@ -137,17 +137,22 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a dvanáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a čtrnáct kontrol ze `scripts/check-*.mjs`:
 
-`check-time` · `check-czech` · `check-decimal-inputs` · `check-forms` ·
-`check-generic-copy` · `check-modals` · `check-palette` ·
-`check-silent-load` · `check-test-imports` · `check-transitions` ·
-`check-width-clash` · `check-contrast-classes`
+`check-time` · `check-czech` · `check-decimal-inputs` · `check-fetch-ok` ·
+`check-forms` · `check-generic-copy` · `check-modals` · `check-money` ·
+`check-palette` · `check-silent-load` · `check-test-imports` ·
+`check-transitions` · `check-width-clash` · `check-contrast-classes`
 
 Vizuálně: Playwright přes 61 obrazovek (46 administrace + 15 klient) na
 1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
 a dotykových cílů — vše 0. K tomu sondy na klávesnici, hromadné akce
 a filtry.
+
+**Chyba se ověřuje výpadkem, ne úvahou.** Sonda, která vrátí na vybrané
+GETy 500 (`probe-k15`, `probe-k18`), je jediný způsob, jak zjistit, že se
+obrazovka po odmítnutí serveru přizná. Odpověď 500 se totiž doručí
+**úspěšně** — samotný `catch` ji nikdy neuvidí.
 
 **Prázdná obrazovka není ověřená obrazovka.** Zhruba polovina nálezů
 v téhle aplikaci se ukázala až s daty; když k obrazovce není fixture,
@@ -384,6 +389,20 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   nenačtený, ne „nemáš zaplaceno".
 - **Odhlášení sdíleného zařízení se potvrzuje.** Obsluha nezná heslo
   tabletu; jedno ťuknutí = tablet mimo provoz do příchodu vedení.
+- **Načítá se přes `okJson` z `lib/api`.** `fetch(url).then(r => r.json())`
+  je zakázané — hlídá to `check-fetch-ok`. `okJson` vyhodí chybu i s tím,
+  co server napsal do `error`, takže `catch` na konci řetězu má konečně co
+  ukázat; `apiMessage(e, 'záložní věta')` z toho udělá českou větu a
+  z anglického `Failed to fetch` tu záložní. Pro odpovědi, které nejsou
+  JSON, je `okText`.
+- **Kde se dá ukázat prázdno, musí jít ukázat i chyba.** Karta, která se
+  prostě nevykreslí, když nemá data, vypadá po výpadku jako klidný den.
+  Buď `ErrorState` s „Zkusit znovu", nebo aspoň `note note-wait` s tím,
+  co se nenačetlo.
+- **Panel nesmí zmizet kvůli tomu, co se nenačetlo.** Žádosti o volno se
+  schovávaly, dokud odpověď neřekla „jsi vedoucí" — a po 500 se tím
+  schovaly i s chybou. Rozhodnutí „ukázat se" nesmí viset na datech,
+  která právě selhala.
 
 ## Peníze a součty
 

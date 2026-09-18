@@ -9,6 +9,7 @@ import ShiftReviewCalendar from './ShiftReviewCalendar';
 import EmployeeProfile from './EmployeeProfile';
 import { ProGate } from '../Pro';
 import { clickable } from '@/lib/clickable';
+import { okJson } from '@/lib/api';
 
 interface Standing {
   id: number; name: string; avatar?: string;
@@ -52,7 +53,7 @@ function RewardsViewInner() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const loadShop = useCallback(() =>
-    fetch('/api/rewards/catalog').then(r => r.json()).then(d => {
+    fetch('/api/rewards/catalog').then(okJson).then(d => {
       setCatalog(Array.isArray(d.catalog) ? d.catalog : []);
       setRedemptions(Array.isArray(d.redemptions) ? d.redemptions : []);
     }).catch(() => {}), []);
@@ -95,7 +96,7 @@ function RewardsViewInner() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch('/api/rewards').then(r => r.json()).then(d => {
+    fetch('/api/rewards').then(okJson).then(d => {
       if (d && !d.error) {
         setStandings(Array.isArray(d.standings) ? d.standings : []);
         setLevels(d.levels ?? []);

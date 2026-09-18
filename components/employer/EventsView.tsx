@@ -11,6 +11,7 @@ import { useMoney } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 type Ev = any;
 
@@ -32,10 +33,10 @@ export default function EventsView({ user }: { user: { id?: string } }) {
   const load = async () => {
     try {
       const [ed, td, iv, mb] = await Promise.all([
-        fetch('/api/events').then(r => r.json()).catch(() => ({})),
-        fetch('/api/teams').then(r => r.json()).catch(() => ({})),
-        fetch('/api/inventory').then(r => r.json()).catch(() => []),
-        fetch('/api/menu').then(r => r.json()).catch(() => null),
+        fetch('/api/events').then(okJson).catch(() => ({})),
+        fetch('/api/teams').then(okJson).catch(() => ({})),
+        fetch('/api/inventory').then(okJson).catch(() => []),
+        fetch('/api/menu').then(okJson).catch(() => null),
       ]);
       setEvents(Array.isArray(ed.events) ? ed.events : []);
       setMembers((td.members ?? []).filter((m: any) => m.role !== 'kiosk'));
@@ -62,7 +63,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
     }).catch(() => null);
     if (res?.ok) {
       await load();
-      const d = await fetch('/api/events').then(r => r.json()).catch(() => ({}));
+      const d = await fetch('/api/events').then(okJson).catch(() => ({}));
       const fresh = (d.events ?? []).find((e: Ev) => e.id === id);
       if (fresh) setDetail((cur: Ev) => (cur && cur.id === id ? fresh : cur));
       return true;
@@ -329,7 +330,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
   useEffect(() => {
     if (!e.offsite) return;
     let dead = false;
-    fetch('/api/pos/places').then(r => r.json()).then(d => { if (!dead) setPlaces(d); }).catch(() => {});
+    fetch('/api/pos/places').then(okJson).then(d => { if (!dead) setPlaces(d); }).catch(() => {});
     return () => { dead = true; };
   }, [e.offsite]);
 

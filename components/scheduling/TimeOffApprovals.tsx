@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 
 import { Icon } from '../Icons';
-import { EmptyState, BulkBar, SelectBox, useSelection, runBulk } from '../ui';
+import { EmptyState, ErrorState, BulkBar, SelectBox, useSelection, runBulk } from '../ui';
+import { okJson, apiMessage } from '@/lib/api';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -56,23 +57,28 @@ export default function TimeOffApprovals() {
   const [requests, setRequests] = useState<TimeOffRequestItem[]>([]);
   const [isEmployer, setIsEmployer] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [reloadTick, setReloadTick] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch('/api/timeoff')
-      .then((r) => (r.ok ? r.json() : null))
+      .then(okJson)
       .then((data) => {
-        if (!active || !data) return;
+        if (!active) return;
         setRequests(Array.isArray(data.requests) ? data.requests : []);
         setIsEmployer(Boolean(data.isEmployer));
+        setLoadErr('');
       })
-      .catch(() => {})
+      // Čekající žádost o volno, která po výpadku zmizí, znamená, že ji
+      // vedoucí neschválí — a zaměstnanec si myslí, že ji poslal.
+      .catch((e) => { if (active) setLoadErr(apiMessage(e, 'Žádosti se nenačetly.')); })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadTick]);
 
   const sel = useSelection<number>();
   const [bulkNote, setBulkNote] = useState('');
@@ -138,7 +144,10 @@ export default function TimeOffApprovals() {
     try { await fetch(`/api/timeoff?id=${r.id}`, { method: 'DELETE' }); } catch { /* optimistic */ }
   };
 
-  if (loading || !isEmployer) return null;
+  // `isEmployer` se dozvíme až z odpovědi. Když ta nepřijde, panel se dřív
+  // celý neukázal — vedoucí tak nevěděl ani to, že žádosti neviděl.
+  if (loading) return null;
+  if (!isEmployer && !loadErr) return null;
 
   const pending = requests.filter((r) => r.status === 'pending');
   const resolved = requests.filter((r) => r.status !== 'pending');
@@ -160,7 +169,10 @@ export default function TimeOffApprovals() {
         )}
       </div>
 
-      {requests.length === 0 ? (
+      {loadErr ? (
+        <ErrorState compact title="Žádosti o volno se nenačetly" hint={loadErr}
+          onRetry={() => { setLoading(true); setReloadTick(t => t + 1); }} />
+      ) : requests.length === 0 ? (
         <EmptyState icon="sun" compact title="Žádné žádosti o volno"
           hint="Zaměstnanci je posílají z Moje směny. Schválené dny generátor rozvrhu automaticky vynechá." />
       ) : (

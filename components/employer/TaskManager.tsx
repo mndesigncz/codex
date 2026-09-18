@@ -8,6 +8,7 @@ import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } fro
 import TaskWeekBoard from '../TaskWeekBoard';
 import { PersonLink } from './ProfileLinkProvider';
 import { pragueToday } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 interface Task {
   id: number;
@@ -64,8 +65,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const load = async () => {
     try {
       const [tk, tm] = await Promise.all([
-        fetch('/api/tasks').then(r => r.json()).catch(() => []),
-        fetch('/api/teams').then(r => r.json()).catch(() => ({})),
+        fetch('/api/tasks').then(okJson).catch(() => []),
+        fetch('/api/teams').then(okJson).catch(() => ({})),
       ]);
       setTasks(Array.isArray(tk) ? tk : []);
       setMembers((tm?.members ?? []).filter((m: Member) => m.role === 'employee' || m.role === 'employer'));
