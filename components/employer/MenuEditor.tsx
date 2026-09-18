@@ -218,11 +218,18 @@ export default function MenuEditor() {
 
   const zrusitPin = async () => {
     if (!board || !confirm('Zrušit PIN? Od stánku pak nepůjde označovat vyprodané položky.')) return;
-    await fetch('/api/menu', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: board.id, pin: '' }),
-    });
-    await load();
+    try {
+      const res = await fetch('/api/menu', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: board.id, pin: '' }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      await load();
+    } catch {
+      // Nezrušený PIN je bezpečnostní rozdíl, ne kosmetika: člověk si
+      // myslí, že od stánku už nikdo označovat nemůže, a přitom může.
+      setChyba('PIN se nepodařilo zrušit — pořád platí. Zkus to prosím znovu.');
+    }
   };
 
   /** Vyprodáno se propisuje hned — během akce na to není čas klikat dvakrát. */

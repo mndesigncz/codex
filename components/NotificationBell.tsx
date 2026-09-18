@@ -74,16 +74,28 @@ export default function NotificationBell() {
     onDismiss: () => { if (unreadRef.current) markAllRead(); },
   });
 
+  // Odznak se nuluje až podle odpovědi. Dřív se vynuloval rovnou, takže
+  // po nepovedeném zápisu tvrdil „přečteno" a server měl pořád nepřečteno;
+  // další dotaz to sice srovnal, ale mezitím číslo poskočilo tam a zpátky.
   const markAllRead = async () => {
-    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
-    setUnread(0);
+    try {
+      const res = await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!res.ok) return;
+      setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnread(0);
+    } catch { /* příště to srovná pravidelné načtení */ }
   };
 
   const openNotif = async (n: Notif) => {
-    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) });
-    setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
-    setUnread(u => Math.max(0, u - (n.is_read ? 0 : 1)));
+    try {
+      const res = await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) });
+      if (res.ok) {
+        setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+        setUnread(u => Math.max(0, u - (n.is_read ? 0 : 1)));
+      }
+    } catch { /* příště to srovná pravidelné načtení */ }
+    // Na odkaz se jde tak jako tak — kvůli neoznačenému přečtení nemá smysl
+    // člověka zdržovat.
     if (n.link && n.link !== '/') window.location.href = n.link;
   };
 

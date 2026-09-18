@@ -422,13 +422,20 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     }
     seededRef.current = true;
     (async () => {
+      // Bez kontroly se mlčky založila jen část výchozích typů a rozvrh
+      // pak nabízel neúplnou nabídku, aniž by kdo tušil proč.
+      let selhalo = 0;
       for (const t of DEFAULT_TYPES) {
-        await fetch('/api/shift-types', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(t),
-        });
+        try {
+          const res = await fetch('/api/shift-types', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(t),
+          });
+          if (!res.ok) selhalo += 1;
+        } catch { selhalo += 1; }
       }
+      if (selhalo > 0) setBoardError('Výchozí typy směn se nepodařilo založit celé. Doplň je v záložce Typy směn.');
       await reloadTypes();
     })();
   }, [tab, loading, shiftTypes.length]);
