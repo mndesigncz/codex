@@ -107,3 +107,7 @@ jobs:
       # ho k poli nepřipojí. Ráčna: nesmí přibývat.
       - name: Popisky polí
         run: node scripts/check-labels.mjs
+      # Bez vlastní stránky ukáže Next.js anglické „404 This page could not
+      # be found." — a dojde na ni zákazník se starým sdíleným odkazem.
+      - name: Slepé uličky
+        run: node scripts/check-dead-ends.mjs

@@ -137,16 +137,18 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a osmnáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a devatenáct kontrol ze `scripts/check-*.mjs`:
 
 `check-contrast-classes` · `check-czech` · `check-dark-classes` ·
+`check-dead-ends` ·
 `check-decimal-inputs` · `check-email` · `check-fetch-ok` · `check-forms` ·
 `check-generic-copy` · `check-ics` · `check-modals` · `check-money` ·
 `check-labels` · `check-palette` · `check-silent-load` ·
 `check-test-imports` · `check-time` · `check-transitions` ·
 `check-width-clash`
 
-Vizuálně: Playwright přes 61 obrazovek (46 administrace + 15 klient) na
+Vizuálně: Playwright přes 62 obrazovek (46 administrace, 15 klient,
+sdílený odkaz) na
 1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
 a dotykových cílů — vše 0. K tomu sondy na klávesnici, hromadné akce
 a filtry.
@@ -460,6 +462,23 @@ je horší než žádné tlačítko — člověk si myslí, že směnu má zapsa
   vlastnost na dvě. Ošetřuje se `\`, `;`, `,` a nový řádek.
 - **Konec před začátkem se vynechá**, událost bez data taky — soubor
   zůstane platný i s pokaženým vstupem.
+
+## Slepé uličky
+
+Adresa, která přestala platit, a chyba za běhu jsou taky obrazovky — jen
+je nikdo nenavrhl, dokud na ně někdo nedošel.
+
+- **Aplikace mluví česky i když padá.** Bez vlastního `not-found.tsx`
+  a `error.tsx` ukáže Next.js svoji anglickou obrazovku. Hlídá
+  `check-dead-ends`.
+- **Nesvaluj to na člověka.** „Neplatný odkaz" zní jako jeho chyba; odkaz
+  přestal platit. Sdílené odkazy na nabídku se dají vypnout a vystavit
+  znovu, a lidé je mají na letácích s QR a v záložkách.
+- **Vždycky nabídni, kam jít dál.** Slepá ulička bez východu je slepá
+  ulička.
+- **`global-error.tsx` nesmí spoléhat na aplikaci.** Když spadne kořenové
+  rozvržení, nemusí být načtené ani CSS — kreslí si `<html>`, `<body>`
+  i styly sama.
 
 ## Pokrytí kontroly je součást kontroly
 
