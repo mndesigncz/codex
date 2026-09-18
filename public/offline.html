@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nejsi připojený · Managero</title>
+<!--
+  Stránka, kterou obsluha uvidí, když zařízení ztratí spojení a stránka
+  se obnoví — na tabletu za barem i na telefonu v ruce.
+
+  Všechno je tu natvrdo a v jednom souboru schválně: v tu chvíli nejde
+  stáhnout ani styl, ani písmo. Kdyby si stránka o cokoliv říkala ven,
+  skončila by prázdná — a prázdná obrazovka je horší než dinosaurus
+  z prohlížeče, protože nevysvětlí vůbec nic.
+-->
+<style>
+  :root {
+    --bg: #F1F3ED;
+    --ink: #16181A;
+    --lime: #C8F542;
+    --surface: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161A; --ink: #EDF2E4; --surface: #17191C; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px calc(16px + env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing: antialiased;
+  }
+  .karta {
+    width: 100%; max-width: 30rem;
+    background: var(--surface);
+    border: 1px solid rgba(127,127,127,0.16);
+    border-radius: 28px;
+    padding: 32px 28px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 18px 48px -20px rgba(0,0,0,0.25);
+  }
+  .znak {
+    width: 56px; height: 56px; border-radius: 18px;
+    background: var(--lime); color: #16181A;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  h1 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 10px; }
+  p { margin: 0 0 14px; font-size: 0.9375rem; line-height: 1.55; opacity: 0.72; }
+  ul { margin: 0 0 22px; padding-left: 1.1rem; font-size: 0.9375rem; line-height: 1.6; opacity: 0.72; }
+  li { margin-bottom: 4px; }
+  button {
+    width: 100%; min-height: 48px;
+    border: 0; border-radius: 999px;
+    background: var(--lime); color: #16181A;
+    font: inherit; font-size: 0.9375rem; font-weight: 600;
+    cursor: pointer;
+  }
+  button:active { transform: scale(0.98); }
+  .stav {
+    margin-top: 14px; text-align: center;
+    font-size: 0.8125rem; opacity: 0.55; min-height: 1.2em;
+  }
+</style>
+</head>
+<body>
+  <main class="karta">
+    <div class="znak" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M4.5 10.5a11 11 0 0 1 4.3-2.6" />
+        <path d="M19.5 10.5a11 11 0 0 0-3.6-2.4" />
+        <path d="M8 14a6 6 0 0 1 8 0" />
+        <path d="M12 18.5h.01" />
+        <path d="M3 3l18 18" />
+      </svg>
+    </div>
+
+    <h1>Nejsi připojený</h1>
+    <p>Spojení se ztratilo, takže se Managero nedá načíst. Není to chyba aplikace ani tvoje.</p>
+    <ul>
+      <li>Nic, co jsi odeslal, se neztratilo.</li>
+      <li>Rozepsané zůstává uložené v tomhle zařízení.</li>
+      <li>Jakmile se wifi vrátí, pokračuješ tam, kde jsi skončil.</li>
+    </ul>
+
+    <button type="button" id="znovu">Zkusit znovu</button>
+    <p class="stav" id="stav" role="status" aria-live="polite"></p>
+  </main>
+
+<script>
+  var stav = document.getElementById('stav');
+  var tlacitko = document.getElementById('znovu');
+
+  function zkusit() {
+    // Tlačítko nesmí tvrdit, že se něco děje, když se neděje nic.
+    // Dokud prohlížeč hlásí, že je offline, obnovení stránky jen znovu
+    // spadne na tuhle obrazovku a vypadá to, že tlačítko nefunguje.
+    if (navigator.onLine === false) {
+      stav.textContent = 'Pořád bez signálu. Zkusím to sám, jakmile se vrátí.';
+      return;
+    }
+    stav.textContent = 'Načítám…';
+    location.reload();
+  }
+
+  tlacitko.addEventListener('click', zkusit);
+
+  // Návrat sítě je ta nejlepší chvíle na obnovení — obsluha u baru
+  // nemá co koukat na tlačítko a čekat.
+  window.addEventListener('online', function () {
+    stav.textContent = 'Spojení je zpátky, načítám…';
+    location.reload();
+  });
+
+  if (navigator.onLine === false) {
+    stav.textContent = 'Čekám, až se spojení vrátí.';
+  }
+</script>
+</body>
+</html>
