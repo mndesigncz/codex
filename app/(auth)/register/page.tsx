@@ -1,10 +1,29 @@
 'use client';
 
+// Založení podniku — a rovnou s ním volba tarifu.
+//
+// Dřív vedla jediná cesta do pokladny přes Nastavení uvnitř aplikace:
+// `/api/billing/checkout` chce přihlášeného provozovatele, takže kdo si
+// chtěl předplatné aktivovat hned při registraci, narazil na 401. Z prodejní
+// stránky se do Stripe nedalo dostat vůbec.
+//
+// Teď si tarif vybere ještě před formulářem (z ceníku se nese v adrese),
+// a jakmile je účet založený a člověk přihlášený, pokladna se otevře sama.
+// Kód týmu je přitom na obrazovce za ní — kdo kartu zadávat nechce, okno
+// zavře a nic neztratí.
+
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogoMark } from '@/components/Icons';
+import { LogoMark, Icon } from '@/components/Icons';
+import { PLAN_NAMES, PRICES, TRIAL_DAYS, priceLabel, type Interval, type PlanId } from '@/lib/plan';
+import { formatMoney } from '@/lib/money';
+
+// Pokladna se stahuje, až když má opravdu vyskočit. Kdo zakládá podnik na
+// tarifu Zdarma, nemá důvod táhnout Stripe.js.
+const CheckoutModal = dynamic(() => import('@/components/CheckoutModal'), { ssr: false });
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -19,13 +38,24 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [ref, setRef] = useState('');
+  const [plan, setPlan] = useState<PlanId>('pro');
+  const [interval, setIntervalPlanu] = useState<Interval>('month');
+  const [pokladna, setPokladna] = useState(false);
+  const [zaplaceno, setZaplaceno] = useState(false);
+  const [prihlaseniSelhalo, setPrihlaseniSelhalo] = useState(false);
   const router = useRouter();
   // Affiliate odkaz /register?ref=KÓD — kód si pamatujeme i přes obnovení stránky.
   useEffect(() => {
     try {
-      const q = new URLSearchParams(window.location.search).get('ref');
-      if (q) { localStorage.setItem('managero-ref', q); setRef(q); }
+      const q = new URLSearchParams(window.location.search);
+      const r = q.get('ref');
+      if (r) { localStorage.setItem('managero-ref', r); setRef(r); }
       else setRef(localStorage.getItem('managero-ref') ?? '');
+      // Tarif z ceníku. Neznámou hodnotu ignorujeme — adresa je od
+      // návštěvníka a nemá právo nastavit něco, co neexistuje.
+      const t = q.get('plan');
+      if (t === 'free' || t === 'pro' || t === 'max') setPlan(t);
+      if (q.get('interval') === 'year') setIntervalPlanu('year');
     } catch { /* ignore */ }
   }, []);
 
@@ -44,17 +74,26 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Chyba při registraci.'); setIsLoading(false); return; }
-      // Show the join code, then sign in automatically
+      // Kód týmu se ukáže vždycky; přihlášení musí proběhnout dřív, než
+      // se otevře pokladna — bez sezení by `/api/billing/checkout` vrátil 401.
       setJoinCode(data.joinCode);
-      await signIn('credentials', { email, password, redirect: false });
+      const prihlaseni = await signIn('credentials', { email, password, redirect: false });
+      // Pokladna se otevře jen s platným sezením. Bez něj by `/api/billing/checkout`
+      // vrátil 401 a člověk by koukal na chybu v okně, které si nevyžádal —
+      // hned potom, co mu aplikace pogratulovala k založení podniku.
+      if (plan !== 'free' && prihlaseni?.ok) setPokladna(true);
+      else if (plan !== 'free') setPrihlaseniSelhalo(true);
     } catch {
       setError('Chyba serveru. Zkuste to prosím znovu.');
       setIsLoading(false);
     }
   };
 
-  // Success screen — reveal the team join code
+  // Po registraci: kód týmu, a nad ním pokladna, pokud si člověk vybral
+  // placený tarif. Pořadí je schválně takové — kód nesmí zmizet jen proto,
+  // že někdo zavřel okno s kartou.
   if (joinCode) {
+    const placeny = plan !== 'free';
     return (
       <div className="min-h-[100dvh] flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center">
@@ -63,19 +102,58 @@ export default function RegisterPage() {
             <div className="text-4xl mb-3">🎉</div>
             <h1 className="text-2xl font-bold tracking-tight text-[#16181A] mb-2">Podnik vytvořen!</h1>
             <p className="text-black/55 text-sm mb-2">Sdílejte tento kód se zaměstnanci — připojí se do vašeho týmu.</p>
-            <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6">Prvních 30 dní máte všechny funkce Pro zdarma.</p>
+
+            {zaplaceno ? (
+              <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6 inline-flex items-center gap-1.5">
+                <Icon name="check" size={13} className="shrink-0" />
+                {PLAN_NAMES[plan]} je aktivní. Prvních {TRIAL_DAYS} dní zdarma, pak {priceLabel(plan as 'pro' | 'max', interval)}.
+              </p>
+            ) : (
+              <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6">
+                Prvních {TRIAL_DAYS} dní máte všechny funkce Pro zdarma.
+              </p>
+            )}
+
             <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-6 mb-6">
               <p className="text-xs uppercase tracking-[0.2em] text-black/45 mb-2">Kód týmu</p>
               <p className="text-4xl font-bold tracking-[0.3em] text-[#5B7A08]">{joinCode}</p>
             </div>
+
             <button
               onClick={() => { router.push('/'); router.refresh(); }}
               className="w-full rounded-full bg-[#C8F542] text-black font-semibold py-3 hover:brightness-110 transition text-sm"
             >
               Přejít do aplikace →
             </button>
+
+            {/* Kdo pokladnu zavřel, se k ní dostane zpátky bez hledání
+                v Nastavení. Bez tohohle odkazu by zavřené okno znamenalo
+                „tak snad někdy jindy". */}
+            {placeny && !zaplaceno && prihlaseniSelhalo && (
+              <p className="mt-3 text-xs text-wait-ink">
+                Podnik je založený, ale přihlášení neproběhlo. Přihlas se a tarif {PLAN_NAMES[plan]} aktivuj v Nastavení → Předplatné.
+              </p>
+            )}
+            {placeny && !zaplaceno && !prihlaseniSelhalo && (
+              <button
+                onClick={() => setPokladna(true)}
+                className="tap-target-sm mt-3 w-full text-sm font-medium text-black/50 hover:text-[#16181A] transition"
+              >
+                Aktivovat {PLAN_NAMES[plan]} kartou
+              </button>
+            )}
           </div>
         </div>
+
+        {pokladna && placeny && (
+          <CheckoutModal
+            plan={plan as 'pro' | 'max'}
+            interval={interval}
+            trial
+            onClose={() => setPokladna(false)}
+            onDone={() => { setZaplaceno(true); setPokladna(false); }}
+          />
+        )}
       </div>
     );
   }
@@ -90,6 +168,38 @@ export default function RegisterPage() {
         </div>
 
         <div className="glass-card p-8">
+          {/* Tarif se volí tady, ne až někde v Nastavení po týdnu používání.
+              Kdo přišel z ceníku, má vybráno; kdo přišel z hlavičky, může
+              přepnout. Karta se zadává až po založení účtu. */}
+          <fieldset className="mb-6">
+            <legend className="block text-xs uppercase tracking-wider text-black/45 mb-2.5">Tarif na začátek</legend>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(['free', 'pro', 'max'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setPlan(t)} aria-pressed={plan === t}
+                  className={`tap-target rounded-2xl px-2 py-2.5 text-center transition ${
+                    plan === t ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/65 hover:text-[#16181A]'
+                  }`}>
+                  <span className="block text-sm font-bold">{PLAN_NAMES[t]}</span>
+                  <span className={`block text-[11px] ${plan === t ? 'text-white/60' : 'text-black/45'}`}>
+                    {t === 'free' ? 'do 3 lidí' : formatMoney(PRICES[t][interval === 'year' ? 'year' : 'month'], 'CZK')}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {plan !== 'free' && (
+              <div className="mt-2.5 flex items-center justify-between gap-3">
+                <div className="flex gap-1 glass rounded-full p-1">
+                  {(['month', 'year'] as const).map(i => (
+                    <button key={i} type="button" onClick={() => setIntervalPlanu(i)} aria-pressed={interval === i}
+                      className={`tap-target-sm rounded-full px-3 py-1 text-xs font-semibold transition ${interval === i ? 'seg-on' : 'seg-off'}`}>
+                      {i === 'month' ? 'Měsíčně' : 'Ročně'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-black/45 text-right">{TRIAL_DAYS} dní zdarma,<br />pak {priceLabel(plan, interval)}</p>
+              </div>
+            )}
+          </fieldset>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="reg-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>

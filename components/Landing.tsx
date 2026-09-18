@@ -82,7 +82,7 @@ const DAY: { time: string; title: string; text: string; card: React.ReactNode }[
 ];
 
 const FAQ: { q: string; a: string }[] = [
-  { q: 'Potřebuju k vyzkoušení kartu?', a: `Ne. Registrace je bez karty a prvních ${TRIAL_DAYS} dní máte všechny funkce. Malý tým může zůstat na tarifu Zdarma napořád.` },
+  { q: 'Potřebuju k vyzkoušení kartu?', a: `Nemusíte. Při zakládání podniku si vyberete: buď kartu zadáte rovnou a po ${TRIAL_DAYS} dnech se předplatné samo spustí, nebo ji přeskočíte a zůstanete na tarifu Zdarma. Malý tým na něm může zůstat napořád.` },
   { q: 'Jak se připojí zaměstnanci?', a: 'Jedním kódem nebo pozvánkou e-mailem. Připojí se z telefonu za minutu a hned vidí svůj rozvrh.' },
   { q: 'Funguje to na telefonu?', a: 'Ano — celá aplikace je stavěná pro telefon, tablet i počítač. Na tablet za barem je zvláštní kioskový režim s velkými tlačítky.' },
   { q: 'Máme ceny v eurech.', a: 'Měnu podniku si zvolíte a všechno — menu, uzávěrky, přehledy — počítá v ní.' },
@@ -145,7 +145,7 @@ export default function Landing() {
                 Co všechno umí?
               </a>
             </div>
-            <p className="mt-4 text-xs text-black/45">Bez karty. Tým se připojí jedním kódem. Malý podnik zdarma napořád.</p>
+            <p className="mt-4 text-xs text-black/45">Kartu zadáš hned, nebo začneš bez ní. Tým se připojí jedním kódem, malý podnik zdarma napořád.</p>
           </div>
 
           <div className="relative rise-in" style={{ animationDelay: '120ms' }}>
@@ -177,7 +177,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               ['1 aplikace', 'místo rozvrhu v excelu, skladu v sešitě a skupinového chatu jinde'],
-              [`${TRIAL_DAYS} dní zdarma`, 'všechny funkce, bez karty — a malý tým zdarma napořád'],
+              [`${TRIAL_DAYS} dní zdarma`, 'všechny funkce; kartu můžeš zadat hned, nebo vůbec — malý tým zdarma napořád'],
               ['1 kód', 'tolik stačí, aby se připojil celý tým i s rozvrhem v telefonu'],
             ].map(([n, t]) => (
               <div key={n} className="lgx rounded-3xl px-6 py-5">
