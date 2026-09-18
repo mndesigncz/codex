@@ -182,7 +182,12 @@ export default function EmployeeLayout({ user }: Props) {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Stejné odsazení jako u vedení — na 320px ho název stránky potřebuje. */}
         <header className="px-4 sm:px-6 pt-5 pb-1 flex items-center gap-2 sm:gap-3 flex-shrink-0">
-          <button onClick={() => setSidebarOpen(v => !v)} className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+          {/* Ikonové tlačítko bez textu je pro odečítač obrazovky prostě
+              „tlačítko". Tenhle přepínač je na každé obrazovce aplikace. */}
+          <button onClick={() => setSidebarOpen(v => !v)} type="button"
+            aria-label={sidebarOpen ? 'Zúžit boční pás' : 'Rozbalit boční pás'}
+            aria-expanded={sidebarOpen}
+            className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="menu" size={20} />
           </button>
           <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>

@@ -137,13 +137,14 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a sedmnáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a osmnáct kontrol ze `scripts/check-*.mjs`:
 
 `check-contrast-classes` · `check-czech` · `check-dark-classes` ·
 `check-decimal-inputs` · `check-email` · `check-fetch-ok` · `check-forms` ·
 `check-generic-copy` · `check-ics` · `check-modals` · `check-money` ·
-`check-palette` · `check-silent-load` · `check-test-imports` ·
-`check-time` · `check-transitions` · `check-width-clash`
+`check-labels` · `check-palette` · `check-silent-load` ·
+`check-test-imports` · `check-time` · `check-transitions` ·
+`check-width-clash`
 
 Vizuálně: Playwright přes 61 obrazovek (46 administrace + 15 klient) na
 1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
@@ -459,6 +460,22 @@ je horší než žádné tlačítko — člověk si myslí, že směnu má zapsa
   vlastnost na dvě. Ošetřuje se `\`, `;`, `,` a nový řádek.
 - **Konec před začátkem se vynechá**, událost bez data taky — soubor
   zůstane platný i s pokaženým vstupem.
+
+## Přístupné jméno
+
+Klávesnice je v samostatné kapitole; tohle je to druhé, co odečítač
+obrazovky potřebuje — vědět, co ten prvek **je**.
+
+- **Ikonové tlačítko bez textu potřebuje `aria-label`.** Jinak je to prostě
+  „tlačítko". Přepínač bočního pásu ho neměl a je na každé obrazovce.
+- **Placeholder není popisek.** Při psaní zmizí a odečítače ho čtou
+  nespolehlivě. Pole potřebuje jméno, které zůstane.
+- **`<label>` bez `htmlFor` popisek není.** Vizuálně vypadá stejně,
+  programově není nic. Odolnější než dvojice `htmlFor`/`id` je vložit pole
+  dovnitř `<label>` — svázání pak nerozpadne přejmenování `id`. Hlídá
+  `check-labels` jako ráčna.
+- **Měří se v prohlížeči.** `probe-a11y` počítá přístupné jméno tak, jak ho
+  skládá odečítač, přes všechny obrazovky.
 
 ## Tmavý režim
 
