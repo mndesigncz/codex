@@ -409,7 +409,7 @@ export function WhoIsWorking() {
         <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">Kdo teď pracuje</h2>
         <button
           onClick={() => setAdding(v => !v)}
-          className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition"
+          className="tap-target inline-flex items-center gap-1.5 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition"
         >
           <Icon name="plus" size={15} /> {adding ? 'Zavřít' : 'Další příchod'}
         </button>
@@ -448,7 +448,7 @@ export function WhoIsWorking() {
               <button
                 onClick={() => punch(m)}
                 title={`Odchod – ${m.name}`}
-                className="absolute top-3 right-3 h-9 w-9 grid place-items-center rounded-full bg-white/70 border border-black/10 text-black/40 hover:text-red-600 hover:border-red-500/30 transition"
+                className="tap-target absolute top-3 right-3 h-9 w-9 grid place-items-center rounded-full bg-white/70 border border-black/10 text-black/40 hover:text-red-600 hover:border-red-500/30 transition"
               >
                 <Icon name="logout" size={16} />
               </button>

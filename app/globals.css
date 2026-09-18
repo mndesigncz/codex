@@ -829,3 +829,44 @@ input[type='search']::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* ---------- Kiosek: tablet za barem, ne monitor na stole ----------
+   Kiosk přebírá komponenty navržené pro myš u monitoru na půl metru.
+   Jenže u baru se čte vestoje, na délku paže, mezi dvěma hosty a často
+   jednou rukou, protože ta druhá drží konvici. Sonda naměřila na sedmi
+   záložkách 27 dotykových cílů pod 44 px a 59 textů pod 14 px.
+
+   Měřítko se nastavuje tady, na povrchu, ne po jednotlivých komponentách:
+   kiosk sdílí Sklad, Uzávěrku, Návody i Postupy s aplikací pro vedení
+   a ta má u monitoru svoje stupně v pořádku. Jeden obal, jedno pravidlo.
+
+   Mění se jen velikost písma a dotyková plocha — ne rozvržení. Proto se
+   nesahá na `padding` ani na `width`: řádek, který se dnes vejde, se
+   vejde i zítra. */
+.kiosk-surface .text-\[11px\] { font-size: 14px; line-height: 1.35; }
+.kiosk-surface .text-\[12px\],
+.kiosk-surface .text-xs { font-size: 14.5px; line-height: 1.4; }
+.kiosk-surface .text-\[13px\],
+.kiosk-surface .text-sm { font-size: 15.5px; }
+/* Odznak nese stav („Čeká na schválení", „Výroba"), ne ozdobu. */
+.kiosk-surface .chip-sm { font-size: 14px; padding: 0.25rem 0.625rem; }
+/* Popisky polí v uzávěrce — podle nich se píšou peníze do kasy. */
+.kiosk-surface .t-meta { font-size: 14.5px; }
+.kiosk-surface .t-label,
+.kiosk-surface .field-label { font-size: 14px; letter-spacing: 0.06em; }
+
+/* Hustý seznam na kiosku neexistuje: 36px je pro myš, ne pro prst.
+   ::before plochu jen rozšíří, rozměr prvku nemění. */
+.kiosk-surface .tap-target-sm::before { width: max(100%, 44px); height: max(100%, 44px); }
+/* Pilulky filtrů a pole hledání končily na 42–43 px. Chybějící dva pixely
+   nikdo nevidí, ale prst je pozná. */
+/* Malé tlačítko (2,25rem) je na tabletu pořád tlačítko — jen menší cíl.
+   Nezvětšuje se rozměr, jen dotyková plocha, aby se rozvržení nehnulo. */
+.kiosk-surface .btn-sm, .kiosk-surface .h-9 { position: relative; }
+.kiosk-surface .btn-sm::before, .kiosk-surface .h-9::before {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+}
+.kiosk-surface .field { min-height: 44px; }
+.kiosk-surface .seg-on,
+.kiosk-surface .seg-off { min-height: 44px; }

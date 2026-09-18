@@ -440,6 +440,25 @@ je horší než žádné tlačítko — člověk si myslí, že směnu má zapsa
 - **Konec před začátkem se vynechá**, událost bez data taky — soubor
   zůstane platný i s pokaženým vstupem.
 
+## Kiosk: tablet za barem, ne monitor na stole
+
+Kiosk sdílí Sklad, Uzávěrku, Návody i Postupy s aplikací pro vedení. Ta má
+u monitoru na půl metru svoje stupně v pořádku — u baru se ale čte vestoje,
+na délku paže, mezi dvěma hosty a často jednou rukou.
+
+- **Měřítko se nastavuje na povrchu, ne po komponentách.** Obal
+  `.kiosk-surface` zvedá stupně písma a dotykové plochy pro celý kiosk;
+  jedno pravidlo místo dvaceti sedmi záplat.
+- **Na kiosku není nic pod 14 px a žádný cíl pod 44 px.** Měří se sondou
+  v prohlížeči (`probe-k23`), ne odhadem ze zdroje — `tap-target` rozšiřuje
+  plochu přes `::before`, takže samotný `getBoundingClientRect` lže.
+- **Mění se velikost, ne rozvržení.** Nesahá se na `padding` ani `width`;
+  dotyková plocha roste přes `::before`, které rozměr prvku nemění. Ověřuje
+  se to porovnáním s výchozím stavem: přeteklo-li něco i bez úpravy,
+  není to její vina.
+- **`tap-target-sm` (36 px) na kiosku neplatí.** Hustý seznam pro myš,
+  ne pro prst; uvnitř kiosku se roztahuje na 44.
+
 ## Sdílený tablet a identita
 
 Tablet za barem nepatří nikomu. Všechno, co se na něm odklikne, přesto
