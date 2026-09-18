@@ -23,6 +23,7 @@ import {
 import { dbTimeHM, dbTimeDayHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { openPrint, esc } from '@/lib/printDoc';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -178,6 +179,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
       <div ref={modal.ref} {...modal.dialogProps}
         className="modal-sheet w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[94vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={modal.guard} />
 
         {/* Hlavička drží datum a rozdíl pořád na očích, i když se scrolluje. */}
         <div className="dock-strong shrink-0 px-5 sm:px-6 py-4 flex items-start justify-between gap-3 border-b border-black/[0.07]">
@@ -198,7 +200,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </span>
             )}
-            <button onClick={onClose} aria-label="Zavřít"
+            <button onClick={modal.guard.attemptClose} aria-label="Zavřít"
               className="tap-target h-9 w-9 flex items-center justify-center rounded-full text-black/40 hover:text-[#16181A] hover:bg-black/[0.06] transition-colors">
               <Icon name="close" size={17} />
             </button>

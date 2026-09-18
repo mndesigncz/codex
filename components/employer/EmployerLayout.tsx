@@ -39,6 +39,7 @@ import { ProfileLinkProvider } from './ProfileLinkProvider';
 import { usePlan, MaxGate } from '../Pro';
 import { czDays } from '@/lib/plan';
 import { useModal } from '@/lib/useModal';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
@@ -419,6 +420,7 @@ export default function EmployerLayout({ user }: Props) {
       {receiptsOpen && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setReceiptsOpen(false)}>
           <div ref={receiptsModal.ref} {...receiptsModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <DiscardGuard guard={receiptsModal.guard} />
             <div className="flex items-center justify-between gap-3 mb-3">
               <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky

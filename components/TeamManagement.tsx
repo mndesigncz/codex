@@ -14,6 +14,7 @@ import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from './ui/DiscardGuard';
 
 interface Member {
   id: number;
@@ -975,6 +976,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           onClick={() => !removing && setRemoveTarget(null)}>
           <div ref={removeModal.ref} {...removeModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin"
             onClick={e => e.stopPropagation()}>
+            <DiscardGuard guard={removeModal.guard} />
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">
                 <Icon name="warning" size={20} />

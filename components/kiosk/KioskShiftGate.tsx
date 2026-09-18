@@ -6,6 +6,7 @@ import { Avatar, EmptyState, ErrorState, Modal } from '../ui';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { nextActiveId, IDLE_MS } from '@/lib/kioskIdentity';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 export interface RosterMember {
   id: number;
@@ -573,6 +574,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={m.guard} />
         <Avatar emoji={member.avatar} size="xl" ring={false} />
         <h2 className="t-section mt-2">{member.name}</h2>
         <p className="text-sm text-black/50 mt-1">

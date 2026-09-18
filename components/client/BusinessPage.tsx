@@ -16,6 +16,7 @@ import { useModal } from '@/lib/useModal';
 import { formatMoney, currencySymbol } from '@/lib/money';
 import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -786,6 +787,7 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev => ev.stopPropagation()}>
+        <DiscardGuard guard={m.guard} />
         {photos.length > 0 && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photos[0]} alt="" className="w-full h-44 sm:h-52 object-cover rounded-t-3xl" />
@@ -798,7 +800,7 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
                 {czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}${e.end_time ? `–${e.end_time}` : ''}` : ''}
               </p>
             </div>
-            <button onClick={onClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+            <button onClick={m.guard.attemptClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
           </div>
 
           {place && (

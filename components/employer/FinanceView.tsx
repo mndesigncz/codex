@@ -15,6 +15,7 @@ import FinanceAdvice from './FinanceAdvice';
 import { PageHeader, Button , SearchField } from '../ui';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -430,6 +431,7 @@ export default function FinanceView() {
       {detail && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setDetail(null)}>
           <div ref={detailModal.ref} {...detailModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-3 scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <DiscardGuard guard={detailModal.guard} />
             <div className="flex items-center justify-between gap-3">
               <h3 className="t-card flex items-center gap-2">
                 <Icon name="receipt" size={20} className="text-[#5B7A08]" /> {detail.label}
@@ -482,9 +484,10 @@ function ExportDialog({ month, onClose, onExport }: {
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div ref={em.ref} {...em.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={em.guard} />
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-bold tracking-tight">Export pro účetní</h3>
-          <button onClick={onClose} aria-label="Zavřít" className="tap-target rounded-full w-9 h-9 grid place-items-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
+          <button onClick={em.guard.attemptClose} aria-label="Zavřít" className="tap-target rounded-full w-9 h-9 grid place-items-center glass text-black/50 hover:text-black"><Icon name="close" size={15} /></button>
         </div>
         <p className="text-sm text-black/55">Vyber období a co má být v souboru. Stáhne se jeden soubor CSV, který otevře Excel i účetní program.</p>
         <div className="grid grid-cols-2 gap-3">

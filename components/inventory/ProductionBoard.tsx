@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 export interface ToMake {
   taskId: number; title: string; priority: string; status: string;
@@ -61,12 +62,13 @@ export function ProduceModal({ entry, onClose, onDone }: { entry: ToMake; onClos
     <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
         className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
+        <DiscardGuard guard={m.guard} />
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="t-card truncate">Vyrobeno: {entry.item.name}</h3>
             <p className="t-meta">Naskladní se dávka a suroviny se odepíšou.</p>
           </div>
-          <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={m.guard.attemptClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="well p-4 flex items-center justify-between gap-3">

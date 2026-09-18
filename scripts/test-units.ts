@@ -15,6 +15,7 @@ import { recipeCost, ingredientCost, marginPct, costDecimals } from '../lib/reci
 import { printHtml, esc as escHtml } from '../lib/printDoc.ts';
 import { escHtml as escMail, usingSandboxSender } from '../lib/email.ts';
 import { formatCost } from '../lib/money.ts';
+import { reakceNaZavreni, jePsanePole, jeRozepsano } from '../lib/modalClose.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -398,6 +399,40 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   process.env.EMAIL_FROM = '   ';
   ok('e-mail: samá mezera se nepočítá', usingSandboxSender());
   if (puvodni === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = puvodni;
+}
+
+// —— Zavírání oken ——————————————————————————————————————————————
+{
+  // Prázdné okno se zavře, ať se o to uživatel pokusí jakkoli.
+  for (const zpusob of ['uklepnuti', 'zavrit', 'zahodit'] as const)
+    eq(`okno: prázdné se zavře (${zpusob})`, reakceNaZavreni({ rozepsano: false, ptameSe: false, zpusob }), 'zavrit');
+
+  // Rozepsané okno se na uklepnutí a na křížek zeptá.
+  eq('okno: Escape u rozepsaného se zeptá', reakceNaZavreni({ rozepsano: true, ptameSe: false, zpusob: 'uklepnuti' }), 'zeptat se');
+  eq('okno: křížek u rozepsaného se zeptá', reakceNaZavreni({ rozepsano: true, ptameSe: false, zpusob: 'zavrit' }), 'zeptat se');
+  // Na tlačítku Zrušit je napsané, co dělá. Ptát se podruhé je práce navíc.
+  eq('okno: Zrušit se neptá', reakceNaZavreni({ rozepsano: true, ptameSe: false, zpusob: 'zahodit' }), 'zavrit');
+
+  // Druhý Escape nad otázkou nesmí zahodit to, na co se okno právě ptá.
+  eq('okno: Escape nad otázkou vrací k úpravám', reakceNaZavreni({ rozepsano: true, ptameSe: true, zpusob: 'uklepnuti' }), 'zpet k upravam');
+  eq('okno: křížek nad otázkou taky', reakceNaZavreni({ rozepsano: true, ptameSe: true, zpusob: 'zavrit' }), 'zpet k upravam');
+  eq('okno: Zahodit nad otázkou zavře', reakceNaZavreni({ rozepsano: true, ptameSe: true, zpusob: 'zahodit' }), 'zavrit');
+
+  // Co se počítá jako psaný text.
+  ok('okno: textarea je psané pole', jePsanePole('TEXTAREA'));
+  ok('okno: input bez typu taky', jePsanePole('input', ''));
+  ok('okno: input type=text', jePsanePole('INPUT', 'text'));
+  ok('okno: input type=number', jePsanePole('INPUT', 'number'));
+  // Hledání je filtr, ne obsah — a zaškrtávátko se ukládá hned při kliknutí.
+  ok('okno: hledání se nepočítá', !jePsanePole('INPUT', 'search'));
+  ok('okno: zaškrtávátko se nepočítá', !jePsanePole('INPUT', 'checkbox'));
+  ok('okno: přepínač se nepočítá', !jePsanePole('INPUT', 'radio'));
+  ok('okno: výběr z nabídky se nepočítá', !jePsanePole('SELECT'));
+  ok('okno: soubor se nepočítá', !jePsanePole('INPUT', 'file'));
+
+  // Napsat a zase smazat není ztráta.
+  ok('okno: prázdná pole nejsou rozepsaná', !jeRozepsano(['', '   ', null, undefined]));
+  ok('okno: jedno vyplněné stačí', jeRozepsano(['', 'Ranní směna má nový postup']));
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

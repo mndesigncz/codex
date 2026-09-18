@@ -193,6 +193,50 @@ spodního kraje, na monitoru zůstává vystředěné okno.
 Okna se převádějí postupně; `scripts/check-modals.mjs` je ráčna, která
 hlídá, aby ručně psaných nepřibývalo.
 
+### Zavření nesmí vzít s sebou rozepsaný text
+
+Escape a klik vedle okna jsou nejčastější omyl, jaký v aplikaci jde udělat.
+Do kola 34 byly neodvolatelné: okno zmizelo a s ním i rozepsané oznámení pro
+celý tým nebo směrnice na půl stránky. Sonda to změřila na čtyřech oknech,
+kam se dá dojít — ztratila text ve čtyřech ze čtyř.
+
+Rozlišují se **uklepnutí** a **mířená akce**:
+
+| Cesta ven | Co znamená | Co se stane, když je rozepsáno |
+|---|---|---|
+| Escape, klik vedle okna | uživatel na nic nemířil | okno zůstane a **zeptá se** |
+| křížek | „chci pryč", ne „zahoď to" | okno zůstane a **zeptá se** |
+| Zrušit, Zahodit | na tlačítku je napsané, co dělá | **zavře bez ptaní** |
+
+Ptát se podruhé na to, co uživatel právě vyslovil tlačítkem, je jen práce
+navíc — proto se „Zrušit" neptá. A druhý Escape nad otevřenou otázkou
+znamená „zpět k úpravám", ne „tak teda zahoď": kdyby procházel skrz, zahodil
+by přesně to, na co se okno ptá.
+
+Rozhodnutí je v `lib/modalClose.ts` (a proměřené testy v `scripts/test-units.ts`),
+chování v `lib/useModal.ts`, otázka v `components/ui/DiscardGuard.tsx`.
+`scripts/check-modal-guard.mjs` hlídá, že žádný ručně skládaný panel
+pojistku nevynechá.
+
+**Rozepsané je jen psaný text** — textarea a textová pole. Zaškrtávátko,
+přepínač ani výběr z nabídky ne: takové ovládání se v aplikaci skoro vždy
+ukládá hned při kliknutí, takže by okno hlásilo rozepsáno nad tím, co je
+dávno uložené. Hledání a filtry uvnitř okna se označí `data-transient`
+(`type="search"` je vyloučený rovnou) — filtr není obsah. A kdo text napíše
+a zase smaže, nic neztrácí: okno se zavře bez ptaní.
+
+Dvě věci, na kterých to při psaní stálo a stojí za zapamatování:
+
+- **Klik vedle okna se musí zastavit na dokumentu**, ne až ve stavu
+  komponenty. Zavírání drží volající (`onClick={onClose}` na překryvu), takže
+  pouhé přepnutí stavu by okno stejně zavřelo. Posluchač v zachytávací fázi
+  událost zastaví dřív, než ji React uvidí.
+- **Hodnota pole se nesmí číst během té události.** Posluchač běží dřív než
+  komponenta, takže `value` v tu chvíli drží, co napsal prohlížeč, ne to, co
+  React přijme. U pole, které si vstup upraví nebo odmítne, by se tak dalo
+  „rozepsáno" zhasnout nad textem, který na obrazovce pořád je. Přepočítává
+  se až po Reactu.
+
 ## Barvy: stav versus kategorie
 
 Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —
