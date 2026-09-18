@@ -25,6 +25,7 @@ import { useModal } from '@/lib/useModal';
 import { usePopover } from '@/lib/usePopover';
 import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
 import { okJson } from '@/lib/api';
+import { openPrint, esc } from '@/lib/printDoc';
 
 const pluralPolozka = (n: number) => czForm(n, POLOZKA);
 
@@ -2091,6 +2092,31 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
     } catch {}
   };
 
+  // Do velkoobchodu se nejde s telefonem v ruce a prstem po seznamu —
+  // jde se s papírem a tužkou. Čtvereček u každé položky je na odškrtání.
+  const [printFailed, setPrintFailed] = useState(false);
+  const printList = () => {
+    const rows = groups.map(([supplier, list]) => `
+      <h2>${esc(supplier)}</h2>
+      <table>
+        <thead><tr><th style="width:8mm"></th><th>Položka</th><th class="num">Objednat</th><th class="num">Zbývá</th></tr></thead>
+        <tbody>${list.map(i => `<tr>
+          <td><span class="tick"></span></td>
+          <td>${esc(i.name)}${(i.buyFor?.length ?? 0) > 0
+            ? `<div class="note">na výrobu: ${esc(i.buyFor!.map(x => x.name).join(', '))}</div>` : ''}</td>
+          <td class="num">${esc(suggestedAmount(i))} ${esc(i.unit)}</td>
+          <td class="num">${esc(i.quantity)} ${esc(i.unit)}</td>
+        </tr>`).join('')}</tbody>
+      </table>`).join('');
+    const n = items.length;
+    const ok = openPrint({
+      title: 'Nákupní seznam',
+      subtitle: `${czCount(n, POLOZKA)} · ${new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
+      body: rows,
+    });
+    setPrintFailed(!ok);
+  };
+
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
   const share = async () => {
     try { await navigator.share({ title: 'Nákupní seznam', text: buildText() }); } catch {}
@@ -2126,6 +2152,12 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
           <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
         {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-amber-500/10 text-amber-700 border border-amber-500/25'}`}>{emailMsg}</p>}
+        {printFailed && (
+          <p className="note note-wait">
+            Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku,
+            nebo si seznam zkopíruj a vytiskni odjinud.
+          </p>
+        )}
 
         <div className="space-y-4">
           {groups.map(([supplier, list]) => (
@@ -2172,6 +2204,10 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
           </button>
           <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 px-4 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
             {copied ? 'Zkopírováno' : 'Zkopírovat seznam'}
+          </button>
+          <button type="button" onClick={printList} className="btn btn-secondary"
+            title="Seznam na papír, s čtverečky k odškrtání v obchodě">
+            <Icon name="print" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Vytisknout
           </button>
           <a
             href={`mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`}

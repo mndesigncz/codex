@@ -12,6 +12,7 @@ import { okJson, okText, apiMessage, statusMessage, ApiError, isOffline } from '
 import { nextActiveId, needsWho, IDLE_MS } from '../lib/kioskIdentity.ts';
 import { buildIcs, escapeText, foldLine } from '../lib/ics.ts';
 import { recipeCost, ingredientCost, marginPct, costDecimals } from '../lib/recipeCost.ts';
+import { printHtml, esc as escHtml } from '../lib/printDoc.ts';
 import { formatCost } from '../lib/money.ts';
 
 let failed = 0;
@@ -348,6 +349,34 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('receptura: nula je nula', costDecimals(0), 0);
   eq('měna: haléře se vypíšou', formatCost(0.125, 'CZK', 'cs-CZ').replace(/\s/g, ' '), '0,13 Kč');
   eq('měna: velké číslo zůstává celé', formatCost(1250, 'CZK', 'cs-CZ').replace(/\s/g, ' '), '1 250 Kč');
+}
+
+// --- Papír (lib/printDoc) ---
+{
+  const NOW = new Date('2026-09-18T03:30:00.000Z');
+  const doc = printHtml({
+    title: 'Nákupní seznam',
+    subtitle: '3 položky',
+    body: '<table><tbody><tr><td>Mléko</td></tr></tbody></table>',
+    business: 'Café U Nás',
+  }, NOW);
+
+  ok('tisk: je to celý dokument', doc.startsWith('<!doctype html>') && doc.trim().endsWith('</html>'));
+  ok('tisk: má český jazyk', doc.includes('<html lang="cs">'));
+  // Papír nemá stav: bez razítka za dva dny nikdo neví, jestli je aktuální.
+  ok('tisk: v patičce je podnik i čas', doc.includes('Café U Nás') && doc.includes('vytištěno'));
+  // Tiskárna v kavárně je černobílá a stránka se láme.
+  ok('tisk: stránka je A4', doc.includes('@page') && doc.includes('A4'));
+  ok('tisk: hlavička tabulky se opakuje', doc.includes('thead { display: table-header-group'));
+  ok('tisk: řádek se neláme vejpůl', doc.includes('page-break-inside: avoid'));
+
+  // „R&D" se dřív rozpadlo na entitu, protože se escapovalo jen `<`.
+  eq('tisk: ampersand se ošetří', escHtml('R&D'), 'R&amp;D');
+  eq('tisk: špičaté závorky taky', escHtml('<script>'), '&lt;script&gt;');
+  eq('tisk: uvozovky do atributů', escHtml('20" pult'), '20&quot; pult');
+  eq('tisk: nic není prázdný řetězec', escHtml(null), '');
+  ok('tisk: název z dat se neprovede',
+    printHtml({ title: '<img src=x onerror=alert(1)>', body: '' }, NOW).includes('&lt;img'));
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

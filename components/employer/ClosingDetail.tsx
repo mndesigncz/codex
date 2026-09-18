@@ -22,6 +22,7 @@ import {
 } from '@/lib/closing';
 import { dbTimeHM, dbTimeDayHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { openPrint, esc } from '@/lib/printDoc';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -121,35 +122,33 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
   }, [onClose]);
 
   // Tisk staví na týchž řádcích jako obrazovka, aby papír a appka nikdy
-  // neukazovaly jiné číslo.
+  // neukazovaly jiné číslo. Dokument skládá `lib/printDoc`: společný
+  // černobílý vzhled a — hlavně — poznatelný neúspěch, když prohlížeč
+  // tiskové okno zablokuje. Dřív se v takovém případě nestalo nic.
+  const [printFailed, setPrintFailed] = useState(false);
   const print = () => {
     if (!c) return;
-    const w = window.open('', '_blank', 'width=640,height=800');
-    if (!w) return;
     const row = (label: string, val: string, strong = false) =>
-      `<tr><td style="padding:6px 0;color:#555;">${label}</td><td style="text-align:right;${strong ? 'font-weight:700;' : ''}">${val}</td></tr>`;
-    const esc = (v: any) => String(v ?? '').replace(/</g, '&lt;');
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Uzávěrka ${esc(c.date)}</title></head>
-      <body style="font-family:-apple-system,sans-serif;max-width:440px;margin:24px auto;color:#16181A;">
-        <h2 style="margin:0 0 2px;">Uzávěrka — ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
-        <p style="margin:0 0 16px;color:#777;">${esc(c.shift_label ?? '')} · vyplnil/a ${esc(c.author_name ?? '—')}${c.created_at ? ` · ${esc(dayTime(c.created_at))}` : ''}</p>
-        <table style="width:100%;border-collapse:collapse;font-size:15px;">
-          ${lines.map(l => row(esc(l.label), `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
-          ${row('Očekávaný stav kasy', money(expectedCash(c)), true)}
-          ${row('Skutečný stav kasy', money(c.closing_cash), true)}
-          ${row(diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko', (diff > 0 ? '+' : '') + money(diff), true)}
-          ${Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('Zůstalo v kase', money(cashLeft(c))) : ''}
-          ${row('Tržba kartou', money(c.card_revenue))}
-          ${row('Spropitné hotově', money(cashTips))}
-          ${row('Spropitné kartou', money(Number(c.tips_card) || 0))}
-          ${row('Zákazníků', String(c.customers))}
-          ${d?.pos ? row('Pokladna — hotovost', money(d.pos.cash)) + row('Pokladna — karta', money(d.pos.card)) : ''}
-        </table>
-        ${c.notes ? `<p style="margin-top:16px;font-size:14px;color:#555;">Poznámka: ${esc(c.notes)}</p>` : ''}
-        <p style="margin-top:24px;font-size:12px;color:#999;">Vytištěno z aplikace Managero · ${new Date().toLocaleString('cs-CZ')}</p>
-        <script>window.onload = () => window.print();</scr` + `ipt>
-      </body></html>`);
-    w.document.close();
+      `<tr><td>${esc(label)}</td><td class="num"${strong ? ' style="font-weight:700"' : ''}>${esc(val)}</td></tr>`;
+    const body = `<table><tbody>
+        ${lines.map(l => row(l.label, `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
+        ${row('Očekávaný stav kasy', money(expectedCash(c)), true)}
+        ${row('Skutečný stav kasy', money(c.closing_cash), true)}
+        ${row(diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko', (diff > 0 ? '+' : '') + money(diff), true)}
+        ${Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('Zůstalo v kase', money(cashLeft(c))) : ''}
+        ${row('Tržba kartou', money(c.card_revenue))}
+        ${row('Spropitné hotově', money(cashTips))}
+        ${row('Spropitné kartou', money(Number(c.tips_card) || 0))}
+        ${row('Zákazníků', String(c.customers))}
+        ${d?.pos ? row('Pokladna — hotovost', money(d.pos.cash)) + row('Pokladna — karta', money(d.pos.card)) : ''}
+      </tbody></table>
+      ${c.notes ? `<p class="note">Poznámka: ${esc(c.notes)}</p>` : ''}`;
+    const ok = openPrint({
+      title: `Uzávěrka — ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
+      subtitle: `${c.shift_label ?? ''}${c.shift_label ? ' · ' : ''}vyplnil/a ${c.author_name ?? '—'}${c.created_at ? ` · ${dayTime(c.created_at)}` : ''}`,
+      body,
+    });
+    setPrintFailed(!ok);
   };
 
   const remove = async () => {
@@ -539,6 +538,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           )}
         </div>
 
+        {printFailed && (
+          <p className="note note-wait mx-5 sm:mx-6 mb-3 cz-sentence">
+            Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.
+          </p>
+        )}
         {c && (
           <div className="dock-strong shrink-0 px-5 sm:px-6 py-3 border-t border-black/[0.07] flex items-center gap-2">
             {c.approved === false && (

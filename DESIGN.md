@@ -405,6 +405,23 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   schovaly i s chybou. Rozhodnutí „ukázat se" nesmí viset na datech,
   která právě selhala.
 
+## Papír
+
+V kavárně se tiskne. Rozvrh visí na zdi u baru, nákupní seznam jde do
+velkoobchodu a odškrtává se tužkou. Papír má vlastnosti, které se na
+obrazovce neřeší.
+
+- **Skládá ho `lib/printDoc`.** Společný černobílý vzhled, A4.
+- **Barva na papíře neplatí.** Tiskárna v kavárně je černobílá. Stav, který
+  se pozná jen barvou, je na výtisku neviditelný — typ směny se píše slovem.
+- **Hlavička tabulky se opakuje** (`thead { display: table-header-group }`)
+  a řádek se neláme vejpůl (`page-break-inside: avoid`).
+- **Papír nemá stav.** Na výtisku musí být, k čemu a ke kdy patří, jinak za
+  dva dny nikdo neví, jestli je aktuální.
+- **Zablokované tiskové okno se musí přiznat.** `openPrint` vrací `false`;
+  bez toho člověk klikne na „Vytisknout" a nestane se vůbec nic.
+- **Escapuje se i `&`.** Ruční `esc` uměl jen `<`, takže „R&D" se rozpadlo.
+
 ## Export do kalendáře
 
 Kalendář je slib o čase. Soubor, který kalendář odmítne nebo přečte špatně,
