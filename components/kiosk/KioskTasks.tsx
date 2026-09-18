@@ -115,7 +115,7 @@ export default function KioskTasks() {
           <button
             onClick={() => setStatus(t, isDone ? 'pending' : 'done')}
             title={isDone ? 'Vrátit mezi nesplněné' : 'Označit jako hotové'}
-            className={`mt-0.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition active:scale-90 ${
+            className={`tap-target mt-0.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition active:scale-90 ${
               isDone ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]'
             }`}
           >
@@ -142,7 +142,7 @@ export default function KioskTasks() {
               <div className="mt-2.5 space-y-1">
                 {t.checklist.map((it, i) => (
                   <button key={i} onClick={() => toggleChecklistItem(t, i)}
-                    className="w-full flex items-center gap-2.5 text-left min-h-[40px] rounded-xl px-2 -mx-2 hover:bg-black/[0.03] active:scale-[0.99] transition">
+                    className="w-full flex items-center gap-2.5 text-left min-h-[44px] rounded-xl px-2 -mx-2 hover:bg-black/[0.03] active:scale-[0.99] transition">
                     <span className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
                       it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20'
                     }`}>
