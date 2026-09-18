@@ -691,6 +691,40 @@ je nikdo nenavrhl, dokud na ně někdo nedošel.
   rozvržení, nemusí být načtené ani CSS — kreslí si `<html>`, `<body>`
   i styly sama.
 
+## Měřidlo, které nemá právo hlásit nálezy
+
+Sonda na viditelný fokus nabídla dvakrát po sobě velký, přesvědčivý nález —
+a obojí byla chyba měřidla, ne aplikace:
+
+1. Volala fokus programově (`el.focus()`). Prstenec se ale kreslí přes
+   `:focus-visible`, což je správně (u myši se neukazuje, u klávesnice ano),
+   a ten programový fokus nespustí. **Naměřeno 30 z 92 „bez označení".**
+2. Četla `getComputedStyle` hned po Tabu. `.field` má na stín přechod
+   0,22 s, takže vracela začátek animace, ne cíl: v čase 0 ms
+   `0px 0px 0px 0px`, ve 300 ms `0px 0px 0px 3px`. **Naměřeno 101 z 1183.**
+
+Obě čísla vypadala jako pořádná práce. Kdyby se podle nich „opravovalo",
+rozbilo by se fungující chování. Skutečný výsledek po opravě sondy:
+**922 prvků, 0 bez viditelného označení.**
+
+Z toho plyne pravidlo, které platí pro každou sondu v `scratchpad/ui`:
+
+> **Měřidlo, které neumí ukázat správnou odpověď na známé zadání, nemá
+> právo hlásit nálezy.**
+
+`probe-fokus.mjs` proto začíná kalibrací: na přihlašovací obrazovce, kde
+ručně víme, že pole po Tabu prstenec má, si ověří, že ho najde. Když ne,
+zahlásí „měřím sebe, ne aplikaci" a skončí s kódem 2, místo aby chrlila
+nálezy. Je to totéž pravidlo jako u kontrol v CI, jen obrácené na nástroj.
+
+Dva konkrétní způsoby, jak se sonda umí splést v prohlížeči, a obojí se tu
+už stalo:
+
+- **Obchází způsob, jakým se věc doopravdy děje.** Programový fokus není
+  fokus z klávesnice; vyplnění pole skriptem není psaní.
+- **Čte dřív, než se věc dokreslila.** Cokoli s `transition` se musí
+  doměřit až po doběhnutí, jinak se čte výchozí stav.
+
 ## Pokrytí kontroly je součást kontroly
 
 Trojí stejná chyba, pokaždé jinde: kontrola hlídala správnou věc, jen se
