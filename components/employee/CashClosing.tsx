@@ -176,12 +176,14 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         <div className="relative w-32 shrink-0">
           <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+            aria-label={`Částka pohybu v ${symbol}`}
             placeholder="0"
             className={`${inputClass} py-2 pr-10 tabular-nums`} />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
         </div>
         <input value={note} onChange={e => setNote(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          aria-label="Za co byl pohyb v kase"
           placeholder={MOVEMENT_KINDS.find(k => k.kind === kind)?.hint ?? 'Za co'}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
         <button type="button" onClick={add} disabled={!amount}
@@ -1048,6 +1050,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             ) : (
               <div className="relative">
                 <input type="number" inputMode="numeric" required value={form.closingCash} onChange={set('closingCash')}
+                  aria-label={`Skutečný stav kasy v ${symbol}`}
                   placeholder="0" className={`${inputClass} pr-12 !py-4 text-base font-semibold`} />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
               </div>
@@ -1206,18 +1209,21 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           <div className="well border border-black/[0.06] p-4 space-y-2.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-black/45"><Icon name="handover" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Předávka pro další směnu <span className="normal-case font-normal text-black/35">(nepovinné — uvidí ji tým na přehledu a tabletu)</span></p>
             <input value={hoTodo} onChange={e => setHoTodo(e.target.value)} maxLength={500}
+              aria-label="Předávka: co zbývá dodělat"
               placeholder="Co zbývá dodělat…"
               className={inputClass} />
             <input value={hoRunningOut} onChange={e => setHoRunningOut(e.target.value)} maxLength={500}
+              aria-label="Předávka: co dochází nebo je potřeba objednat"
               placeholder="Co dochází / objednat…"
               className={inputClass} />
             <input value={hoMessage} onChange={e => setHoMessage(e.target.value)} maxLength={500}
+              aria-label="Předávka: vzkaz pro další směnu"
               placeholder="Vzkaz pro další směnu…"
               className={inputClass} />
           </div>
 
-          <label className="field-label">Poznámka</label>
-          <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
+          <label htmlFor="uzaverka-poznamka" className="field-label">Poznámka</label>
+          <textarea id="uzaverka-poznamka" value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
         </div>
 
         <button type="submit" disabled={submitting}

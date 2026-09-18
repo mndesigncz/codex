@@ -583,7 +583,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <input required placeholder="email@priklad.cz — nebo víc naráz" value={inviteEmail}
               aria-label="E-mail nebo víc e-mailů oddělených čárkou"
               onChange={e => setInviteEmail(e.target.value)} className={inputClass} />
-            <input placeholder="Pozice" value={inviteJob}
+            <input aria-label="Pozice nového člena (nepovinné)" placeholder="Pozice" value={inviteJob}
               onChange={e => setInviteJob(e.target.value)} className={inputClass} />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -823,6 +823,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   const v = laborInput.trim() === '' ? null : Math.max(0, Math.min(100, Math.round(Number(laborInput))));
                   if ((team?.labor_target_pct ?? null) !== v) saveBiz({ laborTargetPct: v });
                 }}
+                aria-label="Cílový podíl mzdových nákladů v procentech"
                 placeholder="např. 30" className={`${inputClass} pr-10 h-[46px]`} />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">%</span>
             </div>
@@ -913,6 +914,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <input type="number" inputMode="numeric" min={0}
               value={floatDraft ?? (team?.drawer_float != null ? String(team.drawer_float) : '')}
               onChange={e => setFloatDraft(e.target.value)}
+              aria-label="Kolik peněz zůstává v kase přes noc"
               placeholder="nenastaveno"
               className="w-32 field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none text-right tabular-nums" />
             {floatDraft !== null && (

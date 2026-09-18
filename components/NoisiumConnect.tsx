@@ -68,13 +68,13 @@ export default function NoisiumConnect() {
       ) : (
         <form onSubmit={connect} className="space-y-3">
           <div>
-            <label className="field-label">API token</label>
-            <input value={token} onChange={e => setToken(e.target.value)} placeholder="tymbr_xxxxxxxxxxxxx" required className={inputClass} />
+            <label htmlFor="noisium-token" className="field-label">API token</label>
+            <input id="noisium-token" value={token} onChange={e => setToken(e.target.value)} placeholder="tymbr_xxxxxxxxxxxxx" required className={inputClass} />
             <p className="text-xs text-black/40 mt-1.5">Vytvoř v Noisium: Nastavení → API tokeny. Token uvidíš jen jednou.</p>
           </div>
           <div>
-            <label className="field-label">API URL (volitelné)</label>
-            <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://noisium.app/api" className={inputClass} />
+            <label htmlFor="noisium-url" className="field-label">API URL (volitelné)</label>
+            <input id="noisium-url" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://noisium.app/api" className={inputClass} />
           </div>
           <button type="submit" disabled={busy || !token.trim()} className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black disabled:opacity-50 whitespace-nowrap">
             {busy ? 'Připojuji…' : 'Připojit Noisium'}

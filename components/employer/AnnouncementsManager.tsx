@@ -147,6 +147,7 @@ export default function AnnouncementsManager() {
           value={content}
           maxLength={1000}
           onChange={(e) => setContent(e.target.value)}
+          aria-label="Text oznámení pro tým"
           placeholder="Např. V pátek zavíráme dřív…"
           className="w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none resize-none"
         />

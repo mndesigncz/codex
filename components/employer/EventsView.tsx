@@ -771,8 +771,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
               </div>
             ) : (
               <div>
-                <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Tržba z akce</label>
-                <input type="number" inputMode="numeric" value={revenue} onChange={ev3 => setRevenue(ev3.target.value)}
+                <label htmlFor={`akce-trzba-${e.id}`} className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Tržba z akce</label>
+                <input id={`akce-trzba-${e.id}`} type="number" inputMode="numeric" value={revenue} onChange={ev3 => setRevenue(ev3.target.value)}
                   onBlur={() => patch(e.id, { revenue: revenue === '' ? null : Number(revenue) })} placeholder="0" className={inputClass} />
                 <p className="text-[11px] text-black/40 mt-1.5">
                   {e.offsite

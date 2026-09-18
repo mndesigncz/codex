@@ -530,6 +530,14 @@ obrazovky potřebuje — vědět, co ten prvek **je**.
   uvnitř druhé, ta vnořená dostane `h2` — `PageHeader` má na to `as`.
   Nadpis, který je zjevný z plochy (chat, kiosk), se dá schovat přes
   `sr-only`; schovat ho není totéž co nemít ho.
+- **Akcent patří hrdinovi, ne textu ke čtení.** Barvu akcentu si volí každý
+  podnik, takže se na její kontrast nedá spolehnout. Velká číslice ceny ji
+  unese (na velký text stačí 3 : 1), drobný symbol měny vedle ní ne —
+  ten drží inkoust.
+- **Obrazovka, která má víc palet, se měří ve všech.** Venkovní menu
+  přepíná den a noc podle hodin; noční paleta procházela, denní ne — a to
+  je právě ta, která visí venku za světla. Sonda, která chytí jen tu
+  palubní zrovna platnou, netestuje, jen se trefuje.
 - **Měří se v prohlížeči.** `probe-a11y` počítá přístupné jméno tak, jak ho
   skládá odečítač, přes všechny obrazovky.
 

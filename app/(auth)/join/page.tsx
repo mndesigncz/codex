@@ -81,14 +81,14 @@ function JoinForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {!token && (
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kód týmu</label>
-                <input type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Např. K7QP2M" required
+                <label htmlFor="join-kod" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Kód týmu</label>
+                <input id="join-kod" autoComplete="one-time-code" type="text" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Např. K7QP2M" required
                   className={`${inputClass} tracking-[0.25em] font-semibold text-center uppercase`} maxLength={6} />
               </div>
             )}
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jana Nováková" required className={inputClass} />
+              <label htmlFor="join-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
+              <input id="join-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jana Nováková" required className={inputClass} />
             </div>
             <div>
               <label htmlFor="join-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>

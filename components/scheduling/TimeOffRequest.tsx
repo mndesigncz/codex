@@ -189,6 +189,7 @@ export default function TimeOffRequest() {
           type="text"
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          aria-label="Poznámka k žádosti o volno (nepovinné)"
           placeholder="Poznámka (nepovinné)"
           className={inputCls}
         />

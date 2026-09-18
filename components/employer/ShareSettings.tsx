@@ -181,12 +181,12 @@ export default function ShareSettings() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Nadpis stránky</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Např. Naše tabáky" className={inputClass} />
+            <label htmlFor="sdil-nadpis" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Nadpis stránky</label>
+            <input id="sdil-nadpis" value={title} onChange={e => setTitle(e.target.value)} placeholder="Např. Naše tabáky" className={inputClass} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Podtitulek</label>
-            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Nepovinný text pod nadpisem" className={inputClass} />
+            <label htmlFor="sdil-podtitulek" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Podtitulek</label>
+            <input id="sdil-podtitulek" value={note} onChange={e => setNote(e.target.value)} placeholder="Nepovinný text pod nadpisem" className={inputClass} />
           </div>
         </div>
 
@@ -270,20 +270,20 @@ export default function ShareSettings() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název podniku</label>
-            <input value={theme.businessName} onChange={e => setTheme(t => ({ ...t, businessName: e.target.value }))}
+            <label htmlFor="sdil-podnik" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název podniku</label>
+            <input id="sdil-podnik" value={theme.businessName} onChange={e => setTheme(t => ({ ...t, businessName: e.target.value }))}
               onBlur={() => saveTheme(theme)} placeholder="Zobrazí se nad nadpisem" className={inputClass} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Logo (odkaz na obrázek)</label>
-            <input value={theme.logoUrl} onChange={e => setTheme(t => ({ ...t, logoUrl: e.target.value }))}
+            <label htmlFor="sdil-logo" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Logo (odkaz na obrázek)</label>
+            <input id="sdil-logo" value={theme.logoUrl} onChange={e => setTheme(t => ({ ...t, logoUrl: e.target.value }))}
               onBlur={() => saveTheme(theme)} placeholder="https://…" className={inputClass} />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Patička</label>
-          <input value={theme.footer} onChange={e => setTheme(t => ({ ...t, footer: e.target.value }))}
+          <label htmlFor="sdil-paticka" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Patička</label>
+          <input id="sdil-paticka" value={theme.footer} onChange={e => setTheme(t => ({ ...t, footer: e.target.value }))}
             onBlur={() => saveTheme(theme)} placeholder="Adresa, otevírací doba, kontakt…" className={inputClass} />
         </div>
 
