@@ -167,7 +167,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
           />
         ) : (
           <div className="flex-1 hidden md:flex flex-col items-center justify-center text-black/45 gap-3">
-            <Icon name="chat" size={48} className="text-[#16181A]/15" />
+            <Icon name="chat" size={48} className="text-black/15" />
             <p className="text-sm">Vyberte konverzaci</p>
           </div>
         )}
@@ -214,7 +214,7 @@ function ConversationRow({
             a jedenáctou"). Z jednoho useknutého řádku se přečetla třetina,
             takže náhled dostal řádky dva. */}
         <div className="flex items-start justify-between gap-2">
-          <span className={`min-w-0 flex-1 text-sm line-clamp-2 ${conv.unreadCount > 0 ? 'text-[#16181A]/80 font-medium' : 'text-black/45'}`}>
+          <span className={`min-w-0 flex-1 text-sm line-clamp-2 ${conv.unreadCount > 0 ? 'text-black/80 font-medium' : 'text-black/45'}`}>
             {conv.lastMessage === 'Příloha'
               ? <span className="inline-flex items-center gap-1"><Icon name="clipboard" size={13} className="shrink-0 opacity-70" />Příloha</span>
               : (conv.lastMessage ?? 'Zatím žádné zprávy')}

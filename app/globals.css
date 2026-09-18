@@ -324,8 +324,8 @@ body::after {
 .t-page { font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.022em; color: var(--ink); }
 .t-section { font-size: 1.125rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
 .t-card { font-size: 0.9375rem; line-height: 1.3; font-weight: 600; color: var(--ink); }
-.t-meta { font-size: 0.8125rem; line-height: 1.4; color: rgba(22,24,26,0.60); }
-.t-label { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(22,24,26,0.50); }
+.t-meta { font-size: 0.8125rem; line-height: 1.4; color: rgba(22,24,26,0.62); }
+.t-label { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(22,24,26,0.62); }
 }
 
 /* Everything tappable presses like a real surface. */
@@ -645,8 +645,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .field::placeholder{ color:rgba(237,242,228,0.35); }
 :root[data-theme="dark"] .field-label{ color:rgba(237,242,228,0.72); }
 :root[data-theme="dark"] .t-page, :root[data-theme="dark"] .t-section, :root[data-theme="dark"] .t-card{ color:#EDF2E4; }
-:root[data-theme="dark"] .t-meta{ color:rgba(237,242,228,0.62); }
-:root[data-theme="dark"] .t-label{ color:rgba(237,242,228,0.52); }
+:root[data-theme="dark"] .t-meta{ color:rgba(237,242,228,0.66); }
+:root[data-theme="dark"] .t-label{ color:rgba(237,242,228,0.62); }
 :root[data-theme="dark"] .list-row-tap:active{ background:rgba(255,255,255,0.08); }
 :root[data-theme="dark"] .chip-ink{ background:#EDF2E4; color:#16181A; }
 
@@ -690,16 +690,28 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .text-black\/50{ color:rgba(237,242,228,0.60) !important; }
 :root[data-theme="dark"] .text-black\/45{ color:rgba(237,242,228,0.56) !important; }
 :root[data-theme="dark"] .text-black\/40{ color:rgba(237,242,228,0.55) !important; }
-:root[data-theme="dark"] .text-black\/35{ color:rgba(237,242,228,0.50) !important; }
+:root[data-theme="dark"] .text-black\/35{ color:rgba(237,242,228,0.55) !important; }
 /* Nadpisy sekcí v bočním pásu („Směny", „Práce", „Tým") nosí /30.
    Při 0,35 vycházely v tmavém režimu pod 3 : 1 — jsou to velká písmena
    s prostrkáním, tedy nejhůř čitelný tvar, jaký text může mít. */
-:root[data-theme="dark"] .text-black\/30{ color:rgba(237,242,228,0.52) !important; }
+:root[data-theme="dark"] .text-black\/30{ color:rgba(237,242,228,0.55) !important; }
 :root[data-theme="dark"] .text-black\/80{ color:rgba(237,242,228,0.86) !important; }
-:root[data-theme="dark"] .text-black\/25{ color:rgba(237,242,228,0.30) !important; }
+/* /90, /75 a /15 v řadě chyběly. Bez přepisu zůstane `rgba(0,0,0,0.9)`
+   černá na tmavém podkladu — naměřeno 1,01:1, tedy vůbec nic. Do /75 a /90
+   se to dostalo převodem z `text-[#16181A]/NN`, které tmavý přepis míjelo
+   úplně, protože je to jiný název třídy než `.text-[#16181A]`. */
+:root[data-theme="dark"] .text-black\/90{ color:rgba(237,242,228,0.92) !important; }
+:root[data-theme="dark"] .text-black\/75{ color:rgba(237,242,228,0.82) !important; }
+:root[data-theme="dark"] .text-black\/15{ color:rgba(237,242,228,0.55) !important; }
+:root[data-theme="dark"] .text-black\/25{ color:rgba(237,242,228,0.55) !important; }
 
 
-:root[data-theme="dark"] .text-black\/20{ color:rgba(237,242,228,0.26) !important; }
+:root[data-theme="dark"] .text-black\/20{ color:rgba(237,242,228,0.55) !important; }
+/* Proč jsou /20 až /35 v tmavém všechny na 0,55: nejsvětlejší tmavý podklad
+   je sklo (zhruba +9 % bílé), a tam 0,52 dává 4,42:1 — pod normou. Stupnice
+   se tím v tmavém zplošťuje, ale hierarchii stejně nese velikost a tučnost,
+   jak to má světlý režim od kola 26. Naměřeno, ne odhadnuto:
+   0,50 → 4,20:1 · 0,52 → 4,42:1 · 0,55 → 4,75:1 na skle. */
 :root[data-theme="dark"] .text-\[\#5B7A08\]{ color:#C8F542 !important; }
 /* Tmavý motiv přebarvoval jen tenhle jeden zelený odstín. Ty ostatní zůstávaly
    tmavě zelené na tmavém skle — naměřeno 2,2:1 a 2,3:1, tedy prakticky
