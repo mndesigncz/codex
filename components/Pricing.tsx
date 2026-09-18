@@ -37,7 +37,7 @@ export default function Pricing() {
             <p className="mt-2 text-3xl font-bold tracking-tight text-[#16181A]">0 Kč</p>
             <p className="text-xs text-black/40 mt-1">navždy · až 3 lidé</p>
             <p className="mt-4 text-sm text-black/55">Základ pro malý tým: směny, úkoly, chat, uzávěrky a sklad.</p>
-            <Link href="/register" className="mt-auto pt-6 block">
+            <Link href="/register?plan=free" className="mt-auto pt-6 block">
               <span className="btn btn-secondary w-full">Začít zdarma</span>
             </Link>
           </div>
@@ -63,7 +63,7 @@ export default function Pricing() {
                     ? 'Všechno bez limitů: neomezený tým, kiosk pro tablet, odměny, exporty a sdílené menu ve vašich barvách.'
                     : 'Vše z Pro a navíc Managero client pro hosty (věrnost, rezervace, objednávky od stolu), pokladna Storyous a výroba vlastních produktů.'}
                 </p>
-                <Link href="/register" className="mt-auto pt-6 block">
+                <Link href={`/register?plan=${p}&interval=${interval}`} className="mt-auto pt-6 block">
                   <span className={`btn w-full ${p === 'pro' ? 'btn-accent' : 'btn-primary'}`}>Vyzkoušet {TRIAL_DAYS} dní zdarma</span>
                 </Link>
               </div>

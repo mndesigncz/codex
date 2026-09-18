@@ -4,9 +4,14 @@
 // lock them kindly — the locked state SELLS the feature, it never hides it.
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, MAX_EXTRAS, type PlanInfo } from '@/lib/plan';
+import dynamic from 'next/dynamic';
+import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, TRIAL_DAYS, priceLabel, MAX_EXTRAS, type PlanInfo } from '@/lib/plan';
 import { Icon } from './Icons';
 import { Modal, Button } from './ui';
+
+// Pokladna se stahuje, až když má vyskočit — zamčená funkce ji většinou
+// nikdy nepotřebuje.
+const CheckoutModal = dynamic(() => import('./CheckoutModal'), { ssr: false });
 
 const PlanCtx = createContext<{ plan: PlanInfo | null; loaded: boolean }>({ plan: null, loaded: false });
 
@@ -46,6 +51,75 @@ export function usePlan(): { plan: PlanInfo | null; pro: boolean; max: boolean; 
   return { plan, pro: !loaded || isPro(plan), max: !loaded || isMax(plan), loaded };
 }
 
+/**
+ * Tlačítko, které zamčenou funkci opravdu odemkne.
+ *
+ * Dřív všechny zámky vedly do Nastavení → Předplatné. Člověk, který klikl
+ * na Managero client, se tím ocitl na úplně jiné obrazovce a musel si
+ * dohledat, co vlastně chtěl. Tady se rovnou otevře to, co dává smysl:
+ *
+ *  - podnik bez předplatného → pokladna Stripe s vybraným tarifem
+ *    (`/api/billing/checkout`, {TRIAL_DAYS} dní zdarma a karta rovnou),
+ *  - podnik s běžícím Pro, který chce Max → změna tarifu na stávajícím
+ *    předplatném (`/api/billing/upgrade`), protože pokladna by v tom
+ *    případě skončila chybou „podnik už předplatné má".
+ *
+ * Na serveru jsou to dvě různé cesty a splést je znamená ukázat chybu
+ * místo nabídky.
+ */
+export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max'; className?: string }) {
+  const { plan: info } = usePlan();
+  const [pokladna, setPokladna] = useState(false);
+  const [prechod, setPrechod] = useState<'ne' | 'bezi' | 'hotovo'>('ne');
+  const [chyba, setChyba] = useState('');
+
+  const bezici = !!info && info.plan !== 'free'
+    && ['active', 'trialing', 'past_due'].includes(String(info.subscriptionStatus));
+  // Změna tarifu se dělá jen na běžícím předplatném a jen směrem k Max.
+  const zmenaTarifu = bezici && plan === 'max';
+
+  const prejit = async () => {
+    setPrechod('bezi'); setChyba('');
+    try {
+      const r = await fetch('/api/billing/upgrade', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      // Bez téhle kontroly by se oslavilo i to, co server odmítl.
+      if (!r.ok) throw new Error(d?.error || 'Přechod se nepodařil.');
+      setPrechod('hotovo');
+      window.location.reload();
+    } catch (e: any) {
+      setChyba(String(e?.message ?? 'Přechod se nepodařil.'));
+      setPrechod('ne');
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant={plan === 'max' ? 'primary' : 'accent'}
+        icon="sparkle"
+        loading={prechod === 'bezi'}
+        onClick={() => (zmenaTarifu ? prejit() : setPokladna(true))}
+        className={className}
+      >
+        {zmenaTarifu
+          ? `Přejít na ${PLAN_NAMES[plan]}${info?.maxOfferUntil ? ' −30 %' : ''}`
+          : `Odemknout ${PLAN_NAMES[plan]}`}
+      </Button>
+      {chyba && <p className="text-bad-ink text-xs mt-2">{chyba}</p>}
+      {pokladna && (
+        <CheckoutModal
+          plan={plan}
+          interval={info?.interval ?? 'month'}
+          trial={!info?.hadSubscription}
+          onClose={() => setPokladna(false)}
+          onDone={() => window.location.reload()}
+        />
+      )}
+    </>
+  );
+}
+
 export function MaxBadge({ className = '' }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-1 rounded-full bg-[#0A5CC0] text-white px-2 py-0.5 text-[11px] font-bold tracking-wide ${className}`}>
@@ -73,8 +147,7 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
           {MAX_EXTRAS.map(x => <li key={x} className="flex items-start gap-2"><Icon name="check" size={15} className="text-[#0A5CC0] shrink-0 mt-0.5" />{x}</li>)}
         </ul>
         {employer ? (
-          <a href="/employer/overview?view=settings" onClick={e => { e.preventDefault(); window.location.href = '/employer/overview?view=settings'; }}
-            className="btn btn-primary">Zjistit víc o Max <Icon name="chevron" size={14} className="-rotate-90" /></a>
+          <div className="flex justify-center"><OdemknoutButton plan="max" /></div>
         ) : (
           <p className="text-xs text-black/40">Řekni vedení — Max se zapíná v Nastavení → Předplatné.</p>
         )}
@@ -114,14 +187,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
           {benefit ?? 'Tahle funkce patří do plánu Pro.'}
         </p>
         {employer ? (
-          <a href="/employer/overview?view=settings" onClick={e => {
-            // Same-shell navigation when we're already in the app.
-            e.preventDefault();
-            window.location.href = '/employer/overview?view=settings';
-          }}
-            className="inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent font-semibold px-6 py-3 text-sm hover:brightness-105 shadow-[0_6px_18px_rgba(200,245,66,0.35)] transition">
-            Zjistit víc o Pro <Icon name="chevron" size={14} className="-rotate-90" />
-          </a>
+          <div className="flex justify-center"><OdemknoutButton plan="pro" /></div>
         ) : (
           <p className="text-xs text-black/40">Řekni vedení — Pro se zapíná v Nastavení → Předplatné.</p>
         )}
@@ -131,18 +197,19 @@ export function ProGate({ feature, children, benefit, employer = true }: {
   );
 }
 
-/** Small modal for inline locked actions (e.g. a CSV button on Free). */
-export function UpgradeModal({ feature, onClose }: { feature: string; onClose: () => void }) {
+/** Okno pro zamčenou akci v řádku (třeba Export CSV na tarifu Zdarma). */
+export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: string; plan?: 'pro' | 'max'; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} size="sm"
-      title={<span className="flex items-center gap-2">{feature} <ProBadge /></span>}
+      title={<span className="flex items-center gap-2">{feature} {plan === 'max' ? <MaxBadge /> : <ProBadge />}</span>}
       footer={<>
         <Button variant="secondary" onClick={onClose}>Zavřít</Button>
-        <Button variant="accent" icon="sparkle" onClick={() => { window.location.href = '/employer/overview?view=settings'; }}>Zjistit víc</Button>
+        <OdemknoutButton plan={plan} />
       </>}>
       <div className="text-center space-y-3">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={20} /></div>
-        <p className="text-sm text-black/55">Tuhle funkci odemyká plán Pro ({PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}).</p>
+        <p className="text-sm text-black/55">Tuhle funkci odemyká plán {PLAN_NAMES[plan]} ({priceLabel(plan, 'month')}).</p>
+        <p className="text-xs text-black/40">{TRIAL_DAYS} dní zdarma, zrušit jde kdykoliv.</p>
       </div>
     </Modal>
   );
