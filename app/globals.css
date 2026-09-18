@@ -189,7 +189,9 @@ body::after {
    tmavá pilulka, nevybraný tlumený text; „glass" si přidá ten, kdo stojí
    volně mimo společný obal. Dřív deset různých zápisů téhož. */
 .seg-on  { background: var(--ink); color: #fff; }
-.seg-off { color: rgba(22,24,26,0.55); }
+/* 0,55 dávalo na světlém podkladu 3,84 : 1 — pod normou pro běžný text.
+   Naměřeno sondou, ne odhadnuto; 0,62 vychází na 4,6 : 1. */
+.seg-off { color: rgba(22,24,26,0.62); }
 @media (hover: hover) { .seg-off:hover { color: var(--ink); background: rgba(22,24,26,0.05); } }
 /* Pilulka ve filtrovacím pásu (stav, měsíc, člověk). Tvar byl opsaný
    v každé obrazovce zvlášť jako `px-4 py-2 rounded-full text-xs …`; tady je
@@ -550,6 +552,35 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .chip-ink{ background:#EDF2E4; color:#16181A; }
 
 /* text */
+/* ---------- Tmavý režim: stavy, které se zapomněly ----------
+   Tmavý režim se v aplikaci nabízí a ukládá, ale nikdy se neproměřil.
+   Sonda, která počítá skutečný kontrast proti podkladu pod textem, našla
+   neaktivní záložky jako `rgba(22,24,26,0.55)` na `rgb(26,28,31)` — tedy
+   1,03 : 1. To není „tlumené", to je neviditelné: „Přehled", „Moje směny"
+   ani „Uzávěrka" nebyly v tmavém režimu vidět vůbec.
+
+   Příčina je pokaždé stejná a stojí za zapamatování: **třída, která si
+   barvu textu nastavuje sama, ji musí mít nastavenou i pro tmavý režim.**
+   Obecné pravidlo pro `.text-black/NN` na ni nedosáhne, protože jméno
+   třídy je jiné. Přesně takhle tu už jednou vypadl stupeň /65 a opravil
+   se zvlášť; tohle je zbytek téže řady. Hlídá to `check-dark-classes`. */
+:root[data-theme="dark"] .seg-off{ color:rgba(237,242,228,0.62); }
+@media (hover: hover) { :root[data-theme="dark"] .seg-off:hover{ color:#EDF2E4; background:rgba(255,255,255,0.08); } }
+:root[data-theme="dark"] .btn-icon{
+  background:rgba(255,255,255,0.08); color:rgba(237,242,228,0.62);
+}
+@media (hover: hover) { :root[data-theme="dark"] .btn-icon:hover{ color:#EDF2E4; background:rgba(255,255,255,0.14); } }
+/* Barevné štítky kategorií: na světlém pozadí je text tmavý odstín téže
+   barvy, na tmavém musí být světlý — jinak splyne s vlastní výplní. */
+:root[data-theme="dark"] .cat-1{ color:#D6F07A; }
+:root[data-theme="dark"] .cat-2{ color:#8FC4FF; }
+:root[data-theme="dark"] .cat-3{ color:#C4AAFF; }
+:root[data-theme="dark"] .cat-4{ color:#F5C46B; }
+:root[data-theme="dark"] .cat-5{ color:#8FE3C8; }
+:root[data-theme="dark"] .cat-6{ color:#FFA9A9; }
+:root[data-theme="dark"] .cat-7{ color:#9FD8F5; }
+:root[data-theme="dark"] .cat-8{ color:#F5B8DA; }
+
 :root[data-theme="dark"] .text-\[\#16181A\]{ color:#EDF2E4 !important; }
 :root[data-theme="dark"] .text-black\/70{ color:rgba(237,242,228,0.78) !important; }
 :root[data-theme="dark"] .text-black\/60{ color:rgba(237,242,228,0.66) !important; }
@@ -561,9 +592,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root[data-theme="dark"] .text-black\/45{ color:rgba(237,242,228,0.56) !important; }
 :root[data-theme="dark"] .text-black\/40{ color:rgba(237,242,228,0.55) !important; }
 :root[data-theme="dark"] .text-black\/35{ color:rgba(237,242,228,0.50) !important; }
-:root[data-theme="dark"] .text-black\/30{ color:rgba(237,242,228,0.35) !important; }
+/* Nadpisy sekcí v bočním pásu („Směny", „Práce", „Tým") nosí /30.
+   Při 0,35 vycházely v tmavém režimu pod 3 : 1 — jsou to velká písmena
+   s prostrkáním, tedy nejhůř čitelný tvar, jaký text může mít. */
+:root[data-theme="dark"] .text-black\/30{ color:rgba(237,242,228,0.52) !important; }
 :root[data-theme="dark"] .text-black\/80{ color:rgba(237,242,228,0.86) !important; }
 :root[data-theme="dark"] .text-black\/25{ color:rgba(237,242,228,0.30) !important; }
+
+
 :root[data-theme="dark"] .text-black\/20{ color:rgba(237,242,228,0.26) !important; }
 :root[data-theme="dark"] .text-\[\#5B7A08\]{ color:#C8F542 !important; }
 /* Tmavý motiv přebarvoval jen tenhle jeden zelený odstín. Ty ostatní zůstávaly

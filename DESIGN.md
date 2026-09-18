@@ -137,13 +137,13 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a šestnáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a sedmnáct kontrol ze `scripts/check-*.mjs`:
 
-`check-time` · `check-czech` · `check-decimal-inputs` · `check-email` ·
-`check-fetch-ok` · `check-forms` · `check-generic-copy` · `check-ics` ·
-`check-modals` · `check-money` · `check-palette` · `check-silent-load` ·
-`check-test-imports` · `check-transitions` · `check-width-clash` ·
-`check-contrast-classes`
+`check-contrast-classes` · `check-czech` · `check-dark-classes` ·
+`check-decimal-inputs` · `check-email` · `check-fetch-ok` · `check-forms` ·
+`check-generic-copy` · `check-ics` · `check-modals` · `check-money` ·
+`check-palette` · `check-silent-load` · `check-test-imports` ·
+`check-time` · `check-transitions` · `check-width-clash`
 
 Vizuálně: Playwright přes 61 obrazovek (46 administrace + 15 klient) na
 1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
@@ -459,6 +459,23 @@ je horší než žádné tlačítko — člověk si myslí, že směnu má zapsa
   vlastnost na dvě. Ošetřuje se `\`, `;`, `,` a nový řádek.
 - **Konec před začátkem se vynechá**, událost bez data taky — soubor
   zůstane platný i s pokaženým vstupem.
+
+## Tmavý režim
+
+Tmavý režim se v aplikaci nabízí a ukládá do prohlížeče. Hostovská část
+(Managero client) ho záměrně nemá — tam si vzhled určuje podnik.
+
+- **Třída, která si nastaví barvu textu, ji musí mít i pro tmavý režim.**
+  Plošné pravidlo pro `.text-black/NN` na `.seg-off` ani `.cat-1` nedosáhne,
+  protože jméno třídy je jiné. Hlídá `check-dark-classes`.
+- **Výjimka jsou plochy, které zůstávají světlé** — limetkový akcent,
+  `.panel-light`, `.chip-ink`. Tam je inkoust správně a přebarvit ho by byla
+  chyba opačným směrem. Vyjmenované jsou ve skriptu kontroly.
+- **Kontrast se měří, ne odhaduje.** `probe-dark` počítá poměr podle WCAG
+  proti skutečnému podkladu pod textem a jede přes všechny obrazovky.
+- **Podklad je první vrstva, která kryje.** Skládat všechny průhledné
+  předky dohromady dává barvy, které na obrazovce nikde nejsou — takhle
+  jsem si sám vyrobil 482 falešných nálezů a málem podle nich opravoval.
 
 ## Kiosk: tablet za barem, ne monitor na stole
 
