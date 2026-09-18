@@ -8,11 +8,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { Initials } from './ClientShell';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const input = 'field !py-2.5 text-sm';
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
 
 export default function CardScan({ onToast, onChange }: { onToast: (m: string) => void; onChange?: () => void }) {
+  const money = useMoney();
+  const symbol = useSymbol();
   const [code, setCode] = useState('');
   const [hit, setHit] = useState<any | null>(null);
   const [amount, setAmount] = useState('');
@@ -90,7 +93,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
                 <span className="rounded-full bg-[#16181A] text-[#C8F542] px-3 py-1 text-xs font-bold">Sleva {hit.discount} %</span>
               )}
               {hit.credit > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#3E5406] px-3 py-1 text-xs font-semibold"><Icon name="card" size={12} />Kredit {hit.credit} Kč</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#3E5406] px-3 py-1 text-xs font-semibold"><Icon name="card" size={12} />Kredit {money(hit.credit)}</span>
               )}
               {hit.nextTierAt && (
                 <span className="text-xs text-black/45">do „{hit.nextTierLabel}" ještě {Math.max(0, hit.nextTierAt - hit.visits)} návštěv</span>
@@ -121,7 +124,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
             </Button>
             <form onSubmit={e => { e.preventDefault(); act('points'); }} className="flex gap-2">
-              <input aria-label="Útrata v Kč" type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder="Útrata Kč" className={`${input} !w-28 text-center`} />
+              <input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className={`${input} !w-28 text-center`} />
               <Button type="submit" variant="primary" loading={busy === 'points'} disabled={!hit.rules?.pointsPer100 || !amount}>Body</Button>
             </form>
           </div>
@@ -133,7 +136,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
                   <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id}
                     onClick={() => { const on = bill === bl.bill_id; setBill(on ? null : bl.bill_id); setAmount(on ? '' : String(Math.round(Number(bl.final_price)))); }}
                     className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums transition border ${bill === bl.bill_id ? 'bg-[#16181A] text-[#C8F542] border-[#16181A]' : 'bg-black/[0.05] hover:bg-black/[0.09] border-transparent'}`}>
-                    {Math.round(Number(bl.final_price))} Kč
+                    {money(Math.round(Number(bl.final_price)))}
                   </button>
                 ))}
               </div>
@@ -154,7 +157,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
           {(hit.affordable?.length ?? 0) > 0 && (
             <p className="text-xs text-black/55">Za body teď dosáhne na: {hit.affordable.map((a: any) => `${a.title} (${a.cost_points} b.)`).join(', ')}. Kupon si vezme sám na své stránce.</p>
           )}
-          {hit.rules?.pointsPer100 > 0 && <p className="text-xs text-black/50">{hit.rules.pointsPer100} b. za každých 100 Kč{hit.rules.cashbackPct > 0 ? ` a ${hit.rules.cashbackPct} % zpět jako kredit` : ''}. Razítko nejvýš jedno denně.</p>}
+          {hit.rules?.pointsPer100 > 0 && <p className="text-xs text-black/50">{hit.rules.pointsPer100} b. za každých 100 {symbol}{hit.rules.cashbackPct > 0 ? ` a ${hit.rules.cashbackPct} % zpět jako kredit` : ''}. Razítko nejvýš jedno denně.</p>}
           {hit.openCoupons?.length > 0 && (
             <ul className="space-y-1.5">
               {hit.openCoupons.map((c: any) => (

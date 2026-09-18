@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
 import { czDay, RES_STATUS, tierFor } from '@/lib/clientSlots';
+import { formatMoney } from '@/lib/money';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -73,7 +74,7 @@ export default function MyPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-xl font-bold tabular-nums leading-tight">{m.points} <span className="text-sm font-medium text-black/50">b.</span></p>
-                      {m.credit > 0 && <p className="text-sm font-semibold tabular-nums text-[#5B7A08] leading-tight">{m.credit} Kč kreditu</p>}
+                      {m.credit > 0 && <p className="text-sm font-semibold tabular-nums text-[#5B7A08] leading-tight">{formatMoney(m.credit, m.currency)} kreditu</p>}
                     </div>
                   </div>
                   {(m.campaigns ?? []).length > 0 ? (
@@ -161,7 +162,7 @@ export default function MyPage() {
                         <p className="text-sm text-black/55 truncate">{(o.items ?? []).map((i: any) => `${i.count}× ${i.name}`).join(', ')}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold tabular-nums">{o.total} Kč</p>
+                        <p className="font-semibold tabular-nums">{formatMoney(o.total, o.currency)}</p>
                         <p className="text-xs text-black/50">{o.status === 'new' ? 'čeká' : o.status === 'confirmed' ? 'připravuje se' : o.status === 'done' ? 'hotovo' : 'nepřijato'}</p>
                       </div>
                     </li>

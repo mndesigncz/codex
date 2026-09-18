@@ -12,6 +12,7 @@ import { Initials } from './ClientShell';
 import CardScan from './CardScan';
 import { RES_STATUS } from '@/lib/clientSlots';
 import { czCount } from '@/lib/czech';
+import { useMoney } from '../CurrencyProvider';
 
 const EVERY_MS = 20 * 1000;
 
@@ -227,6 +228,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
 }
 
 function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: number, s: string) => void; toPos?: (id: number) => void }) {
+  const money = useMoney();
   const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new;
   return (
     <li className="rounded-2xl bg-white/70 border border-black/[0.06] p-3.5">
@@ -238,10 +240,10 @@ function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: nu
             <span className="text-xs font-medium text-black/45">{ago(o.created_at)}</span>
           </p>
           <ul className="mt-1.5 text-sm">
-            {(o.items ?? []).map((l: any, i: number) => <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{l.price * l.count} Kč</span></li>)}
+            {(o.items ?? []).map((l: any, i: number) => <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{money(l.price * l.count)}</span></li>)}
           </ul>
           {o.note && <p className="text-xs text-black/60 mt-1">„{o.note}"</p>}
-          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{o.total} Kč</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
+          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{money(o.total)}</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
             {(() => {
               const st = String(o.pos_state ?? '');
               if (!o.storyous_order_id) {

@@ -25,7 +25,8 @@ export async function GET() {
   let orders: any[] = [];
   try {
     orders = await sql`
-      SELECT o.id, o.items, o.total, o.status, o.created_at, p.slug, COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
+      SELECT o.id, o.items, o.total, o.status, o.created_at, p.slug, t.currency,
+             COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
       FROM client_orders o JOIN client_profiles p ON p.team_id = o.team_id JOIN teams t ON t.id = o.team_id
       WHERE o.customer_id = ${me.id} ORDER BY o.created_at DESC LIMIT 40` as any[];
   } catch { orders = []; }
