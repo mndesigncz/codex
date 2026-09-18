@@ -10,6 +10,7 @@ import { earnedFor, wagesTotal, MAX_SHIFT_HOURS } from '../lib/wages.ts';
 import { normalizeCurrency, formatMoney, currencySymbol } from '../lib/money.ts';
 import { okJson, okText, apiMessage, statusMessage, ApiError, isOffline } from '../lib/api.ts';
 import { nextActiveId, needsWho, IDLE_MS } from '../lib/kioskIdentity.ts';
+import { buildIcs, escapeText, foldLine } from '../lib/ics.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -229,6 +230,73 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   ok('kiosk: bez jména a s lidmi na směně se ptáme', needsWho(null, [2, 3]));
   ok('kiosk: se jménem se neptáme', !needsWho(2, [2, 3]));
   ok('kiosk: prázdná směna není otázka', !needsWho(null, []));
+}
+
+// --- Soubor do kalendáře (lib/ics) ---
+{
+  const NOW = new Date('2026-09-18T02:30:00.000Z');
+  const has = (ics: string, line: string) => ics.split('\r\n').includes(line);
+
+  const smena = buildIcs([{
+    uid: 'managero-shift-7@managero',
+    date: '2026-09-20',
+    startTime: '08:00',
+    endTime: '16:00',
+    summary: 'Ranní — Managero',
+  }], '-//Managero//Smeny//CS', NOW);
+
+  // Bez `DTSTAMP` Outlook a Exchange soubor odmítnou — člověk klikne
+  // na „Do kalendáře" a nestane se nic.
+  ok('ics: událost má DTSTAMP', has(smena, 'DTSTAMP:20260918T023000Z'));
+  ok('ics: DTSTAMP je v UTC', /DTSTAMP:\d{8}T\d{6}Z/.test(smena));
+
+  // `TZID` bez popisu pásma je jen nápis: klient, co Prahu nezná, ukáže
+  // ranní směnu o dvě hodiny jinde.
+  ok('ics: pásmo je popsané', has(smena, 'BEGIN:VTIMEZONE') && has(smena, 'TZID:Europe/Prague'));
+  ok('ics: a má obě poloviny roku', has(smena, 'TZNAME:CEST') && has(smena, 'TZNAME:CET'));
+  ok('ics: začátek se na pásmo odkazuje', has(smena, 'DTSTART;TZID=Europe/Prague:20260920T080000'));
+  ok('ics: konec taky', has(smena, 'DTEND;TZID=Europe/Prague:20260920T160000'));
+  ok('ics: soubor končí správně', smena.endsWith('END:VCALENDAR\r\n'));
+  ok('ics: řádky oddělují CRLF', smena.includes('\r\n') && !/[^\r]\n/.test(smena));
+
+  // Čárka v názvu akce dřív rozdělila vlastnost na dvě a událost se rozsypala.
+  const akce = buildIcs([{
+    uid: 'e1', date: '2026-10-03', startTime: '18:00', endTime: '22:00',
+    summary: 'Degustace, ročník 2019',
+    location: 'Hlavní 5; vchod ze dvora',
+    description: 'Přijďte\nv 18:00',
+  }], '-//Managero//Akce//CS', NOW);
+  ok('ics: čárka v názvu se ošetří', has(akce, 'SUMMARY:Degustace\\, ročník 2019'));
+  ok('ics: středník v adrese taky', has(akce, 'LOCATION:Hlavní 5\\; vchod ze dvora'));
+  ok('ics: nový řádek se nepromítne do souboru', has(akce, 'DESCRIPTION:Přijďte\\nv 18:00'));
+  eq('ics: zpětné lomítko se zdvojí', escapeText('C:\\cesta'), 'C:\\\\cesta');
+
+  // Celodenní: konec je nevýlučný, musí to být den následující.
+  const cely = buildIcs([{ uid: 'e2', date: '2026-12-31', summary: 'Silvestr' }], '-//x//CS', NOW);
+  ok('ics: celodenní má DTSTART jako datum', has(cely, 'DTSTART;VALUE=DATE:20261231'));
+  ok('ics: a končí dalším dnem, i přes rok', has(cely, 'DTEND;VALUE=DATE:20270101'));
+
+  // Konec před začátkem by kalendář nakreslil pozpátku.
+  const pozpatku = buildIcs([{ uid: 'e3', date: '2026-05-05', startTime: '22:00', endTime: '06:00', summary: 'Noční' }], '-//x//CS', NOW);
+  ok('ics: konec před začátkem se vynechá', !pozpatku.includes('DTEND;TZID'));
+  ok('ics: začátek zůstane', has(pozpatku, 'DTSTART;TZID=Europe/Prague:20260505T220000'));
+
+  // Nepoužitelné datum by jen rozbilo soubor.
+  const spatne = buildIcs([{ uid: 'e4', date: 'zítra', summary: 'Nic' }], '-//x//CS', NOW);
+  ok('ics: událost bez data se vynechá', !spatne.includes('BEGIN:VEVENT'));
+  ok('ics: a soubor zůstane platný', has(spatne, 'BEGIN:VCALENDAR') && has(spatne, 'END:VCALENDAR'));
+
+  // Zalomení na 75 oktetů: měří se bajty UTF-8, ne znaky.
+  const dlouhy = 'DESCRIPTION:' + 'ě'.repeat(200);
+  const zalomeny = foldLine(dlouhy);
+  const bytesOf = (t: string) => new TextEncoder().encode(t).length;
+  ok('ics: dlouhý řádek se zalomil', zalomeny.includes('\r\n '));
+  ok('ics: žádný kus nepřeleze 75 oktetů',
+    zalomeny.split('\r\n').every(l => bytesOf(l) <= 75));
+  ok('ics: pokračování začíná mezerou',
+    zalomeny.split('\r\n').slice(1).every(l => l.startsWith(' ')));
+  eq('ics: po slepení zpět je to původní řádek', zalomeny.split('\r\n ').join(''), dlouhy);
+  eq('ics: krátký řádek se nesahá', foldLine('SUMMARY:Směna'), 'SUMMARY:Směna');
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

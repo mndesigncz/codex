@@ -7,6 +7,7 @@ import TeamSchedule from './TeamSchedule';
 import { Icon } from '../Icons';
 import { PageHeader } from '../ui';
 import { okJson } from '@/lib/api';
+import { buildIcs, downloadIcs } from '@/lib/ics';
 interface Shift {
   id: number;
   employeeId: number;
@@ -83,33 +84,19 @@ export default function MyShifts({ user }: Props) {
   // Prefer the server-resolved configured type name; fall back to legacy labels.
   const shiftLabel = (s: Shift) => s.type === 'event' ? 'Akce' : (s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna'));
 
-  // Client-side iCalendar export of upcoming shifts (opens in Apple/Google Calendar).
+  // Směny do kalendáře. Soubor skládá `lib/ics` — dřív se tady lepil ručně
+  // a chyběl mu `DTSTAMP` i popis pásma, takže Outlook ho odmítl a klient,
+  // co nezná `Europe/Prague`, ukázal ranní směnu o dvě hodiny jinde.
   const exportIcs = () => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const lines = [
-      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Managero//Smeny//CS', 'CALSCALE:GREGORIAN',
-    ];
-    for (const s of upcoming) {
-      const d = s.date.replace(/-/g, '');
-      const st = (s.startTime || '08:00').replace(':', '') + '00';
-      const en = (s.endTime || '16:00').replace(':', '') + '00';
-      lines.push(
-        'BEGIN:VEVENT',
-        `UID:managero-shift-${s.id}@managero`,
-        `DTSTART;TZID=Europe/Prague:${d}T${st}`,
-        `DTEND;TZID=Europe/Prague:${d}T${en}`,
-        'SUMMARY:Směna — Managero',
-        `DESCRIPTION:${s.startTime}–${s.endTime}`,
-        'END:VEVENT',
-      );
-    }
-    lines.push('END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'moje-smeny.ics';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const ics = buildIcs(upcoming.map(s => ({
+      uid: `managero-shift-${s.id}@managero`,
+      date: s.date,
+      startTime: s.startTime || '08:00',
+      endTime: s.endTime || '16:00',
+      summary: `${shiftLabel(s)} — Managero`,
+      description: s.startTime && s.endTime ? `${s.startTime}–${s.endTime}` : null,
+    })), '-//Managero//Smeny//CS');
+    downloadIcs('moje-smeny.ics', ics);
   };
 
   return (
