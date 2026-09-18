@@ -3,6 +3,7 @@
 import React from 'react';
 import { Icon } from '../Icons';
 import { useModal } from '@/lib/useModal';
+import { DiscardGuard } from './DiscardGuard';
 
 // Okno — jedno pro všechny.
 //
@@ -51,12 +52,13 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', sheet = fal
             : 'rounded-3xl max-h-[calc(100dvh-2rem)]'
         }`}
         onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={modal.guard} />
         <div className="flex items-start gap-3 p-6 pb-3">
           <div className="min-w-0 flex-1">
             <h3 className="t-section text-balance">{title}</h3>
             {subtitle && <p className="t-meta mt-1 text-pretty">{subtitle}</p>}
           </div>
-          <button type="button" onClick={onClose} aria-label="Zavřít"
+          <button type="button" onClick={modal.guard.attemptClose} aria-label="Zavřít"
             className="btn-icon shrink-0 -mt-1 -mr-1"><Icon name="close" size={16} /></button>
         </div>
         <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>

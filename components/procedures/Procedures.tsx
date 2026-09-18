@@ -13,6 +13,7 @@ import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { czForm } from '@/lib/czech';
 import { okJson, apiMessage } from '@/lib/api';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -388,6 +389,7 @@ export default function Procedures({ user }: Props) {
       {confirmDel && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => !deleting && setConfirmDel(null)}>
           <div ref={delModal.ref} {...delModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <DiscardGuard guard={delModal.guard} />
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-600">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
@@ -446,6 +448,7 @@ export default function Procedures({ user }: Props) {
         return (
           <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setRunDetail(null)}>
             <div ref={runModal.ref} {...runModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+              <DiscardGuard guard={runModal.guard} />
               <div className="flex items-start justify-between gap-3 mb-1">
                 <h3 className="text-lg font-bold tracking-tight text-[#16181A] min-w-0">{runDetail.procedure_name}</h3>
                 <button aria-label="Zavřít" onClick={() => setRunDetail(null)} className="shrink-0 btn-icon"><Icon name="close" size={15} /></button>
@@ -520,6 +523,7 @@ function ProcedureDetail({
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={dm.guard} />
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-start justify-between gap-3">
@@ -541,7 +545,7 @@ function ProcedureDetail({
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
                 </button>
               )}
-              <button onClick={onClose} aria-label="Zavřít" className="btn-icon">
+              <button onClick={dm.guard.attemptClose} aria-label="Zavřít" className="btn-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
@@ -679,9 +683,10 @@ function ProcedureEditor({
         className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
+        <DiscardGuard guard={em.guard} />
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <h2 className="t-section">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
-          <button onClick={onClose} aria-label="Zavřít" className="btn-icon">
+          <button onClick={em.guard.attemptClose} aria-label="Zavřít" className="btn-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>

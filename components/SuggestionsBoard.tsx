@@ -6,6 +6,7 @@ import { Icon } from './Icons';
 import { EmptyState, PageHeader, Button, Modal } from './ui';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from './ui/DiscardGuard';
 type Suggestion = {
   id: number;
   title: string;
@@ -302,6 +303,7 @@ export default function SuggestionsBoard() {
       {composing && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setComposing(false)}>
           <div ref={composeModal.ref} {...composeModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+            <DiscardGuard guard={composeModal.guard} />
             <div className="flex items-center gap-2.5 mb-4">
               <div className="grid place-items-center h-10 w-10 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="bulb" size={20} /></div>
               <h3 className="t-card">Nový podnět</h3>

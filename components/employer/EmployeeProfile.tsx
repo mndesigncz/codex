@@ -7,6 +7,7 @@ import ShiftReviewModal from './ShiftReviewModal';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 interface ShiftRow {
   id: number; date: string; startTime: string | null; endTime: string | null; type: string | null;
@@ -71,6 +72,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={m.guard} />
         {loading || !p ? (
           <div className="p-10 flex items-center justify-center">
             <div className="h-9 w-9 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />

@@ -12,6 +12,7 @@ import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { okJson, apiMessage } from '@/lib/api';
 import { czCount, KATEGORIE } from '@/lib/czech';
+import { DiscardGuard } from './ui/DiscardGuard';
 
 interface User {
   id: number;
@@ -503,6 +504,7 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
             className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
             onClick={(e) => e.stopPropagation()}
           >
+            <DiscardGuard guard={readerModal.guard} />
             <div className="flex items-start justify-between gap-3 sm:gap-4 mb-4">
               <div className="min-w-0 flex-1">
                 {(() => {
@@ -846,9 +848,10 @@ function GuideEditor({
         className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
+        <DiscardGuard guard={em.guard} />
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="t-section min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
-          <button onClick={onClose} className="btn-icon" aria-label="Zavřít">
+          <button onClick={em.guard.attemptClose} className="btn-icon" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
@@ -1107,9 +1110,10 @@ function ManageCategories({
         className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
+        <DiscardGuard guard={cm.guard} />
         <div className="flex items-center justify-between gap-3 mb-6">
           <h2 className="t-section min-w-0 truncate">Kategorie</h2>
-          <button onClick={onClose} className="btn-icon" aria-label="Zavřít">
+          <button onClick={cm.guard.attemptClose} className="btn-icon" aria-label="Zavřít">
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>

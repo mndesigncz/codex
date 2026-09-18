@@ -11,6 +11,7 @@ import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { czCount, SMENA, DEN } from '@/lib/czech';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -1068,6 +1069,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
           {copyOpen && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setCopyOpen(false)}>
               <div ref={copyModal.ref} {...copyModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+                <DiscardGuard guard={copyModal.guard} />
                 <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">Kopírovat týden</h3>
                 <p className="text-sm text-black/50 mb-4">Vezme všechny směny zdrojového týdne a naplánuje je do cílového (stejné dny, časy i lidi).</p>
                 <div className="space-y-3">
@@ -1453,6 +1455,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
       {importPreview && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
           <div ref={importModal.ref} {...importModal.dialogProps} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
+            <DiscardGuard guard={importModal.guard} />
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-bold text-[#16181A] min-w-0 truncate">Náhled importu</h3>
               <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
@@ -2217,6 +2220,7 @@ function DayModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
       <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
+        <DiscardGuard guard={dm.guard} />
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-bold text-[#16181A] cz-sentence min-w-0 truncate">{dayLabel(date)}</h3>
           <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
@@ -2749,13 +2753,14 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
       <div ref={am.ref} {...am.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <DiscardGuard guard={am.guard} />
         <div className="flex items-center gap-3">
           <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{member.avatar}</span>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
             <p className="text-xs text-black/45 cz-sentence">{monthLabel(month)}</p>
           </div>
-          <button onClick={onClose} className="btn-icon shrink-0" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={am.guard.attemptClose} className="btn-icon shrink-0" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <p className="text-xs text-black/45">

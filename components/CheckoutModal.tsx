@@ -12,6 +12,7 @@ import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from '@stripe/st
 import { Icon } from './Icons';
 import { useModal } from '@/lib/useModal';
 import { PLAN_NAMES, PRICES, TRIAL_DAYS, MAX_EXTRAS, type Interval } from '@/lib/plan';
+import { DiscardGuard } from './ui/DiscardGuard';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 function stripeJs(): Promise<Stripe | null> | null {
@@ -89,12 +90,13 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
     <div className="fixed inset-0 modal-overlay z-[80] flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} onClick={e => e.stopPropagation()}
         className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-4xl max-h-[92vh] overflow-hidden flex flex-col">
+        <DiscardGuard guard={m.guard} />
         <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-3">
           <div className="min-w-0">
             <h3 className="t-section truncate">{trial ? `Vyzkoušet ${PLAN_NAMES[plan]} na ${TRIAL_DAYS} dní zdarma` : `Předplatit ${PLAN_NAMES[plan]}`}</h3>
             <p className="t-meta">{trial ? `Karta se zadá teď, první platba ${czk(amount)} až po ${TRIAL_DAYS} dnech.` : `${czk(amount)} ${interval === 'year' ? 'ročně' : 'měsíčně'} za podnik.`}</p>
           </div>
-          <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={m.guard.attemptClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin grid grid-cols-1 md:grid-cols-[260px_1fr]">

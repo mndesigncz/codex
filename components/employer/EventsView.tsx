@@ -12,6 +12,7 @@ import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 type Ev = any;
 
@@ -201,6 +202,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={m.guard} />
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Nová akce</h3>
         {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
         {/* Opravdový <form>, ne jen tlačítko s onClick: po vyplnění názvu
@@ -346,6 +348,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev2 => ev2.stopPropagation()}>
+        <DiscardGuard guard={dm.guard} />
         {/* hlavička */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -356,7 +359,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
               {e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={dm.guard.attemptClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         {/* stav + oznámení týmu */}
@@ -453,7 +456,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
           )}
           {/* Zeď všech členů nahradilo hledací pole — tým může mít i desítky lidí. */}
           <div className="relative">
-            <input value={crewSearch} onChange={ev3 => setCrewSearch(ev3.target.value)}
+            <input data-transient value={crewSearch} onChange={ev3 => setCrewSearch(ev3.target.value)}
               onFocus={() => setCrewOpen(true)} onBlur={() => setTimeout(() => setCrewOpen(false), 150)}
               placeholder="Přidat člověka — začni psát jméno…" className={inputClass} />
             {crewOpen && crewCandidates.length > 0 && (
@@ -697,7 +700,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 ))}
               </div>
               <div className="relative mt-2">
-                <input value={packSearch} onChange={ev3 => setPackSearch(ev3.target.value)} placeholder="Přidat ze skladu — začni psát název…" className={inputClass} />
+                <input data-transient value={packSearch} onChange={ev3 => setPackSearch(ev3.target.value)} placeholder="Přidat ze skladu — začni psát název…" className={inputClass} />
                 {packCandidates.length > 0 && (
                   <div className="absolute inset-x-0 top-full mt-1 z-10 glass-strong rounded-2xl p-1.5 space-y-0.5 shadow-lg">
                     {packCandidates.map(i2 => (

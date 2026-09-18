@@ -8,6 +8,7 @@ import { Icon } from '../Icons';
 import ShrinkageReport from './ShrinkageReport';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { DiscardGuard } from '../ui/DiscardGuard';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const fmt = (n: number) => round3(n).toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
@@ -147,9 +148,10 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
+        <DiscardGuard guard={m.guard} />
         <div className="flex items-center justify-between gap-3 mb-1">
           <h3 className="t-card"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Inventura skladu</h3>
-          <button onClick={onClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+          <button onClick={m.guard.attemptClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
         {err && <p className="text-sm text-red-600 mt-2">{err}</p>}

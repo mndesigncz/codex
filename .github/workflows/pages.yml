@@ -70,6 +70,10 @@ jobs:
       # nepřibývalo a aby nové vznikalo komponentou <Modal>.
       - name: Okna
         run: node scripts/check-modals.mjs
+      # Escape a klik vedle okna zavíraly bez ptaní — u rozepsané směrnice
+      # to byla hodina práce pryč jedním omylem.
+      - name: Rozepsané v oknech
+        run: node scripts/check-modal-guard.mjs
       # `transition-all` animuje i rozvržení; na tabletu u kasy to poskakuje.
       - name: Přechody
         run: node scripts/check-transitions.mjs
