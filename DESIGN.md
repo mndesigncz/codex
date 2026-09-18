@@ -76,11 +76,36 @@ Písmo **Geist** (balíček `geist`, `--font-geist-sans`), kódy kartiček a kup
 
 ## Komponenty (components/ui)
 
-Button, PageHeader (title/subtitle/primary/secondary/aside/menu), Section
-(t-section + jedna akce vpravo), Segmented, EmptyState, Skeleton/PageSkel
-(shimmer), Menu (roste z tlačítka, `pop-in` 160 ms), Avatar/Initials,
-Card/Well, Field/Label/Input/Select/Textarea, Chip, ListRow, Stat/StatRow,
-Toast. Klient navíc: StatCard, SectionTitle, TableMap.
+Než něco napíšeš znovu, podívej se sem. Tenhle seznam byl chvíli o devět
+kusů pozadu a to je nejjistější způsob, jak vznikne desátá podoba téhož.
+
+**Rozvržení a text:** PageHeader (title/subtitle/primary/secondary/aside/
+menu), Section (t-section + jedna akce vpravo), Card/Well, Stat/StatRow,
+Chip, ListRow, Avatar/Initials.
+
+**Ovládání:** Button, Segmented, Menu (roste z tlačítka, `pop-in` 160 ms),
+Field/Label/Input/Select/Textarea, SearchField (poslední hledání, návrhy,
+klávesnice), Modal (sm/md/lg + `sheet`), Toast.
+
+**Stavy obrazovky:** EmptyState, Skeleton/PageSkeleton (shimmer),
+ErrorState (třetí poctivý stav), ErrorBoundary (pád sekce nevybílí
+aplikaci), `useLoad` (data + chyba + `reload` na jednom místě).
+
+**Hromadné akce:** BulkBar, SelectBox, ApproveAllBar, `useSelection`,
+`runBulk`.
+
+**Nápovědy:** Hint (trvale zavřít nebo vypnout všechny).
+
+Klient navíc: StatCard, SectionTitle, TableMap.
+
+## Sdílené kusy v `lib/`
+
+- `pragueTime` — každý „jaký je den" a „kolik je hodin". Hlídá `check-time`.
+- `czech` — skloňování po číslovce. Hlídá `check-czech`.
+- `useModal` — okno: Escape, past na fokus, návrat fokusu, zámek posouvání.
+- `usePopover` — rozbalovací panel: Escape, kliknutí mimo, šipky, návrat fokusu.
+- `useResultKeys` — našeptávač, kde si seznam výsledků kreslí volající.
+- `clickable` — karta, která nemůže být `<button>`, protože nese odkazy.
 
 ## Vzory obrazovek
 
@@ -110,11 +135,24 @@ tvrdší okraje.
 
 ## Ověření
 
-Před pushem: `npm run typecheck && npm test && npm run build` + skripty
-`check-time`, `check-decimal-inputs`, `check-width-clash`,
-`check-contrast-classes`. Vizuálně: Playwright screenshoty všech ~100
-obrazovek (desktop 1280, mobil 390, úzký 320) a sweep přetečení, dotykových
-cílů, duplicitních id a vnořených klikatelných prvků — vše 0.
+Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
+ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
+`npm run build` a dvanáct kontrol ze `scripts/check-*.mjs`:
+
+`check-time` · `check-czech` · `check-decimal-inputs` · `check-forms` ·
+`check-generic-copy` · `check-modals` · `check-palette` ·
+`check-silent-load` · `check-test-imports` · `check-transitions` ·
+`check-width-clash` · `check-contrast-classes`
+
+Vizuálně: Playwright přes 61 obrazovek (46 administrace + 15 klient) na
+1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
+a dotykových cílů — vše 0. K tomu sondy na klávesnici, hromadné akce
+a filtry.
+
+**Prázdná obrazovka není ověřená obrazovka.** Zhruba polovina nálezů
+v téhle aplikaci se ukázala až s daty; když k obrazovce není fixture,
+fotí se prázdno a nic se nedozvíš. Fixtures musí mít tvar skutečné
+odpovědi API — ne ten, který se zdá rozumný.
 
 ## Texty tlačítek
 
