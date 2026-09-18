@@ -99,3 +99,7 @@ jobs:
       # objednávka tváří jako odeslaná a vedoucí čeká na zboží.
       - name: Odesílání e-mailů
         run: node scripts/check-email.mjs
+      # Třída, která si nastaví barvu textu, ji musí mít i pro tmavý režim —
+      # jinak zůstane černá na černém (naměřeno 1,03 : 1 u záložek).
+      - name: Tmavý režim
+        run: node scripts/check-dark-classes.mjs
