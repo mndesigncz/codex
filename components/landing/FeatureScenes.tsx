@@ -17,6 +17,7 @@
 // a zastaví se. Nekonečná smyčka vedle textu se čte hůř než text sám.
 
 import { formatMoney } from '@/lib/money';
+import { zkratkyDnu } from '@/lib/week';
 import { Icon } from '@/components/Icons';
 
 const kc = (n: number) => formatMoney(n, 'CZK');
@@ -55,7 +56,7 @@ function Fajfka({ delay }: { delay: number }) {
 
 /** Rozvrh: prázdný týden, směny spadnou na místo, jedna kolize se vyřeší. */
 function Rozvrh() {
-  const dny = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+  const dny = zkratkyDnu(1);
   const smeny: { den: number; kdo: string; delka: number; kolize?: boolean }[] = [
     { den: 0, kdo: 'Eva', delka: 2 }, { den: 1, kdo: 'Martin', delka: 1 },
     { den: 2, kdo: 'Eva', delka: 1 }, { den: 3, kdo: 'Jana', delka: 2 },

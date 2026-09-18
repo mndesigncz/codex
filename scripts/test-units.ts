@@ -18,6 +18,7 @@ import { formatCost } from '../lib/money.ts';
 import { reakceNaZavreni, jePsanePole, jeRozepsano } from '../lib/modalClose.ts';
 import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.ts';
 import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
+import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -522,6 +523,47 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   // Varování podniku sedí s tím, co se dá dosáhnout.
   ok('barva značky: limetka nepotřebuje varovat', staciKontrast('#C8F542'));
   ok('barva značky: purpurová #DC14C8 varuje (nejlepší možné 4,22:1)', !staciKontrast('#DC14C8'));
+}
+
+// ---- Začátek týdne -------------------------------------------------------
+// Podnik si volí, jestli mu týden začíná pondělím, nebo nedělí. Rozvrh
+// a dostupnost to dřív ignorovaly a kreslily vždycky od pondělí, zatímco
+// kalendáře vedle nastavení ctily.
+{
+  eq('týden: hlavička od pondělí', zkratkyDnu(1), ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']);
+  eq('týden: hlavička od neděle', zkratkyDnu(0), ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So']);
+
+  // 2026-09-14 je pondělí, 2026-09-20 neděle.
+  eq('týden: pondělí je při pondělním začátku první', poradiDne('2026-09-14', 1), 0);
+  eq('týden: neděle je při pondělním začátku poslední', poradiDne('2026-09-20', 1), 6);
+  eq('týden: neděle je při nedělním začátku první', poradiDne('2026-09-20', 0), 0);
+  eq('týden: pondělí je při nedělním začátku druhé', poradiDne('2026-09-14', 0), 1);
+
+  // Odsazení měsíce: 1. 9. 2026 je úterý.
+  eq('týden: odsazení září 2026 při pondělním začátku', odsazeniMesice('2026-09-01', 1), 1);
+  eq('týden: odsazení září 2026 při nedělním začátku', odsazeniMesice('2026-09-01', 0), 2);
+
+  // Hodnota z databáze bývá i null nebo řetězec.
+  eq('týden: chybějící nastavení znamená pondělí', zacatekTydne(null), 1);
+  eq('týden: nula znamená neděli', zacatekTydne(0), 0);
+  eq('týden: „0" z databáze znamená neděli', zacatekTydne('0'), 0);
+  eq('týden: nesmysl znamená pondělí', zacatekTydne('kdykoliv'), 1);
+
+  // Každý den musí padnout do jiného sloupce, jinak se mřížka překrývá.
+  for (const z of [0, 1] as const) {
+    const sloupce = new Set<number>();
+    for (let d = 14; d <= 20; d++) sloupce.add(poradiDne(`2026-09-${d}`, z));
+    ok(`týden: sedm dnů dá sedm různých sloupců (začátek ${z})`, sloupce.size === 7);
+  }
+}
+
+// ---- Otevírací doba: klíč 0 = pondělí ------------------------------------
+// Tohle NENÍ zobrazení a se začátkem týdne se nemění. Kdyby to někdo
+// „sjednotil" s mřížkou, posunul by otevírací dobu všem podnikům o den.
+{
+  const weekdayKey = (date: string) => String((new Date(date + 'T00:00:00').getDay() + 6) % 7);
+  eq('otevírací doba: pondělí má klíč 0', weekdayKey('2026-09-14'), '0');
+  eq('otevírací doba: neděle má klíč 6', weekdayKey('2026-09-20'), '6');
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { zkratkyDnu, zacatekTydne } from '@/lib/week';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import { PersonLink } from '../employer/ProfileLinkProvider';
@@ -12,8 +13,6 @@ type Day = { onShift: Person[]; closedBy: Person[]; hasClosing: boolean; missing
 type Days = Record<string, Day>;
 
 const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-const WD_MON = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
-const WD_SUN = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
 
 const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -43,7 +42,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
   useEffect(() => { load(); }, [load]);
 
   const [y, m] = month.split('-').map(Number);
-  const wd = weekStart === 0 ? WD_SUN : WD_MON;
+  const wd = zkratkyDnu(zacatekTydne(weekStart));
   const firstDow = new Date(y, m - 1, 1).getDay();            // 0=Sun..6=Sat
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
