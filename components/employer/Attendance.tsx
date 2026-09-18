@@ -8,6 +8,7 @@ import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { earnedFor } from '@/lib/wages';
 
 type RosterMember = {
   id: number | string;
@@ -75,10 +76,9 @@ function hMM(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}`;
 }
 
-// Gross earned amount in Kč for a worked duration at an hourly rate.
-function earned(ms: number, rate: number): number {
-  return Math.round(ms / 3600000 * rate);
-}
+// Hrubá mzda za jeden záznam. Sdílená s Financemi i s Uzávěrkami, aby
+// tatáž docházka nedávala tři různé měsíční součty (viz lib/wages).
+const earned = earnedFor;
 
 function fmtTime(iso: string): string {
   return dbTimeHM(iso);

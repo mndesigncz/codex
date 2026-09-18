@@ -9,6 +9,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference, normalizeMovements } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
+import { wagesTotal } from '@/lib/wages';
 
 export const dynamic = 'force-dynamic';
 
@@ -205,12 +206,11 @@ export async function GET(req: NextRequest) {
       JOIN users us ON us.id = te.employee_id
       WHERE te.team_id = ${u.team_id} AND te.clock_out IS NOT NULL
         AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}`;
-    for (const e of entries as any[]) {
-      const rate = num(e.hourly_rate);
-      if (rate <= 0) continue;
-      const ms = new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime();
-      if (ms > 0) wagesWorked += Math.round((ms / 3600000) * rate);
-    }
+    // Jedno pravidlo pro celou aplikaci — viz lib/wages.
+    wagesWorked = wagesTotal((entries as any[]).map(e => ({
+      ms: new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime(),
+      rate: num(e.hourly_rate),
+    }))).total;
   } catch { /* ignore */ }
 
   const spent = (kind: string) => ledger.filter((r) => r.kind === kind).reduce((s, r) => s + r.amount, 0);
