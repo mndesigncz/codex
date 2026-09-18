@@ -9,6 +9,7 @@ import { batchesNeeded, planFor, recipeUnit, availableOf, taskTitleFor, checklis
 import { earnedFor, wagesTotal, MAX_SHIFT_HOURS } from '../lib/wages.ts';
 import { normalizeCurrency, formatMoney, currencySymbol } from '../lib/money.ts';
 import { okJson, okText, apiMessage, statusMessage, ApiError, isOffline } from '../lib/api.ts';
+import { nextActiveId, needsWho, IDLE_MS } from '../lib/kioskIdentity.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -200,6 +201,35 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   ok('api: s odpovědí serveru offline nejsme', !isOffline(new ApiError(500, 'x')));
 }
 
+
+// --- Kdo se zapisuje na sdíleném tabletu ---
+{
+  const N = (prev: number | null, onShift: number[], idleFor = 0) =>
+    nextActiveId({ prev, onShift, idleFor });
+
+  // Tohle je ta chyba, kvůli které kolo vzniklo: Anně (1) skončila směna
+  // a tablet se tiše stal Bobem (2), prvním v rozpisu.
+  eq('kiosk: po odchodu vybraného se nesáhne po náhradníkovi', N(1, [2, 3]), null);
+  eq('kiosk: vybraný na směně zůstává', N(2, [2, 3]), 2);
+
+  // Jeden člověk na směně odhad není.
+  eq('kiosk: jediný na směně se vybere sám', N(null, [7]), 7);
+  eq('kiosk: a přebije i cizí uloženou volbu', N(99, [7]), 7);
+  eq('kiosk: nikdo na směně = nikdo', N(5, []), null);
+
+  // Jméno drží jen proto, že na tablet nikdo nesáhl.
+  eq('kiosk: po nečinnosti se jméno pustí', N(2, [2, 3], IDLE_MS + 1000), null);
+  eq('kiosk: těsně pod prahem drží', N(2, [2, 3], IDLE_MS - 1000), 2);
+  eq('kiosk: u jediného člověka nečinnost nevadí', N(7, [7], IDLE_MS * 10), 7);
+
+  // Volá se po každé změně rozpisu i v tiku nečinnosti — dvakrát po sobě
+  // musí dát totéž, jinak by se obrazovka přepínala sama se sebou.
+  eq('kiosk: rozhodnutí je idempotentní', N(N(1, [2, 3]), [2, 3]), null);
+
+  ok('kiosk: bez jména a s lidmi na směně se ptáme', needsWho(null, [2, 3]));
+  ok('kiosk: se jménem se neptáme', !needsWho(2, [2, 3]));
+  ok('kiosk: prázdná směna není otázka', !needsWho(null, []));
+}
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
 // souboru — všechno pod ní se sice vypsalo, ale do návratového kódu se

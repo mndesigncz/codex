@@ -30,7 +30,7 @@ const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'b
 const todayStr = () => pragueToday();
 
 export default function KioskTasks() {
-  const { active } = useKioskShift();
+  const { active, requireActive } = useKioskShift();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   // Když se úkoly nenačtou, nesmí to vypadat jako „žádné úkoly 🎉“ —
@@ -49,26 +49,33 @@ export default function KioskTasks() {
   };
   useEffect(load, []);
 
+  // Kdo splnil úkol, je záznam o práci. Když tablet neví, koho zapsat,
+  // musí se zeptat dřív, než se cokoli pošle — `actingAs: undefined` dřív
+  // znamenalo, že si úkol připsal tablet sám.
   const setStatus = async (t: Task, status: string) => {
+    const who = await requireActive();
+    if (!who) return;
     const prev = tasks;
     setTasks(list => list.map(x => x.id === t.id ? { ...x, status } : x));
     try {
       const res = await fetch('/api/tasks', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, status, actingAs: active?.id }),
+        body: JSON.stringify({ id: t.id, status, actingAs: who.id }),
       });
       if (!res.ok) throw new Error();
     } catch { setTasks(prev); }
   };
 
   const toggleChecklistItem = async (t: Task, index: number) => {
+    const who = await requireActive();
+    if (!who) return;
     const next = (t.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it);
     const prev = tasks;
     setTasks(list => list.map(x => x.id === t.id ? { ...x, checklist: next } : x));
     try {
       const res = await fetch('/api/tasks', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, checklist: next, actingAs: active?.id }),
+        body: JSON.stringify({ id: t.id, checklist: next, actingAs: who.id }),
       });
       if (!res.ok) throw new Error();
     } catch { setTasks(prev); }

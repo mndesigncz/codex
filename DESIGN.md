@@ -404,6 +404,28 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   schovaly i s chybou. Rozhodnutí „ukázat se" nesmí viset na datech,
   která právě selhala.
 
+## Sdílený tablet a identita
+
+Tablet za barem nepatří nikomu. Všechno, co se na něm odklikne, přesto
+někomu patří — mzda, podpis pod zavíracím postupem, „kdo to naskladnil".
+
+- **Mezi víc lidmi se nehádá.** Jeden člověk na směně odhad není, to je
+  fakt. Dva a víc znamená, že se tablet **zeptá** — a než dostane odpověď,
+  nezapíše nic. Pravidlo žije v `lib/kioskIdentity` a je otestované.
+- **Odchod ze směny neznamená náhradníka.** Když vybranému skončí směna,
+  identita padá na „nevím", ne na prvního v rozpisu.
+- **Nečinnost identitu pustí.** Jméno drží jen proto, že na tablet nikdo
+  nesáhl; po deseti minutách to přestává být důkaz. Cookie se zapisuje na
+  hodinu a obnovuje dotykem, ne na celou směnu.
+- **Přepnutí je vidět.** Když někdo přijde na směnu a tím se stane tím,
+  kdo se zapisuje, řekne se to nahlas — ne potichu za zády toho předchozího.
+- **Prázdný odznak je horší než otázka.** Bez vybraného člověka se odznak
+  nesmí schovat: vypadá to, že tablet nikoho nezapisuje, a přitom zapisuje
+  sám sebe. Místo prázdna „Kdo jsi?".
+- **Rozpracovanost se nepřenáší.** Odškrtané kroky návodu, rozepsaný
+  formulář — cokoli v `localStorage` na sdíleném zařízení nese v klíči
+  i toho, komu to patří.
+
 ## Peníze a součty
 
 - **Jedno číslo se počítá na jednom místě.** Mzdové náklady z docházky
