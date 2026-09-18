@@ -724,6 +724,24 @@ Jedna past na typy: komponenta s výchozí hodnotou parametru
 propadnou na `object`. Řešení je pojmenovat a vyexportovat typ props, ne
 psát `any`.
 
+**Co to stojí, změřeno.** Za menší první načtení se platí tím, že se pohled
+stahuje při prvním otevření. `probe-prepnuti.mjs` to měří:
+
+| | první přepnutí na pohled |
+|---|---|
+| bez omezení | 355–415 ms |
+| pomalá 3G (400 kb/s, 400 ms) | 643–1422 ms |
+
+Kostra je po celou dobu vidět, takže se nečeká do prázdna. Výměna je
+jednoznačná: **261 kB se ušetří pokaždé při otevření aplikace**, těch
+0,6–1,4 s se platí **jen jednou a jen za pohled, který člověk opravdu
+otevře.** Podruhé je chunk v paměti prohlížeče.
+
+Sonda k tomu má vlastní kalibraci: když se kostra ani jednou neukáže,
+zahlásí, že neměří přepnutí. První verze totiž hledala třídu
+`.animate-pulse`, kterou kostra nemá (má `.shimmer` a `aria-busy`), takže
+vracela 46–78 ms — ve skutečnosti neměřila nic.
+
 ## Měřidlo, které nemá právo hlásit nálezy
 
 Sonda na viditelný fokus nabídla dvakrát po sobě velký, přesvědčivý nález —
