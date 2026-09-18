@@ -998,6 +998,28 @@ Nadpis obrazovky je jeden. Když se jedna obrazovka vykresluje uvnitř
 druhé, ta vnořená svou hlavičku nevykresluje — Menu v Managero client
 mělo dvakrát pod sebou „Menu" a pokaždé jinou větu pod ním.
 
+## Okno na telefonu vyjíždí zdola
+
+Na monitoru je okno vystředěný obdélník. Na telefonu je to jiný prvek:
+palec je u spodní hrany, takže tam okno má dosednout a přijet zespodu —
+jako by vyjelo další patro nad obsah. Půlka aplikace to uměla a půlka ne,
+takže dvě okna otevřená za sebou přišla pokaždé odjinud.
+
+- **Dělají to dvě třídy, ne komponenta.** `.modal-overlay` na ztmavení,
+  `.modal-sheet` na panel. Pod `sm` se panel roztáhne přes celou šířku,
+  dosedne na spodní hranu, zaoblí jen horní rohy a přijede zdola. Nad `sm`
+  zůstává všechno, jak bylo. Platí to pro okno kreslené `<Modal>` i pro
+  vlastní překryv — a nové okno to dostane tím, že ty třídy použije.
+- **Přepínač `sheet` je pryč.** Byl to opt-in a ze čtrnácti míst s vlastním
+  překryvem si o něj řeklo jedno. Chování, které má platit všude, nemá být
+  volba.
+- **Průhledný `fixed inset-0` není překryv.** Pod rozbalovacím menu je to
+  záchyt kliknutí; ten se pravidla netýká a `check-sheet` na něj mlčí.
+- **Křivka dosedne, neodrazí se.** `cubic-bezier(0.32, 0.72, 0, 1)` je
+  plochá na konci. Odražený list působí jako chyba, ne jako hravost.
+- **Domovský proužek na iPhonu.** List uvnitř překryvu si přidá
+  `env(safe-area-inset-bottom)`, jinak leží proužek přes poslední řádek.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

@@ -135,3 +135,7 @@ jobs:
       # a `ml-auto` nechá akci viset samotnou v pravé půlce prázdného řádku.
       - name: Zarovnání akcí na telefonu
         run: node scripts/check-mobile-align.mjs
+      # Na telefonu vyjíždějí okna zdola a dosedají na spodní hranu. Dělají
+      # to dvě třídy v globals.css; vlastní překryv bez nich visí uprostřed.
+      - name: Okna vyjíždějí zdola
+        run: node scripts/check-sheet.mjs

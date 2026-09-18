@@ -13,7 +13,7 @@ import { DiscardGuard } from './DiscardGuard';
 // okno zavře. Tohle je ta jedna podoba; `useModal` pod ním řeší fokus,
 // Escape a zámek posouvání.
 
-export function Modal({ open, onClose, title, subtitle, size = 'md', sheet = false, children, footer, className = '' }: {
+export function Modal({ open, onClose, title, subtitle, size = 'md', children, footer, className = '' }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
@@ -27,12 +27,6 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', sheet = fal
    * si tu svoji odhadlo samo.
    */
   size?: 'sm' | 'md' | 'lg';
-  /**
-   * Na telefonu vyjede zdola a drží se spodní hrany (jako list), na
-   * monitoru zůstává vystředěné okno. Pro dlouhý obsah, kde je palec
-   * u spodního kraje — třeba detail uzávěrky nebo výběr z dlouhého seznamu.
-   */
-  sheet?: boolean;
   children: React.ReactNode;
   /** Patička s tlačítky. Hlavní akce vpravo, stejně jako všude jinde. */
   footer?: React.ReactNode;
@@ -43,14 +37,13 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', sheet = fal
   const width = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
   return (
     <div
-      className={`fixed inset-0 z-[70] flex justify-center modal-overlay ${sheet ? 'items-end sm:items-center p-0 sm:p-4' : 'items-center p-4'}`}
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 modal-overlay"
       onClick={onClose}>
+      {/* Vyjetí zdola a dosednutí na spodní hranu na telefonu řeší
+          `.modal-overlay` / `.modal-sheet` v globals.css — pro všechna okna
+          v aplikaci stejně, ať je kreslí tahle komponenta nebo ne. */}
       <div ref={modal.ref} {...modal.dialogProps}
-        className={`modal-sheet w-full ${width} flex flex-col ${className} ${
-          sheet
-            ? 'rounded-t-3xl sm:rounded-3xl max-h-[calc(100dvh-3rem)] sm:max-h-[calc(100dvh-2rem)]'
-            : 'rounded-3xl max-h-[calc(100dvh-2rem)]'
-        }`}
+        className={`modal-sheet w-full ${width} flex flex-col rounded-3xl max-h-[calc(100dvh-2rem)] ${className}`}
         onClick={e => e.stopPropagation()}>
         <DiscardGuard guard={modal.guard} />
         <div className="flex items-start gap-3 p-6 pb-3">

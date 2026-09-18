@@ -1040,3 +1040,48 @@ input[type='search']::-webkit-search-decoration {
   }
   .sc-sweep { opacity: 0 }
 }
+
+/* ---------- Okno na telefonu vyjíždí zdola ----------
+   Na monitoru je okno vystředěné a doletí s malým nadzvednutím. Na telefonu
+   je to jiný prvek: palec je u spodní hrany, takže okno tam má dosednout
+   a přijet zespodu — jako by vyjelo další patro nad obsah.
+
+   Dřív to uměla jen okna, která si o to řekla přepínačem `sheet`; ze
+   čtrnácti míst s vlastním překryvem to bylo jedno. Tady to platí pro
+   všechna naráz, protože všechny už sdílejí `.modal-overlay`
+   a `.modal-sheet` — a nová okna to dostanou tím, že je použijí.
+
+   Zdvojená třída v selektoru zvyšuje specifičnost nad tailwindové
+   `items-center` a `p-4`, které si okna nesou v atributu. Bez toho by
+   záleželo na pořadí v sestaveném CSS. */
+@media (max-width: 640px) {
+  .modal-overlay.modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-sheet.modal-sheet {
+    width: 100%;
+    max-width: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-width: 0;
+    max-height: calc(100dvh - 2.5rem);
+  }
+  /* Domovský proužek na iPhonu jinak leží přes poslední řádek obsahu.
+     Jen pro listy uvnitř překryvu — `MobileMoreSheet` si spodní odsazení
+     počítá sám a je větší; tenhle selektor na něj nedosáhne, protože tam
+     list není potomkem překryvu, ale jeho sourozencem. */
+  .modal-overlay > .modal-sheet {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Vyjetí zdola. Křivka je plochá na konci, takže list dosedne a nedrncne —
+   odražený list působí jako chyba, ne jako hravost. */
+@keyframes pangea-sheet-up {
+  from { opacity: 0.6; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) and (max-width: 640px) {
+  .modal-sheet { animation: pangea-sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+}

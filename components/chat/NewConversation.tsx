@@ -79,7 +79,7 @@ export default function NewConversation({ open, onClose, meId, conversations, on
   };
 
   return (
-    <Modal open={open} onClose={onClose} sheet size="md"
+    <Modal open={open} onClose={onClose} size="md"
       title="Nová zpráva"
       subtitle="Vyberte kolegu — vlákno se otevře hned.">
       <div className="space-y-3">
