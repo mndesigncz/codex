@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Menu Pangea">
+<meta name="apple-mobile-web-app-title" content="Menu">
 <meta name="theme-color" content="#1C1C1C">
 <meta name="robots" content="noindex">
-<title>Venkovní menu Pangea</title>
+<title>Venkovní menu</title>
 <!-- Návštěvnost stránky (Vercel Web Analytics) — bez cookies, neukládá nic o návštěvníkovi.
      Sbírat se to začne, až se v projektu na Vercelu zapne Web Analytics; do té doby
      se skript jen nenačte a nic to nerozbije. -->
@@ -19,7 +19,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231C1C1C'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='%23BE973C' font-family='serif'%3EP%3C/text%3E%3C/svg%3E">
 
 <!-- ============================================================
-     ČAJBAR PANGEA — venkovní / akční menu pro iPad
+     VENKOVNÍ / AKČNÍ MENU pro iPad (Managero)
      Vše, co se běžně mění (položky, ceny, nadpisy, popisky),
      najdeš dole v bloku „NASTAVENÍ MENU“ v <script>.
      ============================================================ -->
@@ -118,8 +118,11 @@ header{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,1.4vh
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
   transition:background-color .45s ease;
 }
+/* `--fit` obsah zmenšuje, aby se cedule vešla na výšku obrazovky — autorská
+   velikost je tedy jen horní odhad. Bez `max()` spadl doplňkový text po
+   vynásobení na 10,8 px, pod spodní hranici, kterou drží zbytek aplikace. */
 .eyebrow{
-  font-size:calc(clamp(9px,1.6vh,14px) * var(--fit));
+  font-size:max(11px, calc(clamp(9px,1.6vh,14px) * var(--fit)));
   font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:var(--fg-soft);
 }
 h1{
@@ -164,7 +167,7 @@ li{transition:opacity .25s ease}
 }
 .price small{font-size:.62em;font-weight:500;margin-left:.22em;opacity:.75}
 .desc{
-  font-size:calc(clamp(11px,2.2vh,18px) * var(--fit));
+  font-size:max(11px, calc(clamp(11px,2.2vh,18px) * var(--fit)));
   font-style:italic;color:var(--fg-soft);line-height:1.35;
   margin-top:calc(clamp(2px,.5vh,6px) * var(--fit));max-width:34ch;
 }
@@ -199,7 +202,7 @@ footer{
   display:flex;justify-content:space-between;align-items:center;gap:clamp(12px,2.5vw,40px);
   padding-top:calc(clamp(7px,1.4vh,16px) * var(--fit));
   border-top:1px solid var(--rule);
-  font-size:calc(clamp(9px,1.6vh,14px) * var(--fit));
+  font-size:max(11px, calc(clamp(9px,1.6vh,14px) * var(--fit)));
   color:var(--fg-soft);line-height:1.4;
 }
 footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-size:1.35em;letter-spacing:.02em}
@@ -213,12 +216,19 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
   display:flex;gap:6px;opacity:.5;transition:opacity .5s ease;
 }
 .tools.idle{opacity:.06}
+/* Cedule stojí venku a mačká se prstem, často za chodu. 38 px je míra pro
+   myš; dotyková plocha musí mít 44. Kruh zůstává vizuálně stejný, plochu
+   roztahuje ::before — rozvržení se tím nehne. */
 .tools button{
-  -webkit-appearance:none;appearance:none;cursor:pointer;
+  -webkit-appearance:none;appearance:none;cursor:pointer;position:relative;
   width:38px;height:38px;border-radius:50%;
   border:1px solid var(--rule);background:var(--shade);color:var(--fg-soft);
   font-family:var(--body);font-size:15px;line-height:1;
   display:grid;place-items:center;
+}
+.tools button::before{
+  content:'';position:absolute;top:50%;left:50%;
+  width:44px;height:44px;transform:translate(-50%,-50%);
 }
 .tools button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* Hlášení jen pro obsluhu: stránka jede na záložním obsahu, protože menu
@@ -298,7 +308,8 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
 
 <div class="board" id="board">
   <header>
-    <div class="logo" id="logo" role="img" aria-label="Čajbar Pangea"></div>
+    <!-- Jméno podniku dodají data z aplikace; do produktu nepatří. -->
+    <div class="logo" id="logo" role="img" aria-label="Logo podniku"></div>
     <p class="eyebrow" id="eyebrow"></p>
     <h1 id="title"></h1>
   </header>
@@ -373,13 +384,17 @@ const ZALOHA = {
     }
   ],
 
-  /* QR míří na https://pangea-eosin.vercel.app/menu-akce.html
-     Pozor: obrázek QR je předgenerovaný. Když se změní adresa menu,
-     musí se vygenerovat nový — samotná změna textu tady nestačí. */
+  /* Obrázek QR je předgenerovaný a míří na adresu, kde menu běží.
+     Když se adresa změní, musí se vygenerovat nový — samotná změna
+     textu tady nestačí. Adresu ukazuje Kasa & sklad → Menu. */
   qr: { popisek: "Menu do mobilu", podtitul: "Naskenuj a odnes si ho s sebou" },
 
   poznamka: "*Alergeny a složení na vyžádání u obsluhy",
-  wifi: { sit: "Pangea", heslo: "heslojeheslo" }
+
+  /* Wifi se vytiskne na ceduli, na kterou vidí ulice. Výchozí hodnota tu
+     proto žádná není: `null` znamená, že se blok nevykreslí. Kdo ho chce,
+     vyplní si svoji síť — cizí heslo z ukázky by jinak viselo na chodníku. */
+  wifi: null
 };
 /* ====================== KONEC NASTAVENÍ ====================== */
 
@@ -440,11 +455,14 @@ function render(){
    Stav drží aplikace, ne prohlížeč — proto ho hned uvidí i host, který
    má menu otevřené v mobilu. Zapisovat smí jen obsluha: buď je na iPadu
    zadaný PIN menu, nebo je někdo přihlášený do aplikace. */
-const PIN_KEY = 'pangea-menu-pin';
+/* Nový klíč; starý `pangea-…` se pořád čte, aby se tabletu v provozu
+   nezahodil uložený PIN jen kvůli přejmenování. */
+const PIN_KEY = 'managero-menu-pin';
+const PIN_KEY_STARY = 'pangea-menu-pin';
 
-function ulozenyPin(){ try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
+function ulozenyPin(){ try { return localStorage.getItem(PIN_KEY) || localStorage.getItem(PIN_KEY_STARY) || ''; } catch (e) { return ''; } }
 function zapamatujPin(p){ try { localStorage.setItem(PIN_KEY, p); } catch (e) {} }
-function zapomenPin(){ try { localStorage.removeItem(PIN_KEY); } catch (e) {} }
+function zapomenPin(){ try { localStorage.removeItem(PIN_KEY); localStorage.removeItem(PIN_KEY_STARY); } catch (e) {} }
 
 function applySoldOut(){
   document.querySelectorAll('#cols li').forEach(li => {
@@ -525,7 +543,8 @@ $('logo').addEventListener('pointerdown', () => {
 /* ---------- den / noc ----------
    Dokud se obsluha nerozhodne sama, řídí se to časem: 7–19 den, jinak noc.
    První ťuknutí na tlačítko volbu zafixuje (a v localStorage zůstane). */
-const MODE = 'pangea-menu-rezim';
+const MODE = 'managero-menu-rezim';
+const MODE_STARY = 'pangea-menu-rezim';
 
 function podleCasu(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'den' : 'noc'; }
 
@@ -535,7 +554,7 @@ function paint(m){
   if (tc) tc.content = (m === 'noc') ? '#1C1C1C' : '#E3DED5';
 }
 function rucniVolba(){
-  try { const v = localStorage.getItem(MODE); return (v === 'den' || v === 'noc') ? v : null; }
+  try { const v = localStorage.getItem(MODE) || localStorage.getItem(MODE_STARY); return (v === 'den' || v === 'noc') ? v : null; }
   catch (e) { return null; }
 }
 function setMode(m){

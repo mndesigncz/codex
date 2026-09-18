@@ -461,6 +461,23 @@ je horší než žádné tlačítko — člověk si myslí, že směnu má zapsa
 - **Konec před začátkem se vynechá**, událost bez data taky — soubor
   zůstane platný i s pokaženým vstupem.
 
+## Pokrytí kontroly je součást kontroly
+
+Trojí stejná chyba, pokaždé jinde: kontrola hlídala správnou věc, jen se
+nedívala všude.
+
+- `check-contrast-classes` obcházel vzorec `components/**/*.tsx` soubory
+  ležící přímo v `components/` — z 86 jich viděl 67.
+- `check-generic-copy` nechodil do `lib/`, takže konvička v uvítacím
+  e-mailu přežila celé kolo o univerzálních textech.
+- Žádná kontrola nechodila do `public/`, kde leží 300 kB ručně psaného
+  venkovního menu — živá funkce, na kterou editor menu generuje QR kódy.
+
+Proto: **když píšeš kontrolu, napiš si zvlášť, co do ní nechodí, a řekni
+proč.** Strom se prochází ručně, ne vzorcem. A obrazovka, kterou sonda
+nikdy neotevřela, není ověřená obrazovka — i když je z jiné technologie
+než zbytek aplikace.
+
 ## Přístupné jméno
 
 Klávesnice je v samostatné kapitole; tohle je to druhé, co odečítač
