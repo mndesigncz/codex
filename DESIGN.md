@@ -137,11 +137,11 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a patnáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a šestnáct kontrol ze `scripts/check-*.mjs`:
 
-`check-time` · `check-czech` · `check-decimal-inputs` · `check-fetch-ok` ·
-`check-forms` · `check-generic-copy` · `check-ics` · `check-modals` ·
-`check-money` · `check-palette` · `check-silent-load` ·
+`check-time` · `check-czech` · `check-decimal-inputs` · `check-email` ·
+`check-fetch-ok` · `check-forms` · `check-generic-copy` · `check-ics` ·
+`check-modals` · `check-money` · `check-palette` · `check-silent-load` ·
 `check-test-imports` · `check-transitions` · `check-width-clash` ·
 `check-contrast-classes`
 
@@ -404,6 +404,26 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   schovávaly, dokud odpověď neřekla „jsi vedoucí" — a po 500 se tím
   schovaly i s chybou. Rozhodnutí „ukázat se" nesmí viset na datech,
   která právě selhala.
+
+## E-mail
+
+E-mail je jediné, co z aplikace odchází ven k lidem, kteří ji nemají.
+Objednávka dodavateli, přístupové údaje novému člověku, záloha dat.
+
+- **Odesílá `lib/email`, nikdo jiný.** Hlídá `check-email`.
+- **`emails.send()` nevyhazuje výjimku.** Chybu vrací v odpovědi jako
+  `{ data, error }`. Bez čtení `error` se odmítnutý e-mail tváří jako
+  odeslaný: server zapíše `email_sent_at`, obrazovka napíše
+  „Objednávka odeslána ✓" a dodavatel nedostane nic. Je to táž tichá lež
+  jako `fetch` a HTTP 500.
+- **Neodesláno se řekne i s důvodem.** „Nepodařilo se" je málo, když
+  server ví, že doména není ověřená.
+- **Odesílatel je `EMAIL_FROM`.** Zkušební adresa odesílací služby
+  nedoručí komukoli a nejde na ni odpovědět.
+- **Kde e-mail prosí o odpověď, patří `reply_to`.** Objednávka výslovně
+  žádá potvrzení termínu; ta odpověď musí dojít do podniku.
+- **Do šablony se vkládá jen escapované.** Název podniku s `<` rozbil
+  HTML, s `&` se rozpadl na entitu.
 
 ## Papír
 

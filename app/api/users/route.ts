@@ -68,13 +68,18 @@ export async function POST(req: NextRequest) {
             ${jobTitle ?? 'Barista'}, ${c.meId}, ${c.teamId})
     RETURNING id, name, email`;
 
+  // Účet vznikl, ať e-mail dopadne jakkoli — ale jestli přístupové údaje
+  // odešly, se nesmí jen předpokládat. Bez nich se člověk nepřihlásí.
+  let emailSent = false;
+  let emailError: string | null = null;
   if (sendInvite) {
-    try {
-      await sendInvitationEmail(email, name, password);
-    } catch (e) {
-      console.error('Failed to send invite email:', e);
-    }
+    const mail = await sendInvitationEmail(email, name, password);
+    emailSent = mail.sent;
+    emailError = mail.error;
   }
 
-  return NextResponse.json({ id: newUser.id, name: newUser.name, email: newUser.email });
+  return NextResponse.json({
+    id: newUser.id, name: newUser.name, email: newUser.email,
+    emailSent, emailError,
+  });
 }

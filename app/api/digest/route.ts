@@ -254,8 +254,12 @@ export async function GET(request: Request) {
             type: diff < 0 || procsMissing.length ? 'warning' : 'info',
             link: '/employer/overview?view=reports',
           });
-          if (e.email) await sendDigestEmail(e.email, team.name ?? 'Podnik', dateLabel, emailHtml);
-          sent++;
+          // Souhrn je „nice to have", ale i tak se nepočítá mezi odeslané,
+          // když ho odesílací služba odmítla.
+          if (e.email) {
+            const mail = await sendDigestEmail(e.email, team.name ?? 'Podnik', dateLabel, emailHtml);
+            if (mail.sent) sent++;
+          } else sent++;
         } catch { /* best-effort per employer */ }
       }
     }

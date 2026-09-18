@@ -134,8 +134,12 @@ export async function GET(request: Request) {
           null, 2,
         );
         for (const e of employers) {
-          try { await sendBackupEmail(e.email as string, filename, json); sent++; }
-          catch (err) { failed++; problems.push(`${team.name}: ${String((err as any)?.message ?? err).slice(0, 80)}`); }
+          // Záloha, o které si myslíme, že odešla, je horší než žádná:
+          // majitel se na ni spoléhá. `sendBackupEmail` chybu vrací,
+          // nevyhazuje — proto se čte návratová hodnota.
+          const mail = await sendBackupEmail(e.email as string, filename, json);
+          if (mail.sent) sent++;
+          else { failed++; problems.push(`${team.name}: ${String(mail.error ?? 'e-mail neodešel').slice(0, 80)}`); }
         }
       } catch (err) {
         failed++;

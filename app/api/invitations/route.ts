@@ -66,15 +66,14 @@ export async function POST(request: Request) {
 
   // The join link always works and is returned so the UI can offer it for
   // manual sharing. The email is a best-effort convenience on top.
-  let emailSent = false;
-  try {
-    await sendTeamInvitation(email, team.name, me.name, token);
-    emailSent = true;
-  } catch (e) {
-    console.error('invite email failed', e);
-  }
+  // `sendTeamInvitation` nevyhazuje — chybu vrací. Dřív se `emailSent`
+  // nastavilo na `true` i tehdy, když Resend pozvánku odmítl.
+  const mail = await sendTeamInvitation(email, team.name, me.name, token);
 
-  return NextResponse.json({ ok: true, token, path: `/join?token=${token}`, emailSent });
+  return NextResponse.json({
+    ok: true, token, path: `/join?token=${token}`,
+    emailSent: mail.sent, emailError: mail.error,
+  });
 }
 
 // DELETE ?id= — revoke a pending invitation (typo in the e-mail, wrong person…).

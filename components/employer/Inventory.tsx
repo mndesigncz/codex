@@ -2046,7 +2046,10 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.emailed) setEmailMsg(`Objednávka odeslána na ${sp.email} ✓`);
-      else if (res.ok) setEmailMsg('Objednávka vytvořena, ale e-mail se nepodařilo odeslat — pošli ji ručně.');
+      // Server teď říká i proč. Dřív se tu psalo obecné „nepodařilo se"
+      // — a hlavně se sem často ani nedostalo, protože odmítnutý e-mail
+      // se tvářil jako odeslaný.
+      else if (res.ok) setEmailMsg(`Objednávka je vytvořená, ale e-mail neodešel${d.emailError ? ` (${d.emailError})` : ''} — pošli ji ručně.`);
       else setEmailMsg(d.error || 'Odeslání se nepodařilo.');
     } catch { setEmailMsg('Odeslání se nepodařilo.'); }
     setEmailing(null);

@@ -95,3 +95,7 @@ jobs:
       # popisu pásma ukáže klient směnu o hodiny jinde.
       - name: Kalendář
         run: node scripts/check-ics.mjs
+      # `emails.send()` nevyhazuje výjimku — bez čtení `error` se odmítnutá
+      # objednávka tváří jako odeslaná a vedoucí čeká na zboží.
+      - name: Odesílání e-mailů
+        run: node scripts/check-email.mjs

@@ -13,6 +13,7 @@ import { nextActiveId, needsWho, IDLE_MS } from '../lib/kioskIdentity.ts';
 import { buildIcs, escapeText, foldLine } from '../lib/ics.ts';
 import { recipeCost, ingredientCost, marginPct, costDecimals } from '../lib/recipeCost.ts';
 import { printHtml, esc as escHtml } from '../lib/printDoc.ts';
+import { escHtml as escMail, usingSandboxSender } from '../lib/email.ts';
 import { formatCost } from '../lib/money.ts';
 
 let failed = 0;
@@ -377,6 +378,26 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('tisk: nic není prázdný řetězec', escHtml(null), '');
   ok('tisk: název z dat se neprovede',
     printHtml({ title: '<img src=x onerror=alert(1)>', body: '' }, NOW).includes('&lt;img'));
+}
+
+// --- E-mail (lib/email) ---
+{
+  // Do šablony se dřív vkládala jména syrová: „Café <U Nás>" rozbilo HTML.
+  eq('e-mail: špičaté závorky se ošetří', escMail('Café <U Nás>'), 'Café &lt;U Nás&gt;');
+  eq('e-mail: ampersand taky', escMail('Sirup R&D'), 'Sirup R&amp;D');
+  eq('e-mail: uvozovky do atributů', escMail('20" pult'), '20&quot; pult');
+  eq('e-mail: nic je prázdný řetězec', escMail(undefined), '');
+
+  // Bez `EMAIL_FROM` se posílá zkušební adresou Resendu. To u pozvánky
+  // projde, ale objednávka dodavateli tak nedojde — volající to má vědět.
+  const puvodni = process.env.EMAIL_FROM;
+  delete process.env.EMAIL_FROM;
+  ok('e-mail: bez EMAIL_FROM jedeme na zkušební adresu', usingSandboxSender());
+  process.env.EMAIL_FROM = 'objednavky@kavarna.cz';
+  ok('e-mail: s EMAIL_FROM už ne', !usingSandboxSender());
+  process.env.EMAIL_FROM = '   ';
+  ok('e-mail: samá mezera se nepočítá', usingSandboxSender());
+  if (puvodni === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = puvodni;
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

@@ -101,7 +101,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [inviteJob, setInviteJob] = useState('Barista');
   const [inviteRole, setInviteRole] = useState('employee');
   const [inviting, setInviting] = useState(false);
-  const [lastInvite, setLastInvite] = useState<{ email: string; token?: string; emailSent: boolean } | null>(null);
+  const [lastInvite, setLastInvite] = useState<{ email: string; token?: string; emailSent: boolean; emailError?: string | null } | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -365,7 +365,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Pozvánku se nepodařilo odeslat.');
-    return data as { token?: string; emailSent?: boolean };
+    return data as { token?: string; emailSent?: boolean; emailError?: string | null };
   };
 
   const sendInvite = async (e: React.FormEvent) => {
@@ -385,7 +385,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           const data = await inviteOne(email);
           setInviteEmail('');
           setInviteJob('Barista');
-          setLastInvite({ email, token: data.token, emailSent: !!data.emailSent });
+          setLastInvite({ email, token: data.token, emailSent: !!data.emailSent, emailError: data.emailError ?? null });
           flash(data.emailSent
             ? `Pozvánka odeslána na ${email}. Pro jistotu můžeš poslat i odkaz níže.`
             : `Pozvánka připravena — zkopíruj odkaz níže a pošli ho ${email}.`);
@@ -616,7 +616,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <p className="text-xs text-black/50">
               {lastInvite.emailSent
                 ? 'E-mail jsme odeslali, ale nemusí vždy dorazit — nejjistější je poslat odkaz přímo (WhatsApp, SMS…).'
-                : 'E-mail není nastavený, takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.'}
+                : lastInvite.emailError
+                  ? `E-mail neodešel (${lastInvite.emailError}), takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.`
+                  : 'E-mail není nastavený, takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.'}
             </p>
             <div className="flex items-center gap-2">
               <input readOnly value={inviteLink(lastInvite.token)}
