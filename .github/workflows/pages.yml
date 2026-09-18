@@ -103,3 +103,7 @@ jobs:
       # jinak zůstane černá na černém (naměřeno 1,03 : 1 u záložek).
       - name: Tmavý režim
         run: node scripts/check-dark-classes.mjs
+      # `<label>` bez `htmlFor` vypadá jako popisek, ale odečítač obrazovky
+      # ho k poli nepřipojí. Ráčna: nesmí přibývat.
+      - name: Popisky polí
+        run: node scripts/check-labels.mjs

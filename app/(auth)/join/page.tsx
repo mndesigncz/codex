@@ -91,13 +91,13 @@ function JoinForm() {
               <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jana Nováková" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required disabled={!!token}
+              <label htmlFor="join-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
+              <input id="join-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required disabled={!!token}
                 className={`${inputClass} ${token ? 'opacity-60' : ''}`} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Heslo</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
+              <label htmlFor="join-heslo" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Heslo</label>
+              <input id="join-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
             </div>
 
             {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}

@@ -100,12 +100,12 @@ export default function RegisterPage() {
               <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Název podniku" className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required className={inputClass} />
+              <label htmlFor="reg-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
+              <input id="reg-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Heslo</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
+              <label htmlFor="reg-heslo" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Heslo</label>
+              <input id="reg-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zopakuj heslo</label>

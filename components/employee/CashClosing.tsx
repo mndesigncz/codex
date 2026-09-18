@@ -81,6 +81,9 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
                   type="number" inputMode="numeric" min={0}
                   value={cnt === 0 ? '' : cnt}
                   onChange={e => setCount(d, e.target.value)}
+                  /* Počítadlo bankovek: bez jména je to pro odečítač jen
+                     „číselné pole" v řadě dvanácti stejných. */
+                  aria-label={`Počet kusů ${fmtDenom(d)} ${symbol}`}
                   placeholder="0"
                   className="w-14 h-9 text-center field rounded-xl border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                 />
@@ -599,15 +602,18 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   ) => {
     const unit = opts?.unit === undefined ? symbol : opts.unit;
     return (
-      <div>
-        <label className="field-label">{label}</label>
+      // Popisek musí být s polem svázaný, ne jen nad ním. Vizuálně to
+      // vypadalo stejně, ale odečítač obrazovky četl „číselné pole,
+      // prázdné" — a do těchhle polí se píšou peníze v kase.
+      <label className="block">
+        <span className="field-label">{label}</span>
         <div className="relative">
           <input type="number" inputMode="numeric" value={form[key]} onChange={set(key)}
             placeholder={opts?.placeholder ?? '0'} className={`${inputClass} ${unit ? 'pr-12' : ''}`} />
           {unit && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{unit}</span>}
         </div>
         {opts?.hint && <p className="text-[11px] text-black/40 mt-1.5">{opts.hint}</p>}
-      </div>
+      </label>
     );
   };
 

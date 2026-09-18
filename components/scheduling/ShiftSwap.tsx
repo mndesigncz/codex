@@ -109,7 +109,10 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
                     Nabídnout
                   </button>
                 </div>
+                {/* Placeholder není popisek: při psaní zmizí a odečítač
+                    obrazovky ho čte nespolehlivě. Jméno pole musí zůstat. */}
                 <input value={offerNote[s.id] ?? ''} onChange={e => setOfferNote(n => ({ ...n, [s.id]: e.target.value }))}
+                  aria-label={`Proč nabízíš směnu ${fmtDay(s.date)}? Nepovinné.`}
                   placeholder="Proč nabízíš? (nepovinné — kolegové to uvidí)" maxLength={160}
                   className="w-full rounded-xl bg-white/60 border border-black/[0.07] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
               </div>
