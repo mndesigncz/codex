@@ -91,3 +91,7 @@ jobs:
       # uloží chybové tělo jako data a obrazovka pak tvrdí, že nic není.
       - name: Odmítnutí serveru
         run: node scripts/check-fetch-ok.mjs
+      # Kalendář je slib o čase: bez DTSTAMP soubor Outlook odmítne a bez
+      # popisu pásma ukáže klient směnu o hodiny jinde.
+      - name: Kalendář
+        run: node scripts/check-ics.mjs

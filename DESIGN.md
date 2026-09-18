@@ -137,12 +137,13 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a čtrnáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a patnáct kontrol ze `scripts/check-*.mjs`:
 
 `check-time` · `check-czech` · `check-decimal-inputs` · `check-fetch-ok` ·
-`check-forms` · `check-generic-copy` · `check-modals` · `check-money` ·
-`check-palette` · `check-silent-load` · `check-test-imports` ·
-`check-transitions` · `check-width-clash` · `check-contrast-classes`
+`check-forms` · `check-generic-copy` · `check-ics` · `check-modals` ·
+`check-money` · `check-palette` · `check-silent-load` ·
+`check-test-imports` · `check-transitions` · `check-width-clash` ·
+`check-contrast-classes`
 
 Vizuálně: Playwright přes 61 obrazovek (46 administrace + 15 klient) na
 1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
@@ -403,6 +404,24 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   schovávaly, dokud odpověď neřekla „jsi vedoucí" — a po 500 se tím
   schovaly i s chybou. Rozhodnutí „ukázat se" nesmí viset na datech,
   která právě selhala.
+
+## Export do kalendáře
+
+Kalendář je slib o čase. Soubor, který kalendář odmítne nebo přečte špatně,
+je horší než žádné tlačítko — člověk si myslí, že směnu má zapsanou.
+
+- **Skládá ho `lib/ics`, nikdo jiný.** Hlídá `check-ics`.
+- **`DTSTAMP` je povinný.** Apple ho doplní, Outlook a Exchange soubor bez
+  něj odmítnou — ťuknutí na „Do kalendáře" pak neudělá nic.
+- **`TZID` bez `VTIMEZONE` je jen nápis.** Klient, co `Europe/Prague`
+  nezná, vezme čas jako místní nebo jako UTC. Ranní směna se objeví
+  v deset a to je zmeškaná směna.
+- **Řádek nesmí přes 75 oktetů.** Měří se bajty UTF-8, ne znaky. Popis akce
+  od podniku limit přeleze snadno a některé čtečky zahodí celou událost.
+- **Text se uniká vždy.** Čárka v „Degustace, ročník 2019" rozdělí
+  vlastnost na dvě. Ošetřuje se `\`, `;`, `,` a nový řádek.
+- **Konec před začátkem se vynechá**, událost bez data taky — soubor
+  zůstane platný i s pokaženým vstupem.
 
 ## Sdílený tablet a identita
 

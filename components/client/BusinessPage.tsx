@@ -15,6 +15,7 @@ import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { formatMoney, currencySymbol } from '@/lib/money';
 import { okJson } from '@/lib/api';
+import { buildIcs, downloadIcs } from '@/lib/ics';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -711,29 +712,20 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
     setMsg(next.follow ? (next.going ? 'Počítáme s tebou! Den předem ti to připomeneme.' : 'Hlídáme ti to — den předem přijde připomínka.') : 'Už nehlídáme.');
   };
 
-  // .ics ke stažení — bez času je to celodenní událost.
-  const downloadIcs = () => {
-    const esc = (t: string) => String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-    const d8 = String(e.date).replace(/-/g, '');
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Managero//Akce//CS', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT', `UID:managero-event-${e.id}@managero`];
-    if (e.start_time) {
-      lines.push(`DTSTART;TZID=Europe/Prague:${d8}T${String(e.start_time).replace(':', '')}00`);
-      const end = e.end_time || null;
-      if (end) lines.push(`DTEND;TZID=Europe/Prague:${d8}T${String(end).replace(':', '')}00`);
-    } else {
-      const next = new Date(e.date + 'T12:00:00'); next.setDate(next.getDate() + 1);
-      lines.push(`DTSTART;VALUE=DATE:${d8}`, `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, '')}`);
-    }
-    lines.push(`SUMMARY:${esc(`${e.title} — ${businessName}`)}`);
-    if (place) lines.push(`LOCATION:${esc(place)}`);
-    if (e.description) lines.push(`DESCRIPTION:${esc(e.description)}`);
-    lines.push('END:VEVENT', 'END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `akce-${e.id}.ics`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  // .ics ke stažení — bez času je to celodenní událost. Skládá `lib/ics`,
+  // ať má soubor `DTSTAMP`, popis pásma a zalomené dlouhé řádky; popis akce
+  // od podniku je snadno přeleze a čtečka pak událost zahodí.
+  const saveIcs = () => {
+    const ics = buildIcs([{
+      uid: `managero-event-${e.id}@managero`,
+      date: String(e.date),
+      startTime: e.start_time ?? null,
+      endTime: e.end_time ?? null,
+      summary: `${e.title} — ${businessName}`,
+      location: place || null,
+      description: e.description || null,
+    }], '-//Managero//Akce//CS');
+    downloadIcs(`akce-${e.id}.ics`, ics);
   };
 
   return (
@@ -806,7 +798,7 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
               <Icon name="bell" size={15} className="shrink-0" />{follow ? 'Hlídám · zrušit' : 'Hlídat akci'}
             </button>
           </div>
-          <button onClick={downloadIcs} className={`${btnQuiet} w-full mt-2`}>
+          <button onClick={saveIcs} className={`${btnQuiet} w-full mt-2`}>
             <Icon name="calendarCheck" size={15} className="shrink-0" />Přidat do kalendáře (.ics)
           </button>
           {!signedIn && <p className="text-xs text-black/45 mt-2 text-center">Na „Přijdu" a hlídání se přihlas — připomínku pošleme den předem.</p>}
