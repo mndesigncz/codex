@@ -14,6 +14,13 @@ import { liseSeOdPrazdneho, maSeObnovit, slouceni } from './draft';
 // ale ne zavření okna prohlížeče. Koncept z minulého týdne, který vyskočí
 // v úplně jiné situaci, je horší než žádný.
 //
+// **Co se do konceptu nikdy nedává: heslo, token, kód, číslo karty.**
+// Uchovat rozepsané přihlášení není laskavost, ale bezpečnostní chyba —
+// tajemství by leželo v úložišti prohlížeče déle, než musí, a přečetl by
+// ho každý skript na té stránce. Formuláře přihlášení a registrace koncept
+// nemají a mít nebudou; hlídá to `scripts/check-draft-safety.mjs`, ne
+// dobrý úmysl.
+//
 // Obnovení se **neděje potichu.** Tiše předvyplněný formulář je vlastní
 // malá lež: uživatel nepozná, jestli to napsal on, nebo se to vzalo odjinud.
 // Hook proto vrací `obnoveno` a volající u formuláře řekne, co se stalo,

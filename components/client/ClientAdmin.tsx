@@ -22,6 +22,8 @@ import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
+import { useDraft } from '@/lib/useDraft';
+import { DraftNote } from '../ui/DraftNote';
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -840,6 +842,9 @@ function Reviews() {
 function Broadcast({ toast }: { toast: (m: string) => void }) {
   const [d, setD] = useState<any | null>(null);
   const [f, setF] = useState({ title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' }); const [busy, setBusy] = useState(false);
+  // Rozeslání jde stovkám zákazníků, takže se text píše rozmyšleně —
+  // a o to víc mrzí, když ho spolkne přechod na jinou záložku.
+  const koncept = useDraft('rozeslani', f, setF, { vychozi: { title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' } });
   const load = useCallback(() => fetch('/api/client/admin/broadcast').then(okJson).then(setD).catch(() => setD({ history: [], members: 0 })), []);
   useEffect(() => { load(); }, [load]);
   const target = f.audience === 'quiet' ? (d?.quiet ?? 0)
@@ -856,7 +861,7 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
     try {
       const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) });
       toast(r.scheduled ? 'Zpráva je naplánovaná — odejde ve svůj čas.' : `Odesláno ${r.broadcast.recipients} členům.`);
-      setF({ title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' }); load();
+      koncept.hotovo(); setF({ title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' }); load();
     } catch (e: any) { toast(e.message); }
     setBusy(false);
   };
@@ -869,6 +874,7 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
     <div className="space-y-5">
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
         <form onSubmit={send} className="glass-card p-5 grid gap-3">
+          <DraftNote koncept={koncept} co="rozepsané rozeslání" />
           <div><label htmlFor="bc-title" className={label}>Nadpis</label><input id="bc-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Nový čaj z jarní sklizně" maxLength={80} className={input} /></div>
           <div><label htmlFor="bc-body" className={label}>Text</label><textarea id="bc-body" value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="Tento týden ochutnávka zdarma ke každé konvici." maxLength={300} rows={3} className={`${input} resize-none`} /></div>
           <div><label htmlFor="bc-aud" className={label}>Komu</label>

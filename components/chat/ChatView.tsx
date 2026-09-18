@@ -19,6 +19,7 @@ import {
   dayKey,
   dayLabel,
 } from './useChat';
+import { useDraft } from '@/lib/useDraft';
 
 interface Props {
   user: { id: number | string; name: string; role?: string; avatar?: string };
@@ -276,6 +277,13 @@ function Thread({
 }) {
   const { messages, setMessages, loading } = useThreadMessages(conv.id);
   const [text, setText] = useState('');
+  // Rozepsaná zpráva je vázaná na kanál: přepnu jinam, vrátím se a mám ji
+  // tam, kde byla. Banner se tu nevykresluje schválně — viz DESIGN.md:
+  // poznámka patří formuláři, který se sám předvyplní a překvapí. Zpráva
+  // v okně chatu je přesně tam, kde jsem ji nechal, a mluví sama za sebe.
+  const koncept = useDraft(`chat-${conv.id}`, { text }, (v) => setText(v.text), {
+    vychozi: { text: '' },
+  });
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -331,6 +339,7 @@ function Thread({
     if (!t || sending) return;
     setSending(true);
     setText('');
+    koncept.hotovo();
     requestAnimationFrame(autoGrow);
     const ok = await doSend({ content: t });
     // The input was cleared optimistically; a failed send must give the text

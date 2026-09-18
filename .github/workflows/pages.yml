@@ -123,3 +123,7 @@ jobs:
       # jen načte znovu a člověk nepozná, proč se nic nestalo.
       - name: Tiché změny
         run: node scripts/check-silent-mutation.mjs
+      # Koncept leží v úložišti prohlížeče. Heslo, token ani číslo karty
+      # tam nepatří — uchovat je není laskavost, ale bezpečnostní chyba.
+      - name: Tajemství v konceptu
+        run: node scripts/check-draft-safety.mjs

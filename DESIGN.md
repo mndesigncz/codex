@@ -321,6 +321,26 @@ klíče, které výchozí tvar zná, a jen když sedí typ.
 
 Měří `probe-koncept.mjs` — a měří celý průchod, ne jen uložení.
 
+**Kde koncept být nesmí.** Heslo, token, kód ani číslo karty se do úložiště
+nedávají: uchovat rozepsané přihlášení není laskavost, ale bezpečnostní
+chyba — tajemství by leželo v prohlížeči déle, než musí, a přečetl by ho
+každý skript na té stránce. Formuláře přihlášení a registrace koncept
+nemají a mít nebudou; hlídá `scripts/check-draft-safety.mjs`, ne dobrý
+úmysl.
+
+**Kde koncept nedává smysl.** Formulář, který **upravuje existující
+záznam** (profil podniku, položka skladu), koncept nedostane. Obnovit nad
+čerstvě načtenými daty týden starou kopii není záchrana práce, ale tichý
+přepis toho, co mezitím změnil někdo jiný. Proto `upravujeSe: true`
+znamená „neobnovuj".
+
+**A jedna výjimka z přiznání.** Okno zprávy v chatu koncept má, ale
+`<DraftNote>` nevykresluje. Poznámka patří formuláři, který se sám
+předvyplní a tím překvapí; rozepsaná zpráva je přesně tam, kde ji člověk
+nechal, ve stejném kanálu a nad tlačítkem Odeslat — mluví sama za sebe
+a banner nad ní by byl šum. Koncept je vázaný na kanál (`chat-<id>`), ne
+na chat jako celek.
+
 ## Barvy: stav versus kategorie
 
 Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —
