@@ -363,10 +363,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-black/70 mb-2">
+              <label htmlFor="dostupnost-max-smen" className="block text-sm font-medium text-black/70 mb-2">
                 Maximální počet směn <span className="text-black/35">(nepovinné)</span>
               </label>
               <input
+                id="dostupnost-max-smen"
                 type="number" inputMode="numeric"
                 min={0}
                 value={maxShifts}
@@ -377,10 +378,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-black/70 mb-2">
+              <label htmlFor="dostupnost-poznamka" className="block text-sm font-medium text-black/70 mb-2">
                 Poznámka <span className="text-black/35">(nepovinné)</span>
               </label>
               <textarea
+                id="dostupnost-poznamka"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}

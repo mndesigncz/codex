@@ -784,6 +784,7 @@ function ProcedureEditor({
                     <input
                       value={s.note ?? ''}
                       onChange={e => patchStep(i, { note: e.target.value })}
+                      aria-label={`Poznámka ke kroku ${i + 1} (nepovinné)`}
                       placeholder="Poznámka (nepovinné)"
                       className="flex-1 min-w-0 rounded-xl bg-white/50 border border-black/[0.06] px-3.5 py-2 text-xs text-black/70 placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
                     />

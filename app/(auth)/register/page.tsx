@@ -92,12 +92,12 @@ export default function RegisterPage() {
         <div className="glass-card p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jan Novák" required className={inputClass} />
+              <label htmlFor="reg-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
+              <input id="reg-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jan Novák" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název podniku</label>
-              <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Název podniku" className={inputClass} />
+              <label htmlFor="reg-podnik" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název podniku</label>
+              <input id="reg-podnik" autoComplete="organization" type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Název podniku" className={inputClass} />
             </div>
             <div>
               <label htmlFor="reg-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
@@ -108,8 +108,8 @@ export default function RegisterPage() {
               <input id="reg-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zopakuj heslo</label>
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Zadejte heslo znovu" required className={inputClass} />
+              <label htmlFor="reg-heslo-znovu" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zopakuj heslo</label>
+              <input id="reg-heslo-znovu" autoComplete="new-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Zadejte heslo znovu" required className={inputClass} />
             </div>
 
             {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}

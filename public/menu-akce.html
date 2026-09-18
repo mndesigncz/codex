@@ -42,7 +42,10 @@
   --bg:#E3DED5;
   --bg-2:#DAD4C8;
   --fg:#1C1C1C;
-  --fg-soft:#6E6A62;
+  /* 6E6A62 vycházelo na papíru 4,02 : 1, tedy pod normou pro běžný text —
+     a denní paleta je právě ta, která visí venku za světla, kdy na
+     kontrastu záleží nejvíc. 5E5A52 dává 5,12 : 1 a tón zůstává týž. */
+  --fg-soft:#5E5A52;
   --accent:#9C7724;
   --rule:rgba(28,28,28,.22);
   --leaf:rgba(28,28,28,.055);
@@ -165,7 +168,13 @@ li{transition:opacity .25s ease}
   font-weight:600;color:var(--accent);white-space:nowrap;
   font-variant-numeric:tabular-nums;
 }
-.price small{font-size:.62em;font-weight:500;margin-left:.22em;opacity:.75}
+/* Symbol měny dědil barvu ceny, tedy akcent podniku. Na denní paletě to
+   dělalo 3,09 : 1 — pro velkou číslici cena v pořádku (na velký text stačí
+   3 : 1), pro drobný symbol vedle ní ne.
+   A protože akcent si volí každý podnik sám, žádná pevná hodnota to
+   nezachrání: číslice zůstává hrdinou v barvě podniku, jednotka je tichý
+   inkoust, který drží kontrast při jakémkoli akcentu. */
+.price small{font-size:.62em;font-weight:500;margin-left:.22em;color:var(--fg);opacity:.8}
 .desc{
   font-size:max(11px, calc(clamp(11px,2.2vh,18px) * var(--fit)));
   font-style:italic;color:var(--fg-soft);line-height:1.35;
@@ -191,9 +200,12 @@ li[data-out="1"] .name::after{
 }
 /* QR se smí zmenšovat s deskou, ale nikdy pod 72 px — jinak ho mobil nepřečte */
 .qr-tile img{width:max(72px, calc(clamp(80px,11vh,104px) * var(--fit)));height:auto;display:block}
+/* Táž úvaha jako u symbolu měny: akcent si volí podnik, takže se na jeho
+   kontrast nedá spolehnout. Nadpis u QR je text ke čtení, ne ozdoba —
+   drží ho inkoust, zdobnost obstará písmo. */
 .qr-text b{
   display:block;font-family:var(--display);font-weight:400;
-  color:var(--accent);font-size:1.5em;line-height:1.15;
+  color:var(--fg);font-size:1.5em;line-height:1.15;
 }
 .qr-text span{display:block;margin-top:.15em}
 
