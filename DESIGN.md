@@ -237,6 +237,57 @@ Dvě věci, na kterých to při psaní stálo a stojí za zapamatování:
   „rozepsáno" zhasnout nad textem, který na obrazovce pořád je. Přepočítává
   se až po Reactu.
 
+## Prodejní stránka (landing)
+
+Jediná plocha s vlastním vizuálním jazykem: světlé „tekuté sklo" — panely
+`.lgx`/`.lgx-strong` s rozmazáním a nasycením podkladu, barevné skvrny
+`.lg-blob` pod nimi, hravé 3D objekty z clay renderů (`public/brand/landing`,
+generované, ne fotobanka). Aplikace sama zůstává u klidnějšího `.glass-card`.
+
+Zásady, které přestavba v kole 35 zafixovala:
+
+- **Landing je světlý ostrov.** Krémové podklady nemají tmavou variantu;
+  `ForceLight` volbu uživatele jen odloží, v aplikaci platí dál (stejný
+  mechanismus jako Managero client).
+- **Obsah nese skutečný produkt, ne dekorace.** Skleněné karty ukazují
+  momenty z aplikace (směna, minimum ve skladu, uzávěrka) a žádná čísla,
+  loga zákazníků ani recenze, které nemáme. Tři čísla nahoře jsou fakta
+  o produktu, ne metriky.
+- **Animace je bonus, ne podmínka.** `Reveal` posílá obsah ze serveru
+  viditelný a schovává ho až v prohlížeči těsně před vykreslením — bez
+  JavaScriptu, s `prefers-reduced-motion` nebo po pádu skriptu je všechno
+  vidět hned. První verze to dělala obráceně (opacity 0 ze serveru) a celé
+  sekce bez JS neexistovaly; chytil to snímek celé stránky, ne úvaha.
+- **Těžké věci líně a s náhradou.** Video v hero se přidá až po obrázku
+  a jen bez `saveData`; otočka hrníčku se stáhne až u sekce a když selže,
+  zůstane obrázek. Stránka nikdy nečeká na ozdobu.
+- **Dekorace nepřináší vlastní paletu.** Značka je krém, inkoust a limetka
+  plus pět stavových tónů — a to platí i pro skvrny pod sklem a pro
+  vygenerované objekty. V první verzi tu byla broskvová a modrá skvrna
+  a syrová tailwindová `amber-400` v ukázkových tečkách; obojí šlo ven.
+  Tečka, která na prodejní stránce hlásí „dochází mléko", má přesně ten
+  tón, který uživatel uvidí uvnitř aplikace (`.dot-ok` / `.dot-wait` /
+  `.dot-muted` nad `--ok` / `--wait` / `--muted`).
+
+### Vygenerované 3D objekty
+
+Clay rendery v `public/brand/landing` drží tři pravidla, protože bez nich
+vypadají levně:
+
+- **Jen ta věc samotná.** Žádná pára, kouř, částice, odlesky do prázdna ani
+  rekvizity kolem. U 3D objektu čte oko každou abstraktní přimíchaninu jako
+  chybu renderu, ne jako atmosféru.
+- **Prázdné pozadí, ne scéna.** Objekt stojí na jednolitém podkladu
+  s měkkým kontaktním stínem. Ve skle se pak propojí násobením
+  (`mix-blend-multiply` u otočky), takže v panelu není vidět obdélník videa.
+- **Paleta značky.** Krémová keramika, limetkový proužek, inkoustový stín —
+  nic dalšího.
+
+Vyplatí se to napsat do promptu výslovně („NO steam, no props, plain solid
+white background") a pak výsledek ověřit, ne odhadnout: zdejší headless
+prohlížeč H.264 nepřehraje, takže obsah smyček se kontroluje strojovým
+popisem scény.
+
 ## Barvy: stav versus kategorie
 
 Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —
