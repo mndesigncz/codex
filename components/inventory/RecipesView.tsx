@@ -269,6 +269,9 @@ export default function RecipesView({ openProductId, onNavigate }: {
   if (connected === false) {
     return (
       <div className="p-4 sm:p-6">
+        {/* Nadpis obrazovky patří i sem. Kdo se pohybuje po nadpisech,
+            jinak na nepřipojené pokladně neví, kde vůbec je. */}
+        <h1 className="t-page sr-only">Receptury</h1>
         <div className="glass-card p-8 text-center max-w-lg mx-auto space-y-2 rise-in">
           <div className="mx-auto h-14 w-14 rounded-2xl bg-[#C8F542]/15 flex items-center justify-center text-[#5B7A08]">
             <Icon name="leaf" size={26} />

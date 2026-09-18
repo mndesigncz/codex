@@ -177,7 +177,8 @@ export default function EmployerLayout({ user }: Props) {
         <div className="space-y-2">
           <MyShifts user={user as any} />
           <ShiftSwap user={user as any} />
-          <AvailabilitySubmit user={user as any} />
+          {/* Uvnitř Mých směn; `h1` už patří jim. */}
+          <AvailabilitySubmit user={user as any} headingLevel="h2" />
           <div className="px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>
         </div>
       );

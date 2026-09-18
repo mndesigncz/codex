@@ -474,6 +474,12 @@ obrazovky potřebuje — vědět, co ten prvek **je**.
   programově není nic. Odolnější než dvojice `htmlFor`/`id` je vložit pole
   dovnitř `<label>` — svázání pak nerozpadne přejmenování `id`. Hlídá
   `check-labels` jako ráčna.
+- **Jeden `h1` na obrazovku, a nikdy podmíněný.** Nadpis je to, podle čeho
+  se pozná, kde člověk je; nesmí viset na stavu dat, jinak při načítání
+  nebo bez připojené pokladny zmizí. Když se jedna obrazovka vykresluje
+  uvnitř druhé, ta vnořená dostane `h2` — `PageHeader` má na to `as`.
+  Nadpis, který je zjevný z plochy (chat, kiosk), se dá schovat přes
+  `sr-only`; schovat ho není totéž co nemít ho.
 - **Měří se v prohlížeči.** `probe-a11y` počítá přístupné jméno tak, jak ho
   skládá odečítač, přes všechny obrazovky.
 

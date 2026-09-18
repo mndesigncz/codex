@@ -76,13 +76,13 @@ export default function LoginForm() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-[#16181A] mb-1.5">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required className={inputClass} />
+              <label htmlFor="login-email" className="block text-sm font-medium text-[#16181A] mb-1.5">Email</label>
+              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#16181A] mb-1.5">Heslo</label>
+              <label htmlFor="login-heslo" className="block text-sm font-medium text-[#16181A] mb-1.5">Heslo</label>
               <div className="relative">
-                <input type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Zadejte heslo" required className={`${inputClass} pr-12`} />
+                <input id="login-heslo" autoComplete="current-password" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Zadejte heslo" required className={`${inputClass} pr-12`} />
                 <button type="button" onClick={() => setShowPwd(v => !v)} aria-pressed={showPwd} className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-black/35 hover:text-black/60 text-sm">
                   {showPwd ? 'skrýt' : 'zobrazit'}
                 </button>

@@ -11,8 +11,15 @@ import { Menu, type MenuItem } from './Menu';
 // hlavní akce. Na telefonu jdou vedlejší akce do menu a hlavní zůstane.
 // Dřív měla každá obrazovka svůj nadpis (osm variant) a svou řadu tlačítek.
 
-export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, aside, className = '' }: {
+export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, aside, className = '', as: Nadpis = 'h1' }: {
   title: React.ReactNode;
+  /**
+   * Úroveň nadpisu. Obrazovka má jeden `h1`; když se jedna obrazovka
+   * vykresluje uvnitř druhé (Dostupnost pod Mými směnami), ta vnořená
+   * musí být `h2`. Dva `h1` na stránce znamenají, že kdo se pohybuje
+   * po nadpisech, nepozná, která je ta hlavní.
+   */
+  as?: 'h1' | 'h2';
   subtitle?: React.ReactNode;
   /**
    * Klíč, pod kterým si pamatujeme, že člověk tenhle vysvětlující řádek
@@ -53,7 +60,7 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
     <div className={`space-y-4 ${className}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1 basis-[14rem]">
-          <h1 className="t-page text-balance">{title}</h1>
+          <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
             <p className="t-meta mt-1.5 max-w-[70ch] text-pretty group">
               {subtitle}

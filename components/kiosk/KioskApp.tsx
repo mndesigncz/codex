@@ -84,6 +84,9 @@ function KioskShell({ user }: { user: KioskUser }) {
 
   return (
     <div className="kiosk-surface min-h-[100dvh] flex flex-col p-5 sm:p-8">
+      {/* Tablet nemá viditelný nadpis — identitu nese jméno a hodiny
+          v hlavičce. Pro odečítač obrazovky ale obrazovka jméno mít musí. */}
+      <h1 className="sr-only">Kiosk — {user.name}</h1>
       {/* Header */}
       {/* Kiosk běží hlavně na tabletu, ale na úzkém displeji se jméno mačkalo
           mezi značku a velké hodiny na 28 px. Identita si vezme celý řádek

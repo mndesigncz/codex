@@ -7,6 +7,12 @@ import { PageHeader, ErrorState } from '../ui';
 import { okJson } from '@/lib/api';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
+  /**
+   * Úroveň nadpisu. Samostatná obrazovka má `h1`; uvnitř Mých směn, kde
+   * `h1` už patří jim, musí být `h2` — dva `h1` na stránce znamenají, že
+   * kdo se pohybuje po nadpisech, nepozná, která je ta hlavní.
+   */
+  headingLevel?: 'h1' | 'h2';
 }
 
 type DayState = string; // 'available' | 'off' | legacy 'morning'/'afternoon' | 'type:<id>'
@@ -61,7 +67,7 @@ function buildGrid(month: string) {
   return cells;
 }
 
-export default function AvailabilitySubmit({ user }: Props) {
+export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props) {
   const now = new Date();
   const currentMonth = ym(now);
   const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
@@ -223,7 +229,7 @@ export default function AvailabilitySubmit({ user }: Props) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
-      <PageHeader hintId="availabilitysubmit" title="Dostupnost"
+      <PageHeader as={headingLevel} hintId="availabilitysubmit" title="Dostupnost"
         subtitle={<>Klepnutím na den cyklicky nastav:{' '}
           <span className="text-black/70 font-medium">{stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}</span>.</>} />
 

@@ -82,6 +82,10 @@ export default function ChatView({ user, openConversationId = null }: Props) {
 
   return (
     <div className="h-full w-full flex overflow-hidden rounded-3xl glass-card">
+      {/* Nadpis obrazovky. Vizuálně je zbytečný — celá plocha je zjevně
+          chat —, ale kdo se po aplikaci pohybuje podle nadpisů, měl tu
+          jedinou obrazovku bez záchytného bodu. */}
+      <h1 className="sr-only">Chat</h1>
       {/* Conversation list */}
       <aside
         className={`${

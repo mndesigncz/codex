@@ -179,14 +179,18 @@ function MyRewardsInner() {
     setAcking(false);
   };
 
+  // Nadpis obrazovky nesmí viset na stavu dat: při načítání ani bez dat
+  // by jinak nebylo podle čeho poznat, kde člověk je.
   if (loading) return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-4">
+      <h1 className="sr-only">Odměny</h1>
       <div className="glass-card h-40 animate-pulse" />
       <div className="glass-card h-32 animate-pulse" />
     </div>
   );
   if (!me) return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
+      <h1 className="sr-only">Odměny</h1>
       <div className="glass-card p-8 text-center text-black/45">Odměny zatím nejsou k dispozici.</div>
     </div>
   );
