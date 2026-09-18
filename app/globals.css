@@ -1005,3 +1005,38 @@ input[type='search']::-webkit-search-decoration {
 .kiosk-surface .field { min-height: 44px; }
 .kiosk-surface .seg-on,
 .kiosk-surface .seg-off { min-height: 44px; }
+
+/* ---------- Motion ukázky funkcí na prodejní stránce ----------
+   Každá funkce má scénu, která předvede, co dělá — řádky naskáčou, sloupec
+   klesne pod minimum, checklist se odškrtá. Je to dekorace jen zdánlivě:
+   návštěvník takhle uvidí mechaniku dřív, než si založí účet.
+
+   Scény se přehrávají jednou při otevření funkce (React je odmountuje
+   přepnutím `key`), takže tu není `infinite` — nekonečná smyčka za textem
+   odvádí pozornost od čtení. */
+@keyframes sc-in      { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes sc-drop    { from { opacity: 0; transform: translateY(-16px) scale(0.96) } to { opacity: 1; transform: none } }
+@keyframes sc-pop     { 0% { opacity: 0; transform: scale(0.7) } 60% { opacity: 1; transform: scale(1.08) } 100% { opacity: 1; transform: scale(1) } }
+@keyframes sc-grow    { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes sc-rise    { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+@keyframes sc-drain   { from { transform: scaleX(1) } to { transform: scaleX(var(--do, 0.3)) } }
+@keyframes sc-sweep   { 0% { transform: translateY(-120%) } 100% { transform: translateY(520%) } }
+@keyframes sc-flash   { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }
+
+.sc      { animation: sc-in 0.5s cubic-bezier(0.2,0.8,0.4,1) both }
+.sc-drop { animation: sc-drop 0.55s cubic-bezier(0.2,0.9,0.35,1) both }
+.sc-pop  { animation: sc-pop 0.45s cubic-bezier(0.2,0.9,0.35,1) both }
+.sc-grow { transform-origin: left center; animation: sc-grow 0.7s cubic-bezier(0.25,0.9,0.3,1) both }
+.sc-rise { transform-origin: bottom center; animation: sc-rise 0.65s cubic-bezier(0.25,0.9,0.3,1) both }
+.sc-drain{ transform-origin: left center; animation: sc-drain 1s cubic-bezier(0.4,0,0.3,1) both }
+.sc-sweep{ animation: sc-sweep 1.6s cubic-bezier(0.4,0,0.4,1) both }
+.sc-flash{ animation: sc-flash 0.9s ease-in-out 2 both }
+
+/* „Omezit pohyb" neznamená nic neukázat — znamená ukázat to rovnou hotové. */
+@media (prefers-reduced-motion: reduce) {
+  .sc, .sc-drop, .sc-pop, .sc-grow, .sc-rise, .sc-drain, .sc-sweep, .sc-flash {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+  .sc-sweep { opacity: 0 }
+}

@@ -2,10 +2,9 @@ import Link from 'next/link';
 import { LogoMark, Icon } from '@/components/Icons';
 import { TRIAL_DAYS } from '@/lib/plan';
 import Pricing from './Pricing';
-import Tilt from './landing/Tilt';
 import Reveal from './landing/Reveal';
-import HeroMedia from './landing/HeroMedia';
-import SpinShowcase from './landing/SpinShowcase';
+import Scene3D from './landing/Scene3D';
+import FeatureShowcase, { type Funkce } from './landing/FeatureShowcase';
 import ForceLight from './landing/ForceLight';
 
 // Prodejní stránka pro nepřihlášené — co Managero je, co umí a co stojí.
@@ -19,27 +18,26 @@ import ForceLight from './landing/ForceLight';
 const B = '/brand/landing';
 
 // ——— Funkce: dvanáct karet, každá jedna schopnost aplikace ————————————
-const FEATURES: { icon: string; title: string; text: string; big?: boolean }[] = [
-  { icon: 'calendar', big: true, title: 'Rozvrh a směny', text: 'Generátor rozvrhu podle dostupnosti a typů směn. Výměny, žádosti o volno, export do kalendáře v telefonu i tisk na nástěnku.' },
-  { icon: 'clock', title: 'Docházka', text: 'Příchody a odchody z telefonu nebo tabletu. Hodiny a mzdové náklady bez excelu.' },
-  { icon: 'coins', title: 'Uzávěrky', text: 'Bankovky, pohyby v kase, odvod — a férové vysvětlení každého rozdílu.' },
-  { icon: 'box', big: true, title: 'Sklad, který hlídá zásoby', text: 'Minima, otevřená balení, inventura i ztráty. Když něco dochází, objednávka dodavateli odejde e-mailem rovnou z aplikace.' },
-  { icon: 'cup', title: 'Receptury a marže', text: 'Cena každé položky spočítaná ze surovin. Víte, na čem vyděláváte.' },
-  { icon: 'clipboard', title: 'Úkoly a postupy', text: 'Denní úkoly, otevírací a zavírací checklisty, návody pro nováčky.' },
-  { icon: 'chat', title: 'Týmový chat', text: 'Kanály, přímé zprávy, přílohy i ankety. Všechno k podniku na jednom místě.' },
-  { icon: 'play', title: 'Kiosk pro tablet', text: 'Jeden sdílený tablet za barem: docházka, úkoly, sklad. Velká tlačítka, žádná hesla.' },
-  { icon: 'leaf', big: true, title: 'Stránka pro hosty', text: 'Menu přes QR, rezervace, objednávky od stolu, věrnostní kartičky a kupony. Ve vašich barvách a s vaším logem.' },
-  { icon: 'tent', title: 'Akce a catering', text: 'Plánování akcí s balicími seznamy a týmem na místě.' },
-  { icon: 'chart', title: 'Finance', text: 'Výdaje a přehledy. Export pro účetní na jedno kliknutí.' },
-  { icon: 'sparkle', title: 'Poctivost v detailu', text: 'Když vypadne wifi, aplikace nelže: řekne, co se neuložilo, a rozepsané nezahodí.' },
+const FEATURES: Funkce[] = [
+  { id: 'rozvrh', icon: 'calendar', title: 'Rozvrh a směny', text: 'Generátor rozvrhu podle dostupnosti a typů směn. Kolize si najde sám a řekne o ní dřív, než ji podepíšeš. Výměny, žádosti o volno, export do kalendáře v telefonu i tisk na nástěnku.' },
+  { id: 'dochazka', icon: 'clock', title: 'Docházka', text: 'Příchody a odchody z telefonu nebo z tabletu za barem. Odpracované hodiny a mzdové náklady se počítají samy — bez excelu a bez dohadování na konci měsíce.' },
+  { id: 'uzaverky', icon: 'coins', title: 'Uzávěrky', text: 'Bankovky, pohyby v kase, odvod do trezoru. Rozdíl se nezamlčí ani nezaokrouhlí: aplikace ukáže, kde vznikl, a nechá ho vysvětlit.' },
+  { id: 'sklad', icon: 'box', title: 'Sklad, který hlídá zásoby', text: 'Minima, otevřená balení, inventura i ztráty. Když něco klesne pod minimum, objednávka pro dodavatele je poskládaná — stačí ji odeslat, a odejde e-mailem rovnou z aplikace.' },
+  { id: 'receptury', icon: 'cup', title: 'Receptury a marže', text: 'Cena každé položky spočítaná ze surovin až na gramy. Víte, na čem vyděláváte — a co se vyplatí přecenit dřív, než to udělá dodavatel za vás.' },
+  { id: 'ukoly', icon: 'clipboard', title: 'Úkoly a postupy', text: 'Denní úkoly, otevírací a zavírací checklisty, návody pro nováčky. Odškrtává se na mobilu i na tabletu a je vidět, co se dodělalo a co ne.' },
+  { id: 'chat', icon: 'chat', title: 'Týmový chat', text: 'Kanály, přímé zprávy, přílohy i ankety. Všechno k podniku na jednom místě, ne rozeseté ve třech skupinách na sociálních sítích.' },
+  { id: 'kiosk', icon: 'play', title: 'Kiosk pro tablet', text: 'Jeden sdílený tablet za barem: docházka, úkoly, sklad. Velká tlačítka, klepnutí na jméno — žádná hesla u baru, kde má člověk mokré ruce.' },
+  { id: 'hoste', icon: 'leaf', title: 'Stránka pro hosty', text: 'Menu přes QR, rezervace, objednávky od stolu, věrnostní kartičky a kupony. Ve vašich barvách a s vaším logem, na vlastní adrese.' },
+  { id: 'akce', icon: 'tent', title: 'Akce a catering', text: 'Plánování akcí s balicími seznamy a týmem na místě. Co se má naložit, kdo jede a co se tam bude podávat — na jednom papíře, který se neztratí.' },
+  { id: 'finance', icon: 'chart', title: 'Finance', text: 'Tržby, nákupy a mzdy měsíce pohromadě, s hrubým výsledkem. Export pro účetní na jedno kliknutí, ve formátu, který si nebude stěžovat.' },
+  { id: 'poctivost', icon: 'sparkle', title: 'Poctivost v detailu', text: 'Když vypadne wifi, aplikace nelže: řekne, co se neuložilo, rozepsané nezahodí a po návratu spojení to dopíše. Drobnost, která rozhoduje o důvěře.' },
 ];
 
 // ——— Den s podnikem: čtyři momenty, v každém kousek skutečné aplikace ———
-const DAY: { time: string; title: string; text: string; img: string; alt: string; card: React.ReactNode }[] = [
+const DAY: { time: string; title: string; text: string; card: React.ReactNode }[] = [
   {
     time: '7:30', title: 'Otevření bez přemýšlení',
     text: 'Otevírací checklist se odškrtává na tabletu. Kdo má dnes směnu, visí na nástěnce v aplikaci — a každému v kalendáři v telefonu.',
-    img: `${B}/clock.webp`, alt: 'Hravý 3D budík',
     card: (
       <ul className="space-y-1.5 text-sm text-[#16181A]">
         <li className="flex items-center gap-2"><Icon name="check" size={14} className="text-[#5B7A08] shrink-0" />Otevírací postup 6/6</li>
@@ -51,7 +49,6 @@ const DAY: { time: string; title: string; text: string; img: string; alt: string
   {
     time: '11:00', title: 'Sklad se hlídá sám',
     text: 'Mléko kleslo pod minimum, tak o sobě dalo vědět. Objednávka dodavateli je poskládaná — stačí ji odeslat. A příjem zboží zvládne kdokoli z tabletu.',
-    img: `${B}/crate.webp`, alt: 'Hravá 3D bedýnka se zbožím',
     card: (
       <ul className="space-y-1.5 text-sm text-[#16181A]">
         <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-wait shrink-0" />Mléko: zbývá na dnešek</li>
@@ -63,7 +60,6 @@ const DAY: { time: string; title: string; text: string; img: string; alt: string
   {
     time: '15:00', title: 'Hosté si objednají sami',
     text: 'QR na stole otevře menu ve vašich barvách. Objednávka od stolu, rezervace i věrnostní kartička — bez fronty u baru a bez další aplikace ke stažení.',
-    img: `${B}/croissant.webp`, alt: 'Hravý 3D croissant',
     card: (
       <ul className="space-y-1.5 text-sm text-[#16181A]">
         <li className="flex items-center gap-2"><Icon name="bell" size={14} className="text-black/45 shrink-0" />Stůl 4: cappuccino a croissant</li>
@@ -75,7 +71,6 @@ const DAY: { time: string; title: string; text: string; img: string; alt: string
   {
     time: '22:00', title: 'Uzávěrka, která sedí',
     text: 'Kasa se počítá po bankovkách, každý pohyb má vysvětlení. Ráno vidíte tržby, mzdové náklady dne i to, co se večer dopočítalo.',
-    img: `${B}/till.webp`, alt: 'Hravá 3D pokladna s účtenkou',
     card: (
       <ul className="space-y-1.5 text-sm text-[#16181A]">
         <li className="flex items-center gap-2"><Icon name="coins" size={14} className="text-black/45 shrink-0" />Spočítáno po bankovkách</li>
@@ -154,31 +149,26 @@ export default function Landing() {
           </div>
 
           <div className="relative rise-in" style={{ animationDelay: '120ms' }}>
-            <Tilt>
-              <figure className="relative">
-                <div className="relative overflow-hidden rounded-[2rem] border border-white/70 shadow-[0_40px_90px_rgba(25,35,15,0.18)]">
-                  <HeroMedia poster={`${B}/hero.webp`} video={`${B}/hero.mp4`}
-                    alt="Hravá 3D scéna kavárenského pultu: kávovar, hrníčky, croissant a tablet v krémové a limetkové" />
-                </div>
-                {/* Skleněné karty se skutečnými momenty z aplikace. */}
-                <figcaption className="absolute -bottom-6 left-3 sm:-left-8 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]" style={{ transform: 'translateZ(46px)' }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
-                  <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
-                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-ok i-pulse shrink-0" />Směna: Eva 8–16, Martin od 12</li>
-                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-wait shrink-0" />Dochází mléko — objednávka připravená</li>
-                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-muted shrink-0" />Včerejší uzávěrka sedí na korunu</li>
-                  </ul>
-                </figcaption>
-                <div className="absolute -top-8 -right-4 sm:-right-8 w-24 sm:w-32 lg-float-a drop-shadow-[0_18px_24px_rgba(25,35,15,0.18)]" style={{ transform: 'translateZ(70px)' }} aria-hidden>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`${B}/cup.webp`} alt="" width={256} height={256} loading="lazy" className="w-full h-auto" />
-                </div>
-                <div className="hidden sm:block absolute top-[58%] sm:-left-7 w-28 lg-float-b drop-shadow-[0_16px_22px_rgba(25,35,15,0.16)]" style={{ transform: 'translateZ(56px)' }} aria-hidden>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`${B}/croissant.webp`} alt="" width={224} height={224} loading="lazy" className="w-full h-auto" />
-                </div>
-              </figure>
-            </Tilt>
+            {/* Dřív tu bylo video s vystřiženými PNG položenými přes něj —
+                proto ty objekty působily vsazeně. Teď je to jedna živá scéna:
+                hrnek má společné světlo se stránkou a vrhá na ni stín. */}
+            <div className="relative mx-auto w-full max-w-[34rem]">
+              <div className="lg-blob lg-blob-lime-2 absolute inset-8 -z-10" aria-hidden />
+              <Scene3D
+                poster={`${B}/hrnek.webp`}
+                alt="Hrnek s podšálkem v krémové a limetkové — 3D scéna Managera"
+                className="w-full"
+              />
+              {/* Skutečný moment z aplikace, ne vymyšlený graf. */}
+              <div className="absolute bottom-2 -left-1 sm:left-2 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
+                <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
+                  <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-ok i-pulse shrink-0" />Směna: Eva 8–16, Martin od 12</li>
+                  <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-wait shrink-0" />Dochází mléko — objednávka připravená</li>
+                  <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-muted shrink-0" />Včerejší uzávěrka sedí na korunu</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -214,14 +204,12 @@ export default function Landing() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">{d.time}</p>
                   <h3 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-[#16181A]">{d.title}</h3>
                   <p className="mt-3 text-sm sm:text-base text-black/60 leading-relaxed max-w-[52ch] text-pretty">{d.text}</p>
-                  <div className="mt-5 lgx-strong rounded-2xl px-4 py-3 inline-block">{d.card}</div>
                 </div>
-                <div className="flex justify-center md:justify-end">
-                  <div className={`w-40 sm:w-52 ${['lg-float-a', 'lg-float-b', 'lg-float-c'][i % 3]} drop-shadow-[0_22px_30px_rgba(25,35,15,0.16)]`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={d.img} alt={d.alt} width={416} height={416} loading="lazy" className="w-full h-auto" />
-                  </div>
-                </div>
+                {/* Skutečný moment z aplikace. Dřív tu vedle textu levitoval
+                    vystřižený objekt; nic neříkal a byl to přesně ten
+                    „nalepený" dojem. Karta na jeho místě říká, co se v tu
+                    hodinu v podniku doopravdy stane. */}
+                <div className="lgx-strong rounded-2xl px-4 py-3.5">{d.card}</div>
               </div>
             </Reveal>
           ))}
@@ -232,21 +220,9 @@ export default function Landing() {
       <section id="funkce" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24 scroll-mt-24">
         <div className="max-w-xl">
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Všechno, co provoz potřebuje</h2>
-          <p className="mt-3 text-base text-black/55 text-pretty">Dvanáct věcí, které jinak děláte ve třech aplikacích, dvou sešitech a jedné hlavě.</p>
+          <p className="mt-3 text-base text-black/55 text-pretty">Vyber si funkci a podívej se, jak se používá. Dvanáct věcí, které jinak děláte ve třech aplikacích, dvou sešitech a jedné hlavě.</p>
         </div>
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-6 gap-4">
-          {FEATURES.map((f, i) => (
-            <Reveal key={f.title} delay={(i % 3) * 70} className={f.big ? 'sm:col-span-4' : 'sm:col-span-2'}>
-              <div className="lgx rounded-3xl p-6 sm:p-7 flex flex-col h-full">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">
-                  <Icon name={f.icon} size={22} />
-                </div>
-                <h3 className={`mt-5 font-bold tracking-tight text-[#16181A] ${f.big ? 'text-2xl' : 'text-lg'}`}>{f.title}</h3>
-                <p className={`mt-2 text-black/60 leading-relaxed text-pretty ${f.big ? 'text-base max-w-[52ch]' : 'text-sm'}`}>{f.text}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+        <FeatureShowcase funkce={FEATURES} />
       </section>
 
       {/* Hosté: druhá polovina produktu — to, co vidí zákazník. */}
@@ -278,23 +254,6 @@ export default function Landing() {
                 </div>
               </div>
             </div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* Malý moment radosti: hrníček vytočený dokola. Dekorace s obsahem —
-          říká, že detailům věnujeme péči. */}
-      <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
-        <Reveal>
-          <div className="lgx rounded-[2rem] p-6 sm:p-10 grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-8 items-center">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A]">Ze všech stran dobré.</h2>
-              <p className="mt-3 text-base text-black/60 leading-relaxed max-w-[52ch] text-pretty">
-                Hrníček jsme si vytočili dokola, protože detaily nás baví. Se stejnou péčí hlídáme
-                každou korunu v uzávěrce, každé balení ve skladu a každou směnu v rozvrhu.
-              </p>
-            </div>
-            <SpinShowcase video={`${B}/cup-spin.mp4`} fallback={`${B}/cup.webp`} alt="Hrníček na espresso s limetkovým okrajem v pomalé otočce" />
           </div>
         </Reveal>
       </section>
