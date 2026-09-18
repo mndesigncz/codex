@@ -111,3 +111,7 @@ jobs:
       # be found." — a dojde na ni zákazník se starým sdíleným odkazem.
       - name: Slepé uličky
         run: node scripts/check-dead-ends.mjs
+      # Mutace, jejíž výsledek nikdo nečte, selže potichu: obrazovka se
+      # jen načte znovu a člověk nepozná, proč se nic nestalo.
+      - name: Tiché změny
+        run: node scripts/check-silent-mutation.mjs

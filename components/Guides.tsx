@@ -11,6 +11,7 @@ import GuideProductLink from './guides/GuideProductLink';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { okJson, apiMessage } from '@/lib/api';
+import { czCount, KATEGORIE } from '@/lib/czech';
 
 interface User {
   id: number;
@@ -223,13 +224,20 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
 
   const createDefaults = async () => {
     setCreatingCat(true);
+    // Smyčka bez kontroly mlčky založila jen část kategorií; člověk pak
+    // koukal na neúplný seznam a nevěděl, jestli to tak má být.
+    let selhalo = 0;
     for (const c of DEFAULT_CATEGORIES) {
-      await fetch('/api/guides/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(c),
-      });
+      try {
+        const res = await fetch('/api/guides/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(c),
+        });
+        if (!res.ok) selhalo += 1;
+      } catch { selhalo += 1; }
     }
+    if (selhalo > 0) setLoadErr(`${czCount(selhalo, KATEGORIE)} se nepodařilo založit. Zkus to prosím znovu.`);
     await loadCategories();
     setCreatingCat(false);
   };
@@ -251,9 +259,16 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
 
   const deleteGuide = async (id: number) => {
     if (!confirm('Opravdu smazat tento návod?')) return;
-    await fetch(`/api/guides/${id}`, { method: 'DELETE' });
-    setReader(null);
-    await loadGuides();
+    // Bez téhle kontroly se po nepovedeném smazání jen zavřel čtenář
+    // a seznam se načetl znovu — návod tam pořád byl a nikdo nevěděl proč.
+    try {
+      const res = await fetch(`/api/guides/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(String(res.status));
+      setReader(null);
+      await loadGuides();
+    } catch {
+      setLoadErr('Návod se nepodařilo smazat. Zkus to prosím znovu.');
+    }
   };
 
   return (
@@ -1029,6 +1044,8 @@ function ManageCategories({
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('book');
   const [busy, setBusy] = useState(false);
+  /** Proč se poslední úprava kategorií neuložila. */
+  const [chyba, setChyba] = useState('');
 
   useEffect(() => {
     setItems(categories);
@@ -1036,31 +1053,51 @@ function ManageCategories({
 
   const add = async () => {
     if (!newName.trim()) return;
-    setBusy(true);
-    await fetch('/api/guides/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), icon: newIcon }),
-    });
-    setNewName('');
-    setNewIcon('book');
-    await onChanged();
-    setBusy(false);
+    setBusy(true); setChyba('');
+    try {
+      const res = await fetch('/api/guides/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim(), icon: newIcon }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setNewName('');
+      setNewIcon('book');
+      await onChanged();
+    } catch {
+      // Jméno zůstává v poli, ať se nemusí psát znovu.
+      setChyba('Kategorii se nepodařilo založit. Zkus to prosím znovu.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const rename = async (id: number, name: string) => {
-    await fetch(`/api/guides/categories/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    await onChanged();
+    setChyba('');
+    try {
+      const res = await fetch(`/api/guides/categories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      await onChanged();
+    } catch {
+      setChyba('Přejmenování se neuložilo. Zkus to prosím znovu.');
+      await onChanged();
+    }
   };
 
   const remove = async (id: number) => {
     if (!confirm('Smazat kategorii? Návody v ní zůstanou (bez kategorie).')) return;
-    await fetch(`/api/guides/categories/${id}`, { method: 'DELETE' });
-    await onChanged();
+    setChyba('');
+    try {
+      const res = await fetch(`/api/guides/categories/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(String(res.status));
+      await onChanged();
+    } catch {
+      setChyba('Kategorii se nepodařilo smazat. Zkus to prosím znovu.');
+    }
   };
 
   return (
@@ -1076,6 +1113,7 @@ function ManageCategories({
             <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
           </button>
         </div>
+        {chyba && <p role="alert" className="note note-danger mb-4">{chyba}</p>}
 
         <div className="space-y-2 mb-6">
           {items.length === 0 && <EmptyState icon="book" compact title="Zatím žádné kategorie"

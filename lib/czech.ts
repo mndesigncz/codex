@@ -40,3 +40,4 @@ export function czVerb(n: number, sg: string, pl: string): string {
 export const POLOZKA: CzNoun = { one: 'položka', few: 'položky', many: 'položek' };
 export const SMENA: CzNoun = { one: 'směna', few: 'směny', many: 'směn' };
 export const DEN: CzNoun = { one: 'den', few: 'dny', many: 'dní' };
+export const KATEGORIE: CzNoun = { one: 'kategorii', few: 'kategorie', many: 'kategorií' };

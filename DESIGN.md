@@ -137,13 +137,13 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a devatenáct kontrol ze `scripts/check-*.mjs`:
+`npm run build` a dvacet kontrol ze `scripts/check-*.mjs`:
 
 `check-contrast-classes` · `check-czech` · `check-dark-classes` ·
 `check-dead-ends` ·
 `check-decimal-inputs` · `check-email` · `check-fetch-ok` · `check-forms` ·
 `check-generic-copy` · `check-ics` · `check-modals` · `check-money` ·
-`check-labels` · `check-palette` · `check-silent-load` ·
+`check-labels` · `check-palette` · `check-silent-load` · `check-silent-mutation` ·
 `check-test-imports` · `check-time` · `check-transitions` ·
 `check-width-clash`
 
@@ -391,6 +391,9 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   stejně jako neexistující podnik: „Podnik tu není." Zákazník z toho usoudí,
   že kavárna na platformě není, a přestane to zkoušet. Neexistenci smí tvrdit
   jen odpověď 404; všechno ostatní je chyba načtení, a ta má tlačítko.
+- **Mutace, jejíž výsledek nikdo nečte, selže potichu.** `await fetch(…,
+  { method: 'DELETE' })` bez kontroly znamená, že se obrazovka jen načte
+  znovu a člověk nepozná, proč se nic nestalo. Hlídá `check-silent-mutation`.
 - **`await fetch` v odesílací obsluze patří do `try`.** Bez něj obsluha
   na výpadku spojení umře uvnitř `await` a nestane se **vůbec nic** —
   žádná chyba, žádné potvrzení, jen ticho. U rezervace nebo objednávky je
