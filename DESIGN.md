@@ -237,6 +237,31 @@ Dvě věci, na kterých to při psaní stálo a stojí za zapamatování:
   „rozepsáno" zhasnout nad textem, který na obrazovce pořád je. Přepočítává
   se až po Reactu.
 
+## Prodejní stránka (landing)
+
+Jediná plocha s vlastním vizuálním jazykem: světlé „tekuté sklo" — panely
+`.lgx`/`.lgx-strong` s rozmazáním a nasycením podkladu, barevné skvrny
+`.lg-blob` pod nimi, hravé 3D objekty z clay renderů (`public/brand/landing`,
+generované, ne fotobanka). Aplikace sama zůstává u klidnějšího `.glass-card`.
+
+Zásady, které přestavba v kole 35 zafixovala:
+
+- **Landing je světlý ostrov.** Krémové podklady nemají tmavou variantu;
+  `ForceLight` volbu uživatele jen odloží, v aplikaci platí dál (stejný
+  mechanismus jako Managero client).
+- **Obsah nese skutečný produkt, ne dekorace.** Skleněné karty ukazují
+  momenty z aplikace (směna, minimum ve skladu, uzávěrka) a žádná čísla,
+  loga zákazníků ani recenze, které nemáme. Tři čísla nahoře jsou fakta
+  o produktu, ne metriky.
+- **Animace je bonus, ne podmínka.** `Reveal` posílá obsah ze serveru
+  viditelný a schovává ho až v prohlížeči těsně před vykreslením — bez
+  JavaScriptu, s `prefers-reduced-motion` nebo po pádu skriptu je všechno
+  vidět hned. První verze to dělala obráceně (opacity 0 ze serveru) a celé
+  sekce bez JS neexistovaly; chytil to snímek celé stránky, ne úvaha.
+- **Těžké věci líně a s náhradou.** Video v hero se přidá až po obrázku
+  a jen bez `saveData`; 3D model (`model-viewer`, vlastní chunk) se stáhne
+  až u sekce a když selže, zůstane obrázek. Stránka nikdy nečeká na ozdobu.
+
 ## Barvy: stav versus kategorie
 
 Paleta má **pět stavových tónů** — `ok`, `wait`, `bad`, `info`, `muted` —
