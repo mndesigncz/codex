@@ -1047,6 +1047,26 @@ tmavou pilulku absolutně umístěným prvkem s `pointer-events: none`.
 Lezení po předcích ji nevidí a `elementsFromPoint` ji přeskakuje. Obojí
 zvlášť hlásilo bílou na krémové u textu, který je bílý na tmavé pilulce.
 
+## Mezipásmo mezi telefonem a monitorem
+
+Měřilo se 390 px a 1280 px. Mezi tím ne — a přitom produkt sám prodává
+„kiosk pro tablet za barem" a menu na iPadu před podnikem. Právě tam se
+breakpointy lámou.
+
+- **Doplněk v řádku seznamu se zapíná až od `lg`, ne od `md`.** Na 768 px
+  se objevil, ale řádek na něj místo neměl: pevné sloupce (číslo 7rem +
+  doplněk 8,5rem) plus ikona, akce a šipka vytlačily jméno, které je
+  `flex-1`, na nulovou šířku. Na iPadu tak seznam zákazníků neukazoval
+  žádná jména. Naměřeno: 768 px → jméno 0 px, 1024 px → 250 px.
+- **Pevné sloupce mají svůj součet i tady.** Je to tatáž vada jako ve
+  Financích na 390 px, jen o breakpoint výš. Kdo přidává sloupec do
+  `ListRow`, sečte šířky a zkontroluje, kde `flex-1` zkolabuje.
+
+Dotyková plocha se neměří krabicí prvku. `.tap-target` ji roztahuje
+pseudoprvkem na 44 px a `getBoundingClientRect` o něm neví — sonda na
+kiosku hlásila tři malé cíle, které ve skutečnosti zabírají 44 px.
+Skutečnost ukáže až zásah: bod 21 px mimo krabici musí pořád trefit.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

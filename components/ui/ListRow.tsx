@@ -57,7 +57,13 @@ export function ListRow({
             {valueMeta != null && <span className="block text-[13px] text-black/55 leading-snug mt-0.5">{valueMeta}</span>}
           </span>
         )}
-        {aside != null && <span className="list-aside shrink-0 hidden md:block text-[13px] text-black/55">{aside}</span>}
+        {/* Doplněk se zapíná až od `lg`, ne od `md`.
+            Na 768 px se objevil, ale řádek na něj místo neměl: pevné sloupce
+            (číslo 7rem + doplněk 8,5rem) plus ikona, akce a šipka vytlačily
+            jméno, které je `flex-1`, na nulovou šířku. Na iPadu tak seznam
+            zákazníků neukazoval žádná jména — jen iniciály a čísla.
+            Naměřeno: 768 px → jméno 0 px, 1024 px → 250 px. */}
+        {aside != null && <span className="list-aside shrink-0 hidden lg:block text-[13px] text-black/55">{aside}</span>}
         {right && <span className="shrink-0 flex items-center gap-2 text-right">{right}</span>}
         {actions && <span className="list-actions shrink-0">{actions}</span>}
       </span>
