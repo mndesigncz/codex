@@ -691,6 +691,39 @@ je nikdo nenavrhl, dokud na ně někdo nedošel.
   rozvržení, nemusí být načtené ani CSS — kreslí si `<html>`, `<body>`
   i styly sama.
 
+## Pohled se stahuje, až když ho někdo otevře
+
+Hlavní obrazovka měla **421 kB prvního načtení**, zatímco zbytek aplikace
+87–137 kB. Příčina byla v rozvržení: importovalo všech dvaadvacet pohledů
+staticky, takže se rozvrh, sklad, receptury, postupy, chat i správa
+hostovské části stahovaly dřív, než se ukázal přehled. Manažer na telefonu
+v kavárně tak čekal na věci, které ten den vůbec neotevře — a zaměstnanec,
+který za směnu otevře dvě obrazovky, stahoval uzávěrku i výměny směn.
+
+Po převedení na `next/dynamic` se skeletonem:
+
+| obrazovka | před | po |
+|---|---|---|
+| `/employer/overview` | 421 kB | **160 kB** |
+| `/employee/shifts` | 288 kB | **161 kB** |
+
+Dvě pravidla, která u toho platí:
+
+- **První obrazovka po přihlášení zůstává statická.** Přehled i domovská
+  obrazovka se otevřou hned; čekat na ně by bylo horší než ušetřené kilobajty.
+- **Pohled, který se načítá, ukáže kostru**, ne prázdno. `PageSkeleton` drží
+  tvar stránky, takže se rozvržení neposkočí.
+
+Hlídá `scripts/check-lazy-views.mjs`: každá komponenta, kterou `switch`
+v rozvržení vykresluje jako celou obrazovku, musí přijít přes
+`naLine(() => import(…))`. Kontrola hned při zavedení našla jeden pohled,
+který při ruční práci utekl — proto existuje.
+
+Jedna past na typy: komponenta s výchozí hodnotou parametru
+(`function X({ a, b }: Props = {})`) se přes `import()` neodvodí a props
+propadnou na `object`. Řešení je pojmenovat a vyexportovat typ props, ne
+psát `any`.
+
 ## Měřidlo, které nemá právo hlásit nálezy
 
 Sonda na viditelný fokus nabídla dvakrát po sobě velký, přesvědčivý nález —

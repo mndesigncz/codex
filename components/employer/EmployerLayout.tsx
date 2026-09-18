@@ -5,32 +5,12 @@ import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
-import ChatView from '../chat/ChatView';
+
 import MessengerDock from '../chat/MessengerDock';
 import { useConversations } from '../chat/useChat';
-import Guides from '../Guides';
-import Settings from '../Settings';
-import TeamManagement from '../TeamManagement';
+
 import EmployerDashboard from './EmployerDashboard';
-import ScheduleBuilder from '../scheduling/ScheduleBuilder';
-import Inventory from './Inventory';
-import PlanningBoard from './PlanningBoard';
-import EventsView from './EventsView';
-import ClosingsOverview from './ClosingsOverview';
-import FinanceView from './FinanceView';
-import MenuEditor from './MenuEditor';
-import SuggestionsBoard from '../SuggestionsBoard';
-import TaskManager from './TaskManager';
-import RewardsView from './RewardsView';
-import Attendance from './Attendance';
-import MyShifts from '../employee/MyShifts';
-import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
-import TimeOffRequest from '../scheduling/TimeOffRequest';
-import TimeOffApprovals from '../scheduling/TimeOffApprovals';
-import Procedures from '../procedures/Procedures';
-import ToGoMode from './ToGoMode';
-import ClientAdmin from '../client/ClientAdmin';
-import RecipesView from '../inventory/RecipesView';
+
 import ReceiptsPanel from './ReceiptsPanel';
 import ShiftSwap from '../scheduling/ShiftSwap';
 import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
@@ -40,6 +20,47 @@ import { usePlan, MaxGate } from '../Pro';
 import { czDays } from '@/lib/plan';
 import { useModal } from '@/lib/useModal';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import dynamic from 'next/dynamic';
+import { PageSkeleton } from '../ui';
+
+// Pohledy se stahují až při otevření.
+//
+// Hlavní obrazovka měla 421 kB prvního načtení, zatímco zbytek aplikace
+// 87–137 kB: všech dvaadvacet pohledů — rozvrh, sklad, receptury, postupy,
+// chat i správa hostovské části — se stahovalo dřív, než se ukázal přehled.
+// Manažer na telefonu v kavárně tak čekal na věci, které ten den vůbec
+// neotevře.
+//
+// Přehled zůstává statický schválně: je to první obrazovka po přihlášení
+// a ta čekat nemá. Zbytek dostane kostru, než dojede.
+function naLine<P extends object>(nacti: () => Promise<{ default: React.ComponentType<P> }>) {
+  return dynamic(nacti, { loading: () => <PageSkeleton /> }) as React.ComponentType<P>;
+}
+
+const ChatView = naLine(() => import('../chat/ChatView'));
+const Guides = naLine(() => import('../Guides'));
+const Settings = naLine(() => import('../Settings'));
+const TeamManagement = naLine(() => import('../TeamManagement'));
+const ScheduleBuilder = naLine(() => import('../scheduling/ScheduleBuilder'));
+const Inventory = naLine(() => import('./Inventory'));
+const PlanningBoard = naLine(() => import('./PlanningBoard'));
+const EventsView = naLine(() => import('./EventsView'));
+const ClosingsOverview = naLine(() => import('./ClosingsOverview'));
+const FinanceView = naLine(() => import('./FinanceView'));
+const MenuEditor = naLine(() => import('./MenuEditor'));
+const SuggestionsBoard = naLine(() => import('../SuggestionsBoard'));
+const TaskManager = naLine(() => import('./TaskManager'));
+const RewardsView = naLine(() => import('./RewardsView'));
+const Attendance = naLine(() => import('./Attendance'));
+const MyShifts = naLine(() => import('../employee/MyShifts'));
+const AvailabilitySubmit = naLine(() => import('../scheduling/AvailabilitySubmit'));
+const TimeOffRequest = naLine(() => import('../scheduling/TimeOffRequest'));
+const TimeOffApprovals = naLine(() => import('../scheduling/TimeOffApprovals'));
+const Procedures = naLine(() => import('../procedures/Procedures'));
+const ToGoMode = naLine(() => import('./ToGoMode'));
+const ClientAdmin = naLine(() => import('../client/ClientAdmin'));
+const RecipesView = naLine<import('../inventory/RecipesView').RecipesViewProps>(() => import('../inventory/RecipesView'));
+
 
 const navItems = [
   { id: 'overview',   label: 'Přehled',    icon: 'overview' },
