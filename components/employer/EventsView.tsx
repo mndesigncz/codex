@@ -13,6 +13,8 @@ import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import { useDraft } from '@/lib/useDraft';
+import { DraftNote } from '../ui/DraftNote';
 
 type Ev = any;
 
@@ -185,6 +187,11 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
   const [endTime, setEndTime] = useState('');
   const [location, setLocation] = useState('');
   const [offsite, setOffsite] = useState(false);
+  const koncept = useDraft('akce-nova',
+    { title, kind, date, startTime, endTime, location, offsite },
+    (v) => { setTitle(v.title); setKind(v.kind); setDate(v.date); setStartTime(v.startTime);
+             setEndTime(v.endTime); setLocation(v.location); setOffsite(v.offsite); },
+    { vychozi: { title: '', kind: 'concert', date: '', startTime: '', endTime: '', location: '', offsite: false } });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -195,7 +202,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
       body: JSON.stringify({ title, kind, date, startTime, endTime, location, offsite }),
     }).catch(() => null);
     setBusy(false);
-    if (res?.ok) { const d = await res.json(); onSaved(d.event); }
+    if (res?.ok) { const d = await res.json(); koncept.hotovo(); onSaved(d.event); }
     else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || 'Akci se nepodařilo založit.'); }
   };
 
@@ -204,6 +211,7 @@ function EventEditor({ onClose, onSaved }: { onClose: () => void; onSaved: (ev: 
       <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
         <DiscardGuard guard={m.guard} />
         <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-4">Nová akce</h3>
+        <div className="mb-3"><DraftNote koncept={koncept} co="rozepsanou akci" /></div>
         {err && <p className="text-sm text-bad-ink mb-2">{err}</p>}
         {/* Opravdový <form>, ne jen tlačítko s onClick: po vyplnění názvu
             a data se čeká, že Enter akci založí. Bez něj se musí sáhnout
