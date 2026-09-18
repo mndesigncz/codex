@@ -177,7 +177,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     nextEvent: nextEvent ? (
       <div className="rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
         <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
-          <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
+          <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A5CC0]" />
           <span className="truncate">{nextEvent.title}</span>
         </p>
         <p className="text-sm text-black/50 mt-0.5 cz-sentence truncate">
@@ -216,7 +216,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
           </div>
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wider text-black/40 leading-tight text-balance">Průměr hodnocení</p>
-            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? <><Icon name="star" size={16} className="inline -mt-0.5 mr-1 text-[#4F6A07]" />{monthAvg.toFixed(1)}</> : '—'}</p>
+            <p className="text-base sm:text-xl font-bold tabular-nums text-[#16181A] mt-0.5 whitespace-nowrap">{monthAvg != null ? <><Icon name="star" size={16} className="inline -mt-0.5 mr-1 text-[#5B7A08]" />{monthAvg.toFixed(1)}</> : '—'}</p>
           </div>
         </div>
       </div>
@@ -227,7 +227,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
-              <Icon name="pin" size={17} className="shrink-0 text-[#4F6A07]" />
+              <Icon name="pin" size={17} className="shrink-0 text-[#5B7A08]" />
               <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
             </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>

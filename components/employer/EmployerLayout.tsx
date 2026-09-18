@@ -361,7 +361,7 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">Client</span>
           </button>
           <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu" aria-label="Přepnout do TO GO režimu"
-            className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#4F6A07] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
+            className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
             <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">TO GO</span>
           </button>
           <NotificationBell />

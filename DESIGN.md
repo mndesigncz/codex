@@ -395,16 +395,61 @@ Dva detaily, které z toho plynou:
 Hlídá `scripts/check-status-colors.mjs`: syrový tailwindový odstín v komponentě
 je tvrdá chyba, barevný hex mimo paletu je ráčna (nastaveno na 110).
 
-**Co zbývá:** ráčna drží šest zelených (`#5B7A08`, `#3E5406`, `#4F6A07`,
-`#8FB811`, `#5B9E00`, `#89AC16`) a tři modré pro tytéž významy. Sjednotit je
-znamená rozhodnout, který odstín je ten pravý — to je vlastní kolo, ne
-vedlejší úklid.
+**Druhá vrstva, dodělaná.** Ráčna držela 110 barevných hexů mimo paletu:
+šest zelených (`#5B7A08`, `#3E5406`, `#4F6A07`, `#8FB811`, `#5B9E00`,
+`#89AC16`) a tři modré pro tytéž významy. Každý z těch bloudících odstínů
+měl význam, který paleta uměla — sjednotily se tedy **na** ni, ne naopak,
+a vždy směrem k tmavšímu, takže kontrast jen rostl:
 
-**A jeden nález, který čeká na rozhodnutí:** `cat-1`, `cat-2` a `cat-4` jsou
-doslova stavové tóny (limetka, info modrá, wait jantarová). „Druhý typ směny"
-má tedy stejnou modrou jako „info" — což je přesně to, co pravidlo nad tímhle
-odstavcem zakazuje. Opravit to znamená přidat kategoriím nové odstíny, tedy
-rozšířit paletu; to se nedělá bez rozmyslu.
+| co to znamenalo | kolik | sjednoceno na |
+|---|---|---|
+| text stavu info | 39 | `#0A5CC0` |
+| limetkový inkoust | 28 | `#5B7A08` |
+| akcentní zelená (tečka, zaškrtávátko, sloupec) | 17 | `#8FB811` |
+| „připíchnuto" | 2 | `#92400E` (wait) |
+| chybový stav (vlastní oranžová dvojice) | 3 | `#DC2626` / `#991B1B` (bad) |
+
+**Z ráčny je tvrdá nula.** To je silnější než „nesmí přibývat": nová barva
+mimo paletu CI rovnou zastaví.
+
+Kontrola u toho dostala dvě zpřesnění, obě z vlastních falešných nálezů:
+barva zmíněná **v komentáři** se nevykresluje, a **skoro bílá plocha** není
+stavová barva (práh sytosti 0,25 → 0,3, světlosti 0,96 → 0,92).
+
+### Past: přejmenování hexu odpojí přepis pro tmavý režim
+
+Třída s pevným hexem v názvu (`text-[#5B7A08]`) má v `globals.css` dvojici
+přepisů — jeden ztmavuje ve světlém režimu na normu, druhý převrací
+v tmavém. **Ty přepisy jsou navázané na jméno třídy, tedy na tu hodnotu.**
+Přejmenování hexu je tiše osiří: pravidlo zůstane v CSS a nikdy se
+netrefí. Naměřeno na vlastní kůži — tmavý režim 21 → 25 po sjednocení
+barev, aniž by se tmavého režimu kdokoli dotkl.
+
+Pokusem o nápravu bylo převést těch 417 tříd na tokeny, které se převracejí
+samy. **Bylo to horší: 25 → 100.** Tokeny neměly `!important`, takže je
+přebila plošná pravidla pro tmavý režim, a ztratila se i úprava kontrastu
+ve světlém. Správná a mnohem menší oprava byla přemapovat existující
+přepisy na nová jména tříd: **výsledek 20**, tedy o jednu líp než před
+celým úklidem.
+
+Pravidlo z toho: **když se mění hodnota v názvu třídy, musí se s ní
+přestěhovat i její přepisy** — a velký převod na tokeny se nedělá naslepo
+v jednom kroku, protože co vypadá čistěji, může být měřitelně horší.
+
+**A jeden nález, který měření uzavřelo jinak, než vypadal.** `cat-1`, `cat-2`
+a `cat-4` jsou v hodnotách doslova stavové tóny (limetka, info modrá, wait
+jantarová). „Druhý typ směny" má tedy stejnou modrou jako stav „info" — což
+pravidlo nad tímhle odstavcem zakazuje. Napravit to znamená dát kategoriím
+nové odstíny, tedy **rozšířit paletu**, a to je přesně to, co se dělat nemá.
+
+Než se palety dotkne, ptá se `probe-kolize.mjs` na to podstatné: **potkají
+se ty dvě věci vůbec na jedné obrazovce?** Naměřeno: kategorie jsou na
+**3 z 51** obrazovek a na žádné z nich není zároveň stavový chip téže barvy.
+**Nula kolizí.** Rozšiřovat paletu kvůli záměně, ke které nedochází, by bylo
+horší než ji nechat být.
+
+Zůstává to ale jako **nastražená past**: kdo přidá stavový chip na obrazovku
+s typy směn, tu záměnu vyrobí. Před takovým krokem se sonda pouští znovu.
 
 ## Responzivní pravidla (mobil / tablet / desktop)
 

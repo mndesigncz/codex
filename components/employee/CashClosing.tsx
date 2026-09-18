@@ -735,7 +735,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                 </button>
                 {evsToday.map(ev => (
                   <button key={ev.id} type="button" role="radio" aria-checked={eventId === ev.id} onClick={() => setEventId(ev.id)}
-                    className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === ev.id ? 'bg-[#0A84FF] text-white' : 'bg-white/70 border border-[#0A84FF]/25 text-[#0A6FE0] hover:bg-[#0A84FF]/10'}`}>
+                    className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === ev.id ? 'bg-[#0A84FF] text-white' : 'bg-white/70 border border-[#0A84FF]/25 text-[#0A5CC0] hover:bg-[#0A84FF]/10'}`}>
                     Za akci: {ev.title}
                   </button>
                 ))}
@@ -1064,7 +1064,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               diff === 0
                 ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
                 : diff > 0
-                  ? 'bg-[#0A84FF]/10 border-[#0A84FF]/25 text-[#0A6FE0]'
+                  ? 'bg-[#0A84FF]/10 border-[#0A84FF]/25 text-[#0A5CC0]'
                   : 'bg-bad/10 border-bad/25 text-bad-ink'
             }`}>
               <span className="flex items-center gap-2 font-semibold">
@@ -1272,7 +1272,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     className="tap-target rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-bad-ink transition-colors"
                   ><Icon name="close" size={15} /></button>
                   <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 max-w-full ${
-                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'
+                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
                 </div>

@@ -39,7 +39,7 @@ const GROUPS: { id: Group; label: string; icon: string; hint: string }[] = [
 const TONES = {
   good: { card: 'border-[#C8F542]/40 bg-[#C8F542]/[0.09]', icon: 'text-[#5B7A08]', title: 'text-[#3E5406]' },
   warn: { card: 'border-wait/30 bg-wait/[0.07]', icon: 'text-wait-ink', title: 'text-wait-ink' },
-  info: { card: 'border-[#0A84FF]/22 bg-[#0A84FF]/[0.05]', icon: 'text-[#0A6FE0]', title: 'text-[#0A5FC4]' },
+  info: { card: 'border-[#0A84FF]/22 bg-[#0A84FF]/[0.05]', icon: 'text-[#0A5CC0]', title: 'text-[#0A5CC0]' },
 } as const;
 
 export default function FinanceAdvice({ month }: { month: string }) {

@@ -112,7 +112,7 @@ export default function AnnouncementsManager() {
               key={a.id}
               className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-wait/[0.12] border-wait/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
             >
-              <span className={`shrink-0 mt-0.5 ${a.pinned ? 'text-[#8A6A00]' : 'text-black/35'}`} aria-hidden>
+              <span className={`shrink-0 mt-0.5 ${a.pinned ? 'text-[#92400E]' : 'text-black/35'}`} aria-hidden>
                 <Icon name={a.pinned ? 'pin' : 'book'} size={17} />
               </span>
               <div className="min-w-0 flex-1">
@@ -132,7 +132,7 @@ export default function AnnouncementsManager() {
                   className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="pencil" size={15} /></button>
                 <button type="button" onClick={() => patch(a.id, { pinned: !a.pinned })}
                   aria-label={a.pinned ? 'Odepnout' : 'Připnout'} title={a.pinned ? 'Odepnout (tým ho přestane vidět)' : 'Znovu připnout'}
-                  className={`tap-target-sm w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/[0.06] transition ${a.pinned ? 'text-[#8A6A00]' : 'text-black/40 hover:text-black/70'}`}><Icon name="pin" size={15} /></button>
+                  className={`tap-target-sm w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/[0.06] transition ${a.pinned ? 'text-[#92400E]' : 'text-black/40 hover:text-black/70'}`}><Icon name="pin" size={15} /></button>
                 <button type="button" onClick={() => remove(a.id)}
                   aria-label="Odstranit oznámení"
                   className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="close" size={15} /></button>
@@ -162,7 +162,7 @@ export default function AnnouncementsManager() {
         />
         <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60">
           <input type="checkbox" checked={alsoChat} onChange={e => setAlsoChat(e.target.checked)}
-            className="h-5 w-5 rounded accent-[#5B9E00]" />
+            className="h-5 w-5 rounded accent-[#8FB811]" />
           Poslat i do týmového chatu
         </label>
         <div className="flex items-center justify-between gap-3 flex-wrap">

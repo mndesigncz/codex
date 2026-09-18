@@ -828,7 +828,7 @@ function ProcedureEditor({
               <span className="block text-xs text-black/45 mt-0.5">Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne.</span>
             </span>
             <input type="checkbox" checked={requireBeforeClosing} onChange={e => setRequireBeforeClosing(e.target.checked)}
-              className="mt-1 h-5 w-5 rounded accent-[#5B9E00] shrink-0" />
+              className="mt-1 h-5 w-5 rounded accent-[#8FB811] shrink-0" />
           </label>
 
           <div>

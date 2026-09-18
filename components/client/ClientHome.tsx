@@ -68,7 +68,7 @@ export default function ClientHome() {
           <ul className="glass-card p-4 space-y-2.5 text-sm">
             {([['card', 'Kartička s QR', 'ukážeš u kasy, obsluha přidá razítko nebo body'], ['calendarCheck', 'Rezervace', 'stůl na den a hodinu, potvrzení přijde do telefonu'], ['cup', 'Objednávka od stolu', 'naskenuješ QR na stole, jde rovnou do kasy']] as const).map(([ic, t, h]) => (
               <li key={t} className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name={ic} size={15} /></span>
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08]"><Icon name={ic} size={15} /></span>
                 <span><span className="font-semibold">{t}</span><span className="block text-xs text-black/55 leading-snug">{h}</span></span>
               </li>
             ))}
@@ -128,9 +128,9 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
               </div>
               <div className={`mt-3 flex flex-wrap gap-1.5 text-xs`}>
                 {b.address && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-black/[0.05] text-black/60'}`}><Icon name="location" size={12} />{b.address}</span>}
-                {b.reservationsOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#4F6A07]'}`}><Icon name="calendarCheck" size={12} />Rezervace</span>}
-                {b.loyaltyOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#4F6A07]'}`}><Icon name="gift" size={12} />Věrnost</span>}
-                {b.orderingOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#4F6A07]'}`}><Icon name="cup" size={12} />Od stolu</span>}
+                {b.reservationsOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="calendarCheck" size={12} />Rezervace</span>}
+                {b.loyaltyOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="gift" size={12} />Věrnost</span>}
+                {b.orderingOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="cup" size={12} />Od stolu</span>}
               </div>
             </div>
           </Link>

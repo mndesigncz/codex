@@ -29,7 +29,7 @@ interface Props {
 
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Čeká', color: 'bg-black/[0.05] text-black/60' },
-  { value: 'in_progress', label: 'Probíhá', color: 'bg-[#0A84FF]/15 text-[#0A6FE0]' },
+  { value: 'in_progress', label: 'Probíhá', color: 'bg-[#0A84FF]/15 text-[#0A5CC0]' },
   { value: 'done', label: 'Hotovo', color: 'bg-[#C8F542]/15 text-[#5B7A08]' },
 ];
 
@@ -154,7 +154,7 @@ export default function Tasks({ user }: Props) {
                 <span className="chip chip-sm chip-info" title="Odškrtnutí naskladní dávku a odepíše suroviny"><Icon name="leaf" size={12} className="inline -mt-0.5 mr-1 shrink-0" /> Výroba</span>
               )}
               {task.teamTask && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-semibold"><Icon name="calendar" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro kohokoliv</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/12 text-[#0A5CC0] px-2 py-0.5 text-[11px] font-semibold"><Icon name="calendar" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro kohokoliv</span>
               )}
               {recurrenceLabel(task.recurrence) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold">↻ {recurrenceLabel(task.recurrence)}</span>

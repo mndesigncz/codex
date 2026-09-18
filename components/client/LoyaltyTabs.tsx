@@ -55,7 +55,7 @@ function useProfile() {
 }
 
 function Tile({ icon, label: lb, value, unit, tone = 'ok' }: { icon: string; label: string; value: number | string; unit?: string; tone?: 'ok' | 'muted' | 'wait' }) {
-  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
+  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#5B7A08]';
   return (
     <div className="glass-card p-4 sm:p-5">
       <div className="flex items-start justify-between gap-2">
@@ -402,7 +402,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
                 <ItemPicker items={items} value={f.stampItems} onChange={v => set({ stampItems: v })} label="Položky, které dávají razítko"
                   hint="Razítko za každý kus z účtenky. Obsluha u kasy zvolí účtenku hosta a razítka se připíší sama." />
                 <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={f.onePerOrder} onChange={e => set({ onePerOrder: e.target.checked })} className="h-4 w-4 rounded accent-[#89AC16]" />
+                  <input type="checkbox" checked={f.onePerOrder} onChange={e => set({ onePerOrder: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
                   Nejvýš jedno razítko z jedné účtenky
                 </label>
               </div>
@@ -414,7 +414,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
                   <p className="text-xs text-black/55 pb-2.5">Razítko za účtenku aspoň na tuhle částku.</p>
                 </div>
                 <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={f.minValueMultiple} onChange={e => set({ minValueMultiple: e.target.checked })} className="h-4 w-4 rounded accent-[#89AC16]" />
+                  <input type="checkbox" checked={f.minValueMultiple} onChange={e => set({ minValueMultiple: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
                   Razítko za každý násobek částky (600 {symbol} = 2 razítka)
                 </label>
               </div>
@@ -432,7 +432,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
               <Segmented options={REPEAT_OPTS} value={f.repeatMode} onChange={v => set({ repeatMode: v })} size="sm" ariaLabel="Opakování karty" wrap />
             </div>
             <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={f.stackCards} onChange={e => set({ stackCards: e.target.checked })} className="h-4 w-4 rounded accent-[#89AC16]" />
+              <input type="checkbox" checked={f.stackCards} onChange={e => set({ stackCards: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
               Přebytek razítek se přenáší do další karty
             </label>
           </div>
@@ -667,11 +667,11 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
             </div>
             <p className="text-xs text-black/50">0 = bez omezení. Limit počítá vyzvednutí, cooldown čas od posledního.</p>
             <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={f.adultOnly} onChange={e => set({ adultOnly: e.target.checked })} className="h-4 w-4 rounded accent-[#89AC16]" />
+              <input type="checkbox" checked={f.adultOnly} onChange={e => set({ adultOnly: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
               Jen 18+ (podle data narození v profilu hosta)
             </label>
             <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={f.welcome} onChange={e => set({ welcome: e.target.checked })} className="h-4 w-4 rounded accent-[#89AC16]" />
+              <input type="checkbox" checked={f.welcome} onChange={e => set({ welcome: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
               Uvítací kupon — nový člen ho dostane sám při vstupu do podniku
             </label>
           </div>

@@ -326,7 +326,7 @@ export default function ClosingsOverview() {
       {missing.length > 0 && (
         <div className="card card-danger p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Icon name="warning" size={17} className="text-[#B23A15] shrink-0" />
+            <Icon name="warning" size={17} className="text-[#991B1B] shrink-0" />
             <h3 className="t-card">Chybí uzávěrka</h3>
             <span className="rounded-full bg-bad/15 text-bad-ink px-2.5 py-0.5 text-xs font-semibold">{missing.length}</span>
           </div>
@@ -374,7 +374,7 @@ export default function ClosingsOverview() {
                     </p>
                   </div>
                   <span className={`tap-target-sm shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
-                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'
+                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}</span>
                 </div>
                 <p className="text-xs text-black/45">Odesláno bez směny — zkontroluj a schval.</p>
@@ -419,7 +419,7 @@ export default function ClosingsOverview() {
         )}
         <div className="glass-card p-5 min-w-0">
           <p className="text-xs uppercase tracking-wider text-black/45 line-clamp-2">Rozdíl kasy</p>
-          <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A6FE0]' : 'text-bad-ink'}`}>
+          <p className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums mt-1.5 truncate ${totals.diff === 0 ? 'text-[#16181A]' : totals.diff > 0 ? 'text-[#0A5CC0]' : 'text-bad-ink'}`}>
             {totals.diff > 0 ? '+' : ''}{money(totals.diff)}
           </p>
           <p className="text-[11px] text-black/40 mt-1 truncate">Manko/přebytek souhrnně</p>
@@ -570,7 +570,7 @@ export default function ClosingsOverview() {
                     return (
                       <div key={h} className="flex flex-col items-center gap-1 min-w-[22px] flex-1"
                         title={`${h}:00 — ${money(v)}${people ? ` · ${people} naplánovaných hodin` : ''}`}>
-                        <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
+                        <div className={`w-full rounded-t-md ${v === max && v > 0 ? 'bg-[#8FB811]' : 'bg-[#C8F542]/70'}`}
                           style={{ height: `${max ? Math.max(v > 0 ? 6 : 0, (v / max) * 56) : 0}px` }} />
                         {/* Obsazenost pod sloupcem — kde je proužek širší než
                             sloupec vysoký, platíme lidi za prázdno. */}
@@ -648,7 +648,7 @@ export default function ClosingsOverview() {
                           d.diff == null ? 'text-black/20'
                             : Math.abs(d.diff) <= 50 ? 'text-[#5B7A08]' : 'text-wait-ink'
                         }`}>
-                          {d.diff == null ? '—' : d.diff === 0 ? <Icon name="check" size={14} className="inline text-[#4F6A07]" /> : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
+                          {d.diff == null ? '—' : d.diff === 0 ? <Icon name="check" size={14} className="inline text-[#5B7A08]" /> : `${d.diff > 0 ? '+' : ''}${money(d.diff)}`}
                         </span>
                       </div>
                     ))}
@@ -831,7 +831,7 @@ export default function ClosingsOverview() {
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                         {(c as any).event_title && (
-                          <span className="ml-1.5 rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2 py-0.5 text-[11px] font-bold align-middle">
+                          <span className="ml-1.5 rounded-full bg-[#0A84FF]/12 text-[#0A5CC0] px-2 py-0.5 text-[11px] font-bold align-middle">
                             <Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {(c as any).event_title}
                           </span>
                         )}
@@ -849,7 +849,7 @@ export default function ClosingsOverview() {
                       <span className="tap-target-sm rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
                     )}
                     <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${
-                      d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'
+                      d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'
                     }`}>
                       {d === 0 ? 'Sedí' : d > 0 ? `+${money(d)}` : money(d)}
                       {/* When the closer explained the difference, say so right in

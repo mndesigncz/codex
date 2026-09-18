@@ -26,6 +26,8 @@ const VZOR = new RegExp(`\\b(?:${UTILITY})-(?:${RODINY})-\\d{2,3}\\b`, 'g');
 // cokoli dalšího barevného je odhad.
 const PALETA = new Set([
   '16181a', 'c8f542', '5b7a08', '3e5406', '0a84ff', '0a5cc0', 'd8ff6b',
+  // stavové tóny v plné síle a jejich inkousty
+  'dc2626', '991b1b', 'f59e0b', '92400e', '8fb811', 'ff8a80',
   // řada kategorií (cat-1..6) — vlastní systém, ne stav
   '8b5cf6', 'f59e0b', '14b8a6', 'ec4899', '6d3fc4', '92600a', '0e6e63', 'a4246c',
 ]);
@@ -40,14 +42,14 @@ function chromaticka(hex) {
   if (mx === 0) return false;
   const l = (mx + mn) / 510;
   const s = (mx - mn) / 255 / (1 - Math.abs(2 * l - 1) || 1);
-  return s > 0.25 && l > 0.05 && l < 0.96;
+  return s > 0.3 && l > 0.06 && l < 0.92;
 }
 
 // Ráčna na barevné hexy mimo paletu. Naměřeno šest zelených (#5B7A08,
 // #3E5406, #4F6A07, #8FB811, #5B9E00, #89AC16) a tři modré pro tytéž
 // významy. Sjednotit je znamená rozhodnout, který odstín je ten pravý —
 // to je vlastní kolo. Do té doby smí počet jen klesat.
-const BASELINE_HEXY = 110;
+const BASELINE_HEXY = 0;
 
 const nalezy = [];
 const hexy = [];
@@ -59,11 +61,13 @@ const walk = (dir) => {
     if (!/\.tsx$/.test(file)) continue;
     const s = readFileSync(file, 'utf8');
     s.split('\n').forEach((line, i) => {
-      for (const m of line.matchAll(VZOR)) {
+      // Komentář se nevykresluje; barva v něm není barva na obrazovce.
+      const kod = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
+      for (const m of kod.matchAll(VZOR)) {
         nalezy.push({ kde: `${relative('.', file)}:${i + 1}`, co: m[0], proc: 'syrový tailwindový odstín' });
       }
       // Hex zápis barvy v třídě: `bg-[#FFD60A]`, `text-[#8A6D00]`.
-      for (const m of line.matchAll(/-\[#([0-9a-fA-F]{3,8})\]/g)) {
+      for (const m of kod.matchAll(/-\[#([0-9a-fA-F]{3,8})\]/g)) {
         const hex = m[1].toLowerCase();
         if (PALETA.has(hex) || PALETA.has(hex.slice(0, 6))) continue;
         if (!chromaticka(hex)) continue;

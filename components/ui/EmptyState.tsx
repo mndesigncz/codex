@@ -35,7 +35,7 @@ export function EmptyState({ illustration, icon, title, hint, action, compact = 
           draggable={false}
         />
       ) : icon ? (
-        <div className={`${compact ? 'h-12 w-12' : 'h-16 w-16'} rounded-2xl bg-[#C8F542]/15 text-[#4F6A07] flex items-center justify-center mb-4`}>
+        <div className={`${compact ? 'h-12 w-12' : 'h-16 w-16'} rounded-2xl bg-[#C8F542]/15 text-[#5B7A08] flex items-center justify-center mb-4`}>
           <Icon name={icon} size={compact ? 22 : 28} />
         </div>
       ) : null}

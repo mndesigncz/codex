@@ -40,7 +40,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center p-6">
         <div className="glass-card p-10 max-w-md text-center space-y-3">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={28} /></div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={28} /></div>
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Kiosk režim</h1>
             <ProBadge />
@@ -287,7 +287,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
       {nextEvent && (
         <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
           <p className="font-bold text-[#16181A] flex items-center gap-2">
-            <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
+            <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A5CC0]" />
             <span className="min-w-0">{nextEvent.title}</span>
           </p>
           <p className="text-sm text-black/50 mt-0.5 cz-sentence">
@@ -328,7 +328,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
                 <Avatar emoji={r.avatar} size="sm" />
                 <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[400px]:basis-0 truncate text-sm font-medium text-[#16181A]">{r.name}</span>
                 <span className="shrink-0 ml-auto text-sm text-black/50 tabular-nums">{String(r.shiftStart).slice(0, 5)}–{String(r.shiftEnd ?? '').slice(0, 5)}</span>
-                {r.openSince && <span className="shrink-0 h-2 w-2 rounded-full bg-[#5B9E00]" title="Na směně" />}
+                {r.openSince && <span className="shrink-0 h-2 w-2 rounded-full bg-[#8FB811]" title="Na směně" />}
               </div>
             ))}
           </div>
@@ -372,7 +372,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
-                <Icon name="pin" size={17} className="shrink-0 text-[#4F6A07]" />
+                <Icon name="pin" size={17} className="shrink-0 text-[#5B7A08]" />
                 <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
               </p>
               <p className="text-sm text-black/50 mt-0.5 truncate">Stránka pro zákazníky — otoč tablet a ukaž, co máme.</p>
