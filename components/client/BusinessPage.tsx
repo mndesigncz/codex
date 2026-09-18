@@ -13,6 +13,7 @@ import { onAccent } from '@/lib/floorplan';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { formatMoney, currencySymbol } from '@/lib/money';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -130,7 +131,10 @@ export default function BusinessPage({ slug }: { slug: string }) {
 }
 
 function MenuTab({ menu, news, events, gallery, accent, tagline, address, description, hours, currency, slug, signedIn, businessName }: { menu: any; news?: any[]; events?: any[]; gallery?: string[]; accent?: string; tagline: string; address: string; description: string; hours: any; currency: string; slug: string; signedIn: boolean; businessName: string }) {
-  const cur = currency === 'CZK' ? 'Kč' : currency;
+  // Dřív `currency === 'CZK' ? 'Kč' : currency`, takže eurová kavárna
+  // ukazovala hostům „120 EUR" a dvanáct a půl tisíce jako „12500 Kč".
+  const cur = currencySymbol(currency);
+  const money = (n: number) => formatMoney(n, currency);
   const [evDetail, setEvDetail] = useState<any | null>(null);
   const ac = accent || '#C8F542';
   return (
@@ -182,7 +186,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
           </ul>
         </section>
       )}
-      {evDetail && <EventSheet e={evDetail} cur={cur} ac={ac} slug={slug} signedIn={signedIn} businessName={businessName} address={address} onClose={() => setEvDetail(null)} />}
+      {evDetail && <EventSheet e={evDetail} currency={currency} ac={ac} slug={slug} signedIn={signedIn} businessName={businessName} address={address} onClose={() => setEvDetail(null)} />}
 
     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 md:gap-10 items-start">
       <div className="space-y-6">
@@ -196,7 +200,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
                     <p className="font-medium leading-tight">{it.name}{it.soldOut && <span className="ml-2 text-[11px] uppercase tracking-wider text-black/50">vyprodáno</span>}</p>
                     {it.description && <p className="text-sm text-black/55 mt-0.5 text-pretty">{it.description}</p>}
                   </div>
-                  <span className="tabular-nums font-semibold shrink-0">{it.price} {cur}</span>
+                  <span className="tabular-nums font-semibold shrink-0">{money(it.price)}</span>
                 </li>
               ))}
             </ul>
@@ -527,7 +531,8 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [orders, setOrders] = useState<any[] | null>(null);
-  const cur = b.currency === 'CZK' ? 'Kč' : b.currency;
+  const cur = currencySymbol(b.currency);
+  const money = (n: number) => formatMoney(n, b.currency);
 
   const loadOrders = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`).then(r => r.json()).then(x => setOrders(x.orders ?? [])).catch(() => setOrders([])), [slug]);
   useEffect(() => { if (signedIn) loadOrders(); else setOrders([]); }, [signedIn, loadOrders]);
@@ -612,7 +617,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
                         <li key={it.id} className="py-2.5 flex items-center gap-3">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium leading-tight">{it.name}</p>
-                            <p className="text-sm text-black/55">{it.price} {cur}{it.description ? ` · ${it.description}` : ''}</p>
+                            <p className="text-sm text-black/55">{money(it.price)}{it.description ? ` · ${it.description}` : ''}</p>
                           </div>
                           {n === 0 ? (
                             <button onClick={() => setCount(it.id, 1)} aria-label={`Přidat ${it.name}`} className="tap-target-sm rounded-full bg-[#16181A] text-white h-9 w-9 grid place-items-center hover:bg-black active:scale-95 transition"><Icon name="plus" size={16} /></button>
@@ -638,12 +643,12 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
           <h2 className="t-section">Objednávka</h2>
           {lines.length === 0 ? <p className="text-sm text-black/55">Zatím prázdná. Přidej něco z nabídky.</p> : (
             <ul className="divide-y divide-black/[0.06] text-sm">
-              {lines.map(l => <li key={l.id} className="py-1.5 flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums">{l.price * l.count} {cur}</span></li>)}
+              {lines.map(l => <li key={l.id} className="py-1.5 flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums">{money(l.price * l.count)}</span></li>)}
             </ul>
           )}
           <div className="flex items-baseline justify-between border-t border-black/[0.06] pt-3">
             <span className="text-sm text-black/60">Celkem</span>
-            <span className="text-xl font-bold tabular-nums">{total} {cur}</span>
+            <span className="text-xl font-bold tabular-nums">{money(total)}</span>
           </div>
           <div className="grid gap-2">
             <label htmlFor="o-note" className={label}>Poznámka pro obsluhu</label>
@@ -661,7 +666,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
                 <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-amber-500/[0.08] border-amber-500/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ?? o.status}</span>
-                    <span className="text-sm tabular-nums">{o.total} {cur}{o.table_name ? ` · ${o.table_name}` : ''}</span>
+                    <span className="text-sm tabular-nums">{money(o.total)}{o.table_name ? ` · ${o.table_name}` : ''}</span>
                   </div>
                   <p className="text-xs text-black/55 truncate">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
                 </li>
@@ -676,10 +681,11 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
 
 
 // ---- Detail akce pro hosta: fotky, menu, mapa, kalendář, sledování -------
-function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose }: {
-  e: any; cur: string; ac: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
+function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, onClose }: {
+  e: any; currency: string; ac: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
 }) {
   const m = useModal(true, onClose, `Akce ${e.title}`);
+  const money = (n: number) => formatMoney(n, currency);
   // Sledování se drží lokálně, ať tlačítka reagují hned a bez načítání celé stránky.
   const [follow, setFollow] = useState<boolean>(e.myFollow === true);
   const [going, setGoing] = useState<boolean>(e.myGoing === true);
@@ -778,7 +784,7 @@ function EventSheet({ e, cur, ac, slug, signedIn, businessName, address, onClose
                 {menu.map((l: any, i: number) => (
                   <li key={i} className="py-1.5 flex items-baseline gap-3">
                     <span className="min-w-0 flex-1">{l.board ? <>Platí celá naše nabídka „{l.name}" <span className="text-black/45">— mrkni do záložky Menu</span></> : l.name}</span>
-                    {l.price != null && <span className="shrink-0 text-sm text-black/60 tabular-nums">{l.price} {cur}</span>}
+                    {l.price != null && <span className="shrink-0 text-sm text-black/60 tabular-nums">{money(l.price)}</span>}
                   </li>
                 ))}
               </ul>

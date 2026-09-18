@@ -11,6 +11,7 @@ import { Initials } from './ClientShell';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
 import { useResultKeys } from '@/lib/useResultKeys';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -106,6 +107,8 @@ function Spark({ title, data, days }: { title: string; data: number[]; days: str
 }
 
 function Overview({ go }: { go: (s: LoyaltySub) => void }) {
+  const money = useMoney();
+  const symbol = useSymbol();
   const [d, setD] = useState<any | null>(null);
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
@@ -129,7 +132,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Tile icon="users" label="Členů" value={s.members ?? 0} tone="muted" />
         <Tile icon="coins" label="Bodů v oběhu" value={s.points ?? 0} />
-        <Tile icon="card" label="Kredit hostů" value={s.credit ?? 0} unit="Kč" />
+        <Tile icon="card" label="Kredit hostů" value={s.credit ?? 0} unit={symbol} />
         <Tile icon="gift" label="Kupony k vyzvednutí" value={s.couponsOpen ?? 0} tone={(s.couponsOpen ?? 0) > 0 ? 'wait' : 'ok'} />
       </div>
       {(d.series ?? []).length > 0 && (() => {
@@ -159,7 +162,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
                     <p className="text-xs text-black/50 truncate">{l.note || l.kind}</p>
                   </div>
                   <span className={`shrink-0 font-semibold tabular-nums text-sm ${(l.delta || l.credit_delta) > 0 ? 'text-[#3E5406]' : 'text-red-700'}`}>
-                    {l.delta ? `${l.delta > 0 ? '+' : ''}${l.delta} b.` : `${l.credit_delta > 0 ? '+' : ''}${l.credit_delta} Kč`}
+                    {l.delta ? `${l.delta > 0 ? '+' : ''}${l.delta} b.` : `${l.credit_delta > 0 ? '+' : ''}${money(l.credit_delta)}`}
                   </span>
                   <span className="shrink-0 text-xs text-black/40 w-24 text-right hidden sm:block">{dbTimeDayHM(l.created_at)}</span>
                 </li>
@@ -188,6 +191,7 @@ function Overview({ go }: { go: (s: LoyaltySub) => void }) {
 // ---- Body -----------------------------------------------------------------------
 
 function Points({ toast }: { toast: (m: string) => void }) {
+  const symbol = useSymbol();
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
   if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
@@ -213,7 +217,7 @@ function Points({ toast }: { toast: (m: string) => void }) {
   return (
     <div className="space-y-5 max-w-3xl">
       <Saver busy={busy} onSave={save} title="Za co host dostane body" hint="Body se sbírají samy: z objednávek od stolu, při načtení kartičky u kasy a při událostech níž. Utratí se za kupony.">
-        {row('l-per100', 'Za 100 Kč', 'útraty. Objednávka za 250 Kč tedy dá dvojnásobek.', 'points_per_100', 100, 'bodů')}
+        {row('l-per100', `Za 100 ${symbol}`, `útraty. Objednávka za 250 ${symbol} tedy dá dvojnásobek.`, 'points_per_100', 100, 'bodů')}
         {row('l-bday', 'Narozeniny', 'jako dárek v den narozenin. 0 = nedávat.', 'birthday_points', 1000, 'bodů')}
         {row('l-ref', 'Pozvání', 'pro oba, když pozvaný kamarád poprvé vstoupí do podniku. 0 = vypnuto.', 'referral_points', 1000, 'bodů')}
       </Saver>
@@ -221,7 +225,7 @@ function Points({ toast }: { toast: (m: string) => void }) {
         {row('l-cash', 'Vrátit', 'z útraty. 0 = nepoužívat. Načítá se při zaúčtování útraty u kasy.', 'cashback_pct', 50, '%')}
         <div>
           <p className={label}>V čem se vrací</p>
-          <Segmented options={[{ id: 'credit', label: 'Kredit v Kč' }, { id: 'points', label: 'Body' }]}
+          <Segmented options={[{ id: 'credit', label: `Kredit v ${symbol}` }, { id: 'points', label: 'Body' }]}
             value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => setP({ ...p, cashback_mode: v })} size="sm" ariaLabel="Podoba cashbacku" />
         </div>
       </Saver>
@@ -324,6 +328,8 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
 }
 
 function Stamps({ toast }: { toast: (m: string) => void }) {
+  const money = useMoney();
+  const symbol = useSymbol();
   const [list, setList] = useState<any[] | null>(null);
   const [form, setForm] = useState<ReturnType<typeof blankCampaign> | null>(null);
   const [items, setItems] = useState<{ id: number; name: string; board: string; paired: boolean }[]>([]);
@@ -403,12 +409,12 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
             {f.ruleType === 'min_value' && (
               <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-[8rem_1fr] gap-3 items-end">
-                  <div><label htmlFor="sc-min" className={label}>Útrata od (Kč)</label><input id="sc-min" type="number" min={1} max={100000} value={f.minValue} onChange={e => set({ minValue: e.target.value })} placeholder="300" className={input} /></div>
+                  <div><label htmlFor="sc-min" className={label}>Útrata od ({symbol})</label><input id="sc-min" type="number" min={1} max={100000} value={f.minValue} onChange={e => set({ minValue: e.target.value })} placeholder="300" className={input} /></div>
                   <p className="text-xs text-black/55 pb-2.5">Razítko za účtenku aspoň na tuhle částku.</p>
                 </div>
                 <label className="flex items-center gap-2.5 text-sm cursor-pointer">
                   <input type="checkbox" checked={f.minValueMultiple} onChange={e => set({ minValueMultiple: e.target.checked })} className="h-4 w-4 rounded accent-[#89AC16]" />
-                  Razítko za každý násobek částky (600 Kč = 2 razítka)
+                  Razítko za každý násobek částky (600 {symbol} = 2 razítka)
                 </label>
               </div>
             )}
@@ -464,7 +470,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
                   <p className="text-xs text-black/55 mt-0.5">
                     {c.required_stamps} razítek {RULE_NAME[c.rule_type] ?? ''}
                     {c.rule_type === 'products' && c.stampItems?.length > 0 && `: ${c.stampItems.map((x: any) => x.name).join(', ')}`}
-                    {c.rule_type === 'min_value' && c.min_value ? ` od ${c.min_value} Kč` : ''}
+                    {c.rule_type === 'min_value' && c.min_value ? ` od ${money(c.min_value)}` : ''}
                   </p>
                 </div>
                 <button onClick={() => toggle(c)} disabled={busy === 'toggle:' + c.id} aria-pressed={!!c.active}

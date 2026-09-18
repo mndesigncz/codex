@@ -7,6 +7,7 @@ import { contrast, normalizeQrDesign } from '../lib/qrDesign.ts';
 import { sanitizeSvg } from '../lib/svgSanitize.ts';
 import { batchesNeeded, planFor, recipeUnit, availableOf, taskTitleFor, checklistFor } from '../lib/productionPlan.ts';
 import { earnedFor, wagesTotal, MAX_SHIFT_HOURS } from '../lib/wages.ts';
+import { normalizeCurrency, formatMoney, currencySymbol } from '../lib/money.ts';
 
 let failed = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -131,4 +132,21 @@ console.log('\nVšechny testy prošly.');
   eq('mzdy: a do součtu nejdou', wagesTotal(sZapomenutym).total, wagesTotal(dvaZaznamy).total);
   eq('mzdy: bez sazby se nepočítá ani jako vynechané',
     wagesTotal([{ ms: 8 * H, rate: 0 }]).skipped, 0);
+}
+
+{
+  // Starší podniky mají uložený symbol místo kódu; `Intl` na symbol spadne.
+  eq('měna: symbol na kód', normalizeCurrency('Kč'), 'CZK');
+  eq('měna: euro', normalizeCurrency('€'), 'EUR');
+  eq('měna: kód zůstane', normalizeCurrency('EUR'), 'EUR');
+  eq('měna: prázdno = koruna', normalizeCurrency(''), 'CZK');
+  eq('měna: null = koruna', normalizeCurrency(null), 'CZK');
+
+  // Hostovská stránka psala „120 EUR" místo „120 €" a tisíce neoddělovala.
+  eq('měna: euro se vykreslí symbolem', formatMoney(120, 'EUR', 'cs-CZ').includes('€'), true);
+  eq('měna: euro není kód', formatMoney(120, 'EUR', 'cs-CZ').includes('EUR'), false);
+  eq('měna: tisíce se oddělují', formatMoney(12500, 'CZK', 'cs-CZ').replace(/\s/g, ' '), '12 500 Kč');
+  eq('měna: uložený symbol se taky naformátuje',
+    formatMoney(12500, 'Kč', 'cs-CZ').replace(/\s/g, ' '), '12 500 Kč');
+  eq('měna: symbol pro popisek', currencySymbol('EUR', 'cs-CZ'), '€');
 }

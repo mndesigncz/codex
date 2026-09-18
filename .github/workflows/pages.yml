@@ -83,3 +83,7 @@ jobs:
       # Testy si Node pouští přímo, takže alias `@/` v nich spadne.
       - name: Importy v testech
         run: node scripts/check-test-imports.mjs
+      # Aplikace je vícem­ěnová; „Kč" nalepené na číslo ukáže rakouské
+      # kavárně koruny. Ráčna: nesmí přibývat.
+      - name: Měna
+        run: node scripts/check-money.mjs

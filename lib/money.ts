@@ -27,18 +27,39 @@ export const LOCALES: { code: string; label: string }[] = [
   { code: 'pl-PL', label: 'Polski' },
 ];
 
+/**
+ * Z toho, co je uložené, udělá kód měny, se kterým umí pracovat `Intl`.
+ *
+ * Starší podniky mají v databázi uložený symbol („Kč"), ne kód („CZK") —
+ * výchozí hodnoty se historicky rozešly mezi `app/api/init` a `lib/menu`.
+ * `Intl.NumberFormat` na symbol vyhodí výjimku, takže bez tohohle by se
+ * hostovská stránka propadla do nouzové větve a tiskla „120 Kč" bez
+ * oddělovače tisíců.
+ */
+export function normalizeCurrency(currency?: string | null): string {
+  const raw = String(currency ?? '').trim();
+  if (!raw) return 'CZK';
+  if (/^[A-Z]{3}$/.test(raw)) return raw;
+  const bySymbol: Record<string, string> = {
+    'Kč': 'CZK', 'kč': 'CZK', '€': 'EUR', '$': 'USD',
+    '£': 'GBP', 'zł': 'PLN', 'Ft': 'HUF', 'lei': 'RON',
+  };
+  return bySymbol[raw] ?? raw.toUpperCase();
+}
+
 export function formatMoney(n: number, currency = 'CZK', locale = 'cs-CZ'): string {
   const val = Math.round(Number(n) || 0);
+  const code = normalizeCurrency(currency);
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency,
+      currency: code,
       maximumFractionDigits: 0,
       minimumFractionDigits: 0,
     }).format(val);
   } catch {
     // Unknown currency/locale — fall back to a plain grouped number + code.
-    return `${val.toLocaleString(locale || 'cs-CZ')} ${currency}`;
+    return `${val.toLocaleString(locale || 'cs-CZ')} ${code}`;
   }
 }
 
@@ -49,10 +70,11 @@ export function makeMoney(cfg: CurrencyConfig) {
 
 // The bare currency symbol (e.g. "Kč", "€", "$") for input adornments.
 export function currencySymbol(currency = 'CZK', locale = 'cs-CZ'): string {
+  const code = normalizeCurrency(currency);
   try {
-    const parts = new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).formatToParts(0);
-    return parts.find(p => p.type === 'currency')?.value ?? currency;
+    const parts = new Intl.NumberFormat(locale, { style: 'currency', currency: code, maximumFractionDigits: 0 }).formatToParts(0);
+    return parts.find(p => p.type === 'currency')?.value ?? code;
   } catch {
-    return currency;
+    return code;
   }
 }

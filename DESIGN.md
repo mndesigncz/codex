@@ -399,6 +399,13 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   to je větší rozdíl než haléře.
 - **Na peněžní výpočet patří test**, ne screenshot. Je to jediná část
   aplikace, kde se správnost dá napsat jako rovnice.
+- **Měna se nelepí k číslu.** `useMoney()` / `useSymbol()` na obrazovce,
+  `formatMoney()` z `lib/money` na serveru a na veřejných stránkách.
+  Ruční `${n} Kč` ukáže rakouské kavárně koruny a k tomu neumí oddělit
+  tisíce — „12500 Kč" místo „12 500 Kč". Hlídá `check-money` (ráčna).
+- **Kód měny není symbol.** V databázi se ukládá `CZK`, na obrazovku jde
+  `Kč`. Starší podniky mají uložený symbol, takže `normalizeCurrency`
+  je most mezi tím; `Intl` na symbol vyhodí výjimku.
 
 ## Anti-vzory (zdejší zákazy)
 
