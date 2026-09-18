@@ -197,7 +197,7 @@ export default function FinanceView() {
         subtitle="Tržby, nákupy a mzdy měsíce pohromadě."
         primary={<Button onClick={() => (pro ? setExportOpen(true) : setUpgradeFor('Export pro účetní'))} variant="accent" icon="download">Export pro účetní</Button>}
         aside={
-          <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-fit">
+          <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-full sm:w-fit">
             <button onClick={() => shiftMonth(-1)} aria-label="Předchozí měsíc" className="tap-target btn-icon">
               <Icon name="chevron" size={16} className="rotate-90" />
             </button>
@@ -353,15 +353,23 @@ export default function FinanceView() {
                           {it.category || 'bez kategorie'}
                           {it.cost == null && <span className="text-wait-ink"> · bez receptury</span>}
                         </p>
+                        {/* Čtyři pevné sloupce (64+96+96+80 px a mezery) se na 390 px
+                            nevejdou a název, který je `flex-1`, zkolaboval na nulu —
+                            zbyla řada čísel bez toho, čeho se týkají. Na telefonu
+                            se proto čísla čtou jako věta pod názvem. */}
+                        <p className="sm:hidden mt-0.5 text-[11px] tabular text-black/55">
+                          {Math.round(it.qty)}× · {it.revenue != null ? money(it.revenue) : '—'}
+                          {it.marginPct != null && <> · marže {it.marginPct} %</>}
+                        </p>
                       </div>
-                      <span className="w-16 text-right text-sm tabular text-black/60">{Math.round(it.qty)}×</span>
-                      <span className="w-24 text-right text-sm tabular font-semibold text-[#16181A]">
+                      <span className="hidden sm:block w-16 text-right text-sm tabular text-black/60">{Math.round(it.qty)}×</span>
+                      <span className="hidden sm:block w-24 text-right text-sm tabular font-semibold text-[#16181A]">
                         {it.revenue != null ? money(it.revenue) : '—'}
                       </span>
-                      <span className="w-24 text-right text-sm tabular text-black/55">
+                      <span className="hidden sm:block w-24 text-right text-sm tabular text-black/55">
                         {it.cost != null ? money(it.cost * it.qty) : '—'}
                       </span>
-                      <span className={`w-20 text-right text-sm tabular font-bold ${
+                      <span className={`hidden sm:block w-20 text-right text-sm tabular font-bold ${
                         it.marginPct == null ? 'text-black/30'
                           : it.marginPct >= 65 ? 'text-[#5B7A08]'
                           : it.marginPct >= 45 ? 'text-[#16181A]' : 'text-bad-ink'

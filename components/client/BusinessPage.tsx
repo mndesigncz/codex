@@ -138,7 +138,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">do „{me.nextTierLabel}" ještě {Math.max(0, me.nextTierAt - me.visits)} návštěv</p>}
               </div>
             ) : (
-              <button onClick={join} disabled={joining} className="tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
+              <button onClick={join} disabled={joining} className="tap-target w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
                 style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> Stát se členem</button>
             )}
           </div>

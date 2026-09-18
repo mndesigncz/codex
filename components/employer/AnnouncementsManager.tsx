@@ -165,13 +165,13 @@ export default function AnnouncementsManager() {
             className="h-5 w-5 rounded accent-[#8FB811]" />
           Poslat i do týmového chatu
         </label>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 sm:flex-wrap">
           <span className="text-[11px] text-black/35">{content.length}/1000</span>
           <button
             type="button"
             onClick={submit}
             disabled={!content.trim() || saving}
-            className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm disabled:opacity-50 whitespace-nowrap"
+            className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm disabled:opacity-50 whitespace-nowrap"
           >
             {saving ? 'Připínám…' : 'Připnout oznámení'}
           </button>

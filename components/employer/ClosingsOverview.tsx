@@ -722,7 +722,20 @@ export default function ClosingsOverview() {
                   );
                 })}
                 <line x1={padX} y1={avgY} x2={chartW - padX} y2={avgY} stroke="#16181A" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="4 4" />
-                <text x={padX} y={avgY - 4} className="text-[11px] fill-black/45 tabular-nums">Ø {money(avg)}</text>
+                {(() => {
+                  // Popisek průměru ležel přímo na sloupci a číslo se v něm ztrácelo
+                  // („Ø 6 7|83 Kč"). Podložka ve barvě karty ho drží čitelný,
+                  // ať je pod ním sloupec, nebo prázdno. Šířka se odhaduje
+                  // z délky textu — SVG tu nemá jak si text změřit.
+                  const popis = `Ø ${money(avg)}`;
+                  return (
+                    <>
+                      <rect x={padX - 4} y={avgY - 15} width={popis.length * 6.2 + 8} height={14} rx={4}
+                        className="fill-white/85 dark:fill-[#16181A]/85" />
+                      <text x={padX} y={avgY - 4} className="text-[11px] fill-black/45 tabular-nums">{popis}</text>
+                    </>
+                  );
+                })()}
               </svg>
             </div>
           </div>
@@ -732,21 +745,21 @@ export default function ClosingsOverview() {
       {/* Month calendar — done / missing / pending at a glance; a click scopes the list. */}
       <ClosingsCalendar selectedDate={selectedDate} onSelectDate={pickDate} reloadKey={dataVersion} />
 
-      <div ref={listRef} className="flex items-center justify-between gap-3 flex-wrap scroll-mt-4">
+      <div ref={listRef} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:flex-wrap scroll-mt-4">
         <h3 className="t-card">Uzávěrky ({topLevel.length})</h3>
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
+        <div className="grid grid-cols-1 sm:flex sm:items-center gap-2 sm:flex-wrap min-w-0">
           <button onClick={() => openCreate()}
-            className="inline-flex items-center gap-1.5 btn btn-primary btn-sm hover:bg-black transition whitespace-nowrap">
+            className="inline-flex items-center justify-center gap-1.5 btn btn-primary btn-sm hover:bg-black transition whitespace-nowrap">
             <Icon name="plus" size={16} /> Nová uzávěrka
           </button>
           {topLevel.length > 0 && (
             <>
               <button onClick={exportCsv}
-                className="btn btn-secondary">
+                className="btn btn-secondary justify-center">
                 Export CSV ↓
               </button>
               <button onClick={exportAccountant}
-                className="btn btn-secondary">
+                className="btn btn-secondary justify-center">
                 <Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro účetní ↓
               </button>
             </>

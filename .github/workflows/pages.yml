@@ -131,3 +131,7 @@ jobs:
       # uživatel otevře jednu záložku. Naměřeno 421 kB místo 160 kB.
       - name: Líné pohledy
         run: node scripts/check-lazy-views.mjs
+      # Na monitoru nadpis vlevo a akce vpravo; na 390 px se řádek zalomí
+      # a `ml-auto` nechá akci viset samotnou v pravé půlce prázdného řádku.
+      - name: Zarovnání akcí na telefonu
+        run: node scripts/check-mobile-align.mjs

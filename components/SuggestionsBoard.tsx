@@ -265,7 +265,7 @@ export default function SuggestionsBoard() {
                 </div>
 
                 {(isEmployer || mine) && (
-                  <div className="flex justify-end gap-1 mt-1">
+                  <div className="flex justify-start sm:justify-end gap-1 mt-1">
                     {isEmployer && s.status !== 'planned' && s.status !== 'done' && (
                       <button
                         onClick={async () => {

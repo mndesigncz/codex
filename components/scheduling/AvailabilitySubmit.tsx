@@ -373,7 +373,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                 value={maxShifts}
                 onChange={(e) => setMaxShifts(e.target.value)}
                 placeholder="např. 12"
-                className="w-40 max-w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
+                className="w-full sm:w-40 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
               />
             </div>
 
@@ -403,7 +403,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               onClick={submit}
               disabled={saving || loadFailed}
               title={loadFailed ? 'Nejdřív je potřeba načíst, co jsi poslal/a dřív.' : undefined}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
+              className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
             >
               {saving ? 'Ukládám…' : existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
             </button>

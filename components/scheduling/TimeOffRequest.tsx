@@ -209,7 +209,7 @@ export default function TimeOffRequest() {
           type="button"
           onClick={submit}
           disabled={submitting}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-105 transition disabled:opacity-50"
+          className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-105 transition disabled:opacity-50"
         >
           {submitting ? 'Odesílám…' : 'Odeslat žádost'}
         </button>
@@ -242,7 +242,7 @@ export default function TimeOffRequest() {
                   <button
                     type="button"
                     onClick={() => cancelRequest(r.id)}
-                    className="tap-target-sm ml-auto rounded-full bg-black/[0.05] border border-black/10 text-black/60 text-xs px-3 py-1.5 whitespace-nowrap hover:bg-black/[0.08] transition"
+                    className="tap-target-sm sm:ml-auto rounded-full bg-black/[0.05] border border-black/10 text-black/60 text-xs px-3 py-1.5 whitespace-nowrap hover:bg-black/[0.08] transition"
                   >
                     Zrušit
                   </button>

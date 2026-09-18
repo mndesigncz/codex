@@ -199,7 +199,7 @@ function InviteCard({ code, onFlash }: { code: string; onFlash: (m: string) => v
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         <span className="font-mono tracking-[0.2em] font-bold text-sm rounded-xl bg-black/[0.05] px-3 py-2">{code}</span>
         <button type="button" onClick={copy} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-secondary btn-sm hover:bg-black/[0.05] active:scale-[0.98] transition"><Icon name="copy" size={15} /> Kopírovat odkaz</button>
-        <button type="button" onClick={share} className="tap-target-sm inline-flex items-center gap-1.5 btn btn-primary active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
+        <button type="button" onClick={share} className="tap-target-sm w-full sm:w-auto justify-center inline-flex items-center gap-1.5 btn btn-primary active:scale-[0.98] transition"><Icon name="send" size={15} /> Sdílet</button>
       </div>
     </section>
   );
@@ -289,7 +289,7 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: (me: any) => void }) {
         <div><label htmlFor="pf-phone" className={label}>Telefon</label><input id="pf-phone" type="tel" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} placeholder="Pro potvrzení rezervace" className={input} /></div>
         <div><label htmlFor="pf-bday" className={label}>Narozeniny</label><input id="pf-bday" type="date" value={f.birthday} onChange={e => setF({ ...f, birthday: e.target.value })} className={input} /></div>
         <p className="sm:col-span-2 text-xs text-black/50">E-mail: {me?.email}. Narozeniny vidí jen podniky, kde jsi členem, kvůli přání a odměně.</p>
-        <button type="submit" disabled={busy} className="tap-target justify-self-start sm:justify-self-end inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
+        <button type="submit" disabled={busy} className="tap-target w-full sm:w-auto justify-center sm:justify-self-end inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
         {err && <p role="alert" className="sm:col-span-3 text-sm text-bad-ink">{err}</p>}
       </form>
     </details>

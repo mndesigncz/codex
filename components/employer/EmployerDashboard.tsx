@@ -437,12 +437,12 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     announcements: <AnnouncementsManager />,
     availability: (
             <div className="glass-card p-6">
-              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:flex-wrap mb-4">
                 <div className="min-w-0">
                   <h3 className="t-card">Dostupnost — {monthLabel}</h3>
                   <p className="text-sm text-black/45">{submittedIds.size} z {members.length} zaměstnanců zadalo dostupnost</p>
                 </div>
-                <button onClick={() => onNavigate('shifts')} className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110 whitespace-nowrap shrink-0">Sestavit rozvrh</button>
+                <button onClick={() => onNavigate('shifts')} className="w-full sm:w-auto rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm hover:brightness-110 whitespace-nowrap shrink-0">Sestavit rozvrh</button>
               </div>
               {notSubmitted.length > 0 ? (
                 <div>

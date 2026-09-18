@@ -380,9 +380,9 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
               {st.label}
             </button>
           ))}
-          <span className="flex-1" />
+          <span className="hidden sm:block flex-1" />
           <button onClick={() => patch(e.id, { publishToTeam: true }).then(ok => ok && alert('Tým dostal notifikaci o akci. ✓'))}
-            className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
+            className="tap-target-sm w-full sm:w-auto rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
             <Icon name="bell" size={13} className="inline -mt-0.5 mr-1.5" />Oznámit týmu
           </button>
         </div>
@@ -391,23 +391,23 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
         <Sec title="Kdy a kde">
           {/* Pevné minimální šířky: nativní time input potřebuje ~110 px,
               jinak hodnotu ořízne (vyfoceno „15:0…"). Řádek se láme, nemačká. */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
             <input type="date" aria-label="Datum akce" value={base.date}
               onChange={ev3 => setBase(b => ({ ...b, date: ev3.target.value }))}
               onBlur={() => { if (base.date && base.date !== e.date) patch(e.id, { date: base.date }); }}
-              className={`${inputClass} !w-auto min-w-[150px] grow`} />
+              className={`${inputClass} col-span-2 sm:!w-auto sm:min-w-[150px] sm:grow`} />
             <input type="time" aria-label="Začátek" value={base.start}
               onChange={ev3 => setBase(b => ({ ...b, start: ev3.target.value }))}
               onBlur={() => { if (base.start !== (e.startTime ?? '')) patch(e.id, { startTime: base.start }); }}
-              className={`${inputClass} !w-[132px] shrink-0`} />
+              className={`${inputClass} !w-full sm:!w-[132px] shrink-0`} />
             <input type="time" aria-label="Konec" value={base.end}
               onChange={ev3 => setBase(b => ({ ...b, end: ev3.target.value }))}
               onBlur={() => { if (base.end !== (e.endTime ?? '')) patch(e.id, { endTime: base.end }); }}
-              className={`${inputClass} !w-[132px] shrink-0`} />
+              className={`${inputClass} !w-full sm:!w-[132px] shrink-0`} />
             <input aria-label="Místo" placeholder={e.offsite ? 'Kam se jede — místo a adresa' : 'Místo v podniku'} value={base.location} maxLength={300}
               onChange={ev3 => setBase(b => ({ ...b, location: ev3.target.value }))}
               onBlur={() => { if (base.location !== (e.location ?? '')) patch(e.id, { location: base.location }); }}
-              className={`${inputClass} basis-full`} />
+              className={`${inputClass} col-span-2 sm:basis-full`} />
           </div>
           {e.public && <p className="text-[11px] text-black/40 mt-1.5">Změnu termínu veřejné akce pošleme hostům, kteří ji sledují.</p>}
           {/* Výjezd s vlastním Storyous terminálem: přiřaď akci její provozovnu
@@ -503,7 +503,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                     setAnnouncing(false);
                     if (ok) alert('Členové dostali pozvánku. ✓');
                   }}
-                  className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
+                  className="tap-target-sm w-full sm:w-auto rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
                   <Icon name="send" size={13} className="inline -mt-0.5 mr-1.5" />{announcing ? 'Rozesílám…' : 'Rozeslat členům'}
                 </button>
               )}
@@ -748,7 +748,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                       if (r?.ok && d) setPos(d);
                       else setPosErr(d?.error || 'Pokladna teď neodpovídá.');
                     }}
-                    className="tap-target-sm rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
+                    className="tap-target-sm w-full sm:w-auto rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
                     <Icon name="receipt" size={13} className="inline -mt-0.5 mr-1.5" />{posBusy ? 'Načítám z pokladny…' : e.offsite ? 'Tržba kasy akce (celý den)' : 'Prodej z pokladny za dobu akce'}
                   </button>
                 ) : (

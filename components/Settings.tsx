@@ -473,8 +473,8 @@ export default function Settings({ user, initialTab }: Props) {
                 )}
               </div>
 
-              <div className="flex justify-end">
-                <button type="submit" disabled={savingProfile} className={primaryBtn}>
+              <div className="flex flex-col sm:flex-row sm:justify-end">
+                <button type="submit" disabled={savingProfile} className={`${primaryBtn} w-full sm:w-auto justify-center`}>
                   {savingProfile ? 'Ukládám…' : 'Uložit změny'}
                 </button>
               </div>

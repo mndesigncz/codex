@@ -163,7 +163,7 @@ export default function TimeOffApprovals() {
         )}
         {pending.length > 1 && !sel.selecting && (
           <button type="button" onClick={sel.start}
-            className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+            className="sm:ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
             <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
           </button>
         )}

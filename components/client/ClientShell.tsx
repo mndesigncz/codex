@@ -90,7 +90,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
       <footer className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
         <span>Managero client</span>
         <span>Rezervace, věrnost a objednávky pro podniky, kam chodíš.</span>
-        <Link href="/" className="tap-target-sm ml-auto inline-flex items-center hover:text-black">Jsem podnik</Link>
+        <Link href="/" className="tap-target-sm sm:ml-auto inline-flex items-center hover:text-black">Jsem podnik</Link>
       </footer>
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace. */}

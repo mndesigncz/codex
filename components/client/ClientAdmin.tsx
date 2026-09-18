@@ -188,7 +188,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         {tab === 'menu' && (
           <div className="space-y-5 max-w-3xl">
             <PageHeader hintId="clientadmin-2" title="Menu" subtitle="Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek." />
-            <MenuEditor />
+            <MenuEditor hlavicka={false} />
           </div>
         )}
         {tab === 'events' && <EventsView user={(user ?? {}) as any} />}
