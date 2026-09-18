@@ -1091,6 +1091,29 @@ nebyl žádný.
   se nemají podmiňovat navzájem; `PushManager` si registraci najde,
   ale nezakládá ji — a čeká na ni s časovým stropem, aby tiše nevisel.
 
+## Barva značky je podniku, čitelnost je naše
+
+Podnik si v Nastavení → Vzhled volí barvu volně (`<input type="color">`).
+Text na ní vybírala heuristika z devadesátek — vnímaný jas podle BT.601
+s prahem 150. To není kontrast a na **28 % barevného prostoru** dávala
+text pod 4,5:1.
+
+Naměřeno na barvách, které si podnik reálně zvolí:
+`#F97316` oranžová → 2,80:1 · `#14B8A6` tyrkysová → 2,49:1 ·
+`#00FF00` zelená → 1,37:1. Kavárna s oranžovou tak měla na své vlastní
+stránce tlačítko „Stát se členem", které si její hosté nepřečtou.
+
+- **Inkoust se vybírá podle skutečného kontrastu**, ne podle jasu:
+  spočítat obě možnosti a vzít lepší. Selhání pod 4,5:1 tím klesne na
+  6,5 % a nejhorší dosažitelná hodnota je 4,22:1 místo 1,37:1 — pod 3:1
+  se nedostane žádná barva.
+- **Zbylých 6,5 % se neopravuje za podnik.** Barvu si zvolil on; přepsat
+  mu ji je horší než mu to říct. V Nastavení → Vzhled proto vidí ukázku
+  tlačítka a u nevyhovující barvy větu, co s tím.
+- **Testuje se celý barevný prostor, ne naše limetka.** Fixture má vždycky
+  limetku, na které vycházelo i to staré řešení — právě proto se vada
+  neukázala. `scripts/test-units.ts` projede prostor a hlídá práh 3:1.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
