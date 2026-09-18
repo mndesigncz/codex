@@ -386,6 +386,17 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
 - **Prázdno z výpadku není prázdno v datech.** „Zatím tu nikdo není —
   zaměstnance přidá vedení" na kiosku byla lež, která posílala obsluhu
   volat šéfovi místo zkontrolovat wifi. Nenačteno ≠ nic tam není.
+- **„Není" a „nedovolali jsme se" jsou dvě různé věci.** Hostovská stránka
+  podniku měla `catch(() => setNotFound(true))`, takže výpadek wifi vyšel
+  stejně jako neexistující podnik: „Podnik tu není." Zákazník z toho usoudí,
+  že kavárna na platformě není, a přestane to zkoušet. Neexistenci smí tvrdit
+  jen odpověď 404; všechno ostatní je chyba načtení, a ta má tlačítko.
+- **`await fetch` v odesílací obsluze patří do `try`.** Bez něj obsluha
+  na výpadku spojení umře uvnitř `await` a nestane se **vůbec nic** —
+  žádná chyba, žádné potvrzení, jen ticho. U rezervace nebo objednávky je
+  nejistota to nejhorší, co se dá hostovi vrátit: neví, jestli stůl má.
+  Zpráva proto říká, že se **nic neodeslalo**, a co bylo rozepsané zůstává
+  (košík, promo kód) — ať se dá ťuknout znovu a nic se neztratí.
 - **Nenačteno znamená neodesílat.** Když se nenačetlo, co člověk poslal
   dřív, formulář se nesmí tvářit jako prázdný a nechat to odeslat —
   přepsal by původní data. Raději chyba a zamčené tlačítko.
