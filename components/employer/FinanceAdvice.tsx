@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
+import { okJson } from '@/lib/api';
 
 type Group = 'revenue' | 'products' | 'people' | 'stock' | 'guests';
 
@@ -52,7 +53,7 @@ export default function FinanceAdvice({ month }: { month: string }) {
     let alive = true;
     setAdvice(null); setErr(null);
     fetch(`/api/finance/advice?month=${month}`)
-      .then(r => r.json())
+      .then(okJson)
       .then(d => {
         if (!alive) return;
         if (d.error) { setErr(d.error); return; }

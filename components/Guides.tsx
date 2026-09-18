@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
-import { EmptyState, Button, PageHeader , SearchField, ApproveAllBar, runBulk } from './ui';
+import { EmptyState, Button, PageHeader , SearchField, ApproveAllBar, runBulk, ErrorState } from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
@@ -10,6 +10,7 @@ import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
+import { okJson, apiMessage } from '@/lib/api';
 
 interface User {
   id: number;
@@ -142,9 +143,11 @@ export default function Guides({ user }: { user: User }) {
   const [manageOpen, setManageOpen] = useState(false);
   const [creatingCat, setCreatingCat] = useState(false);
 
+  const [loadErr, setLoadErr] = useState('');
+  const [reloadTick, setReloadTick] = useState(0);
+
   const loadCategories = useCallback(async () => {
-    const r = await fetch('/api/guides/categories');
-    const d = await r.json();
+    const d = await fetch('/api/guides/categories').then(okJson);
     if (Array.isArray(d.categories)) setCategories(d.categories);
   }, []);
 
@@ -157,14 +160,18 @@ export default function Guides({ user }: { user: User }) {
   };
 
   const loadGuides = useCallback(async () => {
-    const r = await fetch('/api/guides');
-    const d = await r.json();
+    const d = await fetch('/api/guides').then(okJson);
     if (Array.isArray(d.guides)) setGuides(d.guides);
   }, []);
 
   useEffect(() => {
-    Promise.all([loadCategories(), loadGuides()]).finally(() => setLoading(false));
-  }, [loadCategories, loadGuides]);
+    setLoadErr('');
+    Promise.all([loadCategories(), loadGuides()])
+      // Bez tohohle catch skončil výpadek sítě nezachyceným slibem a obrazovka
+      // pak tvrdila „Zatím žádné návody" — přesně opačně, než jak to bylo.
+      .catch(e => setLoadErr(apiMessage(e, 'Návody se nenačetly.')))
+      .finally(() => setLoading(false));
+  }, [loadCategories, loadGuides, reloadTick]);
 
   const catById = useMemo(() => {
     const m = new Map<number, Category>();
@@ -203,8 +210,7 @@ export default function Guides({ user }: { user: User }) {
     setReaderLoading(true);
     setReader({ id, title: '', content: '', checklist: [], categoryId: null, updatedAt: '' });
     try {
-      const r = await fetch(`/api/guides/${id}`);
-      const d = await r.json();
+      const d = await fetch(`/api/guides/${id}`).then(okJson);
       if (d.guide) setReader({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
       else setReader(null);
     } catch {
@@ -356,6 +362,11 @@ export default function Guides({ user }: { user: User }) {
           {loading ? (
             <div className="flex items-center justify-center h-48">
               <div className="spinner" />
+            </div>
+          ) : loadErr ? (
+            <div className="glass-card">
+              <ErrorState title="Návody se nenačetly" hint={loadErr}
+                onRetry={() => { setLoading(true); setReloadTick(t => t + 1); }} />
             </div>
           ) : filtered.length === 0 ? (
             <div className="glass-card">
@@ -741,10 +752,10 @@ function GuideEditor({
   const [items, setItems] = useState<any[]>([]);
   const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
   useEffect(() => {
-    fetch('/api/inventory').then(r => r.json())
+    fetch('/api/inventory').then(okJson)
       .then(d => setItems(Array.isArray(d) ? d.filter((i: any) => i.approved !== false) : []))
       .catch(() => setItems([]));
-    fetch('/api/inventory/categories').then(r => r.json())
+    fetch('/api/inventory/categories').then(okJson)
       .then(d => setStockCategories(Array.isArray(d) ? d.map((c: any) => ({ id: Number(c.id), name: String(c.name) })) : []))
       .catch(() => setStockCategories([]));
   }, []);

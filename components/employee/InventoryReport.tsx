@@ -9,6 +9,7 @@ import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/ca
 import CategoryNav from '../inventory/CategoryNav';
 import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
+import { okJson } from '@/lib/api';
 
 interface InventoryItem {
   id: number;
@@ -69,12 +70,12 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   const [propCatId] = useState<number | ''>('');
   const [propMsg, setPropMsg] = useState('');
   const reloadItems = () =>
-    fetch('/api/inventory').then(r => r.json()).then(d => { if (Array.isArray(d)) setItems(d); }).catch(() => {});
+    fetch('/api/inventory').then(okJson).then(d => { if (Array.isArray(d)) setItems(d); }).catch(() => {});
   const [submitting, setSubmitting] = useState(false);
   const [stocktakeOpen, setStocktakeOpen] = useState(false);
   const [counting, setCounting] = useState(false);
   useEffect(() => {
-    fetch('/api/stocktake').then(r => r.json())
+    fetch('/api/stocktake').then(okJson)
       .then(d => setStocktakeOpen(!!d?.open))
       .catch(() => setStocktakeOpen(false));
   }, [counting]);
@@ -82,8 +83,8 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/inventory').then(r => r.json()).catch(() => []),
-      fetch('/api/inventory/categories').then(r => r.json()).catch(() => []),
+      fetch('/api/inventory').then(okJson).catch(() => []),
+      fetch('/api/inventory/categories').then(okJson).catch(() => []),
     ]).then(([data, cats]) => {
       if (Array.isArray(data)) setItems(data);
       if (Array.isArray(cats)) setAllCats(cats);

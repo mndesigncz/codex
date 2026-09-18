@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { okJson } from '@/lib/api';
 
 const inputCls =
   'w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -39,12 +40,12 @@ export default function ReceiptsPanel({ compact = false }: { compact?: boolean }
 
   const load = async () => {
     try {
-      const d = await fetch('/api/receipts').then(r => r.json());
+      const d = await fetch('/api/receipts').then(okJson);
       setReceipts(Array.isArray(d.receipts) ? d.receipts : []);
       if (d.error) setErr(d.error);
     } catch { /* ignore */ }
     try {
-      const d = await fetch('/api/inventory').then(r => r.json());
+      const d = await fetch('/api/inventory').then(okJson);
       setItems(Array.isArray(d.items) ? d.items : []);
     } catch { /* matching is a nice-to-have */ }
   };

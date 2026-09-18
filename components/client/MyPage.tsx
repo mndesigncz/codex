@@ -11,6 +11,7 @@ import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
 import { czDay, RES_STATUS, tierFor } from '@/lib/clientSlots';
 import { formatMoney } from '@/lib/money';
+import { okJson } from '@/lib/api';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -22,11 +23,11 @@ export default function MyPage() {
   const [pending, setPending] = useState<any[]>([]);
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
-  const load = useCallback(() => fetch('/api/client/me').then(r => r.json()).then(setD).catch(() => setErr('Nenačetlo se. Zkus obnovit stránku.')), []);
+  const load = useCallback(() => fetch('/api/client/me').then(okJson).then(setD).catch(() => setErr('Nenačetlo se. Zkus obnovit stránku.')), []);
   useEffect(() => {
     load();
-    fetch('/api/client/card').then(r => r.json()).then(x => setCard(x?.code ? x : null)).catch(() => setCard(null));
-    fetch('/api/client/reviews').then(r => r.json()).then(x => setPending(Array.isArray(x?.pending) ? x.pending : [])).catch(() => {});
+    fetch('/api/client/card').then(okJson).then(x => setCard(x?.code ? x : null)).catch(() => setCard(null));
+    fetch('/api/client/reviews').then(okJson).then(x => setPending(Array.isArray(x?.pending) ? x.pending : [])).catch(() => {});
   }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
 

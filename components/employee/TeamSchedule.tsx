@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 interface TeamShift {
   id: number;
@@ -37,7 +38,7 @@ export default function TeamSchedule() {
   useEffect(() => {
     let alive = true;
     fetch('/api/shifts?team=1')
-      .then(r => r.json())
+      .then(okJson)
       .then(d => {
         if (!alive) return;
         if (d?.enabled === false) { setEnabled(false); setShifts([]); return; }

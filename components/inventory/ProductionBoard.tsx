@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 export interface ToMake {
   taskId: number; title: string; priority: string; status: string;
@@ -26,7 +27,7 @@ export function useProduction() {
   const [loaded, setLoaded] = useState(false);
   const load = async () => {
     try {
-      const d = await fetch('/api/production').then(r => r.json());
+      const d = await fetch('/api/production').then(okJson);
       setList(Array.isArray(d?.toMake) ? d.toMake : []);
     } catch { /* offline */ }
     setLoaded(true);

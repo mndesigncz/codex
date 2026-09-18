@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { dbTimeDayHM } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 import { Icon } from './Icons';
 interface Announcement {
@@ -19,21 +20,38 @@ function formatDate(iso: string): string {
 
 export default function AnnouncementBanner() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  // Připíchnuté oznámení je to, co vedoucí chce, aby všichni viděli. Když se
+  // nenačte, pruh dřív jen zmizel — a nikdo se nedozvěděl, že něco visí.
+  const [failed, setFailed] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setFailed(false);
     fetch('/api/announcements')
-      .then((r) => (r.ok ? r.json() : { announcements: [] }))
+      .then(okJson)
       .then((d) => {
-        if (!cancelled && Array.isArray(d?.announcements)) {
-          setAnnouncements(d.announcements as Announcement[]);
-        }
+        if (cancelled) return;
+        if (!Array.isArray(d?.announcements)) throw new Error('nečekaná odpověď');
+        setAnnouncements(d.announcements as Announcement[]);
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setFailed(true); });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tick]);
+
+  if (failed) {
+    return (
+      <div className="note note-wait flex items-center justify-between gap-3 min-w-0">
+        <span className="min-w-0">Oznámení se nenačetla. Něco připíchnutého ti teď nevidíme.</span>
+        <button type="button" onClick={() => setTick((t) => t + 1)}
+          className="tap-target-sm shrink-0 font-semibold underline underline-offset-2">
+          Zkusit znovu
+        </button>
+      </div>
+    );
+  }
 
   if (announcements.length === 0) return null;
 

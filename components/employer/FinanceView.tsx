@@ -14,6 +14,7 @@ import LiveRevenue from './LiveRevenue';
 import FinanceAdvice from './FinanceAdvice';
 import { PageHeader, Button , SearchField } from '../ui';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -58,14 +59,14 @@ export default function FinanceView() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetch(`/api/finance?month=${month}`).then(r => r.json())
+    fetch(`/api/finance?month=${month}`).then(okJson)
       .then(d => { if (alive && !d.error) setData(d); })
       .catch(() => {})
       .finally(() => { if (alive) setLoading(false); });
     // Prodeje z pokladny proti recepturám a cenám skladu — marže po položkách.
     // Načítá se zvlášť, aby chybějící pokladna nezdržela zbytek přehledu.
     setPos(null);
-    fetch(`/api/pos/margins?month=${month}`).then(r => r.json())
+    fetch(`/api/pos/margins?month=${month}`).then(okJson)
       .then(d => { if (alive && d?.connected && d?.ready) setPos(d); })
       .catch(() => {});
     return () => { alive = false; };
@@ -114,7 +115,7 @@ export default function FinanceView() {
     if (!months.length) return;
     const rows: string[][] = [];
     for (const mo of months) {
-      const d = mo === month ? data : await fetch(`/api/finance?month=${mo}`).then(r => r.json()).catch(() => null);
+      const d = mo === month ? data : await fetch(`/api/finance?month=${mo}`).then(okJson).catch(() => null);
       if (!d || d.error) continue;
       if (opts.items) {
         rows.push([`Položky ${mo}`, '', '', '', '']);

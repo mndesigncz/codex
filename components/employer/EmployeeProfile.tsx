@@ -6,6 +6,7 @@ import { EmptyState } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 
 interface ShiftRow {
   id: number; date: string; startTime: string | null; endTime: string | null; type: string | null;
@@ -57,7 +58,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
   const [rateDate, setRateDate] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    fetch(`/api/employees/${employeeId}`).then(r => r.json()).then(d => {
+    fetch(`/api/employees/${employeeId}`).then(okJson).then(d => {
       if (d && !d.error) setP(d);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [employeeId]);

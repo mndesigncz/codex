@@ -6,6 +6,7 @@ import TeamSchedule from './TeamSchedule';
 
 import { Icon } from '../Icons';
 import { PageHeader } from '../ui';
+import { okJson } from '@/lib/api';
 interface Shift {
   id: number;
   employeeId: number;
@@ -34,19 +35,19 @@ export default function MyShifts({ user }: Props) {
   useEffect(() => {
     if (!userId) return;
     fetch(`/api/shifts?employeeId=${userId}`)
-      .then(r => r.json())
+      .then(okJson)
       .then(data => { if (Array.isArray(data)) setShifts(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [userId]);
 
   useEffect(() => {
-    fetch('/api/timeoff').then(r => r.json()).then(d => {
+    fetch('/api/timeoff').then(okJson).then(d => {
       const today = pragueToday();
       setTimeOff((Array.isArray(d?.requests) ? d.requests : [])
         .filter((r: any) => r.status === 'approved' && r.toDate >= today)
         .sort((a: any, b: any) => a.fromDate.localeCompare(b.fromDate)));
     }).catch(() => {});
-    fetch('/api/rewards').then(r => r.json()).then(d => {
+    fetch('/api/rewards').then(okJson).then(d => {
       const map: Record<string, number> = {};
       (Array.isArray(d?.reviews) ? d.reviews : []).forEach((r: any) => {
         const day = String(r.work_date ?? '').slice(0, 10);

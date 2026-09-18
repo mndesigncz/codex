@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { usePopover } from '@/lib/usePopover';
+import { okJson } from '@/lib/api';
 
 interface Notif {
   id: number;
@@ -31,8 +32,7 @@ export default function NotificationBell() {
 
   const load = async () => {
     try {
-      const res = await fetch('/api/notifications');
-      const data = await res.json();
+      const data = await fetch('/api/notifications').then(okJson);
       setNotifs(data.notifications || []);
       setUnread(data.unread || 0);
     } catch {}
@@ -43,8 +43,7 @@ export default function NotificationBell() {
   const loadFeedback = useCallback(async () => {
     if (role !== 'employee') return;
     try {
-      const res = await fetch('/api/rewards');
-      const data = await res.json();
+      const data = await fetch('/api/rewards').then(okJson);
       setFlaggedFeedback(Number(data?.unseenFlagged) || 0);
     } catch {}
   }, [role]);

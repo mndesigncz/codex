@@ -11,6 +11,7 @@ import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
 import { pragueToday, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -54,19 +55,19 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     (async () => {
       try {
         const [sh, tk, inv, av, conv, cl, att, tm, rw] = await Promise.all([
-          fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
-          fetch(`/api/tasks?assignedTo=${meId}`).then(r => r.json()).catch(() => []),
-          fetch('/api/inventory').then(r => r.json()).catch(() => []),
-          fetch(`/api/availability?month=${nextMonthStr()}`).then(r => r.json()).catch(() => null),
-          fetch('/api/conversations').then(r => r.json()).catch(() => []),
-          fetch('/api/closings').then(r => r.json()).catch(() => ({})),
-          fetch('/api/attendance').then(r => r.json()).catch(() => ({})),
-          fetch('/api/teams').then(r => r.json()).catch(() => ({})),
-          fetch('/api/rewards').then(r => r.json()).catch(() => ({})),
+          fetch('/api/shifts').then(okJson).catch(() => ({})),
+          fetch(`/api/tasks?assignedTo=${meId}`).then(okJson).catch(() => []),
+          fetch('/api/inventory').then(okJson).catch(() => []),
+          fetch(`/api/availability?month=${nextMonthStr()}`).then(okJson).catch(() => null),
+          fetch('/api/conversations').then(okJson).catch(() => []),
+          fetch('/api/closings').then(okJson).catch(() => ({})),
+          fetch('/api/attendance').then(okJson).catch(() => ({})),
+          fetch('/api/teams').then(okJson).catch(() => ({})),
+          fetch('/api/rewards').then(okJson).catch(() => ({})),
         ]);
         setCfg(tm?.team?.dashboard_config?.employee ?? {});
         setPinnedShare(tm?.pinnedShare ?? null);
-        fetch('/api/events').then(r => r.json()).then(d => {
+        fetch('/api/events').then(okJson).then(d => {
           const today0 = pragueToday();
           const up = (Array.isArray(d.events) ? d.events : [])
             .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
@@ -75,7 +76,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
         }).catch(() => {});
         setMyId(typeof user?.id === 'string' ? parseInt(user.id) : (user?.id ?? null));
         setMyEntries(Array.isArray(att?.entries) ? att.entries : []);
-        fetch('/api/closings/handover').then(r => r.json())
+        fetch('/api/closings/handover').then(okJson)
           .then(d => setHandover(d?.handover ? d : null)).catch(() => {});
         const allShifts = Array.isArray(sh?.shifts) ? sh.shifts : Array.isArray(sh) ? sh : [];
         setShifts(allShifts.filter((s: any) => s.employeeId === meId || s.employee_id === meId));

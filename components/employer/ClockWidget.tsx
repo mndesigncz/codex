@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { parseDbTime, dbTimeDayHM } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 // Lets the employer clock themselves in/out — they can work a shift too.
 export default function ClockWidget({ userId }: { userId: number }) {
@@ -14,7 +15,7 @@ export default function ClockWidget({ userId }: { userId: number }) {
 
   const load = useCallback(async () => {
     try {
-      const d = await fetch('/api/attendance').then(r => r.json());
+      const d = await fetch('/api/attendance').then(okJson);
       const me = (d.roster ?? []).find((r: any) => Number(r.id) === userId);
       setOpenSince(me?.openSince ?? null);
     } catch { /* ignore */ }

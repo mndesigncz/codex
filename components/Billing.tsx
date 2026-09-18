@@ -12,6 +12,7 @@ import {
   PLAN_FEATURES, PLAN_NAMES, PRICES, MAX_EXTRAS, MAX_OFFER_PCT, TRIAL_DAYS, REFERRALS_PER_MONTH,
   planLabel, czDays, type PlanInfo, type Interval,
 } from '@/lib/plan';
+import { okJson, apiMessage } from '@/lib/api';
 
 type Status = {
   configured: boolean;
@@ -38,7 +39,9 @@ export default function Billing() {
   const [notice, setNotice] = useState('');
   const [checkout, setCheckout] = useState<{ plan: 'pro' | 'max'; interval: Interval } | null>(null);
 
-  const load = () => fetch('/api/billing/status').then(r => r.json()).then(d => { if (d?.plan) setSt(d); else setErr(d?.error || 'Nepodařilo se načíst.'); }).catch(() => setErr('Nepodařilo se načíst.'));
+  const load = () => fetch('/api/billing/status').then(okJson)
+    .then(d => { if (d?.plan) setSt(d); else setErr(d?.error || 'Nepodařilo se načíst.'); })
+    .catch(e => setErr(apiMessage(e, 'Nepodařilo se načíst.')));
   useEffect(() => {
     load();
     try {

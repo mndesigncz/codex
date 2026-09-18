@@ -15,6 +15,7 @@ import {
 import { PageHeader } from '../ui';
 import { czCount } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
+import { okJson } from '@/lib/api';
 
 interface Item {
   id?: number;
@@ -300,8 +301,8 @@ export default function MenuEditor() {
   const [objednavaciSlug, setObjednavaciSlug] = useState<string | null>(null);
   useEffect(() => {
     let platne = true;
-    fetch('/api/pos/status').then(r => r.json()).then(d => { if (platne) setPosPripojena(!!d?.connected); }).catch(() => {});
-    fetch('/api/client/admin/profile').then(r => r.json()).then(d => {
+    fetch('/api/pos/status').then(okJson).then(d => { if (platne) setPosPripojena(!!d?.connected); }).catch(() => {});
+    fetch('/api/client/admin/profile').then(okJson).then(d => {
       if (platne && d?.profile?.ordering_on) setObjednavaciSlug(d.profile.menu_slug ? String(d.profile.menu_slug) : '');
     }).catch(() => {});
     return () => { platne = false; };

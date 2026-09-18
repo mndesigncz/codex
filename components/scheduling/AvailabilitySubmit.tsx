@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '../Icons';
 
 import { PageHeader, ErrorState } from '../ui';
+import { okJson } from '@/lib/api';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
 }
@@ -86,10 +87,13 @@ export default function AvailabilitySubmit({ user }: Props) {
   const [confirmed, setConfirmed] = useState(false);
 
   const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
+  const [typesErr, setTypesErr] = useState(false);
   useEffect(() => {
-    fetch('/api/shift-types').then((r) => r.json())
-      .then((d) => setTypes((d.shiftTypes ?? []).map((t: any) => ({ id: t.id, name: t.name }))))
-      .catch(() => {});
+    fetch('/api/shift-types').then(okJson)
+      .then((d) => { setTypes((d.shiftTypes ?? []).map((t: any) => ({ id: t.id, name: t.name }))); setTypesErr(false); })
+      // Bez typů směn se klepání přepne na starý „ráno / odpoledne" — což je
+      // správný stav jen když je tým opravdu nemá, ne když vypadla síť.
+      .catch(() => setTypesErr(true));
   }, []);
   // The tap cycle follows the team's shift types; legacy binary only when none exist.
   const stateList: DayState[] = useMemo(
@@ -222,6 +226,13 @@ export default function AvailabilitySubmit({ user }: Props) {
       <PageHeader hintId="availabilitysubmit" title="Dostupnost"
         subtitle={<>Klepnutím na den cyklicky nastav:{' '}
           <span className="text-black/70 font-medium">{stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}</span>.</>} />
+
+      {typesErr && (
+        <p className="note note-wait cz-sentence">
+          Typy směn se nenačetly, takže klepání zatím nabízí jen ráno a odpoledne.
+          Jestli si tým vede vlastní typy, načti stránku znovu — ať vybíráš z těch svých.
+        </p>
+      )}
 
       {/* Month selector — navigate freely into the future (no limit), but not
           before the current month (submitting availability for the past makes

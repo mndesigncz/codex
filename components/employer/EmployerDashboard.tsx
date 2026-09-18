@@ -16,6 +16,7 @@ import { pragueToday, dbTimeHM } from '@/lib/pragueTime';
 import { greeting } from '@/lib/greeting';
 import { Avatar } from '../ui';
 import { czForm } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 // Everything past `rating` is an optional enrichment of the roster response —
 // rendered only when the API sends it, so the row degrades to name + shift.
@@ -106,7 +107,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
   const yesterday = pragueToday(-1);
 
   const loadRoster = useCallback(async (autoPick = false) => {
-    const day = (d: string) => fetch(`/api/shift-reviews?date=${d}`).then(r => r.json()).catch(() => null);
+    const day = (d: string) => fetch(`/api/shift-reviews?date=${d}`).then(okJson).catch(() => null);
     const [y, t] = await Promise.all([day(yesterday), day(today)]);
     const next: Record<string, RosterEntry[]> = {
       [yesterday]: Array.isArray(y?.list) ? y.list : [],
@@ -127,26 +128,26 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     (async () => {
       try {
         const [team, sh, tk, inv, av, conv, att, toff, offers, clo] = await Promise.all([
-          fetch('/api/teams').then(r => r.json()).catch(() => ({})),
-          fetch('/api/shifts').then(r => r.json()).catch(() => ({})),
-          fetch('/api/tasks').then(r => r.json()).catch(() => []),
-          fetch('/api/inventory').then(r => r.json()).catch(() => []),
-          fetch(`/api/availability?month=${month}`).then(r => r.json()).catch(() => []),
-          fetch('/api/conversations').then(r => r.json()).catch(() => []),
-          fetch('/api/attendance?days=1').then(r => r.json()).catch(() => ({})),
-          fetch('/api/timeoff').then(r => r.json()).catch(() => ({})),
-          fetch('/api/shifts/offers').then(r => r.json()).catch(() => ({})),
-          fetch('/api/closings').then(r => r.json()).catch(() => ({})),
+          fetch('/api/teams').then(okJson).catch(() => ({})),
+          fetch('/api/shifts').then(okJson).catch(() => ({})),
+          fetch('/api/tasks').then(okJson).catch(() => []),
+          fetch('/api/inventory').then(okJson).catch(() => []),
+          fetch(`/api/availability?month=${month}`).then(okJson).catch(() => []),
+          fetch('/api/conversations').then(okJson).catch(() => []),
+          fetch('/api/attendance?days=1').then(okJson).catch(() => ({})),
+          fetch('/api/timeoff').then(okJson).catch(() => ({})),
+          fetch('/api/shifts/offers').then(okJson).catch(() => ({})),
+          fetch('/api/closings').then(okJson).catch(() => ({})),
         ]);
         setCfg(team?.team?.dashboard_config?.employer ?? {});
         setPinnedShare(team?.pinnedShare ?? null);
-        fetch(`/api/pos/summary?date=${pragueToday()}`).then(r => r.json())
+        fetch(`/api/pos/summary?date=${pragueToday()}`).then(okJson)
           .then(d => setPosToday(d?.connected && d.bills != null ? d : null)).catch(() => {});
         // Managero client běží vedle appky; dashboard z něj ukáže jen to,
         // co po vedení něco chce — objednávky, rezervace, nová hodnocení.
-        fetch('/api/client/admin/summary').then(r => r.json())
+        fetch('/api/client/admin/summary').then(okJson)
           .then(d => setGuests(d?.enabled ? d : null)).catch(() => {});
-        fetch('/api/events').then(r => r.json()).then(d => {
+        fetch('/api/events').then(okJson).then(d => {
           const today0 = pragueToday();
           const up = (Array.isArray(d.events) ? d.events : [])
             .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
@@ -216,7 +217,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
     const prev = role === 'employer' ? cfg : employeeCfg;
     setter({ ...prev, layout: next });
     try {
-      const teams = await fetch('/api/teams').then(r => r.json()).catch(() => ({}));
+      const teams = await fetch('/api/teams').then(okJson).catch(() => ({}));
       const current = teams?.team?.dashboard_config ?? {};
       const merged = { ...current, [role]: { ...(current[role] ?? {}), layout: next } };
       const res = await fetch('/api/teams', {

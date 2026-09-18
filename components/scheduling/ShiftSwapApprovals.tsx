@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import { BulkBar, SelectBox, useSelection, runBulk } from '../ui';
+import { okJson } from '@/lib/api';
 
 type Offer = {
   id: number; status: string;
@@ -26,7 +27,7 @@ export default function ShiftSwapApprovals() {
 
   const load = async () => {
     try {
-      const d = await fetch('/api/shifts/offers').then(r => r.json());
+      const d = await fetch('/api/shifts/offers').then(okJson);
       setOffers(Array.isArray(d.offers) ? d.offers : []);
     } catch { /* ignore */ }
   };

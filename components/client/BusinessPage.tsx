@@ -14,6 +14,7 @@ import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/client
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { formatMoney, currencySymbol } from '@/lib/money';
+import { okJson } from '@/lib/api';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -534,7 +535,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
   const cur = currencySymbol(b.currency);
   const money = (n: number) => formatMoney(n, b.currency);
 
-  const loadOrders = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`).then(r => r.json()).then(x => setOrders(x.orders ?? [])).catch(() => setOrders([])), [slug]);
+  const loadOrders = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`).then(okJson).then(x => setOrders(x.orders ?? [])).catch(() => setOrders([])), [slug]);
   useEffect(() => { if (signedIn) loadOrders(); else setOrders([]); }, [signedIn, loadOrders]);
   // Dokud objednávka čeká nebo se připravuje, ptáme se každých deset vteřin.
   useEffect(() => {

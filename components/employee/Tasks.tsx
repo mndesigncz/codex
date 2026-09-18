@@ -8,6 +8,7 @@ import { pragueToday } from '@/lib/pragueTime';
 
 import { EmptyState, PageHeader, Segmented } from '../ui';
 import { Icon } from '../Icons';
+import { okJson } from '@/lib/api';
 interface Task {
   id: number;
   title: string;
@@ -45,7 +46,7 @@ export default function Tasks({ user }: Props) {
   useEffect(() => {
     if (!userId) return;
     fetch(`/api/tasks?assignedTo=${userId}`)
-      .then(r => r.json())
+      .then(okJson)
       .then(data => { if (Array.isArray(data)) setTasks(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [userId]);

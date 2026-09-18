@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
+import { okJson } from '@/lib/api';
 
 type Row = {
   itemId: number; name: string; category: string | null;
@@ -39,7 +40,7 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
 
   useEffect(() => {
     const url = stocktakeId ? `/api/inventory/shrinkage?id=${stocktakeId}` : '/api/inventory/shrinkage';
-    fetch(url).then(r => r.json()).then(setD).catch(() => setD({ ready: false }));
+    fetch(url).then(okJson).then(setD).catch(() => setD({ ready: false }));
   }, [stocktakeId]);
 
   if (!d || !d.ready || !d.totals) return null;

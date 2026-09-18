@@ -5,6 +5,7 @@ import { Icon } from './Icons';
 
 import { EmptyState, PageHeader, Button, Modal } from './ui';
 import { useModal } from '@/lib/useModal';
+import { okJson } from '@/lib/api';
 type Suggestion = {
   id: number;
   title: string;
@@ -72,7 +73,7 @@ export default function SuggestionsBoard() {
 
   const load = async () => {
     try {
-      const d = await fetch('/api/suggestions').then(r => r.json());
+      const d = await fetch('/api/suggestions').then(okJson);
       setItems(Array.isArray(d.suggestions) ? d.suggestions : []);
       setIsEmployer(!!d.isEmployer);
       setMeId(typeof d.meId === 'number' ? d.meId : null);

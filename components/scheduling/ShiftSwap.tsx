@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../Icons';
 import { pragueToday } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 type Offer = {
   id: number; shiftId: number; offeredBy: number; claimedBy: number | null;
@@ -29,8 +30,8 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
   const load = useCallback(async () => {
     try {
       const [o, s] = await Promise.all([
-        fetch('/api/shifts/offers').then(r => r.json()),
-        fetch(`/api/shifts?employeeId=${userId}`).then(r => r.json()),
+        fetch('/api/shifts/offers').then(okJson),
+        fetch(`/api/shifts?employeeId=${userId}`).then(okJson),
       ]);
       setOffers(Array.isArray(o?.offers) ? o.offers : []);
       setShifts(Array.isArray(s) ? s : []);

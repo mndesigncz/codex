@@ -13,6 +13,7 @@ import ShareSettings from './employer/ShareSettings';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { czCount } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 interface Member {
   id: number;
@@ -154,7 +155,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   useEffect(() => {
     Promise.all([loadTeam(), loadInvites()]).finally(() => setLoading(false));
-    fetch('/api/inventory/categories').then(r => r.json())
+    fetch('/api/inventory/categories').then(okJson)
       .then(c => { if (Array.isArray(c)) setInvCategories(c); })
       .catch(() => { /* shortcuts just lose the category options */ });
   }, []);

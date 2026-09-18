@@ -8,6 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { QR_DEFAULT, QR_SHEETS, QR_STYLES, contrast, normalizeQrDesign, type QrDesign } from '@/lib/qrDesign';
+import { okJson } from '@/lib/api';
+import { okText } from '@/lib/api';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -38,11 +40,12 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
   const [hasLogo, setHasLogo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [svg, setSvg] = useState('');
+  const [svgErr, setSvgErr] = useState(false);
   const [open, setOpen] = useState(false);
   const seq = useRef(0);
 
   useEffect(() => {
-    fetch('/api/client/admin/profile').then(r => r.json()).then(x => {
+    fetch('/api/client/admin/profile').then(okJson).then(x => {
       setD(normalizeQrDesign(x?.profile?.qr_design));
       setTeamName(String(x?.profile?.team_name ?? ''));
       setHasLogo(!!x?.profile?.logo_url);
@@ -56,9 +59,11 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
     if (!first) return;
     const mine = ++seq.current;
     fetch(`/api/client/admin/tables/qr?tableId=${first.id}&format=svg&design=${encodeURIComponent(JSON.stringify(design))}`)
-      .then(r => (r.ok ? r.text() : ''))
-      .then(t => { if (mine === seq.current) setSvg(t); })
-      .catch(() => { if (mine === seq.current) setSvg(''); });
+      .then(okText)
+      .then(t => { if (mine === seq.current) { setSvg(t); setSvgErr(false); } })
+      // Prázdná náhledová plocha vypadá jako „kód se nevykreslil" — a designér
+      // pak ladí barvy podle ničeho. Radši řekneme, že se náhled nenačetl.
+      .catch(() => { if (mine === seq.current) { setSvg(''); setSvgErr(true); } });
   }, [first]);
 
   useEffect(() => { if (d && open) { const t = setTimeout(() => refresh(d), 250); return () => clearTimeout(t); } }, [d, open, refresh]);
@@ -110,9 +115,15 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
           {/* Náhled */}
           <div className="space-y-2">
             <div className="rounded-3xl border border-black/[0.08] p-5 text-center" style={{ background: paper, color: ink }}>
-              {svg
-                ? <div className="mx-auto w-[9rem] [&_svg]:w-full [&_svg]:h-auto [&_svg]:block" dangerouslySetInnerHTML={{ __html: svg }} />
-                : <div className="mx-auto h-[9rem] w-[9rem] rounded-2xl bg-black/[0.06] animate-pulse" />}
+              {svg ? (
+                <div className="mx-auto w-[9rem] [&_svg]:w-full [&_svg]:h-auto [&_svg]:block" dangerouslySetInnerHTML={{ __html: svg }} />
+              ) : svgErr ? (
+                <div className="mx-auto h-[9rem] w-[9rem] rounded-2xl bg-black/[0.06] flex items-center justify-center px-3">
+                  <span className="text-[11px] text-black/50 text-pretty">Náhled se nenačetl. Kód na tisku je v pořádku.</span>
+                </div>
+              ) : (
+                <div className="mx-auto h-[9rem] w-[9rem] rounded-2xl bg-black/[0.06] animate-pulse" />
+              )}
               <p className="mt-3 text-base font-bold leading-tight break-words">{d.headline || teamName || 'Název podniku'}</p>
               {d.sub && <p className="text-xs opacity-65 leading-snug mt-0.5">{d.sub}</p>}
               {d.showTable && <p className="text-sm font-bold mt-1.5">Stůl {first?.name ?? '1'}</p>}

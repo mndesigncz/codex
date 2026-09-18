@@ -14,6 +14,7 @@ import { Button } from '../ui';
 import { PlanCanvasContent, TableShape } from './TableMap';
 import type { FloorPlan, MapTable, Shape } from '@/lib/floorplan';
 import { EMPTY_PLAN, tableBox } from '@/lib/floorplan';
+import { okJson } from '@/lib/api';
 
 type Tool = 'select' | 'wall' | 'room' | 'label';
 type Sel = { kind: 'shape'; id: string } | { kind: 'table'; id: number } | null;
@@ -47,7 +48,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
 
   const load = useCallback(async () => {
     try {
-      const d = await fetch('/api/client/admin/floorplan').then(r => r.json());
+      const d = await fetch('/api/client/admin/floorplan').then(okJson);
       const p: FloorPlan = d.plan ?? EMPTY_PLAN;
       const t: MapTable[] = (d.tables ?? []).filter((x: any) => x.active);
       setPlan(p); setTables(t); setBase(JSON.stringify({ p, t }));

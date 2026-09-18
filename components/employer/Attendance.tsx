@@ -9,6 +9,7 @@ import { usePlan, UpgradeModal } from '../Pro';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { earnedFor } from '@/lib/wages';
+import { okJson } from '@/lib/api';
 
 type RosterMember = {
   id: number | string;
@@ -170,7 +171,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     const req = ++reqRef.current;
     setLoading(true);
     try {
-      const data = await fetch(`/api/attendance?days=${d}`).then(r => r.json());
+      const data = await fetch(`/api/attendance?days=${d}`).then(okJson);
       if (req !== reqRef.current) return;
       setRoster(Array.isArray(data.roster) ? data.roster : []);
       setEntries(Array.isArray(data.entries) ? data.entries : []);
@@ -184,7 +185,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   useEffect(() => {
     let cancelled = false;
     fetch('/api/closings')
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { if (!cancelled) setClosings(Array.isArray(d.closings) ? d.closings : []); })
       .catch(() => { /* ignore */ });
     return () => { cancelled = true; };

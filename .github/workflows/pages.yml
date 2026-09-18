@@ -87,3 +87,7 @@ jobs:
       # kavárně koruny. Ráčna: nesmí přibývat.
       - name: Měna
         run: node scripts/check-money.mjs
+      # `fetch` nepadá na HTTP 500 — načtení, které nekontroluje stav,
+      # uloží chybové tělo jako data a obrazovka pak tvrdí, že nic není.
+      - name: Odmítnutí serveru
+        run: node scripts/check-fetch-ok.mjs

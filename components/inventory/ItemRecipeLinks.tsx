@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { useResultKeys } from '@/lib/useResultKeys';
+import { okJson } from '@/lib/api';
 
 type Link = { productId: string; productName: string | null; amount: number };
 type Product = { productId: string; name: string; category?: string | null; price?: number | null };
@@ -48,7 +49,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        const d = await fetch(`/api/pos/usage?q=${encodeURIComponent(q)}`).then(r => r.json());
+        const d = await fetch(`/api/pos/usage?q=${encodeURIComponent(q)}`).then(okJson);
         setFound(Array.isArray(d.products) ? d.products : []);
         if (d.error) setErr(d.error);
       } catch { setFound([]); }

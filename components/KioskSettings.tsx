@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 import { EmptyState } from './ui';
+import { okJson } from '@/lib/api';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -23,8 +24,8 @@ export default function KioskSettings() {
   const load = async () => {
     try {
       const [k, a] = await Promise.all([
-        fetch('/api/kiosk').then(r => r.json()).catch(() => ({})),
-        fetch('/api/attendance').then(r => r.json()).catch(() => ({})),
+        fetch('/api/kiosk').then(okJson).catch(() => ({})),
+        fetch('/api/attendance').then(okJson).catch(() => ({})),
       ]);
       if (k?.kiosk) { setKiosk(k.kiosk); setEmail(k.kiosk.email); }
       setMembers(Array.isArray(a?.roster) ? a.roster : []);

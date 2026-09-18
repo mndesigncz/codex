@@ -13,6 +13,7 @@ import { useTheme } from '../ThemeProvider';
 import ReceiptsPanel from './ReceiptsPanel';
 import ProductionBoard from '../inventory/ProductionBoard';
 import { useConversations } from '../chat/useChat';
+import { okJson } from '@/lib/api';
 
 function pragueToday(offset = 0): string {
   return new Date(Date.now() + offset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
@@ -43,17 +44,17 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
 
   useEffect(() => {
     const today = pragueToday();
-    fetch(`/api/pos/summary?date=${today}`).then(r => r.json())
+    fetch(`/api/pos/summary?date=${today}`).then(okJson)
       .then(d => setPos(d?.connected && d.bills != null ? d : null)).catch(() => {});
-    fetch('/api/closings').then(r => r.json()).then(d => {
+    fetch('/api/closings').then(okJson).then(d => {
       const list = Array.isArray(d.closings) ? d.closings : [];
       setClosings(list);
       setPendingClosings(list.filter((c: any) => c.approved === false).length);
     }).catch(() => {});
-    fetch('/api/attendance?days=1').then(r => r.json()).then(d => {
+    fetch('/api/attendance?days=1').then(okJson).then(d => {
       setRoster(Array.isArray(d.roster) ? d.roster : []);
     }).catch(() => {});
-    fetch('/api/inventory').then(r => r.json()).then(d => {
+    fetch('/api/inventory').then(okJson).then(d => {
       // Endpoint vrací holé pole; dřív se četlo d.items a dlaždice byla vždy prázdná.
       const items = Array.isArray(d) ? d : Array.isArray(d?.items) ? d.items : [];
       setLowItems(items.filter((i: any) => !i.madeInHouse && (i.status === 'low' || i.status === 'critical')));

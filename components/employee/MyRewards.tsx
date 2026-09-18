@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { EmptyState, PageHeader } from '../ui';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { ProGate } from '../Pro';
+import { okJson } from '@/lib/api';
 
 interface Review {
   work_date: string; rating: number; note: string | null; points: number;
@@ -113,7 +114,7 @@ function MyRewardsInner() {
   const [shopMsg, setShopMsg] = useState('');
   const [redeemingId, setRedeemingId] = useState<number | null>(null);
   const loadShop = () =>
-    fetch('/api/rewards/catalog').then(r => r.json()).then(d => {
+    fetch('/api/rewards/catalog').then(okJson).then(d => {
       setCatalog(Array.isArray(d.catalog) ? d.catalog : []);
       setMyRedemptions(Array.isArray(d.redemptions) ? d.redemptions : []);
     }).catch(() => {});
@@ -138,7 +139,7 @@ function MyRewardsInner() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/rewards').then(r => r.json()).then(d => {
+    fetch('/api/rewards').then(okJson).then(d => {
       if (d && !d.error) {
         setLevels(Array.isArray(d.levels) ? d.levels : []);
         setMe(d.me ?? null);

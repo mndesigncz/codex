@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState, Button, PageHeader, ApproveAllBar, runBulk } from '../ui';
+import { EmptyState, Button, PageHeader, ApproveAllBar, runBulk, ErrorState } from '../ui';
 import { isExcused, skipReasonLabel } from '@/lib/procedureScoring';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
@@ -12,6 +12,7 @@ import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { czForm } from '@/lib/czech';
+import { okJson, apiMessage } from '@/lib/api';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -131,18 +132,21 @@ export default function Procedures({ user }: Props) {
     if (!res.ok) throw new Error('nepovedlo se');
   };
 
+  const [loadErr, setLoadErr] = useState('');
+
   const load = useCallback(async () => {
+    setLoadErr('');
     try {
-      const [pRes, rRes] = await Promise.all([
-        fetch('/api/procedures'),
-        fetch('/api/procedures/runs'),
+      const [pData, rData] = await Promise.all([
+        fetch('/api/procedures').then(okJson),
+        fetch('/api/procedures/runs').then(okJson),
       ]);
-      const pData = await pRes.json();
-      const rData = await rRes.json();
       setProcedures(pData.procedures ?? []);
       setRuns(rData.runs ?? []);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      // Povinné zavírací postupy nesmí po výpadku vypadat jako „žádné nejsou" —
+      // podle téhle obrazovky se zavírá podnik.
+      setLoadErr(apiMessage(e, 'Postupy se nenačetly.'));
     } finally {
       setLoading(false);
     }
@@ -207,6 +211,11 @@ export default function Procedures({ user }: Props) {
           {[0, 1, 2].map(i => (
             <div key={i} className="glass-card rounded-3xl h-40 animate-pulse" />
           ))}
+        </div>
+      ) : loadErr ? (
+        <div className="glass-card">
+          <ErrorState title="Postupy se nenačetly" hint={loadErr}
+            onRetry={() => { setLoading(true); load(); }} />
         </div>
       ) : procedures.length === 0 ? (
         <ProceduresEmpty isEmployer={isEmployer} seeding={seeding} onSeed={seedExamples} onNew={openNew} />

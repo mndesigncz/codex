@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { Icon } from '../Icons';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
+import { okJson } from '@/lib/api';
 
 /** Číslo z pole, které snese i desetinnou čárku — „0,7" jinak spadne na nulu. */
 const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
@@ -54,7 +55,7 @@ export default function NewStockEntry({
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('/api/inventory/categories').then(r => r.json())
+    fetch('/api/inventory/categories').then(okJson)
       .then(d => { if (Array.isArray(d)) setCats(d); })
       .catch(() => { /* the form works without categories too */ });
   }, []);

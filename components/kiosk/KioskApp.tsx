@@ -19,6 +19,7 @@ import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
 } from './KioskShiftGate';
+import { okJson } from '@/lib/api';
 
 const TABS = [
   { id: 'shift',      label: 'Směna',    icon: 'clock' },
@@ -189,27 +190,33 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
   const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
   const [handover, setHandover] = useState<any | null>(null);
   const [nextEvent, setNextEvent] = useState<any | null>(null);
+  // Karty téhle mřížky se prostě nevykreslí, když nemají data — takže výpadek
+  // sítě vypadá jako klidný den. Co se nenačetlo, radši vyjmenujeme.
+  const [failed, setFailed] = useState<string[]>([]);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    fetch('/api/attendance').then(r => r.json())
+    setFailed([]);
+    const fail = (what: string) => setFailed(list => (list.includes(what) ? list : [...list, what]));
+    fetch('/api/attendance').then(okJson)
       .then(d => setRoster((d?.roster ?? []).filter((r: any) => r.shiftStart)))
-      .catch(() => {});
-    fetch('/api/teams').then(r => r.json())
+      .catch(() => fail('dnešní směny'));
+    fetch('/api/teams').then(okJson)
       .then(d => setPinnedShare(d?.pinnedShare ?? null))
-      .catch(() => {});
-    fetch('/api/closings/handover').then(r => r.json())
+      .catch(() => fail('připíchnutá stránka'));
+    fetch('/api/closings/handover').then(okJson)
       .then(d => setHandover(d?.handover ? d : null))
-      .catch(() => {});
-    fetch('/api/events').then(r => r.json()).then(d => {
+      .catch(() => fail('předávka'));
+    fetch('/api/events').then(okJson).then(d => {
       const today0 = pragueToday();
       const up = (Array.isArray(d.events) ? d.events : [])
         .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
         .sort((a: any, b: any) => a.date.localeCompare(b.date));
       setNextEvent(up[0] ?? null);
-    }).catch(() => {});
+    }).catch(() => fail('nejbližší akce'));
     Promise.all([
-      fetch('/api/procedures').then(r => r.json()),
-      fetch('/api/procedures/runs?today=team').then(r => r.json()),
+      fetch('/api/procedures').then(okJson),
+      fetch('/api/procedures/runs?today=team').then(okJson),
     ]).then(([pd, rd]) => {
       const runs = Array.isArray(rd?.runs) ? rd.runs : [];
       const req = (Array.isArray(pd?.procedures) ? pd.procedures : [])
@@ -220,7 +227,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
         }));
       setRequired(req); setProcErr(false);
     }).catch(() => setProcErr(true));
-  }, []);
+  }, [tick]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -287,6 +294,14 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {failed.length > 0 && (
+        <div role="alert" className="md:col-span-2 note note-wait flex items-center justify-between gap-3 min-w-0">
+          <span className="min-w-0 cz-sentence">Nenačetlo se: {failed.join(', ')}. Co tu chybí, nemusí znamenat, že nic není.</span>
+          <button type="button" onClick={() => setTick(t => t + 1)}
+            className="tap-target-sm shrink-0 font-semibold underline underline-offset-2">Zkusit znovu</button>
         </div>
       )}
 

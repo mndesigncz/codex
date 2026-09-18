@@ -9,6 +9,7 @@ import { EmptyState, Button, Hint, hintsEnabled, setHintsEnabled, resetHints, di
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos';
 
@@ -111,10 +112,10 @@ export default function Settings({ user, initialTab }: Props) {
   const [posHealth, setPosHealth] = useState<any | null>(null);
   const [posAction, setPosAction] = useState<string>('');
   const loadPosHealth = () =>
-    fetch('/api/pos/status').then(r => r.json()).then(setPosHealth).catch(() => setPosHealth(null));
+    fetch('/api/pos/status').then(okJson).then(setPosHealth).catch(() => setPosHealth(null));
   useEffect(() => {
     if (section !== 'pos' || posStatus) return;
-    fetch('/api/pos').then(r => r.json()).then(setPosStatus).catch(() => setPosStatus({ connected: false }));
+    fetch('/api/pos').then(okJson).then(setPosStatus).catch(() => setPosStatus({ connected: false }));
     loadPosHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
@@ -150,7 +151,7 @@ export default function Settings({ user, initialTab }: Props) {
       const d = await res.json();
       setPosMsg(`Připojeno k provozovně ${d.placeName ?? ''} ✓`);
       setPosStatus(null); setPosForm({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
-      fetch('/api/pos').then(r => r.json()).then(setPosStatus).catch(() => {});
+      fetch('/api/pos').then(okJson).then(setPosStatus).catch(() => {});
       loadPosHealth();
     } else {
       const d = res ? await res.json().catch(() => ({})) : {};
@@ -159,7 +160,7 @@ export default function Settings({ user, initialTab }: Props) {
   };
   useEffect(() => {
     if (section !== 'audit' || auditEntries) return;
-    fetch('/api/audit').then(r => r.json())
+    fetch('/api/audit').then(okJson)
       .then(d => setAuditEntries(Array.isArray(d.entries) ? d.entries : []))
       .catch(() => setAuditEntries([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,14 +201,14 @@ export default function Settings({ user, initialTab }: Props) {
   const [plan, setPlan] = useState<PlanInfo | null>(null);
   useEffect(() => {
     if (section !== 'billing' || plan) return;
-    fetch('/api/teams').then(r => r.json())
+    fetch('/api/teams').then(okJson)
       .then(d => setPlan(d.planInfo ?? planInfoOf(null)))
       .catch(() => setPlan(planInfoOf(null)));
   }, [section, plan]);
 
   useEffect(() => {
     fetch('/api/account')
-      .then(r => r.json())
+      .then(okJson)
       .then(data => {
         if (data.user) {
           const u: Account = data.user;
@@ -235,7 +236,7 @@ export default function Settings({ user, initialTab }: Props) {
   const loadNotifs = () => {
     setNotifsLoading(true);
     fetch('/api/notifications')
-      .then(r => r.json())
+      .then(okJson)
       .then(data => setNotifs(data.notifications || []))
       .catch(() => {})
       .finally(() => { setNotifsLoading(false); setNotifsLoaded(true); });

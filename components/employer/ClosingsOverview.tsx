@@ -15,6 +15,7 @@ import ClosingsCalendar from './ClosingsCalendar';
 import ClosingDetail from './ClosingDetail';
 import { pragueDaySafe } from '@/lib/pragueTime';
 import { wagesTotal } from '@/lib/wages';
+import { okJson } from '@/lib/api';
 
 // Rows may carry an `approved` flag; older rows omit it (treated as approved).
 // `covered_by` links a stub row to the parent closing that also closed for them.
@@ -68,7 +69,7 @@ export default function ClosingsOverview() {
   useEffect(() => {
     if (!analyticsOpen || month === 'all') { setPosInsights(null); return; }
     let alive = true;
-    fetch(`/api/pos/insights?month=${month}`).then(r => r.json())
+    fetch(`/api/pos/insights?month=${month}`).then(okJson)
       .then(d => {
         if (!alive) return;
         setPosInsights(d?.connected && d.bills != null ? d : null);
@@ -86,7 +87,7 @@ export default function ClosingsOverview() {
 
   const load = async () => {
     try {
-      const d = await fetch('/api/closings').then(r => r.json());
+      const d = await fetch('/api/closings').then(okJson);
       setAllClosings(Array.isArray(d.closings) ? d.closings : []);
       setPayDailyCash(!!d.payDailyCash);
       setMissing(Array.isArray(d.missingClosings) ? d.missingClosings : []);
@@ -94,12 +95,12 @@ export default function ClosingsOverview() {
       setDataVersion(v => v + 1);
     } catch { /* ignore */ }
     try {
-      const a = await fetch('/api/attendance?days=180').then(r => r.json());
+      const a = await fetch('/api/attendance?days=180').then(okJson);
       setAttRoster(Array.isArray(a?.roster) ? a.roster : []);
       setAttEntries(Array.isArray(a?.entries) ? a.entries : []);
     } catch { /* month card just loses the labor line */ }
     try {
-      const o = await fetch('/api/orders').then(r => r.json());
+      const o = await fetch('/api/orders').then(okJson);
       setOrders(Array.isArray(o?.orders) ? o.orders : Array.isArray(o) ? o : []);
     } catch { /* and the purchases line */ }
     setLoading(false);

@@ -13,6 +13,7 @@
 // každé načtení stránky.
 
 import { useEffect } from 'react';
+import { okJson } from '@/lib/api';
 
 const KEY = 'managero-migrated-commit';
 
@@ -23,7 +24,7 @@ export default function MigrationOnLoad() {
     try { seen = localStorage.getItem(KEY); } catch { /* soukromé okno */ }
     if (seen === commit) return;
     fetch('/api/init')
-      .then(r => r.json())
+      .then(okJson)
       .then(d => {
         // Uloží se jen po skutečně proběhlé migraci; jinak by se při chybě
         // už nikdy nezkusila znovu.

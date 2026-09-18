@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Icon } from '../Icons';
+import { okJson } from '@/lib/api';
 export default function PollsStrip({ canCreate = true, isEmployer = false, meId }: {
   canCreate?: boolean; isEmployer?: boolean; meId?: number;
 }) {
@@ -15,7 +16,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
   const [err, setErr] = useState('');
 
   const load = useCallback(() =>
-    fetch('/api/polls').then(r => r.json())
+    fetch('/api/polls').then(okJson)
       .then(d => setPolls(Array.isArray(d.polls) ? d.polls : []))
       .catch(() => {}), []);
   useEffect(() => {

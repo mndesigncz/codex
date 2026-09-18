@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
 import { pragueToday } from '@/lib/pragueTime';
+import { okJson } from '@/lib/api';
 
 interface Staff { id: number; name: string; avatar: string | null; reviewed: boolean; rating: number; flagged: boolean }
 interface Day { date: string; staff: Staff[]; pending: number }
@@ -32,7 +33,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
     const req = ++reqRef.current;
     setLoading(true);
     try {
-      const d = await fetch(`/api/shift-reviews?month=${month}`).then(r => r.json());
+      const d = await fetch(`/api/shift-reviews?month=${month}`).then(okJson);
       if (req !== reqRef.current) return;
       const map: Record<string, Day> = {};
       if (Array.isArray(d?.days)) d.days.forEach((x: Day) => { map[x.date] = x; });

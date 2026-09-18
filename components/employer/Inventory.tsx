@@ -24,6 +24,7 @@ import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useModal } from '@/lib/useModal';
 import { usePopover } from '@/lib/usePopover';
 import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 const pluralPolozka = (n: number) => czForm(n, POLOZKA);
 
@@ -266,22 +267,22 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
 
   const loadOrders = async () => {
     try {
-      const data = await fetch('/api/orders').then(r => r.json());
+      const data = await fetch('/api/orders').then(okJson);
       if (Array.isArray(data?.orders)) setOrders(data.orders);
     } catch {}
   };
 
   const load = async () => {
-    fetch('/api/suppliers').then(r => r.json())
+    fetch('/api/suppliers').then(okJson)
       .then(d => setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []))
       .catch(() => {});
-    fetch('/api/inventory/reports').then(r => r.json())
+    fetch('/api/inventory/reports').then(okJson)
       .then(d => setReports(Array.isArray(d.reports) ? d.reports : []))
       .catch(() => {});
     try {
       const [data, cats] = await Promise.all([
-        fetch('/api/inventory').then(r => r.json()),
-        fetch('/api/inventory/categories').then(r => r.json()),
+        fetch('/api/inventory').then(okJson),
+        fetch('/api/inventory/categories').then(okJson),
       ]);
       if (Array.isArray(data)) setItems(data);
       if (Array.isArray(cats)) setCategories(cats);
@@ -459,7 +460,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   // ukázat rovnou v editaci položky bez čekání na pokladnu.
   const [posUsage, setPosUsage] = useState<Record<string, { productId: string; productName: string | null; amount: number }[]>>({});
   useEffect(() => {
-    fetch('/api/pos/usage').then(r => r.json())
+    fetch('/api/pos/usage').then(okJson)
       .then(d => setPosUsage(d?.usage ?? {}))
       .catch(() => {});
   }, []);
@@ -470,7 +471,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
-    fetch(`/api/inventory/log?itemId=${i.id}`).then(r => r.json())
+    fetch(`/api/inventory/log?itemId=${i.id}`).then(okJson)
       .then(d => setItemLog(Array.isArray(d.log) ? d.log : Array.isArray(d) ? d : []))
       .catch(() => {});
     setShowForm(true);
@@ -485,7 +486,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         body: JSON.stringify({ name: clean, parentId: parentId ?? null }),
       });
       if (!res.ok) return false;
-      const cats = await fetch('/api/inventory/categories').then(r => r.json());
+      const cats = await fetch('/api/inventory/categories').then(okJson);
       if (Array.isArray(cats)) { setCategories(cats); lastCats.current = cats; }
       return true;
     } catch { return false; }
@@ -1310,7 +1311,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       {showSuppliers && (
         <SuppliersModal suppliers={suppliers} onClose={() => setShowSuppliers(false)}
           onChanged={async () => {
-            const d = await fetch('/api/suppliers').then(r => r.json()).catch(() => ({}));
+            const d = await fetch('/api/suppliers').then(okJson).catch(() => ({}));
             setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []);
           }} />
       )}

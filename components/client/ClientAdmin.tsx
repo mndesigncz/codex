@@ -21,6 +21,7 @@ import { levelFor } from '@/lib/clientSlots';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
+import { okJson } from '@/lib/api';
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -238,7 +239,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
 
 function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => void; onCustomer: (q: string) => void }) {
   const [today, setToday] = useState<any[] | null>(null);
-  useEffect(() => { fetch('/api/client/admin/reservations?range=today').then(r => r.json()).then(d => setToday(d.reservations ?? [])).catch(() => setToday([])); }, []);
+  useEffect(() => { fetch('/api/client/admin/reservations?range=today').then(okJson).then(d => setToday(d.reservations ?? [])).catch(() => setToday([])); }, []);
   if (!summary) return <PageSkel />;
   if (!summary.enabled) {
     return (
@@ -362,7 +363,7 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
   const load = useCallback(() => {
     const my = ++seq.current;
     const safe = (x: any) => (my === seq.current ? setD(x && Array.isArray(x.reservations) ? x : { reservations: [], tables: [] }) : undefined);
-    return fetch(`/api/client/admin/reservations?range=${range}`).then(r => r.json()).then(safe).catch(() => safe(null));
+    return fetch(`/api/client/admin/reservations?range=${range}`).then(okJson).then(safe).catch(() => safe(null));
   }, [range]);
   useEffect(() => { setD(null); load(); }, [load]);
   const act = async (id: number, body: any) => {
@@ -578,7 +579,7 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
   const load = useCallback(() => {
     const my = ++seq.current;
     const safe = (x: any) => (my === seq.current ? setD(x && Array.isArray(x.customers) ? x : { customers: [], total: 0 }) : undefined);
-    return fetch(`/api/client/admin/customers?q=${encodeURIComponent(q)}`).then(r => r.json()).then(safe).catch(() => safe(null));
+    return fetch(`/api/client/admin/customers?q=${encodeURIComponent(q)}`).then(okJson).then(safe).catch(() => safe(null));
   }, [q]);
   useEffect(() => { const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q]);
   const adjust = async (id: number, name: string) => {
@@ -590,7 +591,7 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
   const showLedger = async (id: number) => {
     if (openId === id) { setOpenId(null); return; }
     setOpenId(id); setLedger(null);
-    const r = await fetch(`/api/client/admin/loyalty?customerId=${id}`).then(r => r.json()).catch(() => ({ ledger: [] }));
+    const r = await fetch(`/api/client/admin/loyalty?customerId=${id}`).then(okJson).catch(() => ({ ledger: [] }));
     setLedger(r.ledger ?? []);
   };
   return (
@@ -643,7 +644,7 @@ function MemberGroups({ customerId, toast }: { customerId: number; toast: (m: st
   const [groups, setGroups] = useState<any[] | null>(null);
   const [mine, setMine] = useState<number[]>([]);
   const [busy, setBusy] = useState(0);
-  const load = useCallback(() => fetch(`/api/client/admin/groups?customerId=${customerId}`).then(r => r.json())
+  const load = useCallback(() => fetch(`/api/client/admin/groups?customerId=${customerId}`).then(okJson)
     .then(d => { setGroups(d.groups ?? []); setMine(d.customerGroupIds ?? []); }).catch(() => setGroups([])), [customerId]);
   useEffect(() => { load(); }, [load]);
   if (groups === null || groups.length === 0) return null;
@@ -795,7 +796,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
 
 function Reviews() {
   const [d, setD] = useState<any | null>(null);
-  useEffect(() => { fetch('/api/client/admin/reviews').then(r => r.json()).then(setD).catch(() => setD({ reviews: [], count: 0, avg: null, dist: [0, 0, 0, 0, 0] })); }, []);
+  useEffect(() => { fetch('/api/client/admin/reviews').then(okJson).then(setD).catch(() => setD({ reviews: [], count: 0, avg: null, dist: [0, 0, 0, 0, 0] })); }, []);
   if (!d) return <PageSkel />;
   const max = Math.max(1, ...(d.dist ?? []));
   return (
@@ -839,7 +840,7 @@ function Reviews() {
 function Broadcast({ toast }: { toast: (m: string) => void }) {
   const [d, setD] = useState<any | null>(null);
   const [f, setF] = useState({ title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' }); const [busy, setBusy] = useState(false);
-  const load = useCallback(() => fetch('/api/client/admin/broadcast').then(r => r.json()).then(setD).catch(() => setD({ history: [], members: 0 })), []);
+  const load = useCallback(() => fetch('/api/client/admin/broadcast').then(okJson).then(setD).catch(() => setD({ history: [], members: 0 })), []);
   useEffect(() => { load(); }, [load]);
   const target = f.audience === 'quiet' ? (d?.quiet ?? 0)
     : f.audience === 'tier:silver' ? (d?.silver ?? 0)
@@ -942,8 +943,8 @@ function Promos({ toast }: { toast: (m: string) => void }) {
   const [d, setD] = useState<any | null>(null); const [coupons, setCoupons] = useState<any[]>([]);
   const [f, setF] = useState({ code: '', title: '', points: 50, coupon_id: '', max_uses: '', valid_until: '' }); const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
-    fetch('/api/client/admin/promos').then(r => r.json()).then(x => setD({ promos: x.promos ?? [] })).catch(() => setD({ promos: [] }));
-    fetch('/api/client/admin/coupons').then(r => r.json()).then(x => setCoupons((x.coupons ?? []).filter((c: any) => c.active))).catch(() => {});
+    fetch('/api/client/admin/promos').then(okJson).then(x => setD({ promos: x.promos ?? [] })).catch(() => setD({ promos: [] }));
+    fetch('/api/client/admin/coupons').then(okJson).then(x => setCoupons((x.coupons ?? []).filter((c: any) => c.active))).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   const add = async (e: React.FormEvent) => {

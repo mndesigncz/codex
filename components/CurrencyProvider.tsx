@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { DEFAULT_CURRENCY, formatMoney, makeMoney, currencySymbol } from '@/lib/money';
+import { okJson } from '@/lib/api';
 
 type CurrencyCtx = {
   currency: string;
@@ -39,7 +40,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const d = await fetch('/api/teams').then(r => r.json());
+        const d = await fetch('/api/teams').then(okJson);
         const t = d?.team;
         if (!t || cancelled) return;
         const currency = t.currency || DEFAULT_CURRENCY.currency;
