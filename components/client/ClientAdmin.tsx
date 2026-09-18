@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
-import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, type MenuItem, ErrorBoundary, ErrorState, useLoad, ListRow, Modal } from '../ui';
+import { Button, PageHeader, Segmented, EmptyState, Skeleton, Menu, type MenuItem, ErrorBoundary, ErrorState, useLoad, ListRow, Modal, SearchField } from '../ui';
 import { Initials } from './ClientShell';
 import StaffInbox from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
@@ -596,7 +596,11 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative w-full max-w-sm"><Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40" /><input aria-label="Hledat zákazníka" value={q} onChange={e => setQ(e.target.value)} placeholder="Jméno nebo e-mail" className={`${input} pl-10 rounded-full`} /></div>
+        {/* Sdílené pole: stejný tvar jako jinde, plus poslední hledání
+            a klávesnice. Dřív tu bylo vlastní `<input>` s ikonou nalepenou
+            absolutním pozicováním. */}
+        <SearchField className="w-full max-w-sm" value={q} onChange={setQ}
+          storageKey="hoste" placeholder="Jméno nebo e-mail" ariaLabel="Hledat zákazníka" />
         {d && <p className="text-sm text-black/55 tabular-nums">{d.total} {d.total === 1 ? 'člen' : d.total < 5 ? 'členové' : 'členů'}</p>}
       </div>
       {d === null ? <PageSkel /> : d.customers.length === 0

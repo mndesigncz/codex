@@ -23,15 +23,29 @@ export async function GET() {
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!c.teamId) return NextResponse.json({ announcements: [] });
   try {
-    const rows = await sql`
+    // Připnutá vždycky všechna, odepnutá jen posledních deset.
+    //
+    // Dřív to bylo jedno `ORDER BY created_at DESC LIMIT 10` přes obojí,
+    // takže deset čerstvě odepnutých vzkazů vytlačilo připnuté oznámení,
+    // které má tým pořád vidět — ze správy nástěnky prostě zmizelo.
+    const pinned = await sql`
       SELECT a.id, a.content, a.pinned, a.created_at AS "createdAt",
              u.name AS "authorName", u.avatar AS "authorAvatar"
       FROM announcements a
       LEFT JOIN users u ON u.id = a.author_id
-      WHERE a.team_id = ${c.teamId} AND (a.pinned = TRUE OR ${c.role === 'employer'})
+      WHERE a.team_id = ${c.teamId} AND a.pinned = TRUE
+      ORDER BY a.created_at DESC`;
+    if (c.role !== 'employer') return NextResponse.json({ announcements: pinned });
+
+    const archived = await sql`
+      SELECT a.id, a.content, a.pinned, a.created_at AS "createdAt",
+             u.name AS "authorName", u.avatar AS "authorAvatar"
+      FROM announcements a
+      LEFT JOIN users u ON u.id = a.author_id
+      WHERE a.team_id = ${c.teamId} AND a.pinned = FALSE
       ORDER BY a.created_at DESC
       LIMIT 10`;
-    return NextResponse.json({ announcements: rows });
+    return NextResponse.json({ announcements: [...pinned, ...archived] });
   } catch {
     // table not migrated yet
     return NextResponse.json({ announcements: [] });

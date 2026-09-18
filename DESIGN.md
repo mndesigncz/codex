@@ -230,6 +230,10 @@ klávesnicí. Když se uprostřed psaní musí sáhnout po myši, je to chyba.
   `<body>` znamená, že další Tab začíná od začátku stránky.
 - **Šipky chodí po nabídce.** Menu, řazení a panel oznámení: ↓ ↑ po
   položkách, Home/End na kraje, ↓ na zavřeném tlačítku panel otevře.
+- **Našeptávač s vlastním seznamem výsledků** (`lib/useResultKeys`): ↓ z pole
+  skočí na první výsledek, ↑ z prvního se vrátí do pole, Escape zavře.
+  `SearchField` řeší jen svoje vlastní návrhy; kde si seznam kreslí volající,
+  patří sem tenhle hook.
 - **Co se dá kliknout, musí jít i Tabem.** Nejlépe `<button>`. Když karta
   nese uvnitř další odkazy (a tlačítko v tlačítku je neplatné), použij
   `clickable()` z `lib/clickable` — dá `role="button"`, `tabIndex`
@@ -264,7 +268,19 @@ scrolluje vodorovně uvnitř sebe.
 
 - **Podle čeho je na kartě největší číslo, podle toho musí jít řadit.**
   Nápady ukazují hlasy jako hlavní obsah a řadily se jen podle data, takže
-  nejpodporovanější nápad mohl ležet dole.
+  nejpodporovanější nápad mohl ležet dole. Totéž souhrn docházky: mzda je
+  na kartě, ale řadilo se vždycky jen podle hodin.
+
+## Archiv
+
+Co tým přestal vidět, nemá překážet tomu, kdo to spravuje.
+
+- **Odložené patří pod sbalený `<details>` s počtem**, ne do téhož seznamu
+  jako živé položky.
+- **Limit na serveru nesmí vytlačit to podstatné.** Nástěnka měla jedno
+  `ORDER BY created_at DESC LIMIT 10` přes připnutá i odepnutá, takže deset
+  čerstvě odepnutých vzkazů skrylo připnuté oznámení, které má tým pořád
+  vidět. Připnutá se načítají všechna, odepnutá s limitem.
 
 ## Hromadné akce
 

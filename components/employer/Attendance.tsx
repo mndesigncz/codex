@@ -90,6 +90,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   // Patnáct lidí krát devadesát dní je přes tisíc řádků v jednom stromu
   // a jediné filtrování bylo 7/30/90 dní. Hledání zúží na jednoho člověka.
   const [q, setQ] = useState('');
+  // Souhrn se řadil vždycky podle odpracovaných hodin. Mzda je přitom na
+  // kartě taky a „kdo mě stojí nejvíc" byla otázka, na kterou obrazovka
+  // odpověď měla, ale nešlo se k ní dostat.
+  const [sumSort, setSumSort] = useState<'hours' | 'name' | 'cost'>('hours');
   const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -221,6 +225,16 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     }
     return Array.from(map.values()).sort((a, b) => b.ms - a.ms);
   }, [entries, now]);
+
+  const summarySorted = useMemo(() => {
+    const list = [...summary];
+    if (sumSort === 'name') return list.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    if (sumSort === 'cost') {
+      const costOf = (s: typeof list[number]) => earned(s.ms, rateById.get(s.id) ?? 0);
+      return list.sort((a, b) => costOf(b) - costOf(a));
+    }
+    return list;
+  }, [summary, sumSort, rateById]);
 
   // Gross labor cost over the period (only employees with a rate > 0).
   const laborCost = useMemo(() => {
@@ -436,9 +450,22 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Souhrn hodin */}
           {summary.length > 0 && (
             <div className="space-y-3">
-              <h2 className="t-section">Souhrn hodin</h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="t-section">Souhrn hodin</h2>
+                {summary.length > 2 && (
+                  <div className="ml-auto flex gap-1.5">
+                    {([['hours', 'Nejvíc hodin'], ['cost', 'Nejvíc mzdy'], ['name', 'Podle jména']] as const).map(([id, label]) => (
+                      <button key={id} type="button" onClick={() => setSumSort(id)}
+                        aria-pressed={sumSort === id}
+                        className={`filter-pill ${sumSort === id ? 'seg-on' : 'seg-off glass'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {summary.map(s => {
+                {summarySorted.map(s => {
                   const rate = rateById.get(s.id);
                   return (
                     <div key={s.id} className="glass-card p-4 flex items-center gap-x-3 gap-y-1.5 flex-wrap min-w-0">

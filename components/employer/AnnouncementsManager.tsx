@@ -96,6 +96,42 @@ export default function AnnouncementsManager() {
     }
   };
 
+  const pinned = announcements.filter(a => a.pinned);
+  const unpinned = announcements.filter(a => !a.pinned);
+
+  const row = (a: Announcement) => (
+            <div
+              key={a.id}
+              className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-[#FFD60A]/[0.12] border-[#FFD60A]/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
+            >
+              <span className={`shrink-0 mt-0.5 ${a.pinned ? 'text-[#8A6A00]' : 'text-black/35'}`} aria-hidden>
+                <Icon name={a.pinned ? 'pin' : 'book'} size={17} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-[#16181A] whitespace-pre-wrap break-words">
+                  {a.content}
+                </p>
+                <p className="mt-1 text-[11px] text-black/40 truncate">
+                  {a.authorAvatar ? `${a.authorAvatar} ` : ''}
+                  {a.authorName ?? ''}
+                  {a.authorName ? ' · ' : ''}
+                  {formatDate(a.createdAt)}
+                </p>
+              </div>
+              <div className="shrink-0 flex items-center gap-1">
+                <button type="button" onClick={() => { setEditing(a); setEditText(a.content); }}
+                  aria-label="Upravit" title="Upravit"
+                  className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="pencil" size={15} /></button>
+                <button type="button" onClick={() => patch(a.id, { pinned: !a.pinned })}
+                  aria-label={a.pinned ? 'Odepnout' : 'Připnout'} title={a.pinned ? 'Odepnout (tým ho přestane vidět)' : 'Znovu připnout'}
+                  className={`tap-target-sm w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/[0.06] transition ${a.pinned ? 'text-[#8A6A00]' : 'text-black/40 hover:text-black/70'}`}><Icon name="pin" size={15} /></button>
+                <button type="button" onClick={() => remove(a.id)}
+                  aria-label="Odstranit oznámení"
+                  className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="close" size={15} /></button>
+              </div>
+            </div>
+  );
+
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="min-w-0">
@@ -134,42 +170,31 @@ export default function AnnouncementsManager() {
       </div>
 
       {announcements.length === 0 ? (
-        <p className="text-sm text-black/40">Žádná připnutá oznámení.</p>
+        <p className="text-sm text-black/40">Zatím žádná oznámení.</p>
       ) : (
         <div className="space-y-2">
-          {announcements.map((a) => (
-            <div
-              key={a.id}
-              className={`rounded-3xl px-4 py-3 flex items-start gap-3 min-w-0 border ${a.pinned ? 'bg-[#FFD60A]/[0.12] border-[#FFD60A]/30' : 'bg-black/[0.03] border-black/[0.07] opacity-70'}`}
-            >
-              <span className={`shrink-0 mt-0.5 ${a.pinned ? 'text-[#8A6A00]' : 'text-black/35'}`} aria-hidden>
-                <Icon name={a.pinned ? 'pin' : 'book'} size={17} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-[#16181A] whitespace-pre-wrap break-words">
-                  {a.content}
-                </p>
-                <p className="mt-1 text-[11px] text-black/40 truncate">
-                  {a.authorAvatar ? `${a.authorAvatar} ` : ''}
-                  {a.authorName ?? ''}
-                  {a.authorName ? ' · ' : ''}
-                  {formatDate(a.createdAt)}
-                </p>
-              </div>
-              <div className="shrink-0 flex items-center gap-1">
-                <button type="button" onClick={() => { setEditing(a); setEditText(a.content); }}
-                  aria-label="Upravit" title="Upravit"
-                  className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="pencil" size={15} /></button>
-                <button type="button" onClick={() => patch(a.id, { pinned: !a.pinned })}
-                  aria-label={a.pinned ? 'Odepnout' : 'Připnout'} title={a.pinned ? 'Odepnout (tým ho přestane vidět)' : 'Znovu připnout'}
-                  className={`tap-target-sm w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/[0.06] transition ${a.pinned ? 'text-[#8A6A00]' : 'text-black/40 hover:text-black/70'}`}><Icon name="pin" size={15} /></button>
-                <button type="button" onClick={() => remove(a.id)}
-                  aria-label="Odstranit oznámení"
-                  className="tap-target-sm w-7 h-7 rounded-full flex items-center justify-center text-black/40 hover:text-black/70 hover:bg-black/[0.06] text-sm transition"><Icon name="close" size={15} /></button>
-              </div>
-            </div>
-          ))}
+          {pinned.map(row)}
         </div>
+      )}
+
+      {/* Odepnutá oznámení tým nevidí, ale ležela dál v tomtéž seznamu —
+          po roce provozu z toho byl nekonečný scroll starých vzkazů.
+          Teď jsou sbalená a je vidět jen posledních deset. */}
+      {unpinned.length > 0 && (
+        <details className="group">
+          <summary className="tap-target-sm cursor-pointer list-none inline-flex items-center gap-2 text-sm font-semibold text-black/55 hover:text-black transition">
+            <Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+            Odepnutá ({unpinned.length})
+          </summary>
+          <div className="space-y-2 mt-2">
+            {unpinned.slice(0, 10).map(row)}
+            {unpinned.length > 10 && (
+              <p className="t-meta px-1">
+                Zobrazeno posledních 10 z {unpinned.length}. Starší už tým nevidí; smazat je můžete křížkem.
+              </p>
+            )}
+          </div>
+        </details>
       )}
 
       {editing && (
