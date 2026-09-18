@@ -41,31 +41,44 @@ export interface UploadResult {
 }
 
 export async function fetchConversations(): Promise<Conversation[]> {
-  const res = await fetch('/api/conversations');
-  if (!res.ok) return [];
+  const res = await fetch('/api/conversations').catch(() => null);
+  if (!res || !res.ok) return [];
   const data = await res.json();
   return data.conversations ?? [];
 }
 
 export async function fetchMessages(conversationId: number): Promise<ChatMessage[]> {
-  const res = await fetch(`/api/conversations/${conversationId}/messages`);
-  if (!res.ok) return [];
+  const res = await fetch(`/api/conversations/${conversationId}/messages`).catch(() => null);
+  if (!res || !res.ok) return [];
   const data = await res.json();
   return data.messages ?? [];
 }
 
+/**
+ * Vrací `null`, když se odeslat nepovedlo — a to i při výpadku sítě.
+ *
+ * Dřív `fetch` offline vyhodil výjimku, kterou volající nechytal: text
+ * napsaný v poli se nevrátil zpátky (bylo vymazané optimisticky) a
+ * `setSending(false)` se nikdy neprovedlo, takže tlačítko odeslat zůstalo
+ * natrvalo zašedlé. Okno se muselo zavřít a otevřít, a napsaná zpráva
+ * byla pryč. Volající s `null` počítají, s výjimkou ne.
+ */
 export async function sendMessage(
   conversationId: number,
   payload: { content?: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string },
 ): Promise<ChatMessage | null> {
-  const res = await fetch(`/api/conversations/${conversationId}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.message ?? null;
+  try {
+    const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    return data?.message ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -101,8 +114,10 @@ export async function uploadFile(file: File): Promise<UploadResult | null> {
   const prepared = await compressImage(file);
   const form = new FormData();
   form.append('file', prepared);
-  const res = await fetch('/api/upload', { method: 'POST', body: form });
-  if (!res.ok) return null;
+  // Stejný důvod jako u `sendMessage`: offline `fetch` vyhodí výjimku,
+  // kterou volající nečeká, a nahrávání pak zůstane viset na „Nahrávám…".
+  const res = await fetch('/api/upload', { method: 'POST', body: form }).catch(() => null);
+  if (!res || !res.ok) return null;
   return (await res.json()) as UploadResult;
 }
 

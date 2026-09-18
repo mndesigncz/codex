@@ -191,21 +191,30 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
       done: snapshot.checkedItems.length,
       skipped: snapshot.skippedItems.length,
     });
+    // Konfety jen za to, co se opravdu uložilo.
+    //
+    // Dřív se `res.ok` nekontrolovalo vůbec a `catch` oslavil taky, takže
+    // při chybě serveru nebo výpadku wifi obsluha viděla „Hotovo!", běh se
+    // zavřel — a na serveru nebylo nic. Zavírací postup se tvářil jako
+    // odevzdaný a vedení ho druhý den vidělo jako neudělaný. To je nejhorší
+    // druh chyby: aplikace zapíše do evidence něco, co se nestalo.
     try {
       const res = await fetch('/api/procedures/runs', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ runId: snapshot.id, checkedItems: snapshot.checkedItems, skippedItems: snapshot.skippedItems, skipReasons: snapshot.skipReasons, complete: true }),
       });
-      const data = await res.json();
-      const duration = res.ok && data.run?.duration_seconds != null
+      if (!res.ok) { setSyncFailed(true); return; }
+      const data = await res.json().catch(() => ({} as any));
+      const duration = data.run?.duration_seconds != null
         ? data.run.duration_seconds
         : Math.max(0, Math.round((Date.now() - new Date(snapshot.startedAt).getTime()) / 1000));
+      setSyncFailed(false);
       celebrate(duration);
       setActive(null);
     } catch {
-      celebrate(Math.max(0, Math.round((Date.now() - new Date(snapshot.startedAt).getTime()) / 1000)));
-      setActive(null);
+      // Běh zůstává otevřený, aby šlo zkusit odeslat znovu, až se síť vrátí.
+      setSyncFailed(true);
     }
   }, [active]);
 

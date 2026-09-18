@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, EmptyState } from '../ui';
+import { Avatar, EmptyState, ErrorState } from '../ui';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 
@@ -75,6 +75,8 @@ interface KioskShiftValue {
   onShift: RosterMember[];
   offShift: RosterMember[];
   loading: boolean;
+  /** První načtení rozpisu selhalo — obrazovka nesmí tvrdit, že tým je prázdný. */
+  loadFailed: boolean;
   activeId: number | null;
   active: ActivePerson | null;
   selectPerson: (id: number) => void;
@@ -98,12 +100,28 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   const [punching, setPunching] = useState<RosterMember | null>(null);
   const [flash, setFlash] = useState('');
   const now = useNow();
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const reload = useCallback(async () => {
     try {
-      const d = await fetch('/api/attendance').then(r => r.json());
+      // `res.ok` se musí kontrolovat zvlášť: `fetch` vyhodí výjimku jen
+      // když spojení vůbec nevznikne. Odpověď 500 se doručí úspěšně a bez
+      // téhle kontroly vypadá jako platná data s prázdným rozpisem —
+      // tedy přesně ta tichá lež, kvůli které se tohle opravuje.
+      const res = await fetch('/api/attendance');
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json();
       if (Array.isArray(d.roster)) setRoster(d.roster);
-    } catch { /* offline — keep the last roster on screen */ }
+      setLoadFailed(false);
+    } catch {
+      // Při výpadku necháme na obrazovce poslední známý rozpis — na tabletu
+      // za barem je lepší mít staré jméno než prázdno. Jenomže když selže
+      // hned to první načtení, žádné staré jméno není a obrazovka pak psala
+      // „Zatím tu nikdo není — zaměstnance přidá vedení". To je lež: tým
+      // v aplikaci je, jen k němu tablet nedosáhl, a obsluha místo
+      // zkontrolování wifi volala šéfovi.
+      setLoadFailed(true);
+    }
     setLoading(false);
   }, []);
 
@@ -151,7 +169,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const value: KioskShiftValue = {
-    roster, onShift, offShift, loading, activeId, active,
+    roster, onShift, offShift, loading, loadFailed, activeId, active,
     selectPerson: setActiveId,
     punch: setPunching,
     reload,
@@ -202,13 +220,21 @@ export function KioskShiftGate({ children }: { children: React.ReactNode }) {
 }
 
 function LockScreen() {
-  const { roster, punch } = useKioskShift();
+  const { roster, punch, loadFailed, reload } = useKioskShift();
   const [picking, setPicking] = useState(false);
 
   return (
     <div className="flex-1 flex items-start justify-center pt-10 sm:pt-16 pb-10">
       <div className="glass-card w-full max-w-3xl p-8 sm:p-10 text-center">
-        {!picking ? (
+        {/* Když se rozpis nenačetl, nemá smysl nabízet „Jsem na směně" —
+            výběr osoby by byl prázdný. Místo něj rovnou chyba a opakování. */}
+        {!picking && loadFailed && roster.length === 0 ? (
+          <ErrorState
+            title="Rozpis se nenačetl"
+            hint="Tablet se nedostal na server — zkontroluj připojení. Lidé v týmu tam jsou, jen je odsud teď není vidět."
+            onRetry={() => { void reload(); }}
+          />
+        ) : !picking ? (
           <>
             <div className="mx-auto h-20 w-20 rounded-3xl bg-[#16181A] text-[#C8F542] grid place-items-center">
               <Icon name="clock" size={38} />
@@ -289,6 +315,7 @@ export function WhoIsWorking() {
   const { onShift, offShift, activeId, selectPerson, punch } = useKioskShift();
   const [adding, setAdding] = useState(false);
   const now = useNow();
+  const [loadFailed, setLoadFailed] = useState(false);
 
   return (
     <section className="glass-card p-4 sm:p-5">

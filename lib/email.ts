@@ -8,10 +8,10 @@ export async function sendInvitationEmail(to: string, name: string, tempPassword
   await getResend().emails.send({
     from: 'Managero <onboarding@resend.dev>',
     to,
-    subject: 'Vítejte v Managero! 🍵',
+    subject: 'Vítejte v Managero',
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; background: #0D0D0D; color: white; border-radius: 16px;">
-        <h1 style="color: #30D158; font-size: 28px;">Vítejte, ${name}! 🍵</h1>
+        <h1 style="color: #30D158; font-size: 28px;">Vítejte, ${name}!</h1>
         <p style="color: rgba(235,235,245,0.6);">Byli jste přidáni do systému Managero.</p>
         <div style="background: #1C1C1E; border-radius: 12px; padding: 20px; margin: 24px 0;">
           <p style="margin: 0; color: rgba(235,235,245,0.6); font-size: 14px;">Přihlašovací email</p>
@@ -30,7 +30,7 @@ export async function sendTeamInvitation(to: string, teamName: string, inviterNa
   await getResend().emails.send({
     from: 'Managero <onboarding@resend.dev>',
     to,
-    subject: `Pozvánka do týmu ${teamName} 🍵`,
+    subject: `Pozvánka do týmu ${teamName}`,
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; background: #0A0A0C; color: white; border-radius: 20px;">
         <h1 style="color: #C8F542; font-size: 26px;">Pozvánka do týmu</h1>

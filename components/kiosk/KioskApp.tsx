@@ -5,7 +5,7 @@ import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
-import { Avatar } from '../ui';
+import { Avatar, Modal, Button } from '../ui';
 import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
@@ -61,6 +61,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 function KioskShell({ user }: { user: KioskUser }) {
   const { active } = useKioskShift();
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('shift');
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   // Počet nových objednávek od stolu do záložky — tablet na baru je první, kdo je má vidět.
   const inbox = useStaffInbox(true);
   const newOrders = Number(inbox.d?.newCount ?? 0);
@@ -97,7 +98,10 @@ function KioskShell({ user }: { user: KioskUser }) {
         <div className="flex items-center gap-3 flex-wrap justify-end">
           <ActivePersonChip />
           <p className="text-3xl font-bold tracking-tight text-[#16181A] tabular-nums leading-none">{clock}</p>
-          <button onClick={() => signOut({ callbackUrl: '/login' })} title="Odhlásit tablet"
+          {/* Odhlášení tabletu je pro obsluhu slepá ulička: e-mail ani heslo
+              zařízení nikdo z baru nezná, takže jedno ťuknutí znamená tablet
+              mimo provoz do příchodu vedení. Proto se ptáme. */}
+          <button type="button" onClick={() => setConfirmSignOut(true)} title="Odhlásit tablet"
             className="rounded-full glass border border-black/10 w-11 h-11 flex items-center justify-center text-black/45 hover:text-black transition shrink-0">
             <Icon name="logout" size={20} />
           </button>
@@ -150,6 +154,18 @@ function KioskShell({ user }: { user: KioskUser }) {
       )}
 
       <MessengerDock user={kioskUser} />
+
+      <Modal open={confirmSignOut} onClose={() => setConfirmSignOut(false)} size="sm"
+        title="Odhlásit tablet?"
+        subtitle="Zařízení se vrátí na přihlašovací obrazovku a bude potřeba e-mail a heslo tabletového účtu. Odpíchnout se odsud do té doby nepůjde."
+        footer={<>
+          <Button variant="secondary" onClick={() => setConfirmSignOut(false)}>Zrušit</Button>
+          <Button variant="primary" icon="logout" onClick={() => signOut({ callbackUrl: '/login' })}>Odhlásit tablet</Button>
+        </>}>
+        <p className="t-meta text-pretty">
+          Tohle není konec směny — na ten je tlačítko u jména nahoře.
+        </p>
+      </Modal>
     </div>
   );
 }
