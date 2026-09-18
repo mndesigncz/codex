@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, Segmented, Modal } from '../ui';
+import { Button, PageHeader, Segmented, Modal, SearchField } from '../ui';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol, useCurrency } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -87,6 +87,9 @@ function fmtTime(iso: string): string {
 export default function Attendance({ user: _user }: { user: { id?: string | number } }) {
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  // Patnáct lidí krát devadesát dní je přes tisíc řádků v jednom stromu
+  // a jediné filtrování bylo 7/30/90 dní. Hledání zúží na jednoho člověka.
+  const [q, setQ] = useState('');
   const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -247,9 +250,15 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const hasRates = rateById.size > 0;
 
   // Group entries by calendar day (newest first — API already sorts DESC).
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return entries;
+    return entries.filter(e => (e.employeeName ?? '').toLowerCase().includes(needle));
+  }, [entries, q]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, Entry[]>();
-    for (const e of entries) {
+    for (const e of shown) {
       const d = new Date(e.clockIn);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       const arr = map.get(key);
@@ -261,7 +270,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       label: new Date(list[0].clockIn).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }),
       list,
     }));
-  }, [entries]);
+  }, [shown]);
 
   // A shift open longer than 12 h is almost certainly a forgotten clock-out.
   const STALE_MS = 12 * 3600 * 1000;
@@ -458,10 +467,22 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
           {/* Seznam záznamů */}
           <div className="space-y-3">
-            <h2 className="t-section">Záznamy ({entries.length})</h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="t-section">
+                Záznamy ({shown.length}{q.trim() && shown.length !== entries.length ? ` z ${entries.length}` : ''})
+              </h2>
+              {entries.length > 10 && (
+                <SearchField className="ml-auto min-w-[14rem] flex-1 max-w-sm" value={q} onChange={setQ}
+                  storageKey="dochazka" placeholder="Hledat zaměstnance…" ariaLabel="Hledat zaměstnance v docházce" />
+              )}
+            </div>
             {entries.length === 0 ? (
               <div className="glass-card p-8 text-center">
                 <p className="text-black/45">Za zvolené období nejsou žádné záznamy docházky.</p>
+              </div>
+            ) : shown.length === 0 ? (
+              <div className="glass-card p-8 text-center">
+                <p className="text-black/45">Nikdo takový v tomhle období nic neodpíchl.</p>
               </div>
             ) : (
               grouped.map(g => (

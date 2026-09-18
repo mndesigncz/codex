@@ -21,6 +21,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference } from '@/lib/closing';
+import { czCount } from '@/lib/czech';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -372,7 +373,7 @@ export async function GET(req: NextRequest) {
   // Čeština skloňuje podle počtu: 1 minuta, 2–4 minuty, 5+ minut. „1 minut"
   // v jinak pečlivém textu okamžitě prozradí, že ho psal stroj.
   const plural = (n: number, one: string, few: string, many: string) =>
-    `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
+    czCount(n, { one, few, many });
   const workedLabel = workedMin >= 60
     ? plural(Math.round(workedMin / 60), 'hodina', 'hodiny', 'hodin')
     : plural(Math.round(workedMin), 'minuta', 'minuty', 'minut');

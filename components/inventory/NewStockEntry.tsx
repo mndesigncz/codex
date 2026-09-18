@@ -47,7 +47,11 @@ export default function NewStockEntry({
   const [more, setMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  // Kolik věcí se v tomhle sezení zapsalo — po „Uložit a přidat další"
+  // zůstává formulář otevřený a tohle je jediné potvrzení, že to prošlo.
+  const [added, setAdded] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch('/api/inventory/categories').then(r => r.json())
@@ -93,7 +97,14 @@ export default function NewStockEntry({
   const bump = (by: number) =>
     setQuantity(q => String(Math.max(0, Math.round((dec(q) + by) * 1000) / 1000)));
 
-  const save = async () => {
+  /**
+   * `keepOpen` = naskladňuje se dodávka.
+   *
+   * Osm položek z jedné bedny znamenalo osmkrát otevřít formulář a osmkrát
+   * znovu vybrat kategorii, jednotku a dodavatele — přitom se mění jen
+   * název a množství. Tohle nechá to společné na místě a vyprázdní zbytek.
+   */
+  const save = async (keepOpen = false) => {
     if (!name.trim()) { setErr('Napiš, co to je.'); return; }
     setSaving(true); setErr('');
     const cat = flat.find(f => f.cat.id === categoryId)?.cat as any;
@@ -120,6 +131,17 @@ export default function NewStockEntry({
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(d.error || 'Zápis se nepodařilo uložit.'); setSaving(false); return; }
+      if (keepOpen) {
+        setAdded(prev => [...prev, name.trim()]);
+        // Kategorie, jednotka, dodavatel a značka zůstávají — z jedné bedny
+        // se vyndává víc věcí téhož druhu.
+        setName(''); setQuantity('1'); setPhotoUrl(null); setNote('');
+        setPackageSize(''); setUnitCost('');
+        setSaving(false);
+        // Kurzor zpátky na název, ať se dá rovnou psát.
+        requestAnimationFrame(() => nameRef.current?.focus());
+        return;
+      }
       onSaved?.();
     } catch { setErr('Zápis se nepodařilo uložit — zkontroluj připojení.'); }
     setSaving(false);
@@ -133,7 +155,7 @@ export default function NewStockEntry({
   return (
     // Naskladnění se vyplňuje jednou rukou u regálu; Enter po posledním poli
     // musí položku zapsat, ne čekat, až se trefíš do tlačítka.
-    <form onSubmit={e => { e.preventDefault(); if (!saving && !uploading && name.trim()) save(); }}
+    <form onSubmit={e => { e.preventDefault(); if (!saving && !uploading && name.trim()) save(false); }}
       className={`space-y-${big ? '5' : '4'}`}>
       {/* What it is — photo first, because a picture beats a description of a
           bottle nobody at the office has seen. */}
@@ -152,7 +174,7 @@ export default function NewStockEntry({
         </button>
         <div className="min-w-0 flex-1">
           <label className={label}>Co to je?</label>
-          <input value={name} onChange={e => setName(e.target.value)} autoFocus
+          <input ref={nameRef} value={name} onChange={e => setName(e.target.value)} autoFocus
             placeholder="Např. Sirup Mango 0,7 l" className={field} />
         </div>
       </div>
@@ -243,11 +265,25 @@ export default function NewStockEntry({
 
       {err && <p className={`text-red-600 ${big ? 'text-base' : 'text-sm'}`}>{err}</p>}
 
-      <div className="flex items-center gap-2">
+      {added.length > 0 && (
+        <p className="note note-ok text-sm">
+          <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5" />
+          Zapsáno {added.length === 1 ? '' : `${added.length}×`}: {added.slice(-3).reverse().join(', ')}
+          {added.length > 3 ? ` a ${added.length - 3} další` : ''}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => save(true)} disabled={saving || uploading || !name.trim()}
+          title="Uloží a nechá kategorii, jednotku i dodavatele nastavené"
+          className={`rounded-full glass border border-black/10 text-[#16181A] font-semibold hover:bg-black/[0.05] disabled:opacity-40 transition ${
+            big ? 'px-6 py-4 text-lg' : 'px-4 py-3 text-sm'}`}>
+          <Icon name="plus" size={15} className="inline -mt-0.5 mr-1.5" />Uložit a přidat další
+        </button>
         <button type="submit" disabled={saving || uploading || !name.trim()}
-          className={`flex-1 rounded-full bg-[#16181A] text-white font-bold hover:bg-black disabled:opacity-40 transition ${
+          className={`flex-1 min-w-[10rem] rounded-full bg-[#16181A] text-white font-bold hover:bg-black disabled:opacity-40 transition ${
             big ? 'px-6 py-4 text-lg' : 'px-5 py-3 text-sm'}`}>
-          {saving ? 'Zapisuji…' : 'Zapsat do skladu'}
+          {saving ? 'Zapisuji…' : added.length > 0 ? 'Zapsat a zavřít' : 'Zapsat do skladu'}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} disabled={saving}

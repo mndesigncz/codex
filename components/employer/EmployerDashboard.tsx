@@ -15,6 +15,7 @@ import { DashboardEditor, LinkTile } from '../DashboardEditor';
 import { pragueToday, dbTimeHM } from '@/lib/pragueTime';
 import { greeting } from '@/lib/greeting';
 import { Avatar } from '../ui';
+import { czForm } from '@/lib/czech';
 
 // Everything past `rating` is an optional enrichment of the roster response —
 // rendered only when the API sends it, so the row degrades to name + shift.
@@ -25,7 +26,7 @@ interface RosterEntry {
   closingFiled?: boolean; tasksDone?: number; tasksMissed?: number; stepsSkipped?: number;
 }
 
-const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
+const plural = (n: number, one: string, few: string, many: string) => czForm(n, { one, few, many });
 const hhmm = (t?: string | null) => (t ? String(t).slice(0, 5) : '');
 
 // Compact "what happened on this shift" line, built from whatever the roster

@@ -20,6 +20,7 @@ import EventsView from '../employer/EventsView';
 import { levelFor } from '@/lib/clientSlots';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { dbTimeDayHM } from '@/lib/pragueTime';
+import { czCount } from '@/lib/czech';
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -799,7 +800,7 @@ function Reviews() {
         <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-start">
           <div className="glass-card p-5 min-w-[14rem]">
             <p className="text-4xl font-bold tabular-nums leading-none">{d.avg ?? '–'}<span className="text-base font-medium text-black/45"> / 5</span></p>
-            <p className="text-xs text-black/55 mt-1">{d.count} {d.count === 1 ? 'hodnocení' : 'hodnocení'}</p>
+            <p className="text-xs text-black/55 mt-1">{d.count} hodnocení</p>
             <ul className="mt-4 space-y-1">
               {[5, 4, 3, 2, 1].map(n => (
                 <li key={n} className="flex items-center gap-2 text-xs tabular-nums"><span className="w-3 text-black/55">{n}</span><span className="on-accent">★</span><span className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full bg-[#C8F542]" style={{ width: `${(d.dist[n - 1] / max) * 100}%` }} /></span><span className="w-6 text-right text-black/55">{d.dist[n - 1]}</span></li>
@@ -890,7 +891,9 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
           </div>
           <p className="text-xs text-black/50">Zpráva se objeví i v Novinkách na tvé stránce pro hosty. Naplánovaná odejde ve svůj čas a do té doby jde zrušit.</p>
           <Button type="submit" variant="accent" icon="send" loading={busy} disabled={!target}>
-            {planned ? `Naplánovat pro ${target} ${target === 1 ? 'člena' : 'členů'}` : `Poslat ${target} ${target === 1 ? 'členovi' : 'členům'}`}
+            {planned
+              ? `Naplánovat pro ${czCount(target, { one: 'člena', few: 'členy', many: 'členů' })}`
+              : `Poslat ${czCount(target, { one: 'členovi', few: 'členům', many: 'členům' })}`}
           </Button>
         </form>
         <section>

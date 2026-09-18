@@ -23,6 +23,9 @@ import ProductionBoard from '../inventory/ProductionBoard';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useModal } from '@/lib/useModal';
 import { usePopover } from '@/lib/usePopover';
+import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
+
+const pluralPolozka = (n: number) => czForm(n, POLOZKA);
 
 interface Item {
   id: number;
@@ -130,9 +133,6 @@ function suggestedAmount(i: Item): number {
   return Math.max(1, Math.max(0, base), Math.ceil(forMaking));
 }
 
-function plural(n: number) {
-  return n === 1 ? 'položka' : n >= 2 && n <= 4 ? 'položky' : 'položek';
-}
 
 function relTime(iso?: string) {
   if (!iso) return '';
@@ -611,7 +611,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       }
       const d = await res.json().catch(() => ({}));
       await load();
-      showNotice(`Upraveno ${d.count ?? ids.length} ${plural(d.count ?? ids.length)} ✓`);
+      showNotice(`Upraveno ${d.count ?? ids.length} ${pluralPolozka(d.count ?? ids.length)} ✓`);
       return true;
     } catch {
       showNotice('Nepodařilo se spojit se serverem.');
@@ -622,7 +622,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const bulkDelete = async () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!confirm(`Smazat ${ids.length} ${plural(ids.length)}? Tohle nejde vrátit.`)) return;
+    if (!confirm(`Smazat ${ids.length} ${pluralPolozka(ids.length)}? Tohle nejde vrátit.`)) return;
     try {
       const res = await fetch('/api/inventory/bulk', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
@@ -631,7 +631,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       if (res.ok) {
         setItems(prev => prev.filter(x => !selected.has(x.id)));
         exitSelection();
-        showNotice(`Smazáno ${ids.length} ${plural(ids.length)}`);
+        showNotice(`Smazáno ${ids.length} ${pluralPolozka(ids.length)}`);
       } else showNotice('Smazání se nepodařilo.');
     } catch { showNotice('Nepodařilo se spojit se serverem.'); }
   };
@@ -1468,7 +1468,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="t-card">Hromadná úprava</h3>
-            <p className="text-xs text-black/45">Změní se {count} {plural(count)} — jen zaškrtnutá pole.</p>
+            <p className="text-xs text-black/45">Změní se {count} {pluralPolozka(count)} — jen zaškrtnutá pole.</p>
           </div>
           <button onClick={onClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
@@ -1519,7 +1519,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
           <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Zrušit</button>
           <button onClick={apply} disabled={busy || chosen.length === 0}
             className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
-            {busy ? 'Ukládám…' : `Použít na ${count} ${plural(count)}`}
+            {busy ? 'Ukládám…' : `Použít na ${count} ${pluralPolozka(count)}`}
           </button>
         </div>
       </div>
@@ -1865,7 +1865,7 @@ function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
       if (res.ok) {
         const data = await res.json().catch(() => null);
         const n = typeof data?.restocked === 'number' ? data.restocked : o.items.length;
-        notify(`Naskladněno ${n} ${n === 1 ? 'položka' : n >= 2 && n <= 4 ? 'položky' : 'položek'} ✓`);
+        notify(`Naskladněno ${czCount(n, POLOZKA)}`);
         setReceivingId(null);
         setCostInput('');
         await Promise.all([refreshOrders(), refreshItems()]);
@@ -2338,7 +2338,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
   const del = async (c: Category) => {
     const kids = categories.filter(x => x.parentId === c.id).length;
-    const extra = kids > 0 ? ` ${kids} ${kids === 1 ? 'podkategorie se přesune' : 'podkategorií se přesune'} na hlavní úroveň.` : '';
+    const extra = kids > 0 ? ` ${czCount(kids, { one: 'podkategorie', few: 'podkategorie', many: 'podkategorií' })} se ${czVerb(kids, 'přesune', 'přesunou')} na hlavní úroveň.` : '';
     if (!confirm(`Smazat kategorii „${c.name}"? Položky si svůj štítek ponechají.${extra}`)) return;
     setBusy(true); setErr('');
     try {

@@ -13,6 +13,7 @@ import {
   type MenuTheme, VYCHOZI_THEME, PREDLOHY, PISMA, normalizeMenuTheme,
 } from '@/lib/menuTheme';
 import { PageHeader } from '../ui';
+import { czCount } from '@/lib/czech';
 
 interface Item {
   id?: number;
@@ -450,7 +451,7 @@ export default function MenuEditor() {
                 <p className="mt-1.5 text-sm font-bold text-[#16181A] truncate">{b.name}</p>
                 <p className="text-[11px] text-black/40 truncate">/{b.slug}</p>
                 <p className="text-[11px] text-black/45 mt-1 tabular-nums">
-                  {sekci} {sekci === 1 ? 'sekce' : sekci >= 2 && sekci <= 4 ? 'sekce' : 'sekcí'} · {polozek} pol.
+                  {czCount(sekci, { one: 'sekce', few: 'sekce', many: 'sekcí' })} · {polozek} pol.
                 </p>
               </button>
             );

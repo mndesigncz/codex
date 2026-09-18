@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { sql, employer, ensureProfile } from '@/lib/client';
 import { getConnection, listDesks, tableOrderState, StoryousError } from '@/lib/storyous';
+import { czCount } from '@/lib/czech';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -118,7 +119,7 @@ export async function GET() {
     if (n > 0 || z > 0) {
       kroky.push({
         krok: 'Objednávky v pokladně', ok: false,
-        detail: `Za posledních sedm dní ${n ? `${n} ${n === 1 ? 'objednávka visí' : 'objednávek visí'} v pokladně nepřijatých` : ''}${n && z ? ' a ' : ''}${z ? `${z} ${z === 1 ? 'objednávku' : 'objednávek'} pokladna sama odmítla` : ''}. Posíláme je s příznakem „potvrdit automaticky", který se podle dokumentace Storyous uplatní ve chvíli, kdy objednávka dorazí do pokladny. Že zůstávají nepřijaté, znamená, že se k terminálu nedostaly.`,
+        detail: `Za posledních sedm dní ${n ? `${czCount(n, { one: 'objednávka', few: 'objednávky', many: 'objednávek' })} visí v pokladně nepřijatých` : ''}${n && z ? ' a ' : ''}${z ? `${czCount(z, { one: 'objednávku', few: 'objednávky', many: 'objednávek' })} pokladna sama odmítla` : ''}. Posíláme je s příznakem „potvrdit automaticky", který se podle dokumentace Storyous uplatní ve chvíli, kdy objednávka dorazí do pokladny. Že zůstávají nepřijaté, znamená, že se k terminálu nedostaly.`,
         kde: 'Tohle appka nespraví. Napiš podpoře Storyous, ať pro provozovnu zapne příjem objednávek přes Delivery API do pokladny.',
       });
     }

@@ -77,3 +77,6 @@ jobs:
       # by uložilo místo zahození.
       - name: Formuláře
         run: node scripts/check-forms.mjs
+      # Po číslovce má čeština tři tvary: 1 položka, 2–4 položky, 5+ položek.
+      - name: Skloňování
+        run: node scripts/check-czech.mjs

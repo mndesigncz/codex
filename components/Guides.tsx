@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from './Icons';
-import { EmptyState, Button, PageHeader , SearchField } from './ui';
+import { EmptyState, Button, PageHeader , SearchField, ApproveAllBar, runBulk } from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
@@ -123,9 +123,12 @@ function renderInline(text: string) {
 
 export default function Guides({ user }: { user: User }) {
   const isEmployer = user.role === 'employer';
+  const [approvingAll, setApprovingAll] = useState(false);
+  const [approveNote, setApproveNote] = useState('');
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [guides, setGuides] = useState<GuideSummary[]>([]);
+  const pendingGuides = guides.filter(g => g.approved === false);
   const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -144,6 +147,14 @@ export default function Guides({ user }: { user: User }) {
     const d = await r.json();
     if (Array.isArray(d.categories)) setCategories(d.categories);
   }, []);
+
+  const approveGuide = async (id: number) => {
+    const res = await fetch(`/api/guides/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approve: true }),
+    });
+    if (!res.ok) throw new Error('nepovedlo se');
+  };
 
   const loadGuides = useCallback(async () => {
     const r = await fetch('/api/guides');
@@ -325,6 +336,23 @@ export default function Guides({ user }: { user: User }) {
               suggestions={categories.map(c => ({ label: c.name, hint: 'kategorie' }))} />
           </div>
 
+          {/* Návrhy od týmu přicházejí po vlnách — po zaškolení jich leží
+              pět naráz a každý se schvaloval zvlášť, s překreslením mřížky
+              po každém kliknutí (karty pod prstem odskakovaly). */}
+          {isEmployer && (
+            <div className="mb-5">
+              <ApproveAllBar count={pendingGuides.length} noun={{ one: 'návod', few: 'návody', many: 'návodů' }} busy={approvingAll} note={approveNote}
+                onApproveAll={async () => {
+                  if (!confirm(`Schválit všech ${pendingGuides.length} návrhů návodů?`)) return;
+                  setApprovingAll(true); setApproveNote('');
+                  const { failed } = await runBulk(pendingGuides.map(g => g.id), approveGuide);
+                  await loadGuides();
+                  setApprovingAll(false);
+                  if (failed.length) setApproveNote(`${failed.length} se neuložilo`);
+                }} />
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center h-48">
               <div className="spinner" />
@@ -359,13 +387,10 @@ export default function Guides({ user }: { user: User }) {
                             <span className="rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">Čeká na schválení</span>
                             {isEmployer && (
                               <button
+                                type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  const res = await fetch(`/api/guides/${g.id}`, {
-                                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ approve: true }),
-                                  }).catch(() => null);
-                                  if (res?.ok) await loadGuides();
+                                  try { await approveGuide(g.id); await loadGuides(); } catch { /* ignore */ }
                                 }}
                                 className="btn btn-primary btn-sm transition whitespace-nowrap">
                                 Schválit

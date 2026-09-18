@@ -217,6 +217,10 @@ otevřít.
 Aplikace se ovládá u pultu jednou rukou, ale ve vedení na notebooku
 klávesnicí. Když se uprostřed psaní musí sáhnout po myši, je to chyba.
 
+- **Co se vyplňuje opakovaně, drží kontext.** Naskladnění osmi věcí
+  z jedné bedny nesmí být osmkrát totéž nastavení: „Uložit a přidat další"
+  nechá kategorii, jednotku i dodavatele a vyprázdní jen název a množství.
+  Že se to opravdu uložilo, řekne řádek nad tlačítky.
 - **Enter odesílá formulář.** Dialog s poli je `<form onSubmit>`, ne `<div>`
   s tlačítkem na `onClick`. Uvnitř `<form>` má každé tlačítko napsáno, čím
   je (`type="submit"` / `type="button"`) — jinak „Zrušit" formulář odešle.
@@ -255,12 +259,27 @@ vyřídit víc řádků najednou. Po sezóně dovolených leží ve frontě dvac
   seznamu a zakrývá řádky.
 - **„Vybrat víc" se ukáže, až když je co vybírat** — u jednoho řádku je
   výběr práce navíc.
+- **Mřížka karet výběr nechce.** Návody a postupy dostanou místo něj pruh
+  `ApproveAllBar` nad mřížkou („3 návody čekají · Schválit vše"), protože
+  zaškrtávátko na kartě je nemotorné a schvaluje se stejně všechno naráz.
 - **Ve výběru zmizí akce u řádků.** Dvě cesty k téže věci na jedné
   obrazovce jsou o jednu moc.
 - **Jedna limetková akce i na liště.** Zbytek jsou tlumené pilulky,
   destruktivní až za nimi a červeně.
 - **Požadavky jdou naráz, ne za sebou** (`runBulk`), a co se nepovede, se
   řekne: „3 z 12 se neuložilo" je jiná zpráva než „hotovo".
+
+## Čeština po číslovce
+
+Tři tvary, ne dva: **1 položka · 2–4 položky · 5+ položek**. Totéž sloveso:
+„3 návody čekají", ale „5 návodů čeká". Angličtina si vystačí s jedním „s",
+takže se ten rozdíl v kódu snadno ztratí — a vzniknou věty jako
+„3 návodů čeká", které by rukou nenapsal nikdo.
+
+- **Pravidlo je v `lib/czech`** (`czForm`, `czCount`, `czVerb`), ne opsané
+  v komponentě. Hlídá `check-czech`.
+- **Dva tvary stačí, když u nich není číslo.** „Dokonči povinné postupy"
+  je správně pro dva i pro pět; „2 postupů" ne.
 
 ## Anti-vzory (zdejší zákazy)
 
@@ -271,4 +290,4 @@ na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod
 `transition: all`; `ease-in` na UI; hover efekt bez `hover: hover`;
 blur mimo plovoucí lištu, dock a topbar; `<div onClick>` bez `role`
 a `tabIndex`; tlačítko bez `type` uvnitř `<form>`; tiše oříznutý seznam; fronta
-ke schválení, kde jde schvalovat jen po jednom.
+ke schválení, kde jde schvalovat jen po jednom; dva tvary po číslovce.

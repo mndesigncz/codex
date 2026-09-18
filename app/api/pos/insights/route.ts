@@ -14,6 +14,7 @@ import { getConnection } from '@/lib/storyous';
 import { billsOfDays } from '@/lib/posMirror';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
+import { czCount } from '@/lib/czech';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -227,7 +228,7 @@ export async function GET(req: NextRequest) {
       const w = off[0];
       reconcileInsights.push({
         icon: 'warning', tone: Math.abs(w.diff as number) > 500 ? 'warn' : 'info',
-        title: `${off.length} ${off.length === 1 ? 'den nesedí' : 'dní nesedí'} s pokladnou`,
+        title: `${czCount(off.length, { one: 'den', few: 'dny', many: 'dní' })} nesedí s pokladnou`,
         text: `Největší rozdíl ${csDate(w.day)}: uzávěrka ${(w.declared ?? 0).toLocaleString('cs-CZ')} Kč proti ${(w.posTotal ?? 0).toLocaleString('cs-CZ')} Kč z kasy${w.people ? ` (${w.people})` : ''}. Nejčastěji překlep v uzávěrce nebo platba, která se do kasy nedostala.`,
       });
     }

@@ -6,6 +6,7 @@ import { useMoney } from '../CurrencyProvider';
 import { normalizePoints } from '@/lib/rewardLevels';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { czForm } from '@/lib/czech';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -44,7 +45,7 @@ export interface Summary {
 
 const todayStr = () => pragueToday();
 const inputCls = 'field';
-const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
+const plural = (n: number, one: string, few: string, many: string) => czForm(n, { one, few, many });
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
 
 function StarPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {

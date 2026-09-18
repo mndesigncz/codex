@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
-import { EmptyState, PageHeader } from './ui';
+import { EmptyState, PageHeader, SearchField } from './ui';
 import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
@@ -105,6 +105,15 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   // Per-member editing
   const [editMemberId, setEditMemberId] = useState<number | null>(null);
+  const [memberQ, setMemberQ] = useState('');
+  const shownMembers = (() => {
+    const q = memberQ.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter(m =>
+      (m.name ?? '').toLowerCase().includes(q) ||
+      (m.email ?? '').toLowerCase().includes(q) ||
+      ((m as any).jobTitle ?? '').toLowerCase().includes(q));
+  })();
   const [editRole, setEditRole] = useState<string>('employee');
   const [editJob, setEditJob] = useState<string>('');
   const [editRate, setEditRate] = useState<string>('');
@@ -630,8 +639,17 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         <div className="t-label flex items-center gap-2">
           <Icon name="users" size={16} /> Členové týmu ({members.length})
         </div>
+        {/* Nad deset lidí se v seznamu hledalo Ctrl+F v prohlížeči — každý
+            řádek přitom nese editaci role, pozice i sazby. */}
+        {members.length > 8 && (
+          <SearchField value={memberQ} onChange={setMemberQ} storageKey="tym"
+            placeholder="Hledat člena — jméno, pozice…" ariaLabel="Hledat člena týmu" />
+        )}
         <div className="divide-y divide-black/[0.06]">
-          {members.map(m => {
+          {shownMembers.length === 0 && (
+            <p className="py-6 text-center text-sm text-black/45">Nikdo neodpovídá hledání.</p>
+          )}
+          {shownMembers.map(m => {
             const owner = m.id === team.owner_id;
             const editing = editMemberId === m.id;
             return (

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../Icons';
 import { useCurrency, useMoney } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
+import { czCount } from '@/lib/czech';
 
 type Person = { id: number; name: string; avatar: string | null; hadClosing?: boolean };
 type Day = {
@@ -119,7 +120,7 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
       </div>
 
       <p className="text-center text-[11px] text-black/45 mb-3 tabular-nums">
-        {doneCount} {doneCount === 1 ? 'uzávěrka' : doneCount >= 2 && doneCount <= 4 ? 'uzávěrky' : 'uzávěrek'}
+        {czCount(doneCount, { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' })}
         {missingCount > 0 && <span className="text-red-600 font-semibold"> · {missingCount} chybí</span>}
         {monthRevenue > 0 && <span> · tržba {money(monthRevenue)}</span>}
       </p>
