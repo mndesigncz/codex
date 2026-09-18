@@ -247,6 +247,25 @@ Strop kvůli výkonu je v pořádku. Tichý strop není.
 - **Výběr se pozná z nadpisu.** „Hotové — posledních 20", ne „Hotové (20)":
   počet po oříznutí vypadá jako úplný.
 
+## Filtrovací pás
+
+Stav, měsíc, člověk — vodorovný pás pilulek nad seznamem, na úzké obrazovce
+scrolluje vodorovně uvnitř sebe.
+
+- **`.filter-pill`** + `.seg-on` / `.seg-off glass`. Tvar byl opsaný
+  v každé obrazovce zvlášť jako `px-4 py-2 rounded-full text-xs …`.
+- **Pilulka nese počet** (`Eva · 3`), aby šlo poznat, kam má cenu klikat.
+- **Druhý klik na tutéž pilulku filtr zruší.** Bez toho se člověk musí
+  trefit do „Všichni", což na telefonu znamená doscrollovat pás zpátky.
+- **Ukáže se, až když je co filtrovat.** Jeden člověk, jeden měsíc,
+  jeden stav — pás je pak jen řádek navíc.
+
+## Řazení
+
+- **Podle čeho je na kartě největší číslo, podle toho musí jít řadit.**
+  Nápady ukazují hlasy jako hlavní obsah a řadily se jen podle data, takže
+  nejpodporovanější nápad mohl ležet dole.
+
 ## Hromadné akce
 
 Když má obrazovka frontu a u každého řádku stejné tlačítko, musí jít

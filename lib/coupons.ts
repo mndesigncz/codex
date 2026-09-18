@@ -133,6 +133,7 @@ export async function claimBlocker(
     const [st] = await sql`
       SELECT COUNT(*)::int AS taken, MAX(claimed_at) AS last FROM client_coupon_claims
       WHERE coupon_id = ${c.id} AND customer_id = ${customerId}`;
+    // czech-ok: „×“ se nesklňuje, tvar zůstává stejný pro všechny počty.
     if (per > 0 && Number(st?.taken ?? 0) >= per) return per === 1 ? 'Tenhle kupon jde vzít jen jednou.' : `Kupon jde vzít nejvýš ${per}×.`;
     if (cd > 0 && st?.last) {
       const since = (Date.now() - new Date(st.last).getTime()) / 86400000;

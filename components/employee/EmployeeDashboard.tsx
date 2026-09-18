@@ -10,6 +10,7 @@ import ProductionBoard from '../inventory/ProductionBoard';
 import { readLayout, EMPLOYEE_WIDGETS } from '@/lib/dashboardWidgets';
 import { LinkTile } from '../DashboardEditor';
 import { pragueToday, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
+import { czCount } from '@/lib/czech';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
@@ -302,7 +303,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] shrink-0"><Icon name="trend" size={18} /></span>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[#16181A]">
-                      {closingsDue.length === 1 ? 'Vyplň uzávěrku ze své směny' : `Máš ${closingsDue.length} neuzavřené směny`}
+                      {closingsDue.length === 1 ? 'Vyplň uzávěrku ze své směny' : `Máš ${czCount(closingsDue.length, { one: 'neuzavřenou směnu', few: 'neuzavřené směny', many: 'neuzavřených směn' })}`}
                     </p>
                     <p className="text-sm text-[#5B7A08]">Spočítej kasu a odešli uzávěrku — vedení ji uvidí hned.</p>
                   </div>

@@ -205,6 +205,7 @@ function MyRewardsInner() {
             <div className="flex-1 min-w-0">
               <p className="font-bold tracking-tight text-[#16181A]">Něco je potřeba napravit</p>
               <p className="text-sm text-black/60 mt-0.5">
+        {/* czech-ok: po předložce „u“ je 2. pád stejný pro 2–4 i 5+. */}
                 {unseenFlagged === 1 ? 'U jedné z tvých směn' : `U ${unseenFlagged} tvých směn`} vedení označilo něco k nápravě. Přečti si poznámky níže.
               </p>
               <button onClick={acknowledge} disabled={acking}

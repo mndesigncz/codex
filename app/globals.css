@@ -191,6 +191,16 @@ body::after {
 .seg-on  { background: var(--ink); color: #fff; }
 .seg-off { color: rgba(22,24,26,0.55); }
 @media (hover: hover) { .seg-off:hover { color: var(--ink); background: rgba(22,24,26,0.05); } }
+/* Pilulka ve filtrovacím pásu (stav, měsíc, člověk). Tvar byl opsaný
+   v každé obrazovce zvlášť jako `px-4 py-2 rounded-full text-xs …`; tady je
+   jednou. Barvu stavu dodá `.seg-on` / `.seg-off glass`. */
+.filter-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  flex-shrink: 0; white-space: nowrap;
+  border-radius: 9999px; padding: 0.5rem 1rem;
+  font-size: 0.75rem; font-weight: 500; line-height: 1.2;
+  transition: background-color .16s ease-out, color .16s ease-out;
+}
 .btn-icon-danger { color: rgba(220,38,38,0.7); }
 @media (hover: hover) { .btn-icon-danger:hover { color: #dc2626; background: rgba(220,38,38,0.08); } }
 /* Kolečko načítání — jedna podoba pro celou aplikaci. */

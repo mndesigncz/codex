@@ -552,7 +552,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <div className="flex gap-1 glass rounded-full p-1">
               {[['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']].map(([val, label]) => (
                 <button key={val} type="button" onClick={() => setInviteRole(val)}
-                  className={`tap-target-sm px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${inviteRole === val ? 'seg-on' : 'seg-off'}`}>
+                  className={`filter-pill ${inviteRole === val ? 'seg-on' : 'seg-off'}`}>
                   {label}
                 </button>
               ))}

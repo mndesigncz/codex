@@ -3,6 +3,9 @@
 // lib/production.ts.
 
 import { stockMeasure, type CategoryPackaging, type StockStatus } from './packaging.ts';
+// Relativní cesta, ne alias `@/`: tenhle soubor si načítá `npm test`
+// přímo Nodem (`node scripts/test-units.ts`) a ten aliasy z tsconfigu nezná.
+import { czCount } from './czech.ts';
 
 export const MAX_BATCHES = 10;
 export const MAX_INGREDIENTS = 20;
@@ -100,7 +103,7 @@ export function describe(plan: ProductionPlan): string {
     : `Ve skladu zbývá ${fmtQty(availableOf(item))} ${recipeUnit(item)}.`;
   const lines: string[] = [head];
   if (plan.lines.length) {
-    lines.push('', `Suroviny na ${plan.batches === 1 ? 'jednu dávku' : `${plan.batches} dávky`}:`);
+    lines.push('', `Suroviny na ${plan.batches === 1 ? 'jednu dávku' : czCount(plan.batches, { one: 'dávku', few: 'dávky', many: 'dávek' })}:`);
     for (const l of plan.lines) {
       const ok = l.missing <= 0;
       lines.push(`• ${l.name} ${fmtQty(l.need)} ${l.unit} — ve skladu ${fmtQty(l.available)} ${l.unit} ${ok ? '✓' : `✗ chybí ${fmtQty(l.missing)} ${l.unit}, je v nákupním seznamu`}`);

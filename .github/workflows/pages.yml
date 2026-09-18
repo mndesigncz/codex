@@ -80,3 +80,6 @@ jobs:
       # Po číslovce má čeština tři tvary: 1 položka, 2–4 položky, 5+ položek.
       - name: Skloňování
         run: node scripts/check-czech.mjs
+      # Testy si Node pouští přímo, takže alias `@/` v nich spadne.
+      - name: Importy v testech
+        run: node scripts/check-test-imports.mjs

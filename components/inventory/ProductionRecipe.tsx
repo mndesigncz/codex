@@ -8,8 +8,9 @@
 // položky vedle „Používá se v kase", protože je to druhá strana téže mince:
 // tam se říká, co se z položky prodává, tady, z čeho se položka dělá.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { useResultKeys } from '@/lib/useResultKeys';
 
 export interface RecipeLine {
   ingredientId: number; name: string; amount: number; unit: string;
@@ -39,6 +40,9 @@ export default function ProductionRecipe({ item, items, onSaved }: {
   const [steps, setSteps] = useState('');
   const [lines, setLines] = useState<{ ingredientId: number; name: string; unit: string; amount: string }[]>([]);
   const [query, setQuery] = useState('');
+  const ingInput = useRef<HTMLInputElement>(null);
+  const ingList = useRef<HTMLDivElement>(null);
+  const ingKeys = useResultKeys(ingList, ingInput, { onEscape: () => setQuery('') });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [saved, setSaved] = useState(false);
@@ -160,9 +164,12 @@ export default function ProductionRecipe({ item, items, onSaved }: {
               );
             })}
             <div className="relative">
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Přidat surovinu ze skladu…" className="field !py-2 text-sm" />
+              <input ref={ingInput} value={query} onChange={e => setQuery(e.target.value)}
+                onKeyDown={ingKeys.onInputKeyDown}
+                placeholder="Přidat surovinu ze skladu…" className="field !py-2 text-sm" />
               {found.length > 0 && (
-                <div className="absolute z-10 left-0 right-0 mt-1 card p-1 max-h-48 overflow-y-auto scrollbar-thin">
+                <div ref={ingList} onKeyDown={ingKeys.onListKeyDown}
+                  className="absolute z-10 left-0 right-0 mt-1 card p-1 max-h-48 overflow-y-auto scrollbar-thin">
                   {found.map(p => (
                     <button key={p.id} type="button"
                       onClick={() => { setLines(ls => [...ls, { ingredientId: p.id, name: p.name, unit: unitOf(p), amount: '' }]); setQuery(''); }}
