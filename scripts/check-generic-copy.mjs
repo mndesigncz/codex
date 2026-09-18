@@ -32,14 +32,16 @@ const walk = (dir) => {
     if (name === 'node_modules' || name === '.next' || name.startsWith('.')) continue;
     const file = join(dir, name);
     if (statSync(file).isDirectory()) { walk(file); continue; }
-    if (!/\.(tsx|ts)$/.test(file)) continue;
+    if (!/\.(tsx|ts|html)$/.test(file)) continue;
     const lines = readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, i) => {
       const code = line.trimStart();
       // Komentáře neřešíme — nejdou uživateli na oči.
       if (code.startsWith('//') || code.startsWith('*') || code.startsWith('/*')) return;
       // Klíče localStorage si nesou starý název kvůli zpětné kompatibilitě.
-      if (/localStorage|COOKIE|LS_|_OLD/.test(line)) return;
+      // `_STARY` je česká obdoba `_OLD`: klíč, který se pořád čte, aby
+      // se lidem v provozu nezahodilo, co mají uložené v prohlížeči.
+      if (/localStorage|COOKIE|LS_|_OLD|_STARY/.test(line)) return;
       // Vnitřní identifikátor není text. `id: 'pangea'` u barevné předlohy
       // se jmenuje „Zlatá a krémová" a to `id` nikdo nevidí; přejmenovat by
       // ho navíc znamenalo rozbít data podnikům, které si ji vybraly.
@@ -73,6 +75,12 @@ walk('app');
 // jako kontakt v každé notifikaci tak přežily celé kolo o univerzálních
 // textech. Obrazovka není jediné místo, kde aplikace mluví.
 walk('lib');
+// `public/` se nehlídalo vůbec — a leží tam 300 kB ručně psaného HTML
+// venkovního menu, které si podnik pověsí na iPad k chodníku. Je to živá
+// funkce (QR na ni generuje editor menu), jen ji žádná kontrola neviděla,
+// protože všechny chodily jen za `.ts` a `.tsx`. Pokrytí kontroly je
+// součást kontroly: co neprojde, to se nekontroluje.
+walk('public');
 
 if (hits.length) {
   console.error('\nText mluví o jednom konkrétním typu podniku.');
