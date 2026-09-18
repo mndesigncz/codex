@@ -21,6 +21,7 @@ export { ErrorBoundary } from './ErrorBoundary';
 export { useLoad } from './useLoad';
 export { Modal } from './Modal';
 export { DiscardGuard } from './DiscardGuard';
+export { DraftNote } from './DraftNote';
 export { BulkBar, SelectBox, ApproveAllBar, type BulkAction } from './BulkBar';
 export { useSelection, runBulk, type Id } from './useSelection';
 export { Hint, hintsEnabled, setHintsEnabled, resetHints, dismissedCount, type HintTone } from './Hint';

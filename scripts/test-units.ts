@@ -16,6 +16,7 @@ import { printHtml, esc as escHtml } from '../lib/printDoc.ts';
 import { escHtml as escMail, usingSandboxSender } from '../lib/email.ts';
 import { formatCost } from '../lib/money.ts';
 import { reakceNaZavreni, jePsanePole, jeRozepsano } from '../lib/modalClose.ts';
+import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -433,6 +434,55 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   // Napsat a zase smazat není ztráta.
   ok('okno: prázdná pole nejsou rozepsaná', !jeRozepsano(['', '   ', null, undefined]));
   ok('okno: jedno vyplněné stačí', jeRozepsano(['', 'Ranní směna má nový postup']));
+}
+
+// —— Rozepsaný formulář ————————————————————————————————————————
+{
+  // Co se počítá za „je co zachraňovat".
+  ok('koncept: prázdný formulář nic nenese', !maObsah({ nazev: '', popis: '   ', body: [] }));
+  ok('koncept: jedno vyplněné pole stačí', maObsah({ nazev: '', popis: 'Umýt okna' }));
+  ok('koncept: text v seznamu se počítá', maObsah({ kroky: ['', 'Zalít konvici'] }));
+  ok('koncept: nula ani false nejsou obsah', !maObsah({ pocet: 0, hotovo: false }));
+
+  // Uložený koncept se skládá na výchozí tvar, ne naopak — formulář se
+  // mezitím mohl změnit a koncept o tom neví.
+  const vychozi = { nazev: '', popis: '', priorita: 'normal', kroky: [] as string[] };
+  eq('koncept: přebírá jen známé klíče',
+    slouceni(vychozi, { nazev: 'Umýt okna', neznamy: 'smetí' }),
+    { nazev: 'Umýt okna', popis: '', priorita: 'normal', kroky: [] });
+  eq('koncept: nesedící typ propadne',
+    slouceni(vychozi, { nazev: 42, popis: 'ok' }),
+    { nazev: '', popis: 'ok', priorita: 'normal', kroky: [] });
+  eq('koncept: pole vs. text se nezamění',
+    slouceni(vychozi, { kroky: 'tohle není pole' }),
+    { nazev: '', popis: '', priorita: 'normal', kroky: [] });
+  eq('koncept: nesmysl místo objektu vrací výchozí', slouceni(vychozi, 'rozbité'), vychozi);
+  eq('koncept: null vrací výchozí', slouceni(vychozi, null), vychozi);
+
+  // Výchozí hodnota není rozepsaný text. První verze se ptala jen na obsah,
+  // takže formulář s předvolenou prioritou vypadal rozepsaně navždycky
+  // a v úložišti zůstával prázdný koncept. Chytila to sonda, ne úvaha.
+  ok('koncept: předvolená hodnota se nepočítá za rozepsané',
+    !liseSeOdPrazdneho({ ...vychozi }, vychozi));
+  ok('koncept: vyplněné pole se počítá',
+    liseSeOdPrazdneho({ ...vychozi, nazev: 'Umýt okna' }, vychozi));
+  ok('koncept: změna předvolby se počítá',
+    liseSeOdPrazdneho({ ...vychozi, priorita: 'high' }, vychozi));
+  ok('koncept: neznámý klíč navíc se nepočítá',
+    !liseSeOdPrazdneho({ ...vychozi, smetí: 'x' }, vychozi));
+
+  // Kdy se obnovuje.
+  ok('koncept: obnoví se, když něco nese',
+    maSeObnovit({ upravujeSe: false, ulozeny: { nazev: 'Umýt okna' }, vychozi }));
+  ok('koncept: při úpravě existujícího záznamu nikdy',
+    !maSeObnovit({ upravujeSe: true, ulozeny: { nazev: 'Umýt okna' }, vychozi }));
+  ok('koncept: prázdný se neobnovuje',
+    !maSeObnovit({ upravujeSe: false, ulozeny: { nazev: '  ' }, vychozi }));
+  // Předvyplnit formulář tím, co v něm stejně bylo, je hláška o ničem.
+  ok('koncept: shodný s prázdným formulářem se neobnovuje',
+    !maSeObnovit({ upravujeSe: false, ulozeny: { ...vychozi }, vychozi }));
+  ok('koncept: koncept jen s neznámými klíči se neobnovuje',
+    !maSeObnovit({ upravujeSe: false, ulozeny: { zruseno: 'x' }, vychozi }));
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
