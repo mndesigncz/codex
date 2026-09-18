@@ -5,6 +5,9 @@
 // the employee stock and the tablet, so the same taps work everywhere.
 
 import { Icon } from '../Icons';
+import { czForm, POLOZKA } from '@/lib/czech';
+
+const pluralPolozka = (n: number) => czForm(n, POLOZKA);
 import {
   ancestryOfId, childrenOfId, findById, scopeIds, type CategoryNode,
 } from '@/lib/categoryTree';
@@ -129,7 +132,7 @@ export default function CategoryNav<T extends CategoryNode>({
                 <span className="min-w-0 flex-1">
                   <span className={`block font-bold text-[#16181A] line-clamp-2 ${touch ? 'text-base' : 'text-sm'}`}>{c.name}</span>
                   <span className="block text-[11px] text-black/40 line-clamp-2">
-                    {count !== null && <>{count} {plural(count)}</>}
+                    {count !== null && <>{count} {pluralPolozka(count)}</>}
                     {kids > 0 && <>{count !== null ? ' · ' : ''}{kids} podkat.</>}
                     {alerts > 0 && <span className="text-amber-700 font-semibold"> · {alerts} dochází</span>}
                   </span>
@@ -161,9 +164,6 @@ export default function CategoryNav<T extends CategoryNode>({
   );
 }
 
-function plural(n: number) {
-  return n === 1 ? 'položka' : n >= 2 && n <= 4 ? 'položky' : 'položek';
-}
 
 /**
  * Items filed under a category or anything nested below it. Matching is by id;

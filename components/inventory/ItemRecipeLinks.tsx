@@ -35,6 +35,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Menu má u větších podniků skoro tisíc položek — hledáme na serveru.
   useEffect(() => {
@@ -73,7 +74,12 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
     const v = dec(amount);
     if (!(v > 0)) { setErr('Kolik téhle suroviny jde na jednu porci?'); return; }
     if (await send(picked.productId, picked.name, v)) {
-      setAdding(false); setPicked(null); setQuery(''); setAmount(''); setFound([]);
+      // Picker zůstává otevřený. Jedna surovina jde typicky do několika
+      // položek menu (mléko do latté, cappuccina, flat white) a zavírat
+      // ho po každém přidání znamenalo pokaždé znovu hledat.
+      // Stejně to dělá `ProductionRecipe` o dva soubory vedle.
+      setPicked(null); setQuery(''); setAmount(''); setFound([]);
+      requestAnimationFrame(() => searchRef.current?.focus());
     }
   };
 
@@ -150,7 +156,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
             </>
           ) : (
             <>
-              <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+              <input ref={searchRef} autoFocus value={query} onChange={e => setQuery(e.target.value)}
                 placeholder="Hledat položku v kase…" className={field} />
               {query.trim().length >= 2 && found.length === 0 && (
                 <p className="text-xs text-black/40">Nic takového v menu není.</p>

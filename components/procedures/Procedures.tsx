@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState, Button, PageHeader } from '../ui';
+import { EmptyState, Button, PageHeader, ApproveAllBar, runBulk } from '../ui';
 import { isExcused, skipReasonLabel } from '@/lib/procedureScoring';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
@@ -11,6 +11,7 @@ import { parseSteps, totalMinutes, fmtMinutes, timeRange, STEP_WEIGHTS, weightSp
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
+import { czForm } from '@/lib/czech';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -95,11 +96,7 @@ function fmtWhen(iso: string) {
   return `${d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'short' })} ${time}`;
 }
 
-function stepsWord(n: number) {
-  if (n === 1) return 'krok';
-  if (n >= 2 && n <= 4) return 'kroky';
-  return 'kroků';
-}
+const stepsWord = (n: number) => czForm(n, { one: 'krok', few: 'kroky', many: 'kroků' });
 
 const playGlyph = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
@@ -110,6 +107,9 @@ export default function Procedures({ user }: Props) {
   const { active, startRun, starting } = useProcedures();
 
   const [procedures, setProcedures] = useState<Procedure[]>([]);
+  const pendingProcedures = procedures.filter(p => p.approved === false);
+  const [approvingAll, setApprovingAll] = useState(false);
+  const [approveNote, setApproveNote] = useState('');
   const [runs, setRuns] = useState<RunRow[]>([]);
   // Clicking a finished run opens the exact ✓/✗/skip breakdown.
   const [runDetail, setRunDetail] = useState<any | null>(null);
@@ -122,6 +122,14 @@ export default function Procedures({ user }: Props) {
   const [confirmDel, setConfirmDel] = useState<Procedure | null>(null);
   const delModal = useModal(!!confirmDel, () => setConfirmDel(null), 'Smazat postup');
   const [deleting, setDeleting] = useState(false);
+
+  const approveProcedure = async (id: number) => {
+    const res = await fetch(`/api/procedures/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approve: true }),
+    });
+    if (!res.ok) throw new Error('nepovedlo se');
+  };
 
   const load = useCallback(async () => {
     try {
@@ -203,6 +211,20 @@ export default function Procedures({ user }: Props) {
       ) : procedures.length === 0 ? (
         <ProceduresEmpty isEmployer={isEmployer} seeding={seeding} onSeed={seedExamples} onNew={openNew} />
       ) : (
+        <>
+        {isEmployer && (
+          <div className="mb-4">
+            <ApproveAllBar count={pendingProcedures.length} noun={{ one: 'postup', few: 'postupy', many: 'postupů' }} busy={approvingAll} note={approveNote}
+              onApproveAll={async () => {
+                if (!confirm(`Schválit všech ${pendingProcedures.length} návrhů postupů?`)) return;
+                setApprovingAll(true); setApproveNote('');
+                const { failed } = await runBulk(pendingProcedures.map(p => p.id), approveProcedure);
+                await load();
+                setApprovingAll(false);
+                if (failed.length) setApproveNote(`${failed.length} se neuložilo`);
+              }} />
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {procedures.map(p => {
             const running = active?.procedureId === p.id;
@@ -235,16 +257,13 @@ export default function Procedures({ user }: Props) {
                     <span className="tap-target-sm rounded-full bg-amber-500/15 text-amber-700 px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
                     {isEmployer && (
                       <button
+                        type="button"
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const res = await fetch(`/api/procedures/${p.id}`, {
-                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ approve: true }),
-                          }).catch(() => null);
-                          if (res?.ok) await load();
+                          try { await approveProcedure(p.id); await load(); } catch { /* ignore */ }
                         }}
                         className="tap-target-sm btn btn-primary btn-sm transition">
-                        Schválit ✓
+                        Schválit
                       </button>
                     )}
                   </div>
@@ -302,6 +321,7 @@ export default function Procedures({ user }: Props) {
             </button>
           )}
         </div>
+        </>
       )}
 
       {/* Recent runs */}

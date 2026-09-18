@@ -7,6 +7,7 @@ import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
 
 import { Icon } from '../Icons';
+import { czForm } from '@/lib/czech';
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
   const s = Math.max(0, sec) % 60;
@@ -334,11 +335,7 @@ export default function FloatingRunner() {
   );
 }
 
-function stepsWord(n: number) {
-  if (n === 1) return 'krok';
-  if (n >= 2 && n <= 4) return 'kroky';
-  return 'kroků';
-}
+const stepsWord = (n: number) => czForm(n, { one: 'krok', few: 'kroky', many: 'kroků' });
 
 const checkGlyph = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>

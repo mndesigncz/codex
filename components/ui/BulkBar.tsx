@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { Icon } from '../Icons';
+import { czCount, czVerb, type CzNoun } from '@/lib/czech';
 
 export interface BulkAction {
   label: string;
@@ -79,6 +80,41 @@ export function BulkBar({ count, totalLabel, onSelectAll, onExit, actions, note 
         <p className="mt-2 rounded-full bg-white/95 px-3 py-1.5 text-center text-xs font-medium text-red-600 shadow">{note}</p>
       )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Pruh nad mřížkou karet: „N čeká na schválení · Schválit vše".
+ *
+ * Kde je fronta seznamem řádků, dává smysl výběr (`BulkBar`). Kde je to
+ * mřížka karet — návody, postupy, uzávěrky — je zaškrtávátko na kartě
+ * nemotorné a ve skutečnosti se stejně schvaluje všechno naráz. Tohle je
+ * to jedno kliknutí, s potvrzením, protože zpět už to nejde.
+ */
+export function ApproveAllBar({ count, noun, onApproveAll, busy, note }: {
+  count: number;
+  /**
+   * Skloňování po číslovce — čeština má tři tvary. „3 návody čekají",
+   * ale „5 návodů čeká"; jediný pevný tvar by jednu z těch vět zkazil.
+   */
+  noun: CzNoun;
+  onApproveAll: () => void;
+  busy?: boolean;
+  note?: React.ReactNode;
+}) {
+  if (count < 2) return null;
+  return (
+    <div className="note note-wait flex flex-wrap items-center gap-3">
+      <Icon name="inbox" size={17} className="shrink-0" />
+      <span className="min-w-0 flex-1 text-sm font-medium">
+        {czCount(count, noun)} {czVerb(count, 'čeká', 'čekají')} na schválení.
+      </span>
+      {note && <span className="text-xs font-medium text-red-600">{note}</span>}
+      <button type="button" onClick={onApproveAll} disabled={busy}
+        className="tap-target-sm btn btn-primary btn-sm disabled:opacity-50 whitespace-nowrap">
+        {busy ? 'Schvaluji…' : `Schválit vše (${count})`}
+      </button>
     </div>
   );
 }
