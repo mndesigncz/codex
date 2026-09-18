@@ -73,8 +73,7 @@ export default function Tasks({ user }: Props) {
     }
   };
 
-  const toggleChecklistItem = async (task: Task, index: number) => {
-    const next = (task.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it);
+  const saveChecklist = async (task: Task, next: { text: string; done: boolean }[]) => {
     const prev = tasks;
     setTasks(ts => ts.map(x => x.id === task.id ? { ...x, checklist: next } : x));
     try {
@@ -85,6 +84,13 @@ export default function Tasks({ user }: Props) {
       if (!res.ok) throw new Error();
     } catch { setTasks(prev); }
   };
+
+  const toggleChecklistItem = (task: Task, index: number) =>
+    saveChecklist(task, (task.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it));
+
+  /** Odškrtnout nebo odškrtnutí zrušit u celého seznamu jedním požadavkem. */
+  const toggleChecklistAll = (task: Task, done: boolean) =>
+    saveChecklist(task, (task.checklist ?? []).map(it => ({ ...it, done })));
 
   const priorityColor = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
   const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
@@ -157,7 +163,8 @@ export default function Tasks({ user }: Props) {
               )}
             </div>
             {task.checklist && task.checklist.length > 0 && (
-              <TaskChecklist items={task.checklist} onToggle={i => toggleChecklistItem(task, i)} />
+              <TaskChecklist items={task.checklist} onToggle={i => toggleChecklistItem(task, i)}
+                onToggleAll={d => toggleChecklistAll(task, d)} />
             )}
           </div>
         </div>

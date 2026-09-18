@@ -303,6 +303,13 @@ vyřídit víc řádků najednou. Po sezóně dovolených leží ve frontě dvac
   destruktivní až za nimi a červeně.
 - **Požadavky jdou naráz, ne za sebou** (`runBulk`), a co se nepovede, se
   řekne: „3 z 12 se neuložilo" je jiná zpráva než „hotovo".
+- **Hromadné nemusí znamenat výběr.** Kde je akce jen jedna a týká se všeho
+  (odškrtnout celý checklist, pozvat víc lidí najednou), stačí jedno
+  tlačítko nebo pole, které přijme seznam. Zaškrtávátka by tam byla krok
+  navíc.
+- **Co se dá vložit hromadně, se tak musí dát vložit.** Pole pro e-mail
+  bere čárkou, středníkem, mezerou i řádky oddělený seznam; nábor na
+  sezónu není šest kol formuláře.
 
 ## Čeština po číslovce
 

@@ -12,6 +12,7 @@ import { useSymbol } from './CurrencyProvider';
 import ShareSettings from './employer/ShareSettings';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
+import { czCount } from '@/lib/czech';
 
 interface Member {
   id: number;
@@ -355,29 +356,64 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     } catch { /* clipboard blocked */ }
   };
 
+  const inviteOne = async (email: string) => {
+    const res = await fetch('/api/invitations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, jobTitle: inviteJob.trim() || 'Barista', role: inviteRole }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Pozvánku se nepodařilo odeslat.');
+    return data as { token?: string; emailSent?: boolean };
+  };
+
   const sendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!inviteEmail.trim()) return;
+    // Nábor na sezónu znamená šest brigádníků naráz. Jedno pole na jeden
+    // e-mail znamenalo šest kol formuláře a šest kopírování odkazu; teď jde
+    // vložit celý seznam oddělený čárkou, středníkem, mezerou nebo řádky.
+    const emails = Array.from(new Set(
+      inviteEmail.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)));
+    if (emails.length === 0) return;
     setInviting(true);
     try {
-      const res = await fetch('/api/invitations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim(), jobTitle: inviteJob.trim() || 'Barista', role: inviteRole }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const email = inviteEmail.trim();
-        setInviteEmail('');
-        setInviteJob('Barista');
-        setLastInvite({ email, token: data.token, emailSent: !!data.emailSent });
-        flash(data.emailSent
-          ? `Pozvánka odeslána na ${email}. Pro jistotu můžeš poslat i odkaz níže.`
-          : `Pozvánka připravena — zkopíruj odkaz níže a pošli ho ${email}.`);
+      if (emails.length === 1) {
+        const email = emails[0];
+        try {
+          const data = await inviteOne(email);
+          setInviteEmail('');
+          setInviteJob('Barista');
+          setLastInvite({ email, token: data.token, emailSent: !!data.emailSent });
+          flash(data.emailSent
+            ? `Pozvánka odeslána na ${email}. Pro jistotu můžeš poslat i odkaz níže.`
+            : `Pozvánka připravena — zkopíruj odkaz níže a pošli ho ${email}.`);
+          loadInvites();
+        } catch (err: any) {
+          setError(err?.message || 'Pozvánku se nepodařilo odeslat.');
+        }
+        return;
+      }
+
+      // Server hlídá velikost týmu podle tarifu, takže část pozvánek může
+      // projít a část ne. Kolik prošlo, se musí říct — „hotovo" by tu bylo
+      // nepravdivé.
+      const done: string[] = [];
+      const failed: { email: string; why: string }[] = [];
+      for (const email of emails) {
+        try { await inviteOne(email); done.push(email); }
+        catch (err: any) { failed.push({ email, why: err?.message ?? '' }); }
+      }
+      if (done.length > 0) {
+        setInviteEmail(failed.map(f => f.email).join(', '));
+        setLastInvite(null);
+        flash(`Pozváno ${czCount(done.length, { one: 'člověk', few: 'lidi', many: 'lidí' })}. Odkazy najdeš níže v čekajících pozvánkách.`);
         loadInvites();
-      } else {
-        setError(data.error || 'Pozvánku se nepodařilo odeslat.');
+      }
+      if (failed.length > 0) {
+        setError(failed.length === emails.length
+          ? (failed[0].why || 'Pozvánky se nepodařilo odeslat.')
+          : `${czCount(failed.length, { one: 'pozvánka', few: 'pozvánky', many: 'pozvánek' })} neprošla: ${failed.map(f => f.email).join(', ')}${failed[0].why ? ` — ${failed[0].why}` : ''}`);
       }
     } finally {
       setInviting(false);
@@ -543,7 +579,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
         <form onSubmit={sendInvite} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input type="email" required placeholder="email@priklad.cz" value={inviteEmail}
+            <input required placeholder="email@priklad.cz — nebo víc naráz" value={inviteEmail}
+              aria-label="E-mail nebo víc e-mailů oddělených čárkou"
               onChange={e => setInviteEmail(e.target.value)} className={inputClass} />
             <input placeholder="Pozice" value={inviteJob}
               onChange={e => setInviteJob(e.target.value)} className={inputClass} />
