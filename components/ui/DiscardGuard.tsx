@@ -36,9 +36,9 @@ export function DiscardGuard({ guard, what = 'Co jsi rozepsal, se neuloží.' }:
   if (!asking) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 discard-guard">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 discard-guard modal-overlay">
       <div role="alertdialog" aria-label="Zahodit rozepsané?" aria-modal={false}
-        className="w-full max-w-[19rem] card p-5 text-center">
+        className="modal-sheet w-full max-w-[19rem] rounded-3xl p-5 text-center">
         <p className="t-card">Zahodit rozepsané?</p>
         <p className="t-meta mt-1 text-pretty">{what}</p>
         <div className="mt-4 flex flex-col-reverse sm:flex-row gap-2">

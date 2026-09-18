@@ -21,7 +21,10 @@ const walk = (dir) => {
     const file = join(dir, name);
     if (statSync(file).isDirectory()) { walk(file); continue; }
     if (!/\.tsx$/.test(file)) continue;
+    // Sdílená mechanika oken, ne jednotlivá okna. `DiscardGuard` se schválně
+    // kreslí nad otevřeným oknem — jako <Modal> by si s ním přetahoval fokus.
     if (file.endsWith(`ui${'/'}Modal.tsx`)) continue;
+    if (file.endsWith(`ui${'/'}DiscardGuard.tsx`)) continue;
     readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
       if (line.includes('modal-sheet')) hits.push(`${relative('.', file)}:${i + 1}`);
     });
