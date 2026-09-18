@@ -385,6 +385,21 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
 - **Odhlášení sdíleného zařízení se potvrzuje.** Obsluha nezná heslo
   tabletu; jedno ťuknutí = tablet mimo provoz do příchodu vedení.
 
+## Peníze a součty
+
+- **Jedno číslo se počítá na jednom místě.** Mzdové náklady z docházky
+  měly tři výpočty ve třech obrazovkách a daly tři různé měsíční součty za
+  tentýž měsíc — a ten třetí, součet sloupce v CSV, neseděl ani s jedním.
+  Teď `lib/wages`.
+- **Zaokrouhluje se tam, kde to člověk vidí.** Účetní sečte, co je
+  vytištěné na řádcích, takže se zaokrouhluje po záznamu, ne až součet.
+  Kdyby to bylo naopak, CSV by nikdy nesedělo s obrazovkou.
+- **Nesmyslný záznam se nepočítá — všude stejně.** Zapomenuté odpíchnutí
+  není třicetihodinová směna. Finance ho braly celé, Uzávěrky vyhazovaly;
+  to je větší rozdíl než haléře.
+- **Na peněžní výpočet patří test**, ne screenshot. Je to jediná část
+  aplikace, kde se správnost dá napsat jako rovnice.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

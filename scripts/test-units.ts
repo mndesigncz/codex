@@ -6,6 +6,7 @@ import { normName, matchByName, sectionTitles } from '../lib/menuPos.ts';
 import { contrast, normalizeQrDesign } from '../lib/qrDesign.ts';
 import { sanitizeSvg } from '../lib/svgSanitize.ts';
 import { batchesNeeded, planFor, recipeUnit, availableOf, taskTitleFor, checklistFor } from '../lib/productionPlan.ts';
+import { earnedFor, wagesTotal, MAX_SHIFT_HOURS } from '../lib/wages.ts';
 
 let failed = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -102,4 +103,32 @@ console.log('\nVšechny testy prošly.');
   eq('výroba: kroky postupu jako checklist', checklistFor(planFor(row({ batchSteps: '1. Nakrájet\n- Svařit\n\nStočit' }), [], stock)).map(c => c.text), ['Nakrájet', 'Svařit', 'Stočit']);
   // toLocaleString('cs-CZ') odděluje tisíce nezlomitelnou mezerou — pro srovnání ji narovnáme.
   eq('výroba: bez postupu checklist ze surovin', checklistFor(plan).map(c => c.text.replace(/\s/g, ' ')), ['Odměřit Citron 2 kg', 'Odměřit Cukr 1 600 g']);
+}
+
+{
+  const H = 3600000;
+  // Zaokrouhluje se po záznamu, protože účetní sečte to, co je vytištěné
+  // v CSV řádcích — a celkové číslo tomu musí odpovídat.
+  eq('mzdy: jeden záznam se zaokrouhlí', earnedFor(2.5 * H, 155), 388);
+  eq('mzdy: bez sazby nic', earnedFor(8 * H, 0), 0);
+  eq('mzdy: záporný čas nic', earnedFor(-1 * H, 155), 0);
+
+  // Právě tenhle případ dělal ze tří obrazovek tři různá čísla: Finance
+  // zapomenuté odpíchnutí počítaly celé, Uzávěrky ho vyhazovaly.
+  eq('mzdy: zapomenuté odpíchnutí se nepočítá', earnedFor(30 * H, 200), 0);
+  eq('mzdy: hranice je 24 h', earnedFor(MAX_SHIFT_HOURS * H, 200), 0);
+  eq('mzdy: těsně pod hranicí se počítá', earnedFor(23.5 * H, 200), 4700);
+
+  const dvaZaznamy = [{ ms: 2.5 * H, rate: 155 }, { ms: 3.5 * H, rate: 155 }];
+  eq('mzdy: součet = součet zaokrouhlených řádků',
+    wagesTotal(dvaZaznamy).total,
+    earnedFor(2.5 * H, 155) + earnedFor(3.5 * H, 155));
+  // Kdyby se zaokrouhlovalo až na konci, vyšlo by 930 — a CSV by nesedělo.
+  eq('mzdy: a liší se od zaokrouhlení až součtu', wagesTotal(dvaZaznamy).total, 931);
+
+  const sZapomenutym = [...dvaZaznamy, { ms: 30 * H, rate: 155 }];
+  eq('mzdy: vynechané se počítají zvlášť', wagesTotal(sZapomenutym).skipped, 1);
+  eq('mzdy: a do součtu nejdou', wagesTotal(sZapomenutym).total, wagesTotal(dvaZaznamy).total);
+  eq('mzdy: bez sazby se nepočítá ani jako vynechané',
+    wagesTotal([{ ms: 8 * H, rate: 0 }]).skipped, 0);
 }
