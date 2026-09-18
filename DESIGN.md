@@ -1067,6 +1067,30 @@ pseudoprvkem na 44 px a `getBoundingClientRect` o něm neví — sonda na
 kiosku hlásila tři malé cíle, které ve skutečnosti zabírají 44 px.
 Skutečnost ukáže až zásah: bod 21 px mimo krabici musí pořád trefit.
 
+## Offline se neukazuje stará aplikace, ale vysvětlení
+
+Pravidlo „když vypadne wifi, aplikace nelže" mělo jedno místo, kde
+aplikace nemluvila vůbec: po výpadku a obnovení stránky se ukázala
+chybová stránka prohlížeče. Service worker uměl jen notifikace a navíc
+se registroval jen tehdy, když byl nastavený klíč pro push — bez něj
+nebyl žádný.
+
+- **Cachuje se jen skořápka, nikdy odpovědi API.** Zastaralý stav skladu
+  nebo rozvrhu je horší než poctivá chyba: obsluha by podle něj
+  objednávala zboží, které už došlo. Offline se proto neukazuje stará
+  aplikace, jen `offline.html` s vysvětlením.
+- **`fetch` chytá jen navigace.** Obrázky, skripty ani volání API se
+  do toho nepletou.
+- **Offline stránka nesmí nic stahovat.** Styl i skript má v sobě —
+  v tu chvíli nejde načíst ani písmo, a prázdná obrazovka je horší než
+  dinosaurus z prohlížeče, protože nevysvětlí nic.
+- **Maže se jen vlastní cache podle předpony.** Cache jsou sdílené přes
+  celý původ, takže „smaž všechno cizí" by vzalo i offline cache
+  hostovského menu, které má vlastní worker.
+- **Registrace workeru nesmí záviset na notifikacích.** Dvě různé věci
+  se nemají podmiňovat navzájem; `PushManager` si registraci najde,
+  ale nezakládá ji — a čeká na ni s časovým stropem, aby tiše nevisel.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

@@ -25,7 +25,15 @@ export default function PushManager() {
     let cancelled = false;
     (async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        // Registraci zakládá <ServiceWorker/>, ať offline skořápka funguje
+        // i bez klíče pro notifikace. Tady se na ni jen počká — ale ne
+        // donekonečna: když registrace neprojde, `ready` se nesplní nikdy
+        // a tenhle průběh by tiše visel do zavření záložky.
+        const reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<null>((res) => setTimeout(() => res(null), 10000)),
+        ]);
+        if (!reg) return;
         if (Notification.permission === 'denied') return;
         if (Notification.permission === 'default') {
           const perm = await Notification.requestPermission();
