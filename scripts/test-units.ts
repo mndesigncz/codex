@@ -11,6 +11,8 @@ import { normalizeCurrency, formatMoney, currencySymbol } from '../lib/money.ts'
 import { okJson, okText, apiMessage, statusMessage, ApiError, isOffline } from '../lib/api.ts';
 import { nextActiveId, needsWho, IDLE_MS } from '../lib/kioskIdentity.ts';
 import { buildIcs, escapeText, foldLine } from '../lib/ics.ts';
+import { recipeCost, ingredientCost, marginPct, costDecimals } from '../lib/recipeCost.ts';
+import { formatCost } from '../lib/money.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -297,6 +299,55 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
     zalomeny.split('\r\n').slice(1).every(l => l.startsWith(' ')));
   eq('ics: po slepení zpět je to původní řádek', zalomeny.split('\r\n ').join(''), dlouhy);
   eq('ics: krátký řádek se nesahá', foldLine('SUMMARY:Směna'), 'SUMMARY:Směna');
+}
+
+// --- Cena receptury na porci (lib/recipeCost) ---
+{
+  // Pět gramů cukru z kilového balení za 25 Kč. Dvanáct haléřů — ne nula.
+  eq('receptura: cukr po pěti gramech', ingredientCost(25, 1, 0.005), 0.125);
+  // Kusovka nemá velikost balení: cena položky je rovnou cena za kus.
+  eq('receptura: kusovka se násobí rovnou', ingredientCost(2, 0, 3), 6);
+  eq('receptura: bez ceny je to nula', ingredientCost(0, 1, 0.5), 0);
+  eq('receptura: bez množství taky', ingredientCost(25, 1, 0), 0);
+
+  // Tohle je ta chyba, kvůli které kolo vzniklo: čtyři levné suroviny,
+  // každá zaokrouhlená zvlášť na nulu, daly nápoj zadarmo.
+  const ctyriLevne = [
+    { unitCost: 40, packageSize: 1, amount: 0.01 },  // 0,40
+    { unitCost: 40, packageSize: 1, amount: 0.01 },  // 0,40
+    { unitCost: 40, packageSize: 1, amount: 0.01 },  // 0,40
+    { unitCost: 40, packageSize: 1, amount: 0.01 },  // 0,40
+  ];
+  eq('receptura: levné suroviny se nesčítají do nuly', recipeCost(ctyriLevne).total, 2);
+  eq('receptura: a přesný součet zůstává přesný', Math.round(recipeCost(ctyriLevne).exact * 100) / 100, 1.6);
+
+  // A opačný směr: každá 1,50 zaokrouhlená nahoru dělala z šesti osm.
+  const ctyriPulky = Array.from({ length: 4 }, () => ({ unitCost: 150, packageSize: 100, amount: 1 }));
+  eq('receptura: ani se nenafouknou nahoru', recipeCost(ctyriPulky).total, 6);
+
+  // Surovina bez ceny je díra v součtu, ne nula.
+  const sDirou = [
+    { unitCost: 250, packageSize: 1, amount: 0.02 },
+    { unitCost: 0, packageSize: 1, amount: 0.01 },
+  ];
+  eq('receptura: chybějící cena se počítá zvlášť', recipeCost(sDirou).missingPrice, 1);
+  eq('receptura: a součet je jen z toho, co cenu má', recipeCost(sDirou).total, 5);
+  eq('receptura: množství nula není chybějící cena',
+    recipeCost([{ unitCost: 0, packageSize: 1, amount: 0 }]).missingPrice, 0);
+
+  // Marže se počítá z nezaokrouhleného nákladu.
+  eq('receptura: marže z ceny a nákladu', marginPct(100, 35), 65);
+  eq('receptura: bez ceny se marže nepočítá', marginPct(null, 35), null);
+  eq('receptura: nulová cena taky ne', marginPct(0, 35), null);
+  eq('receptura: náklad nad cenou dá zápornou marži', marginPct(50, 75), -50);
+
+  // Zobrazení: haléře musí být vidět, jinak je to zase nula.
+  eq('receptura: setiny pod korunou', costDecimals(0.125), 2);
+  eq('receptura: desetiny pod desítkou', costDecimals(5.5), 1);
+  eq('receptura: celé nad deset', costDecimals(42), 0);
+  eq('receptura: nula je nula', costDecimals(0), 0);
+  eq('měna: haléře se vypíšou', formatCost(0.125, 'CZK', 'cs-CZ').replace(/\s/g, ' '), '0,13 Kč');
+  eq('měna: velké číslo zůstává celé', formatCost(1250, 'CZK', 'cs-CZ').replace(/\s/g, ' '), '1 250 Kč');
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

@@ -47,20 +47,35 @@ export function normalizeCurrency(currency?: string | null): string {
   return bySymbol[raw] ?? raw.toUpperCase();
 }
 
-export function formatMoney(n: number, currency = 'CZK', locale = 'cs-CZ'): string {
-  const val = Math.round(Number(n) || 0);
+export function formatMoney(n: number, currency = 'CZK', locale = 'cs-CZ', decimals = 0): string {
+  const d = Math.max(0, Math.min(4, Math.trunc(decimals) || 0));
+  const val = d > 0 ? (Number(n) || 0) : Math.round(Number(n) || 0);
   const code = normalizeCurrency(currency);
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: code,
-      maximumFractionDigits: 0,
-      minimumFractionDigits: 0,
+      maximumFractionDigits: d,
+      minimumFractionDigits: d,
     }).format(val);
   } catch {
     // Unknown currency/locale — fall back to a plain grouped number + code.
-    return `${val.toLocaleString(locale || 'cs-CZ')} ${code}`;
+    return `${val.toLocaleString(locale || 'cs-CZ', { maximumFractionDigits: d, minimumFractionDigits: d })} ${code}`;
   }
+}
+
+/**
+ * Částka, která je menší než jednotka měny — typicky surovina v receptuře.
+ *
+ * Aplikace jinak počítá v celých jednotkách a `formatMoney` je na to
+ * stavěné. Jenže dvanáct haléřů cukru zaokrouhlené na „0 Kč" v receptuře
+ * neznamená nic zadarmo, znamená to chybu v marži. Tady se tedy desetinná
+ * místa přidají — ale jen tam, kde bez nich číslo zmizí.
+ */
+export function formatCost(n: number, currency = 'CZK', locale = 'cs-CZ'): string {
+  const v = Math.abs(Number(n) || 0);
+  const d = v === 0 || v >= 10 ? 0 : v >= 1 ? 1 : 2;
+  return formatMoney(n, currency, locale, d);
 }
 
 // A bound formatter factory for a given team config.

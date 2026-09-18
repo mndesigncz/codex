@@ -11,10 +11,11 @@ import { SearchField, Button } from '../ui';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
-import { useMoney } from '../CurrencyProvider';
+import { useMoney, useCost } from '../CurrencyProvider';
 import ItemInlineEdit from './ItemInlineEdit';
 import NewIngredientInline from './NewIngredientInline';
 import { okJson } from '@/lib/api';
+import { recipeCost, ingredientCost, marginPct } from '@/lib/recipeCost';
 
 const inputCls =
   'field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -68,6 +69,8 @@ export default function RecipesView({ openProductId, onNavigate }: {
   onNavigate?: (view: string, arg?: string) => void;
 } = {}) {
   const money = useMoney();
+  // Surovina může stát míň než korunu; `money` by ji ukázal jako „0 Kč“.
+  const cena = useCost();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
@@ -159,17 +162,21 @@ export default function RecipesView({ openProductId, onNavigate }: {
   const economyOf = (productId: string, price: number | null) => {
     const r: any = recipeByProduct.get(productId);
     if (!r?.ingredients?.length) return null;
-    let cost = 0;
-    for (const ing of r.ingredients) {
+    const rows = r.ingredients.map((ing: any) => {
       const item = itemById.get(String(ing.itemId));
-      const unitCost = Number(item?.unitCost) || 0;
-      const pkg = Number(item?.packageSize) || 0;
-      if (!item || unitCost <= 0) return null;
-      cost += pkg > 0 ? (unitCost / pkg) * Number(ing.amount) : unitCost * Number(ing.amount);
-    }
-    const c = Math.round(cost);
-    const pct = price != null && price > 0 ? Math.round(((price - c) / price) * 100) : null;
-    return { cost: c, marginPct: pct };
+      return {
+        unitCost: Number(item?.unitCost) || 0,
+        packageSize: Number(item?.packageSize) || 0,
+        amount: Number(ing.amount) || 0,
+      };
+    });
+    // Jedna surovina bez ceny znamená, že součet není náklad receptury —
+    // je to jen jeho část, a ta by marži nafoukla.
+    const { total, exact, missingPrice } = recipeCost(rows);
+    if (missingPrice > 0) return null;
+    // Marže z nezaokrouhleného nákladu: u levného nápoje posune
+    // zaokrouhlení na celé koruny procenta o jednotky.
+    return { cost: total, marginPct: marginPct(price, exact) };
   };
 
   // ---- editor ---------------------------------------------------------------
@@ -247,7 +254,9 @@ export default function RecipesView({ openProductId, onNavigate }: {
     const pkg = Number(item.packageSize) || 0;
     const cost = Number(item.unitCost) || 0;
     const portions = pkg > 0 ? Math.floor(pkg / amount) : null;
-    const perPortion = pkg > 0 && cost > 0 ? Math.round((cost / pkg) * amount) : null;
+    // Nezaokrouhluje se: pět gramů cukru za 25 Kč/kg je dvanáct haléřů
+    // a zaokrouhlení po surovině je pošle na nulu. Zaokrouhlí se až součet.
+    const perPortion = cost > 0 ? ingredientCost(cost, pkg, amount) : null;
     return { portions, perPortion };
   };
 
@@ -451,6 +460,9 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
 }) {
+  // Surovina může stát míň než korunu; `money` by dvanáct haléřů cukru
+  // ukázal jako „0 Kč" a marže by pak seděla na sto procentech.
+  const cena = useCost();
   // Která surovina se zrovna upravuje „na místě" — bez odcházení do skladu.
   const [editingItem, setEditingItem] = useState<string | null>(null);
   // Zakládání nové suroviny: index řádku, do kterého se má vložit, nebo -1 pro
@@ -479,17 +491,24 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
       }),
     }));
   };
-  const totalCost = draft.ingredients.reduce((sum, ing) => {
+  const costRows = draft.ingredients.map(ing => {
     const item = itemById.get(ing.itemId);
-    if (!item) return sum;
+    if (!item) return { unitCost: 0, packageSize: 0, amount: 0 };
     const conv = UNITS[familyOf(item)].find(u => u.label === ing.unit)?.toBase ?? 1;
-    const y = yieldOf(item, num(ing.amount) * conv);
-    return sum + (y?.perPortion ?? 0);
-  }, 0);
+    return {
+      unitCost: Number(item.unitCost) || 0,
+      packageSize: Number(item.packageSize) || 0,
+      amount: (num(ing.amount) * conv) / itemFactor(item),
+    };
+  });
+  // Stejný výpočet jako v seznamu. Dřív se tady zaokrouhlovalo po surovině
+  // a pak sčítalo, takže editor a seznam ukazovaly u téže receptury jiné
+  // číslo — a u levných surovin i jiný řád.
+  const cost = recipeCost(costRows);
+  const totalCost = cost.total;
 
   const menuPrice = products.find(p => p.productId === draft.productId)?.price ?? null;
-  const marginPct = menuPrice != null && menuPrice > 0 && totalCost > 0
-    ? Math.round(((menuPrice - totalCost) / menuPrice) * 100) : null;
+  const margin = cost.exact > 0 ? marginPct(menuPrice, cost.exact) : null;
   const ready = draft.ingredients.filter(i => i.itemId && num(i.amount) > 0).length;
 
   return (
@@ -596,7 +615,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   {num(ing.amount) > 0 && (y?.portions != null
                     ? <span>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="text-[#5B7A08]">{y.portions}×</b></span>
                     : <span className="text-amber-700">Chybí velikost balení — porce ani cenu nespočítám.</span>)}
-                  {y?.perPortion != null && <span>· surovina za porci <b className="text-[#16181A]">{money(y.perPortion)}</b></span>}
+                  {y?.perPortion != null && <span>· surovina za porci <b className="text-[#16181A]">{cena(y.perPortion)}</b></span>}
                   {num(ing.amount) > 0 && y?.perPortion == null && Number(item.unitCost) > 0 === false && (
                     <span className="text-amber-700">· chybí cena za balení</span>
                   )}
@@ -676,18 +695,18 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
               <span className="text-black/50">Cena v kase</span>
               <span className="font-semibold tabular text-[#16181A]">{money(menuPrice)}</span>
             </div>
-            {marginPct != null && (
+            {margin != null && (
               <>
                 <div className="flex items-baseline justify-between gap-2 text-sm">
                   <span className="text-black/50">Zbyde na porci</span>
                   <span className="font-semibold tabular text-[#16181A]">{money(menuPrice - totalCost)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1.5">
-                  <div className={`h-full rounded-full ${marginPct >= 65 ? 'bg-[#C8F542]' : marginPct >= 45 ? 'bg-amber-400' : 'bg-red-400'}`}
-                    style={{ width: `${Math.max(0, Math.min(100, marginPct))}%` }} />
+                  <div className={`h-full rounded-full ${margin >= 65 ? 'bg-[#C8F542]' : margin >= 45 ? 'bg-amber-400' : 'bg-red-400'}`}
+                    style={{ width: `${Math.max(0, Math.min(100, margin))}%` }} />
                 </div>
-                <p className={`text-[11px] font-semibold ${marginPct >= 65 ? 'text-[#5B7A08]' : marginPct >= 45 ? 'text-amber-700' : 'text-red-600'}`}>
-                  marže {marginPct} %
+                <p className={`text-[11px] font-semibold ${margin >= 65 ? 'text-[#5B7A08]' : margin >= 45 ? 'text-amber-700' : 'text-red-600'}`}>
+                  marže {margin} %
                 </p>
               </>
             )}
