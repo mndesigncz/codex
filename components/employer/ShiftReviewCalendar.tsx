@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { zkratkyDnu, zacatekTydne } from '@/lib/week';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -11,8 +12,6 @@ interface Staff { id: number; name: string; avatar: string | null; reviewed: boo
 interface Day { date: string; staff: Staff[]; pending: number }
 
 const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-const WD_MON = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
-const WD_SUN = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
 
 const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,7 +43,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
   useEffect(() => { load(); }, [load]);
 
   const [y, m] = month.split('-').map(Number);
-  const wd = weekStart === 0 ? WD_SUN : WD_MON;
+  const wd = zkratkyDnu(zacatekTydne(weekStart));
   const firstDow = new Date(y, m - 1, 1).getDay();
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();

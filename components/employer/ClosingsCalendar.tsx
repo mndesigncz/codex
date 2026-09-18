@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { zkratkyDnu, zacatekTydne } from '@/lib/week';
 import { Icon } from '../Icons';
 import { useCurrency, useMoney } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
@@ -18,8 +19,6 @@ type Day = {
 type Days = Record<string, Day>;
 
 const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-const WD_MON = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
-const WD_SUN = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
 
 const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -88,7 +87,7 @@ export default function ClosingsCalendar({ selectedDate, onSelectDate, reloadKey
   }, [selectedDate, month]);
 
   const [y, m] = month.split('-').map(Number);
-  const wd = weekStart === 0 ? WD_SUN : WD_MON;
+  const wd = zkratkyDnu(zacatekTydne(weekStart));
   const firstDow = new Date(y, m - 1, 1).getDay();            // 0=Sun..6=Sat
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { zkratkyDnu, odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
+import { useCurrency } from '@/components/CurrencyProvider';
 import { dayPrefLabel, prefAllowsSlot, parseTypePref } from '@/lib/dayPrefs';
 import { openSpan, uncovered, typeFitsDay, toHM } from '@/lib/coverage';
 import { Icon } from '../Icons';
@@ -96,7 +98,9 @@ interface Proposed {
   color: string;
 }
 
-const CZ_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+// `CZ_DAYS_FULL` se dál používá tam, kde index NENÍ sloupec mřížky, ale
+// klíč otevírací doby (0 = pondělí). Ten se nesmí přeskládat podle toho,
+// jak si podnik nastavil začátek týdne — posunulo by mu to otevírací dobu.
 const CZ_DAYS_FULL = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle'];
 const COLORS = ['#C8F542', '#3B82F6', '#F59E0B', '#8B5CF6', '#F43F5E', '#14B8A6', '#EC4899', '#64748B'];
 const DEFAULT_TYPES = [
@@ -150,11 +154,11 @@ function dayLabel(date: string) {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 }
-function buildGrid(month: string) {
+function buildGrid(month: string, zacatek: ZacatekTydne) {
   const [y, m] = month.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
-  const lead = (first.getDay() + 6) % 7;
+  const lead = odsazeniMesice(first, zacatek);
   const cells: (string | null)[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(`${month}-${String(d).padStart(2, '0')}`);
@@ -173,6 +177,9 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function ScheduleBuilder({ user, onNavigate }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
+  // Začátek týdne si volí podnik. Dřív to tahle obrazovka ignorovala
+  // a kreslila vždycky od pondělí, zatímco kalendáře vedle ctily nastavení.
+  const zacatek = zacatekTydne(useCurrency().weekStart);
   const now = new Date();
   const currentMonth = ym(now);
   const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
@@ -351,7 +358,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   const employees = useMemo(() => members.filter((m) => m.role === 'employee'), [members]);
   // Assignable to shifts = employees + the employer (who can also work a shift).
   const assignable = useMemo(() => members.filter((m) => m.role === 'employee' || m.role === 'employer'), [members]);
-  const grid = useMemo(() => buildGrid(month), [month]);
+  const grid = useMemo(() => buildGrid(month, zacatek), [month, zacatek]);
 
   const load = async () => {
     const req = ++reqRef.current;
@@ -1317,7 +1324,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
-              {CZ_DAYS.map((d) => (
+              {zkratkyDnu(zacatek).map((d) => (
                 <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
                   {d}
                 </div>
@@ -2706,7 +2713,8 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
       return { ...d, [date]: CYCLE[(i < 0 ? 1 : i + 1) % CYCLE.length] };
     });
 
-  const grid = buildGrid(month);
+  const zacatek = zacatekTydne(useCurrency().weekStart);
+  const grid = buildGrid(month, zacatek);
   // Kategoriální paleta z globals.css — stejné odstíny jako v Dostupnosti.
   // Dřív si obě obrazovky psaly vlastní pole a lišily se.
   const TYPE_TONES = ['cat-4 border', 'cat-2 border', 'cat-3 border', 'cat-5 border'];
@@ -2773,7 +2781,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
 
         <div>
           <div className="grid grid-cols-7 gap-1 mb-1">
-            {['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'].map((d) => (
+            {zkratkyDnu(zacatek).map((d) => (
               <span key={d} className="text-center text-[11px] uppercase tracking-wide text-black/35">{d}</span>
             ))}
           </div>

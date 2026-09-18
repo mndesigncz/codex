@@ -143,3 +143,7 @@ jobs:
       # cache, tablet za barem ukazuje starou verzi napořád.
       - name: Otisk offline stránky
         run: node scripts/check-offline-cache.mjs
+      # Pořadí dnů v mřížce určuje nastavení podniku, ne pondělí natvrdo.
+      # Rozvrh ho ignoroval, zatímco kalendáře vedle něj ho ctily.
+      - name: Začátek týdne
+        run: node scripts/check-week-start.mjs
