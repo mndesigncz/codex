@@ -447,6 +447,19 @@ někomu patří — mzda, podpis pod zavíracím postupem, „kdo to naskladnil"
 
 ## Peníze a součty
 
+- **Zaokrouhluje se jednou, až ten výsledek.** Cena receptury se počítala
+  dvakrát: v seznamu se sečetly přesné hodnoty a zaokrouhlilo se na konci,
+  v editoru se zaokrouhlila každá surovina zvlášť. Pět gramů cukru je dvanáct
+  haléřů; po surovině zaokrouhleno je to nula. Nápoj ze čtyř takových
+  surovin pak stál 0 Kč se stoprocentní marží — a podle marže se nastavují
+  ceny. Výjimka je jediná, `lib/wages`: tam se zaokrouhluje po záznamu,
+  protože ty řádky sečte účetní na papíře a součet jim musí odpovídat.
+- **Částka pod jednotkou měny se ukazuje s desetinami.** `useCost()` místo
+  `useMoney()`. „0 Kč" u suroviny není zaokrouhlení, je to nepravda.
+- **Marže se počítá z nezaokrouhleného nákladu.** U levného nápoje posune
+  zaokrouhlení na celé koruny procenta o jednotky.
+- **Chybějící cena není nula.** Surovina bez ceny je díra v součtu; součet
+  se v takovém případě neukáže vůbec, protože by marži nafoukl.
 - **Jedno číslo se počítá na jednom místě.** Mzdové náklady z docházky
   měly tři výpočty ve třech obrazovkách a daly tři různé měsíční součty za
   tentýž měsíc — a ten třetí, součet sloupce v CSV, neseděl ani s jedním.

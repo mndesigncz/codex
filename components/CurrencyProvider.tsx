@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { DEFAULT_CURRENCY, formatMoney, makeMoney, currencySymbol } from '@/lib/money';
+import { DEFAULT_CURRENCY, formatMoney, formatCost, makeMoney, currencySymbol } from '@/lib/money';
 import { okJson } from '@/lib/api';
 
 type CurrencyCtx = {
@@ -10,6 +10,8 @@ type CurrencyCtx = {
   weekStart: number;          // 1 = Monday, 0 = Sunday
   laborTargetPct: number | null;
   money: (n: number) => string;
+  /** Pro částky pod jednotku měny — surovina v receptuře, kde „0 Kč" lže. */
+  cost: (n: number) => string;
   symbol: string;
   loaded: boolean;
 };
@@ -19,6 +21,7 @@ const Ctx = createContext<CurrencyCtx>({
   weekStart: 1,
   laborTargetPct: null,
   money: (n: number) => formatMoney(n),
+  cost: (n: number) => formatCost(n),
   symbol: 'Kč',
   loaded: false,
 });
@@ -32,6 +35,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     weekStart: 1,
     laborTargetPct: null,
     money: (n: number) => formatMoney(n),
+    cost: (n: number) => formatCost(n),
     symbol: 'Kč',
     loaded: false,
   });
@@ -50,6 +54,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
           currency, locale, weekStart,
           laborTargetPct: t.labor_target_pct ?? null,
           money: makeMoney({ currency, locale }),
+          cost: (n: number) => formatCost(n, currency, locale),
           symbol: currencySymbol(currency, locale),
           loaded: true,
         });
@@ -63,4 +68,5 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 
 export const useCurrency = () => useContext(Ctx);
 export const useMoney = () => useContext(Ctx).money;
+export const useCost = () => useContext(Ctx).cost;
 export const useSymbol = () => useContext(Ctx).symbol;
