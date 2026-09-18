@@ -1020,6 +1020,33 @@ takže dvě okna otevřená za sebou přišla pokaždé odjinud.
 - **Domovský proužek na iPhonu.** List uvnitř překryvu si přidá
   `env(safe-area-inset-bottom)`, jinak leží proužek přes poslední řádek.
 
+## Tmavý režim se musí měřit celý, ne po třídách
+
+Kontrast se dlouho hlídal jen ve světlém režimu: `check-contrast-classes`
+ověřovala, že se slabá šedá v `globals.css` narovná — ale jen ta světlá
+větev. Tmavý přepis nekontroloval nikdo, takže `text-black/25` prošla
+s narovnáním na 0,58 ve světlém a v tmavém spadla na 0,30. To je 2,53:1.
+
+- **Každý stupeň `text-black/NN` musí mít tmavý přepis a ten aspoň 0,55.**
+  Nejsvětlejší tmavý podklad je sklo (zhruba +9 % bílé přes `--surface`);
+  tam 0,50 dává 4,20:1 a 0,52 dává 4,42:1 — obojí pod normou. Stupnice se
+  tím v tmavém zplošťuje, ale hierarchii nese velikost a tučnost, přesně
+  jak to má světlý režim od kola 26.
+- **Inkoust se nepíše hexem s průhledností.** `text-[#16181A]/75` je jiný
+  název třídy než `.text-[#16181A]`, takže ho tmavý přepis mine úplně
+  a zůstane tmavý inkoust na tmavém podkladu — naměřeno 1,01:1 v chatu
+  a ve Financích, tedy text, který na obrazovce prostě není. Píše se
+  `text-black/75`. Hlídá `check-contrast-classes`.
+- **Popisek `t-label` byl 0,50, tedy 3,39:1 na bílé kartě.** Teď 0,62.
+  Barva psaná v CSS unikala kontrole, která čte jen `className` v TSX —
+  proto kontrola čte i `globals.css`.
+
+Sonda `probe-dark` měří skutečné pixely, ne třídy, a proto musí vidět
+i vrstvu, která leží **za** textem jako sourozenec: přepínač kreslí
+tmavou pilulku absolutně umístěným prvkem s `pointer-events: none`.
+Lezení po předcích ji nevidí a `elementsFromPoint` ji přeskakuje. Obojí
+zvlášť hlásilo bílou na krémové u textu, který je bílý na tmavé pilulce.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

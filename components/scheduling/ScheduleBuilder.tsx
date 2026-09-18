@@ -904,7 +904,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                         </div>
                         <p className="text-black/60">
                           Preferuje:{' '}
-                          <span className="text-[#16181A]/90">
+                          <span className="text-black/90">
                             {s.preferredShift === 'morning'
                               ? 'Ranní'
                               : s.preferredShift === 'afternoon'
@@ -913,7 +913,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                           </span>
                           {s.maxShifts != null && (
                             <>
-                              {' · '}max <span className="text-[#16181A]/90">{s.maxShifts}</span> směn
+                              {' · '}max <span className="text-black/90">{s.maxShifts}</span> směn
                             </>
                           )}
                         </p>
@@ -994,7 +994,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                             </div>
                           );
                         })()}
-                        {s.note && <p className="text-black/60">Poznámka: <span className="text-[#16181A]/90">{s.note}</span></p>}
+                        {s.note && <p className="text-black/60">Poznámka: <span className="text-black/90">{s.note}</span></p>}
                         <button
                           onClick={() => setEditAvail({ id: s.employeeId, name: s.employeeName, avatar: s.employeeAvatar })}
                           className="mt-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-semibold hover:bg-black/[0.05] transition">
