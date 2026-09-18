@@ -105,7 +105,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
                     <p className="text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</p>
                   </div>
                   <button onClick={() => act({ shiftId: s.id, note: offerNote[s.id]?.trim() || undefined }, s.id, 'Směna je v burze. ✓')} disabled={busy === s.id}
-                    className="tap-target shrink-0 ml-auto rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
+                    className="tap-target shrink-0 grow sm:grow-0 justify-center sm:ml-auto rounded-full bg-[#16181A] text-white text-sm font-semibold px-4 py-2 hover:bg-black disabled:opacity-50 transition">
                     Nabídnout
                   </button>
                 </div>
@@ -136,7 +136,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
                 {o.note && <p className="text-xs text-black/50 mt-1 italic">„{o.note}"</p>}
               </div>
               <button onClick={() => act({ id: o.id, action: 'claim' }, o.id, 'Vzato — čeká na schválení vedení. ✓')} disabled={busy === o.id}
-                className="shrink-0 ml-auto rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 hover:brightness-110 disabled:opacity-50 transition">
+                className="shrink-0 grow sm:grow-0 justify-center sm:ml-auto rounded-full bg-[#C8F542] text-black text-sm font-semibold px-4 py-2 hover:brightness-110 disabled:opacity-50 transition">
                 Vezmu si to
               </button>
             </div>
@@ -157,7 +157,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
                 </p>
               </div>
               <button onClick={() => act({ id: o.id, action: 'cancel' }, o.id, 'Nabídka stažena.')} disabled={busy === o.id}
-                className="shrink-0 ml-auto rounded-full bg-black/[0.05] text-black/60 text-sm px-4 py-2 hover:bg-black/[0.08] disabled:opacity-50 transition">
+                className="shrink-0 grow sm:grow-0 justify-center sm:ml-auto rounded-full bg-black/[0.05] text-black/60 text-sm px-4 py-2 hover:bg-black/[0.08] disabled:opacity-50 transition">
                 Stáhnout
               </button>
             </div>

@@ -729,7 +729,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             <p className="font-semibold text-sm text-[#16181A]"><Icon name="inbox" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nové věci od týmu ({proposals.length})</p>
             {proposals.length > 1 && !propSel.selecting && (
               <button type="button" onClick={propSel.start}
-                className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+                className="sm:ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
                 <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
               </button>
             )}

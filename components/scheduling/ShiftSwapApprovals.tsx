@@ -75,7 +75,7 @@ export default function ShiftSwapApprovals() {
         <span className="rounded-full bg-[#0A84FF]/15 text-[#0A5CC0] px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
         {pending.length > 1 && !sel.selecting && (
           <button type="button" onClick={sel.start}
-            className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+            className="sm:ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
             <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
           </button>
         )}

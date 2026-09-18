@@ -75,7 +75,7 @@ export default function ClockWidget({ userId }: { userId: number }) {
               : <p className="text-sm text-black/45">Odpíchni si příchod, když jdeš pracovat.</p>}
         </div>
       </div>
-      <Button onClick={punch} loading={busy} variant={on ? 'danger-solid' : 'accent'} icon={on ? 'logout' : 'clock'} className="shrink-0">
+      <Button onClick={punch} loading={busy} variant={on ? 'danger-solid' : 'accent'} icon={on ? 'logout' : 'clock'} block className="shrink-0">
         {on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
       </Button>
     </div>

@@ -43,7 +43,7 @@ const VYCHOZI_SLUG = 'akce';
 const vstup =
   'w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none';
 
-export default function MenuEditor() {
+export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } = {}) {
   const [boards, setBoards] = useState<Board[]>([]);
   const [aktivni, setAktivni] = useState<number | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
@@ -405,7 +405,7 @@ export default function MenuEditor() {
             To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
           {posPripojena && (
             <button type="button" onClick={zalozitZPokladny} disabled={!!importuji || ukladam}
               className="rounded-full bg-[#C8F542] on-accent font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
@@ -438,7 +438,7 @@ export default function MenuEditor() {
       {/* Nadpis obrazovky. Uvnitř karty byl h2 „Menu pro hosty" — vypadal
           jako nadpis sekce, ne obrazovky, takže Menu jako jediná položka
           navigace neřeklo, kde jsi. */}
-      <PageHeader hintId="menueditor" title="Menu" subtitle="Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky." />
+      {hlavicka && <PageHeader hintId="menueditor" title="Menu" subtitle="Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky." />}
       <div className="glass-card p-6 space-y-4">
 
         {/* Všechna menu jako dlaždice — na první pohled je vidět, co existuje,
@@ -469,7 +469,7 @@ export default function MenuEditor() {
             );
           })}
           <button type="button" onClick={() => zalozit(false)} disabled={ukladam}
-            className="rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col items-center justify-center gap-1 min-h-[104px]">
+            className="col-span-full sm:col-span-1 rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col sm:flex-col items-center justify-center gap-1 min-h-[56px] sm:min-h-[104px]">
             <span className="text-xl leading-none">＋</span>
             <span className="text-xs font-semibold">Nové menu</span>
           </button>
@@ -518,18 +518,18 @@ export default function MenuEditor() {
                   menu s vlastní adresou by mu ji přepis vzal. */}
               {zive === 'vypnuto' ? (
                 <button type="button" disabled={ukladam} onClick={() => zverejnit({ enabled: true })}
-                  className="btn btn-primary btn-sm disabled:opacity-50">
+                  className="btn btn-primary btn-sm w-full sm:w-auto disabled:opacity-50">
                   {ukladam ? 'Ukládám…' : 'Zapnout menu pro hosty'}
                 </button>
               ) : ulozenySlug !== VYCHOZI_SLUG ? (
                 <button type="button" disabled={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}
-                  className="btn btn-primary btn-sm disabled:opacity-50">
+                  className="btn btn-primary btn-sm w-full sm:w-auto disabled:opacity-50">
                   {ukladam ? 'Ukládám…' : 'Nastavit jako menu pro iPad'}
                 </button>
               ) : (
                 <button type="button" disabled={ukladam}
                   onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}
-                  className="btn btn-primary btn-sm disabled:opacity-50">
+                  className="btn btn-primary btn-sm w-full sm:w-auto disabled:opacity-50">
                   {ukladam ? 'Ukládám…' : 'Zveřejnit znovu'}
                 </button>
               )}

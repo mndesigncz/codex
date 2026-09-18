@@ -64,7 +64,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     <section aria-labelledby="h-scan" className="card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         <h2 id="h-scan" className="font-bold tracking-tight flex items-center gap-2"><Icon name="card" size={18} className="text-black/55" />Kartička hosta</h2>
-        {hit && <button type="button" onClick={reset} className="tap-target-sm ml-auto text-xs font-semibold text-black/55 hover:text-black">Jiný host</button>}
+        {hit && <button type="button" onClick={reset} className="tap-target-sm sm:ml-auto text-xs font-semibold text-black/55 hover:text-black">Jiný host</button>}
       </div>
       {!hit ? (
         <form onSubmit={e => { e.preventDefault(); lookup(code); }} className="flex gap-2 flex-wrap">

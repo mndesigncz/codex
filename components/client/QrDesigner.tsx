@@ -104,7 +104,7 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
           </h2>
         </div>
         <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
-          className="tap-target-sm ml-auto text-xs font-semibold text-black/55 hover:text-black flex items-center gap-1">
+          className="tap-target-sm sm:ml-auto text-xs font-semibold text-black/55 hover:text-black flex items-center gap-1">
           {open ? 'Skrýt' : 'Upravit a vytisknout'}<Icon name="chevron" size={14} className={open ? 'rotate-180 transition' : 'transition'} />
         </button>
       </div>

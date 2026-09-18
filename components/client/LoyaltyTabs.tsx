@@ -80,7 +80,7 @@ function Saver({ busy, onSave, children, title, hint }: { busy: boolean; onSave:
         {hint && <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">{hint}</p>}
       </div>
       {children}
-      <Button variant="accent" loading={busy} onClick={onSave}>Uložit</Button>
+      <Button variant="accent" loading={busy} onClick={onSave} block>Uložit</Button>
     </section>
   );
 }
@@ -206,13 +206,13 @@ function Points({ toast }: { toast: (m: string) => void }) {
     setBusy(false);
   };
   const row = (id: string, lb: string, hint: string, key: string, max: number, unit: string) => (
-    <div className="grid grid-cols-[7rem_1fr] gap-3 items-start">
+    <div className="grid grid-cols-1 sm:grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 items-start">
       <div><label htmlFor={id} className={label}>{lb}</label>
         <div className="flex items-center gap-1.5">
           <input id={id} type="number" min={0} max={max} value={p[key] ?? 0} onChange={e => setP({ ...p, [key]: e.target.value })} className={input} />
         </div>
       </div>
-      <p className="text-xs text-black/55 pt-7">{unit} {hint}</p>
+      <p className="text-xs text-black/55 sm:pt-7">{unit} {hint}</p>
     </div>
   );
   return (
@@ -619,20 +619,20 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
           <div>
             <p className={label}>Co kupon dává</p>
             <Segmented options={BENEFIT_OPTS} value={f.benefitKind} onChange={v => set({ benefitKind: v })} size="sm" ariaLabel="Výhoda kuponu" wrap />
-            <div className="mt-3 flex flex-wrap items-end gap-3">
+            <div className="mt-3 grid grid-cols-1 sm:flex sm:flex-wrap items-end gap-3">
               {f.benefitKind === 'percent' && (
-                <div><label htmlFor="cp-pct" className={label}>Sleva %</label><input id="cp-pct" type="number" min={1} max={100} value={f.percentOff} onChange={e => set({ percentOff: e.target.value })} placeholder="15" className={`${input} !w-24 text-center`} /></div>
+                <div><label htmlFor="cp-pct" className={label}>Sleva %</label><input id="cp-pct" type="number" min={1} max={100} value={f.percentOff} onChange={e => set({ percentOff: e.target.value })} placeholder="15" className={`${input} !w-full sm:!w-24 text-center`} /></div>
               )}
               {f.benefitKind === 'amount' && (
-                <div><label htmlFor="cp-amt" className={label}>Sleva Kč</label><input id="cp-amt" type="number" min={1} max={100000} value={f.amountOff} onChange={e => set({ amountOff: e.target.value })} placeholder="50" className={`${input} !w-24 text-center`} /></div>
+                <div><label htmlFor="cp-amt" className={label}>Sleva Kč</label><input id="cp-amt" type="number" min={1} max={100000} value={f.amountOff} onChange={e => set({ amountOff: e.target.value })} placeholder="50" className={`${input} !w-full sm:!w-24 text-center`} /></div>
               )}
               {f.benefitKind === 'xy' && (<>
-                <div><label htmlFor="cp-xb" className={label}>Koupí (X)</label><input id="cp-xb" type="number" min={1} max={50} value={f.xyBuy} onChange={e => set({ xyBuy: e.target.value })} placeholder="2" className={`${input} !w-24 text-center`} /></div>
-                <div><label htmlFor="cp-xf" className={label}>Zdarma (Y)</label><input id="cp-xf" type="number" min={1} max={50} value={f.xyFree} onChange={e => set({ xyFree: e.target.value })} className={`${input} !w-24 text-center`} /></div>
+                <div><label htmlFor="cp-xb" className={label}>Koupí (X)</label><input id="cp-xb" type="number" min={1} max={50} value={f.xyBuy} onChange={e => set({ xyBuy: e.target.value })} placeholder="2" className={`${input} !w-full sm:!w-24 text-center`} /></div>
+                <div><label htmlFor="cp-xf" className={label}>Zdarma (Y)</label><input id="cp-xf" type="number" min={1} max={50} value={f.xyFree} onChange={e => set({ xyFree: e.target.value })} className={`${input} !w-full sm:!w-24 text-center`} /></div>
               </>)}
               {f.benefitKind === 'free_item' && <p className="text-xs text-black/55 pb-1">Položka zdarma — co přesně, řekni v názvu kuponu.</p>}
               {f.benefitKind === 'text' && <p className="text-xs text-black/55 pb-1">Výhoda je v názvu a popisu — obsluha ji vyřídí podle nich.</p>}
-              <div><label htmlFor="cp-min" className={label}>Min. útrata (Kč)</label><input id="cp-min" type="number" min={0} max={100000} value={f.minOrderValue} onChange={e => set({ minOrderValue: e.target.value })} placeholder="—" className={`${input} !w-28 text-center`} /></div>
+              <div><label htmlFor="cp-min" className={label}>Min. útrata (Kč)</label><input id="cp-min" type="number" min={0} max={100000} value={f.minOrderValue} onChange={e => set({ minOrderValue: e.target.value })} placeholder="—" className={`${input} !w-full sm:!w-28 text-center`} /></div>
             </div>
           </div>
           <div className="border-t border-black/[0.06] pt-4">
@@ -652,18 +652,18 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
             <div className="flex flex-wrap gap-1.5">
               {DOW.map(d => <Chip key={d.d} on={f.daysOfWeek.includes(d.d)} onClick={() => set({ daysOfWeek: flip(f.daysOfWeek, d.d) })}>{d.l}</Chip>)}
             </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <div><label htmlFor="cp-hf" className={label}>Od hodiny</label><input id="cp-hf" type="time" value={f.hourFrom} onChange={e => set({ hourFrom: e.target.value })} className={`${input} !w-28`} /></div>
-              <div><label htmlFor="cp-ht" className={label}>Do hodiny</label><input id="cp-ht" type="time" value={f.hourTill} onChange={e => set({ hourTill: e.target.value })} className={`${input} !w-28`} /></div>
-              <div><label htmlFor="cp-vs" className={label}>Platí od</label><input id="cp-vs" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} className={`${input} !w-36`} /></div>
-              <div><label htmlFor="cp-vu" className={label}>Platí do</label><input id="cp-vu" type="date" value={f.validUntil} onChange={e => set({ validUntil: e.target.value })} className={`${input} !w-36`} /></div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
+              <div><label htmlFor="cp-hf" className={label}>Od hodiny</label><input id="cp-hf" type="time" value={f.hourFrom} onChange={e => set({ hourFrom: e.target.value })} className={`${input} !w-full sm:!w-28`} /></div>
+              <div><label htmlFor="cp-ht" className={label}>Do hodiny</label><input id="cp-ht" type="time" value={f.hourTill} onChange={e => set({ hourTill: e.target.value })} className={`${input} !w-full sm:!w-28`} /></div>
+              <div><label htmlFor="cp-vs" className={label}>Platí od</label><input id="cp-vs" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} className={`${input} !w-full sm:!w-36`} /></div>
+              <div><label htmlFor="cp-vu" className={label}>Platí do</label><input id="cp-vu" type="date" value={f.validUntil} onChange={e => set({ validUntil: e.target.value })} className={`${input} !w-full sm:!w-36`} /></div>
             </div>
             <p className="text-xs text-black/50">Žádný den nevybraný = platí každý den. Prázdné hodiny = celý den.</p>
           </div>
           <div className="border-t border-black/[0.06] pt-4 space-y-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <div><label htmlFor="cp-per" className={label}>Nejvýš na hosta</label><input id="cp-per" type="number" min={0} max={100} value={f.perCustomer} onChange={e => set({ perCustomer: parseInt(e.target.value || '0', 10) })} className={`${input} !w-24 text-center`} /></div>
-              <div><label htmlFor="cp-cd" className={label}>Znovu až za (dní)</label><input id="cp-cd" type="number" min={0} max={365} value={f.cooldownDays} onChange={e => set({ cooldownDays: parseInt(e.target.value || '0', 10) })} className={`${input} !w-24 text-center`} /></div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
+              <div><label htmlFor="cp-per" className={label}>Nejvýš na hosta</label><input id="cp-per" type="number" min={0} max={100} value={f.perCustomer} onChange={e => set({ perCustomer: parseInt(e.target.value || '0', 10) })} className={`${input} !w-full sm:!w-24 text-center`} /></div>
+              <div><label htmlFor="cp-cd" className={label}>Znovu až za (dní)</label><input id="cp-cd" type="number" min={0} max={365} value={f.cooldownDays} onChange={e => set({ cooldownDays: parseInt(e.target.value || '0', 10) })} className={`${input} !w-full sm:!w-24 text-center`} /></div>
             </div>
             <p className="text-xs text-black/50">0 = bez omezení. Limit počítá vyzvednutí, cooldown čas od posledního.</p>
             <label className="flex items-center gap-2.5 text-sm cursor-pointer">
@@ -764,9 +764,9 @@ function Tiers({ toast }: { toast: (m: string) => void }) {
                 <p className="text-xs text-black/50 mt-1.5">{t.hint ?? t.at ?? 'Od kolika návštěv'}</p>
               </div>
               {t.atKey ? (
-                <div><label htmlFor={`t-${t.id}`} className={label}>Návštěv</label><input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={2000} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} className={`${input} !w-24`} /></div>
-              ) : <span />}
-              <div><label htmlFor={`d-${t.id}`} className={label}>Sleva %</label><input id={`d-${t.id}`} type="number" min={0} max={90} value={p[t.discKey] ?? 0} onChange={e => setP({ ...p, [t.discKey]: e.target.value })} className={`${input} !w-24`} /></div>
+                <div><label htmlFor={`t-${t.id}`} className={label}>Návštěv</label><input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={2000} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} className={`${input} !w-full sm:!w-24`} /></div>
+              ) : <span className="hidden sm:block" />}
+              <div><label htmlFor={`d-${t.id}`} className={label}>Sleva %</label><input id={`d-${t.id}`} type="number" min={0} max={90} value={p[t.discKey] ?? 0} onChange={e => setP({ ...p, [t.discKey]: e.target.value })} className={`${input} !w-full sm:!w-24`} /></div>
             </li>
           ))}
         </ul>

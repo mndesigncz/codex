@@ -58,8 +58,8 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
 
   return (
     <div className={`space-y-4 ${className}`}>
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0 flex-1 basis-[14rem]">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0 sm:flex-1">
           <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
             <p className="t-meta mt-1.5 max-w-[70ch] text-pretty group">
@@ -77,10 +77,10 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
           )}
         </div>
         {(primary || secondary || (menu && menu.length > 0)) && (
-          <div className="flex items-center gap-2 shrink-0 ml-auto">
+          <div className="flex items-center gap-2 sm:shrink-0 sm:ml-auto">
             {secondary && <div className="hidden md:flex items-center gap-2">{secondary}</div>}
             {menu && menu.length > 0 && <Menu items={menu} />}
-            {primary}
+            {primary && <div className="flex-1 sm:flex-none flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{primary}</div>}
           </div>
         )}
       </div>

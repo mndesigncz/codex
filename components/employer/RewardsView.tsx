@@ -124,7 +124,7 @@ function RewardsViewInner() {
               <p className="font-bold text-[#16181A]"><Icon name="gift" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Žádosti o odměny</p>
               {pendingRedemptions.length > 1 && !redSel.selecting && (
                 <button type="button" onClick={redSel.start}
-                  className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
+                  className="sm:ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
                   <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
                 </button>
               )}
@@ -295,7 +295,7 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
                 by byly tři „hlavní" akce a DESIGN.md má jednu. Limetka je
                 vyhrazená hlavní akci obrazovky. */}
             <button onClick={e => { e.stopPropagation(); onRate(s); }}
-              className="btn btn-secondary btn-sm whitespace-nowrap shrink-0 ml-auto">
+              className="btn btn-secondary btn-sm justify-center whitespace-nowrap shrink-0 w-full min-[420px]:w-auto min-[420px]:ml-auto">
               Ohodnotit
             </button>
           </div>

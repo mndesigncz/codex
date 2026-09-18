@@ -961,6 +961,43 @@ někomu patří — mzda, podpis pod zavíracím postupem, „kdo to naskladnil"
   `Kč`. Starší podniky mají uložený symbol, takže `normalizeCurrency`
   je most mezi tím; `Intl` na symbol vyhodí výjimku.
 
+## Na telefonu nesmí prvek skončit v půlce
+
+Na monitoru to vypadá správně: nadpis vlevo, akce vpravo, pole vedle
+nápovědy. Na 390 px se ten řádek zalomí — a `ml-auto` nechá akci viset
+samotnou v pravé půlce prázdného řádku, kde nelícuje s ničím. Ze
+screenshotů z mobilu to byl zdaleka nejčastější nález: „Oznámit týmu",
+„Připnout oznámení", „Nový úkol", „Sestavit rozvrh", „Ohodnotit",
+„Obnovit" — každé zvlášť viselo v prázdnu.
+
+- **Hlavní akce jde na telefonu přes celý řádek.** `w-full sm:w-auto
+  justify-center`, nebo `block` u `<Button>`. Dvojice hlavních akcí se
+  skládá pod sebe, obě přes celý řádek; přepínací menu `···` zůstává
+  vedle. Řeší to `PageHeader` za všechny obrazovky naráz — akce v něm
+  mají na telefonu vlastní řádek.
+- **Tichá akce se srovná s levým okrajem, ne s pravým.** `sm:ml-auto`,
+  `justify-start sm:justify-end`. Malá pilulka u pravého kraje jinak
+  nelícuje s ničím nad sebou ani pod sebou. Hlídá `check-mobile-align`.
+- **Pole s pevnou šířkou je pevné jen na monitoru.** `!w-full sm:!w-24`.
+  Pevných `7rem` vedle nápovědy vyrobilo na telefonu vstup široký 112 px
+  a nápovědu zmáčknutou do tří řádků vedle něj. Dvojice polí (od–do,
+  datum–čas) sdílí řádek přes `grid-cols-2 sm:flex`.
+- **Pevné sloupce mají svůj součet.** Čtyři sloupce po 64–96 px se na
+  390 px nevejdou a `flex-1` název mezi nimi zkolabuje na nulu — zbyde
+  řada čísel bez toho, čeho se týkají. Pod `sm` se z tabulky stává
+  věta pod názvem.
+- **Oddělovač mezi řádky nemá co dělat.** „·" a „–" mezi předvolbami
+  a rozsahem dat drží smysl jen v jedné řádce; po zalomení zůstanou
+  viset samy. Buď řádek nezalomit, nebo oddělovač zahodit.
+- **`ListRow`: když jsou v ocase jen akce, dojedou k okraji.**
+  `space-between` položí jediný prvek doleva a pravá půlka řádku zůstane
+  prázdná. `.list-actions:only-child` v `globals.css` to řeší pro
+  všechny seznamy naráz.
+
+Nadpis obrazovky je jeden. Když se jedna obrazovka vykresluje uvnitř
+druhé, ta vnořená svou hlavičku nevykresluje — Menu v Managero client
+mělo dvakrát pod sebou „Menu" a pokaždé jinou větu pod ním.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

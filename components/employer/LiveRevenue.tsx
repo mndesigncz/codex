@@ -94,7 +94,7 @@ export default function LiveRevenue() {
 
   return (
     <div className="glass-card p-5 sm:p-6 space-y-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between gap-3">
         <div className="min-w-0">
           <h3 className="t-card">
             Živě z pokladny{d?.placeName ? ` · ${d.placeName}` : ''}
@@ -105,27 +105,30 @@ export default function LiveRevenue() {
           </p>
         </div>
         <button onClick={load} disabled={loading}
-          className="shrink-0 rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black disabled:opacity-50 transition inline-flex items-center gap-1.5">
+          className="w-full sm:w-auto shrink-0 rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black disabled:opacity-50 transition inline-flex items-center justify-center gap-1.5">
           <Icon name="swap" size={14} /> {loading ? 'Načítám…' : 'Obnovit'}
         </button>
       </div>
 
       {/* Období */}
-      <div className="flex flex-wrap items-center gap-2">
-        {presets.map(([label, a, b]) => (
-          <button key={label} onClick={() => preset(a, b)}
-            className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
-              isPreset(a, b) ? 'seg-on' : 'seg-off glass'
-            }`}>
-            {label}
-          </button>
-        ))}
-        <span className="text-black/20">·</span>
-        <input type="date" aria-label="Od data" value={from} max={to} onChange={e => setFrom(e.target.value)}
-          className="tap-target-sm field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
-        <span className="text-xs text-black/35">–</span>
-        <input type="date" aria-label="Do data" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
-          className="tap-target-sm field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {presets.map(([label, a, b]) => (
+            <button key={label} onClick={() => preset(a, b)}
+              className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
+                isPreset(a, b) ? 'seg-on' : 'seg-off glass'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="date" aria-label="Od data" value={from} max={to} onChange={e => setFrom(e.target.value)}
+            className="tap-target-sm flex-1 sm:flex-none min-w-0 field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+          <span className="text-xs text-black/35 shrink-0">–</span>
+          <input type="date" aria-label="Do data" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
+            className="tap-target-sm flex-1 sm:flex-none min-w-0 field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
+        </div>
       </div>
 
       {err && <p className="text-sm text-wait-ink bg-wait/10 border border-wait/25 rounded-2xl px-4 py-3">{err}</p>}

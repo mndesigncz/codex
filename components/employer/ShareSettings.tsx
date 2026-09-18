@@ -191,7 +191,7 @@ export default function ShareSettings() {
         </div>
 
         <button onClick={create} disabled={creating}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 inline-flex items-center gap-2">
+          className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 inline-flex items-center gap-2">
           <Icon name="plus" size={16} /> {creating ? 'Vytvářím…' : 'Vytvořit odkaz'}
         </button>
       </div>

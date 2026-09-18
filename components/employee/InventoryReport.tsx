@@ -251,7 +251,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
           {item.archived ? 'Máme zpátky' : 'Nevedeme'}
         </button>
         <button type="button" onClick={() => save(item)} disabled={!dirty || savingId === item.id}
-          className={`tap-target ml-auto rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
+          className={`tap-target sm:ml-auto rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
           {savingId === item.id ? 'Ukládám…' : savedId === item.id && !dirty ? 'Uloženo ✓' : 'Uložit'}
         </button>
       </div>
@@ -292,7 +292,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             </p>
           </div>
           <button onClick={() => setProposeOpen(o => !o)}
-            className="shrink-0 btn btn-primary btn-sm transition">
+            className="shrink-0 btn btn-primary btn-sm justify-center w-full sm:w-auto transition">
             {proposeOpen ? 'Zavřít' : '＋ Nová věc do skladu'}
           </button>
         </div>

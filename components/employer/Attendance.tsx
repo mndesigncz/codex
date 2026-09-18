@@ -451,10 +451,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           {/* Souhrn hodin */}
           {summary.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 sm:flex-wrap">
                 <h2 className="t-section">Souhrn hodin</h2>
                 {summary.length > 2 && (
-                  <div className="ml-auto flex gap-1.5">
+                  <div className="sm:ml-auto flex flex-wrap gap-1.5">
                     {([['hours', 'Nejvíc hodin'], ['cost', 'Nejvíc mzdy'], ['name', 'Podle jména']] as const).map(([id, label]) => (
                       <button key={id} type="button" onClick={() => setSumSort(id)}
                         aria-pressed={sumSort === id}

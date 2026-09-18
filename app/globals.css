@@ -309,6 +309,12 @@ body::after {
   :where(.list-row) { flex-wrap: wrap; }
   .list-tail { display: flex; flex: 1 1 100%; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
   .list-value { width: auto; text-align: left; }
+  /* Když v ocase nic než akce není, `space-between` položí jediný prvek
+     doleva a pravá půlka řádku zůstane prázdná — „QR na stůl" končící
+     v třetině. Hlavní akce v takovém řádku dojede až k okraji, tiché
+     „···" zůstane vedle ní. */
+  .list-actions:only-child { flex: 1 1 auto; }
+  .list-actions:only-child > :first-child { flex: 1 1 auto; }
 }
 
 /* ---------- Typografická škála ----------

@@ -597,7 +597,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               ))}
             </div>
             <button type="submit" disabled={inviting}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50 whitespace-nowrap ml-auto">
+              className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50 whitespace-nowrap sm:ml-auto">
               {inviting ? 'Odesílám…' : 'Odeslat pozvánku'}
             </button>
           </div>
