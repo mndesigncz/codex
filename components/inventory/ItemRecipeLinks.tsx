@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { useResultKeys } from '@/lib/useResultKeys';
 
 type Link = { productId: string; productName: string | null; amount: number };
 type Product = { productId: string; name: string; category?: string | null; price?: number | null };
@@ -36,6 +37,8 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
   const [err, setErr] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const pickList = useRef<HTMLDivElement>(null);
+  const keys = useResultKeys(pickList, searchRef, { onEscape: () => { setAdding(false); setQuery(''); setFound([]); } });
 
   // Menu má u větších podniků skoro tisíc položek — hledáme na serveru.
   useEffect(() => {
@@ -157,12 +160,14 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
           ) : (
             <>
               <input ref={searchRef} autoFocus value={query} onChange={e => setQuery(e.target.value)}
+                onKeyDown={keys.onInputKeyDown}
                 placeholder="Hledat položku v kase…" className={field} />
               {query.trim().length >= 2 && found.length === 0 && (
                 <p className="text-xs text-black/40">Nic takového v menu není.</p>
               )}
               {found.length > 0 && (
-                <div className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
+                <div ref={pickList} onKeyDown={keys.onListKeyDown}
+                  className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
                   {found.map(p => (
                     <button key={p.productId} type="button" onClick={() => { setPicked(p); setErr(''); }}
                       className="w-full text-left px-1 py-2 hover:bg-black/[0.03] transition">

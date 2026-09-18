@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { useResultKeys } from '@/lib/useResultKeys';
 
 type Product = { productId: string; name: string; category?: string | null; price?: number | null };
 
@@ -17,6 +18,9 @@ export default function GuideProductLink({ productId, productName, onPick }: {
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const pickInput = useRef<HTMLInputElement>(null);
+  const pickList = useRef<HTMLDivElement>(null);
+  const keys = useResultKeys(pickList, pickInput, { onEscape: () => { setOpen(false); setQuery(''); } });
   const [found, setFound] = useState<Product[]>([]);
   const [note, setNote] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,14 +55,16 @@ export default function GuideProductLink({ productId, productName, onPick }: {
         </div>
       ) : open ? (
         <div className="well border border-black/[0.07] p-3 space-y-2">
-          <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+          <input ref={pickInput} autoFocus value={query} onChange={e => setQuery(e.target.value)}
+            onKeyDown={keys.onInputKeyDown}
             placeholder="Hledat položku v kase…"
             className="w-full rounded-2xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
           {query.trim().length >= 2 && found.length === 0 && (
             <p className="text-xs text-black/40">{note || 'Nic takového v menu není.'}</p>
           )}
           {found.length > 0 && (
-            <div className="max-h-44 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
+            <div ref={pickList} onKeyDown={keys.onListKeyDown}
+              className="max-h-44 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
               {found.map(p => (
                 <button key={p.productId} type="button"
                   onClick={() => { onPick(p.productId, p.name); setOpen(false); setQuery(''); }}

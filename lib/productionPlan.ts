@@ -3,7 +3,9 @@
 // lib/production.ts.
 
 import { stockMeasure, type CategoryPackaging, type StockStatus } from './packaging.ts';
-import { czCount } from '@/lib/czech';
+// Relativní cesta, ne alias `@/`: tenhle soubor si načítá `npm test`
+// přímo Nodem (`node scripts/test-units.ts`) a ten aliasy z tsconfigu nezná.
+import { czCount } from './czech.ts';
 
 export const MAX_BATCHES = 10;
 export const MAX_INGREDIENTS = 20;
