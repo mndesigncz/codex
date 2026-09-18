@@ -78,22 +78,40 @@ export async function POST(req: NextRequest) {
   // order straight out. Both steps are additive; the order exists regardless.
   const supplierId = parseInt(b.supplierId);
   let emailed = false;
+  // Proč se neodeslalo — obrazovka to má říct, ne mlčet. Dřív se
+  // `email_sent_at` zapsalo i při odmítnutí, protože `send()` nepadá:
+  // chybu vrací v odpovědi. Vedoucí pak čekal na zboží, které nikdo
+  // neobjednal.
+  let emailError: string | null = null;
   if (Number.isFinite(supplierId)) {
     try { await sql`UPDATE orders SET supplier_id = ${supplierId} WHERE id = ${row.id}`; } catch { /* not migrated */ }
     if (b.sendEmail === true) {
       try {
         const [sup] = await sql`SELECT name, email FROM suppliers WHERE id = ${supplierId} AND team_id = ${c.teamId}`;
-        if (sup?.email) {
+        if (!sup?.email) {
+          emailError = 'Dodavatel nemá uložený e-mail.';
+        } else {
           const [team] = await sql`SELECT name FROM teams WHERE id = ${c.teamId}`;
+          // Odpověď musí dojít živému člověku. Tým vlastní kontaktní
+          // adresu nemá, takže se bere e-mail toho, kdo objednává.
+          const [me] = await sql`SELECT email FROM users WHERE id = ${c.meId}`;
           const text = items.map((i: any) => `• ${i.name} — ${i.qty} ${i.unit ?? ''}`.trim()).join('\n');
-          await sendOrderEmail(sup.email, team?.name ?? 'Podnik', text, b.note ?? null);
-          await sql`UPDATE orders SET email_sent_at = NOW() WHERE id = ${row.id}`;
-          emailed = true;
+          // Odpověď dodavatele musí dojít do podniku, ne odesílací službě.
+          const replyTo = (me?.email as string | undefined) || null;
+          const res = await sendOrderEmail(sup.email, team?.name ?? 'Podnik', text, b.note ?? null, replyTo);
+          if (res.sent) {
+            await sql`UPDATE orders SET email_sent_at = NOW() WHERE id = ${row.id}`;
+            emailed = true;
+          } else {
+            emailError = res.error ?? 'Odeslání se nepovedlo.';
+          }
         }
-      } catch { /* e-mail is best-effort; the order stays created */ }
+      } catch (e: any) {
+        emailError = e?.message ?? 'Odeslání se nepovedlo.';
+      }
     }
   }
-  return NextResponse.json({ ok: true, order: shape(row), emailed });
+  return NextResponse.json({ ok: true, order: shape(row), emailed, emailError });
 }
 
 // PATCH (employer) — receive or cancel: { id, action: 'received'|'cancelled', totalCost?, restock? }.
