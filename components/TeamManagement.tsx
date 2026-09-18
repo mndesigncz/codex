@@ -61,7 +61,7 @@ const inputClass =
 function roleChip(role: string) {
   return role === 'employer'
     ? 'bg-[#C8F542]/15 text-[#5B7A08]'
-    : 'bg-blue-500/15 text-blue-600';
+    : 'bg-info/15 text-info-ink';
 }
 function roleLabel(role: string) {
   return role === 'employer' ? 'Vedoucí' : 'Zaměstnanec';
@@ -69,8 +69,8 @@ function roleLabel(role: string) {
 
 function statusChip(status: string) {
   if (status === 'accepted') return 'bg-[#C8F542]/15 text-[#5B7A08]';
-  if (status === 'expired' || status === 'declined' || status === 'revoked') return 'bg-red-500/15 text-red-600';
-  return 'bg-blue-500/15 text-blue-600';
+  if (status === 'expired' || status === 'declined' || status === 'revoked') return 'bg-bad/15 text-bad-ink';
+  return 'bg-info/15 text-info-ink';
 }
 function statusLabel(status: string) {
   if (status === 'accepted') return 'Přijato';
@@ -660,7 +660,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                           if (res.ok) setInvitations(prev => prev.map(x => x.id === inv.id ? { ...x, status: 'revoked' } : x));
                           else setError('Pozvánku se nepodařilo zrušit.');
                         }}
-                        className="text-xs font-medium text-red-600/80 hover:text-red-600 hover:underline whitespace-nowrap">
+                        className="text-xs font-medium text-bad-ink/80 hover:text-bad-ink hover:underline whitespace-nowrap">
                         Zrušit
                       </button>
                     )}
@@ -731,7 +731,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         Upravit
                       </button>
                       <button onClick={() => setRemoveTarget(m)}
-                        className="rounded-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 transition whitespace-nowrap">
+                        className="rounded-full px-4 py-2 text-sm font-medium text-bad-ink hover:bg-bad/10 transition whitespace-nowrap">
                         Odebrat
                       </button>
                     </div>
@@ -978,7 +978,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             onClick={e => e.stopPropagation()}>
             <DiscardGuard guard={removeModal.guard} />
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/20 flex items-center justify-center text-red-600">
+              <div className="w-11 h-11 rounded-full bg-bad/15 border border-bad/20 flex items-center justify-center text-bad-ink">
                 <Icon name="warning" size={20} />
               </div>
               <h3 className="t-card">Odebrat člena</h3>
@@ -989,7 +989,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             </p>
             <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
               <button onClick={confirmRemove} disabled={removing}
-                className="rounded-full bg-red-500 text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50">
+                className="rounded-full bg-bad text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50">
                 {removing ? 'Odebírám…' : 'Odebrat'}
               </button>
               <button onClick={() => setRemoveTarget(null)} disabled={removing}

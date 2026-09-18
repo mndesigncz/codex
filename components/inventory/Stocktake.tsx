@@ -154,7 +154,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
           <button onClick={m.guard.attemptClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
         </div>
 
-        {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
+        {err && <p className="text-sm text-bad-ink mt-2">{err}</p>}
         {doneMsg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-3 mt-3">{doneMsg}</p>}
 
         {loading ? (
@@ -198,7 +198,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                           {h.completedAt ? new Date(h.completedAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
                         </span>
                         <span className="text-black/45">· {counted.length} spočítáno</span>
-                        <span className={diffs.length ? 'text-amber-700 font-medium' : 'text-[#5B7A08]'}>
+                        <span className={diffs.length ? 'text-wait-ink font-medium' : 'text-[#5B7A08]'}>
                           · {diffs.length ? `${diffs.length} rozdílů` : 'vše sedělo ✓'}
                         </span>
                       </button>
@@ -213,16 +213,16 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
             <div className="sticky top-0 z-10 glass-strong rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-[#16181A] tabular-nums">
                 {countedN}/{open.data.length} spočítáno
-                {diffN > 0 && <span className="text-amber-700"> · {diffN} rozdílů</span>}
+                {diffN > 0 && <span className="text-wait-ink"> · {diffN} rozdílů</span>}
               </p>
               <div className="flex gap-2">
                 {isEmployer && (
-                  <button onClick={cancel} className="rounded-full glass text-black/50 hover:text-red-600 px-3.5 py-2 text-xs font-semibold transition">Zrušit</button>
+                  <button onClick={cancel} className="rounded-full glass text-black/50 hover:text-bad-ink px-3.5 py-2 text-xs font-semibold transition">Zrušit</button>
                 )}
                 {isEmployer && (
                   confirmDone ? (
                     <button onClick={complete} disabled={busy}
-                      className="rounded-full bg-red-500/15 border border-red-500/30 text-red-600 px-4 py-2 text-xs font-bold disabled:opacity-50 transition">
+                      className="rounded-full bg-bad/15 border border-bad/30 text-bad-ink px-4 py-2 text-xs font-bold disabled:opacity-50 transition">
                       {busy ? 'Zapisuji…' : `Opravdu zapsat ${diffN} rozdílů?`}
                     </button>
                   ) : (
@@ -258,7 +258,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                             className="w-20 shrink-0 rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                           />
                           <span className={`w-12 shrink-0 text-right text-xs font-semibold tabular-nums ${
-                            diff == null ? 'text-black/20' : diff === 0 ? 'text-[#5B7A08]' : 'text-amber-700'
+                            diff == null ? 'text-black/20' : diff === 0 ? 'text-[#5B7A08]' : 'text-wait-ink'
                           }`}>
                             {diff == null ? '' : diff === 0 ? '✓' : diff > 0 ? `+${diff}` : diff}
                           </span>
@@ -280,7 +280,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
                               className="tap-target-sm w-20 shrink-0 rounded-xl bg-white/60 border border-black/[0.07] px-3 py-1.5 text-xs text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                             />
                             <span className={`w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums ${
-                              openDiff == null ? 'text-black/20' : openDiff === 0 ? 'text-[#5B7A08]' : 'text-amber-700'
+                              openDiff == null ? 'text-black/20' : openDiff === 0 ? 'text-[#5B7A08]' : 'text-wait-ink'
                             }`}>
                               {openDiff == null ? '' : openDiff === 0 ? '✓' : openDiff > 0 ? `+${fmt(openDiff)}` : fmt(openDiff)}
                             </span>

@@ -144,7 +144,7 @@ function RewardsViewInner() {
                     <button type="button" onClick={() => decide(r.id, 'approve')} disabled={busyId !== null}
                       className="tap-target-sm shrink-0 btn btn-primary btn-sm disabled:opacity-50 transition">Schválit</button>
                     <button type="button" onClick={() => decide(r.id, 'decline')} disabled={busyId !== null}
-                      className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-red-600 px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition">Zamítnout</button>
+                      className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-bad-ink px-3 py-1.5 text-xs font-semibold disabled:opacity-50 transition">Zamítnout</button>
                   </>)}
                 </div>
               ))}
@@ -221,7 +221,7 @@ function RewardsViewInner() {
                     if (!confirm(`Smazat odměnu „${rw.title}"?`)) return;
                     await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
                     await loadShop();
-                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-red-600 text-xs"><Icon name="close" size={15} /></button>
+                  }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-bad-ink text-xs"><Icon name="close" size={15} /></button>
                 </div>
               ))}
             </div>
@@ -271,12 +271,12 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
                 <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-0.5 text-[11px] font-bold">{s.levelName}</span>
                 {!!s.flagged && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/12 text-red-600 px-2 py-0.5 text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bad/12 text-bad-ink px-2 py-0.5 text-[11px] font-semibold">
                     <Icon name="warning" size={11} /> {s.flagged}
                   </span>
                 )}
                 {!!s.pending && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-700 px-2 py-0.5 text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold">
                     {s.pending} k hodnocení
                   </span>
                 )}
@@ -367,7 +367,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
           const n = Number.isFinite(raw) ? raw : 0;
           setPts(p => ({ ...p, [key]: Math.max(allowNegative ? -100 : 0, Math.min(100, n)) }));
         }}
-        className={`${inputCls} !py-2.5 tabular-nums ${allowNegative && pts[key] < 0 ? 'text-red-600' : ''}`} />
+        className={`${inputCls} !py-2.5 tabular-nums ${allowNegative && pts[key] < 0 ? 'text-bad-ink' : ''}`} />
       <p className="text-[11px] text-black/40 mt-1">{hint}</p>
     </div>
   );
@@ -416,7 +416,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#16181A] text-[#C8F542] text-xs font-bold">{i + 1}</span>
                 <input value={l.name} onChange={e => setLevel(i, { name: e.target.value })} placeholder="Název úrovně" className={`${inputCls} !py-2 flex-1`} />
                 <button onClick={() => removeLevel(i)} disabled={levels.length <= 1} title="Smazat úroveň"
-                  className="rounded-full w-8 h-8 flex items-center justify-center text-black/40 hover:text-red-600 hover:bg-red-500/10 disabled:opacity-30 shrink-0">
+                  className="rounded-full w-8 h-8 flex items-center justify-center text-black/40 hover:text-bad-ink hover:bg-bad/10 disabled:opacity-30 shrink-0">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
                 </button>
               </div>
@@ -437,7 +437,7 @@ function SettingsPanel({ levels: initLevels, points: initPoints, onSaved }:
           {saving ? 'Ukládám…' : 'Uložit nastavení'}
         </button>
         {saved && <span className="text-sm text-[#5B7A08] font-medium">Uloženo ✓</span>}
-        {err && <span className="text-sm text-red-600 font-medium">{err}</span>}
+        {err && <span className="text-sm text-bad-ink font-medium">{err}</span>}
       </div>
     </div>
   );

@@ -75,8 +75,8 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-[11px] text-black/50">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#C8F542]" /> Ohodnoceno</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Čeká na hodnocení</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Něco je špatně</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-wait" /> Čeká na hodnocení</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Něco je špatně</span>
       </div>
 
       {loading ? (
@@ -94,9 +94,9 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
               const tone = !day
                 ? 'bg-black/[0.015] border-transparent'
                 : flagged
-                  ? 'bg-red-500/[0.08] border-red-500/30'
+                  ? 'bg-bad/[0.08] border-bad/30'
                   : day.pending > 0
-                    ? 'bg-amber-500/[0.08] border-amber-500/30'
+                    ? 'bg-wait/[0.08] border-wait/30'
                     : 'bg-[#C8F542]/[0.12] border-[#C8F542]/40';
               const active = sel === date;
               return (
@@ -112,7 +112,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
                     </div>
                   )}
                   {day && (
-                    <span className={`mt-auto w-1.5 h-1.5 rounded-full ${flagged ? 'bg-red-500' : day.pending > 0 ? 'bg-amber-500' : 'bg-[#8FB811]'}`} />
+                    <span className={`mt-auto w-1.5 h-1.5 rounded-full ${flagged ? 'bg-bad' : day.pending > 0 ? 'bg-wait' : 'bg-[#8FB811]'}`} />
                   )}
                 </button>
               );
@@ -126,7 +126,7 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
                 <p className="font-bold tracking-tight text-[#16181A] cz-sentence">
                   {new Date(sel + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
-                <span className={`text-xs font-medium ${detail.pending > 0 ? 'text-amber-600' : 'text-[#5B7A08]'}`}>
+                <span className={`text-xs font-medium ${detail.pending > 0 ? 'text-wait-ink' : 'text-[#5B7A08]'}`}>
                   {detail.pending > 0 ? `${detail.pending} k ohodnocení` : 'Vše ohodnoceno'}
                 </span>
               </div>
@@ -147,15 +147,15 @@ export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void 
                 )}
                 {detail.staff.map(p => (
                   <button key={p.id} onClick={() => setRating({ person: p, date: sel, whole: false })}
-                    className={`w-full flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition hover:bg-black/[0.03] ${p.flagged ? 'border-red-500/40 bg-red-500/[0.06]' : 'border-black/[0.06] bg-white/40'}`}>
+                    className={`w-full flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition hover:bg-black/[0.03] ${p.flagged ? 'border-bad/40 bg-bad/[0.06]' : 'border-black/[0.06] bg-white/40'}`}>
                     <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.avatar || '👤'}</span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-medium text-[#16181A] truncate">{p.name}</span>
-                      <span className={`block text-xs ${p.reviewed ? 'text-black/45' : 'text-amber-600'}`}>
+                      <span className={`block text-xs ${p.reviewed ? 'text-black/45' : 'text-wait-ink'}`}>
                         {p.reviewed ? `Ohodnoceno${p.rating ? ` · ${p.rating}★` : ''}` : 'Čeká na hodnocení'}
                       </span>
                     </span>
-                    {p.flagged && <Icon name="warning" size={15} className="text-red-600 shrink-0" />}
+                    {p.flagged && <Icon name="warning" size={15} className="text-bad-ink shrink-0" />}
                     {p.reviewed && !p.flagged && <Icon name="check" size={15} className="text-[#5B7A08] shrink-0" />}
                     <Icon name="chevron" size={15} className="-rotate-90 text-black/30 shrink-0" />
                   </button>

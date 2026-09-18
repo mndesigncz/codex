@@ -16,7 +16,7 @@ function Field({ id, label: l, hint, error, children }: { id: string; label: str
     <div className="grid gap-2">
       <label htmlFor={id} className={label}>{l}</label>
       {children}
-      {error ? <p className="text-xs text-red-700">{error}</p> : hint ? <p className="text-xs text-black/45">{hint}</p> : null}
+      {error ? <p className="text-xs text-bad-ink">{error}</p> : hint ? <p className="text-xs text-black/45">{hint}</p> : null}
     </div>
   );
 }

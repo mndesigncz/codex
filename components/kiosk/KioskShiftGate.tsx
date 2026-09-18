@@ -449,7 +449,7 @@ export function WhoIsWorking() {
               <button
                 onClick={() => punch(m)}
                 title={`Odchod – ${m.name}`}
-                className="tap-target absolute top-3 right-3 h-9 w-9 grid place-items-center rounded-full bg-white/70 border border-black/10 text-black/40 hover:text-red-600 hover:border-red-500/30 transition"
+                className="tap-target absolute top-3 right-3 h-9 w-9 grid place-items-center rounded-full bg-white/70 border border-black/10 text-black/40 hover:text-bad-ink hover:border-bad/30 transition"
               >
                 <Icon name="logout" size={16} />
               </button>
@@ -484,8 +484,8 @@ export function ActivePersonChip() {
     if (onShift.length === 0) return null;
     return (
       <button type="button" onClick={() => { void requireActive(); }}
-        className="flex items-center gap-2.5 rounded-full glass border border-[#FFD60A]/50 bg-[#FFD60A]/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-[#FFD60A]/20 transition">
-        <Icon name="warning" size={17} className="text-[#8A6D00] shrink-0" />
+        className="flex items-center gap-2.5 rounded-full glass border border-wait/50 bg-wait/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-wait/20 transition">
+        <Icon name="warning" size={17} className="text-wait-ink shrink-0" />
         <span className="text-left leading-tight">
           <span className="hidden sm:block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">Zapisuje se jako</span>
           <span className="block font-bold text-[#16181A] text-sm">Kdo jsi?</span>
@@ -606,14 +606,14 @@ export function PunchDialog({ member, now, onClose, onDone }: {
           </div>
         )}
 
-        {err && <p className="text-sm text-red-600 mt-4">{err}</p>}
+        {err && <p className="text-sm text-bad-ink mt-4">{err}</p>}
 
         <div className="mt-6 flex gap-2">
           <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] border border-black/10 text-[#16181A] px-4 py-3.5 font-medium hover:bg-black/[0.08] transition">
             Zpět
           </button>
           <button onClick={submit} disabled={busy || (needPin && pin.length < 4)}
-            className={`flex-1 rounded-full px-4 py-3.5 font-semibold text-white transition disabled:opacity-50 ${on ? 'bg-red-500 hover:brightness-110' : 'bg-[#16181A] hover:bg-black'}`}>
+            className={`flex-1 rounded-full px-4 py-3.5 font-semibold text-white transition disabled:opacity-50 ${on ? 'bg-bad hover:brightness-110' : 'bg-[#16181A] hover:bg-black'}`}>
             {busy ? '…' : on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
           </button>
         </div>

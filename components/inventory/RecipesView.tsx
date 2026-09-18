@@ -308,7 +308,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
       </div>
 
       {msg && <div className="rounded-2xl bg-[#C8F542]/12 border border-[#C8F542]/30 text-[#5B7A08] px-4 py-3 text-sm font-semibold rise-in">{msg}</div>}
-      {err && <div className="rounded-2xl bg-red-500/[0.07] border border-red-500/25 text-red-600 px-4 py-3 text-sm rise-in">{err}</div>}
+      {err && <div className="rounded-2xl bg-bad/[0.07] border border-bad/25 text-bad-ink px-4 py-3 text-sm rise-in">{err}</div>}
 
       {draft ? (
         <RecipeEditor
@@ -330,7 +330,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
             </div>
             <div className="glass-card p-4">
               <p className="text-[11px] font-bold uppercase tracking-wider text-black/45">Prodává se bez receptury</p>
-              <p className="text-3xl font-bold tracking-tight text-amber-700 tabular">{unmapped.length}</p>
+              <p className="text-3xl font-bold tracking-tight text-wait-ink tabular">{unmapped.length}</p>
               <p className="text-xs text-black/45">tyhle prodeje se ze skladu neodepíšou</p>
             </div>
             <div className="glass-card p-4">
@@ -341,16 +341,16 @@ export default function RecipesView({ openProductId, onNavigate }: {
           </div>
 
           {unmapped.length > 0 && (
-            <div className="glass-card border-amber-500/25 bg-amber-500/[0.05] p-4 space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-amber-700 flex items-center gap-1.5">
+            <div className="glass-card border-wait/25 bg-wait/[0.05] p-4 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-wait-ink flex items-center gap-1.5">
                 <Icon name="warning" size={14} /> Prodává se, ale neodepisuje
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {unmapped.map((u: any) => (
                   <button key={u.productId} onClick={() => openEditor(u.productId, u.productName ?? u.productId)}
-                    className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-amber-500/20 px-3.5 py-2 text-xs font-semibold text-[#16181A] transition active:scale-95">
+                    className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-wait/20 px-3.5 py-2 text-xs font-semibold text-[#16181A] transition active:scale-95">
                     {u.productName ?? u.productId}
-                    <span className="ml-1.5 text-amber-700 tabular">{Number(u.soldCount) || 0}×</span>
+                    <span className="ml-1.5 text-wait-ink tabular">{Number(u.soldCount) || 0}×</span>
                   </button>
                 ))}
               </div>
@@ -399,7 +399,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
               return (
                 <button key={p.productId} onClick={() => openEditor(p.productId, p.name)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-black/[0.02] transition">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${r ? 'bg-[#C8F542]' : 'bg-amber-500'}`} />
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${r ? 'bg-[#C8F542]' : 'bg-wait'}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[#16181A] line-clamp-2 sm:truncate">{p.name}</p>
                     <p className="text-[11px] text-black/45 line-clamp-2 sm:truncate">
@@ -409,7 +409,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
                         : (p.category || 'bez kategorie')}
                     </p>
                   </div>
-                  {sold > 0 && <span className="text-[11px] font-bold text-amber-700 tabular shrink-0">{sold}×</span>}
+                  {sold > 0 && <span className="text-[11px] font-bold text-wait-ink tabular shrink-0">{sold}×</span>}
                   {(() => {
                     const eco = economyOf(p.productId, p.price ?? null);
                     if (!eco) return null;
@@ -419,7 +419,7 @@ export default function RecipesView({ openProductId, onNavigate }: {
                         {eco.marginPct != null && (
                           <span className={`text-xs font-bold tabular ${
                             eco.marginPct >= 65 ? 'text-[#5B7A08]'
-                              : eco.marginPct >= 45 ? 'text-[#16181A]' : 'text-red-600'
+                              : eco.marginPct >= 45 ? 'text-[#16181A]' : 'text-bad-ink'
                           }`}>{eco.marginPct} %</span>
                         )}
                       </span>
@@ -585,7 +585,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                 </div>
                 <button type="button" title="Odebrat"
                   onClick={() => setDraft(d => d && ({ ...d, ingredients: d.ingredients.filter((_, i) => i !== idx) }))}
-                  className="text-black/30 hover:text-red-600 transition px-1.5"><Icon name="close" size={15} /></button>
+                  className="text-black/30 hover:text-bad-ink transition px-1.5"><Icon name="close" size={15} /></button>
               </div>
               {/* Díly položky — definované u ní, tady se jen vyberou. */}
               {item && Array.isArray(item.portions) && item.portions.length > 0 && (
@@ -617,10 +617,10 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                 <p className="text-[11px] text-black/45 flex flex-wrap items-center gap-x-1.5 gap-y-1">
                   {num(ing.amount) > 0 && (y?.portions != null
                     ? <span>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="text-[#5B7A08]">{y.portions}×</b></span>
-                    : <span className="text-amber-700">Chybí velikost balení — porce ani cenu nespočítám.</span>)}
+                    : <span className="text-wait-ink">Chybí velikost balení — porce ani cenu nespočítám.</span>)}
                   {y?.perPortion != null && <span>· surovina za porci <b className="text-[#16181A]">{cena(y.perPortion)}</b></span>}
                   {num(ing.amount) > 0 && y?.perPortion == null && Number(item.unitCost) > 0 === false && (
-                    <span className="text-amber-700">· chybí cena za balení</span>
+                    <span className="text-wait-ink">· chybí cena za balení</span>
                   )}
                   <button type="button" onClick={() => setEditingItem(editingItem === ing.itemId ? null : ing.itemId)}
                     className="font-bold text-[#5B7A08] hover:brightness-110 transition">
@@ -705,10 +705,10 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
                   <span className="font-semibold tabular text-[#16181A]">{money(menuPrice - totalCost)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1.5">
-                  <div className={`h-full rounded-full ${margin >= 65 ? 'bg-[#C8F542]' : margin >= 45 ? 'bg-amber-400' : 'bg-red-400'}`}
+                  <div className={`h-full rounded-full ${margin >= 65 ? 'bg-[#C8F542]' : margin >= 45 ? 'bg-wait' : 'bg-bad'}`}
                     style={{ width: `${Math.max(0, Math.min(100, margin))}%` }} />
                 </div>
-                <p className={`text-[11px] font-semibold ${margin >= 65 ? 'text-[#5B7A08]' : margin >= 45 ? 'text-amber-700' : 'text-red-600'}`}>
+                <p className={`text-[11px] font-semibold ${margin >= 65 ? 'text-[#5B7A08]' : margin >= 45 ? 'text-wait-ink' : 'text-bad-ink'}`}>
                   marže {margin} %
                 </p>
               </>
@@ -725,7 +725,7 @@ function RecipeEditor({ draft, items, itemById, money, setIng, setDraft, save, s
             <button
               onClick={() => { setDraft(d => d && ({ ...d, ingredients: [] })); setTimeout(save, 0); }}
               disabled={saving}
-              className="w-full rounded-full glass px-5 py-2.5 text-sm font-semibold text-black/50 hover:text-red-600 transition">
+              className="w-full rounded-full glass px-5 py-2.5 text-sm font-semibold text-black/50 hover:text-bad-ink transition">
               Smazat recepturu
             </button>
           )}

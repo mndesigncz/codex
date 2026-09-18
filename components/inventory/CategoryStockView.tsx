@@ -97,8 +97,8 @@ function ParkButton({ item, busy, onToggle, className = '' }: {
 }
 
 const TONE = {
-  critical: { bar: 'bg-red-500', text: 'text-red-600', chip: 'bg-red-500/12 text-red-600' },
-  low: { bar: 'bg-amber-400', text: 'text-amber-700', chip: 'bg-amber-500/12 text-amber-700' },
+  critical: { bar: 'bg-bad', text: 'text-bad-ink', chip: 'bg-bad/12 text-bad-ink' },
+  low: { bar: 'bg-wait', text: 'text-wait-ink', chip: 'bg-wait/12 text-wait-ink' },
   ok: { bar: 'bg-[#C8F542]', text: 'text-[#5B7A08]', chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
 } as const;
 
@@ -329,7 +329,7 @@ export default function CategoryStockView({
                   <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                     {savedId === i.id && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
                     {failedId === i.id && (
-                      <span className="text-xs font-semibold text-red-600 flex items-center gap-1">
+                      <span className="text-xs font-semibold text-bad-ink flex items-center gap-1">
                         <Icon name="warning" size={13} /> Neuloženo
                       </span>
                     )}
@@ -344,7 +344,7 @@ export default function CategoryStockView({
                     )}
                     {onRemoveItem && (
                       <button onClick={() => onRemoveItem(i)} title="Smazat položku"
-                        className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-red-600/70 hover:text-red-600 text-sm"><Icon name="close" size={15} /></button>
+                        className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-bad-ink/70 hover:text-bad-ink text-sm"><Icon name="close" size={15} /></button>
                     )}
                   </div>
                 </div>
@@ -355,7 +355,7 @@ export default function CategoryStockView({
                   </div>
                 ) : size <= 0 ? (
                   <>
-                    <p className="text-xs text-amber-600 mt-2">
+                    <p className="text-xs text-wait-ink mt-2">
                       Chybí velikost balení — doplň ji u položky ve skladu.
                     </p>
                     <ParkButton item={i} busy={savingId === i.id} onToggle={setParked} className="mt-2.5" />

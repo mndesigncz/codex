@@ -29,7 +29,7 @@ const num = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 3 
 
 const toneCls: Record<Insight['tone'], string> = {
   good: 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]',
-  warn: 'bg-amber-500/10 border-amber-500/25 text-amber-800',
+  warn: 'bg-wait/10 border-wait/25 text-wait-ink',
   info: 'bg-black/[0.03] border-black/[0.07] text-black/60',
 };
 
@@ -61,7 +61,7 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div className="well border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Chybí</p>
-          <p className="text-[15px] sm:text-lg font-bold tabular-nums text-red-600 whitespace-nowrap">{money(Math.abs(t.lostValue))}</p>
+          <p className="text-[15px] sm:text-lg font-bold tabular-nums text-bad-ink whitespace-nowrap">{money(Math.abs(t.lostValue))}</p>
           <p className="text-[11px] text-black/35">{t.missing} položek</p>
         </div>
         <div className="well border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
@@ -71,7 +71,7 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
         </div>
         <div className="col-span-2 sm:col-span-1 well border border-black/[0.06] px-3 sm:px-3.5 py-3 min-w-0">
           <p className="text-[11px] text-black/45">Celkem</p>
-          <p className={`text-[15px] sm:text-lg font-bold tabular-nums whitespace-nowrap ${t.netValue < 0 ? 'text-red-600' : 'text-[#16181A]'}`}>
+          <p className={`text-[15px] sm:text-lg font-bold tabular-nums whitespace-nowrap ${t.netValue < 0 ? 'text-bad-ink' : 'text-[#16181A]'}`}>
             {t.netValue > 0 ? '+' : ''}{money(t.netValue)}
           </p>
           <p className="text-[11px] text-black/35">rozdíl proti evidenci</p>
@@ -105,11 +105,11 @@ export default function ShrinkageReport({ stocktakeId }: { stocktakeId?: number 
                       {r.lossPct} % z prodaného
                     </span>
                   )}
-                  <span className={`shrink-0 text-xs font-semibold tabular-nums ${r.diff < 0 ? 'text-red-600' : 'text-[#5B7A08]'}`}>
+                  <span className={`shrink-0 text-xs font-semibold tabular-nums ${r.diff < 0 ? 'text-bad-ink' : 'text-[#5B7A08]'}`}>
                     {r.diff > 0 ? '+' : ''}{num(r.diff)} {r.diffUnit}
                   </span>
                   <span className={`w-20 shrink-0 text-right text-xs font-bold tabular-nums ${
-                    (r.value ?? 0) < 0 ? 'text-red-600' : (r.value ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-black/25'
+                    (r.value ?? 0) < 0 ? 'text-bad-ink' : (r.value ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-black/25'
                   }`}>
                     {r.value == null ? '—' : `${r.value > 0 ? '+' : ''}${money(r.value)}`}
                   </span>

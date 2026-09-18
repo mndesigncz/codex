@@ -257,22 +257,22 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
     ),
     feedback: (latestReview || unseenFlagged > 0) ? (
               <button onClick={() => onNavigate('rewards')}
-                className={`w-full text-left rounded-3xl border p-5 transition ${feedbackAlert ? 'bg-red-500/[0.07] border-red-500/30 hover:bg-red-500/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
+                className={`w-full text-left rounded-3xl border p-5 transition ${feedbackAlert ? 'bg-bad/[0.07] border-bad/30 hover:bg-bad/[0.11]' : 'bg-[#C8F542]/15 border-[#C8F542]/30 hover:bg-[#C8F542]/20'}`}>
                 <div className="flex items-center gap-3">
-                  <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${feedbackAlert ? 'bg-red-500/15 text-red-600' : 'bg-[#16181A] text-[#C8F542]'}`}>
+                  <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${feedbackAlert ? 'bg-bad/15 text-bad-ink' : 'bg-[#16181A] text-[#C8F542]'}`}>
                     <Icon name={feedbackAlert ? 'warning' : 'award'} size={18} />
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-[#16181A]">
                       {feedbackAlert ? 'U tvé směny je něco k nápravě' : 'Vedení ohodnotilo tvou směnu'}
                     </p>
-                    <p className={`text-sm ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`}>
+                    <p className={`text-sm ${feedbackAlert ? 'text-bad-ink' : 'text-[#5B7A08]'}`}>
                       {feedbackAlert
                         ? 'Podívej se, co je potřeba probrat, a potvrď, že to víš.'
                         : feedbackDetail ? `${feedbackDetail} — přečti si zpětnou vazbu.` : 'Přečti si zpětnou vazbu k poslední směně.'}
                     </p>
                   </div>
-                  <Icon name="chevron" size={16} className={`-rotate-90 shrink-0 ${feedbackAlert ? 'text-red-600' : 'text-[#5B7A08]'}`} />
+                  <Icon name="chevron" size={16} className={`-rotate-90 shrink-0 ${feedbackAlert ? 'text-bad-ink' : 'text-[#5B7A08]'}`} />
                 </div>
               </button>
     ) : null,
@@ -342,7 +342,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lowStock.slice(0, 8).map(i => (
-                    <span key={i.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-amber-500/15 text-amber-700">{i.name} · {i.quantity} {i.unit}</span>
+                    <span key={i.id} className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-wait/15 text-wait-ink">{i.name} · {i.quantity} {i.unit}</span>
                   ))}
                 </div>
               </div>

@@ -46,7 +46,7 @@ const Stars = ({ n }: { n: number }) => (
 );
 
 const PointsBadge = ({ n }: { n: number }) => n === 0 ? null : (
-  <span className={`text-[11px] font-bold tabular-nums rounded-full px-2 py-0.5 shrink-0 ${n > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-red-500/15 text-red-600'}`}>
+  <span className={`text-[11px] font-bold tabular-nums rounded-full px-2 py-0.5 shrink-0 ${n > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-bad/15 text-bad-ink'}`}>
     {n > 0 ? '+' : ''}{n} b
   </span>
 );
@@ -102,7 +102,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   <button key={v} onClick={() => setTab(v)}
                     className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${tab === v ? 'seg-on' : 'seg-off bg-black/[0.05]'}`}>
                     {lbl}
-                    {v === 'feedback' && flaggedItems.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-white text-[11px] px-1">{flaggedItems.length}</span>}
+                    {v === 'feedback' && flaggedItems.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-bad text-white text-[11px] px-1">{flaggedItems.length}</span>}
                   </button>
                 ))}
               </div>
@@ -153,7 +153,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                       <p className={`mt-2 text-[12px] rounded-xl px-3 py-2 ${
                         p.punctuality.late === 0
                           ? 'bg-[#C8F542]/10 text-[#5B7A08]'
-                          : 'bg-amber-500/10 text-amber-700'
+                          : 'bg-wait/10 text-wait-ink'
                       }`}>
                         ⏰ Dochvilnost (30 dní): {p.punctuality.checked - p.punctuality.late}/{p.punctuality.checked} včas
                         {p.punctuality.late > 0 && ` · ${p.punctuality.late}× pozdě (víc než 10 min)`}
@@ -174,7 +174,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                         </span>
                       ))}
                       {p.breakdown.flagged > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/12 px-2.5 py-1 text-[11px] font-medium text-red-600 tabular-nums">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-bad/12 px-2.5 py-1 text-[11px] font-medium text-bad-ink tabular-nums">
                           <Icon name="warning" size={11} /> Výtky: <strong>{p.breakdown.flagged}</strong>
                         </span>
                       )}
@@ -184,12 +184,12 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   {/* Reminders — unresolved flagged feedback */}
                   {flaggedItems.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-red-600 mb-2">Co je potřeba napravit</h3>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-bad-ink mb-2">Co je potřeba napravit</h3>
                       <div className="space-y-1.5">
                         {flaggedItems.slice(0, 5).map(it => (
-                          <div key={`${it.kind}-${it.refId}`} className="rounded-xl px-3 py-2 bg-amber-500/[0.12] border border-amber-500/30">
+                          <div key={`${it.kind}-${it.refId}`} className="rounded-xl px-3 py-2 bg-wait/[0.12] border border-wait/30">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <Icon name="warning" size={13} className="text-amber-600 shrink-0" />
+                              <Icon name="warning" size={13} className="text-wait-ink shrink-0" />
                               <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40">{KIND_LABEL[it.kind] ?? ''} · {fmtDay(it.workDate)}</span>
                               <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
                               <PointsBadge n={it.points} />
@@ -236,17 +236,17 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     ) : (
                       <div className="space-y-1.5">
                         {p.shifts.recent.map(sh => (
-                          <div key={sh.id} className={`flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 ${sh.flagged ? 'bg-red-500/[0.06] border border-red-500/20' : 'bg-black/[0.03]'}`}>
+                          <div key={sh.id} className={`flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 ${sh.flagged ? 'bg-bad/[0.06] border border-bad/20' : 'bg-black/[0.03]'}`}>
                             <span className="text-sm font-medium text-[#16181A] cz-sentence min-w-0 flex-1 truncate">{fmtDayLong(sh.date)}</span>
                             <span className="text-xs text-black/45 tabular-nums shrink-0 hidden sm:inline">{sh.startTime}–{sh.endTime}</span>
                             {sh.reviewed ? (
                               <span className="flex items-center gap-1.5 flex-wrap min-w-0">
                                 {sh.rating > 0 && <Stars n={sh.rating} />}
-                                {sh.flagged && <Icon name="warning" size={13} className="text-red-600" />}
+                                {sh.flagged && <Icon name="warning" size={13} className="text-bad-ink" />}
                                 <PointsBadge n={sh.reviewPoints} />
                               </span>
                             ) : (
-                              <span className="text-[11px] font-medium text-amber-700 bg-amber-500/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
+                              <span className="text-[11px] font-medium text-wait-ink bg-wait/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
                             )}
                             <button onClick={() => setRateDate(sh.date)}
                               className="btn btn-primary btn-sm transition shrink-0">
@@ -270,14 +270,14 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                         const dayItems = p.items.filter(i => i.workDate === r.work_date);
                         const alert = r.flagged === true || dayItems.some(i => i.flagged);
                         return (
-                          <div key={r.work_date} className={`rounded-2xl p-3.5 border ${alert ? 'bg-white/60 border-red-500/25' : 'bg-black/[0.03] border-transparent'}`}>
+                          <div key={r.work_date} className={`rounded-2xl p-3.5 border ${alert ? 'bg-white/60 border-bad/25' : 'bg-black/[0.03] border-transparent'}`}>
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-sm font-semibold text-[#16181A]">{fmtDayLong(r.work_date)}</span>
                               <div className="flex items-center gap-2">
                                 {r.rating > 0 && <Stars n={r.rating} />}
                                 <PointsBadge n={r.points} />
                                 {(r.autoPoints ?? 0) !== 0 && (
-                                  <span className={`text-[11px] tabular-nums rounded-full px-1.5 py-0.5 bg-black/[0.05] ${(r.autoPoints ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>
+                                  <span className={`text-[11px] tabular-nums rounded-full px-1.5 py-0.5 bg-black/[0.05] ${(r.autoPoints ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
                                     {(r.autoPoints ?? 0) > 0 ? '+' : ''}{r.autoPoints} auto
                                   </span>
                                 )}
@@ -287,9 +287,9 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                             {dayItems.length > 0 && (
                               <div className="mt-2 space-y-1.5">
                                 {dayItems.map(it => (
-                                  <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-amber-500/[0.12] border border-amber-500/30' : 'bg-black/[0.04]'}`}>
+                                  <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-wait/[0.12] border border-wait/30' : 'bg-black/[0.04]'}`}>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      {it.flagged && <Icon name="warning" size={12} className="text-amber-600 shrink-0" />}
+                                      {it.flagged && <Icon name="warning" size={12} className="text-wait-ink shrink-0" />}
                                       <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? ''}</span>
                                       <span className="text-[13px] text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
                                       <PointsBadge n={it.points} />

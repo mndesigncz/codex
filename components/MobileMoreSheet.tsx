@@ -85,7 +85,7 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
               {actions.map((a, i) => (
                 <button key={i} onClick={() => { a.onClick(); onClose(); }}
                   className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-sm font-medium transition ${
-                    a.danger ? 'text-red-600 hover:bg-red-500/[0.06]' : 'text-black/70 hover:text-black hover:bg-black/[0.05]'
+                    a.danger ? 'text-bad-ink hover:bg-bad/[0.06]' : 'text-black/70 hover:text-black hover:bg-black/[0.05]'
                   }`}>
                   <Icon name={a.icon} size={18} className="shrink-0" />
                   {a.label}

@@ -26,7 +26,7 @@ interface Insight { icon: string; title: string; text: string; tone: 'good' | 'w
 const KIND_META: Record<string, { label: string; cls: string }> = {
   receipt: { label: 'Účtenka', cls: 'bg-[#C8F542]/20 text-[#5B7A08]' },
   order: { label: 'Objednávka', cls: 'bg-[#0A84FF]/12 text-[#0A6FE0]' },
-  expense: { label: 'Výdaj z kasy', cls: 'bg-amber-500/15 text-amber-700' },
+  expense: { label: 'Výdaj z kasy', cls: 'bg-wait/15 text-wait-ink' },
   wage: { label: 'Výplata', cls: 'bg-[#16181A]/[0.07] text-[#16181A]/75' },
   removal: { label: 'Odvod', cls: 'bg-black/[0.06] text-black/55' },
 };
@@ -90,7 +90,7 @@ export default function FinanceView() {
     const wages = Math.max(s.wagesCash, s.wagesWorked);
     const rows = [
       { label: 'Nákupy a účtenky', amount: ledger.filter(r => r.kind === 'receipt' || r.kind === 'order').reduce((a, r) => a + r.amount, 0), cls: 'bg-[#C8F542]' },
-      { label: 'Výdaje z kasy', amount: ledger.filter(r => r.kind === 'expense').reduce((a, r) => a + r.amount, 0), cls: 'bg-amber-400' },
+      { label: 'Výdaje z kasy', amount: ledger.filter(r => r.kind === 'expense').reduce((a, r) => a + r.amount, 0), cls: 'bg-wait' },
       { label: 'Mzdy', amount: wages, cls: 'bg-[#16181A]/70' },
     ].filter(r => r.amount > 0);
     const max = Math.max(...rows.map(r => r.amount), 1);
@@ -182,7 +182,7 @@ export default function FinanceView() {
 
   const TONES = {
     good: 'border-[#C8F542]/40 bg-[#C8F542]/[0.10] text-[#3E5406]',
-    warn: 'border-amber-500/30 bg-amber-500/[0.08] text-amber-800',
+    warn: 'border-wait/30 bg-wait/[0.08] text-wait-ink',
     info: 'border-[#0A84FF]/25 bg-[#0A84FF]/[0.06] text-[#0A5FC4]',
   } as const;
 
@@ -241,7 +241,7 @@ export default function FinanceView() {
             </div>
             <div className="glass-card rounded-3xl p-4">
               <p className="text-[11px] uppercase tracking-wider text-black/45 font-bold">Hrubý výsledek</p>
-              <p className={`mt-1 text-xl font-bold tabular-nums ${s.gross >= 0 ? 'text-[#5B7A08]' : 'text-red-600'}`}>{money(s.gross)}</p>
+              <p className={`mt-1 text-xl font-bold tabular-nums ${s.gross >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>{money(s.gross)}</p>
               <p className="text-[11px] text-black/40 mt-0.5">tržby − nákupy − mzdy</p>
             </div>
           </div>
@@ -351,7 +351,7 @@ export default function FinanceView() {
                         <p className="text-sm font-medium text-[#16181A] truncate">{it.name}</p>
                         <p className="text-[11px] text-black/40 truncate">
                           {it.category || 'bez kategorie'}
-                          {it.cost == null && <span className="text-amber-700"> · bez receptury</span>}
+                          {it.cost == null && <span className="text-wait-ink"> · bez receptury</span>}
                         </p>
                       </div>
                       <span className="w-16 text-right text-sm tabular text-black/60">{Math.round(it.qty)}×</span>
@@ -364,7 +364,7 @@ export default function FinanceView() {
                       <span className={`w-20 text-right text-sm tabular font-bold ${
                         it.marginPct == null ? 'text-black/30'
                           : it.marginPct >= 65 ? 'text-[#5B7A08]'
-                          : it.marginPct >= 45 ? 'text-[#16181A]' : 'text-red-600'
+                          : it.marginPct >= 45 ? 'text-[#16181A]' : 'text-bad-ink'
                       }`}>
                         {it.marginPct != null ? `${it.marginPct} %` : '—'}
                       </span>
@@ -372,7 +372,7 @@ export default function FinanceView() {
                   ))}
                 </div>
               </div>
-              {pos.menuError && <p className="text-xs text-amber-700 px-1">{pos.menuError}</p>}
+              {pos.menuError && <p className="text-xs text-wait-ink px-1">{pos.menuError}</p>}
             </div>
           )}
 

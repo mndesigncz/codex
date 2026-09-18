@@ -35,7 +35,7 @@ const TYPE_LABELS: Record<TimeOffType, string> = {
 const STATUS_META: Record<TimeOffStatus, { label: string; cls: string }> = {
   pending: { label: 'Čeká', cls: 'bg-black/[0.05] text-black/55' },
   approved: { label: 'Schváleno', cls: 'bg-[#C8F542]/15 text-[#5B7A08]' },
-  rejected: { label: 'Zamítnuto', cls: 'bg-red-500/15 text-red-600' },
+  rejected: { label: 'Zamítnuto', cls: 'bg-bad/15 text-bad-ink' },
 };
 
 function parseDate(s: string): Date {
@@ -194,7 +194,7 @@ export default function TimeOffRequest() {
           className={inputCls}
         />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-bad-ink">{error}</p>}
 
         <button
           type="button"

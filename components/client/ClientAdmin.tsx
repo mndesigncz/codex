@@ -54,13 +54,13 @@ const BY_ID = Object.fromEntries(TABS.map(t => [t.id, t])) as Record<Tab, typeof
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
-const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-red-500/10 text-red-700'}`;
+const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-wait/15 text-wait-ink' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-bad/10 text-bad-ink'}`;
 
 /** Dlaždice jako na přehledu podniku: štítek, ikona v tónovaném kolečku, číslo. Kliknutím do záložky. */
 function StatCard({ icon, label, value, onClick, tone = 'ok' }: { icon: string; label: string; value: number | string; onClick?: () => void; tone?: 'ok' | 'wait' | 'muted' }) {
-  const ring = tone === 'wait' ? 'bg-amber-500/15 border-amber-500/25 text-amber-800' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
+  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
   return (
-    <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-amber-500/25' : ''}`}>
+    <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-wait/25' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <p className="t-label">{label}</p>
         <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
@@ -628,7 +628,7 @@ function Members({ toast, initialQuery = '' }: { toast: (m: string) => void; ini
                     <MemberGroups customerId={c.id} toast={toast} />
                     {ledger === null ? <Skeleton className="h-10 rounded-xl" /> : ledger.length === 0 ? <p className="text-black/55">Deník je prázdný.</p>
                       : <ul className="divide-y divide-black/[0.06]">{ledger.map((l: any) => (
-                          <li key={l.id} className="py-1.5 flex gap-3"><span className="text-black/45 w-24 shrink-0">{dbTimeDayHM(l.created_at)}</span><span className={`w-12 shrink-0 font-semibold tabular-nums ${l.delta > 0 ? 'text-[#3E5406]' : l.delta < 0 ? 'text-red-700' : 'text-black/45'}`}>{l.delta > 0 ? '+' : ''}{l.delta}</span><span className="min-w-0 truncate">{l.note || l.kind}</span></li>))}</ul>}
+                          <li key={l.id} className="py-1.5 flex gap-3"><span className="text-black/45 w-24 shrink-0">{dbTimeDayHM(l.created_at)}</span><span className={`w-12 shrink-0 font-semibold tabular-nums ${l.delta > 0 ? 'text-[#3E5406]' : l.delta < 0 ? 'text-bad-ink' : 'text-black/45'}`}>{l.delta > 0 ? '+' : ''}{l.delta}</span><span className="min-w-0 truncate">{l.note || l.kind}</span></li>))}</ul>}
                   </div>
                 )}
               </li>
@@ -721,7 +721,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
           </div>
           <p className="text-xs text-black/50 mt-1 break-all">{d.url}</p>
         </div>
-        {!hoursOk && <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 px-3 py-2">Podnik nemá vyplněnou otevírací dobu (Rozvrh → Otevírací doba). Bez ní hosté nemůžou rezervovat.</p>}
+        {!hoursOk && <p className="text-xs rounded-xl bg-wait/10 border border-wait/25 text-wait-ink px-3 py-2">Podnik nemá vyplněnou otevírací dobu (Rozvrh → Otevírací doba). Bez ní hosté nemůžou rezervovat.</p>}
       </section>
       <section className="glass-card p-5 grid gap-4">
         <h2 className="t-section">Nabídka pro hosty</h2>
@@ -741,7 +741,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
             const chybi = vybrane ? Number(vybrane.items) - Number(vybrane.linked) : 0;
             if (!p.ordering_on || !vybrane || chybi <= 0) return null;
             return (
-              <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 px-3 py-2 mt-1.5">
+              <p className="text-xs rounded-xl bg-wait/10 border border-wait/25 text-wait-ink px-3 py-2 mt-1.5">
                 V menu „{vybrane.name}" nemá {chybi} {chybi === 1 ? 'položka produkt' : chybi < 5 ? 'položky produkt' : 'položek produkt'} v pokladně. Objednávka, ve které taková položka bude, se do Storyous nepošle a na terminálu se nevytiskne — spáruj je v záložce Menu.
               </p>
             );
@@ -774,7 +774,7 @@ function SettingsTab({ toast, onChange }: { toast: (m: string) => void; onChange
             <option value="warn">Jen upozornit obsluhu, objednávku nechat čekat</option>
             <option value="off">Neověřovat</option>
           </select>
-          {p.order_geo !== 'off' && !hasCoords && <p className="text-xs rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 px-3 py-2 mt-2">Poloha podniku není nastavená, ověření polohy zatím neběží. Stoupni si v podniku s telefonem a klepni na „Použít moji polohu".</p>}
+          {p.order_geo !== 'off' && !hasCoords && <p className="text-xs rounded-xl bg-wait/10 border border-wait/25 text-wait-ink px-3 py-2 mt-2">Poloha podniku není nastavená, ověření polohy zatím neběží. Stoupni si v podniku s telefonem a klepni na „Použít moji polohu".</p>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
           <div><label htmlFor="s-lat" className={label}>Zeměpisná šířka</label><input id="s-lat" inputMode="decimal" value={p.lat ?? ''} onChange={e => setP({ ...p, lat: e.target.value })} placeholder="49.1951" className={input} /></div>
@@ -821,7 +821,7 @@ function Reviews() {
                   {v.note ? <p className="text-sm text-black/70 mt-0.5 text-pretty">„{v.note}"</p> : <p className="text-sm text-black/45 mt-0.5">Bez komentáře.</p>}
                   <p className="text-xs text-black/45 mt-1">{dbTimeDayHM(v.created_at)} · {String(v.ref).startsWith('ord:') ? 'objednávka od stolu' : 'rezervace'}</p>
                   {v.crew?.length > 0 && (
-                    <p className={`text-xs mt-1 ${Number(v.rating) <= 2 ? 'text-amber-800' : 'text-black/45'}`}>
+                    <p className={`text-xs mt-1 ${Number(v.rating) <= 2 ? 'text-wait-ink' : 'text-black/45'}`}>
                       Ten den měli směnu: {v.crew.map((c: any) => `${c.avatar} ${c.name}`).join(', ')}
                     </p>
                   )}
@@ -908,7 +908,7 @@ function Broadcast({ toast }: { toast: (m: string) => void }) {
                 <li key={h.id} className="py-3">
                   <div className="flex items-start justify-between gap-3">
                     <p className="font-semibold leading-tight min-w-0">{h.title}
-                      {h.status === 'scheduled' && <span className="ml-2 rounded-full bg-amber-500/15 text-amber-800 px-2 py-0.5 text-[11px] font-semibold align-middle">naplánováno</span>}
+                      {h.status === 'scheduled' && <span className="ml-2 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">naplánováno</span>}
                     </p>
                     {h.status === 'scheduled' && <Button size="sm" variant="ghost" onClick={() => cancel(h)}>Zrušit</Button>}
                   </div>

@@ -76,7 +76,7 @@ function Row({ label, value, tone }: { label: string; value: React.ReactNode; to
       <span className={`shrink-0 whitespace-nowrap tabular-nums text-sm ${
         tone === 'strong' ? 'font-bold text-[#16181A]'
           : tone === 'plus' ? 'font-semibold text-[#5B7A08]'
-          : tone === 'minus' ? 'font-semibold text-red-600'
+          : tone === 'minus' ? 'font-semibold text-bad-ink'
           : 'font-semibold text-[#16181A]'}`}>{value}</span>
     </div>
   );
@@ -196,7 +196,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {c && !c.covered_by && (
               <span className={`tap-target-sm text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
-                diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-red-500/15 text-red-600'}`}>
+                diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'}`}>
                 {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </span>
             )}
@@ -208,7 +208,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 sm:px-6 py-5 divide-y divide-black/[0.06]">
-          {err && <p className="text-sm text-red-600 py-4">{err}</p>}
+          {err && <p className="text-sm text-bad-ink py-4">{err}</p>}
           {!d && !err && <p className="text-sm text-black/40 py-8 text-center">Načítám…</p>}
 
           {d && c && (
@@ -281,7 +281,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                       )}
                     </div>
                     <div className={`-mx-1 mt-1 mb-1.5 rounded-xl px-3 py-2 flex items-center justify-between gap-3 ${
-                      diff === 0 ? 'bg-[#C8F542]/12 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-red-500/10 text-red-600'}`}>
+                      diff === 0 ? 'bg-[#C8F542]/12 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-bad/10 text-bad-ink'}`}>
                       <span className="text-sm font-semibold">{diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko'}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>
@@ -320,7 +320,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   <ul className="mt-3 space-y-1.5">
                     {(d.notes ?? []).map((n, i) => (
                       <li key={i} className="flex gap-2 text-[13px] text-black/55 leading-snug">
-                        <Icon name="warning" size={13} className="shrink-0 mt-0.5 text-amber-600" />
+                        <Icon name="warning" size={13} className="shrink-0 mt-0.5 text-wait-ink" />
                         <span>{n}</span>
                       </li>
                     ))}
@@ -359,7 +359,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
 
               {(c.diff_reason || c.diff_note) && (
                 <Section title="Proč kasa nesedí">
-                  <div className="rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 p-3.5">
+                  <div className="rounded-2xl bg-wait/[0.08] border border-wait/25 p-3.5">
                     {c.diff_reason && <p className="text-sm font-semibold text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
                     {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
                   </div>
@@ -431,7 +431,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 {/* Automaticky doplněný odchod je odhad — ať je to vidět tady,
                     ne až ve mzdách. */}
                 {d.attendance.filter(a => a.note).map(a => (
-                  <p key={a.id} className="mt-2 flex gap-2 text-[13px] text-amber-700 leading-snug">
+                  <p key={a.id} className="mt-2 flex gap-2 text-[13px] text-wait-ink leading-snug">
                     <Icon name="warning" size={13} className="shrink-0 mt-0.5" />
                     <span>{a.employee?.name}: {a.note}</span>
                   </p>
@@ -470,7 +470,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     </div>
                   )}
                   {d.missingProcedures.length > 0 && (
-                    <p className="flex gap-2 text-[13px] text-amber-700 leading-snug">
+                    <p className="flex gap-2 text-[13px] text-wait-ink leading-snug">
                       <Icon name="warning" size={13} className="shrink-0 mt-0.5" />
                       <span>Povinné postupy, které ten den nikdo nedokončil: {d.missingProcedures.join(', ')}.</span>
                     </p>
@@ -558,7 +558,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
               Vytisknout
             </button>
             <button onClick={remove} disabled={busy}
-              className="rounded-full text-red-600 px-4 py-2.5 text-sm font-medium hover:bg-red-500/[0.07] transition disabled:opacity-50">
+              className="rounded-full text-bad-ink px-4 py-2.5 text-sm font-medium hover:bg-bad/[0.07] transition disabled:opacity-50">
               Smazat
             </button>
             <button onClick={onClose}

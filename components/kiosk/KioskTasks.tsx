@@ -26,7 +26,7 @@ interface Task {
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
-const prioDot = (p: string) => p === 'high' ? 'bg-red-500' : p === 'medium' ? 'bg-amber-400' : 'bg-[#C8F542]';
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 const todayStr = () => pragueToday();
 
 export default function KioskTasks() {
@@ -131,7 +131,7 @@ export default function KioskTasks() {
             <p className="text-xs text-black/40 mt-1.5 truncate">
               {t.teamTask || t.assignedTo == null ? 'Kdokoliv' : `${t.assigneeAvatar ?? '👤'} ${t.assigneeName ?? ''}`}
               {t.dueDate && (
-                <span className={overdueTask ? 'text-red-600 font-medium' : ''}>
+                <span className={overdueTask ? 'text-bad-ink font-medium' : ''}>
                   {' · '}{new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
                   {overdueTask && ' · po termínu'}
                 </span>
@@ -194,7 +194,7 @@ export default function KioskTasks() {
           {filter !== 'done' && overdue.length + todayTasks.length + thisWeek.length + later.length === 0 && (
             <div className="glass-card p-6 text-center text-[#5B7A08] font-medium">Všechny úkoly splněné! 🎉</div>
           )}
-          {section('Po termínu', overdue, 'text-red-600')}
+          {section('Po termínu', overdue, 'text-bad-ink')}
           {section('Dnes', todayTasks, 'text-[#5B7A08]')}
           {section('Tento týden', thisWeek)}
           {section('Později', later)}

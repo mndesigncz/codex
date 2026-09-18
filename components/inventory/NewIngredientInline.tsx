@@ -163,7 +163,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
         )}
       </div>
 
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p className="text-sm text-bad-ink">{err}</p>}
 
       <div className="flex items-center gap-2">
         <button type="button" onClick={save} disabled={saving}

@@ -20,6 +20,13 @@ module.exports = {
         drawer: 'cubic-bezier(0.32, 0.72, 0, 1)',
       },
       colors: {
+        // Stavové tóny nad tokeny z globals.css. Holé kanály znamenají, že
+        // `bg-bad/15`, `border-wait/40` i `text-bad-ink` vycházejí z jedné
+        // hodnoty — a `-ink` se v tmavém režimu převrátí samo.
+        ok:   { DEFAULT: 'rgb(var(--ok-rgb) / <alpha-value>)',   ink: 'rgb(var(--ok-ink-rgb) / <alpha-value>)' },
+        wait: { DEFAULT: 'rgb(var(--wait-rgb) / <alpha-value>)', ink: 'rgb(var(--wait-ink-rgb) / <alpha-value>)' },
+        bad:  { DEFAULT: 'rgb(var(--bad-rgb) / <alpha-value>)',  ink: 'rgb(var(--bad-ink-rgb) / <alpha-value>)', lift: 'rgb(var(--bad-lift-rgb) / <alpha-value>)' },
+        info: { DEFAULT: 'rgb(var(--info-rgb) / <alpha-value>)', ink: 'rgb(var(--info-ink-rgb) / <alpha-value>)' },
         // iOS 26 glassmorphism design tokens
         deep: '#0A0A0C',
         lime: {

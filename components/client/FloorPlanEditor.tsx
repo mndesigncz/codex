@@ -204,7 +204,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
           {open && <p className="text-xs text-black/55 mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>}
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          {dirty && <span className="text-xs text-amber-800">Neuloženo</span>}
+          {dirty && <span className="text-xs text-wait-ink">Neuloženo</span>}
           {open && <Button size="sm" variant="accent" loading={busy} disabled={!dirty} onClick={save}>Uložit plánek</Button>}
           <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
             className="tap-target-sm text-xs font-semibold text-black/55 hover:text-black flex items-center gap-1">
@@ -234,7 +234,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
               <input type="range" min={5} max={100} value={Math.round(plan.bgOpacity * 100)} aria-label="Sytost podkladu"
                 onChange={e => setPlan(p => p && ({ ...p, bgOpacity: Number(e.target.value) / 100 }))} className="w-20 accent-[#16181A]" /></label>
             <button type="button" onClick={() => setPlan(p => p && ({ ...p, bg: null }))}
-              className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-red-700 hover:bg-red-500/10 transition">Odebrat podklad</button>
+              className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-bad-ink hover:bg-bad/10 transition">Odebrat podklad</button>
           </>
         )}
       </div>
@@ -345,7 +345,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
                   onChange={e => patchShape(selShape.id, x => ({ ...x, t: Number(e.target.value) / 10 }))} className="w-20 accent-[#16181A]" /></label>
             )}
             <button type="button" onClick={removeSel}
-              className="tap-target-sm rounded-full px-3 py-1.5 font-semibold text-black/55 hover:text-red-700 hover:bg-red-500/10 transition">{sel.kind === 'table' ? 'Z plánku pryč' : 'Smazat'}</button>
+              className="tap-target-sm rounded-full px-3 py-1.5 font-semibold text-black/55 hover:text-bad-ink hover:bg-bad/10 transition">{sel.kind === 'table' ? 'Z plánku pryč' : 'Smazat'}</button>
           </div>
         )}
       </div>

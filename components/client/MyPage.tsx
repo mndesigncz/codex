@@ -262,7 +262,7 @@ function ReviewPrompt({ p, onDone }: { p: any; onDone: () => void }) {
         <input value={note} onChange={e => setNote(e.target.value)} placeholder="Pár slov, když chceš" aria-label="Poznámka k hodnocení" className={`${input} flex-1 basis-48`} maxLength={500} />
         <button type="button" onClick={send} disabled={busy} className="tap-target inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Odeslat'}</button>
       </div>
-      {err && <p role="alert" className="mt-2 text-sm text-red-700">{err}</p>}
+      {err && <p role="alert" className="mt-2 text-sm text-bad-ink">{err}</p>}
     </li>
   );
 }
@@ -290,7 +290,7 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: (me: any) => void }) {
         <div><label htmlFor="pf-bday" className={label}>Narozeniny</label><input id="pf-bday" type="date" value={f.birthday} onChange={e => setF({ ...f, birthday: e.target.value })} className={input} /></div>
         <p className="sm:col-span-2 text-xs text-black/50">E-mail: {me?.email}. Narozeniny vidí jen podniky, kde jsi členem, kvůli přání a odměně.</p>
         <button type="submit" disabled={busy} className="tap-target justify-self-start sm:justify-self-end inline-flex items-center gap-2 btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{busy ? '…' : 'Uložit'}</button>
-        {err && <p role="alert" className="sm:col-span-3 text-sm text-red-700">{err}</p>}
+        {err && <p role="alert" className="sm:col-span-3 text-sm text-bad-ink">{err}</p>}
       </form>
     </details>
   );
@@ -304,7 +304,7 @@ function ResRow({ r }: { r: any }) {
         <p className="font-semibold cz-sentence">{czDay(r.date, true)} <span className="text-black/50 font-medium">· {r.time}</span></p>
         <p className="text-sm text-black/55 truncate">{r.business} · {r.party} {plural(r.party, 'osoba', 'osoby', 'osob')}</p>
       </div>
-      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : 'bg-black/[0.06] text-black/60'}`}>{st.label}</span>
+      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{st.label}</span>
     </li>
   );
 }

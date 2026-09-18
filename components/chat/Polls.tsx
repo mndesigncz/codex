@@ -87,7 +87,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
         creating ? (
           <form onSubmit={e => { e.preventDefault(); if (question.trim() && opts.filter(o => o.trim()).length >= 2) create(); }}
             className="well border border-black/[0.07] p-3.5 space-y-2">
-            {err && <p className="text-xs text-red-600">{err}</p>}
+            {err && <p className="text-xs text-bad-ink">{err}</p>}
             <input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Otázka ankety…" maxLength={200}
               className="w-full rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
             {opts.map((o, i) => (

@@ -171,7 +171,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
         </div>
       )}
       {cam && !hit && <Camera onCode={c => { setCam(false); lookup(c); }} onError={m => { setCam(false); setErr(m); }} />}
-      {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
+      {err && <p role="alert" className="text-sm text-bad-ink">{err}</p>}
     </section>
   );
 }

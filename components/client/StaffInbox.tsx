@@ -45,9 +45,9 @@ function Verified({ o }: { o: any }) {
   else if (o.geo_status === 'far') parts.push({ txt: `daleko · ${o.geo_distance_m} m`, tone: 'off' });
   else if (o.geo_status === 'none') parts.push({ txt: 'bez polohy', tone: 'wait' });
   if (!parts.length) return null;
-  return <>{parts.map(p => <span key={p.txt} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${p.tone === 'ok' ? 'bg-[#C8F542]/20 text-[#3E5406]' : p.tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : 'bg-red-500/10 text-red-700'}`}><Icon name={p.txt.startsWith('QR') || p.txt === 'bez QR' ? 'tag' : 'location'} size={11} />{p.txt}</span>)}</>;
+  return <>{parts.map(p => <span key={p.txt} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${p.tone === 'ok' ? 'bg-[#C8F542]/20 text-[#3E5406]' : p.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-bad/10 text-bad-ink'}`}><Icon name={p.txt.startsWith('QR') || p.txt === 'bez QR' ? 'tag' : 'location'} size={11} />{p.txt}</span>)}</>;
 }
-const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-red-500/10 text-red-700'}`;
+const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-wait/15 text-wait-ink' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-bad/10 text-bad-ink'}`;
 
 function ago(iso: string) {
   const m = Math.max(0, Math.round((Date.now() - new Date(String(iso).replace(' ', 'T') + (String(iso).match(/[Zz]$|[+-]\d{2}:?\d{2}$/) ? '' : 'Z')).getTime()) / 60000));
@@ -143,13 +143,13 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
   return (
     <div className="space-y-5">
       {!compact && (vady.length > 0 || test) && (
-        <section aria-labelledby="h-pos" className={`rounded-2xl border p-4 ${vady.length ? 'border-amber-500/35 bg-amber-500/[0.07]' : 'border-black/[0.08] bg-white/60'}`}>
-          <p id="h-pos" className={`text-sm font-bold flex items-center gap-2 ${vady.length ? 'text-amber-900' : 'text-[#16181A]'}`}>
+        <section aria-labelledby="h-pos" className={`rounded-2xl border p-4 ${vady.length ? 'border-wait/35 bg-wait/[0.07]' : 'border-black/[0.08] bg-white/60'}`}>
+          <p id="h-pos" className={`text-sm font-bold flex items-center gap-2 ${vady.length ? 'text-wait-ink' : 'text-[#16181A]'}`}>
             <Icon name={vady.length ? 'warning' : 'receipt'} size={16} className="shrink-0" />
             {vady.length ? 'Objednávky se nevytisknou na terminálu' : 'Spojení s pokladnou'}
           </p>
           {vady.length > 0 && (
-            <ul className="mt-1.5 space-y-1 text-[13px] text-amber-900/90">
+            <ul className="mt-1.5 space-y-1 text-[13px] text-wait-ink/90">
               {vady.map((v, i) => <li key={i} className="flex gap-2"><span aria-hidden>·</span><span>{v}</span></li>)}
             </ul>
           )}
@@ -157,7 +157,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
             <ul className="mt-2.5 space-y-1.5">
               {test.map((k, i) => (
                 <li key={i} className="flex gap-2 text-[13px]">
-                  <span className={`shrink-0 mt-0.5 ${k.ok ? 'text-[#5B7A08]' : 'text-red-600'}`} aria-hidden><Icon name={k.ok ? 'check' : 'close'} size={13} /></span>
+                  <span className={`shrink-0 mt-0.5 ${k.ok ? 'text-[#5B7A08]' : 'text-bad-ink'}`} aria-hidden><Icon name={k.ok ? 'check' : 'close'} size={13} /></span>
                   <span className="min-w-0">
                     <span className="font-semibold text-[#16181A]">{k.krok}:</span> <span className="text-black/70">{k.detail}</span>
                     {k.kde && <span className="block text-[11px] text-black/45 mt-0.5">→ {k.kde}</span>}
@@ -190,8 +190,8 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
         <div className="mt-2"><CardScan onToast={toast} onChange={compact ? undefined : reload} /></div>
       </details>
       {news.length > 0 && (
-        <section className="rounded-3xl bg-amber-500/[0.10] border border-amber-500/40 p-4 space-y-3">
-          <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-amber-800" />{news.length === 1 ? 'Nová objednávka od stolu' : `${czCount(news.length, { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' })} od stolu`}</h2>
+        <section className="rounded-3xl bg-wait/[0.10] border border-wait/40 p-4 space-y-3">
+          <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-wait-ink" />{news.length === 1 ? 'Nová objednávka od stolu' : `${czCount(news.length, { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' })} od stolu`}</h2>
           <ul className="space-y-3">{news.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
         </section>
       )}
@@ -249,16 +249,16 @@ function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: nu
               const st = String(o.pos_state ?? '');
               if (!o.storyous_order_id) {
                 return o.status !== 'declined'
-                  ? <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Není v kase</span>
+                  ? <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-2.5 py-1 text-[11px] font-semibold text-wait-ink"><span className="h-1.5 w-1.5 rounded-full bg-wait" />Není v kase</span>
                   : null;
               }
-              if (st === 'DECLINED') return <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/12 px-2.5 py-1 text-[11px] font-semibold text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-600" />Kasa odmítla</span>;
+              if (st === 'DECLINED') return <span className="inline-flex items-center gap-1.5 rounded-full bg-bad/12 px-2.5 py-1 text-[11px] font-semibold text-bad-ink"><span className="h-1.5 w-1.5 rounded-full bg-bad" />Kasa odmítla</span>;
               if (/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(st)) return <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]"><span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />Přijato v kase · tiskne se</span>;
-              return <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-amber-600" />V kase čeká na přijetí</span>;
+              return <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-2.5 py-1 text-[11px] font-semibold text-wait-ink"><span className="h-1.5 w-1.5 rounded-full bg-wait" />V kase čeká na přijetí</span>;
             })()}
           </p>
           {o.pos_note && o.status !== 'declined' && !/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(String(o.pos_state ?? '')) && (
-            <p className="mt-1 text-[11px] text-amber-900 leading-snug">{o.pos_note}</p>
+            <p className="mt-1 text-[11px] text-wait-ink leading-snug">{o.pos_note}</p>
           )}
         </div>
         <div className="flex gap-1.5 flex-wrap justify-end ml-auto">

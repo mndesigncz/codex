@@ -120,7 +120,7 @@ export default function NotificationBell() {
         {/* The bell only moves when there is actually something new. */}
         <Icon name="bell" size={19} className="i-lead" motion={badge > 0 ? 'ring' : undefined} />
         {badge > 0 && (
-          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center rise-in ${flaggedFeedback > 0 ? 'bg-red-500 text-white' : 'bg-[#C8F542] text-black'}`}>
+          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center rise-in ${flaggedFeedback > 0 ? 'bg-bad text-white' : 'bg-[#C8F542] text-black'}`}>
             {badge > 9 ? '9+' : badge}
           </span>
         )}
@@ -137,8 +137,8 @@ export default function NotificationBell() {
           </div>
           <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
             {flaggedFeedback > 0 && (
-              <div className="px-4 py-3 flex gap-3 bg-red-500/[0.07]">
-                <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-600">
+              <div className="px-4 py-3 flex gap-3 bg-bad/[0.07]">
+                <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-bad/15 text-bad-ink">
                   <Icon name="warning" size={15} />
                 </span>
                 <div className="min-w-0 flex-1">

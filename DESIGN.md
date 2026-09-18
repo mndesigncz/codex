@@ -304,6 +304,55 @@ vypadá v Rozvrhu stejně jako v Dostupnosti.
 
 Hlídá `scripts/check-palette.mjs`.
 
+### Stav se sděluje tokenem, ne odhadnutým odstínem
+
+Paleta měla u každého stavu jen podklad (`--X-bg`) a text (`--X-ink`).
+Plný odstín ani střední alfa v ní nebyly — a tak si je každé místo, které
+potřebovalo plnou tečku, patnáctiprocentní podklad nebo obrys, vymyslelo
+z Tailwindu. Naměřeno napříč 62 obrazovkami: **dvanáct různých červených
+a deset jantarových pro dva významy.** „Zamítnuto" bylo na jedné obrazovce
+`#DC2626`, na druhé `#EF4444` a na třetí `#B91C1C`. Přesně ten rozdíl, co
+tam není a člověk ho v něm hledá.
+
+Od kola 36 má každý stav v `globals.css` tón i v holých kanálech
+(`--bad-rgb`, `--wait-rgb`, `--ok-rgb`, `--info-rgb` a jejich `-ink`
+dvojčata), takže Tailwind si k němu umí domíchat průhlednost:
+
+| dřív | teď |
+|---|---|
+| `bg-red-500` | `bg-bad` |
+| `bg-red-500/15` | `bg-bad/15` |
+| `text-red-600` | `text-bad-ink` |
+| `border-amber-500/40` | `border-wait/40` |
+
+`-ink` se navíc **v tmavém režimu převrací sám** — tailwindové
+`text-red-600` zůstávalo tmavě červené i na tmavém podkladu, token ne.
+Sjednocení proto zároveň spravilo kus tmavého režimu, aniž by se ho někdo
+dotkl.
+
+Dva detaily, které z toho plynou:
+
+- **Pátý tón se nezavádí.** Žlutá `#FFD60A` nesla „připíchnuto, všimni si"
+  ve čtyřech souborech. Významově je to `wait` — něco, co čeká na pozornost
+  — a tam se sjednotila. Paleta má pět stavů a šestý si nepřidává.
+- **Plocha, která je tmavá vždycky** (hromadný pruh, pás režimu s sebou),
+  potřebuje tón posazený výš: `--bad-lift-rgb`. Je to tentýž odstín, jen
+  světlejší, proto se v tmavém režimu nepřevrací.
+
+Hlídá `scripts/check-status-colors.mjs`: syrový tailwindový odstín v komponentě
+je tvrdá chyba, barevný hex mimo paletu je ráčna (nastaveno na 110).
+
+**Co zbývá:** ráčna drží šest zelených (`#5B7A08`, `#3E5406`, `#4F6A07`,
+`#8FB811`, `#5B9E00`, `#89AC16`) a tři modré pro tytéž významy. Sjednotit je
+znamená rozhodnout, který odstín je ten pravý — to je vlastní kolo, ne
+vedlejší úklid.
+
+**A jeden nález, který čeká na rozhodnutí:** `cat-1`, `cat-2` a `cat-4` jsou
+doslova stavové tóny (limetka, info modrá, wait jantarová). „Druhý typ směny"
+má tedy stejnou modrou jako „info" — což je přesně to, co pravidlo nad tímhle
+odstavcem zakazuje. Opravit to znamená přidat kategoriím nové odstíny, tedy
+rozšířit paletu; to se nedělá bez rozmyslu.
+
 ## Responzivní pravidla (mobil / tablet / desktop)
 
 Ověřováno na šířkách 320, 390, 768, 1024, 1280 a 1440 px — nula

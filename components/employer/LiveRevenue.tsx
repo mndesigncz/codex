@@ -32,7 +32,7 @@ type Data = {
 
 const toneCls: Record<Note['tone'], string> = {
   good: 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]',
-  warn: 'bg-amber-500/10 border-amber-500/25 text-amber-800',
+  warn: 'bg-wait/10 border-wait/25 text-wait-ink',
   info: 'bg-black/[0.03] border-black/[0.07] text-black/60',
 };
 const toneIcon: Record<Note['tone'], string> = { good: 'check', warn: 'warning', info: 'bulb' };
@@ -128,7 +128,7 @@ export default function LiveRevenue() {
           className="tap-target-sm field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
       </div>
 
-      {err && <p className="text-sm text-amber-800 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3">{err}</p>}
+      {err && <p className="text-sm text-wait-ink bg-wait/10 border border-wait/25 rounded-2xl px-4 py-3">{err}</p>}
 
       {loading && !d ? (
         <div className="flex items-center justify-center h-28">
@@ -276,7 +276,7 @@ export default function LiveRevenue() {
                       <span className="shrink-0 font-semibold tabular-nums text-[#16181A]">{money(day.total)}</span>
                       {day.diff != null && (
                         <span className={`w-16 shrink-0 text-right text-xs font-bold tabular-nums ${
-                          Math.abs(day.diff) <= 50 ? 'text-[#5B7A08]' : 'text-amber-700'
+                          Math.abs(day.diff) <= 50 ? 'text-[#5B7A08]' : 'text-wait-ink'
                         }`} title="Rozdíl proti uzávěrce">
                           {day.diff === 0 ? '✓' : `${day.diff > 0 ? '+' : ''}${money(day.diff)}`}
                         </span>

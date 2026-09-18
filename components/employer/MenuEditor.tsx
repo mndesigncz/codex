@@ -422,7 +422,7 @@ export default function MenuEditor() {
             Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.
           </p>
         )}
-        {chyba && <p className="text-red-600 text-sm">{chyba}</p>}
+        {chyba && <p className="text-bad-ink text-sm">{chyba}</p>}
         {hlaska && <p className="text-sm text-[#3E5406]">{hlaska}</p>}
       </div>
     );
@@ -495,12 +495,12 @@ export default function MenuEditor() {
             <p className="text-xs text-black/45">Adresu se teď nepodařilo ověřit — zkontroluj připojení.</p>
           )}
           {zive === 'vypnuto' && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-wait-ink">
               Menu je vypnuté, takže se hostům neukazuje.
             </p>
           )}
           {zive === 'chybi' && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-wait-ink">
               {ulozenySlug === VYCHOZI_SLUG
                 ? 'Pozor: server na téhle adrese žádné menu nevydává, takže iPad ukazuje záložní nabídku.'
                 : 'Pozor: iPad otevřený bez parametru bere menu s adresou „akce“, a to tohle menu není — proto se tvoje úpravy hostům neukazují.'}
@@ -786,7 +786,7 @@ export default function MenuEditor() {
             </button>
           </div>
           {objednavaciSlug != null && objednavaciSlug !== '' && board.slug !== objednavaciSlug && (
-            <p className="text-sm text-amber-900 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-3.5 py-2.5">
+            <p className="text-sm text-wait-ink bg-wait/10 border border-wait/30 rounded-2xl px-3.5 py-2.5">
               Pozor: hosté objednávají z menu s adresou <strong>{objednavaciSlug}</strong>, ne z tohohle. Párování tady se do objednávek nepropíše — přepni na to správné menu, nebo ho podniku nastav v Klientu → Nastavení.
             </p>
           )}
@@ -812,7 +812,7 @@ export default function MenuEditor() {
               className="rounded-full border border-black/10 w-10 h-10 text-black/50">↓</button>
             <button type="button" title="Smazat sekci"
               onClick={() => { if (confirm(`Smazat sekci „${s.title}“ i s položkami?`)) upravit((b) => { b.sections.splice(si, 1); }); }}
-              className="rounded-full border border-red-200 w-10 h-10 text-red-500">×</button>
+              className="rounded-full border border-bad/25 w-10 h-10 text-bad-ink">×</button>
           </div>
 
           <div className="space-y-2">
@@ -821,7 +821,7 @@ export default function MenuEditor() {
                 className={`rounded-2xl border p-3 space-y-2 ${
                   !posPripojena ? 'border-black/[0.06]'
                     : it.posProductId ? 'border-[#C8F542]/60 bg-[#C8F542]/[0.06]'
-                      : 'border-amber-500/35 bg-amber-500/[0.04]'}`}>
+                      : 'border-wait/35 bg-wait/[0.04]'}`}>
                 <div className="flex gap-2 flex-wrap">
                   <input className={`${vstup} flex-1 min-w-[10rem]`} value={it.name} maxLength={80} placeholder="Název položky"
                     onChange={(e) => upravit((b) => { b.sections[si].items[ii].name = e.target.value; })} />
@@ -833,7 +833,7 @@ export default function MenuEditor() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button type="button" onClick={() => prepnoutVyprodano(si, ii)}
                     className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                      it.soldOut ? 'bg-red-500 text-white' : 'border border-black/10 text-black/60'}`}>
+                      it.soldOut ? 'bg-bad text-white' : 'border border-black/10 text-black/60'}`}>
                     {it.soldOut ? 'Vyprodáno' : 'Na skladě'}
                   </button>
                   {posPripojena && (it.posProductId ? (
@@ -844,8 +844,8 @@ export default function MenuEditor() {
                   ) : (
                     <button type="button" onClick={() => otevritVyber(si, ii)}
                       title="Bez produktu z pokladny objednávka na terminál nedoletí."
-                      className="tap-target-sm inline-flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-900 hover:bg-amber-500/20 transition">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />Netiskne se · spárovat
+                      className="tap-target-sm inline-flex items-center gap-1.5 rounded-full border border-wait/50 bg-wait/10 px-2.5 py-1.5 text-[11px] font-semibold text-wait-ink hover:bg-wait/20 transition">
+                      <span className="h-1.5 w-1.5 rounded-full bg-wait" />Netiskne se · spárovat
                     </button>
                   ))}
                   {posPripojena && it.posProductId && (
@@ -859,7 +859,7 @@ export default function MenuEditor() {
                     className="rounded-full border border-black/10 w-9 h-9 text-black/50">↓</button>
                   <button type="button" title="Smazat položku"
                     onClick={() => upravit((b) => { b.sections[si].items.splice(ii, 1); })}
-                    className="rounded-full border border-red-200 w-9 h-9 text-red-500">×</button>
+                    className="rounded-full border border-bad/25 w-9 h-9 text-bad-ink">×</button>
                 </div>
               </div>
             ))}
@@ -917,14 +917,14 @@ export default function MenuEditor() {
         </button>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          {chyba && <p className="text-red-600 text-sm">{chyba}</p>}
+          {chyba && <p className="text-bad-ink text-sm">{chyba}</p>}
           {hlaska && !chyba && <p className="text-[#5B9E00] text-sm">{hlaska}</p>}
           {neulozeno && !chyba && (
-            <p className="text-amber-700 text-sm font-semibold">Máš neuložené změny</p>
+            <p className="text-wait-ink text-sm font-semibold">Máš neuložené změny</p>
           )}
           <span className="flex-1" />
           <button type="button" onClick={smazat} disabled={ukladam}
-            className="rounded-full border border-red-200 px-4 py-2.5 text-sm font-medium text-red-500 disabled:opacity-50">
+            className="rounded-full border border-bad/25 px-4 py-2.5 text-sm font-medium text-bad-ink disabled:opacity-50">
             Smazat menu
           </button>
           <button type="button" onClick={() => ulozit()} disabled={ukladam}

@@ -244,7 +244,7 @@ export default function PlanningBoard() {
                           <div className="h-px bg-black/[0.08] my-1" />
                           <button
                             onClick={() => deleteCard(card)}
-                            className="w-full text-left px-2 py-2 rounded-xl text-sm text-red-600 hover:bg-red-500/10 transition-colors"
+                            className="w-full text-left px-2 py-2 rounded-xl text-sm text-bad-ink hover:bg-bad/10 transition-colors"
                           >
                             Smazat kartu
                           </button>

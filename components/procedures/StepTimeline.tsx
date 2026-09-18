@@ -43,7 +43,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
         const first = i === 0;
         const last = i === steps.length - 1;
 
-        const segColor = (st: Status) => (st === 'done' ? 'bg-[#C8F542]' : st === 'skipped' ? 'bg-amber-300' : 'bg-black/[0.12]');
+        const segColor = (st: Status) => (st === 'done' ? 'bg-[#C8F542]' : st === 'skipped' ? 'bg-wait/70' : 'bg-black/[0.12]');
 
         return (
           <li key={i} className="relative flex items-stretch gap-3">
@@ -72,7 +72,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                   done
                     ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/30'
                     : skipped
-                    ? 'bg-amber-500/[0.07] border-amber-500/25'
+                    ? 'bg-wait/[0.07] border-wait/25'
                     : 'bg-white border-black/[0.05] shadow-[0_2px_10px_rgba(20,30,10,0.05)]'
                 } ${interactive ? 'cursor-pointer active:scale-[0.99]' : ''}`}
               >
@@ -85,7 +85,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       {s.text}
                     </p>
                     {skipped ? (
-                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-wait-ink">
                         {skipGlyph} Přeskočeno
                       </p>
                     ) : s.note && !compact && (
@@ -108,8 +108,8 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       title={skipped ? 'Vrátit mezi kroky' : 'Přeskočit tento krok'}
                       className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                         skipped
-                          ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25'
-                          : 'bg-black/[0.05] text-black/45 hover:bg-amber-500/12 hover:text-amber-600'
+                          ? 'bg-wait/15 text-wait-ink hover:bg-wait/25'
+                          : 'bg-black/[0.05] text-black/45 hover:bg-wait/12 hover:text-wait-ink'
                       }`}
                     >
                       {skipped ? 'Vrátit' : <>{skipGlyph}<span className={compact ? 'sr-only' : ''}>Přeskočit</span></>}
@@ -136,7 +136,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                   done
                     ? 'bg-[#C8F542] text-black shadow-[0_2px_8px_rgba(200,245,66,0.5)]'
                     : skipped
-                    ? 'bg-amber-400 text-white shadow-[0_2px_8px_rgba(251,191,36,0.4)]'
+                    ? 'bg-wait text-white shadow-[0_2px_8px_rgba(251,191,36,0.4)]'
                     : `bg-white border-2 border-black/15 shadow-sm ${interactive ? 'hover:border-[#C8F542] cursor-pointer' : ''}`
                 }`}
               >

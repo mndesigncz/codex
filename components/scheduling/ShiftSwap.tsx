@@ -168,7 +168,7 @@ export default function ShiftSwap({ user }: { user: { id?: string | number } }) 
                 <p className="text-sm font-semibold text-[#16181A] cz-sentence truncate">{fmtDay(o.date)} <span className="text-black/40 font-normal">· {o.startTime}–{o.endTime}</span></p>
                 <p className="text-xs text-black/45">Bereš si od {o.offeredByName ?? 'kolegy'} — čeká na schválení vedení</p>
               </div>
-              <span className="tap-target-sm shrink-0 rounded-full bg-amber-500/15 text-amber-700 px-3 py-1 text-xs font-medium whitespace-nowrap">Ke schválení</span>
+              <span className="tap-target-sm shrink-0 rounded-full bg-wait/15 text-wait-ink px-3 py-1 text-xs font-medium whitespace-nowrap">Ke schválení</span>
             </div>
           ))}
         </div>

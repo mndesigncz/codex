@@ -73,7 +73,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-[11px] text-black/50">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#C8F542]" /> Uzávěrka hotová</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Chybí uzávěrka</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Chybí uzávěrka</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-black/20" /> Směna</span>
       </div>
 
@@ -91,7 +91,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
               const tone = !day
                 ? 'bg-black/[0.015] border-transparent'
                 : day.missing
-                  ? 'bg-red-500/[0.08] border-red-500/30'
+                  ? 'bg-bad/[0.08] border-bad/30'
                   : day.hasClosing
                     ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40'
                     : day.onShift.length > 0
@@ -109,7 +109,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                     </div>
                   )}
                   {day && (
-                    <span className={`mt-auto w-1.5 h-1.5 rounded-full ${day.missing ? 'bg-red-500' : day.hasClosing ? 'bg-[#8FB811]' : day.onShift.length > 0 ? 'bg-black/20' : 'bg-transparent'}`} />
+                    <span className={`mt-auto w-1.5 h-1.5 rounded-full ${day.missing ? 'bg-bad' : day.hasClosing ? 'bg-[#8FB811]' : day.onShift.length > 0 ? 'bg-black/20' : 'bg-transparent'}`} />
                   )}
                 </button>
               );
@@ -129,7 +129,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.onShift.map(p => (
-                      <PersonLink key={p.id} id={p.id} className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-red-500/10 text-red-600' : 'bg-black/[0.05] text-black/60'}`}>
+                      <PersonLink key={p.id} id={p.id} className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-bad/10 text-bad-ink' : 'bg-black/[0.05] text-black/60'}`}>
                         <span>{p.avatar ?? '👤'}</span> {p.name}
                         {p.startTime && <span className="opacity-60 tabular-nums">{p.startTime}–{p.endTime}</span>}
                         {p.hadClosing ? ' ✓' : ''}
@@ -141,7 +141,7 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-1.5">Uzávěrku udělal</p>
                 {detail.closedBy.length === 0 ? (
-                  <p className={`text-sm ${detail.missing ? 'text-red-600 font-medium' : 'text-black/40'}`}>{detail.missing ? 'Nikdo — uzávěrka chybí.' : 'Zatím nikdo.'}</p>
+                  <p className={`text-sm ${detail.missing ? 'text-bad-ink font-medium' : 'text-black/40'}`}>{detail.missing ? 'Nikdo — uzávěrka chybí.' : 'Zatím nikdo.'}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (

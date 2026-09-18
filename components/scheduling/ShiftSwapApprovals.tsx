@@ -99,7 +99,7 @@ export default function ShiftSwapApprovals() {
                 {busy.has(o.id) ? '…' : 'Schválit výměnu'}
               </button>
               <button type="button" onClick={() => decide(o.id, 'reject')} disabled={busy.has(o.id)}
-                className="rounded-full bg-black/[0.05] border border-black/10 text-red-600 text-sm px-4 py-2 disabled:opacity-50">
+                className="rounded-full bg-black/[0.05] border border-black/10 text-bad-ink text-sm px-4 py-2 disabled:opacity-50">
                 Zamítnout
               </button>
             </div>

@@ -63,7 +63,7 @@ export default function AnnouncementBanner() {
       {visible.map((a) => (
         <div
           key={a.id}
-          className="rounded-3xl bg-[#FFD60A]/[0.12] border border-[#FFD60A]/30 px-4 py-3 flex items-start gap-3 min-w-0"
+          className="rounded-3xl bg-wait/[0.12] border border-wait/30 px-4 py-3 flex items-start gap-3 min-w-0"
         >
           <span className="shrink-0 text-lg leading-6" aria-hidden>
             <Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />

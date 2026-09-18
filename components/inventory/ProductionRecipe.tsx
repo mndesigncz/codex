@@ -148,7 +148,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
                 <div key={l.ingredientId} className="flex items-center gap-2 rounded-2xl bg-white/70 border border-black/[0.06] pl-3.5 pr-2 py-1.5">
                   <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">
                     {l.name}
-                    {a && <span className={`ml-1.5 text-[11px] ${short ? 'text-red-600' : 'text-black/40'}`}>ve skladu {fmt(a.available)} {a.unit}</span>}
+                    {a && <span className={`ml-1.5 text-[11px] ${short ? 'text-bad-ink' : 'text-black/40'}`}>ve skladu {fmt(a.available)} {a.unit}</span>}
                   </span>
                   <input value={l.amount} inputMode="decimal"
                     onChange={e => setLines(ls => ls.map(x => x.ingredientId === l.ingredientId ? { ...x, amount: e.target.value } : x))}
@@ -158,7 +158,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
                   <span className="shrink-0 text-[11px] text-black/40 w-8">{l.unit}</span>
                   <button type="button" aria-label={`Odebrat ${l.name}`} title="Odebrat z receptury"
                     onClick={() => { setLines(ls => ls.filter(x => x.ingredientId !== l.ingredientId)); setTimeout(() => save(), 0); }}
-                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/30 hover:text-red-600 transition">
+                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/30 hover:text-bad-ink transition">
                     <Icon name="close" size={13} />
                   </button>
                 </div>
@@ -200,7 +200,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
           </div>
         </>
       )}
-      {err && <p className="text-xs text-red-600">{err}</p>}
+      {err && <p className="text-xs text-bad-ink">{err}</p>}
     </div>
   );
 }

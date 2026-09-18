@@ -359,10 +359,10 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold cz-sentence">{czDay(r.date, true)} <span className="text-black/50 font-medium">· {r.time}</span></p>
                     <p className="text-sm text-black/55">{r.party} {r.party === 1 ? 'osoba' : r.party < 5 ? 'osoby' : 'osob'}{r.note ? ` · ${r.note}` : ''}</p>
-                    <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-amber-500/15 text-amber-800' : 'bg-black/[0.06] text-black/60'}`}>{st.label}</span>
+                    <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{st.label}</span>
                   </div>
                   {['requested', 'confirmed'].includes(r.status) && (
-                    <button onClick={() => cancel(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-red-700 transition shrink-0">Zrušit</button>
+                    <button onClick={() => cancel(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">Zrušit</button>
                   )}
                 </li>
               );
@@ -509,7 +509,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
             <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder="Z letáku nebo účtenky" autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
             <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
           </div>
-          {promoErr && <p role="alert" className="mt-2 text-sm text-red-700">{promoErr}</p>}
+          {promoErr && <p role="alert" className="mt-2 text-sm text-bad-ink">{promoErr}</p>}
         </form>
       </section>
       <section>
@@ -532,7 +532,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                         {[...(c.badges ?? []), c.valid_until ? `do ${czDay(c.valid_until)}` : null].filter(Boolean).join(' · ')}
                       </p>
                     )}
-                    {c.blocked && <p className="text-xs text-amber-800 mt-0.5">{c.blocked}</p>}
+                    {c.blocked && <p className="text-xs text-wait-ink mt-0.5">{c.blocked}</p>}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? 'zdarma' : `${c.cost_points} b.`}</p>
@@ -652,7 +652,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             </>
           )}
           {geoMode !== 'off' && (!qrOnly || token) && (
-            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-[#3E5406]' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-red-700' : 'text-amber-800') : 'text-black/50'}`}>
+            <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-[#3E5406]' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-bad-ink' : 'text-wait-ink') : 'text-black/50'}`}>
               <Icon name="location" size={13} />
               {geo.status === 'ok' ? 'Poloha ověřena.' : geo.status === 'asking' || geo.status === 'idle' ? 'Ověřujeme, že sedíš u stolu…'
                 : geoMode === 'block' ? 'Bez polohy objednat nejde. Povol ji v prohlížeči.' : 'Bez polohy objednávku nejdřív potvrdí obsluha.'}
@@ -721,7 +721,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní objednávky</h3>
             <ul className="space-y-2">
               {orders.map(o => (
-                <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-amber-500/[0.08] border-amber-500/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
+                <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-wait/[0.08] border-wait/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ?? o.status}</span>
                     <span className="text-sm tabular-nums">{money(o.total)}{o.table_name ? ` · ${o.table_name}` : ''}</span>
