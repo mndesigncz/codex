@@ -43,8 +43,8 @@ const DAY: { time: string; title: string; text: string; img: string; alt: string
     card: (
       <ul className="space-y-1.5 text-sm text-[#16181A]">
         <li className="flex items-center gap-2"><Icon name="check" size={14} className="text-[#5B7A08] shrink-0" />Otevírací postup 6/6</li>
-        <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30 shrink-0" />Směna: Eva 8–16, Martin od 12</li>
-        <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-black/25 ring-2 ring-black/10 shrink-0" />Dnes 2 úkoly na baru</li>
+        <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-ok shrink-0" />Směna: Eva 8–16, Martin od 12</li>
+        <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-muted shrink-0" />Dnes 2 úkoly na baru</li>
       </ul>
     ),
   },
@@ -54,7 +54,7 @@ const DAY: { time: string; title: string; text: string; img: string; alt: string
     img: `${B}/crate.webp`, alt: 'Hravá 3D bedýnka se zbožím',
     card: (
       <ul className="space-y-1.5 text-sm text-[#16181A]">
-        <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/30 shrink-0" />Mléko: zbývá na dnešek</li>
+        <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-wait shrink-0" />Mléko: zbývá na dnešek</li>
         <li className="flex items-center gap-2"><Icon name="mail" size={14} className="text-black/45 shrink-0" />Objednávka pro dodavatele připravená</li>
         <li className="flex items-center gap-2"><Icon name="check" size={14} className="text-[#5B7A08] shrink-0" />Odesláno a potvrzeno</li>
       </ul>
@@ -101,8 +101,8 @@ export default function Landing() {
       {/* Barevné skvrny pod sklem — celá stránka stojí na jedné vrstvě pozadí. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[130vh] overflow-hidden" aria-hidden>
         <div className="lg-blob lg-blob-lime w-[46rem] h-[46rem] -top-40 -right-40" />
-        <div className="lg-blob lg-blob-peach w-[34rem] h-[34rem] top-[38rem] -left-52" />
-        <div className="lg-blob lg-blob-sky w-[30rem] h-[30rem] top-[16rem] left-[38%]" />
+        <div className="lg-blob lg-blob-cream w-[34rem] h-[34rem] top-[38rem] -left-52" />
+        <div className="lg-blob lg-blob-lime-2 w-[30rem] h-[30rem] top-[16rem] left-[38%]" />
       </div>
 
       {/* Header — skleněná lišta držící se horní hrany. */}
@@ -164,9 +164,9 @@ export default function Landing() {
                 <figcaption className="absolute -bottom-6 left-3 sm:-left-8 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]" style={{ transform: 'translateZ(46px)' }}>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
                   <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
-                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] ring-2 ring-[#C8F542]/30 i-pulse shrink-0" />Směna: Eva 8–16, Martin od 12</li>
-                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 ring-2 ring-amber-400/30 shrink-0" />Dochází mléko — objednávka připravená</li>
-                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-black/25 ring-2 ring-black/10 shrink-0" />Včerejší uzávěrka sedí na korunu</li>
+                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-ok i-pulse shrink-0" />Směna: Eva 8–16, Martin od 12</li>
+                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-wait shrink-0" />Dochází mléko — objednávka připravená</li>
+                    <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-muted shrink-0" />Včerejší uzávěrka sedí na korunu</li>
                   </ul>
                 </figcaption>
                 <div className="absolute -top-8 -right-4 sm:-right-8 w-24 sm:w-32 lg-float-a drop-shadow-[0_18px_24px_rgba(25,35,15,0.18)]" style={{ transform: 'translateZ(70px)' }} aria-hidden>

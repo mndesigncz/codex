@@ -259,8 +259,34 @@ Zásady, které přestavba v kole 35 zafixovala:
   vidět hned. První verze to dělala obráceně (opacity 0 ze serveru) a celé
   sekce bez JS neexistovaly; chytil to snímek celé stránky, ne úvaha.
 - **Těžké věci líně a s náhradou.** Video v hero se přidá až po obrázku
-  a jen bez `saveData`; 3D model (`model-viewer`, vlastní chunk) se stáhne
-  až u sekce a když selže, zůstane obrázek. Stránka nikdy nečeká na ozdobu.
+  a jen bez `saveData`; otočka hrníčku se stáhne až u sekce a když selže,
+  zůstane obrázek. Stránka nikdy nečeká na ozdobu.
+- **Dekorace nepřináší vlastní paletu.** Značka je krém, inkoust a limetka
+  plus pět stavových tónů — a to platí i pro skvrny pod sklem a pro
+  vygenerované objekty. V první verzi tu byla broskvová a modrá skvrna
+  a syrová tailwindová `amber-400` v ukázkových tečkách; obojí šlo ven.
+  Tečka, která na prodejní stránce hlásí „dochází mléko", má přesně ten
+  tón, který uživatel uvidí uvnitř aplikace (`.dot-ok` / `.dot-wait` /
+  `.dot-muted` nad `--ok` / `--wait` / `--muted`).
+
+### Vygenerované 3D objekty
+
+Clay rendery v `public/brand/landing` drží tři pravidla, protože bez nich
+vypadají levně:
+
+- **Jen ta věc samotná.** Žádná pára, kouř, částice, odlesky do prázdna ani
+  rekvizity kolem. U 3D objektu čte oko každou abstraktní přimíchaninu jako
+  chybu renderu, ne jako atmosféru.
+- **Prázdné pozadí, ne scéna.** Objekt stojí na jednolitém podkladu
+  s měkkým kontaktním stínem. Ve skle se pak propojí násobením
+  (`mix-blend-multiply` u otočky), takže v panelu není vidět obdélník videa.
+- **Paleta značky.** Krémová keramika, limetkový proužek, inkoustový stín —
+  nic dalšího.
+
+Vyplatí se to napsat do promptu výslovně („NO steam, no props, plain solid
+white background") a pak výsledek ověřit, ne odhadnout: zdejší headless
+prohlížeč H.264 nepřehraje, takže obsah smyček se kontroluje strojovým
+popisem scény.
 
 ## Barvy: stav versus kategorie
 

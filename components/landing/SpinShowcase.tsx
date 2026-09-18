@@ -32,9 +32,11 @@ export default function SpinShowcase({ video, fallback, alt }: { video: string; 
       <img src={fallback} alt={alt} width={640} height={640} loading="lazy"
         className="absolute inset-0 h-full w-full object-contain" />
       {play && !failed && (
+        // Bílé pozadí otočky se násobením propadne do skla — objekt bez
+        // vlastního rámečku, žádný „obdélník videa" v panelu.
         <video muted loop playsInline autoPlay preload="none" aria-hidden
           onError={() => setFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover">
+          className="absolute inset-0 h-full w-full object-cover mix-blend-multiply">
           <source src={video} type="video/mp4" />
         </video>
       )}

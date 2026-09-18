@@ -346,6 +346,15 @@ input::-webkit-date-and-time-value { text-align: left; }
   .ken-burns { animation: ken-burns 40s ease-in-out infinite alternate; transform-origin: 35% 60%; will-change: transform; }
 }
 
+/* Stavové tečky v ukázkách na landingu. Vezou stejné tóny jako aplikace
+   (--ok / --wait / --muted), aby „dochází mléko" na prodejní stránce mělo
+   přesně tu barvu, kterou uvidí uvnitř. Syrová tailwindová amber tu byla
+   a šla ven: značka je krém, inkoust a limetka plus pět stavových tónů,
+   dekorace vlastní paletu nepřináší. */
+.dot-ok    { background: #C8F542; box-shadow: 0 0 0 2px rgba(200,245,66,0.30); }
+.dot-wait  { background: #F59E0B; box-shadow: 0 0 0 2px rgba(245,158,11,0.28); }
+.dot-muted { background: rgba(22,24,26,0.25); box-shadow: 0 0 0 2px rgba(22,24,26,0.10); }
+
 /* ——— Prodejní stránka: liquid glass ————————————————————————————
    Sklo à la iOS 26: průsvitný panel, který světlo nejen rozmaže, ale i
    nasytí, a na horní hraně chytí odlesk. Jen pro landing — aplikace sama
@@ -376,11 +385,14 @@ input::-webkit-date-and-time-value { text-align: left; }
 }
 
 /* Barevné skvrny pod sklem — to, co se v rozmazání panelu nasytí.
-   Statické: pohyb pozadí přes celou stránku by tahal oči od obsahu. */
+   Statické: pohyb pozadí přes celou stránku by tahal oči od obsahu.
+   Jen značkové barvy: limetka ve dvou silách a teplý krém. Broskvová
+   a modrá tu krátce byly a šly ven — značka je krém + inkoust + limetka
+   a dekorace nemá právo přinášet vlastní paletu. */
 .lg-blob { position: absolute; border-radius: 9999px; filter: blur(70px); pointer-events: none; }
-.lg-blob-lime  { background: rgba(200,245,66,0.5); }
-.lg-blob-peach { background: rgba(255,197,143,0.42); }
-.lg-blob-sky   { background: rgba(164,214,255,0.4); }
+.lg-blob-lime   { background: rgba(200,245,66,0.5); }
+.lg-blob-lime-2 { background: rgba(200,245,66,0.26); }
+.lg-blob-cream  { background: rgba(240,233,214,0.9); }
 @media (prefers-reduced-transparency: reduce) { .lg-blob { display: none; } }
 
 /* Vznášení vystřižených objektů. Tři fáze, ať nekývou v zákrytu. */
