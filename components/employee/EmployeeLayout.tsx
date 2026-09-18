@@ -5,24 +5,36 @@ import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
-import ChatView from '../chat/ChatView';
 import MessengerDock from '../chat/MessengerDock';
 import { useConversations } from '../chat/useChat';
-import Guides from '../Guides';
-import Settings from '../Settings';
 import EmployeeDashboard from './EmployeeDashboard';
-import MyShifts from './MyShifts';
-import AvailabilitySubmit from '../scheduling/AvailabilitySubmit';
-import TimeOffRequest from '../scheduling/TimeOffRequest';
-import InventoryReport from './InventoryReport';
-import Tasks from './Tasks';
-import MyRewards from './MyRewards';
-import CashClosing from './CashClosing';
-import SuggestionsBoard from '../SuggestionsBoard';
-import ShiftSwap from '../scheduling/ShiftSwap';
-import ShiftCalendar from '../scheduling/ShiftCalendar';
-import Procedures from '../procedures/Procedures';
 import MobileMoreSheet from '../MobileMoreSheet';
+import dynamic from 'next/dynamic';
+import { PageSkeleton } from '../ui';
+
+// Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
+// otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
+// inventuru i výměny směn je čekání navíc na telefonu v provozu.
+// Domovská obrazovka zůstává statická, je první po přihlášení.
+function naLine<P extends object>(nacti: () => Promise<{ default: React.ComponentType<P> }>) {
+  return dynamic(nacti, { loading: () => <PageSkeleton /> }) as React.ComponentType<P>;
+}
+
+const ChatView = naLine(() => import('../chat/ChatView'));
+const Guides = naLine(() => import('../Guides'));
+const Settings = naLine(() => import('../Settings'));
+const MyShifts = naLine(() => import('./MyShifts'));
+const AvailabilitySubmit = naLine(() => import('../scheduling/AvailabilitySubmit'));
+const TimeOffRequest = naLine(() => import('../scheduling/TimeOffRequest'));
+const InventoryReport = naLine(() => import('./InventoryReport'));
+const Tasks = naLine(() => import('./Tasks'));
+const MyRewards = naLine(() => import('./MyRewards'));
+const CashClosing = naLine(() => import('./CashClosing'));
+const SuggestionsBoard = naLine(() => import('../SuggestionsBoard'));
+const ShiftSwap = naLine(() => import('../scheduling/ShiftSwap'));
+const ShiftCalendar = naLine(() => import('../scheduling/ShiftCalendar'));
+const Procedures = naLine(() => import('../procedures/Procedures'));
+
 
 const navItems = [
   { id: 'home',        label: 'Přehled',    icon: 'overview' },

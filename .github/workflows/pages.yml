@@ -127,3 +127,7 @@ jobs:
       # tam nepatří — uchovat je není laskavost, ale bezpečnostní chyba.
       - name: Tajemství v konceptu
         run: node scripts/check-draft-safety.mjs
+      # Statický import těžkého pohledu stáhne celou aplikaci, i když
+      # uživatel otevře jednu záložku. Naměřeno 421 kB místo 160 kB.
+      - name: Líné pohledy
+        run: node scripts/check-lazy-views.mjs

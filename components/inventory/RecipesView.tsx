@@ -64,10 +64,14 @@ function itemFactor(item: any): number {
 // musí být vidět — tiché oříznutí je ztráta dat bez upozornění.
 const LIMIT = 200;
 
-export default function RecipesView({ openProductId, onNavigate }: {
+// Typ je pojmenovaný, aby ho uneslo i líné načtení: u parametru s výchozí
+// hodnotou (`= {}`) se props z `import()` samy neodvodí.
+export interface RecipesViewProps {
   openProductId?: string;
   onNavigate?: (view: string, arg?: string) => void;
-} = {}) {
+}
+
+export default function RecipesView({ openProductId, onNavigate }: RecipesViewProps = {}) {
   const money = useMoney();
   // Surovina může stát míň než korunu; `money` by ji ukázal jako „0 Kč“.
   const cena = useCost();
