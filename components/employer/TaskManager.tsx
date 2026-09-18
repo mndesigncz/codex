@@ -45,6 +45,9 @@ const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority:
 export default function TaskManager({ user }: { user: { id?: string | number } }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  // Padesát úkolů napříč osmi lidmi a jediné, co šlo, bylo číst je podle
+  // data. „Co má dneska Eva" nešlo zjistit jinak než očima přes celý seznam.
+  const [who, setWho] = useState<number | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm());
@@ -206,14 +209,15 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   // Day-based grouping for the list view.
   const byDate = (a: Task, b: Task) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
-  const undone = tasks.filter(t => t.status !== 'done');
+  const forWho = who === 'all' ? tasks : tasks.filter(t => t.assignedTo === who);
+  const undone = forWho.filter(t => t.status !== 'done');
   const overdue = undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate);
   const todayTasks = undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate);
   const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
   // Week ahead up front (greyed as inactive); anything further out sits behind a toggle.
   const upcomingSoon = upcoming.filter(t => t.dueDate! <= weekAhead);
   const upcomingLater = upcoming.filter(t => t.dueDate! > weekAhead);
-  const doneTasks = tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 30);
+  const doneTasks = forWho.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 30);
 
   const labelFor = (t: Task) => t.teamTask ? 'Kdokoliv' : (t.assignedTo != null ? (memberById.get(t.assignedTo)?.name ?? '') : '');
 
@@ -292,6 +296,26 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         aside={<div className="md:hidden"><Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
           options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} /></div>}
       />
+
+      {/* Filtr podle člověka. Ukáže se, až když je koho filtrovat. */}
+      {members.length > 1 && tasks.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+          <button type="button" onClick={() => setWho('all')}
+            className={`filter-pill ${who === 'all' ? 'seg-on' : 'seg-off glass'}`}>
+            Všichni · {tasks.length}
+          </button>
+          {members.map(m => {
+            const n = tasks.filter(t => t.assignedTo === m.id).length;
+            if (n === 0) return null;
+            return (
+              <button key={m.id} type="button" onClick={() => setWho(w => (w === m.id ? 'all' : m.id))}
+                className={`filter-pill ${who === m.id ? 'seg-on' : 'seg-off glass'}`}>
+                {m.name.split(' ')[0]} · {n}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">

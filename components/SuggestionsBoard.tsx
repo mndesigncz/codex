@@ -62,6 +62,7 @@ export default function SuggestionsBoard() {
   const [meId, setMeId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState<'new' | 'votes'>('new');
   const [composing, setComposing] = useState(false);
   const composeModal = useModal(composing, () => setComposing(false), 'Nový podnět');
   const [title, setTitle] = useState('');
@@ -156,7 +157,14 @@ export default function SuggestionsBoard() {
   };
 
   const counts = items.reduce((a, s) => { a[s.status] = (a[s.status] ?? 0) + 1; return a; }, {} as Record<string, number>);
-  const shown = filter === 'all' ? items : items.filter(s => s.status === filter);
+  const shown = (() => {
+    const base = filter === 'all' ? items : items.filter(s => s.status === filter);
+    // Hlasy jsou na kartě to největší číslo a hlavní obsah celé nástěnky —
+    // a přesto se podle nich nedalo řadit. Pořadí ze serveru je podle data,
+    // takže nejpodporovanější nápad mohl být úplně dole.
+    if (sort === 'votes') return [...base].sort((a, b) => b.votes - a.votes);
+    return base;
+  })();
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-6">
@@ -173,18 +181,25 @@ export default function SuggestionsBoard() {
 
       {/* Filters */}
       {items.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
+        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1 min-w-0 flex-1">
           {FILTERS.map(f => {
             const cnt = f.id === 'all' ? items.length : (counts[f.id] ?? 0);
             return (
               <button key={f.id} onClick={() => setFilter(f.id)}
-                className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition ${
-                  filter === f.id ? 'seg-on' : 'seg-off glass'
-                }`}>
+                className={`filter-pill ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
                 {f.label} {cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/35'}>· {cnt}</span>}
               </button>
             );
           })}
+        </div>
+        {items.length > 2 && (
+          <button type="button" onClick={() => setSort(v => (v === 'votes' ? 'new' : 'votes'))}
+            aria-pressed={sort === 'votes'}
+            className={`filter-pill ${sort === 'votes' ? 'seg-on' : 'seg-off glass'}`}>
+            <Icon name="trend" size={14} />{sort === 'votes' ? 'Nejvíc hlasů' : 'Od nejnovějších'}
+          </button>
+        )}
         </div>
       )}
 

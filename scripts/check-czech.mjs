@@ -27,7 +27,11 @@ const COPIED = /\b[a-zA-Z_$][\w$]*\s*>=\s*2\s*&&\s*[a-zA-Z_$][\w$]*\s*<=\s*4\b/;
 // „dokonči povinné postupy" je bez číslovky správně pro dva i pro pět,
 // kdežto „2 postupů" je chyba. Rozhoduje tedy přítomnost `${x}` / `{x}`
 // se stejnou proměnnou na témže řádku.
-const TWO_FORMS = /([\w$.]+)\s*===\s*1\s*\?\s*['"][^'"]{2,}['"]\s*:\s*['"][^'"]{2,}['"]/;
+// Obě větve můžou být i šablonové literály — tam se číslo vypisuje uvnitř
+// nich (`${n} nové objednávky`), takže původní podoba s uvozovkami je
+// přehlédla. Právě takhle v aplikaci přežilo „5 nové objednávky".
+const STR = String.raw`(?:'[^']{2,}'|"[^"]{2,}"|\`[^\`]{2,}\`)`;
+const TWO_FORMS = new RegExp(String.raw`([\w$.]+)\s*===\s*1\s*\?\s*${STR}\s*:\s*${STR}`);
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
@@ -43,15 +47,21 @@ for (const root of ROOTS) {
   for (const file of walk(root)) {
     const rel = relative('.', file);
     if (ALLOW.has(rel)) continue;
-    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, i) => {
       const at = `${rel}:${i + 1}  ${line.trim().slice(0, 110)}`;
+      // Výjimka s důvodem: po předložce, která žádá 2. pád („u tří směn",
+      // „z pěti uzávěrek"), je tvar pro 2–4 i 5+ stejný a dva tvary jsou
+      // správně. Píše se na týž nebo předchozí řádek, aby to fungovalo
+      // i v JSX, kde `//` uprostřed značky není komentář.
+      if (/czech-ok/.test(line) || /czech-ok/.test(lines[i - 1] ?? '')) return;
       if (COPIED.test(line)) copied.push(at);
       // Jen české texty; `? 'day' : 'days'` v anglickém řetězci nás nezajímá.
       else {
         const m = TWO_FORMS.exec(line);
         if (m && /[áčďéěíňóřšťúůýž]/i.test(line)) {
           const v = m[1].replace(/[.$]/g, '\\$&');
-          const rendered = new RegExp(`\\$\\{\\s*${v}\\s*\\}|\\{\\s*${v}\\s*\\}`);
+          const rendered = new RegExp(String.raw`\$\{\s*${v}\s*\}|\{\s*${v}\s*\}`);
           if (rendered.test(line)) twoForms.push(at);
         }
       }

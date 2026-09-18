@@ -133,6 +133,7 @@ export default function NotificationBell() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[#16181A]">Něco je potřeba napravit</p>
                   <p className="text-xs text-black/55 mt-0.5">
+        {/* czech-ok: po předložce „u“ je 2. pád stejný pro 2–4 i 5+ („u tří směn“, „u pěti směn“). */}
                     {flaggedFeedback === 1 ? 'U jedné z tvých směn' : `U ${flaggedFeedback} tvých směn`} máš zpětnou vazbu od vedení. Otevři sekci Odměny.
                   </p>
                 </div>

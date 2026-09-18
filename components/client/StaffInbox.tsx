@@ -11,6 +11,7 @@ import { Button, EmptyState, Skeleton } from '../ui';
 import { Initials } from './ClientShell';
 import CardScan from './CardScan';
 import { RES_STATUS } from '@/lib/clientSlots';
+import { czCount } from '@/lib/czech';
 
 const EVERY_MS = 20 * 1000;
 
@@ -188,7 +189,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       </details>
       {news.length > 0 && (
         <section className="rounded-3xl bg-amber-500/[0.10] border border-amber-500/40 p-4 space-y-3">
-          <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-amber-800" />{news.length === 1 ? 'Nová objednávka od stolu' : `${news.length} nové objednávky od stolu`}</h2>
+          <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-amber-800" />{news.length === 1 ? 'Nová objednávka od stolu' : `${czCount(news.length, { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' })} od stolu`}</h2>
           <ul className="space-y-3">{news.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
         </section>
       )}

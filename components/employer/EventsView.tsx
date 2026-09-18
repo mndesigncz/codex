@@ -764,6 +764,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
             )}
             {e.closingsCount > 0 ? (
               <div className="flex items-center justify-between gap-2 flex-wrap rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2.5">
+                {/* czech-ok: po předložce „z“ je 2. pád stejný pro 2–4 i 5+. */}
                 <p className="text-sm text-black/60"><Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5" />Tržba z {e.closingsCount === 1 ? 'uzávěrky za akci' : `${e.closingsCount} uzávěrek za akci`}</p>
                 <p className="text-sm font-bold tabular-nums text-[#16181A]">{money(e.closingsTotal)}</p>
               </div>

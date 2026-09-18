@@ -13,6 +13,7 @@ import {
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { czCount } from '@/lib/czech';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -628,7 +629,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         <div className="p-4 rounded-2xl bg-amber-500/[0.09] border border-amber-500/30 space-y-2.5">
           <p className="flex items-center gap-2 font-semibold text-[#16181A] text-sm">
             <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
-            {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${eligible.length} uzávěrky za dny, kdy jsi měl/a směnu`}
+            {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${czCount(eligible.length, { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' })} za dny, kdy jsi měl/a směnu`}
           </p>
           <p className="text-xs text-black/55">
             Vyplň ji prosím — vyber den a projdi formulář níže.
