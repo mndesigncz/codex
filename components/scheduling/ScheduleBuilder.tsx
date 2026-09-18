@@ -975,7 +975,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                               <Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dovolená ({holidays.length}):{' '}
                               <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
                                 {holidays.map((t: any) => (
-                                  <span key={t.id} className="rounded-md bg-[#0A84FF]/12 text-[#0A6FE0] px-1.5 py-0.5 text-xs tabular-nums">
+                                  <span key={t.id} className="rounded-md bg-[#0A84FF]/12 text-[#0A5CC0] px-1.5 py-0.5 text-xs tabular-nums">
                                     {parseInt(t.fromDate.split('-')[2])}.{parseInt(t.fromDate.split('-')[1])}.
                                     {t.fromDate !== t.toDate ? `–${parseInt(t.toDate.split('-')[2])}.${parseInt(t.toDate.split('-')[1])}.` : ''}
                                   </span>
@@ -1368,7 +1368,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                       )}
                       {(eventsByDate[cell] ?? []).map((ev: any) => (
                         <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/12 text-[#0A6FE0]">
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/12 text-[#0A5CC0]">
                           <span className="flex-shrink-0"><Icon name="calendarCheck" size={15} /></span>
                           <span className="truncate min-w-0">{ev.title}</span>
                         </span>
@@ -2767,7 +2767,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
           Klikáním na den přepínáš: volno → <span className="text-bad-ink font-medium">nemůže</span>
           {shiftTypes.length
             ? shiftTypes.map((t) => <span key={t.id}> → <span className="font-medium">jen {t.name}</span></span>)
-            : <> → <span className="text-wait-ink font-medium">jen ranní</span> → <span className="font-medium text-[#0A5FC0]">jen odpolední</span></>}
+            : <> → <span className="text-wait-ink font-medium">jen ranní</span> → <span className="font-medium text-[#0A5CC0]">jen odpolední</span></>}
           . Denní volby jsou pro generátor závazné — typy se berou z nastavení „Typy směn".
         </p>
 

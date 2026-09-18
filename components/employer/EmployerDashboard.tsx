@@ -301,7 +301,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
-              <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A6FE0]" />
+              <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A5CC0]" />
               <span className="truncate">{nextEvent.title}</span>
             </p>
             <p className="text-sm text-black/50 mt-0.5 cz-sentence truncate">
@@ -309,7 +309,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
             </p>
           </div>
-          <span className="shrink-0 text-sm text-[#0A6FE0]">Akce →</span>
+          <span className="shrink-0 text-sm text-[#0A5CC0]">Akce →</span>
         </div>
         {nextEvent.crewPeople?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2.5">
@@ -326,7 +326,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
-              <Icon name="pin" size={17} className="shrink-0 text-[#4F6A07]" />
+              <Icon name="pin" size={17} className="shrink-0 text-[#5B7A08]" />
               <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
             </p>
             <p className="text-sm text-black/50 mt-0.5 truncate">Sdílená stránka pro zákazníky — otevři nebo ukaž QR z prohlížeče.</p>
@@ -349,8 +349,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-[#5B9E00] opacity-60 motion-safe:animate-ping" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#5B9E00]" />
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-[#8FB811] opacity-60 motion-safe:animate-ping" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#8FB811]" />
                     </span>
                     <p className="font-bold text-[#16181A] truncate">Právě na směně ({onShift.length})</p>
                   </div>
@@ -495,7 +495,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   <div className="space-y-2">
                     {todayShifts.map(s => (
                       <div key={s.id} className="flex items-center gap-3 p-3 well">
-                        <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-wait-ink' : 'text-[#0A6FE0]'} /></span>
+                        <span className="text-lg"><Icon name={s.type === 'morning' ? 'sun' : 'moon'} size={16} className={s.type === 'morning' ? 'text-wait-ink' : 'text-[#0A5CC0]'} /></span>
                         <div>
                           <PersonLink id={s.employeeId ?? s.employee_id}><p className="text-sm font-medium text-[#16181A]">{s.employeeName ?? s.employee_name ?? 'Zaměstnanec'}</p></PersonLink>
                           <p className="text-xs text-black/45">{(s.startTime ?? s.start_time)} – {(s.endTime ?? s.end_time)}</p>

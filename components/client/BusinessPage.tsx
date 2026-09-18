@@ -808,7 +808,7 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
               <Icon name="location" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />{place}
               {mapQuery && (
                 <a href={`https://mapy.cz/zakladni?q=${encodeURIComponent(mapQuery)}`} target="_blank" rel="noopener noreferrer"
-                  className="tap-target-sm inline-block ml-2 py-1 text-[#0A6FE0] underline decoration-[#0A6FE0]/30 hover:decoration-[#0A6FE0]">mapa ↗</a>
+                  className="tap-target-sm inline-block ml-2 py-1 text-[#0A5CC0] underline decoration-[#0A5CC0]/30 hover:decoration-[#0A5CC0]">mapa ↗</a>
               )}
             </p>
           )}

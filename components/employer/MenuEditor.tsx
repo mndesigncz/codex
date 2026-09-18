@@ -480,7 +480,7 @@ export default function MenuEditor() {
           <div className="flex items-center gap-2 flex-wrap">
             <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
             <a href={cesta} target="_blank" rel="noreferrer"
-              className="tap-target-sm text-sm font-medium text-[#5B9E00] underline underline-offset-2">
+              className="tap-target-sm text-sm font-medium text-[#8FB811] underline underline-offset-2">
               Otevřít ↗
             </a>
           </div>
@@ -597,7 +597,7 @@ export default function MenuEditor() {
               </button>
             )}
             <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60 py-2.5">
-              <input type="checkbox" checked={board.enabled} className="h-5 w-5 rounded accent-[#5B9E00]"
+              <input type="checkbox" checked={board.enabled} className="h-5 w-5 rounded accent-[#8FB811]"
                 onChange={(e) => upravit((b) => { b.enabled = e.target.checked; })} />
               Menu je veřejně dostupné
             </label>
@@ -707,7 +707,7 @@ export default function MenuEditor() {
                 <label className="space-y-1">
                   <span className="text-xs font-semibold text-black/50">Síla prvků: {t.pozadi.sila} %</span>
                   <input type="range" min={0} max={20} step={0.5} value={t.pozadi.sila}
-                    className="w-full accent-[#5B9E00]"
+                    className="w-full accent-[#8FB811]"
                     onChange={(e) => setT((x) => { x.pozadi.sila = Number(e.target.value); })} />
                 </label>
                 {t.pozadi.druh === 'vlastni' && (
@@ -918,7 +918,7 @@ export default function MenuEditor() {
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
           {chyba && <p className="text-bad-ink text-sm">{chyba}</p>}
-          {hlaska && !chyba && <p className="text-[#5B9E00] text-sm">{hlaska}</p>}
+          {hlaska && !chyba && <p className="text-[#8FB811] text-sm">{hlaska}</p>}
           {neulozeno && !chyba && (
             <p className="text-wait-ink text-sm font-semibold">Máš neuložené změny</p>
           )}

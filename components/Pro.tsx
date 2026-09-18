@@ -105,7 +105,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
   return (
     <div className="p-4 sm:p-6 max-w-xl mx-auto">
       <div className="glass-card p-8 text-center space-y-3">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={24} /></div>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={24} /></div>
         <div className="flex items-center justify-center gap-2">
           <h3 className="t-card">{feature}</h3>
           <ProBadge />
@@ -141,7 +141,7 @@ export function UpgradeModal({ feature, onClose }: { feature: string; onClose: (
         <Button variant="accent" icon="sparkle" onClick={() => { window.location.href = '/employer/overview?view=settings'; }}>Zjistit víc</Button>
       </>}>
       <div className="text-center space-y-3">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#4F6A07]"><Icon name="lock" size={20} /></div>
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={20} /></div>
         <p className="text-sm text-black/55">Tuhle funkci odemyká plán Pro ({PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}).</p>
       </div>
     </Modal>

@@ -24,7 +24,7 @@ export function ErrorState({ title = 'Tohle se nepodařilo načíst', hint, onRe
 }) {
   return (
     <div className={`flex flex-col items-center text-center ${compact ? 'py-6 px-4' : 'py-12 px-6'} ${className}`}>
-      <div className={`${compact ? 'h-12 w-12' : 'h-16 w-16'} rounded-2xl bg-[#E4572E]/10 text-[#B23A15] flex items-center justify-center mb-4`}>
+      <div className={`${compact ? 'h-12 w-12' : 'h-16 w-16'} rounded-2xl bg-[#DC2626]/10 text-[#991B1B] flex items-center justify-center mb-4`}>
         <Icon name="warning" size={compact ? 22 : 28} />
       </div>
       <p className={`font-bold tracking-tight text-[#16181A] text-balance ${compact ? 'text-base' : 'text-lg'}`}>{title}</p>

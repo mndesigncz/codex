@@ -89,7 +89,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
         className="w-full glass-card p-5 text-left hover:bg-black/[0.02] transition">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-bold tracking-tight text-[#16181A] line-clamp-2"><Icon name={k.icon} size={16} className="inline -mt-0.5 mr-1.5 text-[#0A6FE0]" />{e.title}</p>
+            <p className="font-bold tracking-tight text-[#16181A] line-clamp-2"><Icon name={k.icon} size={16} className="inline -mt-0.5 mr-1.5 text-[#0A5CC0]" />{e.title}</p>
             <p className="text-sm text-black/50 mt-0.5 cz-sentence line-clamp-2">
               {fmtDate(e.date)}{e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
             </p>
@@ -102,7 +102,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
               e.status === 'confirmed' ? 'bg-[#C8F542]/20 text-[#5B7A08]'
               : e.status === 'done' ? 'bg-black/[0.06] text-black/50'
               : e.status === 'cancelled' ? 'bg-bad/10 text-bad-ink'
-              : 'bg-[#0A84FF]/10 text-[#0A6FE0]'
+              : 'bg-[#0A84FF]/10 text-[#0A5CC0]'
             }`}>{statusLabel(e.status)}</span>
             {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná{e.going > 0 ? ` · přijde ${e.going}` : ''}</span>}
             {result != null && (
@@ -360,7 +360,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
         {/* hlavička */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-xl font-bold tracking-tight text-[#16181A]"><Icon name={k.icon} size={20} className="inline -mt-1 mr-2 text-[#0A6FE0]" />{e.title}</h3>
+            <h3 className="text-xl font-bold tracking-tight text-[#16181A]"><Icon name={k.icon} size={20} className="inline -mt-1 mr-2 text-[#0A5CC0]" />{e.title}</h3>
             <p className="text-sm text-black/50 cz-sentence mt-0.5">
               {e.offsite ? 'Výjezd ven' : 'U nás v podniku'}
               {' · '}{new Date(e.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -437,8 +437,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {(e.onShift ?? []).map((m2: any) => (
-                  <span key={m2.id} className="rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] border border-[#0A84FF]/20 px-3 py-1.5 text-sm">
-                    {m2.avatar} {m2.name}<span className="text-[#0A6FE0] tabular-nums">{m2.start ? ` · ${String(m2.start).slice(0, 5)}` : ''}{m2.end ? `–${String(m2.end).slice(0, 5)}` : ''}</span>
+                  <span key={m2.id} className="rounded-full bg-[#0A84FF]/10 text-[#0A5CC0] border border-[#0A84FF]/20 px-3 py-1.5 text-sm">
+                    {m2.avatar} {m2.name}<span className="text-[#0A5CC0] tabular-nums">{m2.start ? ` · ${String(m2.start).slice(0, 5)}` : ''}{m2.end ? `–${String(m2.end).slice(0, 5)}` : ''}</span>
                   </span>
                 ))}
               </div>
@@ -571,11 +571,11 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 <ul className="space-y-1.5">
                   {(e.menu ?? []).map((l: any, i: number) => (
                     <li key={`${l.boardId ?? 'b'}-${l.itemId ?? 'x'}-${i}`} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm ${l.boardId != null ? 'bg-[#C8F542]/[0.10] border-[#C8F542]/30' : 'bg-white/60 border-black/[0.06]'}`}>
-                      {l.boardId != null && <Icon name="leaf" size={14} className="shrink-0 text-[#4F6A07]" />}
+                      {l.boardId != null && <Icon name="leaf" size={14} className="shrink-0 text-[#5B7A08]" />}
                       <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.boardId != null ? <>Celá nabídka „{l.name}"<span className="text-black/45"> · {l.count ?? 0} položek</span></> : l.name}</span>
                       {l.itemId != null && (
                         l.pos
-                          ? <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#C8F542]/15 text-[#4F6A07] px-2 py-0.5 text-[11px] font-semibold" title="Spárováno s pokladnou — dá se namarkovat a tiskne se"><Icon name="receipt" size={11} />kasa</span>
+                          ? <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold" title="Spárováno s pokladnou — dá se namarkovat a tiskne se"><Icon name="receipt" size={11} />kasa</span>
                           : <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold" title="Bez párování s pokladnou — v kase nepůjde namarkovat. Spáruj v Menu.">bez kasy</span>
                       )}
                       {l.price != null && <span className="shrink-0 text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
@@ -621,7 +621,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                       ))}
                     </div>
                   ))}
-                  <a href="/employer/overview?mode=client&tab=menu" className="tap-target-sm inline-block py-1 text-xs font-semibold text-[#0A6FE0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
+                  <a href="/employer/overview?mode=client&tab=menu" className="tap-target-sm inline-block py-1 text-xs font-semibold text-[#0A5CC0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
                 </div>
               )}
               {/* Výjezd mívá úplně vlastní menu — volný řádek s cenou, vždy po ruce. */}
@@ -654,7 +654,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 <button type="button" aria-pressed={c.done}
                   onClick={() => patch(e.id, { checklist: e.checklist.map((x: any, j: number) => j === i ? { ...x, done: !x.done } : x) })}
                   className="tap-target flex items-center gap-2.5 text-left min-w-0 flex-1">
-                  <span className={c.done ? 'text-[#4F6A07]' : 'text-black/30'}><Icon name={c.done ? 'check' : 'box'} size={16} /></span>
+                  <span className={c.done ? 'text-[#5B7A08]' : 'text-black/30'}><Icon name={c.done ? 'check' : 'box'} size={16} /></span>
                   <span className="min-w-0 flex-1">{c.text}</span>
                 </button>
                 <button type="button" aria-label="Odebrat úkol"
@@ -754,7 +754,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                 ) : (
                   <div className="rounded-xl bg-white/60 border border-black/[0.06] px-3 py-2.5 space-y-1.5">
                     <p className="text-sm text-[#16181A]">
-                      <Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5 text-[#4F6A07]" />
+                      <Icon name="receipt" size={15} className="inline -mt-0.5 mr-1.5 text-[#5B7A08]" />
                       V kase {pos.from ? `${pos.from}–${pos.till ?? 'konec dne'}` : 'ten den'}: <span className="font-bold tabular-nums">{money(pos.revenue)}</span>
                       <span className="text-black/45"> · {pos.bills} {pos.bills === 1 ? 'účtenka' : pos.bills < 5 ? 'účtenky' : 'účtenek'}</span>
                     </p>

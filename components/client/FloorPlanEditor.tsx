@@ -198,7 +198,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h2 className="t-section flex items-center gap-2.5">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name="location" size={15} /></span>
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08]"><Icon name="location" size={15} /></span>
             Plánek podniku
           </h2>
           {open && <p className="text-xs text-black/55 mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>}

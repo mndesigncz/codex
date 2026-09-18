@@ -68,7 +68,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
               return (
                 <button key={i} onClick={() => vote(p.id, i)}
                   className={`relative w-full overflow-hidden rounded-xl border px-3 py-2 text-left text-sm transition ${
-                    mine ? 'border-[#5B9E00]/50 bg-white/70' : 'border-black/[0.07] bg-white/50 hover:bg-white/80'
+                    mine ? 'border-[#8FB811]/50 bg-white/70' : 'border-black/[0.07] bg-white/50 hover:bg-white/80'
                   }`}>
                   <span className="absolute inset-y-0 left-0 bg-[#C8F542]/30 transition-[width]" style={{ width: `${pct}%` }} />
                   <span className="relative flex items-center justify-between gap-2">

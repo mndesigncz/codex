@@ -138,7 +138,7 @@ export default function MyShifts({ user }: Props) {
               const one = t.fromDate === t.toDate;
               const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
               return (
-                <span key={i} className="rounded-full bg-[#0A84FF]/10 text-[#0A6FE0] px-3.5 py-1.5 text-sm font-medium whitespace-nowrap">
+                <span key={i} className="rounded-full bg-[#0A84FF]/10 text-[#0A5CC0] px-3.5 py-1.5 text-sm font-medium whitespace-nowrap">
                   {one ? fmt(t.fromDate) : `${fmt(t.fromDate)} – ${fmt(t.toDate)}`}
                 </span>
               );

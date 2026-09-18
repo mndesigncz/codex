@@ -196,7 +196,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {c && !c.covered_by && (
               <span className={`tap-target-sm text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
-                diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-bad/15 text-bad-ink'}`}>
+                diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'}`}>
                 {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </span>
             )}
@@ -226,7 +226,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     <div className="rounded-xl bg-[#0A84FF]/[0.06] border border-[#0A84FF]/20 px-3 py-2 my-1.5 space-y-1">
                       {(c as any).event_breakdown.map((eb: any, i: number) => (
                         <p key={i} className="text-sm text-[#16181A]">
-                          <Icon name="calendarCheck" size={14} className="inline -mt-0.5 mr-1.5 text-[#0A6FE0]" />
+                          <Icon name="calendarCheck" size={14} className="inline -mt-0.5 mr-1.5 text-[#0A5CC0]" />
                           Z toho akce „{eb.title}"{eb.from ? ` (${eb.from}–${eb.till ?? 'konec'})` : ''}: <span className="font-bold tabular-nums">{money(eb.revenue)}</span>
                           <span className="text-black/45"> · {eb.bills} úč.</span>
                         </p>
@@ -254,7 +254,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     </span>
                   )}
                   {c.event_title && (
-                    <span className="rounded-full bg-[#0A84FF]/12 text-[#0A6FE0] px-2.5 py-1 text-[11px] font-bold"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {c.event_title}</span>
+                    <span className="rounded-full bg-[#0A84FF]/12 text-[#0A5CC0] px-2.5 py-1 text-[11px] font-bold"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {c.event_title}</span>
                   )}
                   {c.shift_date && c.shift_date !== c.date && (
                     <span className="chip chip-muted">
@@ -281,7 +281,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                       )}
                     </div>
                     <div className={`-mx-1 mt-1 mb-1.5 rounded-xl px-3 py-2 flex items-center justify-between gap-3 ${
-                      diff === 0 ? 'bg-[#C8F542]/12 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A6FE0]' : 'bg-bad/10 text-bad-ink'}`}>
+                      diff === 0 ? 'bg-[#C8F542]/12 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A5CC0]' : 'bg-bad/10 text-bad-ink'}`}>
                       <span className="text-sm font-semibold">{diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko'}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>

@@ -70,9 +70,9 @@ export default function ShiftSwapApprovals() {
   return (
     <div className="rounded-3xl bg-[#0A84FF]/[0.06] border border-[#0A84FF]/20 p-5 space-y-3">
       <div className="flex items-center gap-2">
-        <Icon name="swap" size={18} className="text-[#0A6FE0]" />
+        <Icon name="swap" size={18} className="text-[#0A5CC0]" />
         <h3 className="t-card">Výměny směn ke schválení</h3>
-        <span className="rounded-full bg-[#0A84FF]/15 text-[#0A6FE0] px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
+        <span className="rounded-full bg-[#0A84FF]/15 text-[#0A5CC0] px-2.5 py-0.5 text-xs font-semibold">{pending.length}</span>
         {pending.length > 1 && !sel.selecting && (
           <button type="button" onClick={sel.start}
             className="ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">

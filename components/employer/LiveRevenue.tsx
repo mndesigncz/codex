@@ -203,7 +203,7 @@ export default function LiveRevenue() {
               <div className="flex items-end gap-[3px] h-16">
                 {(d.hours ?? []).map((v, h) => (
                   <div key={h} className="flex-1 min-w-[8px] flex flex-col items-center gap-1" title={`${h}:00 — ${money(v)}`}>
-                    <div className={`w-full rounded-t ${v === maxHour ? 'bg-[#5B9E00]' : 'bg-[#C8F542]/70'}`}
+                    <div className={`w-full rounded-t ${v === maxHour ? 'bg-[#8FB811]' : 'bg-[#C8F542]/70'}`}
                       style={{ height: `${maxHour ? Math.max(v > 0 ? 4 : 0, (v / maxHour) * 48) : 0}px` }} />
                     <span className="text-[11px] text-black/30 tabular-nums">{h % 3 === 0 ? h : ''}</span>
                   </div>

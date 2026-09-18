@@ -600,8 +600,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* Firemní zelená je o vlas pod normou (4,44:1) — ztmavením o dva tóny se
    dostane na 5,53:1 a v barvě je pořád tatáž. */
 .text-\[\#5B7A08\], .text-\[\#5B7A08\]\/70 { color: #4F6A07; }   /* 5,53:1 */
-.text-\[\#5B9E00\] { color: #4F6A07; }
-.text-\[\#0A6FE0\] { color: #0A5CC0; }   /* 5,68:1 */
+.text-\[\#8FB811\] { color: #4F6A07; }
+.text-\[\#0A5CC0\] { color: #0A5CC0; }   /* 5,68:1 */
 
 :root[data-theme="dark"] { color-scheme: dark; }
 :root[data-theme="dark"] body{
@@ -706,7 +706,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* Modrá informační: na světlé stojí #0A6FE0, na tmavém skle je moc tmavá
    (naměřeno 2,2:1 u pilulky „Za akci" v uzávěrce a 2,8:1 u termínů směn).
    Stejné zesvětlení jako u zelené řady. */
-:root[data-theme="dark"] .text-\[\#0A6FE0\]{ color:#7EB8FF !important; }
+:root[data-theme="dark"] .text-\[\#0A5CC0\]{ color:#7EB8FF !important; }
 /* Ink-on-accent: text that sits on a lime (#C8F542) surface must stay dark in
    BOTH themes — these two are deliberately never overridden. */
 .on-accent{ color:#16181A; }

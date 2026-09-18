@@ -61,7 +61,7 @@ const inputClass =
 function roleChip(role: string) {
   return role === 'employer'
     ? 'bg-[#C8F542]/15 text-[#5B7A08]'
-    : 'bg-info/15 text-info-ink';
+    : 'bg-info/15 text-[#0A5CC0]';
 }
 function roleLabel(role: string) {
   return role === 'employer' ? 'Vedoucí' : 'Zaměstnanec';
@@ -70,7 +70,7 @@ function roleLabel(role: string) {
 function statusChip(status: string) {
   if (status === 'accepted') return 'bg-[#C8F542]/15 text-[#5B7A08]';
   if (status === 'expired' || status === 'declined' || status === 'revoked') return 'bg-bad/15 text-bad-ink';
-  return 'bg-info/15 text-info-ink';
+  return 'bg-info/15 text-[#0A5CC0]';
 }
 function statusLabel(status: string) {
   if (status === 'accepted') return 'Přijato';

@@ -41,7 +41,7 @@ const PRIORITIES = [
   { value: 'high', label: 'Vysoká', dot: 'bg-bad' },
 ];
 const statusLabel = (s: string) => s === 'done' ? 'Hotovo' : s === 'in_progress' ? 'Probíhá' : 'Čeká';
-const statusChip = (s: string) => s === 'done' ? 'bg-[#C8F542]/15 text-[#5B7A08]' : s === 'in_progress' ? 'bg-[#0A84FF]/15 text-[#0A6FE0]' : 'bg-black/[0.05] text-black/55';
+const statusChip = (s: string) => s === 'done' ? 'bg-[#C8F542]/15 text-[#5B7A08]' : s === 'in_progress' ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-black/[0.05] text-black/55';
 
 const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[] });
 

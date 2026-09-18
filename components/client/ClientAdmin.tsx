@@ -60,7 +60,7 @@ const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11
 
 /** Dlaždice jako na přehledu podniku: štítek, ikona v tónovaném kolečku, číslo. Kliknutím do záložky. */
 function StatCard({ icon, label, value, onClick, tone = 'ok' }: { icon: string; label: string; value: number | string; onClick?: () => void; tone?: 'ok' | 'wait' | 'muted' }) {
-  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#4F6A07]';
+  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#5B7A08]';
   return (
     <button type="button" onClick={onClick} className={`text-left glass-card p-4 sm:p-5 transition duration-300 hover:bg-white/80 active:scale-[0.99] ${tone === 'wait' ? 'ring-1 ring-wait/25' : ''}`}>
       <div className="flex items-start justify-between gap-2">
@@ -77,7 +77,7 @@ function SectionTitle({ icon, children, action }: { icon: string; children: Reac
   return (
     <div className="flex items-center justify-between gap-3 mb-3">
       <h2 className="t-section flex items-center gap-2.5">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name={icon} size={15} /></span>
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08]"><Icon name={icon} size={15} /></span>
         {children}
       </h2>
       {action}
@@ -87,7 +87,7 @@ function SectionTitle({ icon, children, action }: { icon: string; children: Reac
 
 /** Odkaz do jiné záložky — v textu, s šipkou. */
 function GoLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className="tap-target-sm inline-flex items-center gap-1 text-sm font-semibold text-[#16181A] hover:text-[#4F6A07] transition">{children}<Icon name="chevron" size={14} className="-rotate-90" /></button>;
+  return <button type="button" onClick={onClick} className="tap-target-sm inline-flex items-center gap-1 text-sm font-semibold text-[#16181A] hover:text-[#5B7A08] transition">{children}<Icon name="chevron" size={14} className="-rotate-90" /></button>;
 }
 
 async function j(url: string, init?: RequestInit) {
@@ -306,7 +306,7 @@ function Overview({ summary, go, onCustomer }: { summary: any; go: (t: Tab) => v
                 <li key={r.id} className="py-2.5 flex items-center gap-x-3 gap-y-1 flex-wrap">
                   <span className="font-semibold tabular-nums w-12 shrink-0">{r.time}</span>
                   <Initials name={r.customer_name} size={28} />
-                  <button type="button" onClick={() => onCustomer(r.customer_name)} className="tap-target-sm min-w-0 flex-1 basis-40 truncate text-left hover:text-[#4F6A07] transition">
+                  <button type="button" onClick={() => onCustomer(r.customer_name)} className="tap-target-sm min-w-0 flex-1 basis-40 truncate text-left hover:text-[#5B7A08] transition">
                     <span className="font-medium">{r.customer_name}</span> <span className="text-black/50">· {r.party} os.{r.table_name ? ` · ${r.table_name}` : ''}</span>
                   </button>
                   <span className={`${chip(RES_STATUS[r.status]?.tone ?? 'wait')} ml-auto`}>{RES_STATUS[r.status]?.label ?? r.status}</span>
@@ -392,7 +392,7 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
         ? <EmptyState icon="calendarCheck" title={range === 'past' ? 'Žádné minulé rezervace' : 'Zatím žádné rezervace'} hint={range === 'past' ? '' : 'Objeví se tu, jakmile si host zarezervuje stůl na tvé stránce.'} compact />
         : groups.map(([date, rows]) => (
           <section key={date} className="glass-card p-4 sm:p-5">
-            <h2 className="t-card cz-sentence mb-1 flex items-center gap-2"><Icon name="calendar" size={15} className="text-[#4F6A07]" />{czDay(date, true)} <span className="text-black/40 font-medium">· {rows.length}</span></h2>
+            <h2 className="t-card cz-sentence mb-1 flex items-center gap-2"><Icon name="calendar" size={15} className="text-[#5B7A08]" />{czDay(date, true)} <span className="text-black/40 font-medium">· {rows.length}</span></h2>
             <ul className="divide-y divide-black/[0.06]">
               {rows.map((r: any) => {
                 const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
@@ -401,7 +401,7 @@ function Reservations({ toast, onChange, onCustomer }: { toast: (m: string) => v
                   <li key={r.id} className="py-3 grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_auto] gap-x-3 gap-y-2 items-center">
                     <span className="font-semibold tabular-nums text-lg leading-none">{r.time}</span>
                     <div className="min-w-0">
-                      <p className="font-semibold truncate flex items-center gap-2"><Initials name={r.customer_name} size={24} /><button type="button" onClick={() => onCustomer(r.customer_name)} title="Otevřít v Zákaznících" className="tap-target-sm truncate hover:text-[#4F6A07] transition">{r.customer_name}</button> <span className="text-black/50 font-medium">· {r.party} os.</span></p>
+                      <p className="font-semibold truncate flex items-center gap-2"><Initials name={r.customer_name} size={24} /><button type="button" onClick={() => onCustomer(r.customer_name)} title="Otevřít v Zákaznících" className="tap-target-sm truncate hover:text-[#5B7A08] transition">{r.customer_name}</button> <span className="text-black/50 font-medium">· {r.party} os.</span></p>
                       <p className="text-xs text-black/55 truncate">{r.customer_email}{r.note ? ` · „${r.note}"` : ''}</p>
                       <span className={`${chip(st.tone)} mt-1`}>{st.label}</span>
                     </div>
@@ -494,7 +494,7 @@ function Tables({ toast }: { toast: (m: string) => void }) {
         : <ul className="glass-card p-3 sm:p-4 list max-w-3xl">
             {d.tables.map((t: any) => (
               <ListRow key={t.id} className={t.active ? '' : 'opacity-55'}
-                lead={<span className={`grid h-9 w-9 place-items-center rounded-full ${t.active ? 'bg-[#C8F542]/20 text-[#4F6A07]' : 'bg-black/[0.05] text-black/40'}`}><Icon name="location" size={17} /></span>}
+                lead={<span className={`grid h-9 w-9 place-items-center rounded-full ${t.active ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-black/[0.05] text-black/40'}`}><Icon name="location" size={17} /></span>}
                 title={t.name}
                 meta={<>{t.seats} {t.seats === 1 ? 'místo' : t.seats < 5 ? 'místa' : 'míst'} · {t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}{t.active ? '' : ' · skrytý'}</>}
                 actions={<>

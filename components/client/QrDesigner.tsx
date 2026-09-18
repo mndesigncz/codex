@@ -99,7 +99,7 @@ export default function QrDesigner({ toast, tables }: { toast: (m: string) => vo
       <div className="flex items-center gap-3 flex-wrap">
         <div className="min-w-0">
           <h2 id="h-qr" className="t-section flex items-center gap-2.5">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#4F6A07]"><Icon name="print" size={15} /></span>
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08]"><Icon name="print" size={15} /></span>
             Vzhled QR na stůl
           </h2>
         </div>
