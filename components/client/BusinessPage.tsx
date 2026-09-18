@@ -283,18 +283,32 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
     if (!time) { setErr('Vyber čas.'); return; }
     setBusy(true);
-    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/reservations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, time, party, note }) });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) { setErr(d.error || 'Rezervace se nepovedla.'); return; }
-    setNote(''); onDone('Rezervace odeslána. Podnik ji potvrdí.');
+    // Bez `try` umřela obsluha na výpadku spojení uvnitř `await fetch`
+    // a nestalo se **vůbec nic**: žádná chyba, žádné potvrzení. Host pak
+    // neví, jestli stůl má — buď přijde a nemá, nebo nepřijde vůbec.
+    // U rezervace je nejistota to nejhorší, co jí můžeme vrátit.
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/reservations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, time, party, note }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(d.error || 'Rezervace se nepovedla.'); return; }
+      setNote(''); onDone('Rezervace odeslána. Podnik ji potvrdí.');
+    } catch {
+      setErr('Rezervace neodešla — vypadlo připojení. Zkus to prosím znovu.');
+    } finally {
+      setBusy(false);
+    }
   };
   const cancel = async (id: number) => {
     if (!confirm('Zrušit rezervaci?')) return;
-    const r = await fetch(`/api/client/reservations/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) });
-    if (r.ok) { onDone('Rezervace zrušena.'); return; }
-    const d = await r.json().catch(() => ({}));
-    setErr(d.error || 'Zrušení se nepovedlo. Zkus to prosím znovu.');
+    try {
+      const r = await fetch(`/api/client/reservations/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) });
+      if (r.ok) { onDone('Rezervace zrušena.'); return; }
+      const d = await r.json().catch(() => ({}));
+      setErr(d.error || 'Zrušení se nepovedlo. Zkus to prosím znovu.');
+    } catch {
+      // Nezrušená rezervace je horší než neodeslaná: podnik na hosta čeká.
+      setErr('Zrušení neodešlo — vypadlo připojení. Rezervace zatím platí, zkus to prosím znovu.');
+    }
   };
 
   return (
@@ -370,21 +384,32 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug + '?tab=loyalty')}`; return; }
     if (!promo.trim()) return;
     setPromoBusy(true); setPromoErr('');
-    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/promo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: promo }) });
-    const d = await r.json().catch(() => ({}));
-    setPromoBusy(false);
-    if (!r.ok) { setPromoErr(d.error || 'Kód nešel uplatnit.'); return; }
-    setPromo('');
-    onDone(`${d.title}: ${[d.points ? `+${d.points} bodů` : '', d.coupon ? `kupon ${d.coupon}` : ''].filter(Boolean).join(' a ')}.`);
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/promo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: promo }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setPromoErr(d.error || 'Kód nešel uplatnit.'); return; }
+      setPromo('');
+      onDone(`${d.title}: ${[d.points ? `+${d.points} bodů` : '', d.coupon ? `kupon ${d.coupon}` : ''].filter(Boolean).join(' a ')}.`);
+    } catch {
+      // Kód zůstává v poli — jednorázový promo kód se nepřepisuje naslepo.
+      setPromoErr('Kód se nepodařilo odeslat — vypadlo připojení. Zkus to znovu.');
+    } finally {
+      setPromoBusy(false);
+    }
   };
   const claim = async (id: number) => {
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
     setBusy(id); setErr('');
-    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/coupons/${id}/claim`, { method: 'POST' });
-    const d = await r.json().catch(() => ({}));
-    setBusy(null);
-    if (!r.ok) { setErr(d.error || 'Kupon se nepodařilo vzít.'); return; }
-    onDone(`Kupon je tvůj. Kód ${d.code} ukaž u kasy.`);
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/coupons/${id}/claim`, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(d.error || 'Kupon se nepodařilo vzít.'); return; }
+      onDone(`Kupon je tvůj. Kód ${d.code} ukaž u kasy.`);
+    } catch {
+      setErr('Kupon se nepodařilo vzít — vypadlo připojení. Zkus to znovu.');
+    } finally {
+      setBusy(null);
+    }
   };
   const target = b.stampTarget || 0;
   return (
@@ -582,11 +607,17 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
     setBusy(true);
     const pos = geo.status === 'ok' ? { lat: geo.lat, lng: geo.lng, accuracy: geo.accuracy } : await askGeo();
     if (geoMode === 'block' && !pos) { setBusy(false); setErr('Bez polohy objednat nejde. Povol polohu v prohlížeči a zkus to znovu.'); return; }
-    const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId, token, geo: pos, items: lines.map(l => ({ id: l.id, count: l.count })), note }) });
-    const x = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) { setErr(x.error || 'Objednávka se nepovedla.'); return; }
-    setCart({}); setNote(''); onDone(x.straight ? 'Objednávka je v pokladně. Obsluha ji už připravuje.' : 'Objednávka odeslána. Obsluha ji za chvíli potvrdí.'); loadOrders();
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId, token, geo: pos, items: lines.map(l => ({ id: l.id, count: l.count })), note }) });
+      const x = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(x.error || 'Objednávka se nepovedla.'); return; }
+      setCart({}); setNote(''); onDone(x.straight ? 'Objednávka je v pokladně. Obsluha ji už připravuje.' : 'Objednávka odeslána. Obsluha ji za chvíli potvrdí.'); loadOrders();
+    } catch {
+      // Košík schválně zůstává plný: host ťukne znovu a neztratí, co navybíral.
+      setErr('Objednávka neodešla — vypadlo připojení. Nic se neodeslalo, zkus to prosím znovu.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

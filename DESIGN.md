@@ -391,6 +391,12 @@ Nejhorší chyba není prázdná obrazovka. Nejhorší je obrazovka, která tvrd
   stejně jako neexistující podnik: „Podnik tu není." Zákazník z toho usoudí,
   že kavárna na platformě není, a přestane to zkoušet. Neexistenci smí tvrdit
   jen odpověď 404; všechno ostatní je chyba načtení, a ta má tlačítko.
+- **`await fetch` v odesílací obsluze patří do `try`.** Bez něj obsluha
+  na výpadku spojení umře uvnitř `await` a nestane se **vůbec nic** —
+  žádná chyba, žádné potvrzení, jen ticho. U rezervace nebo objednávky je
+  nejistota to nejhorší, co se dá hostovi vrátit: neví, jestli stůl má.
+  Zpráva proto říká, že se **nic neodeslalo**, a co bylo rozepsané zůstává
+  (košík, promo kód) — ať se dá ťuknout znovu a nic se neztratí.
 - **Nenačteno znamená neodesílat.** Když se nenačetlo, co člověk poslal
   dřív, formulář se nesmí tvářit jako prázdný a nechat to odeslat —
   přepsal by původní data. Raději chyba a zamčené tlačítko.
