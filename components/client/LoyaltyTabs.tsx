@@ -4,12 +4,13 @@
 // razítka, co se dá za body pořídit, jaké slevy plynou z úrovně, a promo
 // kódy na letáky. Každá část zvlášť, ať se v tom vedení vyzná.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Segmented, EmptyState, Skeleton, ErrorState, PageHeader } from '../ui';
 import { Initials } from './ClientShell';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
+import { useResultKeys } from '@/lib/useResultKeys';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -277,6 +278,9 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
   label: string; hint?: string;
 }) {
   const [q, setQ] = useState('');
+  const pickInput = useRef<HTMLInputElement>(null);
+  const pickList = useRef<HTMLUListElement>(null);
+  const pickKeys = useResultKeys(pickList, pickInput, { onEscape: () => setQ('') });
   const chosen = new Set(value.map(v => v.itemId));
   const needle = q.trim().toLowerCase();
   const found = needle ? items.filter(i => !chosen.has(i.id) && i.name.toLowerCase().includes(needle)).slice(0, 6) : [];
@@ -295,10 +299,12 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
           ))}
         </div>
       )}
-      <input value={q} onChange={e => setQ(e.target.value)} placeholder={items.length ? 'Hledej v nabídce…' : 'Nabídka je prázdná'} disabled={!items.length}
+      <input ref={pickInput} onKeyDown={pickKeys.onInputKeyDown}
+        value={q} onChange={e => setQ(e.target.value)} placeholder={items.length ? 'Hledej v nabídce…' : 'Nabídka je prázdná'} disabled={!items.length}
         className={input} aria-label={lb} />
       {found.length > 0 && (
-        <ul className="mt-1.5 rounded-2xl border border-black/[0.08] bg-white/85 divide-y divide-black/[0.05] overflow-hidden">
+        <ul ref={pickList} onKeyDown={pickKeys.onListKeyDown}
+          className="mt-1.5 rounded-2xl border border-black/[0.08] bg-white/85 divide-y divide-black/[0.05] overflow-hidden">
           {found.map(i => (
             <li key={i.id}>
               <button type="button" onClick={() => { onChange([...value, { itemId: i.id, name: i.name }]); setQ(''); }}

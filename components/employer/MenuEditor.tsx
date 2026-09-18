@@ -7,13 +7,14 @@
 // vyprodáno na jedno ťuknutí a bez ukládání (propíše se hned), zbytek
 // se ukládá dohromady tlačítkem.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import {
   type MenuTheme, VYCHOZI_THEME, PREDLOHY, PISMA, normalizeMenuTheme,
 } from '@/lib/menuTheme';
 import { PageHeader } from '../ui';
 import { czCount } from '@/lib/czech';
+import { useResultKeys } from '@/lib/useResultKeys';
 
 interface Item {
   id?: number;
@@ -267,6 +268,9 @@ export default function MenuEditor() {
   const [posProdukty, setPosProdukty] = useState<PosProduct[] | null>(null);
   const [posStav, setPosStav] = useState<string | null>(null);
   const [posHledat, setPosHledat] = useState('');
+  const posInput = useRef<HTMLInputElement>(null);
+  const posList = useRef<HTMLDivElement>(null);
+  const posKeys = useResultKeys(posList, posInput, { onEscape: () => setPosOtevreno(null) });
   const [posPripojena, setPosPripojena] = useState<boolean | null>(null);
   const [importuji, setImportuji] = useState('');
 
@@ -868,14 +872,14 @@ export default function MenuEditor() {
           {posOtevreno?.si === si && (
             <div className="rounded-2xl border border-black/[0.08] p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <input className={`${vstup} flex-1`} value={posHledat} autoFocus
+                <input ref={posInput} onKeyDown={posKeys.onInputKeyDown} className={`${vstup} flex-1`} value={posHledat} autoFocus
                   placeholder={posOtevreno?.ii == null ? 'Hledat v katalogu kasy…' : `Ke které položce v kase patří „${s.items[posOtevreno.ii]?.name || '…'}“?`}
                   onChange={(e) => setPosHledat(e.target.value)} />
                 <button type="button" onClick={() => setPosOtevreno(null)}
                   className="rounded-full border border-black/10 px-3 py-2 text-sm text-black/50">Zavřít</button>
               </div>
               {posStav && <p className="text-sm text-black/45">{posStav}</p>}
-              <div className="max-h-64 overflow-y-auto space-y-1">
+              <div ref={posList} onKeyDown={posKeys.onListKeyDown} className="max-h-64 overflow-y-auto space-y-1">
                 {(posProdukty ?? [])
                   .filter((p) => !posHledat || (p.name + ' ' + p.category).toLowerCase().includes(posHledat.toLowerCase()))
                   .slice(0, 80)
