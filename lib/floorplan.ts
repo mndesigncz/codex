@@ -72,14 +72,65 @@ export function tableBox(t: MapTable): { w: number; h: number; shape: string; ro
   };
 }
 
+/** Relativní jas podle WCAG 2.1. */
+function jas(r: number, g: number, b: number): number {
+  const k = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * k(r) + 0.7152 * k(g) + 0.0722 * k(b);
+}
+
+/** Kontrastní poměr dvou barev podle WCAG 2.1. */
+export function kontrast(a: [number, number, number], b: [number, number, number]): number {
+  const la = jas(...a), lb = jas(...b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+function slozky(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
+const INKOUST: [number, number, number] = [22, 24, 26];
+const BILA: [number, number, number] = [255, 255, 255];
+
 /**
- * Barva značky podniku: jas rozhodne, jestli na ní bude text tmavý, nebo
- * bílý. Bez toho by si podnik mohl vybrat žlutou a popisky by zmizely.
+ * Text na barvě značky podniku — tmavý, nebo bílý.
+ *
+ * Dřív o tom rozhodoval vnímaný jas (ITU-R BT.601) s prahem 150. To je
+ * heuristika z devadesátek, ne kontrast, a na barvě, kterou si podnik
+ * vybere sám, selhávala na **28 % barevného prostoru**. Naměřeno na
+ * skutečných značkových barvách:
+ *
+ *   #F97316 (oranžová) → bílý text, 2,80:1
+ *   #14B8A6 (tyrkysová) → bílý text, 2,49:1
+ *   #00FF00 (zelená)    → bílý text, 1,37:1
+ *
+ * Kavárna, která si zvolí oranžovou, tak měla na své vlastní stránce
+ * tlačítko „Stát se členem", které si její hosté nepřečtou.
+ *
+ * Teď se počítá skutečný kontrast obou možností a bere se lepší. Selhání
+ * pod 4,5:1 tím klesne na 6,5 % a nejhorší dosažitelná hodnota je 4,22:1
+ * místo 1,37:1 — pod 3:1 se nedostane žádná barva.
+ *
+ * Zbylých 6,5 % nejde spravit výběrem inkoustu, jen změnou samotné barvy.
+ * To je rozhodnutí podniku, ne naše, takže se mu to řekne v Nastavení →
+ * Vzhled (viz `staciKontrast`).
  */
 export function onAccent(hex?: string | null): string {
   const c = String(hex ?? '').trim();
   if (!/^#[0-9a-fA-F]{6}$/.test(c)) return '#16181A';
-  const r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
-  // Vnímaný jas (ITU-R BT.601) — na světlé barvě tmavý inkoust, na tmavé bílá.
-  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#16181A' : '#FFFFFF';
+  const bg = slozky(c);
+  return kontrast(INKOUST, bg) >= kontrast(BILA, bg) ? '#16181A' : '#FFFFFF';
+}
+
+/**
+ * Dá se na téhle barvě značky vůbec dosáhnout čitelného textu?
+ *
+ * Když ne, není to chyba, kterou bychom měli opravit za podnik — barva je
+ * jeho. Ale mlčet o tom znamená nechat ho vydat stránku, kterou si hosté
+ * nepřečtou.
+ */
+export function staciKontrast(hex?: string | null, prah = 4.5): boolean {
+  const c = String(hex ?? '').trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(c)) return true;
+  const bg = slozky(c);
+  return Math.max(kontrast(INKOUST, bg), kontrast(BILA, bg)) >= prah;
 }

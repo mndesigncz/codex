@@ -6,6 +6,7 @@
 // pro zapnuté podniky — host totiž tým nemá a na týmové soubory nedosáhne.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { onAccent, staciKontrast } from '@/lib/floorplan';
 import { Icon } from '../Icons';
 import { Button, PageHeader, Skeleton, ErrorState } from '../ui';
 
@@ -161,6 +162,23 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
               className="h-9 w-12 rounded-lg border border-black/10 bg-transparent p-0.5" /></label>
           {p.accent && <button type="button" onClick={() => setP({ ...p, accent: '' })} className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:bg-black/[0.06] transition">Výchozí</button>}
         </div>
+
+        {/* Ukázka i varování. Na některých barvách se čitelného textu prostě
+            dosáhnout nedá — barva je ale podniku, ne naše, takže ji
+            nepřepisujeme. Mlčet by ale znamenalo nechat ho vydat stránku,
+            kterou si hosté nepřečtou. */}
+        {p.accent && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold"
+              style={{ background: p.accent, color: onAccent(p.accent) }}>Stát se členem</span>
+            {staciKontrast(p.accent)
+              ? <span className="text-xs text-black/45">Takhle uvidí hosté hlavní tlačítko.</span>
+              : <span className="text-xs text-wait-ink max-w-[42ch]">
+                  Na téhle barvě se text špatně čte — ani tmavý, ani bílý na ní nedosáhne
+                  doporučeného kontrastu. Zkus ji o kus ztmavit nebo zesvětlit.
+                </span>}
+          </div>
+        )}
       </section>
 
       <section className="glass-card p-5 grid gap-4">

@@ -17,6 +17,7 @@ import { escHtml as escMail, usingSandboxSender } from '../lib/email.ts';
 import { formatCost } from '../lib/money.ts';
 import { reakceNaZavreni, jePsanePole, jeRozepsano } from '../lib/modalClose.ts';
 import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.ts';
+import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -483,6 +484,44 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
     !maSeObnovit({ upravujeSe: false, ulozeny: { ...vychozi }, vychozi }));
   ok('koncept: koncept jen s neznámými klíči se neobnovuje',
     !maSeObnovit({ upravujeSe: false, ulozeny: { zruseno: 'x' }, vychozi }));
+}
+
+// ---- Text na barvě značky podniku ----------------------------------------
+// Barvu si podnik volí sám v Nastavení → Vzhled, takže projít musí celý
+// barevný prostor, ne jen naše limetka. Dřív o inkoustu rozhodoval vnímaný
+// jas (BT.601, práh 150) a na 28 % barev vyšel text pod 4,5:1.
+{
+  const slozky = (h: string): [number, number, number] =>
+    [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const pomer = (h: string) => kontrast(slozky(onAccent(h)), slozky(h));
+
+  // Barvy, které stará heuristika pokazila — u každé je uvedeno, co dávala.
+  for (const [barva, drive] of [['#F97316', '2,80:1'], ['#14B8A6', '2,49:1'], ['#00FF00', '1,37:1'],
+    ['#16A34A', '3,30:1'], ['#EC4899', '3,53:1'], ['#0A84FF', '3,65:1']] as const) {
+    ok(`barva značky ${barva}: text nad 4,5:1 (dřív ${drive})`, pomer(barva) >= 4.5);
+  }
+
+  // Značková limetka a tmavý inkoust musí zůstat, jak byly.
+  eq('barva značky: na limetce zůstává tmavý inkoust', onAccent('#C8F542'), '#16181A');
+  eq('barva značky: na tmavé zůstává bílá', onAccent('#16181A'), '#FFFFFF');
+
+  // Nesmyslný nebo chybějící vstup nesmí shodit stránku hosta.
+  eq('barva značky: prázdná hodnota dá tmavý inkoust', onAccent(''), '#16181A');
+  eq('barva značky: null dá tmavý inkoust', onAccent(null), '#16181A');
+  eq('barva značky: nesmysl dá tmavý inkoust', onAccent('zelená'), '#16181A');
+
+  // Žádná barva se nesmí dostat pod 3:1 — to je práh i pro velký text.
+  let nejhorsi = 99, kde = '';
+  for (let r = 0; r < 256; r += 15) for (let g = 0; g < 256; g += 15) for (let b = 0; b < 256; b += 15) {
+    const h = '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    const p2 = pomer(h);
+    if (p2 < nejhorsi) { nejhorsi = p2; kde = h; }
+  }
+  ok(`barva značky: nejhorší z celého prostoru je ${nejhorsi.toFixed(2)}:1 (${kde}), nad 3:1`, nejhorsi >= 3);
+
+  // Varování podniku sedí s tím, co se dá dosáhnout.
+  ok('barva značky: limetka nepotřebuje varovat', staciKontrast('#C8F542'));
+  ok('barva značky: purpurová #DC14C8 varuje (nejlepší možné 4,22:1)', !staciKontrast('#DC14C8'));
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
