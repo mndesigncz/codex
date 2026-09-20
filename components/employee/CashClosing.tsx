@@ -313,6 +313,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [todayRuns, setTodayRuns] = useState<any[]>([]);
   // Procedures the employer marked as mandatory before the closing.
   const [requiredProcs, setRequiredProcs] = useState<{ id: number; name: string; icon?: string }[]>([]);
+  // Víme vůbec, co se dnes odškrtlo? Bez toho se nesmí blokovat.
+  const [runsZname, setRunsZname] = useState(false);
   // Real numbers from the POS (Storyous), when the team connected one.
   const [pos, setPos] = useState<any | null>(null);
   // Counting the drawer by denomination instead of typing one total. When the
@@ -354,7 +356,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     try {
       const rd = await fetch('/api/procedures/runs?today=team').then(okJson);
       setTodayRuns(Array.isArray(rd?.runs) ? rd.runs : []);
-    } catch { /* runs are a nice-to-have here */ }
+      setRunsZname(true);
+    } catch {
+      // Běhy nejsou „nice-to-have": jsou to jediný doklad, že postup
+      // proběhl. Když se nenačtou, prázdný seznam vypadá stejně jako
+      // „dnes nikdo nic neudělal" — a uzávěrka pak zablokuje celý tým.
+      // Neblokovat je v tomhle případě poctivější než blokovat naslepo.
+      setRunsZname(false);
+    }
     try {
       const pd = await fetch('/api/procedures').then(okJson);
       const list = Array.isArray(pd?.procedures) ? pd.procedures : [];
@@ -526,7 +535,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   // someone who wasn't on shift can't be asked to finish a shift they never
   // had (that closing goes to the employer for approval anyway).
   const closingIsToday = form.date === today();
-  const proceduresApply = eventId === '' && closingIsToday && (!isSelf || onShift);
+  const proceduresApply = runsZname && eventId === '' && closingIsToday && (!isSelf || onShift);
   const missingRequired = !proceduresApply ? [] : requiredProcs.filter(p =>
     !todayRuns.some((r: any) => r.procedure_id === p.id && r.status === 'completed'));
 
