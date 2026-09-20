@@ -1114,6 +1114,28 @@ stránce tlačítko „Stát se členem", které si její hosté nepřečtou.
   limetku, na které vycházelo i to staré řešení — právě proto se vada
   neukázala. `scripts/test-units.ts` projede prostor a hlídá práh 3:1.
 
+## Začátek týdne si volí podnik
+
+V Nastavení → Tým si podnik zvolí, jestli mu týden začíná pondělím, nebo
+nedělí. Šest komponent si ale pořadí počítalo samo a dvě z nich to
+nastavení ignorovaly úplně: rozvrh i dostupnost měly `(getDay() + 6) % 7`
+natvrdo. Podnik s nedělním týdnem tak plánoval směny v mřížce, která
+začínala jinde než kalendář, ve kterém je pak četl.
+
+- **Seřazená hlavička dnů se bere z `zkratkyDnu(zacatek)`.** Jedno
+  pravidlo v `lib/week.ts`, ne sedm polí po komponentách. Hlídá
+  `check-week-start`.
+- **Sedmička, která tímhle NEJDE.** Otevírací doba se ukládá klíčem
+  0 = pondělí, dny opakování připomínky taky. To je úložná konvence, ne
+  zobrazení; převést ji na pořadí mřížky by podnikům posunulo otevírací
+  dobu i připomínky o den.
+- **Poznat se to dá podle mapování.** Hlavička mapuje jen hodnotu
+  (`.map(d => …)`), datový editor bere i index (`.map((label, d) => …)`)
+  a ten index je uložená data. Kontrola rozlišuje přesně tohle.
+- **`Number(null)` je nula.** Prosté `Number(h) === 0` by podniku bez
+  uloženého nastavení dalo neděli místo výchozího pondělí. Chytil to test,
+  ne oko.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

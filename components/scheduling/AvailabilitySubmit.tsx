@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { zkratkyDnu, odsazeniMesice, zacatekTydne } from '@/lib/week';
+import { useCurrency } from '@/components/CurrencyProvider';
 import { Icon } from '../Icons';
 
 import { PageHeader, ErrorState } from '../ui';
@@ -17,7 +19,6 @@ interface Props {
 
 type DayState = string; // 'available' | 'off' | legacy 'morning'/'afternoon' | 'type:<id>'
 
-const CZ_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 const SHIFTS = [
   { id: 'morning', label: 'Ranní' },
   { id: 'afternoon', label: 'Odpolední' },
@@ -53,11 +54,11 @@ function monthLabel(month: string) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 }
-function buildGrid(month: string) {
+function buildGrid(month: string, zacatek: 0 | 1) {
   const [y, m] = month.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
-  const lead = (first.getDay() + 6) % 7; // Monday = 0
+  const lead = odsazeniMesice(first, zacatek);
   const cells: (string | null)[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
@@ -121,7 +122,9 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     };
   };
 
-  const grid = useMemo(() => buildGrid(month), [month]);
+  // Začátek týdne si volí podnik; dřív tu bylo pondělí natvrdo.
+  const zacatek = zacatekTydne(useCurrency().weekStart);
+  const grid = useMemo(() => buildGrid(month, zacatek), [month, zacatek]);
   const todayStr = ym(now) === month ? `${month}-${String(now.getDate()).padStart(2, '0')}` : null;
 
   useEffect(() => {
@@ -305,7 +308,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               Typy směn se berou z nastavení rozvrhu; celková preference níže je jen orientační.
             </p>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
-              {CZ_DAYS.map((d) => (
+              {zkratkyDnu(zacatek).map((d) => (
                 <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
                   {d}
                 </div>

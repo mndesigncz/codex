@@ -89,9 +89,18 @@ export async function GET(request: Request) {
         JOIN procedures p ON p.id = r.procedure_id
         JOIN users u ON u.id = r.user_id
         WHERE r.team_id = ${me.teamId}
-          AND to_char(COALESCE(r.completed_at, r.started_at), 'YYYY-MM-DD') = ${today}
+          -- Datum běhu se musí číst v Praze, ne v UTC. Bez převodu spadne
+          -- postup odškrtnutý v 00:30 do včerejška, takže ho dnešní feed
+          -- nevidí — a uzávěrka pak celému týmu tvrdí, že ho nikdo neudělal.
+          -- Zbytek aplikace tenhle převod dělá; tohle bylo jediné místo bez něj.
+          AND to_char((COALESCE(r.completed_at, r.started_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${today}
         ORDER BY COALESCE(r.completed_at, r.started_at) DESC`;
-    } catch { rows = []; }
+    } catch {
+      // Selhání dotazu se nesmí tvářit jako „dnes nikdo nic neudělal".
+      // Uzávěrka podle tohohle seznamu blokuje odeslání, takže prázdná
+      // odpověď s dvoustovkou je pro ni nerozeznatelná od pravdy.
+      return NextResponse.json({ error: 'Dnešní postupy se nepodařilo načíst.' }, { status: 503 });
+    }
     return NextResponse.json({ runs: rows });
   }
 
