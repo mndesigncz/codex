@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { buildBoard, publicShape, cleanSlug } from '@/lib/menu';
+import { podnikJePozastaveny } from '@/lib/blokaceDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +25,15 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
     // veřejné čtení pak závisí na sloupcích, o kterých ani neví.
     const [board] = await sql`
       SELECT id, slug, name, eyebrow, title, note,
-             wifi_ssid, wifi_password, currency, enabled, theme, updated_at
+             wifi_ssid, wifi_password, currency, enabled, theme, updated_at, team_id
       FROM menu_boards
       WHERE slug = ${slug} AND enabled IS NOT FALSE
       ORDER BY id LIMIT 1`;
+    // Pozastavený podnik nemá ani veřejné menu — host vidí totéž, co když
+    // menu neexistuje. `team_id` se ven neposílá (níž se vypisují sloupce).
+    if (board && await podnikJePozastaveny(board.team_id)) {
+      return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
+    }
     if (!board) {
       // Samotné „nenalezeno" je pro hledání chyby k ničemu — nepozná se z něj
       // vypnuté menu od překlepu v adrese ani od prázdné databáze. Doptáváme

@@ -701,6 +701,23 @@ export async function GET(request: Request) {
       )`);
     // Colours and logo for every share page of the team.
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS share_theme JSONB`);
+    // ---- Správa platformy (superadmin) ----
+    // Pozastavení podniku, ruční tarif a interní poznámka. Kdo smí, je
+    // v prostředí (SUPERADMIN_USER_IDS), ne tady — viz docs/ADMIN.md.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS blocked_reason TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS plan_override TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS admin_note TEXT`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS admin_audit (
+        id SERIAL PRIMARY KEY,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        team_id INTEGER,
+        detail TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS admin_audit_time ON admin_audit (created_at DESC)`);
 
     // ---- Zákaznické menu (iPad před podnikem + QR do mobilu hosta) ----
     await ddl(sql`

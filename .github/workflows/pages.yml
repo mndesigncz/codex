@@ -152,3 +152,7 @@ jobs:
       # uzávěrek i varování v kiosku se prostě nekreslilo.
       - name: Krytí mimo škálu
         run: node scripts/check-opacity-steps.mjs
+      # Správa platformy: žádná admin routa bez requireSuperadmin, middleware
+      # s blokací existuje, lib/superadmin.ts je bez Node importů (edge).
+      - name: Brána správy platformy
+        run: node scripts/check-admin-auth.mjs

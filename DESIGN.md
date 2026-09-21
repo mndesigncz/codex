@@ -1294,6 +1294,29 @@ MP4 hlásila `readyState 0` a vypadalo to jako chyba aplikace. Než se
 z takového nálezu cokoli opraví, zeptej se prohlížeče `canPlayType` — tady
 odpověděl `ne` pro H.264 a `probably` pro VP9.
 
+## Správa platformy: nad podniky, ne v jednom z nich
+
+Správce platformy vidí všechny podniky a každé jeho kliknutí zasáhne cizí
+provoz. Obrazovka to musí říkat dřív, než kdo klikne:
+
+- **Stejný jazyk, jiný pás.** Karty, řádky, chipy a okna jsou tytéž jako
+  v aplikaci; horní lišta má navíc chip „superadmin" a žádnou navigaci
+  podniku. Kdo tu je, ví, že není doma.
+- **Nevratné jde přes okno s důvodem pro majitele.** Pozastavení podniku
+  chce důvod (aspoň tři znaky) a okno říká, co se stane a komu. Nápověda
+  u pole říká „piš pro něj, ne pro sebe" — důvod podnik uvidí.
+- **Každý zásah má aktéra.** Z obrazovky e-mail, z MCP „api-token"
+  (chip „MCP / skript"). Bez toho by se nedalo poznat, jestli podnik
+  pozastavil člověk, nebo Claude.
+- **Stav je jeden slovník.** `STAV_NAZEV`/`STAV_TON` v
+  `components/admin/spolecne.ts`; „pozastavený" je `bad`, „po splatnosti"
+  `wait`, „zkušební" `info`. Seznam, detail i historie ho sdílejí.
+- **Co tu schválně není:** přihlášení za jiného, čtení uzávěrek a mezd,
+  mazání podniků. Tlačítko, které neexistuje, se nedá stisknout omylem.
+
+Hlídá to `scripts/check-admin-auth.mjs`: žádná admin routa bez brány,
+middleware s blokací existuje, `lib/superadmin.ts` je bez Node importů.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

@@ -104,7 +104,7 @@ async function memberLimitHit(sql: any, teamId: number): Promise<boolean> {
   if (!PLAN_ENFORCED) return false;
   let plan;
   try {
-    const [row] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
+    const [row] = await sql`SELECT plan, plan_override, trial_ends_at FROM teams WHERE id = ${teamId}`;
     plan = planInfoOf(row);
   } catch { return false; }
   if (plan.effective === 'pro') return false;

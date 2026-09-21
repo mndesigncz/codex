@@ -111,11 +111,20 @@ export async function ensureProfile(teamId: number): Promise<any> {
 export async function profileBySlug(slug: string): Promise<any | null> {
   const s = slugify(slug);
   if (!s) return null;
-  const [row] = await sql`
-    SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
-    FROM client_profiles p JOIN teams t ON t.id = p.team_id
-    WHERE p.slug = ${s} AND p.enabled = TRUE`;
-  return row ?? null;
+  try {
+    const [row] = await sql`
+      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
+      FROM client_profiles p JOIN teams t ON t.id = p.team_id
+      WHERE p.slug = ${s} AND p.enabled = TRUE AND t.blocked_at IS NULL`;
+    return row ?? null;
+  } catch {
+    // Databáze před migrací správy platformy: sloupec blocked_at ještě není.
+    const [row] = await sql`
+      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
+      FROM client_profiles p JOIN teams t ON t.id = p.team_id
+      WHERE p.slug = ${s} AND p.enabled = TRUE`;
+    return row ?? null;
+  }
 }
 
 /** Tvar profilu, který jde ven hostovi — bez id týmu a interních věcí. */

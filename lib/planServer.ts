@@ -10,7 +10,7 @@ const sql = neon(process.env.DATABASE_URL!);
 export async function teamPlanInfo(teamId: number): Promise<PlanInfo> {
   try {
     const [row] = await sql`
-      SELECT plan, trial_ends_at, subscription_status, subscription_interval, current_period_end,
+      SELECT plan, plan_override, trial_ends_at, subscription_status, subscription_interval, current_period_end,
              cancel_at_period_end, trial_end, max_offer_until, stripe_subscription_id, had_subscription
       FROM teams WHERE id = ${teamId}`;
     return planInfoOf(row);

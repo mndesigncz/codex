@@ -94,7 +94,7 @@ const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
 const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
 
 interface Props {
-  user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string };
+  user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string; superadmin?: boolean };
 }
 
 export default function EmployerLayout({ user }: Props) {
@@ -462,6 +462,8 @@ export default function EmployerLayout({ user }: Props) {
         actions={[
           { label: 'Nastavení', icon: 'settings', onClick: openSettings },
           { label: 'Nastavení týmu', icon: 'users', onClick: openTeam },
+          // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
+          ...(user.superadmin ? [{ label: 'Správa platformy', icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
           { label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } },
           { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
         ]}

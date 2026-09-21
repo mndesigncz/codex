@@ -20,6 +20,10 @@ import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.
 import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
 import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week.ts';
 import { denPrichodu } from '../lib/businessDay.ts';
+import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
+import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
+import { rozhodni } from '../lib/blokace.ts';
+import { planInfoOf } from '../lib/plan.ts';
 import { pragueMomentOf } from '../lib/pragueTime.ts';
 
 let failed = 0;
@@ -576,6 +580,46 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
     denPrichodu({ at: v('2026-09-20', '05:01'), otevrenoVcera: bar }), '2026-09-20');
   eq('příchod: směna má přednost před otevírací dobou (ranní směna, ale bar otevřený) → řídí se otevírací dobou až po směně',
     denPrichodu({ at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '08:00', end_time: '16:00' }], otevrenoVcera: bar }), '2026-09-19');
+
+  // Správce platformy: kdo to je — id účtu, ne e-mail.
+  eq('správce: id z prostředí, čárka/mezera/středník', superadminIds(' 7, 12;300  '), [7, 12, 300]);
+  eq('správce: prázdné prostředí = nikdo', superadminIds(''), []);
+  eq('správce: nesmysl se ignoruje (e-mail, nula, záporné, desetinné)', superadminIds('admin@firma.cz, 0, -3, 2.5, 9'), [9]);
+  eq('správce: id v seznamu ano', isSuperadminId(7, '7,12'), true);
+  eq('správce: id jako text z tokenu ano', isSuperadminId('12', '7,12'), true);
+  eq('správce: cizí id ne', isSuperadminId(8, '7,12'), false);
+  eq('správce: undefined ne', isSuperadminId(undefined, '7,12'), false);
+  eq('správce: vedení s id v seznamu → ano', rozhodniSpravce({ id: 7, role: 'employer', seznam: '7' }), true);
+  eq('správce: kiosk s id v seznamu → ne (překlep v prostředí nesmí udělat správce z tabletu)', rozhodniSpravce({ id: 7, role: 'kiosk', seznam: '7' }), false);
+  eq('správce: zaměstnanec → ne', rozhodniSpravce({ id: 7, role: 'employee', seznam: '7' }), false);
+  eq('správce: vedení mimo seznam → ne', rozhodniSpravce({ id: 8, role: 'employer', seznam: '7' }), false);
+
+  // Token pro MCP.
+  const tok = 'x'.repeat(MIN_TOKEN_LENGTH);
+  eq('token: správný Bearer projde', adminTokenOk(`Bearer ${tok}`, tok), true);
+  eq('token: bez Bearer ne', adminTokenOk(tok, tok), false);
+  eq('token: jiná hodnota ne', adminTokenOk(`Bearer ${'y'.repeat(MIN_TOKEN_LENGTH)}`, tok), false);
+  eq('token: chybějící tajemství = nikdo', adminTokenOk(`Bearer ${tok}`, undefined), false);
+  eq('token: krátké tajemství = nikdo', adminTokenOk('Bearer abc', 'abc'), false);
+  eq('token: prázdná hlavička ne', adminTokenOk(null, tok), false);
+
+  // Blokace: čisté rozhodnutí.
+  const B = new Set([7]);
+  eq('blokace: nezablokovaný podnik projde', rozhodni({ pathname: '/api/shifts', teamId: 3, blokovane: B, superadmin: false }), { akce: 'pustit' });
+  eq('blokace: zablokovaný na API → 423', rozhodni({ pathname: '/api/shifts', teamId: 7, blokovane: B, superadmin: false }), { akce: 'api', status: 423 });
+  eq('blokace: zablokovaný na stránce → /pozastaveno', rozhodni({ pathname: '/employer/overview', teamId: 7, blokovane: B, superadmin: false }), { akce: 'presmerovat', kam: '/pozastaveno' });
+  eq('blokace: odhlášení jde vždycky', rozhodni({ pathname: '/api/auth/signout', teamId: 7, blokovane: B, superadmin: false }), { akce: 'pustit' });
+  eq('blokace: správce se nikdy nezablokuje', rozhodni({ pathname: '/employer/overview', teamId: 7, blokovane: B, superadmin: true }), { akce: 'pustit' });
+  eq('blokace: bez týmu není co blokovat', rozhodni({ pathname: '/api/shifts', teamId: null, blokovane: B, superadmin: false }), { akce: 'pustit' });
+  eq('blokace: kiosk zablokovaného podniku taky', rozhodni({ pathname: '/kiosk', teamId: 7, blokovane: B, superadmin: false }), { akce: 'presmerovat', kam: '/pozastaveno' });
+  eq('blokace: admin API se neblokuje samo', rozhodni({ pathname: '/api/admin/teams', teamId: 7, blokovane: B, superadmin: false }), { akce: 'pustit' });
+
+  // Ruční tarif přebíjí všechno.
+  eq('tarif: bez override platí uložený', planInfoOf({ plan: 'free' }).effective, 'free');
+  eq('tarif: override max na free týmu', planInfoOf({ plan: 'free', plan_override: 'max' }).effective, 'max');
+  eq('tarif: override free na placeném max — uložené zůstává max', planInfoOf({ plan: 'max', plan_override: 'free' }), { ...planInfoOf({ plan: 'max', plan_override: 'free' }), effective: 'free', plan: 'max', override: 'free' });
+  eq('tarif: nesmyslný override se ignoruje', planInfoOf({ plan: 'pro', plan_override: 'vip' }).override, null);
+  eq('tarif: override přebije i běžící zkušební dobu', planInfoOf({ plan: 'free', trial_ends_at: new Date(Date.now() + 5 * 86400000).toISOString(), plan_override: 'free' }).effective, 'free');
 
   // Každý den musí padnout do jiného sloupce, jinak se mřížka překrývá.
   for (const z of [0, 1] as const) {

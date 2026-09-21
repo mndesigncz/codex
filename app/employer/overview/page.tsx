@@ -9,6 +9,7 @@ export default async function EmployerOverviewPage() {
     email: session?.user?.email,
     id: (session?.user as any)?.id,
     role: (session?.user as any)?.role,
+    superadmin: (session?.user as any)?.superadmin === true,
     avatar: (session?.user as any)?.avatar,
   };
   return <EmployerApp user={user} />;
