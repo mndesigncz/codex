@@ -1204,6 +1204,37 @@ vůbec: zamítnutý řádek vypadal jako každý jiný.
   známém špatném i známém dobrém vstupu, a hlavně proti **vygenerovanému
   CSS** — ne proti domněnce, co Tailwind umí.
 
+## Příchod po půlnoci patří včerejšku
+
+Zaměstnanec se sobotní směnou v baru chtěl udělat uzávěrku a v návrzích
+viděl jedinou možnost: **neděli — den, kdy má podnik zavřeno.** Směna, kterou
+mu aplikace založila sama při klepnutí na „příchod", dostala datum podle
+hodin na zdi. Klepl po půlnoci, a ze sobotního večera se stala nedělní směna,
+kterou nikdo neplánoval a která se nedá uzavřít. `date` je v tabulce směn
+prostý text, takže se po cestě nic nepřevádělo — ten nedělní řádek tam
+opravdu byl.
+
+Odchod tohle pravidlo znal a měl ho i v komentáři („směna patří dni, kdy
+začala"). Příchod ne. Dvě místa, dvě pravidla — a shodovala se jen do půlnoci.
+
+Teď je to jednou, `lib/businessDay.ts`, a řídí příchod, odchod i úklid
+zapomenutých odchodů:
+
+1. **Včerejší směna, jejíž okno (s tolerancí) pokrývá okamžik příchodu → včera.**
+   Fakt, nic se nehádá.
+2. **Podnik měl včera otevřeno přes půlnoc a ještě nezavřel → včera.** Taky
+   fakt, z otevírací doby. Právě tohle říká „v neděli máme zavřeno".
+3. **Jinak dnes.**
+
+Posouvá se jen dozadu a jen s důkazem. Proto to není prosté „před šestou
+ráno = včera", jak to má pokladna u účtenek: pekař, který přijde ve čtyři,
+by si tím psal směnu na předchozí den. U pekárny zavírající v šest večer
+se pravidlo 2 nikdy nespustí — hlídá to test.
+
+Poučení, které je obecnější než uzávěrka: **když dvě místa odpovídají na
+tutéž otázku („ke kterému dni to patří?"), musí volat tutéž funkci.** Ne
+dvě funkce, které se shodují ve všech případech, na které si kdo vzpomněl.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

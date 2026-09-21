@@ -5,8 +5,8 @@ import { hit, clear } from '@/lib/rateLimit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
-import { autoCloseEntry, isForgottenClockOut, pragueMoment } from '@/lib/staleShifts';
+import { pragueToday, pragueDaySafe, parseDbTime } from '@/lib/pragueTime';
+import { autoCloseEntry, isForgottenClockOut, pragueMoment, denSmeny } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -266,16 +266,21 @@ export async function POST(req: NextRequest) {
       INSERT INTO time_entries (team_id, employee_id, source)
       VALUES (${c.teamId}, ${employeeId}, ${isKiosk ? 'kiosk' : 'self'})
       RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
-    // No planned shift for today? Create one from the clock-in so the closing counts it.
+    // Žádná plánovaná směna? Založí se automatická, aby ji uzávěrka viděla.
+    // Den NENÍ „dnes podle hodin na zdi": kdo klepne na příchod po půlnoci
+    // v podniku, který zavírá ve dvě, patří ještě k včerejšku. Dřív tu bylo
+    // `today` — a sobotní směna v baru se založila jako nedělní, v den, kdy
+    // je zavřeno. Odchod (níž) tohle pravidlo znal; příchod ne.
     const now = hhmmPrague();
-    await ensureShift(c.teamId, employeeId, today, now, now);
+    const denSmenyPrichodu = await denSmeny(c.teamId, employeeId, new Date());
+    await ensureShift(c.teamId, employeeId, denSmenyPrichodu, now, now);
 
     // Late check: a planned start more than 10 minutes ago means the shift
     // started without them — tell the employer while it still matters.
     try {
       const [planned] = await sql`
         SELECT start_time FROM shifts
-        WHERE employee_id = ${employeeId} AND date = ${today} AND start_time IS NOT NULL
+        WHERE employee_id = ${employeeId} AND date = ${denSmenyPrichodu} AND start_time IS NOT NULL
         ORDER BY start_time ASC LIMIT 1`;
       if (planned?.start_time) {
         const [ph, pm] = String(planned.start_time).split(':').map(Number);
@@ -306,8 +311,10 @@ export async function POST(req: NextRequest) {
     UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
     RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
   // Směna patří dni, kdy začala. Kdo se odpíchne po půlnoci, hledal by jinak
-  // svou směnu i uzávěrku pod zítřejším datem — a nenašel ani jedno.
-  const shiftDay = pragueDaySafe(open.clock_in) || today;
+  // svou směnu i uzávěrku pod zítřejším datem — a nenašel ani jedno. A „den,
+  // kdy začala" se počítá stejným pravidlem jako u příchodu, jinak by si
+  // příchod založil směnu na sobotu a odchod ji hledal pod nedělí.
+  const shiftDay = await denSmeny(c.teamId, employeeId, parseDbTime(open.clock_in) ?? new Date());
   // Extend the auto-created shift's end to the real clock-out time.
   try { await sql`UPDATE shifts SET end_time = ${hhmmPrague()} WHERE employee_id = ${employeeId} AND date = ${shiftDay} AND auto_created = TRUE`; } catch { /* not migrated */ }
 

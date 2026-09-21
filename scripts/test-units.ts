@@ -19,6 +19,8 @@ import { reakceNaZavreni, jePsanePole, jeRozepsano } from '../lib/modalClose.ts'
 import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.ts';
 import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
 import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week.ts';
+import { denPrichodu } from '../lib/businessDay.ts';
+import { pragueMomentOf } from '../lib/pragueTime.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -548,6 +550,32 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('týden: nula znamená neděli', zacatekTydne(0), 0);
   eq('týden: „0" z databáze znamená neděli', zacatekTydne('0'), 0);
   eq('týden: nesmysl znamená pondělí', zacatekTydne('kdykoliv'), 1);
+
+  // Příchod po půlnoci. 2026-09-19 je sobota, 20. neděle, 21. pondělí.
+  const v = (den: string, hm: string) => pragueMomentOf(den, hm)!;
+  const bar = { open: '20:00', close: '02:00', closed: false };
+  eq('příchod: sobotní bar, klepnuto v neděli 0:20 → patří sobotě',
+    denPrichodu({ at: v('2026-09-20', '00:20'), otevrenoVcera: bar }), '2026-09-19');
+  eq('příchod: v sobotu zavřeno → neděle zůstane nedělí',
+    denPrichodu({ at: v('2026-09-20', '00:20'), otevrenoVcera: { ...bar, closed: true } }), '2026-09-20');
+  eq('příchod: bez otevírací doby i bez směn → kalendářní den',
+    denPrichodu({ at: v('2026-09-20', '00:20') }), '2026-09-20');
+  eq('příchod: pekárna otevřená 6–18, pekař přijde v úterý ve 4:00 → úterý, ne pondělí',
+    denPrichodu({ at: v('2026-09-22', '04:00'), otevrenoVcera: { open: '06:00', close: '18:00', closed: false } }), '2026-09-22');
+  eq('příchod: podnik zavírá 23:30 (ne přes půlnoc) → 0:20 je už dnešek',
+    denPrichodu({ at: v('2026-09-20', '00:20'), otevrenoVcera: { open: '10:00', close: '23:30', closed: false } }), '2026-09-20');
+  eq('příchod: plánovaná sobotní směna 18–02 pokrývá 0:20 → sobota i bez otevírací doby',
+    denPrichodu({ at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '18:00', end_time: '02:00' }] }), '2026-09-19');
+  eq('příchod: sobotní ranní směna 8–16 už dávno skončila → neděle',
+    denPrichodu({ at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '08:00', end_time: '16:00' }] }), '2026-09-20');
+  eq('příchod: sobota 21:00 se nikdy nepřesune na pátek, i když pátek zavíral po půlnoci',
+    denPrichodu({ at: v('2026-09-19', '21:00'), otevrenoVcera: bar }), '2026-09-19');
+  eq('příchod: tolerance na úklid — 4:59 po zavíračce ve 2:00 je ještě sobota',
+    denPrichodu({ at: v('2026-09-20', '04:59'), otevrenoVcera: bar }), '2026-09-19');
+  eq('příchod: 5:01 už je za tolerancí → neděle',
+    denPrichodu({ at: v('2026-09-20', '05:01'), otevrenoVcera: bar }), '2026-09-20');
+  eq('příchod: směna má přednost před otevírací dobou (ranní směna, ale bar otevřený) → řídí se otevírací dobou až po směně',
+    denPrichodu({ at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '08:00', end_time: '16:00' }], otevrenoVcera: bar }), '2026-09-19');
 
   // Každý den musí padnout do jiného sloupce, jinak se mřížka překrývá.
   for (const z of [0, 1] as const) {

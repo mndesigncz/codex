@@ -15,9 +15,45 @@
 
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
-import { pragueHourOf } from '@/lib/pragueTime';
+import { pragueHourOf, pragueDayOf, dayPlus } from '@/lib/pragueTime';
+import { denPrichodu } from '@/lib/businessDay';
+import { weekdayKey, type OpeningDay } from '@/lib/coverage';
+import type { ShiftRow } from '@/lib/shiftWindow';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+/**
+ * Obchodní den, ke kterému patří příchod v okamžiku `at` — s tím, co o tom
+ * ví databáze: včerejší směny toho člověka a včerejší otevírací doba podniku.
+ * Pravidlo samotné je čisté a otestované v `lib/businessDay.ts`; tohle mu jen
+ * přinese vstupy. Bez `employeeId` se přeskočí směny, bez `teamId` otevírací
+ * doba — a zbylé pravidlo pořád platí.
+ *
+ * Volá se z příchodu, z odchodu i z úklidu zapomenutých odchodů. Právě proto
+ * je tady jednou: dřív měl příchod „dnes podle hodin na zdi" a odchod „den,
+ * kdy začala", a po půlnoci se ty dvě odpovědi rozešly.
+ */
+export async function denSmeny(teamId: number | null, employeeId: number | null, at: Date): Promise<string> {
+  const dnes = pragueDayOf(at);
+  const vcera = dayPlus(dnes, -1);
+  let smenyVcera: ShiftRow[] = [];
+  if (employeeId != null) {
+    try {
+      smenyVcera = (await sql`
+        SELECT date, start_time, end_time, type FROM shifts
+        WHERE employee_id = ${employeeId} AND date = ${vcera}`) as unknown as ShiftRow[];
+    } catch { /* bez tabulky směn zbývá otevírací doba */ }
+  }
+  let otevrenoVcera: OpeningDay | null = null;
+  if (teamId != null) {
+    try {
+      const [t] = await sql`SELECT opening_hours FROM teams WHERE id = ${teamId}`;
+      const oh = t?.opening_hours;
+      if (oh && typeof oh === 'object') otevrenoVcera = ((oh as Record<string, OpeningDay>)[weekdayKey(vcera)]) ?? null;
+    } catch { /* bez otevírací doby zbývá směna */ }
+  }
+  return denPrichodu({ at, smenyVcera, otevrenoVcera });
+}
 
 /** Od kolika ráno platí, že v podniku už nikdo nepracuje (pražský čas). */
 export const NIGHT_SWEEP_FROM_HOUR = 5;
@@ -80,7 +116,7 @@ export function pragueMoment(dateStr: string, hhmm: string): Date | null {
 
 /** The planned end of the person's shift on the day the entry started. */
 export async function plannedEndFor(employeeId: number, clockIn: Date): Promise<Date | null> {
-  const day = pragueDateOf(clockIn);
+  const day = await denSmeny(null, employeeId, clockIn);
   try {
     const [sh] = await sql`
       SELECT end_time FROM shifts
@@ -95,7 +131,7 @@ export async function plannedEndFor(employeeId: number, clockIn: Date): Promise<
 /** Konec otevírací doby v den, kdy směna začala (+ půl hodiny na úklid). */
 async function shopCloseFor(teamId: number | null, clockIn: Date): Promise<Date | null> {
   if (!teamId) return null;
-  const day = pragueDateOf(clockIn);
+  const day = await denSmeny(teamId, null, clockIn);
   try {
     const [t] = await sql`SELECT opening_hours FROM teams WHERE id = ${teamId}`;
     const oh = t?.opening_hours;
@@ -124,7 +160,7 @@ async function shopCloseFor(teamId: number | null, clockIn: Date): Promise<Date 
 async function bestCloseTime(
   entry: { employee_id: number; team_id: number | null }, inTs: Date, now: Date,
 ): Promise<{ at: Date; why: string }> {
-  const day = pragueDateOf(inTs);
+  const day = await denSmeny(entry.team_id, entry.employee_id, inTs);
   const candidates: { at: Date; why: string }[] = [];
   const add = (v: any, why: string) => {
     if (!v) return;
@@ -198,7 +234,7 @@ export async function autoCloseEntry(entry: { id: number; employee_id: number; t
         const [has] = await sql`
           SELECT 1 FROM cash_closings
           WHERE created_by = ${entry.employee_id}
-            AND COALESCE(shift_date, date) = ${pragueDateOf(inTs)}`;
+            AND COALESCE(shift_date, date) = ${await denSmeny(entry.team_id, entry.employee_id, inTs)}`;
         missingClosing = !has;
       } catch { /* volitelné */ }
       await notifyUsers((employers as any[]).map(e => e.id), {
