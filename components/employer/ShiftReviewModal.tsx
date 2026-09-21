@@ -315,7 +315,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               {/* Closing */}
               <div className={`rounded-2xl border overflow-hidden ${summary.closing?.item?.flagged ? 'border-wait/40' : 'border-black/[0.06]'}`}>
                 <button onClick={() => summary.closing && toggleExpand('closing')} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left">
-                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full shrink-0 ${summary.closing ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-bad/12 text-bad-ink'}`}>
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full shrink-0 ${summary.closing ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-bad/15 text-bad-ink'}`}>
                     <Icon name={summary.closing ? 'check' : 'warning'} size={14} />
                   </span>
                   <span className="flex-1 min-w-0 text-sm text-[#16181A]">
@@ -373,7 +373,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                           <button onClick={() => toggleExpand(key)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left">
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${prioDot(t.priority)}`} />
                             <span className={`flex-1 min-w-0 text-[13px] truncate ${missed ? 'text-bad-ink' : 'text-[#16181A]'}`}>{t.title}</span>
-                            {missed && <span className="rounded-full bg-bad/12 text-bad-ink px-2 py-0.5 text-[11px] font-semibold shrink-0">neuděláno</span>}
+                            {missed && <span className="rounded-full bg-bad/15 text-bad-ink px-2 py-0.5 text-[11px] font-semibold shrink-0">neuděláno</span>}
                             {itemBadge(t.item)}
                             {(t.item?.note || t.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
                             {t.checklist.length > 0 && <span className="text-[11px] text-black/40 tabular-nums shrink-0">{t.checklist.filter(i => i.done).length}/{t.checklist.length}</span>}
@@ -502,7 +502,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               </div>
             </div>
             <button onClick={() => setFlagged(f => !f)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition ${flagged ? 'bg-bad/12 text-bad-ink border border-bad/40' : 'bg-black/[0.05] text-black/55 border border-transparent hover:bg-black/[0.09]'}`}>
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition ${flagged ? 'bg-bad/15 text-bad-ink border border-bad/40' : 'bg-black/[0.05] text-black/55 border border-transparent hover:bg-black/[0.09]'}`}>
               <Icon name="warning" size={14} /> {flagged ? 'Směna označena k nápravě' : 'Označit směnu k nápravě'}
             </button>
           </div>

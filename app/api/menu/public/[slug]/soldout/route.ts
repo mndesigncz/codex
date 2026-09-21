@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { cleanSlug } from '@/lib/menu';
+import { podnikJePozastaveny } from '@/lib/blokaceDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,8 @@ export async function POST(request: Request, { params }: { params: { slug: strin
       SELECT id, team_id, pin_hash FROM menu_boards
       WHERE slug = ${slug} AND enabled IS NOT FALSE
       ORDER BY id LIMIT 1`;
+    // Pozastavený podnik nemá ani veřejné menu (viz lib/blokaceDb).
+    if (row && await podnikJePozastaveny(row.team_id)) return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
     board = row;
   } catch {
     return NextResponse.json({ error: 'Menu zatím není nastavené' }, { status: 404 });

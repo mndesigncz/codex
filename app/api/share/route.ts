@@ -118,7 +118,7 @@ export async function PATCH(request: Request) {
 
 async function teamPlan(sql: any, teamId: number) {
   try {
-    const [row] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`;
+    const [row] = await sql`SELECT plan, plan_override, trial_ends_at FROM teams WHERE id = ${teamId}`;
     return planInfoOf(row);
   } catch { return planInfoOf(null); }
 }

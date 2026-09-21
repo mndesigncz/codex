@@ -70,3 +70,17 @@ Spouští se po každém pohybu skladu včetně odpisů z prodejů v pokladně
 (prodej limonády → dochází → úkol), takže úkol nikdy nechybí a nikdy není
 dvakrát; když se zásoba doplní jinak, zavře se sám. Kód: lib/production.ts
 (data), lib/productionPlan.ts (čistá logika, testy v `npm test`).
+
+## Správa platformy (superadmin)
+
+Provozovatel Managera vidí všechny podniky a umí jim zasáhnout do provozu:
+pozastavit (lidé podniku dostanou vysvětlení, ne chybu), přepnout tarif
+ručně (podpora, partner, náhrada za výpadek), prodloužit zkušební dobu,
+připsat interní poznámku. Každý zásah má v historii aktéra — člověka
+z obrazovky, nebo „api-token", když to udělal Claude přes MCP.
+
+Kdo je správce, říká prostředí (`SUPERADMIN_USER_IDS`), ne databáze. Blokace
+se vynucuje v middleware před každou routou, ne v každé routě zvlášť.
+
+Schválně chybí: přihlášení za někoho jiného, čtení uzávěrek a mezd podniku,
+mazání podniků. Podrobně v `docs/ADMIN.md`.

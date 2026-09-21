@@ -13,7 +13,7 @@
 import { timingSafeEqual } from 'crypto';
 
 /** Porovná dva řetězce bez ohledu na to, kde se rozejdou. */
-function sameSecret(a: string, b: string): boolean {
+export function sameSecret(a: string, b: string): boolean {
   const ba = Buffer.from(a), bb = Buffer.from(b);
   if (ba.length !== bb.length) {
     // Délku nelze porovnat konstantně; aspoň ať se neodhalí porovnáním obsahu.

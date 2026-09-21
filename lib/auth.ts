@@ -7,6 +7,7 @@ import { db } from './db';
 import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
 import { generateJoinCode } from './team';
+import { jeSpravcePodleDb } from './superadminDb';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -69,6 +70,9 @@ export const authOptions: NextAuthOptions = {
         if (user.role === 'employer') {
           teamId = await ensureEmployerTeam(user.id, user.name, teamId);
         }
+        // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
+        // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
+        const superadmin = await jeSpravcePodleDb(user.id);
         return {
           id: String(user.id),
           name: user.name,
@@ -77,6 +81,7 @@ export const authOptions: NextAuthOptions = {
           avatar: user.avatar ?? '👤',
           jobTitle: user.jobTitle ?? 'Barista',
           teamId,
+          superadmin,
         } as any;
       },
     }),
@@ -88,6 +93,7 @@ export const authOptions: NextAuthOptions = {
         token.avatar = (user as any).avatar;
         token.jobTitle = (user as any).jobTitle;
         token.teamId = (user as any).teamId;
+        token.superadmin = (user as any).superadmin === true;
       }
       // session.update() volá PROHLÍŽEČ. Smí proto obnovit jen to, co je
       // kosmetické — jméno a avatar. Příslušnost k týmu odsud přijímat nelze:
@@ -103,6 +109,7 @@ export const authOptions: NextAuthOptions = {
           const sql = neon(process.env.DATABASE_URL!);
           const [u] = await sql`SELECT team_id, role FROM users WHERE id = ${parseInt(String(token.sub))}`;
           if (u) { token.teamId = u.team_id ?? null; token.role = u.role; }
+          token.superadmin = await jeSpravcePodleDb(parseInt(String(token.sub)));
         } catch { /* při výpadku databáze zůstane token, jaký byl */ }
       }
       return token;
@@ -114,6 +121,9 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).jobTitle = token.jobTitle;
         (session.user as any).teamId = token.teamId;
         (session.user as any).id = token.sub;
+        // Správce platformy z tokenu — rozhodl se při přihlášení podle databáze
+        // (role vedení, e-mail ze seznamu, bez dvojníka). Klient ho nezmění.
+        (session.user as any).superadmin = token.superadmin === true;
       }
       return session;
     },

@@ -11,12 +11,23 @@ export async function GET(req: NextRequest) {
   const q = String(new URL(req.url).searchParams.get('q') ?? '').trim().toLowerCase().slice(0, 60);
   let rows: any[] = [];
   try {
-    rows = await sql`
-      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency,
-             (SELECT COUNT(*)::int FROM client_memberships m WHERE m.team_id = p.team_id) AS members
-      FROM client_profiles p JOIN teams t ON t.id = p.team_id
-      WHERE p.enabled = TRUE
-      ORDER BY t.name ASC LIMIT 100` as any[];
+    // Pozastavený podnik v adresáři není. Před migrací sloupec chybí — pak
+    // se sáhne po dotazu bez něj, ať adresář nezmizí celý.
+    try {
+      rows = await sql`
+        SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency,
+               (SELECT COUNT(*)::int FROM client_memberships m WHERE m.team_id = p.team_id) AS members
+        FROM client_profiles p JOIN teams t ON t.id = p.team_id
+        WHERE p.enabled = TRUE AND t.blocked_at IS NULL
+        ORDER BY t.name ASC LIMIT 100` as any[];
+    } catch {
+      rows = await sql`
+        SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency,
+               (SELECT COUNT(*)::int FROM client_memberships m WHERE m.team_id = p.team_id) AS members
+        FROM client_profiles p JOIN teams t ON t.id = p.team_id
+        WHERE p.enabled = TRUE
+        ORDER BY t.name ASC LIMIT 100` as any[];
+    }
   } catch { return NextResponse.json({ businesses: [] }); }
   const me = await customer();
   let mine = new Set<number>();

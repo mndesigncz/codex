@@ -373,7 +373,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08] shrink-0"><Icon name="award" size={17} /></span>
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/15 text-[#5B7A08] shrink-0"><Icon name="award" size={17} /></span>
                     <div className="min-w-0">
                       <h3 className="t-card">Ohodnotit směny</h3>
                       <p className="text-xs text-black/45">Projdi, co kdo udělal, a dej hodnocení.</p>
@@ -422,7 +422,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                               {r.rating > 0 && <><Icon name="star" size={12} className="shrink-0" />{r.rating}</>} Hodnoceno
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-wait/12 text-wait-ink px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-[11px] font-medium shrink-0">Čeká</span>
                           )}
                           <button onClick={() => setRating(r)} className="tap-target-sm btn btn-primary btn-sm transition shrink-0">
                             {r.reviewed ? 'Upravit' : 'Ohodnotit'}

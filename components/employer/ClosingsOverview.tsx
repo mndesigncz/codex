@@ -844,7 +844,7 @@ export default function ClosingsOverview() {
                         {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' })}
                         {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
                         {(c as any).event_title && (
-                          <span className="ml-1.5 rounded-full bg-[#0A84FF]/12 text-[#0A5CC0] px-2 py-0.5 text-[11px] font-bold align-middle">
+                          <span className="ml-1.5 rounded-full bg-[#0A84FF]/15 text-[#0A5CC0] px-2 py-0.5 text-[11px] font-bold align-middle">
                             <Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {(c as any).event_title}
                           </span>
                         )}

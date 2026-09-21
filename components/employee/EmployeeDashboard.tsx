@@ -241,7 +241,7 @@ export default function EmployeeDashboard({ user, onNavigate }: Props) {
             <button onClick={() => onNavigate('my-shifts')} className="w-full text-left glass-card p-6 hover:bg-black/[0.05] transition duration-300">
               <div className="flex items-center justify-between mb-3">
                 <p className="t-label">Nejbližší směna</p>
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/12 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="calendar" size={17} /></span>
               </div>
               {nextShift ? (
                 <div>

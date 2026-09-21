@@ -3,7 +3,7 @@
 // strings — a closing filed at 00:40 belongs to the shift that started at 18:00
 // the day before. Everything that attributes work to a shift goes through here.
 
-import { pragueMomentOf, dayPlus } from '@/lib/pragueTime';
+import { pragueMomentOf, dayPlus } from './pragueTime.ts';
 
 export interface ShiftRow {
   id?: number;

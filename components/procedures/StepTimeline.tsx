@@ -109,7 +109,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                         skipped
                           ? 'bg-wait/15 text-wait-ink hover:bg-wait/25'
-                          : 'bg-black/[0.05] text-black/45 hover:bg-wait/12 hover:text-wait-ink'
+                          : 'bg-black/[0.05] text-black/45 hover:bg-wait/15 hover:text-wait-ink'
                       }`}
                     >
                       {skipped ? 'Vrátit' : <>{skipGlyph}<span className={compact ? 'sr-only' : ''}>Přeskočit</span></>}

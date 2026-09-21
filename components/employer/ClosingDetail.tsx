@@ -254,7 +254,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                     </span>
                   )}
                   {c.event_title && (
-                    <span className="rounded-full bg-[#0A84FF]/12 text-[#0A5CC0] px-2.5 py-1 text-[11px] font-bold"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {c.event_title}</span>
+                    <span className="rounded-full bg-[#0A84FF]/15 text-[#0A5CC0] px-2.5 py-1 text-[11px] font-bold"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {c.event_title}</span>
                   )}
                   {c.shift_date && c.shift_date !== c.date && (
                     <span className="chip chip-muted">
@@ -281,7 +281,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                       )}
                     </div>
                     <div className={`-mx-1 mt-1 mb-1.5 rounded-xl px-3 py-2 flex items-center justify-between gap-3 ${
-                      diff === 0 ? 'bg-[#C8F542]/12 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A5CC0]' : 'bg-bad/10 text-bad-ink'}`}>
+                      diff === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A5CC0]' : 'bg-bad/10 text-bad-ink'}`}>
                       <span className="text-sm font-semibold">{diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko'}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>

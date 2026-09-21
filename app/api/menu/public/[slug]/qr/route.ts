@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import QRCode from 'qrcode';
 import { cleanSlug } from '@/lib/menu';
+import { podnikJePozastaveny } from '@/lib/blokaceDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,9 @@ export async function GET(request: Request, { params }: { params: { slug: string
   // nestane generátor QR na libovolný text.
   try {
     const [board] = await sql`
-      SELECT id FROM menu_boards WHERE slug = ${slug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+      SELECT team_id, id FROM menu_boards WHERE slug = ${slug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+    // Pozastavený podnik nemá ani veřejné menu (viz lib/blokaceDb).
+    if (board && await podnikJePozastaveny(board.team_id)) return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
     if (!board) return NextResponse.json({ error: 'Menu nenalezeno' }, { status: 404 });
   } catch {
     return NextResponse.json({ error: 'Menu zatím není nastavené' }, { status: 404 });

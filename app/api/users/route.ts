@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   // Same limit the invitation flows enforce — this direct form must not be a
   // side door around the Free plan's team size.
   try {
-    const [row] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${c.teamId}`;
+    const [row] = await sql`SELECT plan, plan_override, trial_ends_at FROM teams WHERE id = ${c.teamId}`;
     const [cnt] = await sql`
       SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${c.teamId} AND role <> 'kiosk'`;
     if (!canAddMember(planInfoOf(row), Number(cnt?.n) || 0)) {

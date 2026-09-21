@@ -27,6 +27,8 @@ export interface PlanInfo {
   maxOfferUntil: string | null;
   /** Tým někdy měl předplatné (trial se nabízí jen jednou). */
   hadSubscription: boolean;
+  /** Tarif nastavený ručně správcem platformy; přebíjí Stripe i trial. */
+  override: PlanId | null;
 }
 
 export const TRIAL_DAYS = 30;
@@ -93,10 +95,16 @@ export function planInfoOf(
     current_period_end?: string | Date | null; cancel_at_period_end?: boolean | null;
     trial_end?: string | Date | null; max_offer_until?: string | Date | null;
     stripe_subscription_id?: string | null; had_subscription?: boolean | null;
+    plan_override?: string | null;
   } | null | undefined,
   now = Date.now(),
 ): PlanInfo {
   const stored: PlanId = row?.plan === 'free' ? 'free' : row?.plan === 'max' ? 'max' : 'pro';
+  // Ruční tarif od správce platformy (podpora, partner, náhrada za výpadek).
+  // Přebíjí Stripe i zkušební dobu, ale `plan` (co platí ze Stripe) zůstává
+  // uložený, aby se dalo kdykoli vrátit zpět.
+  const override: PlanId | null = row?.plan_override === 'free' || row?.plan_override === 'pro' || row?.plan_override === 'max'
+    ? row.plan_override : null;
   const status = (row?.subscription_status ?? null) as SubscriptionStatus | null;
   const ms = (v: any) => { const t = v ? new Date(v).getTime() : NaN; return Number.isFinite(t) ? t : null; };
   const iso = (t: number | null) => (t != null ? new Date(t).toISOString() : null);
@@ -109,7 +117,8 @@ export function planInfoOf(
   const trialing = trialEnd != null && trialEnd > now;
 
   let effective: PlanId;
-  if (status === 'trialing' && trialing) effective = stored === 'free' ? 'pro' : stored;
+  if (override) effective = override;
+  else if (status === 'trialing' && trialing) effective = stored === 'free' ? 'pro' : stored;
   else if (stored === 'free') effective = trialing ? 'pro' : 'free';
   else effective = stored;
 
@@ -118,6 +127,7 @@ export function planInfoOf(
   return {
     plan: stored,
     effective,
+    override,
     trialEndsAt: iso(trialEnd),
     trialDaysLeft,
     trialing,

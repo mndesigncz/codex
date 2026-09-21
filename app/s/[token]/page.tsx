@@ -11,6 +11,7 @@ import type { Metadata } from 'next';
 import { normalizeTheme, normalizeExcluded, isDark, type ShareTheme } from '@/lib/share';
 import { buildTree, type CategoryNode, type TreeNode } from '@/lib/categoryTree';
 import { pragueToday } from '@/lib/pragueTime';
+import { podnikJePozastaveny } from '@/lib/blokaceDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,10 @@ type Entry = { id: number; name: string; brand: string | null; description: stri
 async function loadLink(token: string) {
   try {
     const [row] = await sql`SELECT * FROM share_links WHERE token = ${token} AND enabled IS NOT FALSE`;
-    return row ?? null;
+    if (!row) return null;
+    // Pozastavený podnik nemá ani veřejnou nabídku.
+    if (await podnikJePozastaveny(row.team_id)) return null;
+    return row;
   } catch {
     return null;
   }

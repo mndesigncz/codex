@@ -25,7 +25,7 @@ interface Insight { icon: string; title: string; text: string; tone: 'good' | 'w
 
 const KIND_META: Record<string, { label: string; cls: string }> = {
   receipt: { label: 'Účtenka', cls: 'bg-[#C8F542]/20 text-[#5B7A08]' },
-  order: { label: 'Objednávka', cls: 'bg-[#0A84FF]/12 text-[#0A5CC0]' },
+  order: { label: 'Objednávka', cls: 'bg-[#0A84FF]/15 text-[#0A5CC0]' },
   expense: { label: 'Výdaj z kasy', cls: 'bg-wait/15 text-wait-ink' },
   wage: { label: 'Výplata', cls: 'bg-[#16181A]/[0.07] text-black/75' },
   removal: { label: 'Odvod', cls: 'bg-black/[0.06] text-black/55' },

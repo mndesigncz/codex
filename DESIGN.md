@@ -241,8 +241,9 @@ Dvě věci, na kterých to při psaní stálo a stojí za zapamatování:
 
 Jediná plocha s vlastním vizuálním jazykem: světlé „tekuté sklo" — panely
 `.lgx`/`.lgx-strong` s rozmazáním a nasycením podkladu, barevné skvrny
-`.lg-blob` pod nimi, hravé 3D objekty z clay renderů (`public/brand/landing`,
-generované, ne fotobanka). Aplikace sama zůstává u klidnějšího `.glass-card`.
+`.lg-blob` pod nimi a dokumentární fotografie podniků
+(`public/brand/landing/foto`, jedna vygenerovaná kampaň, ne fotobanka).
+Aplikace sama zůstává u klidnějšího `.glass-card`.
 
 Zásady, které přestavba v kole 35 zafixovala:
 
@@ -258,9 +259,11 @@ Zásady, které přestavba v kole 35 zafixovala:
   JavaScriptu, s `prefers-reduced-motion` nebo po pádu skriptu je všechno
   vidět hned. První verze to dělala obráceně (opacity 0 ze serveru) a celé
   sekce bez JS neexistovaly; chytil to snímek celé stránky, ne úvaha.
-- **Těžké věci líně a s náhradou.** Video v hero se přidá až po obrázku
-  a jen bez `saveData`; otočka hrníčku se stáhne až u sekce a když selže,
-  zůstane obrázek. Stránka nikdy nečeká na ozdobu.
+- **Těžké věci líně a s náhradou.** Eager se načítá jediná fotka — ta
+  v hero; zbylých sedm až u své sekce, a do té doby na jejich místě leží
+  rozmazaný šestnáctipixelový náhled. Paralaxa jede přes scroll-driven
+  animaci v CSS: kdo ji neumí, dostane fotku, která stojí. Stránka nikdy
+  nečeká na ozdobu a neplatí za ni kilobajty skriptu.
 - **Dekorace nepřináší vlastní paletu.** Značka je krém, inkoust a limetka
   plus pět stavových tónů — a to platí i pro skvrny pod sklem a pro
   vygenerované objekty. V první verzi tu byla broskvová a modrá skvrna
@@ -269,24 +272,36 @@ Zásady, které přestavba v kole 35 zafixovala:
   tón, který uživatel uvidí uvnitř aplikace (`.dot-ok` / `.dot-wait` /
   `.dot-muted` nad `--ok` / `--wait` / `--muted`).
 
-### Vygenerované 3D objekty
+### Fotografie podniků (a proč tu nejsou 3D objekty)
 
-Clay rendery v `public/brand/landing` drží tři pravidla, protože bez nich
-vypadají levně:
+Hero prodejní stránky prošlo třemi podobami: vystřižené clay rendery
+položené přes video, pak živá WebGL scéna s procedurálním hrnkem, a teď
+fotografie. Každá další verze byla technicky lepší než ta předchozí a
+prodávala hůř, dokud nepřišla fotka.
 
-- **Jen ta věc samotná.** Žádná pára, kouř, částice, odlesky do prázdna ani
-  rekvizity kolem. U 3D objektu čte oko každou abstraktní přimíchaninu jako
-  chybu renderu, ne jako atmosféru.
-- **Prázdné pozadí, ne scéna.** Objekt stojí na jednolitém podkladu
-  s měkkým kontaktním stínem. Ve skle se pak propojí násobením
-  (`mix-blend-multiply` u otočky), takže v panelu není vidět obdélník videa.
-- **Paleta značky.** Krémová keramika, limetkový proužek, inkoustový stín —
-  nic dalšího.
+Důvod je prostý: návštěvník téhle stránky nekupuje hrnek. Kupuje klid
+v provozu — a ten je vidět na lidech v zástěrách, ne na renderu. Fotka
+podniku navíc odpoví na otázku „je to vůbec pro mě?" dřív, než kdo dočte
+nadpis; pás osmi podniků pod hero to řekne rychleji než věta „pro kavárny,
+restaurace a bary" nad ním.
 
-Vyplatí se to napsat do promptu výslovně („NO steam, no props, plain solid
-white background") a pak výsledek ověřit, ne odhadnout: zdejší headless
-prohlížeč H.264 nepřehraje, takže obsah smyček se kontroluje strojovým
-popisem scény.
+Pravidla, která fotky drží pohromadě:
+
+- **Jedna kampaň, ne sbírka.** Všech osm vzniklo z jednoho zadání: 35 mm
+  dokument, denní světlo (bar večerní), teplá tlumená paleta krém – dub –
+  matná čerň, malá hloubka ostrosti, zrno. Fotky z různých zdrojů se poznají
+  na první pohled a stránka pak vypadá jako koláž z fotobanky.
+- **Práce, ne pózování.** Nikdo se nedívá do objektivu, nikdo nedrží produkt
+  k fotoaparátu. Ruce v páce, kuchař u výdeje, čtyři lidi před otevřením.
+- **Žádná loga, žádné nápisy, žádné jméno podniku.** Kdyby na fotce byla
+  cedule, stránka by tvrdila, že ten podnik je zákazník. Patička to říká
+  výslovně: fotky jsou ilustrační, obrazovky aplikace skutečné.
+- **Fotka má rozměr, náhled a popis.** `components/landing/foto.ts` nese
+  u každé `w`/`h` (jinak stránka při načtení poskočí), šestnáctipixelový
+  rozmazaný náhled v datové adrese a `alt`, který říká, co na fotce je.
+  Eager se načítá jediná — ta v hero.
+- **Text na fotce potřebuje změřené ztmavení.** Viz níž; tohle je to
+  pravidlo, které se nejsnáz poruší.
 
 ### Rozepsané přežije i odchod na jinou záložku
 
@@ -961,6 +976,19 @@ někomu patří — mzda, podpis pod zavíracím postupem, „kdo to naskladnil"
   `Kč`. Starší podniky mají uložený symbol, takže `normalizeCurrency`
   je most mezi tím; `Intl` na symbol vyhodí výjimku.
 
+## Co se samo přepíná, nesmí měnit výšku
+
+Ukázka funkcí na prodejní stránce se po šesti vteřinách sama posune na
+další scénu. Scény mají různou výšku, a na telefonu panel nedržela žádná
+podlaha — naměřený rozkmit **85 px**. Stránka se tedy pod čtenářem každých
+šest vteřin zkrátila nebo prodloužila, a odstavec, který zrovna četl, mu
+odskočil. Na monitoru se to nedělo, protože tam `sm:min-h-[24rem]` bylo.
+
+Pravidlo: **cokoliv, co se přepíná bez zásahu uživatele, má pevnou
+podlahu výšky na všech šířkách.** Číslo se bere z měření nejvyšší varianty,
+ne od oka. A měří se to tak, že se projdou všechny varianty a porovná se
+min s max — ne tak, že se dvě otevřou a vypadají stejně.
+
 ## Na telefonu nesmí prvek skončit v půlce
 
 Na monitoru to vypadá správně: nadpis vlevo, akce vpravo, pole vedle
@@ -1135,6 +1163,159 @@ začínala jinde než kalendář, ve kterém je pak četl.
 - **`Number(null)` je nula.** Prosté `Number(h) === 0` by podniku bez
   uloženého nastavení dalo neděli místo výchozího pondělí. Chytil to test,
   ne oko.
+
+## Bílý text na fotce se měří, ne odhaduje
+
+Závěrečné CTA má bílý nadpis na fotce týmu. Na náhledu to vypadalo dobře.
+Naměřeno: **1,04 : 1** — protože v pozadí fotky je vypálené okno a ztmavení
+pod textem ve skutečnosti neexistovalo (viz pravidlo níž).
+
+Z toho plyne postup, ne pocit:
+
+- Text na fotce jede vždycky přes třídu `.scrim`, ne přes tón nasazený
+  v JSX. Je to svislý přechod 0,74 → 0,92 inkoustu; horní hodnota je
+  spočítaná tak, aby i **čistě bílý** pixel pod textem dal bílé aspoň
+  4,5 : 1.
+- Měří se **nejhorší pixel pod textem**, ne průměr. Průměr byl 4,1 : 1 a
+  vypadal skoro v pořádku, zatímco nadpis se v jednom místě nedal přečíst.
+- Měří se **jen plocha, kde text doopravdy je**. Snímek celé vrstvy bere
+  i zaoblené rohy bloku, kudy prosvítá krémová stránka — a sonda pak hlásí
+  nález v místě, kde žádné písmeno není. (Stálo to jeden falešný poplach.)
+- Snímek se dělá z prvku, ne výřezem stránky: výřez se počítá od začátku
+  dokumentu, ne od okna, takže po odscrollování fotíte úplně jiné místo.
+  (Stálo to druhý falešný poplach.)
+
+## Krytí mimo Tailwindovu škálu se tiše nevygeneruje
+
+`bg-[#16181A]/72` vypadá jako platná třída. Není: 72 není krok Tailwindovy
+škály krytí, pravidlo v CSS nevznikne a prvek zůstane průhledný. Nic
+nespadne, nic se nevypíše — jen tam, kde mělo být ztmavení, není nic.
+
+Sonda pak našla **35 takových tříd napříč aplikací**, z toho 34 starších
+než tenhle nález: `bg-bad/12` u zamítnutých řádků v rozvrhu a v posouzení
+směn, `bg-wait/12` u čekajících uzávěrek, inventur a odměn, `bg-[#0A84FF]/12`
+na obou nástěnkách, ve financích a v úkolech. Zvýraznění se nekreslilo
+vůbec: zamítnutý řádek vypadal jako každý jiný.
+
+- Škála jde po pěti: 0, 5, 10 … 95, 100. Mezihodnota musí být v hranatých
+  závorkách (`/[0.72]`), jinak neexistuje.
+- Platí to i pro naše tokenové barvy (`bg-bad/…`), ne jen pro hexy.
+- Hlídá to `scripts/check-opacity-steps.mjs`. Kontrola byla ověřená na
+  známém špatném i známém dobrém vstupu, a hlavně proti **vygenerovanému
+  CSS** — ne proti domněnce, co Tailwind umí.
+
+## Příchod po půlnoci patří včerejšku
+
+Zaměstnanec se sobotní směnou v baru chtěl udělat uzávěrku a v návrzích
+viděl jedinou možnost: **neděli — den, kdy má podnik zavřeno.** Směna, kterou
+mu aplikace založila sama při klepnutí na „příchod", dostala datum podle
+hodin na zdi. Klepl po půlnoci, a ze sobotního večera se stala nedělní směna,
+kterou nikdo neplánoval a která se nedá uzavřít. `date` je v tabulce směn
+prostý text, takže se po cestě nic nepřevádělo — ten nedělní řádek tam
+opravdu byl.
+
+Odchod tohle pravidlo znal a měl ho i v komentáři („směna patří dni, kdy
+začala"). Příchod ne. Dvě místa, dvě pravidla — a shodovala se jen do půlnoci.
+
+Teď je to jednou, `lib/businessDay.ts`, a řídí příchod, odchod i úklid
+zapomenutých odchodů:
+
+1. **Včerejší směna, jejíž okno (s tolerancí) pokrývá okamžik příchodu → včera.**
+   Fakt, nic se nehádá.
+2. **Podnik měl včera otevřeno přes půlnoc a ještě nezavřel → včera.** Taky
+   fakt, z otevírací doby. Právě tohle říká „v neděli máme zavřeno".
+3. **Jinak dnes.**
+
+Posouvá se jen dozadu a jen s důkazem. Proto to není prosté „před šestou
+ráno = včera", jak to má pokladna u účtenek: pekař, který přijde ve čtyři,
+by si tím psal směnu na předchozí den. U pekárny zavírající v šest večer
+se pravidlo 2 nikdy nespustí — hlídá to test.
+
+Poučení, které je obecnější než uzávěrka: **když dvě místa odpovídají na
+tutéž otázku („ke kterému dni to patří?"), musí volat tutéž funkci.** Ne
+dvě funkce, které se shodují ve všech případech, na které si kdo vzpomněl.
+
+## Fotka vedle textu: o výšce rozhoduje text, fotka vyplní zbytek
+
+Karty „Jeden den s Managerem" měly fotku s pevným poměrem stran vedle
+textu. Fotka byla vyšší než text, takže o výšce řádku rozhodovala ona a text
+v něm plaval — **na 1280 px zabíral 36–40 % výšky karty**, zbytek byl vzduch
+nad ním a pod ním. Na náhledu to vypadalo „vzdušně", ve skutečnosti to byla
+karta ze dvou třetin prázdná.
+
+Pravidlo: **v kartě s textem a fotkou vedle sebe určuje výšku text.** Fotka
+je `.foto-vypln` — od 768 px má `aspect-ratio: auto`, obrázek je absolutně
+posazený (takže do výšky řádku nic nepřidá) a jen vyplní, kolik místa mu
+text nechá. Pod 768 px, kde jsou pod sebou, poměr stran zůstává. Mřížka má
+`items-stretch`, textový sloupec `flex-col justify-center`.
+
+Vrstvy se překrývají, ne že vedle sebe leží: karta s momentem z aplikace
+přesahuje o 3,5 rem přes okraj fotky. Přesah musí mít `z-10` a nesmí
+přetéct z karty — hlídá to sonda šířek.
+
+Měří se **podíl výšky obsahu textového sloupce vůči výšce karty**; pod 0,7
+je to nález. Po opravě: šest nálezů → jeden (hero, kde je vzduch kolem
+nadpisu záměr).
+
+## Mřížka nesmí nechat osiřelou buňku
+
+„Místo čeho" mělo sedm položek ve dvou sloupcích: poslední řádek zel.
+Počet položek v mřížce je **násobek počtu sloupců na každé šířce**, kde má
+mřížka víc než jeden sloupec — jinak se přidá, ubere, nebo změní počet
+sloupců. Sedm se doplnilo na osm skutečnou funkcí (objednávka dodavateli
+e-mailem s potvrzením), ne výplní.
+
+Měří se za běhu, protože počet sloupců závisí na šířce: pro každou mřížku
+`děti % sloupce`. Nula na 390, 768, 1024, 1280 i 1440 px.
+
+## Produkt v prostoru, ne objekt v prostoru
+
+„3D" na prodejní stránce už jednou bylo — hrnek — a neprodávalo, protože
+návštěvník nekupuje hrnek. Tohle je jiné 3D: **skutečná obrazovka aplikace**
+(tatáž scéna rozvrhu, která se přehrává v ukázce funkcí níž) v tabletu
+s tenkým rámem, natočená o 12°/5° a pomalu se vznášející nad fotkou.
+Nula bajtů modelu, nula WebGL — perspektiva je CSS. Naklonění je malé
+schválně: větší už oko čte jako mockup ze šablony a text na obrazovce se
+přestane dát přečíst. Na telefonu leží pod fotkou, ne schovaný — produkt
+na nejčastější obrazovce skrývat popírá smysl hero.
+
+## Video v hero je fotka, která ožila
+
+Video vzniklo z téže fotky baristy, která pod ním leží jako poster — když
+se nenačte, nehraje, nebo ho člověk nechce, nikdo nepozná, že mělo být.
+Stahuje se jen od 768 px (na telefonu jsou stovky kilobajtů za pět vteřin
+pohybu špatný obchod), bez `saveData`, bez 2G a bez `prefers-reduced-motion`.
+Zdroj se do `<video>` vkládá až po tom rozhodnutí; prohlížeč by jinak začal
+stahovat, i když se pak neukáže. Dva zdroje: VP9 WebM (126 kB) napřed,
+H.264 MP4 (144 kB) jako záloha pro Safari.
+
+Měřidlo: headless Chromium v Playwrightu **nemá H.264**. Sonda s jediným
+MP4 hlásila `readyState 0` a vypadalo to jako chyba aplikace. Než se
+z takového nálezu cokoli opraví, zeptej se prohlížeče `canPlayType` — tady
+odpověděl `ne` pro H.264 a `probably` pro VP9.
+
+## Správa platformy: nad podniky, ne v jednom z nich
+
+Správce platformy vidí všechny podniky a každé jeho kliknutí zasáhne cizí
+provoz. Obrazovka to musí říkat dřív, než kdo klikne:
+
+- **Stejný jazyk, jiný pás.** Karty, řádky, chipy a okna jsou tytéž jako
+  v aplikaci; horní lišta má navíc chip „superadmin" a žádnou navigaci
+  podniku. Kdo tu je, ví, že není doma.
+- **Nevratné jde přes okno s důvodem pro majitele.** Pozastavení podniku
+  chce důvod (aspoň tři znaky) a okno říká, co se stane a komu. Nápověda
+  u pole říká „piš pro něj, ne pro sebe" — důvod podnik uvidí.
+- **Každý zásah má aktéra.** Z obrazovky e-mail, z MCP „api-token"
+  (chip „MCP / skript"). Bez toho by se nedalo poznat, jestli podnik
+  pozastavil člověk, nebo Claude.
+- **Stav je jeden slovník.** `STAV_NAZEV`/`STAV_TON` v
+  `components/admin/spolecne.ts`; „pozastavený" je `bad`, „po splatnosti"
+  `wait`, „zkušební" `info`. Seznam, detail i historie ho sdílejí.
+- **Co tu schválně není:** přihlášení za jiného, čtení uzávěrek a mezd,
+  mazání podniků. Tlačítko, které neexistuje, se nedá stisknout omylem.
+
+Hlídá to `scripts/check-admin-auth.mjs`: žádná admin routa bez brány,
+middleware s blokací existuje, `lib/superadmin.ts` je bez Node importů.
 
 ## Anti-vzory (zdejší zákazy)
 
