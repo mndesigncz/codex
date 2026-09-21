@@ -1285,7 +1285,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {/* Bez denní výplaty jsou statistiky tři — dva sloupce by
+                    nechaly třetí samotnou na druhém řádku. Počet sloupců
+                    kopíruje počet položek, ať je řádek vždycky plný. */}
+                <div className={`grid ${payDailyCash ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 text-xs`}>
                   <div className="min-w-0"><span className="block text-black/40 truncate">Tržba hotově</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_revenue)}</p></div>
                   <div className="min-w-0"><span className="block text-black/40 truncate">Tržba kartou</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.card_revenue)}</p></div>
                   <div className="min-w-0"><span className="block text-black/40 truncate">Odloženo</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_removed)}</p></div>

@@ -100,15 +100,19 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const newestUnread = chatConvs.filter(c => (c.unreadCount || 0) > 0)
     .sort((a, b) => String(b.lastTime ?? '').localeCompare(String(a.lastTime ?? '')))[0] ?? null;
 
-  // Zprávy jdou první. Sedm dlaždic ve třech sloupcích nechá jednu samotnou
-  // na posledním řádku; ať je to Finance, na které se kouká jednou za měsíc,
-  // a ne chat, kvůli kterému člověk telefon vytáhl.
+  // Zprávy jdou první a Finance poslední (kouká se na ně jednou za měsíc).
+  // Devět dlaždic = tři plné řádky. Dřív jich bylo sedm a Finance zůstávala
+  // samotná na posledním řádku — mřížka nemá nechávat osiřelou buňku,
+  // a Úkoly s Postupy na telefonu „za pochodu" chybět nemají: otevírací
+  // checklist a denní úkoly jsou přesně to, co se řeší cestou do podniku.
   const tiles = [
     { view: 'chat', icon: 'chat', label: 'Zprávy', badge: unreadChat || null, badgeTone: 'seg-on' },
     { view: 'reports', icon: 'trend', label: 'Přehledy', badge: pendingClosings || null, badgeTone: 'seg-on' },
     { view: 'inventory', icon: 'box', label: 'Sklad', badge: lowItems.length || null, badgeTone: 'bg-wait text-white' }, // zásoby jsou varování, ne počet
     { view: 'shifts', icon: 'calendar', label: 'Rozvrh', badge: null, badgeTone: '' },
     { view: 'attendance', icon: 'clock', label: 'Docházka', badge: onShift.length || null, badgeTone: 'seg-on' },
+    { view: 'tasks', icon: 'check', label: 'Úkoly', badge: null, badgeTone: '' },
+    { view: 'procedures', icon: 'clipboard', label: 'Postupy', badge: null, badgeTone: '' },
     { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
     { view: 'finance', icon: 'coins', label: 'Finance', badge: null, badgeTone: '' },
   ];
