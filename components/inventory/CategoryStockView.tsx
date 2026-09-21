@@ -97,8 +97,8 @@ function ParkButton({ item, busy, onToggle, className = '' }: {
 }
 
 const TONE = {
-  critical: { bar: 'bg-bad', text: 'text-bad-ink', chip: 'bg-bad/12 text-bad-ink' },
-  low: { bar: 'bg-wait', text: 'text-wait-ink', chip: 'bg-wait/12 text-wait-ink' },
+  critical: { bar: 'bg-bad', text: 'text-bad-ink', chip: 'bg-bad/15 text-bad-ink' },
+  low: { bar: 'bg-wait', text: 'text-wait-ink', chip: 'bg-wait/15 text-wait-ink' },
   ok: { bar: 'bg-[#C8F542]', text: 'text-[#5B7A08]', chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
 } as const;
 

@@ -354,7 +354,7 @@ function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
           <div className="flex flex-wrap gap-2">
             {required.map(p => (
               <span key={p.id} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium ${
-                p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-wait/12 text-wait-ink'
+                p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-wait/15 text-wait-ink'
               }`}>
                 {p.icon ? <span>{p.icon}</span> : <Icon name="clipboard" size={15} className="shrink-0" />} {p.name} {p.done ? <Icon name="check" size={15} className="shrink-0" /> : '· čeká'}
               </span>

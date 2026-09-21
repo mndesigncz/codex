@@ -1199,8 +1199,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   const running = r.status === 'running';
                   return (
                     <span key={r.id} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                      running ? 'bg-wait/12 text-wait-ink'
-                      : missing > 0 ? 'bg-wait/12 text-wait-ink'
+                      running ? 'bg-wait/15 text-wait-ink'
+                      : missing > 0 ? 'bg-wait/15 text-wait-ink'
                       : 'bg-[#C8F542]/15 text-[#5B7A08]'
                     }`}>
                       {r.procedure_icon ?? '📋'} {r.procedure_name}

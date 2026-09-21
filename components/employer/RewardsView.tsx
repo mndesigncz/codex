@@ -271,7 +271,7 @@ function StandingsBoard({ standings, onRate, onOpen }: { standings: Standing[]; 
                 <p className="font-semibold text-[#16181A] truncate">{s.name}</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2.5 py-0.5 text-[11px] font-bold">{s.levelName}</span>
                 {!!s.flagged && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-bad/12 text-bad-ink px-2 py-0.5 text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bad/15 text-bad-ink px-2 py-0.5 text-[11px] font-semibold">
                     <Icon name="warning" size={11} /> {s.flagged}
                   </span>
                 )}

@@ -226,7 +226,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                         {i.name}
                         {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
                         {(i as any).approved === false && (
-                          <span className="ml-1.5 rounded-full bg-wait/12 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
+                          <span className="ml-1.5 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
                             čeká na potvrzení
                           </span>
                         )}

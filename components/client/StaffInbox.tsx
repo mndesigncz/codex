@@ -252,7 +252,7 @@ function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: nu
                   ? <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-2.5 py-1 text-[11px] font-semibold text-wait-ink"><span className="h-1.5 w-1.5 rounded-full bg-wait" />Není v kase</span>
                   : null;
               }
-              if (st === 'DECLINED') return <span className="inline-flex items-center gap-1.5 rounded-full bg-bad/12 px-2.5 py-1 text-[11px] font-semibold text-bad-ink"><span className="h-1.5 w-1.5 rounded-full bg-bad" />Kasa odmítla</span>;
+              if (st === 'DECLINED') return <span className="inline-flex items-center gap-1.5 rounded-full bg-bad/15 px-2.5 py-1 text-[11px] font-semibold text-bad-ink"><span className="h-1.5 w-1.5 rounded-full bg-bad" />Kasa odmítla</span>;
               if (/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(st)) return <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]"><span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />Přijato v kase · tiskne se</span>;
               return <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-2.5 py-1 text-[11px] font-semibold text-wait-ink"><span className="h-1.5 w-1.5 rounded-full bg-wait" />V kase čeká na přijetí</span>;
             })()}

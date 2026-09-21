@@ -241,8 +241,9 @@ Dvě věci, na kterých to při psaní stálo a stojí za zapamatování:
 
 Jediná plocha s vlastním vizuálním jazykem: světlé „tekuté sklo" — panely
 `.lgx`/`.lgx-strong` s rozmazáním a nasycením podkladu, barevné skvrny
-`.lg-blob` pod nimi, hravé 3D objekty z clay renderů (`public/brand/landing`,
-generované, ne fotobanka). Aplikace sama zůstává u klidnějšího `.glass-card`.
+`.lg-blob` pod nimi a dokumentární fotografie podniků
+(`public/brand/landing/foto`, jedna vygenerovaná kampaň, ne fotobanka).
+Aplikace sama zůstává u klidnějšího `.glass-card`.
 
 Zásady, které přestavba v kole 35 zafixovala:
 
@@ -258,9 +259,11 @@ Zásady, které přestavba v kole 35 zafixovala:
   JavaScriptu, s `prefers-reduced-motion` nebo po pádu skriptu je všechno
   vidět hned. První verze to dělala obráceně (opacity 0 ze serveru) a celé
   sekce bez JS neexistovaly; chytil to snímek celé stránky, ne úvaha.
-- **Těžké věci líně a s náhradou.** Video v hero se přidá až po obrázku
-  a jen bez `saveData`; otočka hrníčku se stáhne až u sekce a když selže,
-  zůstane obrázek. Stránka nikdy nečeká na ozdobu.
+- **Těžké věci líně a s náhradou.** Eager se načítá jediná fotka — ta
+  v hero; zbylých sedm až u své sekce, a do té doby na jejich místě leží
+  rozmazaný šestnáctipixelový náhled. Paralaxa jede přes scroll-driven
+  animaci v CSS: kdo ji neumí, dostane fotku, která stojí. Stránka nikdy
+  nečeká na ozdobu a neplatí za ni kilobajty skriptu.
 - **Dekorace nepřináší vlastní paletu.** Značka je krém, inkoust a limetka
   plus pět stavových tónů — a to platí i pro skvrny pod sklem a pro
   vygenerované objekty. V první verzi tu byla broskvová a modrá skvrna
@@ -269,24 +272,36 @@ Zásady, které přestavba v kole 35 zafixovala:
   tón, který uživatel uvidí uvnitř aplikace (`.dot-ok` / `.dot-wait` /
   `.dot-muted` nad `--ok` / `--wait` / `--muted`).
 
-### Vygenerované 3D objekty
+### Fotografie podniků (a proč tu nejsou 3D objekty)
 
-Clay rendery v `public/brand/landing` drží tři pravidla, protože bez nich
-vypadají levně:
+Hero prodejní stránky prošlo třemi podobami: vystřižené clay rendery
+položené přes video, pak živá WebGL scéna s procedurálním hrnkem, a teď
+fotografie. Každá další verze byla technicky lepší než ta předchozí a
+prodávala hůř, dokud nepřišla fotka.
 
-- **Jen ta věc samotná.** Žádná pára, kouř, částice, odlesky do prázdna ani
-  rekvizity kolem. U 3D objektu čte oko každou abstraktní přimíchaninu jako
-  chybu renderu, ne jako atmosféru.
-- **Prázdné pozadí, ne scéna.** Objekt stojí na jednolitém podkladu
-  s měkkým kontaktním stínem. Ve skle se pak propojí násobením
-  (`mix-blend-multiply` u otočky), takže v panelu není vidět obdélník videa.
-- **Paleta značky.** Krémová keramika, limetkový proužek, inkoustový stín —
-  nic dalšího.
+Důvod je prostý: návštěvník téhle stránky nekupuje hrnek. Kupuje klid
+v provozu — a ten je vidět na lidech v zástěrách, ne na renderu. Fotka
+podniku navíc odpoví na otázku „je to vůbec pro mě?" dřív, než kdo dočte
+nadpis; pás osmi podniků pod hero to řekne rychleji než věta „pro kavárny,
+restaurace a bary" nad ním.
 
-Vyplatí se to napsat do promptu výslovně („NO steam, no props, plain solid
-white background") a pak výsledek ověřit, ne odhadnout: zdejší headless
-prohlížeč H.264 nepřehraje, takže obsah smyček se kontroluje strojovým
-popisem scény.
+Pravidla, která fotky drží pohromadě:
+
+- **Jedna kampaň, ne sbírka.** Všech osm vzniklo z jednoho zadání: 35 mm
+  dokument, denní světlo (bar večerní), teplá tlumená paleta krém – dub –
+  matná čerň, malá hloubka ostrosti, zrno. Fotky z různých zdrojů se poznají
+  na první pohled a stránka pak vypadá jako koláž z fotobanky.
+- **Práce, ne pózování.** Nikdo se nedívá do objektivu, nikdo nedrží produkt
+  k fotoaparátu. Ruce v páce, kuchař u výdeje, čtyři lidi před otevřením.
+- **Žádná loga, žádné nápisy, žádné jméno podniku.** Kdyby na fotce byla
+  cedule, stránka by tvrdila, že ten podnik je zákazník. Patička to říká
+  výslovně: fotky jsou ilustrační, obrazovky aplikace skutečné.
+- **Fotka má rozměr, náhled a popis.** `components/landing/foto.ts` nese
+  u každé `w`/`h` (jinak stránka při načtení poskočí), šestnáctipixelový
+  rozmazaný náhled v datové adrese a `alt`, který říká, co na fotce je.
+  Eager se načítá jediná — ta v hero.
+- **Text na fotce potřebuje změřené ztmavení.** Viz níž; tohle je to
+  pravidlo, které se nejsnáz poruší.
 
 ### Rozepsané přežije i odchod na jinou záložku
 
@@ -961,6 +976,19 @@ někomu patří — mzda, podpis pod zavíracím postupem, „kdo to naskladnil"
   `Kč`. Starší podniky mají uložený symbol, takže `normalizeCurrency`
   je most mezi tím; `Intl` na symbol vyhodí výjimku.
 
+## Co se samo přepíná, nesmí měnit výšku
+
+Ukázka funkcí na prodejní stránce se po šesti vteřinách sama posune na
+další scénu. Scény mají různou výšku, a na telefonu panel nedržela žádná
+podlaha — naměřený rozkmit **85 px**. Stránka se tedy pod čtenářem každých
+šest vteřin zkrátila nebo prodloužila, a odstavec, který zrovna četl, mu
+odskočil. Na monitoru se to nedělo, protože tam `sm:min-h-[24rem]` bylo.
+
+Pravidlo: **cokoliv, co se přepíná bez zásahu uživatele, má pevnou
+podlahu výšky na všech šířkách.** Číslo se bere z měření nejvyšší varianty,
+ne od oka. A měří se to tak, že se projdou všechny varianty a porovná se
+min s max — ne tak, že se dvě otevřou a vypadají stejně.
+
 ## Na telefonu nesmí prvek skončit v půlce
 
 Na monitoru to vypadá správně: nadpis vlevo, akce vpravo, pole vedle
@@ -1135,6 +1163,46 @@ začínala jinde než kalendář, ve kterém je pak četl.
 - **`Number(null)` je nula.** Prosté `Number(h) === 0` by podniku bez
   uloženého nastavení dalo neděli místo výchozího pondělí. Chytil to test,
   ne oko.
+
+## Bílý text na fotce se měří, ne odhaduje
+
+Závěrečné CTA má bílý nadpis na fotce týmu. Na náhledu to vypadalo dobře.
+Naměřeno: **1,04 : 1** — protože v pozadí fotky je vypálené okno a ztmavení
+pod textem ve skutečnosti neexistovalo (viz pravidlo níž).
+
+Z toho plyne postup, ne pocit:
+
+- Text na fotce jede vždycky přes třídu `.scrim`, ne přes tón nasazený
+  v JSX. Je to svislý přechod 0,74 → 0,92 inkoustu; horní hodnota je
+  spočítaná tak, aby i **čistě bílý** pixel pod textem dal bílé aspoň
+  4,5 : 1.
+- Měří se **nejhorší pixel pod textem**, ne průměr. Průměr byl 4,1 : 1 a
+  vypadal skoro v pořádku, zatímco nadpis se v jednom místě nedal přečíst.
+- Měří se **jen plocha, kde text doopravdy je**. Snímek celé vrstvy bere
+  i zaoblené rohy bloku, kudy prosvítá krémová stránka — a sonda pak hlásí
+  nález v místě, kde žádné písmeno není. (Stálo to jeden falešný poplach.)
+- Snímek se dělá z prvku, ne výřezem stránky: výřez se počítá od začátku
+  dokumentu, ne od okna, takže po odscrollování fotíte úplně jiné místo.
+  (Stálo to druhý falešný poplach.)
+
+## Krytí mimo Tailwindovu škálu se tiše nevygeneruje
+
+`bg-[#16181A]/72` vypadá jako platná třída. Není: 72 není krok Tailwindovy
+škály krytí, pravidlo v CSS nevznikne a prvek zůstane průhledný. Nic
+nespadne, nic se nevypíše — jen tam, kde mělo být ztmavení, není nic.
+
+Sonda pak našla **35 takových tříd napříč aplikací**, z toho 34 starších
+než tenhle nález: `bg-bad/12` u zamítnutých řádků v rozvrhu a v posouzení
+směn, `bg-wait/12` u čekajících uzávěrek, inventur a odměn, `bg-[#0A84FF]/12`
+na obou nástěnkách, ve financích a v úkolech. Zvýraznění se nekreslilo
+vůbec: zamítnutý řádek vypadal jako každý jiný.
+
+- Škála jde po pěti: 0, 5, 10 … 95, 100. Mezihodnota musí být v hranatých
+  závorkách (`/[0.72]`), jinak neexistuje.
+- Platí to i pro naše tokenové barvy (`bg-bad/…`), ne jen pro hexy.
+- Hlídá to `scripts/check-opacity-steps.mjs`. Kontrola byla ověřená na
+  známém špatném i známém dobrém vstupu, a hlavně proti **vygenerovanému
+  CSS** — ne proti domněnce, co Tailwind umí.
 
 ## Anti-vzory (zdejší zákazy)
 

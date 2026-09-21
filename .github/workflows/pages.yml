@@ -147,3 +147,8 @@ jobs:
       # Rozvrh ho ignoroval, zatímco kalendáře vedle něj ho ctily.
       - name: Začátek týdne
         run: node scripts/check-week-start.mjs
+      # Krytí mimo Tailwindovu škálu (`bg-bad/12`) se tiše nevygeneruje.
+      # Našlo se 35 takových tříd: zvýraznění zamítnutých řádků, čekajících
+      # uzávěrek i varování v kiosku se prostě nekreslilo.
+      - name: Krytí mimo škálu
+        run: node scripts/check-opacity-steps.mjs

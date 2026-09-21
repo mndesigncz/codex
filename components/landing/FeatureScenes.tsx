@@ -305,7 +305,7 @@ function Graf() {
 function Poctivost() {
   return (
     <Ram popisek="Když vypadne wifi">
-      <Radek delay={120} className="!bg-bad/12">
+      <Radek delay={120} className="!bg-bad/15">
         <Icon name="warning" size={14} className="shrink-0 text-bad-ink" />
         <p className="text-xs font-semibold text-bad-ink">Nepodařilo se uložit — jsi offline</p>
       </Radek>

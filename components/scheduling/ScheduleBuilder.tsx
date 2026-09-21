@@ -982,7 +982,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                               <Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dovolená ({holidays.length}):{' '}
                               <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
                                 {holidays.map((t: any) => (
-                                  <span key={t.id} className="rounded-md bg-[#0A84FF]/12 text-[#0A5CC0] px-1.5 py-0.5 text-xs tabular-nums">
+                                  <span key={t.id} className="rounded-md bg-[#0A84FF]/15 text-[#0A5CC0] px-1.5 py-0.5 text-xs tabular-nums">
                                     {parseInt(t.fromDate.split('-')[2])}.{parseInt(t.fromDate.split('-')[1])}.
                                     {t.fromDate !== t.toDate ? `–${parseInt(t.toDate.split('-')[2])}.${parseInt(t.toDate.split('-')[1])}.` : ''}
                                   </span>
@@ -1160,7 +1160,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                             </span>
                           </>
                         ) : (
-                          <span className="rounded-full bg-bad/12 text-bad-ink px-2.5 py-0.5 text-xs font-bold">zrušit — nikdo nemůže</span>
+                          <span className="rounded-full bg-bad/15 text-bad-ink px-2.5 py-0.5 text-xs font-bold">zrušit — nikdo nemůže</span>
                         )}
                         <span className="text-xs text-black/40 w-full sm:w-auto sm:ml-auto">({ch.reason})</span>
                       </div>
@@ -1353,7 +1353,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                     title={problemTitle}
                     className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition flex flex-col gap-1 overflow-hidden border ${
                       hole
-                        ? 'bg-bad/12 border-bad/60 hover:bg-bad/[0.18]'
+                        ? 'bg-bad/15 border-bad/60 hover:bg-bad/[0.18]'
                         : problem
                           ? 'bg-bad/[0.06] border-bad/35 hover:bg-bad/10'
                           : 'bg-black/[0.03] border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04]'
@@ -1375,7 +1375,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
                       )}
                       {(eventsByDate[cell] ?? []).map((ev: any) => (
                         <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/12 text-[#0A5CC0]">
+                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/15 text-[#0A5CC0]">
                           <span className="flex-shrink-0"><Icon name="calendarCheck" size={15} /></span>
                           <span className="truncate min-w-0">{ev.title}</span>
                         </span>

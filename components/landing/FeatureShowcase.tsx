@@ -102,6 +102,11 @@ export function FeatureShowcase({ funkce }: { funkce: Funkce[] }) {
       {/* Panel. `key` je tu ta podstatná věc: přepnutím funkce se scéna
           odmountuje a animace se rozjede od začátku. Bez toho by druhá
           funkce naskočila hotová a ukázka by nic neukázala. */}
+      {/* `min-h` na telefonu NENÍ kosmetika. Scény mají různou výšku a panel
+          se sám přepíná po šesti vteřinách — bez pevné podlahy se stránka
+          pod čtenářem každých šest vteřin zkrátí nebo prodlouží. Naměřeno
+          na 390 px: rozkmit 85 px. Na ≥640 px to drží `sm:min-h-[24rem]`,
+          níž nedrželo nic. Číslo je z měření nejvyšší scény, ne od oka. */}
       {/* Panel je jeden a má stálé `id`. Vykreslovat dvanáct panelů a jedenáct
           z nich schovávat by znamenalo dvanáct scén najednou v paměti; mít
           `id` podle aktivní funkce zase nechá jedenáct záložek ukazovat
@@ -112,7 +117,7 @@ export function FeatureShowcase({ funkce }: { funkce: Funkce[] }) {
         id="fn-panel"
         aria-labelledby={`fn-tab-${f.id}`}
         tabIndex={0}
-        className="lgx rounded-[2rem] p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-6 items-center sm:min-h-[24rem]"
+        className="lgx rounded-[2rem] p-5 sm:p-7 grid grid-cols-1 sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-6 items-center min-h-[36rem] sm:min-h-[24rem]"
       >
         <div>
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">

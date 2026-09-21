@@ -311,7 +311,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
         </button>
       </div>
 
-      {msg && <div className="rounded-2xl bg-[#C8F542]/12 border border-[#C8F542]/30 text-[#5B7A08] px-4 py-3 text-sm font-semibold rise-in">{msg}</div>}
+      {msg && <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] px-4 py-3 text-sm font-semibold rise-in">{msg}</div>}
       {err && <div className="rounded-2xl bg-bad/[0.07] border border-bad/25 text-bad-ink px-4 py-3 text-sm rise-in">{err}</div>}
 
       {draft ? (

@@ -315,7 +315,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             <p className="text-xs font-bold uppercase tracking-wider text-black/40">Čeká na potvrzení vedením</p>
             <div className="flex flex-wrap gap-1.5">
               {myPending.map((i: any) => (
-                <span key={i.id} className="tap-target-sm flex items-center gap-2 rounded-full bg-wait/12 text-wait-ink pl-1.5 pr-3 py-1 text-xs font-medium">
+                <span key={i.id} className="tap-target-sm flex items-center gap-2 rounded-full bg-wait/15 text-wait-ink pl-1.5 pr-3 py-1 text-xs font-medium">
                   {i.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={i.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
@@ -421,7 +421,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                           {item.name}
                           {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
                           {(item as any).approved === false && (
-                            <span className="ml-1.5 rounded-full bg-wait/12 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
+                            <span className="ml-1.5 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
                               čeká na potvrzení
                             </span>
                           )}

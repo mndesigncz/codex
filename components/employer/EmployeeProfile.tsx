@@ -174,7 +174,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                         </span>
                       ))}
                       {p.breakdown.flagged > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-bad/12 px-2.5 py-1 text-[11px] font-medium text-bad-ink tabular-nums">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-bad/15 px-2.5 py-1 text-[11px] font-medium text-bad-ink tabular-nums">
                           <Icon name="warning" size={11} /> Výtky: <strong>{p.breakdown.flagged}</strong>
                         </span>
                       )}
@@ -246,7 +246,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                                 <PointsBadge n={sh.reviewPoints} />
                               </span>
                             ) : (
-                              <span className="text-[11px] font-medium text-wait-ink bg-wait/12 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
+                              <span className="text-[11px] font-medium text-wait-ink bg-wait/15 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
                             )}
                             <button onClick={() => setRateDate(sh.date)}
                               className="btn btn-primary btn-sm transition shrink-0">

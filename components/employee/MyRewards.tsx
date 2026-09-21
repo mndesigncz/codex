@@ -284,7 +284,7 @@ function MyRewardsInner() {
                   </div>
                   <button onClick={() => redeem(rw)} disabled={!afford || pending || redeemingId !== null}
                     className={`tap-target-sm shrink-0 ml-auto rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap transition ${
-                      pending ? 'bg-wait/12 text-wait-ink cursor-default'
+                      pending ? 'bg-wait/15 text-wait-ink cursor-default'
                       : afford ? 'bg-[#16181A] text-white hover:bg-black'
                       : 'bg-black/[0.05] text-black/35 cursor-not-allowed'
                     }`}>
@@ -300,7 +300,7 @@ function MyRewardsInner() {
                 <span key={r.id} className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium ${
                   r.status === 'approved' ? 'bg-[#C8F542]/15 text-[#5B7A08]'
                   : r.status === 'declined' ? 'bg-bad/10 text-bad-ink'
-                  : 'bg-wait/12 text-wait-ink'
+                  : 'bg-wait/15 text-wait-ink'
                 }`}>
                   {r.title} · {r.status === 'approved' ? 'schváleno ✓' : r.status === 'declined' ? 'zamítnuto' : 'čeká'}
                 </span>
@@ -337,7 +337,7 @@ function MyRewardsInner() {
             const reached = i <= me.levelIndex;
             const current = i === me.levelIndex;
             return (
-              <div key={i} className={`flex items-start gap-3 rounded-2xl p-3 border ${current ? 'bg-[#C8F542]/12 border-[#C8F542]/40' : reached ? 'bg-black/[0.02] border-black/[0.05]' : 'bg-white border-black/[0.05] opacity-70'}`}>
+              <div key={i} className={`flex items-start gap-3 rounded-2xl p-3 border ${current ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : reached ? 'bg-black/[0.02] border-black/[0.05]' : 'bg-white border-black/[0.05] opacity-70'}`}>
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${reached ? 'bg-[#16181A] text-[#C8F542]' : 'bg-black/[0.06] text-black/40'}`}>
                   {reached ? <Icon name="check" size={14} /> : i + 1}
                 </span>
@@ -358,7 +358,7 @@ function MyRewardsInner() {
       {flaggedDays.length > 0 && (
         <div className="rounded-3xl bg-bad/[0.05] border border-bad/25 p-5">
           <div className="flex items-center gap-2.5 mb-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bad/12 text-bad-ink shrink-0"><Icon name="warning" size={17} /></span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bad/15 text-bad-ink shrink-0"><Icon name="warning" size={17} /></span>
             <div className="min-w-0">
               <h3 className="t-card">Něco je potřeba napravit</h3>
               <p className="text-xs text-black/50">Vedení u těchto směn označilo, co příště udělat jinak.</p>

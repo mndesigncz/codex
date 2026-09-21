@@ -1097,3 +1097,83 @@ input[type='search']::-webkit-search-decoration {
 @media (prefers-reduced-motion: no-preference) and (max-width: 640px) {
   .modal-sheet { animation: pangea-sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
 }
+
+/* =====================================================================
+   Prodejní stránka: fotografie a pohyb
+   ---------------------------------------------------------------------
+   Dvě věci, které se sem přidaly, když z hero zmizel 3D hrnek a nastoupily
+   skutečné fotky podniků.
+
+   1) PÁS PODNIKŮ. Nekonečný vodorovný pruh fotek. Aby se nesekal na konci,
+      je obsah v šabloně dvakrát a posouvá se přesně o polovinu — druhá
+      kopie je `aria-hidden`, jinak by odečítač obrazovky přečetl všechno
+      dvakrát. Zastaví se pod myší i při fokusu z klávesnice; bez toho by
+      se do odkazu uvnitř nedalo trefit.
+
+   2) PARALAXA. Řešená scroll-driven animací v CSS, ne skriptem. Kdo ji
+      neumí, dostane fotku, která prostě stojí — a to je v pořádku. Předtím
+      to stálo kilobajty JavaScriptu za efekt, který nic nesděluje.
+   ===================================================================== */
+
+.pas-obal { position: relative; overflow: hidden; }
+/* Okraje pásu se ztrácejí do pozadí — pruh nemá končit useknutou fotkou. */
+.pas-obal::before, .pas-obal::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 4rem; z-index: 2;
+  pointer-events: none;
+}
+.pas-obal::before { left: 0; background: linear-gradient(90deg, var(--bg), transparent); }
+.pas-obal::after { right: 0; background: linear-gradient(270deg, var(--bg), transparent); }
+@media (max-width: 640px) { .pas-obal::before, .pas-obal::after { width: 1.5rem; } }
+
+.pas-radek { display: flex; width: max-content; }
+@media (prefers-reduced-motion: no-preference) {
+  .pas-radek { animation: pas-posun 56s linear infinite; }
+  .pas-obal:hover .pas-radek,
+  .pas-obal:focus-within .pas-radek { animation-play-state: paused; }
+}
+@keyframes pas-posun { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* Rám fotky: ořez, jemná linka dovnitř a měkký stín. Linka je tu proto,
+   že tmavá fotka na krémovém papíře jinak vypadá jako díra. */
+.foto-ramec {
+  position: relative; overflow: hidden;
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px rgba(25,35,15,0.05), 0 24px 60px -24px rgba(25,35,15,0.35);
+}
+.foto-ramec::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+}
+.foto-ramec img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .paralax img {
+      animation: paralax-posun linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+      will-change: transform;
+    }
+    @keyframes paralax-posun {
+      from { transform: scale(1.14) translateY(-3.5%); }
+      to   { transform: scale(1.14) translateY(3.5%); }
+    }
+  }
+}
+
+/* Ztmavení pod bílým textem posazeným na fotku.
+   Není to vkus, je to změřená podmínka: nejsvětlejší místo fotky pod textem
+   musí dát bílé aspoň 4,5 : 1. Na fotce týmu je v pozadí vypálené okno, takže
+   plochý tón musí být silnější, než se na náhledu zdá — naměřeno 1,04 : 1,
+   když překryv chyběl úplně.
+
+   Proč třída a ne `bg-[#16181A]/72` v JSX: takhle zapsané krytí Tailwind
+   vůbec nevygeneruje (72 není krok jeho škály) a překryv tiše zmizí. Hlídá
+   to `scripts/check-opacity-steps.mjs`. */
+.scrim {
+  background: linear-gradient(180deg,
+    rgba(22,24,26,0.74) 0%,
+    rgba(22,24,26,0.86) 55%,
+    rgba(22,24,26,0.92) 100%);
+}
