@@ -75,20 +75,57 @@ nefunguje MCP a odmítá se — chybějící tajemství znamená „nikoho", ne
 Endpoint `POST /api/mcp`, Streamable HTTP bez stavu, ověření hlavičkou
 `Authorization: Bearer <ADMIN_API_TOKEN>`.
 
+**Adresa musí být `https://www.managero.app/api/mcp`, s `www`.** Apex
+`managero.app` se přesměrovává na `www` (308) a **klient při přesměrování
+na jiný host zahodí hlavičku `Authorization`** — je to záměr prohlížečů
+i curlu, aby se tajemství neposlalo cizí doméně. Výsledkem je 401 s
+tokenem, který je v pořádku, a půlhodina hledání chyby na špatném místě.
+Tenhle návod tu chybu jednou měl.
+
+Než se napojuje cokoliv, ať je jisté, že odpovídá sám endpoint:
+
+```bash
+TOKEN='…'
+curl -s -X POST https://www.managero.app/api/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}'
+```
+
+Čeká se `"serverInfo":{"name":"managero-admin"…}`. Když přijde 401: token
+nesedí, je kratší než 32 znaků, `ADMIN_API_TOKEN` na Vercelu není, nebo po
+jeho přidání neproběhlo nasazení. Když přijde `{"redirect": …}`, zůstalo
+v adrese apex bez `www`.
+
 Claude Code:
 
 ```
-claude mcp add --transport http managero https://managero.app/api/mcp \
-  --header "Authorization: Bearer <ADMIN_API_TOKEN>"
+claude mcp add --transport http managero https://www.managero.app/api/mcp \
+  --header "Authorization: Bearer <ADMIN_API_TOKEN>" -s user
 ```
 
-Claude Desktop / claude.ai: vlastní konektor s URL `https://managero.app/api/mcp`
-a stejnou hlavičkou.
+`-s user` zpřístupní server ve všech projektech, ne jen v aktuálním.
+Ověření: `claude mcp list` → `managero: connected`.
 
-Nástroje: `managero_list_teams`, `managero_get_team`, `managero_block_team`,
-`managero_unblock_team`, `managero_set_plan`, `managero_extend_trial`,
-`managero_set_note`, `managero_admin_audit`. Každý zásah se loguje stejně
-jako z obrazovky, s aktérem `api-token`.
+Claude Desktop / claude.ai: vlastní konektor se stejnou adresou. **Ověř si,
+že jde nastavit vlastní hlavička** — konektory tam bývají stavěné na OAuth
+a políčko na hlavičky mít nemusí. Když tam není, endpoint potřebuje druhou
+cestu ověření (OAuth, nebo token v URL jako u cronu); dokud se to neudělá,
+funguje jen Claude Code.
+
+Nástroje (devět): `managero_overview`, `managero_list_teams`,
+`managero_get_team`, `managero_block_team`, `managero_unblock_team`,
+`managero_set_plan`, `managero_extend_trial`, `managero_set_note`,
+`managero_admin_audit`. Každý zásah se loguje stejně jako z obrazovky,
+s aktérem `api-token`.
+
+### Když token unikne
+
+Přepsat `ADMIN_API_TOKEN` na Vercelu a nasadit. Starý přestane platit
+okamžitě a nikde jinde uložený není — pak stačí opravit ten jeden
+`claude mcp add`. Token patří jen do prostředí na Vercelu a do konfigurace
+Clauda: ne do repa, ne do snímku obrazovky, ne do chatu.
 
 ## Kde to je v kódu
 
