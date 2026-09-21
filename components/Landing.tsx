@@ -5,6 +5,8 @@ import Pricing from './Pricing';
 import Reveal from './landing/Reveal';
 import Foto from './landing/Foto';
 import Pas from './landing/Pas';
+import HeroVideo from './landing/HeroVideo';
+import Zarizeni from './landing/Zarizeni';
 import FeatureShowcase, { type Funkce } from './landing/FeatureShowcase';
 import ForceLight from './landing/ForceLight';
 import type { FotoId } from './landing/foto';
@@ -96,7 +98,9 @@ const MISTO: { pryc: string; misto: string }[] = [
   { pryc: 'Ceny nápojů odhadem „tak nějak to vychází"', misto: 'Marže spočítaná ze surovin na gramy' },
   { pryc: 'Skupinový chat, kde zapadne i důležitá věc', misto: 'Kanály podniku, ankety a oznámení, která dojdou všem' },
   { pryc: 'Rezervace v e-mailu, na papíře a v hlavě', misto: 'Potvrzení hostovi hned a přehled na jednom místě' },
+  { pryc: 'Objednávka dodavateli po telefonu, na kterou si nikdo nevzpomene', misto: 'Objednávka z aplikace e-mailem — s potvrzením, že došla' },
 ];
+// Osm, ne sedm: mřížka má dva sloupce a lichý počet nechá poslední řádek zet.
 
 // ——— Jak začít. Tři kroky, ne pět — pátý krok nikdo nedočte. ————————
 const KROKY: { n: string; icon: string; title: string; text: string }[] = [
@@ -197,21 +201,17 @@ export default function Landing() {
           <div className="relative rise-in" style={{ animationDelay: '120ms' }}>
             <div className="relative mx-auto w-full max-w-[34rem]">
               <div className="lg-blob lg-blob-lime-2 absolute inset-8 -z-10" aria-hidden />
-              {/* Jediná fotka, která se načítá hned — zbytek stránky čeká,
-                  až se k němu člověk doscrolluje. */}
-              <Foto
-                id="barista"
-                pomer="aspect-[4/5]"
-                sizes="(max-width: 1024px) 92vw, 34rem"
-                priority
-                paralax={false}
-              />
-              {/* Malá druhá fotka přes roh: bez ní je kompozice placatá.
-                  Na telefonu není — tam by zakryla čtvrtinu té hlavní. */}
-              <div className="hidden sm:block absolute -top-5 -right-4 w-36 lg:w-44 rotate-[4deg]">
-                <Foto id="tym" pomer="aspect-[4/3]" sizes="11rem" paralax={false} />
+              {/* Jediná fotka, která se načítá hned. Od 768 px nad ní ožije
+                  video vyrobené z téže fotky — na telefonu zůstane fotka. */}
+              <div className="foto-ramec aspect-[4/5]">
+                <Foto id="barista" bezRamu sizes="(max-width: 1024px) 92vw, 34rem" priority />
+                <HeroVideo src="/brand/landing/foto/barista" />
               </div>
-              <div className="mt-4 sm:mt-0 sm:absolute sm:bottom-4 sm:-left-4 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]">
+              {/* Produkt v prostoru: skutečná scéna rozvrhu v tabletu, lehce
+                  natočená nad fotkou. Na telefonu leží pod fotkou — schovat
+                  produkt na nejčastější obrazovce by popřelo smysl hero. */}
+              <Zarizeni scena="rozvrh" className="mt-4 sm:mt-0 sm:absolute sm:-top-6 sm:-right-3 lg:-right-5 xl:-right-8 w-full sm:w-[17rem] lg:w-[19.5rem]" />
+              <div className="hidden sm:block sm:absolute sm:bottom-4 sm:-left-4 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
                 <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
                   <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-ok i-pulse shrink-0" />Směna: Eva 8–16, Martin od 12</li>
@@ -259,16 +259,22 @@ export default function Landing() {
         <div className="mt-10 space-y-6">
           {DAY.map((d, i) => (
             <Reveal key={d.time} delay={i % 2 ? 80 : 0}>
-              <div className={`lgx rounded-[2rem] p-5 sm:p-8 grid grid-cols-1 md:grid-cols-[minmax(0,5fr)_minmax(0,4fr)] gap-6 md:gap-8 items-center ${i % 2 ? 'md:[&>*:first-child]:order-2' : ''}`}>
-                <div>
+              {/* O výšce karty rozhoduje text; fotka vyplní, co zbude
+                  (`foto-vypln`). Dřív to bylo naopak a text plaval ve
+                  vzduchu — na 1280 px zabíral 36–40 % výšky karty. Karta
+                  s momentem z aplikace přesahuje přes okraj fotky: vrstvy
+                  se překrývají, ne že vedle sebe leží. */}
+              <div className={`lgx rounded-[2rem] p-5 sm:p-8 grid grid-cols-1 md:grid-cols-[minmax(0,5fr)_minmax(0,4fr)] gap-6 md:gap-6 md:items-stretch ${i % 2 ? 'md:[&>*:first-child]:order-2' : ''}`}>
+                <div className="relative z-10 flex flex-col justify-center">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">{d.time}</p>
                   <h3 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-[#16181A]">{d.title}</h3>
                   <p className="mt-3 text-sm sm:text-base text-black/60 leading-relaxed max-w-[52ch] text-pretty">{d.text}</p>
-                  <div className="mt-5 lgx-strong rounded-2xl px-4 py-3.5">{d.card}</div>
+                  <div className={`mt-5 lgx-strong rounded-2xl px-4 py-3.5 shadow-[0_18px_44px_rgba(25,35,15,0.16)] ${i % 2 ? 'md:-ml-14' : 'md:-mr-14'}`}>{d.card}</div>
                 </div>
                 <Foto
                   id={d.foto}
-                  pomer="aspect-[4/3] md:aspect-[5/6]"
+                  pomer="aspect-[4/3]"
+                  className="foto-vypln md:min-h-[17rem]"
                   sizes="(max-width: 768px) 90vw, 26rem"
                 />
               </div>
@@ -313,9 +319,9 @@ export default function Landing() {
       {/* Kiosk: tablet za barem. Fotka vlevo, skutečná obrazovka vpravo. */}
       <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
         <Reveal>
-          <div className="lgx rounded-[2rem] p-5 sm:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <Foto id="tablet" pomer="aspect-[4/3]" sizes="(max-width: 768px) 90vw, 28rem" />
-            <div>
+          <div className="lgx rounded-[2rem] p-5 sm:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:items-stretch">
+            <Foto id="tablet" pomer="aspect-[4/3]" className="foto-vypln md:min-h-[18rem]" sizes="(max-width: 768px) 90vw, 28rem" />
+            <div className="flex flex-col justify-center">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">Kioskový režim</p>
               <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A]">Jeden tablet za barem, celá směna bez hesel</h2>
               <p className="mt-4 text-sm sm:text-base text-black/60 leading-relaxed text-pretty">
@@ -343,8 +349,8 @@ export default function Landing() {
       {/* Hosté: druhá polovina produktu — to, co vidí zákazník. */}
       <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
         <Reveal>
-          <div className="lgx rounded-[2rem] p-5 sm:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <div>
+          <div className="lgx rounded-[2rem] p-5 sm:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:items-stretch">
+            <div className="flex flex-col justify-center">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">Managero client</p>
               <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A]">Vlastní stránka podniku, kterou hosté opravdu použijí</h2>
               <ul className="mt-5 space-y-3 text-sm sm:text-base text-black/60">
@@ -356,8 +362,8 @@ export default function Landing() {
             </div>
             {/* Telefon ve skle položený na fotku hosta — produkt v ruce, ne
                 na bílém pozadí. */}
-            <div className="relative">
-              <Foto id="host" pomer="aspect-[4/5]" sizes="(max-width: 768px) 90vw, 24rem" />
+            <div className="relative md:min-h-[22rem]">
+              <Foto id="host" pomer="aspect-[4/5]" className="foto-vypln" sizes="(max-width: 768px) 90vw, 24rem" />
               <div className="mt-4 md:mt-0 md:absolute md:-bottom-4 md:-right-2 lgx-strong rounded-[2rem] p-4 md:w-56 shadow-[0_30px_70px_rgba(25,35,15,0.20)]">
                 <div className="rounded-3xl bg-white/85 border border-black/[0.05] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45">Kavárna U Lípy</p>

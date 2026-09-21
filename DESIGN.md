@@ -1235,6 +1235,65 @@ Poučení, které je obecnější než uzávěrka: **když dvě místa odpovída
 tutéž otázku („ke kterému dni to patří?"), musí volat tutéž funkci.** Ne
 dvě funkce, které se shodují ve všech případech, na které si kdo vzpomněl.
 
+## Fotka vedle textu: o výšce rozhoduje text, fotka vyplní zbytek
+
+Karty „Jeden den s Managerem" měly fotku s pevným poměrem stran vedle
+textu. Fotka byla vyšší než text, takže o výšce řádku rozhodovala ona a text
+v něm plaval — **na 1280 px zabíral 36–40 % výšky karty**, zbytek byl vzduch
+nad ním a pod ním. Na náhledu to vypadalo „vzdušně", ve skutečnosti to byla
+karta ze dvou třetin prázdná.
+
+Pravidlo: **v kartě s textem a fotkou vedle sebe určuje výšku text.** Fotka
+je `.foto-vypln` — od 768 px má `aspect-ratio: auto`, obrázek je absolutně
+posazený (takže do výšky řádku nic nepřidá) a jen vyplní, kolik místa mu
+text nechá. Pod 768 px, kde jsou pod sebou, poměr stran zůstává. Mřížka má
+`items-stretch`, textový sloupec `flex-col justify-center`.
+
+Vrstvy se překrývají, ne že vedle sebe leží: karta s momentem z aplikace
+přesahuje o 3,5 rem přes okraj fotky. Přesah musí mít `z-10` a nesmí
+přetéct z karty — hlídá to sonda šířek.
+
+Měří se **podíl výšky obsahu textového sloupce vůči výšce karty**; pod 0,7
+je to nález. Po opravě: šest nálezů → jeden (hero, kde je vzduch kolem
+nadpisu záměr).
+
+## Mřížka nesmí nechat osiřelou buňku
+
+„Místo čeho" mělo sedm položek ve dvou sloupcích: poslední řádek zel.
+Počet položek v mřížce je **násobek počtu sloupců na každé šířce**, kde má
+mřížka víc než jeden sloupec — jinak se přidá, ubere, nebo změní počet
+sloupců. Sedm se doplnilo na osm skutečnou funkcí (objednávka dodavateli
+e-mailem s potvrzením), ne výplní.
+
+Měří se za běhu, protože počet sloupců závisí na šířce: pro každou mřížku
+`děti % sloupce`. Nula na 390, 768, 1024, 1280 i 1440 px.
+
+## Produkt v prostoru, ne objekt v prostoru
+
+„3D" na prodejní stránce už jednou bylo — hrnek — a neprodávalo, protože
+návštěvník nekupuje hrnek. Tohle je jiné 3D: **skutečná obrazovka aplikace**
+(tatáž scéna rozvrhu, která se přehrává v ukázce funkcí níž) v tabletu
+s tenkým rámem, natočená o 12°/5° a pomalu se vznášející nad fotkou.
+Nula bajtů modelu, nula WebGL — perspektiva je CSS. Naklonění je malé
+schválně: větší už oko čte jako mockup ze šablony a text na obrazovce se
+přestane dát přečíst. Na telefonu leží pod fotkou, ne schovaný — produkt
+na nejčastější obrazovce skrývat popírá smysl hero.
+
+## Video v hero je fotka, která ožila
+
+Video vzniklo z téže fotky baristy, která pod ním leží jako poster — když
+se nenačte, nehraje, nebo ho člověk nechce, nikdo nepozná, že mělo být.
+Stahuje se jen od 768 px (na telefonu jsou stovky kilobajtů za pět vteřin
+pohybu špatný obchod), bez `saveData`, bez 2G a bez `prefers-reduced-motion`.
+Zdroj se do `<video>` vkládá až po tom rozhodnutí; prohlížeč by jinak začal
+stahovat, i když se pak neukáže. Dva zdroje: VP9 WebM (126 kB) napřed,
+H.264 MP4 (144 kB) jako záloha pro Safari.
+
+Měřidlo: headless Chromium v Playwrightu **nemá H.264**. Sonda s jediným
+MP4 hlásila `readyState 0` a vypadalo to jako chyba aplikace. Než se
+z takového nálezu cokoli opraví, zeptej se prohlížeče `canPlayType` — tady
+odpověděl `ne` pro H.264 a `probably` pro VP9.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

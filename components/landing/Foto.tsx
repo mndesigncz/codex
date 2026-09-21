@@ -12,7 +12,7 @@ import { FOTO, type FotoId } from './foto';
 // které odsud zmizel 3D hrnek. Vypíná se tam, kde je fotka malá nebo kde
 // je na ní posazený text: pohyb pod textem se špatně čte.
 export default function Foto({
-  id, pomer = 'aspect-[4/3]', className = '', sizes, priority = false, paralax = true, prekryv,
+  id, pomer = 'aspect-[4/3]', className = '', sizes, priority = false, paralax = true, prekryv, bezRamu = false,
 }: {
   id: FotoId;
   /** Tailwindový poměr stran rámu. */
@@ -23,10 +23,12 @@ export default function Foto({
   paralax?: boolean;
   /** Ztmavení pod text posazený na fotku. */
   prekryv?: string;
+  /** Jen obrázek bez rámu — když rám drží rodič (hero s videem). */
+  bezRamu?: boolean;
 }) {
   const f = FOTO[id];
-  return (
-    <div className={`foto-ramec ${paralax ? 'paralax' : ''} ${pomer} ${className}`}>
+  const obrazek = (
+    <>
       <Image
         src={f.src}
         alt={f.alt}
@@ -39,6 +41,12 @@ export default function Foto({
         loading={priority ? undefined : 'lazy'}
       />
       {prekryv && <div className={`absolute inset-0 ${prekryv}`} aria-hidden />}
+    </>
+  );
+  if (bezRamu) return obrazek;
+  return (
+    <div className={`foto-ramec ${paralax ? 'paralax' : ''} ${pomer} ${className}`}>
+      {obrazek}
     </div>
   );
 }

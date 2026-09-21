@@ -1177,3 +1177,39 @@ input[type='search']::-webkit-search-decoration {
     rgba(22,24,26,0.86) 55%,
     rgba(22,24,26,0.92) 100%);
 }
+
+/* ---------- Fotka, která vyplní řádek, a produkt v prostoru ----------
+   Naměřeno na 1280 px: text v denních kartách zabíral 36–40 % výšky karty,
+   zbytek byl vzduch nad ním a pod ním. Příčina: fotka měla pevný poměr stran,
+   takže o výšce řádku rozhodovala ona, a text se v něm vystředil.
+
+   `.foto-vypln` to obrací: od 768 px fotka výšku řádku NEURČUJE — obrázek
+   je absolutně posazený, takže do výšky nic nepřidá, a jen vyplní, kolik
+   místa mu text nechá. Na telefonu, kde jsou pod sebou, poměr stran zůstává. */
+@media (min-width: 768px) {
+  .foto-vypln { aspect-ratio: auto; height: 100%; }
+  .foto-vypln img { position: absolute; inset: 0; }
+}
+
+/* Zařízení v perspektivě: skutečná obrazovka aplikace, ne render objektu.
+   Naklonění je malé — 12°/5° — protože větší už čte oko jako „mockup ze
+   šablony" a text na obrazovce se přestane dát přečíst. Vznáší se pomalu
+   (6 s) a málo (6 px); rychleji by to bylo poutač, ne produkt. */
+.zarizeni-scena { perspective: 1400px; }
+.zarizeni {
+  transform: rotateY(-12deg) rotateX(5deg);
+  transform-style: preserve-3d;
+  box-shadow: 0 30px 70px -20px rgba(25,35,15,0.35), 0 2px 6px rgba(25,35,15,0.08);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .zarizeni { animation: zarizeni-plout 6s ease-in-out infinite; }
+  @keyframes zarizeni-plout {
+    0%, 100% { transform: rotateY(-12deg) rotateX(5deg) translateY(0); }
+    50%      { transform: rotateY(-12deg) rotateX(5deg) translateY(-6px); }
+  }
+}
+
+/* Video v hero se objeví až ve chvíli, kdy umí hrát — do té doby leží pod
+   ním fotka, ze které vzniklo, takže přechod není poznat. */
+.hero-video { opacity: 0; transition: opacity .6s ease; }
+.hero-video.hraje { opacity: 1; }
