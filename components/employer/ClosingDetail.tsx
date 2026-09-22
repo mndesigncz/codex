@@ -15,7 +15,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
-import { useMoney } from '../CurrencyProvider';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 import {
   Closing, expectedCash, expectedCashLines, cashDifference, cashLeft,
   movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS,
@@ -69,6 +69,13 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 /** Řádek štítek → hodnota, zarovnaný na desetinné čárce. */
+/** „7 h 40 min" z milisekund — pro popisek mzdy. */
+function hodinyMinuty(ms: number): string {
+  const min = Math.round(ms / 60000);
+  const h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
+}
+
 function Row({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'plus' | 'minus' | 'strong' }) {
   return (
     <div className="flex items-baseline justify-between gap-x-4 gap-y-0.5 flex-wrap py-1.5">
@@ -86,6 +93,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
   id: number; onClose: () => void; onChanged?: () => void; payDailyCash?: boolean;
 }) {
   const money = useMoney();
+  const symbol = useSymbol();
   // Jediné okno v aplikaci, které si překryv skládalo samo. Mělo sice
   // `role="dialog"`, ale Escape ho nezavřel, Tab z něj utekl na stránku pod
   // ním a pozadí se scrollovalo — a je to zrovna to okno, ve kterém se čte
@@ -238,6 +246,13 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   <Row label="Výdaje z kasy" value={money(c.expenses)} />
                   <Row label="Odloženo ven" value={money(c.cash_removed)} />
                   {payDailyCash && <Row label="Výplata zaměstnance" value={money(c.self_payout)} />}
+                  {/* Snímek z okamžiku uzávěrky — sazba i čas tak, jak byly tehdy.
+                      Docházka a Finance počítají živě; tady zůstává, co člověk
+                      viděl, když uzávěrku odesílal. */}
+                  {(c as any).wage_earned != null && (Number((c as any).worked_ms) || 0) > 0 && (
+                    <Row label={`Mzda za směnu (${hodinyMinuty(Number((c as any).worked_ms))} × ${Number((c as any).wage_rate) || 0} ${symbol}/h)`}
+                      value={money(Number((c as any).wage_earned) || 0)} />
+                  )}
                   <Row label="Kasa na konci" value={money(c.closing_cash)} />
                   {(Number(c.final_removal) || 0) > 0 && <Row label="Odvod na konci" value={money(Number(c.final_removal))} />}
                   <Row label="Zákazníků" value={String(c.customers)} />

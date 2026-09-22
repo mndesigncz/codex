@@ -7,6 +7,7 @@ import { cashDifference, czk, normalizeMovements, normalizeDenominations, normal
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { windowOf } from '@/lib/shiftWindow';
 import { denSmeny, denUzaverkyPro, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
+import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
 
@@ -713,5 +714,45 @@ export async function POST(request: Request) {
     } catch { /* column not migrated yet */ }
   }
 
-  return NextResponse.json({ ok: true, closing: row, approved, covered: coveredIds.length, tipsInDrawer });
+  // Snímek mzdy: kolik autor za směnu odpracoval a vydělal v okamžiku
+  // uzávěrky. Sazba se ukládá s tím — pozdější změna hodinovky nesmí
+  // přepsat historii. Otevřený záznam se počítá do teď: uzávěrka JE konec
+  // směny, odpíchnout se lidi chodí až po ní.
+  if (row?.id && eventId == null) {
+    try {
+      const m = await mzdaZaSmenu(c.teamId, actorId, shiftDate);
+      if (!m.noEntries && !m.suspicious) {
+        await sql`
+          UPDATE cash_closings SET worked_ms = ${Math.round(m.ms)}, wage_rate = ${m.rate}, wage_earned = ${m.earned}
+          WHERE id = ${row.id}`;
+      }
+    } catch { /* sloupce před migrací — uzávěrka se tím nesmí zdržet */ }
+  }
+
+  // Kdo z osádky se zapomněl odpíchnout, se dozví hned — ne až ráno z nočního
+  // úklidu. Samotné uzavření záznamu necháváme na něm (lib/staleShifts.ts):
+  // uzávěrka ve 22:00 neznamená, že v 22:00 odešel. Bere si čas uzávěrky
+  // jako nejpozdější doloženou stopu, takže výsledek je ten, který obsluha
+  // čeká — jen s možností se ještě odpíchnout a mít čas přesně.
+  const openClockIns: { id: number; name: string }[] = [];
+  try {
+    const osadka = Array.from(new Set<number>([actorId, ...coveredIds]));
+    const otevrene = await sql`
+      SELECT te.employee_id AS id, u.name
+      FROM time_entries te JOIN users u ON u.id = te.employee_id
+      WHERE te.team_id = ${c.teamId} AND te.clock_out IS NULL AND te.employee_id = ANY(${osadka})
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${shiftDate}`;
+    for (const o of otevrene as any[]) {
+      openClockIns.push({ id: Number(o.id), name: String(o.name ?? '') });
+      notifyUser(Number(o.id), {
+        title: '⏱️ Odpíchni se',
+        body: 'Uzávěrka je hotová, ale příchod máš pořád otevřený. Odpíchni se — jinak směnu uzavřeme podle času uzávěrky.',
+        type: 'warning',
+        category: 'shift',
+        link: '/employee/shifts',
+      }).catch(() => {});
+    }
+  } catch { /* před migrací */ }
+
+  return NextResponse.json({ ok: true, closing: row, approved, covered: coveredIds.length, tipsInDrawer, openClockIns });
 }

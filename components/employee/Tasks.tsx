@@ -7,6 +7,7 @@ import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
 
 import { EmptyState, PageHeader, Segmented } from '../ui';
+import { Toast } from '../ui/Toast';
 import { Icon } from '../Icons';
 import { okJson } from '@/lib/api';
 interface Task {
@@ -55,6 +56,7 @@ export default function Tasks({ user }: Props) {
   const today = pragueToday();
   const weekAhead = pragueToday(7);
 
+  const [bodyToast, setBodyToast] = useState<string | null>(null);
   const updateStatus = async (task: Task, newStatus: string) => {
     // Completing a task on a day that isn't its due day → warn first.
     if (newStatus === 'done' && task.dueDate && task.dueDate !== today) {
@@ -67,7 +69,14 @@ export default function Tasks({ user }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: task.id, status: newStatus }),
       });
-      if (res.ok) setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+        // Body se přičítaly potichu. Když je člověk uvidí hned, ví, že
+        // odškrtnutí něco znamená — a „vyrob limonádu" přestane být otrava.
+        const d = await res.json().catch(() => null);
+        const pts = Number(d?.pointsEarned);
+        if (newStatus === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`+${pts} ${pts === 1 ? 'bod' : pts < 5 ? 'body' : 'bodů'} za splněný úkol`);
+      }
       else { setSaveErr('Změnu stavu se nepodařilo uložit.'); setTimeout(() => setSaveErr(''), 4000); }
     } catch (e) {
       console.error(e);
@@ -199,6 +208,7 @@ export default function Tasks({ user }: Props) {
           options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />} />
 
       {saveErr && <div className="note note-danger px-4 py-2.5 text-sm">{saveErr}</div>}
+      <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
 
       {loading ? (
         <div className="flex items-center justify-center h-48"><div className="spinner" /></div>

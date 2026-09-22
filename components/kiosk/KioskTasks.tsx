@@ -6,6 +6,7 @@ import { useKioskShift } from './KioskShiftGate';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson, apiMessage } from '@/lib/api';
 import { ErrorState } from '../ui/ErrorState';
+import { Toast } from '../ui/Toast';
 
 interface ChecklistItem { text: string; done: boolean }
 interface Task {
@@ -53,6 +54,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   // Kdo splnil úkol, je záznam o práci. Když tablet neví, koho zapsat,
   // musí se zeptat dřív, než se cokoli pošle — `actingAs: undefined` dřív
   // znamenalo, že si úkol připsal tablet sám.
+  const [bodyToast, setBodyToast] = useState<string | null>(null);
   const setStatus = async (t: Task, status: string) => {
     const who = await requireActive();
     if (!who) return;
@@ -64,6 +66,13 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
         body: JSON.stringify({ id: t.id, status, actingAs: who.id }),
       });
       if (!res.ok) throw new Error();
+      // Body patří tomu, kdo u tabletu stojí — a má je vidět hned, jinak
+      // odškrtnutí „vyrob limonádu" nic neznamená.
+      const d = await res.json().catch(() => null);
+      const pts = Number(d?.pointsEarned);
+      if (status === 'done' && Number.isFinite(pts) && pts > 0) {
+        setBodyToast(`${who.name}: +${pts} ${pts === 1 ? 'bod' : pts < 5 ? 'body' : 'bodů'} za splněný úkol`);
+      }
     } catch { setTasks(prev); }
   };
 
@@ -179,6 +188,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
 
   return (
     <div className="space-y-6">
+      <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
       {/* Filter chips */}
       <div className="flex gap-1.5 flex-wrap">
         {FILTERS.map(f => (

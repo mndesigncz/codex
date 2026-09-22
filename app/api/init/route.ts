@@ -781,6 +781,12 @@ export async function GET(request: Request) {
     // Od teď je `date` obchodní den a tady se to srovná i zpětně — jen tam,
     // kde server obchodní den skutečně spočítal (shift_date není NULL).
     try { await sql`UPDATE cash_closings SET date = shift_date WHERE shift_date IS NOT NULL AND shift_date <> date`; } catch { /* best-effort */ }
+    // Snímek mzdy v okamžiku uzávěrky: odpracovaný čas, sazba a výsledek.
+    // Sazba se ukládá schválně — kdyby se brala živě z users.hourly_rate,
+    // pozdější změna hodinovky by přepsala historii.
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS worked_ms BIGINT`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS wage_rate INTEGER`);
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS wage_earned INTEGER`);
 
     // ---- Shift reviews: whole-shift scope, flags, per-item scoring ----
     await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'individual'`);
