@@ -10,6 +10,7 @@ import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { earnedFor } from '@/lib/wages';
 import { okJson } from '@/lib/api';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 type RosterMember = {
   id: number | string;
@@ -268,7 +269,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return entries;
-    return entries.filter(e => (e.employeeName ?? '').toLowerCase().includes(needle));
+    return entries.filter(e => obsahuje(e.employeeName, needle));
   }, [entries, q]);
 
   const grouped = useMemo(() => {

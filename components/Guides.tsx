@@ -13,6 +13,7 @@ import { clickable } from '@/lib/clickable';
 import { okJson, apiMessage } from '@/lib/api';
 import { czCount, KATEGORIE } from '@/lib/czech';
 import { DiscardGuard } from './ui/DiscardGuard';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface User {
   id: number;
@@ -202,7 +203,7 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
         return false;
       }
       if (!q) return true;
-      return g.title.toLowerCase().includes(q) || g.excerpt.toLowerCase().includes(q);
+      return obsahujeNekde(q, g.title, g.excerpt);
     });
   }, [guides, activeCat, search]);
 

@@ -15,6 +15,7 @@ import { okJson } from '@/lib/api';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 type Ev = any;
 
@@ -346,10 +347,10 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
 
   const crewCandidates = members
     .filter(m => !e.crew.includes(m.id))
-    .filter(m => crewSearch.trim() === '' || String(m.name).toLowerCase().includes(crewSearch.trim().toLowerCase()))
+    .filter(m => obsahuje(m.name, crewSearch))
     .slice(0, 6);
   const packCandidates = packSearch.trim()
-    ? items.filter(i => i.name.toLowerCase().includes(packSearch.toLowerCase())
+    ? items.filter(i => obsahuje(i.name, packSearch)
         && !e.packing.some((p: any) => p.itemId === i.id)).slice(0, 6)
     : [];
 

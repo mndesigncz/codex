@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
 import { audit } from '@/lib/audit';
+import { obsahujeNekde } from '@/lib/hledani';
 
 /** Receptury mění jen vedení — stejná podmínka jako v /api/pos/products. */
 async function employer() {
@@ -39,9 +40,8 @@ export async function GET(req: Request) {
       const conn = await getConnection(u.team_id);
       if (!conn) return NextResponse.json({ products: [] });
       const all = await menuProducts(conn);
-      const needle = q.toLowerCase();
       const products = all
-        .filter(p => p.name.toLowerCase().includes(needle) || (p.category ?? '').toLowerCase().includes(needle))
+        .filter(p => obsahujeNekde(q, p.name, p.category))
         .slice(0, 20)
         .map(p => ({ productId: p.productId, name: p.name, category: p.category, price: p.price }));
       return NextResponse.json({ products });

@@ -27,6 +27,7 @@ import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 const pluralPolozka = (n: number) => czForm(n, POLOZKA);
 
@@ -381,8 +382,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       (showArchived ? i.archived === true : i.archived !== true) &&
       inCat(i) &&
       !hiddenOnOverview(i) &&
-      (q === '' || i.name.toLowerCase().includes(q) || (i.brand ?? '').toLowerCase().includes(q)
-        || (i.supplier ?? '').toLowerCase().includes(q)));
+      obsahujeNekde(q, i.name, i.brand, i.supplier));
     const sorted = [...list];
     sorted.sort((a, b) => {
       switch (sort) {

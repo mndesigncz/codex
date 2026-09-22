@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer, publicProfile } from '@/lib/client';
+import { obsahujeNekde } from '@/lib/hledani';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -37,6 +38,6 @@ export async function GET(req: NextRequest) {
   }
   const list = rows
     .map(r => ({ ...publicProfile(r), members: Number(r.members) || 0, member: mine.has(Number(r.team_id)) }))
-    .filter(b => !q || b.name.toLowerCase().includes(q) || b.address.toLowerCase().includes(q) || b.tagline.toLowerCase().includes(q));
+    .filter(b => obsahujeNekde(q, b.name, b.address, b.tagline));
   return NextResponse.json({ businesses: list, signedIn: !!me });
 }

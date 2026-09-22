@@ -156,3 +156,8 @@ jobs:
       # s blokací existuje, lib/superadmin.ts je bez Node importů (edge).
       - name: Brána správy platformy
         run: node scripts/check-admin-auth.mjs
+      # Česká aplikace: hledání musí najít „mražená" i na „mrazena".
+      # Devatenáct hledání mělo tutéž vadu — obsluha ve skladu položku
+      # prostě nenašla a myslela si, že tam není.
+      - name: Hledání s diakritikou
+        run: node scripts/check-hledani.mjs

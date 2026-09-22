@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { obsahuje, proHledani } from '@/lib/hledani';
 
 export interface SearchSuggestion {
   label: string;
@@ -70,9 +71,9 @@ export function SearchField({ value, onChange, placeholder = 'Hledat…', sugges
 
   const q = value.trim().toLowerCase();
   const items = useMemo(() => {
-    const sug = (q ? suggestions.filter(s => s.label.toLowerCase().includes(q)) : suggestions).slice(0, 6)
+    const sug = (q ? suggestions.filter(s => obsahuje(s.label, q)) : suggestions).slice(0, 6)
       .map(s => ({ kind: 'sug' as const, label: s.label, hint: s.hint, value: s.value ?? s.label }));
-    const rec = (q ? recent.filter(r => r.toLowerCase().includes(q) && r.toLowerCase() !== q) : recent)
+    const rec = (q ? recent.filter(r => obsahuje(r, q) && proHledani(r) !== proHledani(q)) : recent)
       .filter(r => !sug.some(s => s.value.toLowerCase() === r.toLowerCase()))
       .map(r => ({ kind: 'rec' as const, label: r, hint: 'poslední hledání', value: r }));
     return [...rec.slice(0, 3), ...sug];

@@ -16,6 +16,7 @@ import ItemInlineEdit from './ItemInlineEdit';
 import NewIngredientInline from './NewIngredientInline';
 import { okJson } from '@/lib/api';
 import { recipeCost, ingredientCost, marginPct } from '@/lib/recipeCost';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 const inputCls =
   'field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -151,7 +152,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
   const shown = useMemo(() => products.filter(p => {
     if (cat !== 'Vše' && (p.category || 'Bez kategorie') !== cat) return false;
     if (onlyMissing && recipeByProduct.has(p.productId)) return false;
-    if (q && !p.name.toLowerCase().includes(q) && !(p.category ?? '').toLowerCase().includes(q)) return false;
+    if (q && !obsahujeNekde(q, p.name, p.category)) return false;
     return true;
   }).sort((a, b) => (soldByProduct.get(b.productId) ?? 0) - (soldByProduct.get(a.productId) ?? 0)
     || a.name.localeCompare(b.name, 'cs')),

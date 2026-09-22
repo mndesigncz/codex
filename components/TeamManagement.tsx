@@ -15,6 +15,7 @@ import { clickable } from '@/lib/clickable';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { DiscardGuard } from './ui/DiscardGuard';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Member {
   id: number;
@@ -113,9 +114,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     const q = memberQ.trim().toLowerCase();
     if (!q) return members;
     return members.filter(m =>
-      (m.name ?? '').toLowerCase().includes(q) ||
-      (m.email ?? '').toLowerCase().includes(q) ||
-      ((m as any).jobTitle ?? '').toLowerCase().includes(q));
+      obsahujeNekde(q, m.name, m.email, (m as any).jobTitle));
   })();
   const [editRole, setEditRole] = useState<string>('employee');
   const [editJob, setEditJob] = useState<string>('');

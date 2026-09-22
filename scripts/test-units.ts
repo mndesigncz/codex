@@ -20,6 +20,7 @@ import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.
 import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
 import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week.ts';
 import { denPrichodu } from '../lib/businessDay.ts';
+import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
 import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
 import { rozhodni } from '../lib/blokace.ts';
@@ -580,6 +581,21 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
     denPrichodu({ at: v('2026-09-20', '05:01'), otevrenoVcera: bar }), '2026-09-20');
   eq('příchod: směna má přednost před otevírací dobou (ranní směna, ale bar otevřený) → řídí se otevírací dobou až po směně',
     denPrichodu({ at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '08:00', end_time: '16:00' }], otevrenoVcera: bar }), '2026-09-19');
+
+  // Hledání bez diakritiky — přesně ten případ ze Skladu.
+  eq('hledání: „mraz" najde „Mražená malina"', obsahuje('Mražená malina', 'mraz'), true);
+  eq('hledání: „mraž" taky najde (diakritika na obou stranách)', obsahuje('Mrazena malina', 'mraž'), true);
+  eq('hledání: „cerstve" najde „Čerstvé"', obsahuje('Čerstvé', 'cerstve'), true);
+  eq('hledání: „dzem" najde „Džem"', obsahuje('Džem', 'dzem'), true);
+  eq('hledání: „RIZEK" najde „řízek" (velikost písmen)', obsahuje('řízek', 'RIZEK'), true);
+  eq('hledání: co tam není, se nenajde', obsahuje('Mražená malina', 'bramboro'), false);
+  eq('hledání: prázdný dotaz projde vším', obsahuje('cokoliv', '   '), true);
+  eq('hledání: chybějící text nenajde nic', obsahuje(null, 'mraz'), false);
+  eq('hledání: normalizace je idempotentní', proHledani(proHledani(' Mražená ')), 'mrazena');
+  eq('hledání: ch zůstává dvě písmena', obsahuje('Chléb', 'chl'), true);
+  eq('hledání: přes víc polí — trefa ve druhém', obsahujeNekde('makro', 'Mléko', 'Makro s.r.o.'), true);
+  eq('hledání: přes víc polí — nikde', obsahujeNekde('lidl', 'Mléko', 'Makro s.r.o.'), false);
+  eq('hledání: přes víc polí — prázdné pole nevadí', obsahujeNekde('mleko', 'Mléko', null, undefined), true);
 
   // Správce platformy: kdo to je — id účtu, ne e-mail.
   eq('správce: id z prostředí, čárka/mezera/středník', superadminIds(' 7, 12;300  '), [7, 12, 300]);

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 export interface RecipeLine {
   ingredientId: number; name: string; amount: number; unit: string;
@@ -67,7 +68,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
     const used = new Set(lines.map(l => l.ingredientId));
-    return items.filter(p => p.id !== item.id && !used.has(p.id) && p.name.toLowerCase().includes(q)).slice(0, 8);
+    return items.filter(p => p.id !== item.id && !used.has(p.id) && obsahuje(p.name, q)).slice(0, 8);
   }, [query, items, lines, item.id]);
 
   const save = async (next?: { on?: boolean }) => {
