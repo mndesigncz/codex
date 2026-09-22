@@ -245,7 +245,7 @@ export default function EmployerLayout({ user }: Props) {
     .filter(g => g.items.length);
 
   const AccountMenu = () => (
-    <div className="glass rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(25,35,15,0.14)]">
+    <div className="glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] pop-in origin-bottom">
       <button onClick={openSettings} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
         <Icon name="settings" size={18} /> Nastavení
       </button>
