@@ -58,7 +58,7 @@ async function shiftsOnDay(teamId: number, date: string) {
     return await sql`
       SELECT s.id, s.employee_id, s.start_time, s.end_time, s.type
       FROM shifts s JOIN users u ON u.id = s.employee_id
-      WHERE s.date = ${date} AND (s.team_id = ${teamId} OR u.team_id = ${teamId})
+      WHERE s.date = ${date} AND s.team_id = ${teamId}
       ORDER BY s.start_time ASC, s.id ASC`;
   } catch {
     return [] as any[];
@@ -343,7 +343,7 @@ export async function GET(req: NextRequest) {
     try {
       shiftRows = await sql`
         SELECT s.date, s.employee_id FROM shifts s JOIN users u ON u.id = s.employee_id
-        WHERE (s.team_id = ${c.teamId} OR u.team_id = ${c.teamId}) AND s.date >= ${from} AND s.date <= ${to}`;
+        WHERE s.team_id = ${c.teamId} AND s.date >= ${from} AND s.date <= ${to}`;
     } catch { /* ignore */ }
     try {
       closingRows = await sql`

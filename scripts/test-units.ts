@@ -24,6 +24,7 @@ import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
 import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
 import { parseStep, serializeStep, parseSteps } from '../lib/steps.ts';
 import { odkazNaNavod } from '../lib/otevriNavod.ts';
+import { normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, VYCHOZI_NASTAVENI } from '../lib/organizace.ts';
 import { describe as popisUkolu } from '../lib/productionPlan.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
 import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
@@ -693,6 +694,26 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('odkaz: zaměstnanec', odkazNaNavod('/employee/shifts', 12), '/employee/shifts?view=guides&guide=12');
   eq('odkaz: tablet odkazem nejde — řeší si to sám', odkazNaNavod('/kiosk', 12), null);
   eq('odkaz: neznámá cesta radši nic', odkazNaNavod('/', 12), null);
+
+  // ---- Organizace nad podniky --------------------------------------------
+  // Kdo smí přepnout kam, rozhoduje o tom, čí data člověk uvidí.
+  eq('organizace: prázdné nastavení → výchozí', normalizujNastaveni(null), VYCHOZI_NASTAVENI);
+  eq('organizace: neznámá fakturace → per_team', normalizujNastaveni({ fakturace: 'ročně' }).fakturace, 'per_team');
+  eq('organizace: per_org projde', normalizujNastaveni({ fakturace: 'per_org' }).fakturace, 'per_org');
+  eq('organizace: řetězec místo booleanu se ignoruje', normalizujNastaveni({ sdileniLidi: 'ano' }).sdileniLidi, true);
+  eq('organizace: false zůstane false', normalizujNastaveni({ konsolidovanyPrehled: false }).konsolidovanyPrehled, false);
+  eq('organizace: role — cokoli kromě employer je employee', [normalizujRoli('employer'), normalizujRoli('kiosk'), normalizujRoli(undefined)], ['employer', 'employee', 'employee']);
+  {
+    const cl = [
+      { teamId: 1, role: 'employer' as const, teamName: 'Kavárna A', organizationId: 9 },
+      { teamId: 2, role: 'employee' as const, teamName: 'Kavárna B', organizationId: 9 },
+    ];
+    eq('organizace: přepnout na podnik, kde jsem členem → ano, s rolí toho členství', smiPrepnout(cl, 2)?.role, 'employee');
+    eq('organizace: přepnout na cizí podnik → ne (ani vlastník organizace)', smiPrepnout(cl, 3), null);
+  }
+  eq('organizace: vedení sdílet jde vždy', smiSdiletZamestnance({ ...VYCHOZI_NASTAVENI, sdileniLidi: false }, 'employer'), true);
+  eq('organizace: zaměstnanec jen se zapnutým sdílením', smiSdiletZamestnance({ ...VYCHOZI_NASTAVENI, sdileniLidi: false }, 'employee'), false);
+  eq('organizace: zaměstnanec se zapnutým sdílením ano', smiSdiletZamestnance(VYCHOZI_NASTAVENI, 'employee'), true);
 
   // ---- Postup v úkolu: návod bije holý text -----------------------------
   {

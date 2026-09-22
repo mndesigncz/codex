@@ -150,7 +150,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       FROM tasks t
       WHERE t.completed_at IS NOT NULL
         AND to_char((t.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${day}
-        AND t.assigned_to IN (SELECT id FROM users WHERE team_id = ${teamId})
+        AND t.team_id = ${teamId}
       ORDER BY t.completed_at` as any[]).map(t => ({
         id: t.id, title: t.title, employee: person(t.completed_by),
         completedAt: t.completed_at, priority: t.priority,

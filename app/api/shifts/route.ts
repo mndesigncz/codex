@@ -89,13 +89,13 @@ export async function GET(req: NextRequest) {
       ? await sql`
           SELECT s.*, u.name AS employee_name, u.avatar AS employee_avatar
           FROM shifts s JOIN users u ON u.id = s.employee_id
-          WHERE (u.team_id = ${c.teamId} OR s.team_id = ${c.teamId})
+          WHERE s.team_id = ${c.teamId}
             AND to_char(s.date::date, 'YYYY-MM') = ${month}
           ORDER BY s.date ASC, s.start_time ASC`
       : await sql`
           SELECT s.*, u.name AS employee_name, u.avatar AS employee_avatar
           FROM shifts s JOIN users u ON u.id = s.employee_id
-          WHERE (u.team_id = ${c.teamId} OR s.team_id = ${c.teamId})
+          WHERE s.team_id = ${c.teamId}
           ORDER BY s.date ASC, s.start_time ASC`;
     return NextResponse.json({
       enabled: true,
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
     const rows = await sql`
       SELECT s.* FROM shifts s
       JOIN users u ON u.id = s.employee_id
-      WHERE u.team_id = ${c.teamId} OR s.team_id = ${c.teamId}
+      WHERE s.team_id = ${c.teamId}
       ORDER BY s.date ASC`;
     return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
   }

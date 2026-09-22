@@ -36,8 +36,7 @@ export async function GET(req: NextRequest) {
     const rows = await sql`
       SELECT * FROM (
         SELECT m.* FROM messages m
-        JOIN users u ON u.id = m.sender_id
-        WHERE m.channel = ${channel} AND u.team_id = ${me.teamId}
+        WHERE m.channel = ${channel} AND m.team_id = ${me.teamId}
         ORDER BY m.created_at DESC
         LIMIT 200
       ) t ORDER BY t.created_at ASC`;
@@ -60,8 +59,8 @@ export async function POST(req: NextRequest) {
     // The sender is whoever is logged in; body.senderId is ignored so nobody
     // can post under a colleague's name.
     const [row] = await sql`
-      INSERT INTO messages (sender_id, channel, content)
-      VALUES (${me.meId}, ${channel}, ${content})
+      INSERT INTO messages (sender_id, channel, content, team_id)
+      VALUES (${me.meId}, ${channel}, ${content}, ${me.teamId})
       RETURNING *`;
     return NextResponse.json(row);
   } catch {

@@ -136,7 +136,7 @@ export async function GET() {
                u.id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar"
         FROM shifts s
         JOIN users u ON u.id = s.employee_id
-        WHERE u.team_id = ${c.teamId}
+        WHERE s.team_id = ${c.teamId}
           AND s.date <= ${today} AND s.date >= ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
@@ -151,7 +151,7 @@ export async function GET() {
                  u.id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar"
           FROM shifts s
           JOIN users u ON u.id = s.employee_id
-          WHERE u.team_id = ${c.teamId}
+          WHERE s.team_id = ${c.teamId}
             AND s.date <= ${today} AND s.date >= ${cutoff}
             AND NOT EXISTS (
               SELECT 1 FROM cash_closings cc
@@ -166,7 +166,7 @@ export async function GET() {
       eligibleShifts = await sql`
         SELECT s.id, s.date, s.auto_created, s.start_time AS "startTime", s.end_time AS "endTime", s.type
         FROM shifts s
-        WHERE s.employee_id = ${c.meId}
+        WHERE s.employee_id = ${c.meId} AND s.team_id = ${c.teamId}
           AND s.date <= ${today} AND s.date >= ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
@@ -179,7 +179,7 @@ export async function GET() {
         eligibleShifts = await sql`
           SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type
           FROM shifts s
-          WHERE s.employee_id = ${c.meId}
+          WHERE s.employee_id = ${c.meId} AND s.team_id = ${c.teamId}
             AND s.date <= ${today} AND s.date >= ${cutoff}
             AND NOT EXISTS (
               SELECT 1 FROM cash_closings cc
@@ -214,7 +214,7 @@ export async function GET() {
       const sched = await sql`
         SELECT DISTINCT s.date, s.auto_created, u.id, u.name, u.avatar
         FROM shifts s JOIN users u ON u.id = s.employee_id
-        WHERE u.team_id = ${c.teamId} AND s.date >= ${cutoff} AND s.date <= ${today}
+        WHERE s.team_id = ${c.teamId} AND s.date >= ${cutoff} AND s.date <= ${today}
         ORDER BY s.date DESC, u.name ASC`;
       // Automatická směna na den, kdy je zavřeno, je příchod po půlnoci zapsaný
       // podle hodin na zdi z doby, než to příchod uměl líp. Uzávěrku za neděli,
@@ -420,7 +420,7 @@ export async function POST(request: Request) {
     const crew = await sql`
       SELECT DISTINCT s.employee_id AS id, s.start_time, s.end_time
       FROM shifts s JOIN users u ON u.id = s.employee_id
-      WHERE u.team_id = ${c.teamId} AND s.date = ${shiftDate}`;
+      WHERE s.team_id = ${c.teamId} AND s.date = ${shiftDate}`;
     for (const r of crew as any[]) {
       const id = Number(r.id);
       if (!Number.isFinite(id) || shiftEmployeeIds.includes(id)) continue;

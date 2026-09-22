@@ -32,7 +32,7 @@ export async function GET() {
       SELECT r.*, us.name AS author_name, us.avatar AS author_avatar
       FROM inventory_reports r
       JOIN users us ON us.id = r.reported_by
-      WHERE us.team_id = ${u.team_id}
+      WHERE r.team_id = ${u.team_id}
       ORDER BY r.created_at DESC
       LIMIT 50`;
     return NextResponse.json({ reports: rows });
@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
     const note = body.note ? String(body.note).trim().slice(0, 1000) || null : null;
 
     const [row] = await sql`
-      INSERT INTO inventory_reports (reported_by, items, note, status)
-      VALUES (${u.id}, ${items}, ${note}, 'new')
+      INSERT INTO inventory_reports (reported_by, items, note, status, team_id)
+      VALUES (${u.id}, ${items}, ${note}, 'new', ${u.team_id})
       RETURNING *`;
 
     // The report is FOR the employers — tell them it exists.
@@ -89,7 +89,7 @@ export async function PATCH(req: NextRequest) {
     if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
     const [row] = await sql`
       UPDATE inventory_reports SET status = ${status}
-      WHERE id = ${id} AND reported_by IN (SELECT id FROM users WHERE team_id = ${u.team_id})
+      WHERE id = ${id} AND team_id = ${u.team_id}
       RETURNING *`;
     if (!row) return NextResponse.json({ error: 'Hlášení nenalezeno' }, { status: 404 });
     return NextResponse.json(row);

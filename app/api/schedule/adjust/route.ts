@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       const [sh] = await sql`
         SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time FROM shifts s
         JOIN users u ON u.id = s.employee_id
-        WHERE s.id = ${shiftId} AND (s.team_id = ${c.teamId} OR u.team_id = ${c.teamId})`;
+        WHERE s.id = ${shiftId} AND s.team_id = ${c.teamId}`;
       if (!sh) continue;
       if (ch.action === 'remove') {
         await sql`DELETE FROM shifts WHERE id = ${shiftId}`;
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
   const shifts = await sql`
     SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time, s.type
     FROM shifts s JOIN users u ON u.id = s.employee_id
-    WHERE (s.team_id = ${c.teamId} OR u.team_id = ${c.teamId})
+    WHERE s.team_id = ${c.teamId}
       AND s.date >= ${month + '-01'} AND s.date <= ${month + '-31'}
     ORDER BY s.date ASC, s.start_time ASC`;
   const avail = await sql`

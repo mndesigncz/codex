@@ -42,9 +42,19 @@ export async function POST(request: Request) {
     : await sql`SELECT id, name FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
-  const existingUser = await sql`SELECT id FROM users WHERE email = ${email}`;
-  if (existingUser.length > 0) {
-    return NextResponse.json({ error: 'Uživatel s tímto emailem už existuje' }, { status: 409 });
+  // Existující účet jde pozvat do DALŠÍHO podniku (přijetí mu přidá členství).
+  // Nejde pozvat tablet ani hosta, a nejde pozvat někoho, kdo už tu je.
+  const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE email = ${email}`;
+  if (existingUser) {
+    if (existingUser.role === 'kiosk' || existingUser.role === 'customer') {
+      return NextResponse.json({ error: 'Tenhle e-mail patří tabletu nebo hostovi — do týmu ho pozvat nejde.' }, { status: 409 });
+    }
+    let uzClen = Number(existingUser.team_id) === Number(team.id);
+    try {
+      const [m] = await sql`SELECT 1 FROM team_members WHERE user_id = ${existingUser.id} AND team_id = ${team.id}`;
+      uzClen = uzClen || !!m;
+    } catch { /* před migrací */ }
+    if (uzClen) return NextResponse.json({ error: 'Tenhle člověk už v týmu je.' }, { status: 409 });
   }
 
   const token = generateInviteToken();

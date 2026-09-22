@@ -900,6 +900,73 @@ export async function GET(request: Request) {
     // stejně jako `require_read`, aby na to nemusela vzniknout další
     // obrazovka nastavení.
     await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS for_closing BOOLEAN DEFAULT FALSE`);
+
+    // ---- Organizace nad podniky ----
+    // Majitel víc podniků. Do téhle chvíle měl účet právě jeden tým
+    // (`users.team_id`) a e-mail byl globálně unikátní, takže druhý podnik
+    // znamenal druhý účet. Příslušnost teď drží `team_members` — jeden člověk,
+    // víc podniků, v každém vlastní role. `users.team_id` a `users.role`
+    // ZŮSTÁVAJÍ jako zrcadlo aktivního členství: 96 míst v API si tým čte
+    // odtud a přepisovat je najednou by bylo riskantnější než je nechat
+    // a přepínat zrcadlo na serveru po ověření členství (lib/tenant.ts).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS organizations (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        owner_id INTEGER NOT NULL,
+        settings JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS organization_id INTEGER`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS teams_organization ON teams (organization_id)`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS team_members (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        role TEXT NOT NULL DEFAULT 'employee',
+        job_title TEXT,
+        hourly_rate INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (user_id, team_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS team_members_team ON team_members (team_id)`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS active_team_id INTEGER`);
+    // Zpětné naplnění: každý, kdo má tým, je jeho členem se svou dnešní rolí.
+    // Idempotentní — ON CONFLICT nic nepřepíše, takže pozdější změna role
+    // v členství přežije každý další běh initu.
+    try {
+      await sql`
+        INSERT INTO team_members (user_id, team_id, role, job_title, hourly_rate)
+        SELECT id, team_id, role, job_title, hourly_rate FROM users
+        WHERE team_id IS NOT NULL AND role IN ('employer', 'employee')
+        ON CONFLICT (user_id, team_id) DO NOTHING`;
+      await sql`UPDATE users SET active_team_id = team_id WHERE active_team_id IS NULL AND team_id IS NOT NULL`;
+    } catch { /* best-effort */ }
+
+    // Řádek musí znát svůj podnik SÁM. Do téhle chvíle si ho několik tabulek
+    // odvozovalo z `users.team_id` autora — což byla pravda, dokud měl člověk
+    // jeden tým. Jakmile umí přepínat, jeho recepty, karty a směny by se
+    // stěhovaly s ním do podniku, ve kterém zrovna stojí. Sloupec + jednorázové
+    // naplnění z autora; dotazy se přepínají v tomtéž kole (lib/tenant.ts).
+    await ddl(sql`ALTER TABLE planning_cards ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE recipes ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE shift_requests ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE inventory_reports ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    await ddl(sql`ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS team_id INTEGER`);
+    try {
+      await sql`UPDATE planning_cards p SET team_id = u.team_id FROM users u WHERE p.team_id IS NULL AND u.id = p.created_by`;
+      await sql`UPDATE recipes r SET team_id = u.team_id FROM users u WHERE r.team_id IS NULL AND u.id = r.created_by`;
+      await sql`UPDATE shift_requests r SET team_id = u.team_id FROM users u WHERE r.team_id IS NULL AND u.id = r.employee_id`;
+      await sql`UPDATE inventory_reports r SET team_id = u.team_id FROM users u WHERE r.team_id IS NULL AND u.id = r.reported_by`;
+      await sql`UPDATE messages m SET team_id = u.team_id FROM users u WHERE m.team_id IS NULL AND u.id = m.sender_id`;
+      await sql`UPDATE daily_reports d SET team_id = u.team_id FROM users u WHERE d.team_id IS NULL AND u.id = d.created_by`;
+      // Směny a úkoly sloupec mají, ale starší řádky ho mají prázdný —
+      // a dotazy to dosud kryly přes `OR u.team_id`. Ta záplata odchází.
+      await sql`UPDATE shifts s SET team_id = u.team_id FROM users u WHERE s.team_id IS NULL AND u.id = s.employee_id`;
+      await sql`UPDATE tasks t SET team_id = u.team_id FROM users u WHERE t.team_id IS NULL AND u.id = COALESCE(t.assigned_to, t.created_by)`;
+    } catch { /* best-effort */ }
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS guide_reads (
         id SERIAL PRIMARY KEY,

@@ -8,6 +8,7 @@ import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
 import { generateJoinCode } from './team';
 import { jeSpravcePodleDb } from './superadminDb';
+import { zajistiClenstvi } from './tenant';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -70,6 +71,9 @@ export const authOptions: NextAuthOptions = {
         if (user.role === 'employer') {
           teamId = await ensureEmployerTeam(user.id, user.name, teamId);
         }
+        // Členství v podniku (kolo 55): kdo má tým z doby před migrací, dostane
+        // řádek v team_members — přepínač podniků ho jinak nevidí.
+        await zajistiClenstvi(user.id, teamId, user.role);
         // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
         // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
         const superadmin = await jeSpravcePodleDb(user.id);

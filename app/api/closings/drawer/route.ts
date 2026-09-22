@@ -54,7 +54,7 @@ export async function GET() {
       const smeny = await sql`
         SELECT DISTINCT s.date, s.auto_created
         FROM shifts s JOIN users us ON us.id = s.employee_id
-        WHERE us.team_id = ${u.team_id} AND s.date > ${od} AND s.date < ${dnes}
+        WHERE s.team_id = ${u.team_id} AND s.date > ${od} AND s.date < ${dnes}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc
             WHERE cc.team_id = ${u.team_id} AND COALESCE(cc.shift_date, cc.date) = s.date

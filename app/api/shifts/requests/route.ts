@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     // An employee only ever sees their own requests, whatever they ask for.
     if (me.role !== 'employer') {
       const rows = await sql`
-        SELECT * FROM shift_requests WHERE employee_id = ${me.meId} ORDER BY created_at DESC`;
+        SELECT * FROM shift_requests WHERE employee_id = ${me.meId} AND team_id = ${me.teamId} ORDER BY created_at DESC`;
       return NextResponse.json(rows);
     }
 
@@ -43,13 +43,11 @@ export async function GET(req: NextRequest) {
     const rows = Number.isFinite(asked)
       ? await sql`
           SELECT r.* FROM shift_requests r
-          JOIN users u ON u.id = r.employee_id
-          WHERE u.team_id = ${me.teamId} AND r.employee_id = ${asked}
+          WHERE r.team_id = ${me.teamId} AND r.employee_id = ${asked}
           ORDER BY r.created_at DESC`
       : await sql`
           SELECT r.* FROM shift_requests r
-          JOIN users u ON u.id = r.employee_id
-          WHERE u.team_id = ${me.teamId}
+          WHERE r.team_id = ${me.teamId}
           ORDER BY r.created_at DESC`;
     return NextResponse.json(rows);
   } catch {
@@ -85,8 +83,8 @@ export async function POST(req: NextRequest) {
     }
 
     const [row] = await sql`
-      INSERT INTO shift_requests (employee_id, request_type, date, note, status)
-      VALUES (${employeeId}, ${requestType}, ${date}, ${note}, 'pending')
+      INSERT INTO shift_requests (employee_id, request_type, date, note, status, team_id)
+      VALUES (${employeeId}, ${requestType}, ${date}, ${note}, 'pending', ${me.teamId})
       RETURNING *`;
     return NextResponse.json(row);
   } catch {

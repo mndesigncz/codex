@@ -31,8 +31,7 @@ export async function GET() {
   try {
     const rows = await sql`
       SELECT r.* FROM recipes r
-      JOIN users u ON u.id = r.created_by
-      WHERE u.team_id = ${me.teamId}
+      WHERE r.team_id = ${me.teamId}
       ORDER BY r.created_at DESC`;
     return NextResponse.json(rows);
   } catch {
@@ -57,8 +56,8 @@ export async function POST(req: NextRequest) {
     const prepTime = Number.isFinite(Number(body.prepTime)) ? Math.max(0, Number(body.prepTime)) : 5;
 
     const [row] = await sql`
-      INSERT INTO recipes (name, description, ingredients, instructions, prep_time, created_by)
-      VALUES (${name}, ${description}, ${ingredients}, ${instructions}, ${prepTime}, ${me.meId})
+      INSERT INTO recipes (name, description, ingredients, instructions, prep_time, created_by, team_id)
+      VALUES (${name}, ${description}, ${ingredients}, ${instructions}, ${prepTime}, ${me.meId}, ${me.teamId})
       RETURNING *`;
     return NextResponse.json(row);
   } catch {

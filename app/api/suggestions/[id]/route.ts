@@ -69,8 +69,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const [full] = await sql`SELECT title, content FROM suggestions WHERE id = ${id}`;
     if (!full) return NextResponse.json({ error: 'Podnět nenalezen' }, { status: 404 });
     await sql`
-      INSERT INTO planning_cards (title, description, "column", position, created_by)
-      VALUES (${full.title}, ${full.content ?? null}, 'ideas', 0, ${c.meId})`;
+      INSERT INTO planning_cards (title, description, "column", position, created_by, team_id)
+      VALUES (${full.title}, ${full.content ?? null}, 'ideas', 0, ${c.meId}, ${c.teamId})`;
     await sql`UPDATE suggestions SET status = 'planned' WHERE id = ${id} AND team_id = ${c.teamId}`;
     return NextResponse.json({ ok: true });
   }

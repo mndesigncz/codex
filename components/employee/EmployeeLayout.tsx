@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
+import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
@@ -142,6 +143,10 @@ export default function EmployeeLayout({ user }: Props) {
               <p className="t-label text-black/40 mt-0.5">Portál zaměstnance</p>
             </div>
           )}
+        </div>
+        {/* Barista, který jezdí mezi pobočkami, si tu vybere, kde dnes je. */}
+        <div className={`border-b border-black/[0.07] ${sidebarOpen ? 'px-2 py-1.5' : 'px-1 py-1.5'}`}>
+          <PodnikSwitcher compact={!sidebarOpen} />
         </div>
         <nav className="flex-1 py-3 space-y-0.5 px-3 overflow-y-auto scrollbar-thin">
           {navSections.map((sec, si) => {
