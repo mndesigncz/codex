@@ -161,3 +161,7 @@ jobs:
       # prostě nenašla a myslela si, že tam není.
       - name: Hledání s diakritikou
         run: node scripts/check-hledani.mjs
+      # Menu a popover na `.glass` (4% tón bez pozadí) nechaly prosvítat
+      # navigaci pod sebou. Plovoucí panel patří na `.glass-strong`.
+      - name: Plovoucí panely s pozadím
+        run: node scripts/check-floating-glass.mjs

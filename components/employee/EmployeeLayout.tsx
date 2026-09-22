@@ -177,7 +177,7 @@ export default function EmployeeLayout({ user }: Props) {
         </nav>
         <div className="p-3 border-t border-black/[0.07] relative">
           {accountOpen && (
-            <div className="absolute left-3 right-3 bottom-full mb-2 glass rounded-2xl p-1.5 shadow-[0_10px_30px_rgba(25,35,15,0.14)]">
+            <div className="absolute left-3 right-3 bottom-full mb-2 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] pop-in origin-bottom">
               <button onClick={openSettings} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
                 <Icon name="settings" size={18} /> Nastavení
               </button>
