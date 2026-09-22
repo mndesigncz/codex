@@ -872,6 +872,13 @@ export async function GET(request: Request) {
     // na postup.
     await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_id TEXT`);
     await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS product_name TEXT`);
+    // Druhá vazba, opačným směrem: návod patří ke skladové položce, kterou si
+    // vyrábíme sami. `product_id` říká „tohle se z toho prodává“, `item_id`
+    // říká „takhle se to vyrábí“. Postup výroby se do téhle chvíle psal jako
+    // holý text do `inventory_items.batch_steps` — bez kategorií, bez
+    // schvalování, bez potvrzení o přečtení a neviditelný ze záložky Návody.
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS item_id INTEGER`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS guides_item_idx ON guides (item_id)`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS guide_reads (
         id SERIAL PRIMARY KEY,

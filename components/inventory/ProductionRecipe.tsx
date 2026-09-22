@@ -8,11 +8,12 @@
 // položky vedle „Používá se v kase", protože je to druhá strana téže mince:
 // tam se říká, co se z položky prodává, tady, z čeho se položka dělá.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { obsahuje } from '@/lib/hledani';
+import ProductionGuideLink from './ProductionGuideLink';
 
 export interface RecipeLine {
   ingredientId: number; name: string; amount: number; unit: string;
@@ -23,6 +24,8 @@ export interface ProductionInfo {
   madeInHouse: boolean; batchYield: number | null; batchSteps: string;
   productionLabel: string; taskTitle: string; status: string; batches: number;
   ingredients: RecipeLine[];
+  /** Návod připnutý k téhle položce — z něj jdou kroky do úkolu „Vyrobit X“. */
+  guideId?: number | null; guideTitle?: string | null; guideSteps?: number;
 }
 type Pickable = { id: number; name: string; unit: string; contentUnit?: string | null; packageSize?: number | null; category?: string };
 
@@ -49,19 +52,30 @@ export default function ProductionRecipe({ item, items, onSaved }: {
   const [err, setErr] = useState('');
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    fetch(`/api/inventory/${item.id}/production`).then(okJson).then(d => {
-      if (!alive || !d || d.error) return;
+  const nacti = useCallback((alive: () => boolean, jenNavod = false) => {
+    return fetch(`/api/inventory/${item.id}/production`).then(okJson).then(d => {
+      if (!alive() || !d || d.error) return;
       setInfo(d);
+      // Po změně vazby na návod se přepisuje jen `info` — rozepsané pole
+      // s postupem nebo výtěžností by se jinak přetáhlo zpátky na to, co je
+      // na serveru, a člověk by přišel o to, co právě napsal.
+      if (jenNavod) return;
       setOn(!!d.madeInHouse);
       setYieldStr(d.batchYield != null ? fmt(d.batchYield) : '');
       setLabel(d.productionLabel ?? '');
       setSteps(d.batchSteps ?? '');
       setLines((d.ingredients ?? []).map((l: RecipeLine) => ({ ingredientId: l.ingredientId, name: l.name, unit: l.unit, amount: fmt(l.amount) })));
     }).catch(() => {});
-    return () => { alive = false; };
   }, [item.id]);
+
+  useEffect(() => {
+    let alive = true;
+    nacti(() => alive);
+    return () => { alive = false; };
+  }, [nacti]);
+
+  const nactiZnovu = () => { nacti(() => true, true); };
+  const maNavodSKroky = !!info?.guideId && (info.guideSteps ?? 0) > 0;
 
   const unitOf = (p: Pickable) => (Number(p.packageSize) > 0 ? (p.contentUnit ?? p.unit) : p.unit);
   const found = useMemo(() => {
@@ -185,10 +199,28 @@ export default function ProductionRecipe({ item, items, onSaved }: {
             </div>
           </div>
 
+          {/* Návod bije text níž: má kategorii, schválení i potvrzení přečtení
+              a je vidět i ze záložky Návody. Textové pole zůstává pro postupy,
+              kolem kterých se návod psát nikomu nevyplatí. */}
+          <ProductionGuideLink
+            itemId={item.id} itemName={item.name}
+            guideId={info?.guideId ?? null} guideTitle={info?.guideTitle ?? null}
+            guideSteps={info?.guideSteps ?? 0}
+            onChanged={nactiZnovu}
+          />
+
           <div>
-            <label className="field-label">Postup (řádek = krok v úkolu)</label>
+            <label className="field-label">
+              {maNavodSKroky ? 'Postup (návod ho přebíjí)' : 'Postup (řádek = krok v úkolu)'}
+            </label>
             <textarea value={steps} onChange={e => setSteps(e.target.value)} onBlur={() => save()} rows={3}
               placeholder={'Nakrájet citrony\nSvařit sirup s vodou\nNechat vychladnout a stočit'} className="field resize-none text-sm" />
+            {maNavodSKroky && (
+              <p className="text-[11px] text-black/45 mt-1">
+                Kroky do úkolu jdou z návodu „{info?.guideTitle}“. Tenhle text zůstane uložený,
+                ale obsluha ho neuvidí — použije se, až vazbu na návod zrušíš.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 text-[11px] text-black/45">

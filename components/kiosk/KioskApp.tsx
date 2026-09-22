@@ -68,6 +68,9 @@ function KioskShell({ user }: { user: KioskUser }) {
   const newOrders = Number(inbox.d?.newCount ?? 0);
   // Home-screen shortcut: jump to the stock tab with the entry form already open.
   const [wantStockEntry, setWantStockEntry] = useState(false);
+  // Úkol „Vyrobit limonádu“ s návodem musí na tabletu otevřít ten návod,
+  // ne jen přepnout na záložku Návody — u baru se nehledá v seznamu.
+  const [wantGuide, setWantGuide] = useState<number | null>(null);
   const now = useNow();
   // The real kiosk session user — used where the surface is shared/read-only.
   const kioskUser = { id: user.id ?? 0, name: user.name, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;
@@ -144,7 +147,11 @@ function KioskShell({ user }: { user: KioskUser }) {
           the active person's account. */}
       {tab !== 'shift' && (
         <KioskShiftGate>
-          {tab === 'tasks' && <main className="flex-1 mt-5"><KioskTasks /></main>}
+          {tab === 'tasks' && (
+            <main className="flex-1 mt-5">
+              <KioskTasks onOpenGuide={id => { setWantGuide(id); setTab('guides'); }} />
+            </main>
+          )}
           {tab === 'procedures' && (
             <WhoFirst>
               <main className="flex-1 mt-2 -mx-1"><Procedures user={actingUser} /></main>
@@ -159,7 +166,11 @@ function KioskShell({ user }: { user: KioskUser }) {
           )}
           {tab === 'orders' && <main className="flex-1 mt-5"><StaffInbox /></main>}
           {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
-          {tab === 'guides' && <main className="flex-1 mt-2 -mx-1"><Guides user={kioskUser} ticksFor={active?.id ?? null} /></main>}
+          {tab === 'guides' && (
+            <main className="flex-1 mt-2 -mx-1">
+              <Guides user={kioskUser} ticksFor={active?.id ?? null} openGuideId={wantGuide} />
+            </main>
+          )}
         </KioskShiftGate>
       )}
 

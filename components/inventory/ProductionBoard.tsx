@@ -17,6 +17,8 @@ export interface ToMake {
   taskId: number; title: string; priority: string; status: string;
   item: { id: number; name: string; unit: string; status: string; quantity: number; available: number; recipeUnit: string };
   batches: number; yieldTotal: number; batchYield: number | null; steps: string | null;
+  /** Návod připnutý k položce — postup pak nečte z `steps`, ale z něj. */
+  guideId?: number | null; guideTitle?: string | null;
   lines: { ingredientId: number; name: string; amount: number; unit: string; available: number; need: number; missing: number }[];
   missing: number[]; ready: boolean;
 }
@@ -170,8 +172,19 @@ export default function ProductionBoard({ compact = false, onOpenTasks, onChange
                       ))}
                     </div>
                   )}
-                  {e.steps && <p className="text-[13px] text-black/60 whitespace-pre-wrap">{e.steps}</p>}
-                  {e.lines.length === 0 && !e.steps && <p className="text-[13px] text-black/45">Bez receptury — vedení ji nastaví u položky ve skladu.</p>}
+                  {/* Návod má přednost před textem: je schválený, má kroky
+                      a dá se u něj potvrdit přečtení. */}
+                  {e.guideId ? (
+                    <a href={`?view=guides&guide=${e.guideId}`}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent font-semibold px-4 py-2 text-[13px] hover:brightness-110 transition">
+                      <Icon name="book" size={14} />
+                      {e.guideTitle ? `Návod: ${e.guideTitle}` : 'Otevřít návod'}
+                    </a>
+                  ) : e.steps ? (
+                    <p className="text-[13px] text-black/60 whitespace-pre-wrap">{e.steps}</p>
+                  ) : e.lines.length === 0 ? (
+                    <p className="text-[13px] text-black/45">Bez receptury — vedení ji nastaví u položky ve skladu.</p>
+                  ) : null}
                 </div>
               )}
             </li>

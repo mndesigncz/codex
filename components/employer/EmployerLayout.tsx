@@ -143,10 +143,16 @@ export default function EmployerLayout({ user }: Props) {
   // s poslední nepřečtenou zprávou. Bez toho vedl každý proklik jen na
   // seznam a člověk musel vlákno najít znovu sám.
   const [chatConvId, setChatConvId] = useState<number | null>(null);
+  // Proklik na KONKRÉTNÍ návod. Odkaz `?view=guides&guide=12` se generoval
+  // z receptur už dřív, ale `guide` nikdo nečetl — člověk skončil na seznamu
+  // návodů a hledal ten svůj znovu ručně. Teď na něj míří i úkol „Vyrobit X“,
+  // takže mrtvý odkaz by byl vidět mnohem víc.
+  const [guideId, setGuideId] = useState<number | null>(null);
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
+    setGuideId(view === 'guides' && arg ? Number(arg) : null);
     // Rada, která říká „nastav to v Nastavení → Pokladna", musí umět
     // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
     // hledal dál sám.
@@ -155,8 +161,11 @@ export default function EmployerLayout({ user }: Props) {
   };
   // Deep links from notifications and old bookmarks: /employer/overview?view=X
   useEffect(() => {
-    const v = new URLSearchParams(window.location.search).get('view');
+    const p = new URLSearchParams(window.location.search);
+    const v = p.get('view');
     if (v && (byId[v] || v === 'settings' || v === 'team-settings')) setCurrentView(v);
+    const g = Number(p.get('guide'));
+    if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   // Chat byl na telefonu jediná ikona v docku, která nikdy nedala vědět,
@@ -189,7 +198,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
       case 'chat':      return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'procedures': return <Procedures user={user as any} />;
-      case 'guides':    return <Guides user={user as any} />;
+      case 'guides':    return <Guides user={user as any} openGuideId={guideId} />;
       case 'planning':  return <PlanningBoard />;
       case 'events':    return <EventsView user={user as any} />;
       case 'tasks':     return <TaskManager user={user as any} />;

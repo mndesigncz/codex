@@ -29,6 +29,7 @@ interface Task {
   completedByName?: string | null;
   completedByAvatar?: string | null;
   source?: string | null;
+  sourceMeta?: { guideId?: number | null; guideTitle?: string | null } | null;
 }
 interface Member { id: number; name: string; role: string; avatar?: string }
 
@@ -266,6 +267,15 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </span>
               {t.source === 'production' && (
                 <span className="chip chip-sm chip-info shrink-0" title="Vzniká sám, když dochází vlastní výroba">Výroba</span>
+              )}
+              {/* Vedení odsud vidí, podle čeho obsluha vyrábí — a jedním
+                  ťuknutím je v tom návodu. */}
+              {t.sourceMeta?.guideId && (
+                <a href={`/employer/overview?view=guides&guide=${t.sourceMeta.guideId}`}
+                  className="chip chip-sm bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 transition shrink-0"
+                  title={t.sourceMeta.guideTitle ?? 'Otevřít návod'}>
+                  {t.sourceMeta.guideTitle ?? 'Návod'}
+                </a>
               )}
               {recurrenceLabel(t.recurrence) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>

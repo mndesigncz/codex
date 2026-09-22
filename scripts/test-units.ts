@@ -21,6 +21,8 @@ import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
 import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week.ts';
 import { denPrichodu } from '../lib/businessDay.ts';
 import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
+import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
+import { describe as popisUkolu } from '../lib/productionPlan.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
 import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
 import { rozhodni } from '../lib/blokace.ts';
@@ -596,6 +598,62 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('hledání: přes víc polí — trefa ve druhém', obsahujeNekde('makro', 'Mléko', 'Makro s.r.o.'), true);
   eq('hledání: přes víc polí — nikde', obsahujeNekde('lidl', 'Mléko', 'Makro s.r.o.'), false);
   eq('hledání: přes víc polí — prázdné pole nevadí', obsahujeNekde('mleko', 'Mléko', null, undefined), true);
+
+  // ---- Návod připnutý ke skladové položce -------------------------------
+  // Postup výroby se dřív psal jako holý text k položce. Vazba na návod
+  // rozhoduje o tom, co uvidí obsluha v úkolu „Vyrobit X" — takže když se
+  // tahle logika splete, pracuje se podle špatného postupu.
+  eq('návod: řádek bez item_id se ignoruje',
+    navodyPodlePolozek([{ id: 1, title: 'A', checklist: [], item_id: null }]).size, 0);
+  eq('návod: kroky se normalizují ze starého pole řetězců',
+    krokyNavodu(navodZRadku({ id: 1, title: 'A', checklist: ['Uvařit', ' Stočit '] })), ['Uvařit', 'Stočit']);
+  eq('návod: checklist uložený jako text projde taky',
+    krokyNavodu(navodZRadku({ id: 1, title: 'A', checklist: '[{"text":"Uvařit"}]' })), ['Uvařit']);
+  eq('návod: rozbitý JSON nespadne, jen nemá kroky',
+    krokyNavodu(navodZRadku({ id: 1, title: 'A', checklist: '{nevalidní' })), []);
+  eq('návod: prázdný krok se zahodí',
+    krokyNavodu(navodZRadku({ id: 1, title: 'A', checklist: [{ text: 'Uvařit' }, { text: '   ' }] })), ['Uvařit']);
+  {
+    // Dva návody na jednu položku: vyhrát musí schválený. Nepotvrzený návrh
+    // od zaměstnance nesmí obsluze přebít postup, který vedení schválilo.
+    const m = navodyPodlePolozek([
+      { id: 5, title: 'Návrh', checklist: [], item_id: 3, approved: false },
+      { id: 9, title: 'Schválený', checklist: [], item_id: 3, approved: true },
+    ]);
+    eq('návod: schválený bije nepotvrzený návrh', m.get(3)?.title, 'Schválený');
+  }
+  {
+    // Mezi stejně schválenými rozhoduje nižší id — ten, co tam byl dřív.
+    const m = navodyPodlePolozek([
+      { id: 9, title: 'Novější', checklist: [], item_id: 3, approved: true },
+      { id: 5, title: 'Starší', checklist: [], item_id: 3, approved: true },
+    ]);
+    eq('návod: mezi schválenými vyhraje starší', m.get(3)?.title, 'Starší');
+  }
+  {
+    const m = navodyPodlePolozek([
+      { id: 1, title: 'Limonáda', checklist: [{ text: 'Svařit' }], item_id: 4 },
+      { id: 2, title: 'Ice tea', checklist: [], item_id: 7 },
+    ]);
+    eq('návod: dvě položky, dva návody', m.size, 2);
+    eq('návod: kroky dojdou ke správné položce', krokyNavodu(m.get(4)), ['Svařit']);
+  }
+
+  // ---- Postup v úkolu: návod bije holý text -----------------------------
+  {
+    const polozka = { name: 'Limonáda', unit: 'l', batchSteps: 'Starý postup\nDruhý řádek' } as any;
+    const plan = { item: polozka, batches: 1, yieldTotal: 0, lines: [], missing: [] } as any;
+    eq('úkol: bez návodu se použije text u položky',
+      checklistFor(plan).map(k => k.text), ['Starý postup', 'Druhý řádek']);
+    eq('úkol: návod s kroky text přebije',
+      checklistFor(plan, { id: 1, title: 'N', steps: ['Z návodu'] }).map(k => k.text), ['Z návodu']);
+    eq('úkol: návod bez kroků text nepřebije',
+      checklistFor(plan, { id: 1, title: 'N', steps: [] }).map(k => k.text), ['Starý postup', 'Druhý řádek']);
+    ok('úkol: popis jmenuje návod, podle kterého se pracuje',
+      popisUkolu(plan, { id: 1, title: 'Domácí limonáda', steps: ['Z návodu'] }).includes('Domácí limonáda'));
+    ok('úkol: popis bez návodu jmenuje jen „Postup"',
+      popisUkolu(plan).includes('Postup:'));
+  }
 
   // Správce platformy: kdo to je — id účtu, ne e-mail.
   eq('správce: id z prostředí, čárka/mezera/středník', superadminIds(' 7, 12;300  '), [7, 12, 300]);

@@ -22,6 +22,7 @@ interface Task {
   assigneeAvatar?: string | null;
   completedByName?: string | null;
   source?: string | null;
+  sourceMeta?: { guideId?: number | null; guideTitle?: string | null } | null;
 }
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
@@ -29,7 +30,7 @@ type Filter = 'all' | 'mine' | 'open' | 'done';
 const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 const todayStr = () => pragueToday();
 
-export default function KioskTasks() {
+export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number) => void }) {
   const { active, requireActive } = useKioskShift();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,6 +128,15 @@ export default function KioskTasks() {
               {t.title}
             </p>
             {t.source === 'production' && !isDone && <span className="chip chip-sm chip-info mt-1">Výroba · odškrtnutí naskladní dávku</span>}
+            {/* Postup je v návodu, ne v popisu úkolu. U baru je rozdíl mezi
+                „přepni na Návody a najdi si to" a jedním ťuknutím zásadní. */}
+            {!isDone && t.sourceMeta?.guideId && onOpenGuide && (
+              <button type="button" onClick={() => onOpenGuide(Number(t.sourceMeta!.guideId))}
+                className="mt-1.5 inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent font-semibold px-4 min-h-[44px] text-sm active:scale-[0.97] transition">
+                <Icon name="book" size={16} />
+                {t.sourceMeta.guideTitle ? `Návod: ${t.sourceMeta.guideTitle}` : 'Otevřít návod'}
+              </button>
+            )}
             {t.description && !isDone && <p className="text-sm text-black/50 mt-1 whitespace-pre-wrap">{t.description}</p>}
             <p className="text-xs text-black/40 mt-1.5 truncate">
               {t.teamTask || t.assignedTo == null ? 'Kdokoliv' : `${t.assigneeAvatar ?? '👤'} ${t.assigneeName ?? ''}`}

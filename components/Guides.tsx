@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Icon } from './Icons';
 import { EmptyState, Button, PageHeader , SearchField, ApproveAllBar, runBulk, ErrorState } from './ui';
 import StepTimeline from './procedures/StepTimeline';
@@ -8,6 +8,7 @@ import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
+import GuideItemLink from './guides/GuideItemLink';
 import { useModal } from '@/lib/useModal';
 import { clickable } from '@/lib/clickable';
 import { okJson, apiMessage } from '@/lib/api';
@@ -125,7 +126,12 @@ function renderInline(text: string) {
   });
 }
 
-export default function Guides({ user, ticksFor }: { user: User; ticksFor?: number | null }) {
+export default function Guides({ user, ticksFor, openGuideId }: {
+  user: User;
+  ticksFor?: number | null;
+  /** Otevřít rovnou tenhle návod — proklik z receptury, ze skladu nebo z úkolu. */
+  openGuideId?: number | null;
+}) {
   const isEmployer = user.role === 'employer';
   const [approvingAll, setApprovingAll] = useState(false);
   const [approveNote, setApproveNote] = useState('');
@@ -223,6 +229,19 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
       setReaderLoading(false);
     }
   };
+
+  // Proklik na konkrétní návod otevře rovnou čtečku. Odkaz
+  // `?view=guides&guide=12` se z receptur generoval už dřív, ale nikdo ho
+  // nečetl — člověk skončil na seznamu a svůj návod hledal znovu ručně.
+  // Ref hlídá, aby se čtečka po zavření sama znovu neotevřela.
+  const otevrenoZOdkazu = useRef<number | null>(null);
+  useEffect(() => {
+    if (!openGuideId || otevrenoZOdkazu.current === openGuideId) return;
+    otevrenoZOdkazu.current = openGuideId;
+    openReader(openGuideId);
+    // openReader má při každém renderu jinou identitu; hlídá to ref výš.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openGuideId]);
 
   const createDefaults = async () => {
     setCreatingCat(true);
@@ -524,6 +543,17 @@ export default function Guides({ user, ticksFor }: { user: User; ticksFor?: numb
                     Aktualizováno {formatDate(reader.updatedAt)}
                   </p>
                 )}
+                {/* Že podle návodu vzniká konkrétní věc ve skladu, je při čtení
+                    důležité: obsluha pak ví, že odškrtání kroků má dopad
+                    na zásobu, a ne že si jen něco přečetla. */}
+                {(reader as any).itemName && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#0A84FF]/[0.09] border border-[#0A84FF]/20 px-3 py-1 text-xs text-[#0A5CC0]">
+                    <Icon name="leaf" size={12} />
+                    {(reader as any).itemMadeInHouse
+                      ? `Vyrábíme podle něj: ${(reader as any).itemName}`
+                      : `Položka ${(reader as any).itemName} už není vlastní výroba`}
+                  </p>
+                )}
                 {(() => {
                   const summary = guides.find(g => g.id === reader.id);
                   if (!summary) return null;
@@ -770,6 +800,9 @@ function GuideEditor({
   // Návod patří k položce v kase; z jeho surovin se pak dá složit receptura.
   const [productId, setProductId] = useState<string | null>((editing as any)?.productId ?? null);
   const [productName, setProductName] = useState<string | null>((editing as any)?.productName ?? null);
+  // A druhým směrem: podle kterého návodu se položka vyrábí. Postup výroby
+  // se do téhle chvíle psal jako holý text u skladové položky.
+  const [itemId, setItemId] = useState<number | null>((editing as any)?.itemId ?? null);
   const [alsoRecipe, setAlsoRecipe] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
@@ -807,7 +840,7 @@ function GuideEditor({
     setSaving(true);
     setError('');
     const checklist = normalizeSteps(steps);
-    const payload = { title: title.trim(), content, categoryId, checklist, productId, productName };
+    const payload = { title: title.trim(), content, categoryId, checklist, productId, productName, itemId };
     const res = editing
       ? await fetch(`/api/guides/${editing.id}`, {
           method: 'PATCH',
@@ -905,6 +938,10 @@ function GuideEditor({
             productId={productId} productName={productName}
             onPick={(id, name) => { setProductId(id); setProductName(name); }}
           />
+
+          {/* Opačný směr: co se podle návodu vyrábí. Odsud si úkol „Vyrobit X“
+              vezme kroky místo odstavce textu u skladové položky. */}
+          <GuideItemLink itemId={itemId} items={items} onPick={setItemId} />
 
           {/* Checklist builder */}
           <div>

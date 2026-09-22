@@ -21,6 +21,7 @@ interface Task {
   completedByName?: string | null;
   checklist?: ChecklistItem[];
   source?: string | null;
+  sourceMeta?: { guideId?: number | null; guideTitle?: string | null } | null;
 }
 
 interface Props {
@@ -152,6 +153,16 @@ export default function Tasks({ user }: Props) {
               )}
               {task.source === 'production' && (
                 <span className="chip chip-sm chip-info" title="Odškrtnutí naskladní dávku a odepíše suroviny"><Icon name="leaf" size={12} className="inline -mt-0.5 mr-1 shrink-0" /> Výroba</span>
+              )}
+              {/* Postup bydlí v návodu — odsud se na něj dá dostat jedním
+                  ťuknutím místo hledání v seznamu návodů. */}
+              {task.sourceMeta?.guideId && (
+                <a href={`/employee/shifts?view=guides&guide=${task.sourceMeta.guideId}`}
+                  className="chip chip-sm bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 transition"
+                  title={task.sourceMeta.guideTitle ?? 'Otevřít návod'}>
+                  <Icon name="book" size={12} className="inline -mt-0.5 mr-1 shrink-0" />
+                  {task.sourceMeta.guideTitle ?? 'Návod'}
+                </a>
               )}
               {task.teamTask && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/15 text-[#0A5CC0] px-2 py-0.5 text-[11px] font-semibold"><Icon name="calendar" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro kohokoliv</span>
