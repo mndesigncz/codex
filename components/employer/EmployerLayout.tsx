@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
+import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
@@ -285,6 +286,11 @@ export default function EmployerLayout({ user }: Props) {
               <p className="t-label text-black/40 mt-0.5">Správa podniku</p>
             </div>
           )}
+        </div>
+        {/* Který podnik právě spravuju. Do kola 55 tu název podniku nebyl
+            vůbec — s jedním to nevadilo, s třemi je to první otázka. */}
+        <div className={`border-b border-black/[0.07] ${sidebarOpen ? 'px-2 py-1.5' : 'px-1 py-1.5'}`}>
+          <PodnikSwitcher compact={!sidebarOpen} canCreate />
         </div>
         {/* Šestnáct položek se na notebooku s 900 px na výšku nevejde. Dřív se
             poslední („Nápady") prostě uřízla a nic nenaznačilo, že se rail

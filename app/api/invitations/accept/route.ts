@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { linkNewMember } from '@/lib/chat';
 import { notifyUser } from '@/lib/push';
+import { pridejClenstvi } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,8 +33,28 @@ export async function POST(request: Request) {
     const [team] = await sql`SELECT id, owner_id FROM teams WHERE id = ${inv.team_id}`;
     if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
-    const existing = await sql`SELECT id FROM users WHERE email = ${inv.email}`;
-    if (existing.length > 0) return NextResponse.json({ error: 'Účet už existuje' }, { status: 409 });
+    // Existující účet se do dalšího podniku PŘIDÁ jako člen — nezakládá se
+    // znovu (e-mail je unikátní) a nevrací se 409. Přesně tohle je majitel
+    // druhé kavárny nebo barista, který jezdí mezi pobočkami. Heslo se
+    // ověřuje, aby pozvánka v cizí schránce nešla přijmout za někoho jiného.
+    const [existing] = await sql`SELECT id, name, password_hash FROM users WHERE email = ${inv.email}`;
+    if (existing) {
+      const ok = await bcrypt.compare(password, String(existing.password_hash ?? ''));
+      if (!ok) return NextResponse.json({ error: 'Účet s tímhle e-mailem už existuje — zadej jeho heslo.' }, { status: 409 });
+      if (await memberLimitHit(sql, inv.team_id)) {
+        return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
+      }
+      await pridejClenstvi(Number(existing.id), Number(team.id), inv.role === 'employer' ? 'employer' : 'employee', { jobTitle: inv.job_title || null });
+      await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
+      try { await linkNewMember(sql, team.id, team.owner_id, Number(existing.id)); } catch { /* chat je volitelný */ }
+      notifyUser(team.owner_id, {
+        title: 'Pozvánka přijata',
+        body: `${existing.name} se připojil/a do týmu — už má účet, přibylo mu členství.`,
+        type: 'invite',
+        link: '/employer/overview?view=team-settings',
+      }).catch(() => {});
+      return NextResponse.json({ ok: true, user: { id: existing.id, name: existing.name, email: inv.email }, existingAccount: true });
+    }
 
     const passwordHash = await bcrypt.hash(password, 12);
     const newRole = inv.role === 'employer' ? 'employer' : 'employee';
@@ -47,6 +68,7 @@ export async function POST(request: Request) {
       RETURNING id, name, email, role`;
 
     await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
+    await pridejClenstvi(Number(user.id), Number(team.id), newRole, { jobTitle: inv.job_title || null }).catch(() => {});
     await linkNewMember(sql, team.id, team.owner_id, user.id);
 
     notifyUser(team.owner_id, {

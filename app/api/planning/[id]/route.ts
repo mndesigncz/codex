@@ -27,8 +27,7 @@ async function employerTeam() {
 async function ownedByTeam(id: number, teamId: number) {
   const [row] = await sql`
     SELECT p.id FROM planning_cards p
-    JOIN users u ON u.id = p.created_by
-    WHERE p.id = ${id} AND u.team_id = ${teamId}`;
+    WHERE p.id = ${id} AND p.team_id = ${teamId}`;
   return !!row;
 }
 

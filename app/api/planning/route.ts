@@ -24,8 +24,7 @@ export async function GET() {
 
   const cards = await sql`
     SELECT p.* FROM planning_cards p
-    JOIN users u ON u.id = p.created_by
-    WHERE u.team_id = ${c.teamId}
+    WHERE p.team_id = ${c.teamId}
     ORDER BY p.position ASC, p.created_at ASC`;
   return NextResponse.json(cards);
 }
@@ -40,8 +39,8 @@ export async function POST(req: NextRequest) {
   if (!title) return NextResponse.json({ error: 'Chybí název karty' }, { status: 400 });
 
   const [card] = await sql`
-    INSERT INTO planning_cards (title, description, "column", position, created_by)
-    VALUES (${title}, ${body.description ?? null}, ${body.column ?? 'ideas'}, ${body.position ?? 0}, ${c.meId})
+    INSERT INTO planning_cards (title, description, "column", position, created_by, team_id)
+    VALUES (${title}, ${body.description ?? null}, ${body.column ?? 'ideas'}, ${body.position ?? 0}, ${c.meId}, ${c.teamId})
     RETURNING *`;
   return NextResponse.json(card);
 }

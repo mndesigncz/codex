@@ -133,8 +133,6 @@ export async function GET() {
           LEFT JOIN users u ON u.id = t.assigned_to
           LEFT JOIN users cu ON cu.id = t.completed_by
           WHERE t.team_id = ${c.teamId}
-             OR t.assigned_to IN (SELECT id FROM users WHERE team_id = ${c.teamId})
-             OR t.created_by = ${c.meId}
           ORDER BY (t.status = 'done'), t.due_date ASC NULLS LAST, t.created_at DESC`
       : await sql`
           SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar,
@@ -142,8 +140,8 @@ export async function GET() {
           FROM tasks t
           LEFT JOIN users u ON u.id = t.assigned_to
           LEFT JOIN users cu ON cu.id = t.completed_by
-          WHERE t.assigned_to = ${c.meId}
-             OR (t.assigned_to IS NULL AND t.team_id = ${c.teamId})
+          WHERE t.team_id = ${c.teamId}
+            AND (t.assigned_to = ${c.meId} OR t.assigned_to IS NULL)
           ORDER BY (t.status = 'done'), t.due_date ASC NULLS LAST, t.created_at DESC`;
     return NextResponse.json(rows.map(shape));
   } catch {
@@ -152,7 +150,7 @@ export async function GET() {
       ? await sql`
           SELECT t.*, u.name AS assignee_name, u.avatar AS assignee_avatar FROM tasks t
           JOIN users u ON u.id = t.assigned_to
-          WHERE u.team_id = ${c.teamId} OR t.created_by = ${c.meId}
+          WHERE u.team_id = ${c.teamId}
           ORDER BY t.created_at DESC`
       : await sql`SELECT * FROM tasks WHERE assigned_to = ${c.meId} ORDER BY created_at DESC`;
     return NextResponse.json(rows.map(shape));

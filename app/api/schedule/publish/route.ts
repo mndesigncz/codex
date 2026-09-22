@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const rows = await sql`
       SELECT DISTINCT s.employee_id AS id
       FROM shifts s JOIN users u ON u.id = s.employee_id
-      WHERE u.team_id = ${me.team_id} AND s.date LIKE ${month + '-%'} AND s.employee_id <> ${meId}`;
+      WHERE s.team_id = ${me.team_id} AND s.date LIKE ${month + '-%'} AND s.employee_id <> ${meId}`;
     const ids = (rows as any[]).map(r => Number(r.id)).filter(Number.isFinite);
     const label = new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
     if (ids.length) {

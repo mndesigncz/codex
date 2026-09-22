@@ -43,12 +43,12 @@ export async function GET(req: NextRequest) {
       ? await sql`
           SELECT s.date, s.auto_created, u.id, u.name, u.avatar, s.start_time AS "startTime", s.end_time AS "endTime"
           FROM shifts s JOIN users u ON u.id = s.employee_id
-          WHERE s.employee_id = ${c.meId} AND s.date >= ${start} AND s.date <= ${end}
+          WHERE s.employee_id = ${c.meId} AND s.team_id = ${c.teamId} AND s.date >= ${start} AND s.date <= ${end}
           ORDER BY s.date ASC, s.start_time ASC`
       : await sql`
           SELECT s.date, s.auto_created, u.id, u.name, u.avatar, s.start_time AS "startTime", s.end_time AS "endTime"
           FROM shifts s JOIN users u ON u.id = s.employee_id
-          WHERE u.team_id = ${c.teamId} AND s.date >= ${start} AND s.date <= ${end}
+          WHERE s.team_id = ${c.teamId} AND s.date >= ${start} AND s.date <= ${end}
           ORDER BY s.date ASC, s.start_time ASC`;
 
     // A closing covers the whole shift, so scope=me must also pick up the days
