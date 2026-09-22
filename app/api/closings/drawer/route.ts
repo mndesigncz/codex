@@ -8,6 +8,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { cashLeft } from '@/lib/closing';
+import { pragueToday } from '@/lib/pragueTime';
+import { zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +25,10 @@ export async function GET() {
   let row: any = null;
   try {
     [row] = await sql`
-      SELECT cc.date, cc.shift_label, cc.closing_cash, cc.final_removal, us.name AS author_name
+      SELECT COALESCE(cc.shift_date, cc.date) AS date, cc.shift_label, cc.closing_cash, cc.final_removal, us.name AS author_name
       FROM cash_closings cc LEFT JOIN users us ON us.id = cc.created_by
       WHERE cc.team_id = ${u.team_id} AND cc.covered_by IS NULL AND cc.event_id IS NULL
-      ORDER BY cc.date DESC, cc.created_at DESC LIMIT 1`;
+      ORDER BY COALESCE(cc.shift_date, cc.date) DESC, cc.created_at DESC LIMIT 1`;
   } catch {
     try {
       [row] = await sql`
@@ -37,7 +39,38 @@ export async function GET() {
     } catch { /* table missing */ }
   }
   if (!row) return NextResponse.json({ drawer: null });
+
+  // Dny MEZI poslední uzávěrkou a dneškem, kdy někdo pracoval, ale nikdo
+  // nezavřel. Bez tohohle se sobota, za kterou uzávěrka chybí, potichu
+  // propíše do pondělka: pondělí začne s pátečním stavem kasy, a co se
+  // v sobotu utržilo, vypadá jako pondělní přebytek — „tržba, která tam
+  // nemá být". Formulář to musí říct dřív, než člověk začne počítat.
+  let gapDays: string[] = [];
+  try {
+    const od = String(row.date);
+    const dnes = pragueToday();
+    if (od < dnes) {
+      const zavreno = await zavreneDnyTydne(u.team_id);
+      const smeny = await sql`
+        SELECT DISTINCT s.date, s.auto_created
+        FROM shifts s JOIN users us ON us.id = s.employee_id
+        WHERE us.team_id = ${u.team_id} AND s.date > ${od} AND s.date < ${dnes}
+          AND NOT EXISTS (
+            SELECT 1 FROM cash_closings cc
+            WHERE cc.team_id = ${u.team_id} AND COALESCE(cc.shift_date, cc.date) = s.date
+          )
+        ORDER BY s.date ASC`;
+      const dny = new Set<string>();
+      for (const r of smeny as any[]) {
+        if (smenaBezUzaverky(r, zavreno)) continue;
+        dny.add(String(r.date));
+      }
+      gapDays = Array.from(dny).sort();
+    }
+  } catch { /* před migrací — bez varování, ne bez zásuvky */ }
+
   return NextResponse.json({
+    gapDays,
     drawer: {
       date: row.date,
       shiftLabel: row.shift_label ?? null,

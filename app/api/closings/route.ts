@@ -5,7 +5,9 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
-import { windowOf, coveredBy } from '@/lib/shiftWindow';
+import { windowOf } from '@/lib/shiftWindow';
+import { denSmeny, denUzaverkyPro, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
+import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
 
@@ -125,11 +127,12 @@ export async function GET() {
   // shift_employees, so the created_by check still covers them.
   let eligibleShifts: any[] = [];
   const today = pragueToday();
+  const zavrenoTyden = await zavreneDnyTydne(c.teamId);
   if (c.role === 'kiosk') {
     const cutoff = pragueToday(-3);
     try {
       eligibleShifts = await sql`
-        SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type,
+        SELECT s.id, s.date, s.auto_created, s.start_time AS "startTime", s.end_time AS "endTime", s.type,
                u.id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar"
         FROM shifts s
         JOIN users u ON u.id = s.employee_id
@@ -161,7 +164,7 @@ export async function GET() {
     const cutoff = pragueToday(-14);
     try {
       eligibleShifts = await sql`
-        SELECT s.id, s.date, s.start_time AS "startTime", s.end_time AS "endTime", s.type
+        SELECT s.id, s.date, s.auto_created, s.start_time AS "startTime", s.end_time AS "endTime", s.type
         FROM shifts s
         WHERE s.employee_id = ${c.meId}
           AND s.date <= ${today} AND s.date >= ${cutoff}
@@ -187,6 +190,10 @@ export async function GET() {
     }
   }
 
+  // „Neděle v návrzích" — automatická směna na den, kdy je zavřeno, se
+  // nenabízí k zavření. Viz smenaBezUzaverky.
+  eligibleShifts = eligibleShifts.filter(s => !smenaBezUzaverky(s, zavrenoTyden));
+
   // For the employer's "submit on behalf" selector.
   let members: any[] = [];
   // Which team members were scheduled each recent day, and which of those days
@@ -205,15 +212,21 @@ export async function GET() {
     try {
       const cutoff = pragueToday(-30);
       const sched = await sql`
-        SELECT DISTINCT s.date, u.id, u.name, u.avatar
+        SELECT DISTINCT s.date, s.auto_created, u.id, u.name, u.avatar
         FROM shifts s JOIN users u ON u.id = s.employee_id
         WHERE u.team_id = ${c.teamId} AND s.date >= ${cutoff} AND s.date <= ${today}
         ORDER BY s.date DESC, u.name ASC`;
+      // Automatická směna na den, kdy je zavřeno, je příchod po půlnoci zapsaný
+      // podle hodin na zdi z doby, než to příchod uměl líp. Uzávěrku za neděli,
+      // ve které nikdo nepracoval, po nikom nechceme.
+      const zavreno = await zavreneDnyTydne(c.teamId);
       for (const r of sched as any[]) {
+        if (smenaBezUzaverky(r, zavreno)) continue;
         (scheduledByDate[r.date] ??= []).push({ id: r.id, name: r.name, avatar: r.avatar });
       }
-      // Dates that had at least one shift but not a single closing row.
-      const closedDates = new Set(closings.map(r => r.date));
+      // Dates that had at least one shift but not a single closing row —
+      // podle obchodního dne, ne podle dne odeslání formuláře.
+      const closedDates = new Set(closings.map(r => String(r.shift_date ?? r.date)));
       missingClosings = Object.keys(scheduledByDate)
         .filter(d => !closedDates.has(d))
         .sort().reverse()
@@ -225,18 +238,12 @@ export async function GET() {
   // midnight still belongs to the day it started, so the form must not default
   // to the calendar date on the wall clock. Yesterday wins whenever yesterday's
   // shift is still inside its window (with the usual grace).
+  // Stejné pravidlo jako u příchodu a u odeslání: včerejší směna, která v tuhle
+  // chvíli ještě běží (i s tolerancí na úklid), nebo podnik otevřený přes
+  // půlnoc → včera. Dřív tu platilo jen „plánovaná směna přes půlnoc", takže
+  // 16–23 zavřená v 0:20 padla na neděli.
   let suggestedDate = today;
-  try {
-    const y = pragueToday(-1);
-    const [prev] = await sql`
-      SELECT start_time, end_time FROM shifts
-      WHERE employee_id = ${c.meId} AND date = ${y}
-      ORDER BY start_time DESC LIMIT 1`;
-    if (prev) {
-      const w = windowOf({ ...prev, date: y } as any, y);
-      if (w && w.overnight && coveredBy(w, new Date())) suggestedDate = y;
-    }
-  } catch { /* no shifts table — today it is */ }
+  try { suggestedDate = await denSmeny(c.teamId, c.meId, new Date()); } catch { /* today it is */ }
 
   return NextResponse.json({
     closings,
@@ -266,7 +273,10 @@ export async function POST(request: Request) {
 
   const b = await request.json();
   const today = pragueToday();
-  const date = typeof b.date === 'string' && b.date ? b.date : today;
+  // Datum z formuláře je návrh. Pole má vždycky hodnotu, takže „bez data"
+  // odsud nikdy nepřijde — a po půlnoci v něm stojí zítřek jen proto, že
+  // tak šly hodiny. Obchodní den se spočítá níž, až víme, za koho se zavírá.
+  const zvoleno = typeof b.date === 'string' && b.date ? b.date : null;
   const isEmployer = c.role === 'employer';
   const isKiosk = c.role === 'kiosk';
   let payDailyCash = false;
@@ -310,14 +320,18 @@ export async function POST(request: Request) {
   }
 
   // No closing a day that hasn't happened yet.
-  if (date > today) {
+  if (zvoleno && zvoleno > today) {
     return NextResponse.json({ error: 'Uzávěrku nelze vyplnit pro budoucí datum.' }, { status: 400 });
   }
 
-  // Which SHIFT is this closing for? Filing at 00:40 after a night shift means
-  // the shift started yesterday — the closing follows the shift, not the clock.
-  const dateExplicit = typeof b.date === 'string' && !!b.date;
-  let shiftDate = date;
+  // Ke kterému dni uzávěrka patří — jedním pravidlem s příchodem
+  // (`denUzaverky`). Dřív se datum z formuláře bralo jako hotová věc a záchrana
+  // „směna přes půlnoc" se spouštěla jen bez data, což se z formuláře nikdy
+  // nestalo. Sobotní směna zavřená v 0:20 tak ležela pod nedělí, sobota se
+  // hlásila jako nezavřená a kolegům přibyly nedělní směny. Od teď je `date`
+  // obchodní den a `shift_date` totéž — jedna pravda pro všechny čtenáře.
+  const shiftDate = await denUzaverkyPro(c.teamId, actorId, zvoleno, new Date());
+  const date = shiftDate;
   // Somebody who worked twice that day says WHICH shift they are closing;
   // without that we would always resolve to the first one and the second
   // closing would look like a duplicate of the first.
@@ -326,28 +340,14 @@ export async function POST(request: Request) {
   if (Number.isFinite(pickedShiftId)) {
     const [picked] = await sql`
       SELECT id, start_time, end_time FROM shifts
-      WHERE id = ${pickedShiftId} AND employee_id = ${actorId} AND date = ${date}`;
+      WHERE id = ${pickedShiftId} AND employee_id = ${actorId} AND date = ${shiftDate}`;
     if (picked) shift = picked;
   }
   if (!shift) {
     [shift] = await sql`
       SELECT id, start_time, end_time FROM shifts
-      WHERE employee_id = ${actorId} AND date = ${date}
+      WHERE employee_id = ${actorId} AND date = ${shiftDate}
       ORDER BY start_time ASC LIMIT 1`;
-  }
-  if (!shift && !dateExplicit) {
-    const prev = dayPlus(date, -1);
-    try {
-      const [pShift] = await sql`
-        SELECT id, start_time, end_time FROM shifts
-        WHERE employee_id = ${actorId} AND date = ${prev}
-        ORDER BY start_time DESC LIMIT 1`;
-      const w = pShift ? windowOf({ ...pShift, date: prev }) : null;
-      if (pShift && w && w.overnight && coveredBy(w, new Date())) {
-        shift = pShift;
-        shiftDate = prev;
-      }
-    } catch { /* no shifts table — stay on today */ }
   }
 
   // One closing per person per shift.
@@ -714,5 +714,45 @@ export async function POST(request: Request) {
     } catch { /* column not migrated yet */ }
   }
 
-  return NextResponse.json({ ok: true, closing: row, approved, covered: coveredIds.length, tipsInDrawer });
+  // Snímek mzdy: kolik autor za směnu odpracoval a vydělal v okamžiku
+  // uzávěrky. Sazba se ukládá s tím — pozdější změna hodinovky nesmí
+  // přepsat historii. Otevřený záznam se počítá do teď: uzávěrka JE konec
+  // směny, odpíchnout se lidi chodí až po ní.
+  if (row?.id && eventId == null) {
+    try {
+      const m = await mzdaZaSmenu(c.teamId, actorId, shiftDate);
+      if (!m.noEntries && !m.suspicious) {
+        await sql`
+          UPDATE cash_closings SET worked_ms = ${Math.round(m.ms)}, wage_rate = ${m.rate}, wage_earned = ${m.earned}
+          WHERE id = ${row.id}`;
+      }
+    } catch { /* sloupce před migrací — uzávěrka se tím nesmí zdržet */ }
+  }
+
+  // Kdo z osádky se zapomněl odpíchnout, se dozví hned — ne až ráno z nočního
+  // úklidu. Samotné uzavření záznamu necháváme na něm (lib/staleShifts.ts):
+  // uzávěrka ve 22:00 neznamená, že v 22:00 odešel. Bere si čas uzávěrky
+  // jako nejpozdější doloženou stopu, takže výsledek je ten, který obsluha
+  // čeká — jen s možností se ještě odpíchnout a mít čas přesně.
+  const openClockIns: { id: number; name: string }[] = [];
+  try {
+    const osadka = Array.from(new Set<number>([actorId, ...coveredIds]));
+    const otevrene = await sql`
+      SELECT te.employee_id AS id, u.name
+      FROM time_entries te JOIN users u ON u.id = te.employee_id
+      WHERE te.team_id = ${c.teamId} AND te.clock_out IS NULL AND te.employee_id = ANY(${osadka})
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${shiftDate}`;
+    for (const o of otevrene as any[]) {
+      openClockIns.push({ id: Number(o.id), name: String(o.name ?? '') });
+      notifyUser(Number(o.id), {
+        title: '⏱️ Odpíchni se',
+        body: 'Uzávěrka je hotová, ale příchod máš pořád otevřený. Odpíchni se — jinak směnu uzavřeme podle času uzávěrky.',
+        type: 'warning',
+        category: 'shift',
+        link: '/employee/shifts',
+      }).catch(() => {});
+    }
+  } catch { /* před migrací */ }
+
+  return NextResponse.json({ ok: true, closing: row, approved, covered: coveredIds.length, tipsInDrawer, openClockIns });
 }

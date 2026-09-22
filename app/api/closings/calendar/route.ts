@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { pragueToday } from '@/lib/pragueTime';
+import { zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,12 +41,12 @@ export async function GET(req: NextRequest) {
   try {
     const shifts = selfOnly
       ? await sql`
-          SELECT s.date, u.id, u.name, u.avatar, s.start_time AS "startTime", s.end_time AS "endTime"
+          SELECT s.date, s.auto_created, u.id, u.name, u.avatar, s.start_time AS "startTime", s.end_time AS "endTime"
           FROM shifts s JOIN users u ON u.id = s.employee_id
           WHERE s.employee_id = ${c.meId} AND s.date >= ${start} AND s.date <= ${end}
           ORDER BY s.date ASC, s.start_time ASC`
       : await sql`
-          SELECT s.date, u.id, u.name, u.avatar, s.start_time AS "startTime", s.end_time AS "endTime"
+          SELECT s.date, s.auto_created, u.id, u.name, u.avatar, s.start_time AS "startTime", s.end_time AS "endTime"
           FROM shifts s JOIN users u ON u.id = s.employee_id
           WHERE u.team_id = ${c.teamId} AND s.date >= ${start} AND s.date <= ${end}
           ORDER BY s.date ASC, s.start_time ASC`;
@@ -56,35 +57,35 @@ export async function GET(req: NextRequest) {
     try {
       closings = selfOnly
         ? await sql`
-            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+            SELECT COALESCE(cc.shift_date, cc.date) AS date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
                    cc.shift_employees AS "shiftEmployees",
                    cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
                    u.name, u.avatar
             FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-            WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}
+            WHERE cc.team_id = ${c.teamId} AND COALESCE(cc.shift_date, cc.date) >= ${start} AND COALESCE(cc.shift_date, cc.date) <= ${end}
               AND (cc.created_by = ${c.meId} OR cc.shift_employees @> to_jsonb(${c.meId}::int))`
         : await sql`
-            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+            SELECT COALESCE(cc.shift_date, cc.date) AS date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
                    cc.shift_employees AS "shiftEmployees",
                    cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
                    u.name, u.avatar
             FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-            WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}`;
+            WHERE cc.team_id = ${c.teamId} AND COALESCE(cc.shift_date, cc.date) >= ${start} AND COALESCE(cc.shift_date, cc.date) <= ${end}`;
     } catch {
       // shift_employees not migrated yet — per-author attribution only.
       closings = selfOnly
         ? await sql`
-            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+            SELECT COALESCE(cc.shift_date, cc.date) AS date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
                    cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
                    u.name, u.avatar
             FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-            WHERE cc.created_by = ${c.meId} AND cc.date >= ${start} AND cc.date <= ${end}`
+            WHERE cc.created_by = ${c.meId} AND COALESCE(cc.shift_date, cc.date) >= ${start} AND COALESCE(cc.shift_date, cc.date) <= ${end}`
         : await sql`
-            SELECT cc.date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
+            SELECT COALESCE(cc.shift_date, cc.date) AS date, cc.created_by AS "createdBy", cc.covered_by AS "coveredBy",
                    cc.cash_revenue AS "cashRevenue", cc.card_revenue AS "cardRevenue",
                    u.name, u.avatar
             FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-            WHERE cc.team_id = ${c.teamId} AND cc.date >= ${start} AND cc.date <= ${end}`;
+            WHERE cc.team_id = ${c.teamId} AND COALESCE(cc.shift_date, cc.date) >= ${start} AND COALESCE(cc.shift_date, cc.date) <= ${end}`;
     }
 
     // Who is covered by ANY closing that day (author or shift crew), who filed a
@@ -111,9 +112,14 @@ export async function GET(req: NextRequest) {
     const days: Record<string, any> = {};
     const ensure = (date: string) => (days[date] ??= { onShift: [], closedBy: [], hasClosing: false, missing: false });
     const tstr = todayStr();
+    // Automatická směna na den, kdy je zavřeno, není odpracovaný den — je to
+    // příchod po půlnoci zapsaný podle hodin na zdi. V kalendáři by svítila
+    // jako „chybí uzávěrka za neděli".
+    const zavreno = await zavreneDnyTydne(c.teamId);
     // De-dupe people per day (someone could have two shift rows).
     const seen = new Map<string, Set<number>>();
     for (const s of shifts as any[]) {
+      if (smenaBezUzaverky(s, zavreno)) continue;
       const day = ensure(s.date);
       const seenSet = seen.get(s.date) ?? seen.set(s.date, new Set()).get(s.date)!;
       if (!seenSet.has(s.id)) {

@@ -16,7 +16,7 @@
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { pragueHourOf, pragueDayOf, dayPlus } from '@/lib/pragueTime';
-import { denPrichodu } from '@/lib/businessDay';
+import { denPrichodu, denUzaverky, type DenPrichoduVstup } from '@/lib/businessDay';
 import { weekdayKey, type OpeningDay } from '@/lib/coverage';
 import type { ShiftRow } from '@/lib/shiftWindow';
 
@@ -34,6 +34,23 @@ const sql = neon(process.env.DATABASE_URL!);
  * kdy začala", a po půlnoci se ty dvě odpovědi rozešly.
  */
 export async function denSmeny(teamId: number | null, employeeId: number | null, at: Date): Promise<string> {
+  return denPrichodu(await vstupyDne(teamId, employeeId, at));
+}
+
+/**
+ * Ke kterému dni patří uzávěrka, kterou člověk zrovna odesílá — se stejnými
+ * vstupy jako `denSmeny`. Zvolené datum z formuláře se respektuje jen jako
+ * starší den; „dnes" po půlnoci se přepočítá pravidlem pro příchod. Viz
+ * `denUzaverky` v `lib/businessDay.ts`, kde je i důvod.
+ */
+export async function denUzaverkyPro(
+  teamId: number | null, employeeId: number | null, zvoleno: string | null | undefined, at: Date,
+): Promise<string> {
+  return denUzaverky(zvoleno, await vstupyDne(teamId, employeeId, at));
+}
+
+/** Co o „včerejšku" ví databáze: směny toho člověka a otevírací doba podniku. */
+async function vstupyDne(teamId: number | null, employeeId: number | null, at: Date): Promise<DenPrichoduVstup> {
   const dnes = pragueDayOf(at);
   const vcera = dayPlus(dnes, -1);
   let smenyVcera: ShiftRow[] = [];
@@ -52,7 +69,33 @@ export async function denSmeny(teamId: number | null, employeeId: number | null,
       if (oh && typeof oh === 'object') otevrenoVcera = ((oh as Record<string, OpeningDay>)[weekdayKey(vcera)]) ?? null;
     } catch { /* bez otevírací doby zbývá směna */ }
   }
-  return denPrichodu({ at, smenyVcera, otevrenoVcera });
+  return { at, smenyVcera, otevrenoVcera };
+}
+
+/**
+ * Dny v týdnu (klíč 0 = pondělí), kdy má podnik zavřeno. Automaticky založená
+ * směna na takový den je skoro jistě příchod po půlnoci zapsaný podle hodin
+ * na zdi z doby, než to příchod uměl líp — a uzávěrku za den, kdy je zavřeno,
+ * nemá smysl chtít po nikom.
+ */
+export async function zavreneDnyTydne(teamId: number | null): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (teamId == null) return out;
+  try {
+    const [t] = await sql`SELECT opening_hours FROM teams WHERE id = ${teamId}`;
+    const oh = t?.opening_hours;
+    if (oh && typeof oh === 'object') {
+      for (const [k, v] of Object.entries(oh as Record<string, OpeningDay>)) {
+        if (v && v.closed === true) out.add(String(k));
+      }
+    }
+  } catch { /* bez otevírací doby nic nevynecháváme */ }
+  return out;
+}
+
+/** Má se tenhle řádek směny vynechat z „chybí uzávěrka"? */
+export function smenaBezUzaverky(row: { date: string; auto_created?: boolean | null }, zavreno: Set<string>): boolean {
+  return row.auto_created === true && zavreno.has(weekdayKey(String(row.date)));
 }
 
 /** Od kolika ráno platí, že v podniku už nikdo nepracuje (pražský čas). */

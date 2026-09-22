@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { windowOf } from '@/lib/shiftWindow';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,20 +28,27 @@ export async function GET(request: Request) {
 
   let reminded = 0;
   try {
-    // Shifts today whose end time has passed and have no closing for that person.
+    // Dnešní směny bez uzávěrky. Jestli už SKONČILY, rozhodne až okno směny
+    // níž — porovnání `end_time <= nowHM` bylo textové, takže směna 18:00–02:00
+    // měla ve 23:00 „02:00" menší než „23:00" a člověk uprostřed směny dostal
+    // „tvoje směna skončila, vyplň uzávěrku".
     const due = await sql`
-      SELECT s.employee_id AS id, s.end_time, u.name
+      SELECT s.employee_id AS id, s.date, s.start_time, s.end_time, u.name
       FROM shifts s
       JOIN users u ON u.id = s.employee_id
       WHERE s.date = ${today}
-        AND s.end_time <= ${nowHM}
         AND NOT EXISTS (
           SELECT 1 FROM cash_closings cc
-          WHERE cc.created_by = s.employee_id AND cc.date = ${today}
+          WHERE cc.created_by = s.employee_id AND COALESCE(cc.shift_date, cc.date) = ${today}
         )`;
     // De-dupe employees (one nudge even with multiple shifts).
     const seen = new Set<number>();
     for (const r of due) {
+      const w = windowOf(r as any, today);
+      // Bez čitelných časů se řídíme starým pravidlem (textově), ať se
+      // připomínka neztratí; jinak jen po skutečném konci směny.
+      const skoncila = w ? now.getTime() >= w.end.getTime() : String(r.end_time ?? '') <= nowHM;
+      if (!skoncila) continue;
       if (seen.has(r.id)) continue;
       seen.add(r.id);
       try {

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
         AND u.id <> ${exclude}
         AND NOT EXISTS (
           SELECT 1 FROM cash_closings cc
-          WHERE cc.date = ${date} AND cc.team_id = ${teamId}
+          WHERE COALESCE(cc.shift_date, cc.date) = ${date} AND cc.team_id = ${teamId}
             AND (cc.created_by = u.id OR cc.shift_employees @> to_jsonb(u.id))
         )
       ORDER BY (sh.id IS NULL), u.name ASC`;

@@ -197,6 +197,13 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
 }
 
 // A numbered, iconed section panel — one guided step of the closing flow.
+/** „7 h 40 min" z milisekund. */
+function hodinyMinuty(ms: number): string {
+  const min = Math.round(ms / 60000);
+  const h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
+}
+
 function Step({
   num, total, icon, title, subtitle, children, tone = 'plain', refCb, guide,
 }: {
@@ -347,6 +354,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [diffNote, setDiffNote] = useState('');
   // The previous closing's counted cash — offered as this shift's opening cash.
   const [carry, setCarry] = useState<{ amount: number; date: string; label: string | null } | null>(null);
+  // Dny mezi poslední uzávěrkou a dneškem, kdy někdo pracoval, ale nikdo
+  // nezavřel. Hotovost z nich leží v kase, ale v rovnici pro dnešek není —
+  // vyšel by přebytek přesně ve výši té tržby a člověk by ji „srovnal" tím,
+  // že ji dopíše do dneška. Přesně tak sobota potichu splynula s pondělím.
+  const [gapDays, setGapDays] = useState<string[]>([]);
   // Today's procedure runs — the closing is the natural moment to notice an
   // unfinished closing checklist.
   const [todayRuns, setTodayRuns] = useState<any[]>([]);
@@ -426,6 +438,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       // old (or a covered stub) and would manufacture a phantom manko.
       try {
         const dd = await fetch('/api/closings/drawer').then(okJson);
+        setGapDays(Array.isArray(dd?.gapDays) ? dd.gapDays.map(String) : []);
         const prev = dd?.drawer;
         if (prev) {
           const left = Math.round(Number(prev.amount) || 0);
@@ -490,6 +503,23 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
   // Team members who ALSO had a shift that day and don't have their own closing
   // yet — one person can close for the whole crew.
+  // Kolik si člověk za tuhle směnu vydělal a kolik dostane bodů. Vedení to
+  // vidělo v Docházce, zaměstnanec nikde — a uzávěrka je přesně chvíle, kdy
+  // se ptá „kolik to dneska bylo". Tablet dostane `available: false`
+  // (sdílená obrazovka za barem) a karta se nevykreslí.
+  const [mzda, setMzda] = useState<{
+    wage: { ms: number; rate: number; earned: number; open: boolean; suspicious: boolean; noEntries: boolean };
+    points: { tasks: number; procedures: number; taskPts: number; procPts: number; closingPts: number; total: number };
+  } | null>(null);
+  useEffect(() => {
+    if (!form.date || actorId == null || isKiosk) { setMzda(null); return; }
+    let alive = true;
+    fetch(`/api/closings/wage?date=${form.date}&employeeId=${actorId}`).then(okJson)
+      .then(d => { if (alive) setMzda(d?.available && d.wage ? { wage: d.wage, points: d.points } : null); })
+      .catch(() => { if (alive) setMzda(null); });
+    return () => { alive = false; };
+  }, [form.date, actorId, isKiosk]);
+
   useEffect(() => {
     if (!form.date || actorId == null) { setCoworkers([]); return; }
     let cancelled = false;
@@ -623,7 +653,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       if (res.ok) {
         const d = await res.json().catch(() => ({}));
         const forCoworkers = includedCoworkers.length > 0 ? ' (i za kolegy)' : '';
-        setMsg(d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`);
+        // Kdo se zapomněl odpíchnout, to musí slyšet teď, ne ráno z nočního
+        // úklidu. Server jim poslal i push; tady je to pro toho, kdo stojí u
+        // obrazovky a zrovna odeslal.
+        const neodpichnuti: { name: string }[] = Array.isArray(d.openClockIns) ? d.openClockIns : [];
+        const dovetek = neodpichnuti.length
+          ? ` Nezapomeň se odpíchnout${neodpichnuti.length > 1 ? ` (${neodpichnuti.map(o => o.name).join(', ')})` : ''} — jinak se směna uzavře podle času uzávěrky.`
+          : '';
+        setMsg((d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`) + dovetek);
         setForm(emptyForm());
         setPickedShiftId(null);
         setCoworkerSel({});
@@ -636,7 +673,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         setTipsInDrawer(teamTipsInDrawer);
         onSubmitted?.();
         await load();
-        setTimeout(() => setMsg(''), 4000);
+        setTimeout(() => setMsg(''), neodpichnuti.length ? 12000 : 4000);
       } else {
         const d = await res.json().catch(() => ({}));
         setErr(d.error || 'Uzávěrku se nepodařilo odeslat.');
@@ -803,6 +840,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               {closings.some(c => c.date === form.date) && (
                 <p className="text-[11px] font-medium text-wait-ink bg-wait/[0.1] border border-wait/25 rounded-xl px-3 py-2">
                   Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
+                </p>
+              )}
+              {gapDays.length > 0 && gapDays.every(d => d < form.date) && (
+                <p role="alert" className="text-[11px] font-medium text-bad-ink bg-bad/[0.08] border border-bad/25 rounded-xl px-3 py-2">
+                  Mezi poslední uzávěrkou a dneškem chybí uzávěrka za{' '}
+                  {gapDays.map(d => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })).join(', ')}.
+                  Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící,
+                  jinak dnešek vyjde s přebytkem, který není jeho.
                 </p>
               )}
               {carry && (
@@ -1252,6 +1297,41 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               {todayRuns.some((r: any) => r.status === 'running') && (
                 <p className="text-[12px] text-wait-ink mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
               )}
+            </div>
+          )}
+
+          {mzda && !mzda.wage.noEntries && (
+            <div className="rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/30 p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#5B7A08]">
+                <Icon name="clock" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Tvoje směna
+              </p>
+              {mzda.wage.suspicious ? (
+                <p className="text-sm text-bad-ink">
+                  Příchod je otevřený déle než den — to je zapomenuté odpíchnutí, ne odpracovaný čas. Mzdu spočítáme, až ho vedení opraví.
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <p className="text-sm text-[#16181A]">
+                    Odpracováno <span className="font-bold tabular-nums">{hodinyMinuty(mzda.wage.ms)}</span>
+                    {mzda.wage.open && <span className="text-black/45"> (do teď — příchod je otevřený)</span>}
+                  </p>
+                  {mzda.wage.rate > 0 ? (
+                    <p className="text-sm text-[#16181A]">
+                      × {mzda.wage.rate} {symbol}/h = <span className="font-bold tabular-nums">{money(mzda.wage.earned)}</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-black/45">Hodinovku ti vedení zatím nenastavilo.</p>
+                  )}
+                </div>
+              )}
+              <p className="text-[12px] text-black/55">
+                Body za dnešek: <span className="font-semibold text-[#5B7A08] tabular-nums">+{mzda.points.total}</span>
+                <span className="text-black/40">
+                  {' '}— {mzda.points.closingPts} za uzávěrku
+                  {mzda.points.tasks > 0 ? `, ${mzda.points.taskPts} za ${mzda.points.tasks === 1 ? 'úkol' : mzda.points.tasks < 5 ? 'úkoly' : 'úkolů'}` : ''}
+                  {mzda.points.procedures > 0 ? `, ${mzda.points.procPts} za ${mzda.points.procedures === 1 ? 'postup' : mzda.points.procedures < 5 ? 'postupy' : 'postupů'}` : ''}
+                </span>
+              </p>
             </div>
           )}
 

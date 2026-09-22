@@ -6,6 +6,7 @@ import { notifyUser } from '@/lib/push';
 import { resolveActingUser } from '@/lib/kioskActing';
 import { ensureProductionTasks, produceBatch } from '@/lib/production';
 import { pragueToday } from '@/lib/pragueTime';
+import { sazebnikBodu } from '@/lib/mzdaSmeny';
 
 export const dynamic = 'force-dynamic';
 
@@ -462,5 +463,12 @@ export async function PATCH(req: NextRequest) {
       [row] = await sql`UPDATE tasks SET status = ${b.status} WHERE id = ${id} RETURNING *`;
     }
   }
-  return NextResponse.json(shape(row));
+  // Body za splnění se přičítaly potichu — člověk je viděl až v žebříčku,
+  // pokud tam vůbec zašel. Odpověď je nese, aby obrazovka mohla říct
+  // „+5 bodů" hned při odškrtnutí. Jen při přechodu do „hotovo".
+  let pointsEarned: number | null = null;
+  if (done && task.status !== 'done' && taskTeam) {
+    try { pointsEarned = (await sazebnikBodu(Number(taskTeam))).task; } catch { /* bez bodů se úkol splní taky */ }
+  }
+  return NextResponse.json({ ...shape(row), pointsEarned });
 }

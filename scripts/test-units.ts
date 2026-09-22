@@ -19,7 +19,7 @@ import { reakceNaZavreni, jePsanePole, jeRozepsano } from '../lib/modalClose.ts'
 import { maObsah, slouceni, maSeObnovit, liseSeOdPrazdneho } from '../lib/draft.ts';
 import { onAccent, staciKontrast, kontrast } from '../lib/floorplan.ts';
 import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week.ts';
-import { denPrichodu } from '../lib/businessDay.ts';
+import { denPrichodu, denUzaverky } from '../lib/businessDay.ts';
 import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
 import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
 import { parseStep, serializeStep, parseSteps } from '../lib/steps.ts';
@@ -585,6 +585,29 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
     denPrichodu({ at: v('2026-09-20', '05:01'), otevrenoVcera: bar }), '2026-09-20');
   eq('příchod: směna má přednost před otevírací dobou (ranní směna, ale bar otevřený) → řídí se otevírací dobou až po směně',
     denPrichodu({ at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '08:00', end_time: '16:00' }], otevrenoVcera: bar }), '2026-09-19');
+
+  // ---- Uzávěrka: ke kterému dni patří -------------------------------------
+  // Formulář posílá datum vždy (má pole s hodnotou). „Neděle" v poli deset
+  // minut po půlnoci je hodina na zdi, ne odpracovaný den.
+  const sobotniBar = { open: '16:00', close: '00:00', closed: false };
+  eq('uzávěrka: sobotní směna 16–23, zavírá 0:20 v neděli, v poli „dnes" → sobota',
+    denUzaverky('2026-09-20', { at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '16:00', end_time: '23:00' }] }), '2026-09-19');
+  eq('uzávěrka: totéž bez směny, ale bar měl v sobotu do půlnoci → sobota',
+    denUzaverky('2026-09-20', { at: v('2026-09-20', '00:20'), otevrenoVcera: sobotniBar }), '2026-09-19');
+  eq('uzávěrka: v neděli 0:20, ale v sobotu zavřeno a žádná směna → neděle (nemáme co přebít)',
+    denUzaverky('2026-09-20', { at: v('2026-09-20', '00:20'), otevrenoVcera: { ...sobotniBar, closed: true } }), '2026-09-20');
+  eq('uzávěrka: vedení doplňuje starý den → zvolené datum se respektuje',
+    denUzaverky('2026-09-12', { at: v('2026-09-20', '14:00'), smenyVcera: [{ start_time: '16:00', end_time: '23:00' }] }), '2026-09-12');
+  eq('uzávěrka: zaměstnanec si vybral včerejší směnu ze seznamu → včera, bez hádání',
+    denUzaverky('2026-09-19', { at: v('2026-09-20', '00:20') }), '2026-09-19');
+  eq('uzávěrka: bez data → totéž pravidlo jako příchod',
+    denUzaverky(null, { at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '18:00', end_time: '02:00' }] }), '2026-09-19');
+  eq('uzávěrka: nesmysl v poli data se ignoruje, ne spadne',
+    denUzaverky('včera', { at: v('2026-09-20', '14:00') }), '2026-09-20');
+  eq('uzávěrka: sobotní ranní 8–16, zavírá v neděli 0:20 → to už je neděle (směna dávno skončila)',
+    denUzaverky('2026-09-20', { at: v('2026-09-20', '00:20'), smenyVcera: [{ start_time: '08:00', end_time: '16:00' }] }), '2026-09-20');
+  eq('uzávěrka: ve 14:00 v neděli s pondělkem v poli (budoucnost) → dnes; budoucnost hlídá server zvlášť',
+    denUzaverky('2026-09-21', { at: v('2026-09-20', '14:00') }), '2026-09-20');
 
   // Hledání bez diakritiky — přesně ten případ ze Skladu.
   eq('hledání: „mraz" najde „Mražená malina"', obsahuje('Mražená malina', 'mraz'), true);

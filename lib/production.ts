@@ -255,18 +255,25 @@ export async function produceBatch(teamId: number, itemId: number, batches: numb
     VALUES (${item.id}, ${userId}, ${item.quantity}, ${newQty}, ${`Výroba +${added} ${item.unit} (${n}× dávka)`}, NOW())`);
   await sql.transaction(writes);
 
-  // Neon neskládá fragmenty — dva samostatné dotazy místo jednoho s OR.
+  // Splněný úkol nese body (lib/pointsBalance.ts počítá řádky s completed_by).
+  // Odškrtnutí JEDNOHO úkolu proto smí připsat jen ten jeden — hromadný
+  // zápis přes všechny otevřené výrobní úkoly položky dával jednomu člověku
+  // body za víc úkolů, než odškrtl. Zbylé otevřené úkoly téže položky zavře
+  // ensureProductionTasks níž, jakmile vidí doplněnou zásobu — bez
+  // completed_by, takže bez bodů. Z výrobní tabule (bez taskId) se úkoly
+  // dál zavírají hromadně, tam je to jedna akce za celou položku.
   const stamp = JSON.stringify({ produced: true, producedBatches: n });
   try {
-    await sql`
-      UPDATE tasks SET status = 'done', completed_by = ${userId}, completed_at = NOW(),
-        source_meta = COALESCE(source_meta, '{}'::jsonb) || ${stamp}::jsonb
-      WHERE team_id = ${teamId} AND source = 'production' AND source_ref = ${item.id} AND status <> 'done'`;
     if (opts.taskId) {
       await sql`
         UPDATE tasks SET status = 'done', completed_by = ${userId}, completed_at = NOW(),
           source_meta = COALESCE(source_meta, '{}'::jsonb) || ${stamp}::jsonb
         WHERE id = ${opts.taskId} AND team_id = ${teamId}`;
+    } else {
+      await sql`
+        UPDATE tasks SET status = 'done', completed_by = ${userId}, completed_at = NOW(),
+          source_meta = COALESCE(source_meta, '{}'::jsonb) || ${stamp}::jsonb
+        WHERE team_id = ${teamId} AND source = 'production' AND source_ref = ${item.id} AND status <> 'done'`;
     }
   } catch { /* před migrací */ }
   try { await sql`DELETE FROM purchase_flags WHERE for_item_id = ${item.id}`; } catch { /* před migrací */ }
