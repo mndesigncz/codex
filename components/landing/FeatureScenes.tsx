@@ -83,7 +83,7 @@ function Rozvrh() {
       </div>
       <Radek delay={1150} className="!bg-[#C8F542]/15">
         <Fajfka delay={1250} />
-        <p className="text-xs font-semibold text-[#16181A]">Kolize vyřešená — Martin má po směně 11 hodin volna</p>
+        <p className="text-xs font-semibold text-[#16181A]">Kolize vyřešená. Martin má po směně 11 hodin volna</p>
       </Radek>
     </Ram>
   );
@@ -242,7 +242,7 @@ function Telefon() {
           </div>
         </div>
       </div>
-      <p className="sc text-center text-[11px] text-black/45" style={za(1800)}>Host naskenuje QR u stolu — menu i kartička v jednom</p>
+      <p className="sc text-center text-[11px] text-black/45" style={za(1800)}>Host naskenuje QR u stolu, menu i kartička v jednom</p>
     </Ram>
   );
 }
@@ -266,7 +266,7 @@ function Kiosk() {
           <span key={j} className="sc-pop rounded-full bg-white/80 border border-black/[0.07] px-2.5 py-1 text-[11px] font-semibold text-[#16181A]" style={za(860 + i * 110)}>{j}</span>
         ))}
       </div>
-      <p className="sc text-center text-[11px] text-black/45" style={za(1250)}>Klepnutí na jméno stačí — žádná hesla u baru</p>
+      <p className="sc text-center text-[11px] text-black/45" style={za(1250)}>Klepnutí na jméno stačí, žádná hesla u baru</p>
     </Ram>
   );
 }
@@ -307,16 +307,16 @@ function Poctivost() {
     <Ram popisek="Když vypadne wifi">
       <Radek delay={120} className="!bg-bad/15">
         <Icon name="warning" size={14} className="shrink-0 text-bad-ink" />
-        <p className="text-xs font-semibold text-bad-ink">Nepodařilo se uložit — jsi offline</p>
+        <p className="text-xs font-semibold text-bad-ink">Nepodařilo se uložit, jsi offline</p>
       </Radek>
       <div className="sc rounded-2xl border border-black/[0.08] bg-white/80 px-3 py-2.5" style={za(520)}>
         <p className="text-[11px] uppercase tracking-wider text-black/40">Rozepsaná uzávěrka</p>
-        <p className="mt-1 text-xs text-[#16181A]">Rozdíl 120 v kase — spropitné z pátku, doplním ráno…</p>
+        <p className="mt-1 text-xs text-[#16181A]">Rozdíl 120 v kase: spropitné z pátku, doplním ráno…</p>
       </div>
       <p className="sc text-[11px] text-black/45" style={za(820)}>Text zůstal. Aplikace ho nezahodila a netvrdila, že je uložený.</p>
       <Radek delay={1200} className="!bg-[#C8F542]/15">
         <Fajfka delay={1320} />
-        <p className="text-xs font-semibold text-[#16181A]">Spojení zpátky — uloženo</p>
+        <p className="text-xs font-semibold text-[#16181A]">Spojení zpátky, uloženo</p>
       </Radek>
     </Ram>
   );

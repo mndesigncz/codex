@@ -44,9 +44,9 @@ const skupiny = SKUPINY.map(sk => ({ ...sk, radky: [] as typeof PLAN_FEATURES })
 for (const f of PLAN_FEATURES) skupiny.find(sk => sk.sedi(f.label))!.radky.push(f);
 
 const KARTY: { id: 'free' | 'pro' | 'max'; veta: string; body: string[] }[] = [
-  { id: 'free', veta: 'Základ pro malý tým — a napořád zdarma.', body: ['Směny, docházka a žádosti', 'Úkoly, návody a chat', 'Uzávěrky a sklad'] },
+  { id: 'free', veta: 'Základ pro malý tým, a napořád zdarma.', body: ['Směny, docházka a žádosti', 'Úkoly, návody a chat', 'Uzávěrky a sklad'] },
   { id: 'pro', veta: 'Všechno bez limitů pro jeden podnik.', body: ['Neomezený tým', 'Kiosk pro tablet za barem', 'Odměny, exporty a měsíční přehled'] },
-  { id: 'max', veta: 'Vše z Pro a k tomu druhá půlka — hosté.', body: ['Věrnost, rezervace a objednávky od stolu', 'Napojení na pokladnu Storyous', 'Výroba vlastních produktů'] },
+  { id: 'max', veta: 'Vše z Pro a k tomu druhá půlka: hosté.', body: ['Věrnost, rezervace a objednávky od stolu', 'Napojení na pokladnu Storyous', 'Výroba vlastních produktů'] },
 ];
 
 export default function Pricing() {
@@ -67,7 +67,7 @@ export default function Pricing() {
         <div className="max-w-xl">
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Jednoduchý ceník</h2>
           <p className="mt-3 text-base text-black/55 text-pretty">
-            Zdarma napořád pro malý tým. Pro a Max si vyzkoušíte {TRIAL_DAYS} dní zdarma — karta se strhne až po měsíci.
+            Zdarma napořád pro malý tým. Pro a Max si vyzkoušíte {TRIAL_DAYS} dní zdarma, karta se strhne až po měsíci.
           </p>
         </div>
         <Segmented size="sm" ariaLabel="Období" value={interval} onChange={v => setInterval_(v as Interval)}
@@ -88,9 +88,8 @@ export default function Pricing() {
               {pro && <span className="absolute top-5 right-5 chip chip-sm chip-ok uppercase tracking-wider">Doporučeno</span>}
               <p className="t-label text-black/45">{PLAN_NAMES[k.id]}</p>
               <p className="mt-2 text-4xl font-bold tracking-tight text-[#16181A] tabular-nums">{c ? c.hlavni : '0 Kč'}</p>
-              <p className="text-xs text-black/45 mt-1">
-                {c ? <>{c.pod}{c.skrt && <> · <s>{c.skrt}</s></>}{interval === 'year' && <> · {mesicne(k.id as 'pro' | 'max')}</>}</> : 'navždy · až 3 lidé'}
-              </p>
+              <p className="text-xs text-black/45 mt-1">{c ? c.pod : 'navždy, až 3 lidé'}</p>
+              {c?.skrt && <p className="text-xs text-black/45"><s>{c.skrt}</s> ročně, vychází na {mesicne(k.id as 'pro' | 'max')}</p>}
               <p className="mt-4 text-sm font-semibold text-[#16181A] text-pretty">{k.veta}</p>
               <ul className="mt-4 space-y-2 text-sm text-black/65">
                 {k.body.map(b => (
@@ -102,7 +101,7 @@ export default function Pricing() {
               </ul>
               <Link href={k.id === 'free' ? '/register?plan=free' : `/register?plan=${k.id}&interval=${interval}`} className="mt-auto pt-7 block">
                 <span className={`btn w-full ${pro ? 'btn-accent' : max ? 'btn-primary' : 'btn-secondary'}`}>
-                  {k.id === 'free' ? 'Začít zdarma' : `Vyzkoušet ${TRIAL_DAYS} dní zdarma`}
+                  Zvolit {PLAN_NAMES[k.id]}
                 </span>
               </Link>
             </div>
@@ -137,7 +136,7 @@ export default function Pricing() {
             ))}
           </tbody>
         </table>
-        <p className="mt-4 px-3 text-[11px] text-black/40">Ceny bez DPH. Doporučte Managero dalšímu podniku a získejte měsíc zdarma — až tři za měsíc.</p>
+        <p className="mt-4 px-3 text-[11px] text-black/40">Ceny bez DPH. Doporučte Managero dalšímu podniku a získejte měsíc zdarma, až tři za měsíc.</p>
       </div>
     </section>
   );

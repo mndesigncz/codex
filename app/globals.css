@@ -1306,7 +1306,7 @@ input[type='search']::-webkit-search-decoration {
       animation-range: entry 0% cover 40%;
     }
     @keyframes stena-narovnat {
-      from { transform: rotateX(34deg) rotateY(calc(var(--uhel, 0) * 1deg)) translateY(70px); opacity: 0.35; }
+      from { transform: rotateX(34deg) rotateY(calc(var(--uhel, 0) * 1deg)) translateY(36px); opacity: 0.35; }
       to   { transform: rotateX(0deg) rotateY(0deg) translateY(0); opacity: 1; }
     }
   }
@@ -1314,16 +1314,6 @@ input[type='search']::-webkit-search-decoration {
 @media (max-width: 767px) {
   /* Pod sebou na telefonu nemá stranové natočení smysl — jen náklon dozadu. */
   .stena-karta { transform: rotateX(6deg); }
-}
-
-/* Časová osa dne: svislá linka s hodinou u každého momentu. */
-.den-osa { position: relative; }
-@media (min-width: 768px) {
-  .den-osa::before {
-    content: ''; position: absolute; left: 2.75rem; top: 1.5rem; bottom: 1.5rem; width: 2px;
-    background: linear-gradient(180deg, rgba(200,245,66,0.9), rgba(22,24,26,0.10) 40%, rgba(22,24,26,0.10) 60%, rgba(200,245,66,0.9));
-    border-radius: 9999px;
-  }
 }
 
 /* Srovnání tarifů: sloupec Pro je podbarvený v celé výšce, ne jen

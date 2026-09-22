@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { LogoMark } from '@/components/Icons';
+import { TRIAL_DAYS } from '@/lib/plan';
 
 // Hlavička prodejní stránky.
 //
@@ -34,11 +35,16 @@ export default function LandingHeader() {
   const nav = useRef<HTMLElement>(null);
   const [pilulka, setPilulka] = useState<{ x: number; w: number } | null>(null);
 
+  // „Posunuto" hlídá neviditelná hlídka na začátku stránky: dokud je
+  // v obraze, lišta je bez pozadí. Žádný posluchač scrollu, který by běžel
+  // na každém snímku; IntersectionObserver se ozve jen při změně.
+  const hlidka = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const na = () => setPosunuto(window.scrollY > 24);
-    na();
-    window.addEventListener('scroll', na, { passive: true });
-    return () => window.removeEventListener('scroll', na);
+    const el = hlidka.current;
+    if (!el || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(([z]) => setPosunuto(!z.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   // Která sekce je v obraze. Práh 0,35: sekce se „ujme" navigace, jakmile
@@ -68,10 +74,12 @@ export default function LandingHeader() {
   }, [aktivni]);
 
   return (
+    <>
+    <div ref={hlidka} className="h-6 -mb-6 pointer-events-none" aria-hidden />
     <header className="sticky top-0 z-40">
       <div className="max-w-6xl mx-auto px-3 sm:px-5 pt-3">
         <div className={`lg-bar rounded-full pl-3 pr-2 sm:pl-4 sm:pr-2.5 py-2 flex items-center justify-between gap-3 ${posunuto ? 'posunuto' : ''}`}>
-          <Link href="/" className="flex items-center gap-2.5 min-w-0 rounded-full" aria-label="Managero — na začátek stránky">
+          <Link href="/" className="flex items-center gap-2.5 min-w-0 rounded-full" aria-label="Managero, na začátek stránky">
             <LogoMark size={30} />
             <span className="text-lg font-bold tracking-tight text-[#16181A] truncate">Managero</span>
           </Link>
@@ -97,11 +105,12 @@ export default function LandingHeader() {
             <Link href="/login" className="btn btn-ghost btn-sm !px-3 whitespace-nowrap">Přihlásit</Link>
             <Link href="/register" className="btn btn-primary btn-sm whitespace-nowrap">
               <span className="sm:hidden">Vyzkoušet</span>
-              <span className="hidden sm:inline">Vyzkoušet zdarma</span>
+              <span className="hidden sm:inline">Vyzkoušet {TRIAL_DAYS} dní zdarma</span>
             </Link>
           </div>
         </div>
       </div>
     </header>
+    </>
   );
 }
