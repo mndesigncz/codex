@@ -10,6 +10,7 @@ import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
 import Guides from '../Guides';
+import { prevezmiOtevreniNavodu } from '@/lib/otevriNavod';
 import CashClosing from '../employee/CashClosing';
 import MessengerDock from '../chat/MessengerDock';
 import AnnouncementBanner from '../AnnouncementBanner';
@@ -71,6 +72,10 @@ function KioskShell({ user }: { user: KioskUser }) {
   // Úkol „Vyrobit limonádu“ s návodem musí na tabletu otevřít ten návod,
   // ne jen přepnout na záložku Návody — u baru se nehledá v seznamu.
   const [wantGuide, setWantGuide] = useState<number | null>(null);
+  // Na tabletu nejsou URL, takže odkaz `?view=guides&guide=N` tu nefunguje.
+  // Plovoucí běžec postupů visí nad všemi třemi rozhraními a sám neví, že
+  // je na kiosku — proto si otevírání návodů přebereme a přepneme záložku.
+  useEffect(() => prevezmiOtevreniNavodu(id => { setWantGuide(id); setTab('guides'); }), []);
   const now = useNow();
   // The real kiosk session user — used where the surface is shared/read-only.
   const kioskUser = { id: user.id ?? 0, name: user.name, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;

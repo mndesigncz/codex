@@ -12,6 +12,15 @@ export interface Step {
   weight: StepWeight;
   /** Override of the minus points when the step isn't done (positive number). */
   penalty: number | null;
+  /**
+   * Návod, podle kterého se krok dělá.
+   *
+   * `note` je jedna věta („Nechat nahřát před prvním kafem."). Krok
+   * „Vyčistit kávovar" ale potřebuje celý postup — a ten v aplikaci
+   * existuje, jen se k němu obsluha za provozu nedostala jinak než přes
+   * záložku Návody a hledání.
+   */
+  guideId: number | null;
 }
 
 export type StepWeight = 'minor' | 'normal' | 'key';
@@ -41,6 +50,7 @@ export function parseStep(raw: any): Step {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const m = Number(raw.minutes);
     const pen = Number(raw.penalty);
+    const g = Number(raw.guideId);
     return {
       text: String(raw.text ?? '').trim(),
       minutes: Number.isFinite(m) && m > 0 ? Math.round(m) : null,
@@ -48,9 +58,10 @@ export function parseStep(raw: any): Step {
       emoji: raw.emoji ? String(raw.emoji).trim().slice(0, 4) : null,
       weight: raw.weight === 'key' || raw.weight === 'minor' ? raw.weight : 'normal',
       penalty: Number.isFinite(pen) && pen >= 0 ? Math.round(pen) : null,
+      guideId: Number.isFinite(g) && g > 0 ? Math.round(g) : null,
     };
   }
-  return { text: String(raw ?? '').trim(), minutes: null, note: null, emoji: null, weight: 'normal', penalty: null };
+  return { text: String(raw ?? '').trim(), minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null };
 }
 
 export function parseSteps(items: any): Step[] {
@@ -61,13 +72,14 @@ export function parseSteps(items: any): Step[] {
 // and keep plain-string compatibility when a step carries only text.
 export function serializeStep(s: Step): string | Record<string, any> {
   const plainWeight = !s.weight || s.weight === 'normal';
-  if (!s.minutes && !s.note && !s.emoji && plainWeight && s.penalty == null) return s.text;
+  if (!s.minutes && !s.note && !s.emoji && plainWeight && s.penalty == null && s.guideId == null) return s.text;
   const out: Record<string, any> = { text: s.text };
   if (s.minutes) out.minutes = s.minutes;
   if (s.note) out.note = s.note;
   if (s.emoji) out.emoji = s.emoji;
   if (!plainWeight) out.weight = s.weight;
   if (s.penalty != null) out.penalty = s.penalty;
+  if (s.guideId != null) out.guideId = s.guideId;
   return out;
 }
 

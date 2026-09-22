@@ -22,6 +22,8 @@ import { zkratkyDnu, poradiDne, odsazeniMesice, zacatekTydne } from '../lib/week
 import { denPrichodu } from '../lib/businessDay.ts';
 import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
 import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
+import { parseStep, serializeStep, parseSteps } from '../lib/steps.ts';
+import { odkazNaNavod } from '../lib/otevriNavod.ts';
 import { describe as popisUkolu } from '../lib/productionPlan.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
 import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
@@ -638,6 +640,36 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
     eq('návod: dvě položky, dva návody', m.size, 2);
     eq('návod: kroky dojdou ke správné položce', krokyNavodu(m.get(4)), ['Svařit']);
   }
+
+  // ---- Krok postupu s návodem -------------------------------------------
+  // `guideId` se přidával do modelu, který v databázi leží jako JSON u stovek
+  // postupů. Když se zpětná kompatibilita rozbije, přijdou lidi o kroky.
+  eq('krok: starý prostý řetězec projde beze změny',
+    parseStep('Vyčistit kávovar').guideId, null);
+  eq('krok: bez návodu se pořád serializuje jako holý řetězec',
+    serializeStep(parseStep('Vyčistit kávovar')), 'Vyčistit kávovar');
+  eq('krok: s návodem už musí být objekt',
+    (serializeStep(parseStep({ text: 'Vyčistit kávovar', guideId: 7 })) as any).guideId, 7);
+  eq('krok: návod přežije kolečko tam a zpět',
+    parseStep(serializeStep(parseStep({ text: 'X', guideId: 7 }))).guideId, 7);
+  eq('krok: nesmysl místo id se zahodí (nula, záporné, text)',
+    [parseStep({ text: 'X', guideId: 0 }).guideId,
+     parseStep({ text: 'X', guideId: -3 }).guideId,
+     parseStep({ text: 'X', guideId: 'abc' }).guideId], [null, null, null]);
+  eq('krok: desetinné id se zaokrouhlí, ne zahodí',
+    parseStep({ text: 'X', guideId: 7.4 }).guideId, 7);
+  eq('krok: ostatní pole zůstanou, když přibude návod',
+    (() => { const s2 = serializeStep(parseStep({ text: 'X', minutes: 5, weight: 'key', guideId: 2 })) as any;
+      return [s2.minutes, s2.weight, s2.guideId]; })(), [5, 'key', 2]);
+  eq('krok: prázdný text vypadne i s návodem',
+    parseSteps([{ text: '  ', guideId: 3 }, { text: 'Zůstane' }]).length, 1);
+
+  // ---- Kam vede „Otevřít návod" ------------------------------------------
+  // Špatná cesta by obsluhu poslala do cizí části aplikace.
+  eq('odkaz: vedení', odkazNaNavod('/employer/overview', 12), '/employer/overview?view=guides&guide=12');
+  eq('odkaz: zaměstnanec', odkazNaNavod('/employee/shifts', 12), '/employee/shifts?view=guides&guide=12');
+  eq('odkaz: tablet odkazem nejde — řeší si to sám', odkazNaNavod('/kiosk', 12), null);
+  eq('odkaz: neznámá cesta radši nic', odkazNaNavod('/', 12), null);
 
   // ---- Postup v úkolu: návod bije holý text -----------------------------
   {

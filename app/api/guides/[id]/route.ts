@@ -133,6 +133,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Schválení není dostupné — spusť /api/init.' }, { status: 400 });
     }
   }
+  // Návod k uzávěrce: přepínač stejného druhu jako povinné čtení, jen se
+  // u něj nikomu nic neposílá — je to označení místa, ne úkol.
+  if (body.forClosing !== undefined) {
+    try {
+      await sql`UPDATE guides SET for_closing = ${body.forClosing === true} WHERE id = ${id} AND team_id = ${c.teamId}`;
+      // Na uzávěrce se ukazuje jeden návod. Kdyby jich bylo víc, obsluha by
+      // viděla ten, který se náhodou vybral první.
+      if (body.forClosing === true) {
+        await sql`UPDATE guides SET for_closing = FALSE WHERE team_id = ${c.teamId} AND id <> ${id}`;
+      }
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: 'Návod k uzávěrce není dostupný — spusť /api/init.' }, { status: 400 });
+    }
+  }
+
   const { title, content, categoryId, checklist } = body;
   const hasProduct = Object.prototype.hasOwnProperty.call(body, 'productId');
   const productId = body.productId ? String(body.productId).trim().slice(0, 120) : null;
