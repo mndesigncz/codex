@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     rows = categoryId
       ? await sql`
           SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
-                 g.item_id, g.require_read,
+                 g.item_id, g.require_read, g.for_closing,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
                  EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
           FROM guides g
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
           ORDER BY g.updated_at DESC`
       : await sql`
           SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
-                 g.item_id, g.require_read,
+                 g.item_id, g.require_read, g.for_closing,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
                  EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
           FROM guides g
@@ -100,6 +100,7 @@ export async function GET(request: Request) {
     hasChecklist: checklistLength(g.checklist) > 0,
     productId: g.product_id ?? null,
     itemId: g.item_id != null ? Number(g.item_id) : null,
+    forClosing: g.for_closing === true,
   }));
 
   return NextResponse.json({ guides });

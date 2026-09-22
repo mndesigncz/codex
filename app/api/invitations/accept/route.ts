@@ -56,6 +56,35 @@ export async function POST(request: Request) {
       link: '/employer/overview?view=team-settings',
     }).catch(() => {});
 
+    // Povinné čtení dávalo vědět JEN v okamžiku, kdy ho vedení zapnulo.
+    // Kdo přišel do týmu později — tedy každý nový člověk — se o něm
+    // nedozvěděl vůbec: pozvánka ho pustila rovnou do plného rozhraní
+    // a povinné návody ležely v záložce, kam neměl důvod jít.
+    //
+    // Nic se nikam neukládá: seznam povinných návodů je stav týmu, ne
+    // vlastnost pozvánky. Vázat ho na pozici by nešlo spolehlivě —
+    // `job_title` je volný text, který si zaměstnanec sám přepíše.
+    try {
+      const povinne = await sql`
+        SELECT id, title FROM guides
+        WHERE team_id = ${team.id} AND require_read = TRUE AND approved IS DISTINCT FROM FALSE
+        ORDER BY id`;
+      if (povinne.length > 0) {
+        // Jeden návod → rovnou do něj. Víc → na seznam, kde jsou vidět všechny.
+        const odkaz = povinne.length === 1
+          ? `/employee/shifts?view=guides&guide=${povinne[0].id}`
+          : '/employee/shifts?view=guides';
+        notifyUser(user.id, {
+          title: '📖 Přečti si před první směnou',
+          body: povinne.length === 1
+            ? `Návod „${povinne[0].title}" je povinný — přečti a potvrď.`
+            : `${povinne.length} návodů je povinných — přečti je a potvrď.`,
+          type: 'info',
+          link: odkaz,
+        }).catch(() => {});
+      }
+    } catch { /* před migrací sloupec chybí — pozvánka se tím nesmí zdržet */ }
+
     return NextResponse.json({ ok: true, user });
   } catch (error) {
     console.error('accept invite error', error);

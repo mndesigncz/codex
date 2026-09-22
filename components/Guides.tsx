@@ -41,6 +41,9 @@ interface GuideSummary {
   requireRead?: boolean;
   readCount?: number;
   myRead?: boolean;
+  itemId?: number | null;
+  /** Ukazuje se u kroku „Kontrola kasy" v uzávěrce. */
+  forClosing?: boolean;
 }
 
 interface GuideFull {
@@ -154,6 +157,8 @@ export default function Guides({ user, ticksFor, openGuideId }: {
 
   const [loadErr, setLoadErr] = useState('');
   const [reloadTick, setReloadTick] = useState(0);
+  // U kterého návodu má vedení rozbalený seznam „kdo četl".
+  const [ctenariFor, setCtenariFor] = useState<number | null>(null);
 
   const loadCategories = useCallback(async () => {
     const d = await fetch('/api/guides/categories').then(okJson);
@@ -575,6 +580,15 @@ export default function Guides({ user, ticksFor, openGuideId }: {
                       {summary.requireRead && summary.myRead && (
                         <span className="tap-target-sm rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno</span>
                       )}
+                      {/* Ze samotného čísla „3×" se nedá zjistit, komu
+                          připomenout. Povinné čtení, u kterého nejde zjistit,
+                          kdo chybí, je jen odznak. */}
+                      {isEmployer && summary.requireRead && (
+                        <button onClick={() => setCtenariFor(c => (c === reader.id ? null : reader.id))}
+                          className="tap-target-sm rounded-full bg-black/[0.05] text-black/60 hover:text-black px-3 py-1.5 text-xs font-semibold transition">
+                          {ctenariFor === reader.id ? 'Skrýt, kdo četl' : `Kdo četl (${summary.readCount ?? 0})`}
+                        </button>
+                      )}
                       {isEmployer && (
                         <button
                           onClick={async () => {
@@ -590,9 +604,30 @@ export default function Guides({ user, ticksFor, openGuideId }: {
                           {summary.requireRead ? 'Zrušit povinné čtení' : 'Označit jako povinné čtení'}
                         </button>
                       )}
+                      {/* Krok „Kontrola kasy" je jediné místo, kde vzniká
+                          manko. Návod „co dělat, když to nesedí" tam patří,
+                          ale z rozdělané uzávěrky se do Návodů nikdo nejde
+                          podívat — proto se tenhle jeden připne přímo tam. */}
+                      {isEmployer && (
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/guides/${reader.id}`, {
+                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ forClosing: !(summary.forClosing === true) }),
+                            }).catch(() => null);
+                            if (res?.ok) await loadGuides();
+                          }}
+                          title={'Ukáže se u kroku „Kontrola kasy" v uzávěrce'}
+                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                            summary.forClosing ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
+                          }`}>
+                          {summary.forClosing ? 'Odepnout od uzávěrky' : 'Připnout k uzávěrce'}
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
+                {isEmployer && ctenariFor === reader.id && <CtenariNavodu guideId={reader.id} />}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {isEmployer && !readerLoading && (
@@ -1217,6 +1252,64 @@ function ManageCategories({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Kdo návod četl a kdo ne — jmény, ne číslem. Vidí jen vedení. */
+function CtenariNavodu({ guideId }: { guideId: number }) {
+  const [data, setData] = useState<{
+    read: { id: number; name: string; avatar: string; jobTitle: string | null; readAt: string }[];
+    unread: { id: number; name: string; avatar: string; jobTitle: string | null }[];
+  } | null>(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setData(null); setErr('');
+    fetch(`/api/guides/${guideId}/reads`).then(okJson)
+      .then(d => { if (alive) setData({ read: d.read ?? [], unread: d.unread ?? [] }); })
+      // Tady se mlčet nesmí: prázdný seznam by vedení četlo jako „přečetli
+      // to všichni", což je pravý opak toho, co se stalo.
+      .catch(e => { if (alive) setErr(apiMessage(e, 'Seznam se nenačetl.')); });
+    return () => { alive = false; };
+  }, [guideId]);
+
+  if (err) return <p className="mt-3 text-xs text-bad-ink">{err}</p>;
+  if (!data) return <p className="mt-3 text-xs text-black/40">Načítám…</p>;
+
+  const radek = (
+    p: { id: number; name: string; avatar: string; jobTitle: string | null },
+    kdy?: string,
+  ) => (
+    <li key={p.id} className="flex items-center gap-2 py-1">
+      <span className="shrink-0 text-base leading-none">{p.avatar || '👤'}</span>
+      <span className="min-w-0 flex-1 truncate text-xs text-[#16181A]">
+        {p.name}
+        {p.jobTitle && <span className="ml-1.5 text-black/40">{p.jobTitle}</span>}
+      </span>
+      {kdy && <span className="shrink-0 text-[11px] text-black/40">{formatDate(kdy)}</span>}
+    </li>
+  );
+
+  return (
+    <div className="mt-3 well border border-black/[0.07] p-3 space-y-2.5">
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-bad-ink">
+          Nepřečetli ({data.unread.length})
+        </p>
+        {data.unread.length === 0
+          ? <p className="text-xs text-black/45 mt-1">Přečetli to všichni.</p>
+          : <ul className="mt-1">{data.unread.map(p => radek(p))}</ul>}
+      </div>
+      {data.read.length > 0 && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#5B7A08]">
+            Přečetli ({data.read.length})
+          </p>
+          <ul className="mt-1">{data.read.map(p => radek(p, p.readAt))}</ul>
+        </div>
+      )}
     </div>
   );
 }

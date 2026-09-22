@@ -15,6 +15,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
+import { useOtevreniNavodu } from '@/lib/otevriNavod';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -197,11 +198,13 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
 
 // A numbered, iconed section panel — one guided step of the closing flow.
 function Step({
-  num, total, icon, title, subtitle, children, tone = 'plain', refCb,
+  num, total, icon, title, subtitle, children, tone = 'plain', refCb, guide,
 }: {
   num: number; total: number; icon: string; title: string; subtitle: string;
   children: React.ReactNode; tone?: 'plain' | 'climax';
   refCb?: (el: HTMLElement | null) => void;
+  /** Návod připnutý k tomuhle kroku — viz „Připnout k uzávěrce" v Návodech. */
+  guide?: { id: number; title: string; href: string | null; onOpen?: () => void } | null;
 }) {
   const climax = tone === 'climax';
   return (
@@ -229,6 +232,20 @@ function Step({
           </div>
           <h4 className="font-bold tracking-tight text-[#16181A] leading-tight">{title}</h4>
           <p className="text-black/45 text-[13px] mt-0.5">{subtitle}</p>
+          {/* Když kasa nesedí, odpověď na „co teď" nesmí být v jiné záložce. */}
+          {guide && (guide.href || guide.onOpen) && (
+            guide.onOpen ? (
+              <button type="button" onClick={guide.onOpen}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1.5 text-[11px] font-semibold transition">
+                <Icon name="book" size={13} /> {guide.title}
+              </button>
+            ) : (
+              <a href={guide.href as string}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1.5 text-[11px] font-semibold transition">
+                <Icon name="book" size={13} /> {guide.title}
+              </a>
+            )
+          )}
         </div>
       </div>
       {children}
@@ -277,6 +294,28 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   initialDate?: string;
 }) {
   const [closings, setClosings] = useState<Closing[]>([]);
+  // Návod připnutý k uzávěrce („Připnout k uzávěrce" v Návodech). Ukazuje se
+  // u kroku „Kontrola kasy" — jediného místa v aplikaci, kde vzniká manko.
+  // Když se seznam nenačte, krok vypadá přesně jako dřív.
+  const navodOdkaz = useOtevreniNavodu();
+  const [navodUzaverkyRaw, setNavodUzaverkyRaw] = useState<{ id: number; title: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/guides').then(okJson)
+      .then(d => {
+        if (!alive || !Array.isArray(d.guides)) return;
+        const g = d.guides.find((x: any) => x.forClosing === true && x.approved !== false);
+        setNavodUzaverkyRaw(g ? { id: Number(g.id), title: String(g.title) } : null);
+      })
+      .catch(() => { /* bez návodu se uzávěrka chová jako dřív */ });
+    return () => { alive = false; };
+  }, []);
+  const navodUzaverky = navodUzaverkyRaw ? {
+    id: navodUzaverkyRaw.id,
+    title: navodUzaverkyRaw.title,
+    href: navodOdkaz.guideHref ? navodOdkaz.guideHref(navodUzaverkyRaw.id) : null,
+    onOpen: navodOdkaz.onOpenGuide ? () => navodOdkaz.onOpenGuide!(navodUzaverkyRaw.id) : undefined,
+  } : null;
   const [payDailyCash, setPayDailyCash] = useState(false);
   // Per-closing money-flow flags, seeded from the team policy so a reset after
   // submitting goes back to the team default rather than a hardcoded guess.
@@ -1005,7 +1044,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
         {/* Step 4 — the climax: expected vs counted */}
         <Step refCb={el => { stepRefs.current[3] = el; }} num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
-          subtitle="Spočítej hotovost v kase a porovnej s očekáváním.">
+          subtitle="Spočítej hotovost v kase a porovnej s očekáváním."
+          guide={navodUzaverky}>
           {/* The arithmetic spelled out — no mystery number to argue with. */}
           <div className="rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3.5 space-y-1.5">
             {expectedLines.map(l => (

@@ -13,6 +13,16 @@ interface Props {
   onSkip?: (index: number) => void;     // skip button / right-click → skipped
   interactive?: boolean;
   compact?: boolean;
+  /**
+   * Jak otevřít návod připnutý ke kroku.
+   *
+   * Ve webu stačí odkaz `?view=guides&guide=N` — layout ho umí přečíst.
+   * Na tabletu URL směrování není, takže kiosk předá callback a přepne
+   * záložku sám. Bez obojího se odkaz nevykreslí vůbec, aby nikde
+   * nesvítilo tlačítko, které nikam nevede.
+   */
+  onOpenGuide?: (guideId: number) => void;
+  guideHref?: (guideId: number) => string;
 }
 
 const clockGlyph = (
@@ -28,11 +38,14 @@ const skipGlyph = (
 const infoGlyph = (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
 );
+const bookGlyph = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+);
 
 // One consistent on-brand tile (lime + lime-text) for every step.
 const TILE = 'bg-[#C8F542]/30 text-[#5B7A08]';
 
-export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, interactive = false, compact = false }: Props) {
+export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, interactive = false, compact = false, onOpenGuide, guideHref }: Props) {
   return (
     <ol className="relative">
       {steps.map((s, i) => {
@@ -93,6 +106,24 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                         <span className="mt-0.5 flex-shrink-0 text-black/30">{infoGlyph}</span>
                         <span className="leading-snug">{s.note}</span>
                       </p>
+                    )}
+                    {/* Návod ke kroku. Klik se nesmí propsat na kartu — ta
+                        krok odškrtne, takže bez stopPropagation by otevření
+                        návodu zároveň prohlásilo krok za hotový. */}
+                    {s.guideId != null && !skipped && (onOpenGuide || guideHref) && (
+                      onOpenGuide ? (
+                        <button type="button"
+                          onClick={(e) => { e.stopPropagation(); onOpenGuide(s.guideId as number); }}
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1 text-[11px] font-semibold transition">
+                          {bookGlyph} Otevřít návod
+                        </button>
+                      ) : (
+                        <a href={guideHref!(s.guideId as number)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1 text-[11px] font-semibold transition">
+                          {bookGlyph} Otevřít návod
+                        </a>
+                      )
                     )}
                   </div>
                   {s.minutes != null && !skipped && (

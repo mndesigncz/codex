@@ -879,6 +879,13 @@ export async function GET(request: Request) {
     // schvalování, bez potvrzení o přečtení a neviditelný ze záložky Návody.
     await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS item_id INTEGER`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS guides_item_idx ON guides (item_id)`);
+    // Návod k uzávěrce. Krok „Kontrola kasy“ je jediné místo v aplikaci,
+    // kde vzniká manko — tedy nejdražší chyba, kterou obsluha udělá —
+    // a odpověď na „co teď, když to nesedí“ ležela v Návodech, kam se
+    // z rozdělané uzávěrky nikdo nešel dívat. Příznak je na návodu
+    // stejně jako `require_read`, aby na to nemusela vzniknout další
+    // obrazovka nastavení.
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS for_closing BOOLEAN DEFAULT FALSE`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS guide_reads (
         id SERIAL PRIMARY KEY,

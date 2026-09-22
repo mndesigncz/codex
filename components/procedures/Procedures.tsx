@@ -14,6 +14,8 @@ import { clickable } from '@/lib/clickable';
 import { czForm } from '@/lib/czech';
 import { okJson, apiMessage } from '@/lib/api';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
+import { useOtevreniNavodu } from '@/lib/otevriNavod';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -519,6 +521,7 @@ function ProcedureDetail({
   const dm = useModal(true, onClose, 'Detail postupu');
   const steps = parseSteps(procedure.items);
   const mins = totalMinutes(steps);
+  const navodOdkaz = useOtevreniNavodu();
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
@@ -555,7 +558,7 @@ function ProcedureDetail({
 
         {/* Timeline preview */}
         <div className="overflow-y-auto scrollbar-thin px-5 pb-2">
-          <StepTimeline steps={steps} />
+          <StepTimeline steps={steps} {...navodOdkaz} />
         </div>
 
         {/* Play */}
@@ -613,13 +616,24 @@ function ProcedureEditor({
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
-  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null });
+  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null });
   const [steps, setSteps] = useState<Step[]>(() => {
     const parsed = parseSteps(initial?.items);
     return parsed.length ? parsed : [blankStep()];
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Návody se načtou JEDNOU pro celý editor — kroků bývá dvacet a dvacet
+  // stejných požadavků na `/api/guides` je zbytečných. Když se načtení
+  // nepovede, výběr se prostě nenabídne; postup se uloží i tak.
+  const [guideOptions, setGuideOptions] = useState<PickableGuide[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/guides').then(okJson)
+      .then(d => { if (alive && Array.isArray(d.guides)) setGuideOptions(d.guides.map((g: any) => ({ id: Number(g.id), title: String(g.title) }))); })
+      .catch(() => { /* bez návodů se krok uloží taky */ });
+    return () => { alive = false; };
+  }, []);
 
   const patchStep = (i: number, patch: Partial<Step>) => setSteps(prev => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const addStep = () => setSteps(prev => [...prev, blankStep()]);
@@ -644,6 +658,9 @@ function ProcedureEditor({
         // Scoring config must survive the round-trip — dropping it here would
         // silently reset every "klíčový krok" back to normal on each save.
         weight: s.weight ?? 'normal', penalty: s.penalty ?? null,
+        // Totéž platí pro návod: kdyby se tu zahodil, každé uložení postupu
+        // by obsluze potichu sebralo odkaz na postup, podle kterého pracuje.
+        guideId: s.guideId ?? null,
       }))
       .filter(s => s.text.length > 0);
     if (!cleanName) { setError('Zadejte název postupu.'); return; }
@@ -792,6 +809,12 @@ function ProcedureEditor({
                       aria-label={`Poznámka ke kroku ${i + 1} (nepovinné)`}
                       placeholder="Poznámka (nepovinné)"
                       className="flex-1 min-w-0 rounded-xl bg-white/50 border border-black/[0.06] px-3.5 py-2 text-xs text-black/70 placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
+                    />
+                    {/* Poznámka je na jednu větu. „Vyčistit kávovar" chce celý
+                        postup — a ten v Návodech nejspíš už je. */}
+                    <StepGuidePicker
+                      guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
+                      onChange={g => patchStep(i, { guideId: g })}
                     />
                     <div className="flex flex-shrink-0 items-center">
                       <button onClick={() => move(i, -1)} disabled={i === 0} title="Nahoru" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">

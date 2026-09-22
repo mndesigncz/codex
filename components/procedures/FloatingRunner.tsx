@@ -5,6 +5,7 @@ import { useProcedures } from './ProcedureProvider';
 import { parseSteps } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
+import { useOtevreniNavodu } from '@/lib/otevriNavod';
 
 import { Icon } from '../Icons';
 import { czForm } from '@/lib/czech';
@@ -72,6 +73,12 @@ export default function FloatingRunner() {
   const [skipNote, setSkipNote] = useState('');
   const elapsed = useElapsed(active?.startedAt);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Běžec visí v `app/providers.tsx`, tedy nad vedením, zaměstnancem
+  // i tabletem naráz, a sám neví, kde je. Na tabletu si otevírání přebírá
+  // kiosk (přepne záložku), jinde stačí odkaz odvozený z cesty. Když ani
+  // jedno, tlačítko se nevykreslí — viz lib/otevriNavod.ts.
+  const navodOdkaz = useOtevreniNavodu();
 
   // Reset transient UI when a new run starts / celebration appears.
   useEffect(() => { if (active) { setMinimized(false); setConfirmClose(false); setConfirmFinish(false); } }, [active?.id]);
@@ -277,6 +284,7 @@ export default function FloatingRunner() {
                   }}
                   interactive
                   compact
+                  {...navodOdkaz}
                 />
               </div>
 
