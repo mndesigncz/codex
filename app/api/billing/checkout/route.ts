@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { employerCtx } from '../_auth';
 import { createCheckout, NOT_CONFIGURED, stripe } from '@/lib/billing';
+import { verejnaHlaska } from '@/lib/verejnaChyba';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,6 @@ export async function POST(req: Request) {
     const out = await createCheckout(c.teamId, plan, interval, b.embedded ? 'embedded' : 'hosted');
     return NextResponse.json(out);
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? 'Pokladnu se nepodařilo otevřít.') }, { status: 400 });
+    return NextResponse.json({ error: verejnaHlaska(e, 'Pokladnu se nepodařilo otevřít.', '[billing] checkout') }, { status: 400 });
   }
 }

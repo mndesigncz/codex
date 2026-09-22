@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
   const shiftId = parseInt(b.shiftId);
   if (!Number.isFinite(shiftId)) return NextResponse.json({ error: 'Neplatná směna.' }, { status: 400 });
 
-  const [shift] = await sql`SELECT id, employee_id, date FROM shifts WHERE id = ${shiftId}`;
+  // Jen směna AKTIVNÍHO podniku: kdo pracuje ve dvou, nesmí nabídnout směnu
+  // z podniku A do burzy podniku B (vedení B by ji pak přidělilo svému člověku).
+  const [shift] = await sql`SELECT id, employee_id, date FROM shifts WHERE id = ${shiftId} AND team_id = ${c.teamId}`;
   if (!shift) return NextResponse.json({ error: 'Směna nenalezena.' }, { status: 404 });
   if (shift.employee_id !== c.meId) return NextResponse.json({ error: 'Můžeš nabídnout jen svou směnu.' }, { status: 403 });
   if (shift.date < today()) return NextResponse.json({ error: 'Minulou směnu nabídnout nelze.' }, { status: 400 });
@@ -144,7 +146,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Approve: actually reassign the shift to the person who claimed it.
-    await sql`UPDATE shifts SET employee_id = ${o.claimed_by} WHERE id = ${o.shift_id}`;
+    await sql`UPDATE shifts SET employee_id = ${o.claimed_by} WHERE id = ${o.shift_id} AND team_id = ${c.teamId}`;
     await sql`UPDATE shift_offers SET status = 'approved' WHERE id = ${id}`;
     try {
       await notifyUser(o.claimed_by, { title: '✅ Směna je tvoje', body: `Vedení schválilo převzetí směny ${o.date}.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=availability' });

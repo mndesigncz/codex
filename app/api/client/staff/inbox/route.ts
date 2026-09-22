@@ -6,6 +6,7 @@ import { setOrderStatus, refreshPosState, sendToPos } from '@/lib/clientOrders';
 import { getConnection } from '@/lib/storyous';
 import { pragueToday } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
+import { verejnaHlaska } from '@/lib/verejnaChyba';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -78,7 +79,7 @@ export async function PATCH(req: NextRequest) {
       audit(u.team_id, u.id, 'client.order.pos', 'client', id, r.posNote ?? '');
       return NextResponse.json({ ok: r.posOk, ...r });
     } catch (e: any) {
-      return NextResponse.json({ error: String(e?.message ?? 'Nepovedlo se.').slice(0, 160) }, { status: 400 });
+      return NextResponse.json({ error: verejnaHlaska(e, 'Odeslání do pokladny se nepovedlo.', '[inbox] pos') }, { status: 400 });
     }
   }
 
@@ -89,6 +90,6 @@ export async function PATCH(req: NextRequest) {
     audit(u.team_id, u.id, 'client.order', 'client', id, `objednávka → ${next}${r.posNote ? ` · ${r.posNote}` : ''}`);
     return NextResponse.json({ ok: true, ...r });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? 'Nepovedlo se.').slice(0, 160) }, { status: 400 });
+    return NextResponse.json({ error: verejnaHlaska(e, 'Stav objednávky se nepodařilo změnit.', '[inbox] status') }, { status: 400 });
   }
 }

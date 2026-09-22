@@ -3,6 +3,7 @@
 // bez přepočtů. Poměr stran drží `ratio`; při nahrání podkladu se vezme
 // z jeho viewBoxu.
 
+import { sanitizeSvg } from './svgSanitize.ts';
 export type Shape =
   | { id: string; type: 'wall'; x1: number; y1: number; x2: number; y2: number; t: number }
   | { id: string; type: 'room'; x: number; y: number; w: number; h: number; label?: string }
@@ -33,7 +34,16 @@ export function normalizePlan(raw: any): FloorPlan {
     else if (s?.type === 'label') { const text = txt(s.text); if (text) shapes.push({ id, type: 'label', x: pct(s.x), y: pct(s.y), text }); }
   }
   let bg: FloorPlan['bg'] = null;
-  if (typeof raw?.bg?.svg === 'string' && raw.bg.svg.length < 500_000) bg = { svg: raw.bg.svg };
+  // SVG se kreslí přes dangerouslySetInnerHTML — na veřejné stránce podniku
+  // i v editoru. Čistička dřív běžela jen při nahrání souboru; PUT plánku
+  // bral `bg.svg` tak, jak ho poslal prohlížeč, takže kdokoli s účtem
+  // vedení mohl uložit `<img onerror=…>` a skript se spustil každému hostovi
+  // i personálu cizích podniků na doméně aplikace. Teď projde čističkou
+  // při KAŽDÉM průchodu — při uložení i při čtení, takže se zneškodní i to,
+  // co už v databázi leží.
+  if (typeof raw?.bg?.svg === 'string' && raw.bg.svg.length < 500_000) {
+    try { bg = { svg: sanitizeSvg(raw.bg.svg, 500_000).svg }; } catch { bg = null; }
+  }
   else if (typeof raw?.bg?.src === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(raw.bg.src) && raw.bg.src.length < 700_000) bg = { src: raw.bg.src };
   return {
     v: 1,

@@ -22,7 +22,7 @@ function hhmmPrague(d = new Date()): string {
 // closing counts it. Returns silently on any error (e.g. column not migrated).
 async function ensureShift(teamId: number, employeeId: number, date: string, start: string, end: string) {
   try {
-    const [sh] = await sql`SELECT id FROM shifts WHERE employee_id = ${employeeId} AND date = ${date} LIMIT 1`;
+    const [sh] = await sql`SELECT id FROM shifts WHERE employee_id = ${employeeId} AND date = ${date} AND team_id = ${teamId} LIMIT 1`;
     if (sh) return;
     try {
       await sql`INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, auto_created)
@@ -236,9 +236,12 @@ export async function POST(req: NextRequest) {
     await clear(`pin:${employeeId}`);
   }
 
+  // Otevřený příchod v TOMHLE podniku. Bez filtru odchod v podniku A zavřel
+  // příchod z podniku B. NULL připouští řádky z doby před sloupcem team_id.
   const [open] = await sql`
     SELECT id, clock_in FROM time_entries
     WHERE employee_id = ${employeeId} AND clock_out IS NULL
+      AND (team_id = ${c.teamId} OR team_id IS NULL)
     ORDER BY clock_in DESC LIMIT 1`;
 
   const today = pragueToday();

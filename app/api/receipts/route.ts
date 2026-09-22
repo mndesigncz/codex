@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
+import { souborUrl } from '@/lib/bezpecnaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const u = await employer();
   if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const b = await req.json().catch(() => ({}));
-  const photoUrl = b.photoUrl ? String(b.photoUrl).slice(0, 500) : null;
+  const photoUrl = souborUrl(b.photoUrl);
   const supplier = b.supplier ? String(b.supplier).trim().slice(0, 160) : null;
   const amount = b.amount === null || b.amount === undefined || b.amount === ''
     ? null : Math.max(0, Math.round(Number(b.amount)) || 0);

@@ -3,6 +3,8 @@ import { neon } from '@neondatabase/serverless';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
+import { checkCron } from '@/lib/cronAuth';
+import { hit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,18 +20,22 @@ export async function GET(request: Request) {
     commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
   };
-  let allowed = false;
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get('authorization') ?? '';
-    const key = new URL(request.url).searchParams.get('key');
-    allowed = (auth.startsWith('Bearer ') && auth.slice(7) === secret) || key === secret;
-  }
+  // Tajemství se porovnává v konstantním čase (checkCron), ne `===`.
+  const zCronu = checkCron(request).ok;
+  let allowed = zCronu;
   if (!allowed) {
     try {
       const session = await getServerSession(authOptions);
       allowed = (session?.user as any)?.role === 'employer';
     } catch { /* bez session zůstává zakázáno */ }
+    // Vedení migraci spouští po nasazení (MigrationOnLoad), ale je to migrace
+    // CELÉ platformy — přes všechny podniky. Vedení se dá registrovat samo,
+    // takže bez limitu šla spouštět dokola jako zátěž. Šest spuštění za deset
+    // minut po nasazení stačí; cron limit nemá.
+    if (allowed) {
+      const gate = await hit('init:vedeni', 6, 10 * 60);
+      if (!gate.ok) return NextResponse.json({ ok: false, migrated: false, throttled: true, ...version });
+    }
   }
   if (!allowed) {
     // Verze ano — ta se dá vyčíst i z hlaviček Vercelu a hodí se pro kontrolu
@@ -1779,6 +1785,32 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`);
 
+    // ---- Řádky bez podniku ----
+    // Sklad a uzávěrky z doby před sloupcem team_id měly podnik NULL a dotazy
+    // je pouštěly k „team_id = můj OR team_id IS NULL" — tedy KAŽDÉMU podniku
+    // na platformě, včetně úprav a mazání. Tým se doplní podle autora;
+    // co autora nemá, pochází z doby jediného (referenčního) podniku a patří
+    // nejstaršímu týmu. Potom dotazy na NULL přestanou sahat.
+    await ddl(sql`UPDATE inventory_items i SET team_id = u.team_id FROM users u
+                  WHERE i.team_id IS NULL AND i.created_by = u.id AND u.team_id IS NOT NULL`);
+    await ddl(sql`UPDATE inventory_items SET team_id = (SELECT MIN(id) FROM teams) WHERE team_id IS NULL`);
+    await ddl(sql`UPDATE cash_closings c SET team_id = u.team_id FROM users u
+                  WHERE c.team_id IS NULL AND c.created_by = u.id AND u.team_id IS NOT NULL`);
+    await ddl(sql`UPDATE cash_closings SET team_id = (SELECT MIN(id) FROM teams) WHERE team_id IS NULL`);
+
+    // ---- Adresy s nebezpečným schématem ----
+    // Web dodavatele, fotka položky, příloha v chatu a fotka účtenky se
+    // vykreslují jako odkaz. Hodnota `javascript:…` se spustila s relací
+    // toho, kdo klikl. Nové zápisy už hlídá lib/bezpecnaUrl; tady se
+    // vynulují staré, které mají jiné schéma než http(s). Relativní cesty
+    // (/api/upload/…) a holé domény zůstávají.
+    const zleSchema = '^\\s*[a-zA-Z][a-zA-Z0-9+.-]*:';
+    const dobreSchema = '^\\s*https?:';
+    await ddl(sql`UPDATE inventory_items SET supplier_url = NULL WHERE supplier_url ~ ${zleSchema} AND supplier_url !~* ${dobreSchema}`);
+    await ddl(sql`UPDATE inventory_items SET photo_url = NULL WHERE photo_url ~ ${zleSchema} AND photo_url !~* ${dobreSchema}`);
+    await ddl(sql`UPDATE receipts SET photo_url = NULL WHERE photo_url ~ ${zleSchema} AND photo_url !~* ${dobreSchema}`);
+    await ddl(sql`UPDATE chat_messages SET attachment_url = NULL WHERE attachment_url ~ ${zleSchema} AND attachment_url !~* ${dobreSchema}`);
+
     // ---- PIN na kiosku se ukládá zahašovaný ----
     // Sloupec `pin` nesl čtyři číslice v čitelné podobě: kdo se dostal k výpisu
     // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;
@@ -1804,14 +1836,11 @@ export async function GET(request: Request) {
       message: 'Databáze inicializována — všechny tabulky připraveny.',
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
       deployment: process.env.VERCEL_DEPLOYMENT_ID ?? null,
-      // Migrations that are allowed to fail silently report their outcome here,
-      // so a swallowed one can be seen from outside instead of guessed at.
-      closingIndex,
-      closingIndexes,
-      closingConstraints,
-      birthdays,
+      // Počet selhaných kroků vidí každý, kdo migraci spustil. Podrobnosti
+      // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
+      // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      migFailDetail: migFails.slice(0, 10),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { webovaUrl } from '@/lib/bezpecnaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +80,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.supplierUrl !== undefined) {
-    const url = patch.supplierUrl ? String(patch.supplierUrl).trim().slice(0, 500) || null : null;
+    const url = webovaUrl(patch.supplierUrl);
     await sql`UPDATE inventory_items SET supplier_url = ${url} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
     applied.push('supplierUrl');
   }

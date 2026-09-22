@@ -10,6 +10,7 @@ import { randomBytes } from 'crypto';
 import { health, runFullSync, backfill, rememberStock } from '@/lib/posMirror';
 import { getConnection } from '@/lib/storyous';
 import { audit } from '@/lib/audit';
+import { verejnaHlaska } from '@/lib/verejnaChyba';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -76,6 +77,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String((e as any)?.message ?? 'Selhalo').slice(0, 160) }, { status: 502 });
+    return NextResponse.json({ error: verejnaHlaska(e, 'Spojení s pokladnou selhalo.', '[pos/status]') }, { status: 502 });
   }
 }

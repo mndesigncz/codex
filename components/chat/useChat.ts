@@ -109,7 +109,9 @@ export async function markRead(conversationId: number): Promise<void> {
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-export async function uploadFile(file: File): Promise<UploadResult | null> {
+/** Úspěch vrátí soubor, neúspěch důvod — server říká proč (typ, velikost),
+ *  a „nezdařilo se" bez důvodu člověka nechá zkoušet totéž pořád dokola. */
+export async function uploadFile(file: File): Promise<UploadResult | { error: string }> {
   const { compressImage } = await import('@/lib/clientImage');
   const prepared = await compressImage(file);
   const form = new FormData();
@@ -117,8 +119,10 @@ export async function uploadFile(file: File): Promise<UploadResult | null> {
   // Stejný důvod jako u `sendMessage`: offline `fetch` vyhodí výjimku,
   // kterou volající nečeká, a nahrávání pak zůstane viset na „Nahrávám…".
   const res = await fetch('/api/upload', { method: 'POST', body: form }).catch(() => null);
-  if (!res || !res.ok) return null;
-  return (await res.json()) as UploadResult;
+  if (!res) return { error: 'Nahrání se nezdařilo — zkontroluj připojení.' };
+  const d = await res.json().catch(() => null);
+  if (!res.ok || !d?.url) return { error: typeof d?.error === 'string' ? d.error : 'Nahrání souboru se nezdařilo.' };
+  return d as UploadResult;
 }
 
 /**

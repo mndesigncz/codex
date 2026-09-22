@@ -4,6 +4,8 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { notifyUser } from '@/lib/push';
 import { linkNewMember } from '@/lib/chat';
+import { hit } from '@/lib/rateLimit';
+import { klientIp } from '@/lib/klientIp';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +21,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků' }, { status: 400 });
     }
 
+    // Kód týmu má šest znaků — asi miliarda kombinací. Bez limitu se dal
+    // zkoušet strojově a kdo trefil, dostal se jako zaměstnanec do cizího
+    // podniku: rozvrh, chat, sklad. Deset pokusů z jedné adresy za čtvrt
+    // hodiny člověku s překlepem stačí, skriptu ne. Počítá se každý pokus,
+    // ne jen neúspěšný, ať se limit nedá obejít střídáním s platným kódem.
+    const gate = await hit(`join-ip:${klientIp(request.headers)}`, 10, 15 * 60, { failClosed: true });
+    if (!gate.ok) {
+      return NextResponse.json({ error: `Příliš mnoho pokusů. Zkus to znovu za ${Math.ceil(gate.retryAfter / 60)} min.` }, { status: 429, headers: { 'Retry-After': String(gate.retryAfter) } });
+    }
+
     const sql = neon(process.env.DATABASE_URL!);
 
-    const [team] = await sql`SELECT id, owner_id, name FROM teams WHERE join_code = ${joinCode.trim().toUpperCase()}`;
+    const [team] = await sql`SELECT id, owner_id, name FROM teams WHERE join_code = ${String(joinCode).trim().toUpperCase()}`;
     if (!team) {
       return NextResponse.json({ error: 'Neplatný kód týmu' }, { status: 404 });
     }

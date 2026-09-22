@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { createNoisiumProject } from '@/lib/noisium';
+import { createNoisiumProject, bezpecnaZakladna } from '@/lib/noisium';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
   const [team] = await c.sql`SELECT name, noisium_project_id FROM teams WHERE id = ${c.teamId}`;
   try {
+    if (baseUrl) bezpecnaZakladna(String(baseUrl));
     // Reuse existing project if already created, else create a new one named after the team
     let projectId = team?.noisium_project_id as string | null;
     if (!projectId) {

@@ -7,6 +7,7 @@ import { normalizeCategoryPackaging, stockStatus, type CategoryPackaging } from 
 import { resolveActingUser } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 import { packagingSourceOf } from '@/lib/categoryTree';
+import { webovaUrl, souborUrl } from '@/lib/bezpecnaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +60,7 @@ export async function GET() {
       FROM inventory_items i
       LEFT JOIN users u ON u.id = i.updated_by
       LEFT JOIN users s ON s.id = i.submitted_by
-      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      WHERE i.team_id = ${me.teamId}
       ORDER BY i.name ASC`;
   } catch {
    try {
@@ -90,7 +91,7 @@ export async function GET() {
       FROM inventory_items i
       LEFT JOIN users u ON u.id = i.updated_by
       LEFT JOIN users s ON s.id = i.submitted_by
-      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      WHERE i.team_id = ${me.teamId}
       ORDER BY i.name ASC`;
    } catch {
    try {
@@ -110,7 +111,7 @@ export async function GET() {
         u.name              AS "updatedByName"
       FROM inventory_items i
       LEFT JOIN users u ON u.id = i.updated_by
-      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      WHERE i.team_id = ${me.teamId}
       ORDER BY i.name ASC`;
    } catch {
     items = await sql`
@@ -126,7 +127,7 @@ export async function GET() {
         u.name              AS "updatedByName"
       FROM inventory_items i
       LEFT JOIN users u ON u.id = i.updated_by
-      WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+      WHERE i.team_id = ${me.teamId}
       ORDER BY i.name ASC`;
    }
    }
@@ -231,7 +232,7 @@ export async function POST(request: Request) {
   const maxQuantity = Number(body.maxQuantity) || 0;
   const unit = body.unit ?? 'ks';
   const supplier = body.supplier ?? null;
-  const supplierUrl = body.supplierUrl ? String(body.supplierUrl).trim() || null : null;
+  const supplierUrl = webovaUrl(body.supplierUrl);
 
   const unitCost = body.unitCost === '' || body.unitCost == null ? null : Math.max(0, Math.round(Number(body.unitCost)));
 
@@ -244,8 +245,10 @@ export async function POST(request: Request) {
         (${me.teamId}, ${name}, ${category}, ${quantity}, ${minQuantity}, ${criticalQuantity}, ${maxQuantity}, ${unit}, ${supplier}, ${supplierUrl}, ${authorId}, ${authorId}, NOW())
       RETURNING id`;
   } catch (e) {
-    // A naked 500 here once cost a debugging session — name the reason.
-    return NextResponse.json({ error: 'Položku se nepodařilo vytvořit.', detail: String(e).slice(0, 300) }, { status: 500 });
+    // Příčina patří do logu, ne do prohlížeče: `detail` nesl celou hlášku
+    // Postgresu (tabulky, sloupce, omezení) komukoli z týmu včetně tabletu.
+    console.error('[inventory] založení položky selhalo', e);
+    return NextResponse.json({ error: 'Položku se nepodařilo vytvořit.' }, { status: 500 });
   }
 
   // Crew entries wait for the employer's tick; the columns are newer, so the
@@ -305,7 +308,7 @@ export async function POST(request: Request) {
   }
 
   // A photo of the actual thing — how the employer recognizes what the crew brought in.
-  const photoUrl = body.photoUrl ? String(body.photoUrl).trim().slice(0, 500) || null : null;
+  const photoUrl = souborUrl(body.photoUrl);
   if (photoUrl) {
     try { await sql`UPDATE inventory_items SET photo_url = ${photoUrl} WHERE id = ${item.id}`; } catch { /* not migrated */ }
   }
