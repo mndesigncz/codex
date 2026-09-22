@@ -9,6 +9,9 @@ import HeroVideo from './landing/HeroVideo';
 import Zarizeni from './landing/Zarizeni';
 import FeatureShowcase, { type Funkce } from './landing/FeatureShowcase';
 import ForceLight from './landing/ForceLight';
+import LandingHeader from './landing/LandingHeader';
+import Naklon from './landing/Naklon';
+import Stena from './landing/Stena';
 import type { FotoId } from './landing/foto';
 
 // Prodejní stránka pro nepřihlášené — co Managero je, co umí a co stojí.
@@ -151,29 +154,7 @@ export default function Landing() {
         <div className="lg-blob lg-blob-lime-2 w-[30rem] h-[30rem] top-[16rem] left-[38%]" />
       </div>
 
-      {/* Header — skleněná lišta držící se horní hrany. */}
-      <header className="sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-3 sm:px-5 pt-3">
-          <div className="lgx rounded-full px-4 sm:px-5 py-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <LogoMark size={32} />
-              <span className="text-lg font-bold tracking-tight text-[#16181A] truncate">Managero</span>
-            </div>
-            <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
-              <a href="#funkce" className="hidden md:inline rounded-full px-3 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors">Funkce</a>
-              <a href="#zacatek" className="hidden lg:inline rounded-full px-3 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors">Jak začít</a>
-              <a href="#cenik" className="hidden md:inline rounded-full px-3 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors">Ceník</a>
-              <Link href="/login" className="rounded-full px-2.5 sm:px-4 py-2 text-sm font-medium text-black/60 hover:text-black transition-colors whitespace-nowrap">
-                Přihlásit
-              </Link>
-              <Link href="/register" className="rounded-full bg-[#C8F542] on-accent px-3.5 sm:px-5 py-2 text-sm font-semibold hover:brightness-105 transition-colors whitespace-nowrap">
-                <span className="sm:hidden">Zdarma</span>
-                <span className="hidden sm:inline">Vyzkoušet zdarma</span>
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <LandingHeader />
 
       {/* Hero: text vlevo, fotka podniku vpravo. Karta s dnešním ránem leží
           na telefonu POD fotkou a teprve od 640 px na ní — plovoucí prvek
@@ -191,7 +172,7 @@ export default function Landing() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <Zkusit />
-              <a href="#funkce" className="pressable w-full sm:w-auto lgx rounded-full px-7 py-3.5 text-sm font-semibold text-black/70 hover:text-black active:scale-[0.97] inline-flex items-center justify-center">
+              <a href="#funkce" className="pressable w-full sm:w-auto btn btn-secondary btn-lg active:scale-[0.97] inline-flex items-center justify-center">
                 Co všechno umí?
               </a>
             </div>
@@ -199,19 +180,21 @@ export default function Landing() {
           </div>
 
           <div className="relative rise-in" style={{ animationDelay: '120ms' }}>
-            <div className="relative mx-auto w-full max-w-[34rem]">
+            <Naklon className="relative mx-auto w-full max-w-[34rem]">
               <div className="lg-blob lg-blob-lime-2 absolute inset-8 -z-10" aria-hidden />
               {/* Jediná fotka, která se načítá hned. Od 768 px nad ní ožije
                   video vyrobené z téže fotky — na telefonu zůstane fotka. */}
-              <div className="foto-ramec aspect-[4/5]">
+              <div className="naklon-vrstva foto-ramec aspect-[4/5]" style={{ ['--hloubka' as string]: -0.35 }}>
                 <Foto id="barista" bezRamu sizes="(max-width: 1024px) 92vw, 34rem" priority />
                 <HeroVideo src="/brand/landing/foto/barista" />
               </div>
               {/* Produkt v prostoru: skutečná scéna rozvrhu v tabletu, lehce
                   natočená nad fotkou. Na telefonu leží pod fotkou — schovat
                   produkt na nejčastější obrazovce by popřelo smysl hero. */}
-              <Zarizeni scena="rozvrh" className="mt-4 sm:mt-0 sm:absolute sm:-top-6 sm:-right-3 lg:-right-5 xl:-right-8 w-full sm:w-[17rem] lg:w-[19.5rem]" />
-              <div className="hidden sm:block sm:absolute sm:bottom-4 sm:-left-4 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]">
+              <div className="naklon-vrstva mt-4 sm:mt-0 sm:absolute sm:-top-6 sm:-right-3 lg:-right-5 xl:-right-8 w-full sm:w-[17rem] lg:w-[19.5rem]" style={{ ['--hloubka' as string]: 1.7 }}>
+                <Zarizeni scena="rozvrh" />
+              </div>
+              <div className="naklon-vrstva hidden sm:block sm:absolute sm:bottom-4 sm:-left-4 lgx-strong rounded-3xl px-4 py-3 shadow-[0_18px_44px_rgba(25,35,15,0.16)]" style={{ ['--hloubka' as string]: 1.1 }}>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-black/50">Dnes ráno</p>
                 <ul className="mt-1.5 space-y-1 text-sm text-[#16181A]">
                   <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-ok i-pulse shrink-0" />Směna: Eva 8–16, Martin od 12</li>
@@ -219,7 +202,7 @@ export default function Landing() {
                   <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full dot-muted shrink-0" />Včerejší uzávěrka sedí na korunu</li>
                 </ul>
               </div>
-            </div>
+            </Naklon>
           </div>
         </div>
       </section>
@@ -249,16 +232,31 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Stěna obrazovek: celá aplikace v prostoru, ne jedna obrazovka. */}
+      <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
+        <div className="max-w-xl">
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Celá aplikace, ne jedna obrazovka</h2>
+          <p className="mt-3 text-base text-black/55 text-pretty">Sklad, kasa a peníze vedle sebe. Tři sešity, které v podniku obvykle nikdo nevede do konce — tady se vedou samy a navzájem si sedí.</p>
+        </div>
+        <Stena />
+      </section>
+
       {/* Den s podnikem: čtyři momenty. Fotka podniku, kus skutečného
           rozhraní a věta, co se v tu hodinu doopravdy děje. */}
-      <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
+      <section id="den" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24 scroll-mt-24">
         <div className="max-w-xl">
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Jeden den s Managerem</h2>
           <p className="mt-3 text-base text-black/55 text-pretty">Od otevření po uzávěrku — takhle vypadá den, kdy nic nedrží na papírku.</p>
         </div>
-        <div className="mt-10 space-y-6">
+        <div className="den-osa mt-10 space-y-6">
           {DAY.map((d, i) => (
             <Reveal key={d.time} delay={i % 2 ? 80 : 0}>
+              <div className="md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] md:gap-4 md:items-start">
+              {/* Hodina na ose. Na monitoru sedí u linky a jede s kartou;
+                  na telefonu je v kartě, osa tam není. */}
+              <div className="hidden md:flex md:sticky md:top-24 justify-center">
+                <span className="lgx-strong rounded-full px-3 py-1.5 text-xs font-bold tabular-nums text-[#16181A]">{d.time}</span>
+              </div>
               {/* O výšce karty rozhoduje text; fotka vyplní, co zbude
                   (`foto-vypln`). Dřív to bylo naopak a text plaval ve
                   vzduchu — na 1280 px zabíral 36–40 % výšky karty. Karta
@@ -266,10 +264,14 @@ export default function Landing() {
                   se překrývají, ne že vedle sebe leží. */}
               <div className={`lgx rounded-[2rem] p-5 sm:p-8 grid grid-cols-1 md:grid-cols-[minmax(0,5fr)_minmax(0,4fr)] gap-6 md:gap-6 md:items-stretch ${i % 2 ? 'md:[&>*:first-child]:order-2' : ''}`}>
                 <div className="relative z-10 flex flex-col justify-center">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">{d.time}</p>
-                  <h3 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-[#16181A]">{d.title}</h3>
+                  <p className="md:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">{d.time}</p>
+                  <h3 className="mt-2 md:mt-0 text-xl sm:text-2xl font-bold tracking-tight text-[#16181A]">{d.title}</h3>
                   <p className="mt-3 text-sm sm:text-base text-black/60 leading-relaxed max-w-[52ch] text-pretty">{d.text}</p>
-                  <div className={`mt-5 lgx-strong rounded-2xl px-4 py-3.5 shadow-[0_18px_44px_rgba(25,35,15,0.16)] ${i % 2 ? 'md:-ml-14' : 'md:-mr-14'}`}>{d.card}</div>
+                  {/* Jen tak široká, jak je její obsah (`w-fit`), a přisazená k okraji
+                      fotky, přes který přesahuje. Dřív měla šířku celého sloupce
+                      textu plus 3,5 rem do fotky — na 1440 px 640 px široký panel
+                      se třemi krátkými řádky, a ten přesah vypadal jako chyba. */}
+                  <div className={`mt-5 w-fit max-w-full lgx-strong rounded-2xl px-4 py-3.5 shadow-[0_18px_44px_rgba(25,35,15,0.16)] ${i % 2 ? 'md:self-start md:-ml-14' : 'md:self-end md:-mr-14'}`}>{d.card}</div>
                 </div>
                 <Foto
                   id={d.foto}
@@ -277,6 +279,7 @@ export default function Landing() {
                   className="foto-vypln md:min-h-[17rem]"
                   sizes="(max-width: 768px) 90vw, 26rem"
                 />
+              </div>
               </div>
             </Reveal>
           ))}
@@ -465,27 +468,43 @@ export default function Landing() {
         </Reveal>
       </section>
 
-      {/* Footer */}
+      {/* Patička. Tři sloupce, ne jeden řádek odkazů: kdo dojel až sem
+          a nekoupil, hledá buď funkci, kterou přehlédl, nebo cestu dovnitř. */}
       <footer className="border-t border-black/[0.06] relative">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 text-sm text-black/45">
-            <div className="flex items-center gap-2">
-              <LogoMark size={22} />
-              <span>Managero — systém pro správu podniku</span>
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12">
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-8">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <LogoMark size={26} />
+                <span className="text-base font-bold tracking-tight text-[#16181A]">Managero</span>
+              </div>
+              <p className="mt-3 text-sm text-black/55 max-w-sm text-pretty">Provoz podniku na jednom místě — směny, docházka, uzávěrky, sklad, receptury, úkoly, chat a stránka pro hosty.</p>
+              <div className="mt-5">
+                <Zkusit />
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <a href="#funkce" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Funkce</a>
-              <a href="#zacatek" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Jak začít</a>
-              <a href="#cenik" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Ceník</a>
-              <a href="#otazky" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Otázky</a>
-              <Link href="/login" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Přihlášení</Link>
-              <Link href="/register" className="tap-target-sm inline-flex items-center hover:text-black transition-colors">Registrace</Link>
+            <div>
+              <p className="t-label text-black/45">Na stránce</p>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                <li><a href="#funkce" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Funkce</a></li>
+                <li><a href="#den" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Jeden den s Managerem</a></li>
+                <li><a href="#zacatek" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Jak začít</a></li>
+                <li><a href="#cenik" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Ceník</a></li>
+                <li><a href="#otazky" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Časté otázky</a></li>
+              </ul>
+            </div>
+            <div>
+              <p className="t-label text-black/45">Účet</p>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                <li><Link href="/register" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Založit podnik</Link></li>
+                <li><Link href="/login" className="tap-target-sm inline-flex items-center text-black/65 hover:text-[#16181A] transition-colors">Přihlášení</Link></li>
+              </ul>
             </div>
           </div>
           {/* Poctivost i tady: fotky nejsou snímky konkrétních zákazníků
               a stránka to nikde netvrdí. Napsat to je levnější než se toho
               jednou doprošovat. */}
-          <p className="mt-6 text-xs text-black/40 max-w-2xl text-pretty">
+          <p className="mt-10 pt-6 border-t border-black/[0.06] text-xs text-black/40 max-w-2xl text-pretty">
             Fotografie na této stránce jsou ilustrační a nezobrazují konkrétní podniky ani
             zákazníky. Obrazovky aplikace jsou skutečné.
           </p>
