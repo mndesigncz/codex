@@ -30,10 +30,11 @@ const UTILITY = 'bg|text|border|from|via|to|ring|ring-offset|fill|stroke|decorat
 const BARVA = '\\[[^\\]\\s]+\\]|[a-z][a-z0-9]*(?:-[a-z0-9]+)*';
 const VZOR = new RegExp(`(?:^|[\\s"'\`])((?:${UTILITY})-(?:${BARVA})\\/(\\d{1,3}))(?![\\w.[])`, 'g');
 
-const soubory = execSync(
-  "git ls-files 'app/**/*.tsx' 'app/**/*.ts' 'components/**/*.tsx' 'components/**/*.ts' 'lib/**/*.tsx'",
-  { encoding: 'utf8' },
-).split('\n').filter(Boolean);
+// Celé složky, přípona se filtruje tady: pathspec `components/**/*.tsx`
+// vynechává soubory ležící PŘÍMO v `components/`, takže Landing, Settings
+// ani Pricing se dřív nekontrolovaly vůbec.
+const soubory = execSync('git ls-files app components lib', { encoding: 'utf8' })
+  .split('\n').filter(f => /\.(tsx?|jsx?)$/.test(f));
 
 const nalezy = [];
 for (const f of soubory) {

@@ -13,6 +13,7 @@ import {
   effectivePackages, totalContent, stockStatus, thresholdUnitLabel,
 } from '@/lib/packaging';
 import ConsumeControl from './ConsumeControl';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 export interface StockItem {
   id: number;
@@ -137,7 +138,7 @@ export default function CategoryStockView({
     const q = search.trim().toLowerCase();
     return items
       .filter(i => (showParked ? i.archived === true : i.archived !== true))
-      .filter(i => !q || i.name.toLowerCase().includes(q))
+      .filter(i => obsahuje(i.name, q))
       .sort((a, b) => {
         // Emptiest first while writing, alphabetical while browsing.
         if (mode === 'edit') return effectivePackages(a) - effectivePackages(b);

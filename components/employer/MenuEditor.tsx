@@ -16,6 +16,7 @@ import { PageHeader } from '../ui';
 import { czCount } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Item {
   id?: number;
@@ -889,7 +890,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               {posStav && <p className="text-sm text-black/45">{posStav}</p>}
               <div ref={posList} onKeyDown={posKeys.onListKeyDown} className="max-h-64 overflow-y-auto space-y-1">
                 {(posProdukty ?? [])
-                  .filter((p) => !posHledat || (p.name + ' ' + p.category).toLowerCase().includes(posHledat.toLowerCase()))
+                  .filter((p) => obsahuje(p.name + ' ' + p.category, posHledat))
                   .slice(0, 80)
                   .map((p) => (
                     <button key={p.productId} type="button" onClick={() => vybratZPos(p)}

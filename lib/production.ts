@@ -20,6 +20,8 @@ import {
 export { availableOf, batchesNeeded, fmtQty, planFor, recipeUnit, taskTitleFor } from './productionPlan';
 export type { ProductionPlan, RecipeLine, StockRow } from './productionPlan';
 import { packagingSourceOf } from './categoryTree';
+import { navodyProPolozky, navodProPolozku } from './navodyDb';
+import { krokyNavodu } from './navody';
 import { pragueToday } from './pragueTime';
 import { notifyUsers } from './push';
 import { audit } from './audit';
@@ -116,10 +118,12 @@ export async function ensureProductionTasks(teamId: number, actorId?: number | n
   if (made.length === 0) return { created: 0, open: 0 };
 
   const recipes = await recipesFor(teamId, made.map(i => i.id));
+  // Návod připnutý k položce nahradí holý text „Postup“ — viz lib/navody.ts.
+  const navody = await navodyProPolozky(teamId, made.map(i => i.id));
   let openTasks: any[] = [];
   try {
     openTasks = await sql`
-      SELECT id, source_ref, source_meta FROM tasks
+      SELECT id, source_ref, source_meta, checklist FROM tasks
       WHERE team_id = ${teamId} AND source = 'production' AND status <> 'done'`;
   } catch { return { created: 0, open: 0 }; }
   const openByItem = new Map<number, any>(openTasks.map((t: any) => [Number(t.source_ref), t]));
@@ -141,25 +145,46 @@ export async function ensureProductionTasks(teamId: number, actorId?: number | n
       continue;
     }
     const plan = planFor(item, recipes.get(item.id) ?? [], stock);
+    // Nepotvrzený návrh návodu se do úkolu nepouští — obsluha by pracovala
+    // podle postupu, který vedení ještě nevidělo.
+    const n = navody.get(item.id);
+    const navod = n && n.approved ? { id: n.id, title: n.title, steps: krokyNavodu(n) } : null;
     const meta = {
       itemId: item.id, batches: plan.batches, yieldTotal: plan.yieldTotal,
       ingredients: plan.lines.map(l => ({ id: l.ingredientId, name: l.name, need: l.need, available: l.available, unit: l.unit })),
       missing: plan.missing.map(l => l.ingredientId),
       status: item.status,
+      // Odsud si ho vezmou Úkoly, kiosk i výrobní tabule a nabídnou „Otevřít návod“.
+      guideId: navod?.id ?? null,
+      guideTitle: navod?.title ?? null,
     };
     const priority = item.status === 'critical' ? 'high' : 'medium';
     if (open) {
-      await sql`
-        UPDATE tasks SET description = ${describe(plan)}, priority = ${priority},
-          source_meta = ${JSON.stringify({ ...(open.source_meta ?? {}), ...meta })}::jsonb
-        WHERE id = ${open.id}`;
+      // Checklist se přepisuje JEN dokud na něm nikdo nezačal pracovat.
+      // `ensureProductionTasks` běží po každém pohybu skladu a při každém
+      // načtení úkolů — bezpodmínečný přepis by obsluze uprostřed výroby
+      // smazal odškrtané kroky a ona by začínala znovu.
+      const nedotcene = !Array.isArray(open.checklist)
+        || open.checklist.every((k: any) => k?.done !== true);
+      if (nedotcene) {
+        await sql`
+          UPDATE tasks SET description = ${describe(plan, navod)}, priority = ${priority},
+            checklist = ${JSON.stringify(checklistFor(plan, navod))}::jsonb,
+            source_meta = ${JSON.stringify({ ...(open.source_meta ?? {}), ...meta })}::jsonb
+          WHERE id = ${open.id}`;
+      } else {
+        await sql`
+          UPDATE tasks SET description = ${describe(plan, navod)}, priority = ${priority},
+            source_meta = ${JSON.stringify({ ...(open.source_meta ?? {}), ...meta })}::jsonb
+          WHERE id = ${open.id}`;
+      }
     } else {
       if (creator === undefined) creator = await oldestEmployer(teamId);
       if (creator == null) continue;
       await sql`
         INSERT INTO tasks (title, description, assigned_to, created_by, priority, status, due_date, team_id, checklist, source, source_ref, source_meta)
-        VALUES (${taskTitleFor(item)}, ${describe(plan)}, NULL, ${creator}, ${priority}, 'pending', ${today}, ${teamId},
-                ${JSON.stringify(checklistFor(plan))}::jsonb, 'production', ${item.id}, ${JSON.stringify(meta)}::jsonb)`;
+        VALUES (${taskTitleFor(item)}, ${describe(plan, navod)}, NULL, ${creator}, ${priority}, 'pending', ${today}, ${teamId},
+                ${JSON.stringify(checklistFor(plan, navod))}::jsonb, 'production', ${item.id}, ${JSON.stringify(meta)}::jsonb)`;
       created++;
       createdTitles.push(taskTitleFor(item));
     }
@@ -277,6 +302,11 @@ export async function openProduction(teamId: number) {
       batchYield: item.batchYield, steps: item.batchSteps,
       lines: plan.lines, missing: plan.missing.map(l => l.ingredientId),
       ready: plan.missing.length === 0,
+      // Tabule dřív u položky bez postupu napsala „Bez receptury — vedení ji
+      // nastaví u položky ve skladu." a tím to skončilo. Odsud si vezme odkaz
+      // na návod a nabídne ho místo té slepé uličky.
+      guideId: t.source_meta?.guideId != null ? Number(t.source_meta.guideId) : null,
+      guideTitle: t.source_meta?.guideTitle ?? null,
     };
   }).filter(Boolean);
 }
@@ -288,12 +318,17 @@ export async function recipeOf(teamId: number, itemId: number) {
   if (!item) return null;
   const recipe = (await recipesFor(teamId, [itemId])).get(itemId) ?? [];
   const plan = planFor(item, recipe, stock);
+  const navod = await navodProPolozku(teamId, itemId);
   return {
     itemId: item.id, name: item.name, unit: item.unit,
     madeInHouse: item.madeInHouse, batchYield: item.batchYield, batchSteps: item.batchSteps ?? '',
     productionLabel: item.productionLabel ?? '', taskTitle: taskTitleFor(item),
     status: item.status, batches: plan.batches,
     ingredients: plan.lines,
+    guideId: navod?.id ?? null,
+    guideTitle: navod?.title ?? null,
+    guideSteps: krokyNavodu(navod).length,
+    guideApproved: navod ? navod.approved : null,
   };
 }
 

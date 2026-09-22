@@ -10,6 +10,7 @@ import CategoryNav from '../inventory/CategoryNav';
 import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
 import { okJson } from '@/lib/api';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface InventoryItem {
   id: number;
@@ -165,7 +166,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   const filtered = useMemo(
     () => usable.filter(i =>
       (showParked ? i.archived === true : i.archived !== true)
-      && i.name.toLowerCase().includes(search.toLowerCase())),
+      && obsahuje(i.name, search)),
     [usable, search, showParked],
   );
 

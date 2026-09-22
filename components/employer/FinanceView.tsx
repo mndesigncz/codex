@@ -16,6 +16,7 @@ import { PageHeader, Button , SearchField } from '../ui';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Row {
   date: string; kind: string; label: string; amount: number;
@@ -79,7 +80,7 @@ export default function FinanceView() {
   const needle = q.trim().toLowerCase();
   const filtered = ledger
     .filter(r => filter === 'all' || r.kind === filter)
-    .filter(r => !needle || `${r.label} ${r.note ?? ''}`.toLowerCase().includes(needle));
+    .filter(r => obsahuje(`${r.label} ${r.note ?? ''}`, needle));
   const filteredSum = filtered.reduce((a, r) => a + r.amount, 0);
   const trendPct = s && s.prevRevenue > 0
     ? Math.round(((s.revenue - s.prevRevenue) / s.prevRevenue) * 100) : null;

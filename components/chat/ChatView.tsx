@@ -20,6 +20,7 @@ import {
   dayLabel,
 } from './useChat';
 import { useDraft } from '@/lib/useDraft';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Props {
   user: { id: number | string; name: string; role?: string; avatar?: string };
@@ -75,8 +76,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
       if (onlyUnread && c.unreadCount === 0) return false;
       if (!needle) return true;
       return (
-        c.name.toLowerCase().includes(needle) ||
-        (c.lastMessage ?? '').toLowerCase().includes(needle)
+        obsahujeNekde(needle, c.name, c.lastMessage)
       );
     });
   }, [conversations, q, onlyUnread]);

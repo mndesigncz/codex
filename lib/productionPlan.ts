@@ -95,7 +95,25 @@ export function taskTitleFor(item: StockRow): string {
   return label || `Vyrobit ${item.name}`;
 }
 
-export function describe(plan: ProductionPlan): string {
+/**
+ * Postup, který má v úkolu vyhrát.
+ *
+ * Návod připnutý k položce bije holý text `batch_steps`: prošel schválením,
+ * má kategorii, dá se u něj potvrdit přečtení a je vidět i ze záložky Návody.
+ * Když návod není, zůstává starý text — stovky položek ho mají vyplněný
+ * a migrovat je kvůli nepovinné vazbě by bylo riskantnější než tohle.
+ */
+function postupUkolu(plan: ProductionPlan, navod?: NavodUkolu | null): string[] {
+  const zNavodu = (navod?.steps ?? []).map(s => s.trim()).filter(Boolean);
+  if (zNavodu.length) return zNavodu;
+  return (plan.item.batchSteps ?? '')
+    .split('\n').map(s => s.replace(/^\s*(\d+[.)]|[-•*])\s*/, '').trim()).filter(Boolean);
+}
+
+/** Návod připnutý k vyráběné položce — tolik, kolik úkol potřebuje. */
+export interface NavodUkolu { id: number; title: string; steps: string[] }
+
+export function describe(plan: ProductionPlan, navod?: NavodUkolu | null): string {
   const { item } = plan;
   const yieldQty = item.batchYield && item.batchYield > 0 ? item.batchYield : null;
   const head = yieldQty
@@ -109,14 +127,16 @@ export function describe(plan: ProductionPlan): string {
       lines.push(`• ${l.name} ${fmtQty(l.need)} ${l.unit} — ve skladu ${fmtQty(l.available)} ${l.unit} ${ok ? '✓' : `✗ chybí ${fmtQty(l.missing)} ${l.unit}, je v nákupním seznamu`}`);
     }
   }
-  if (item.batchSteps?.trim()) lines.push('', 'Postup:', item.batchSteps.trim());
+  const postup = postupUkolu(plan, navod);
+  if (postup.length) {
+    lines.push('', navod ? `Podle návodu „${navod.title}":` : 'Postup:', ...postup.map(s => `${s}`));
+  }
   lines.push('', 'Po odškrtnutí se dávka naskladní a suroviny odepíšou samy.');
   return lines.join('\n').slice(0, 4000);
 }
 
-export function checklistFor(plan: ProductionPlan): { text: string; done: boolean }[] {
-  const steps = (plan.item.batchSteps ?? '')
-    .split('\n').map(s => s.replace(/^\s*(\d+[.)]|[-•*])\s*/, '').trim()).filter(Boolean);
+export function checklistFor(plan: ProductionPlan, navod?: NavodUkolu | null): { text: string; done: boolean }[] {
+  const steps = postupUkolu(plan, navod);
   const items = steps.length
     ? steps
     : plan.lines.map(l => `Odměřit ${l.name} ${fmtQty(l.need)} ${l.unit}`);

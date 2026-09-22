@@ -9,6 +9,7 @@ import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
 import { useKioskShift } from './KioskShiftGate';
 import { okJson } from '@/lib/api';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Item {
   id: number;
@@ -87,7 +88,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   const filtered = items.filter(i =>
     (showParked ? i.archived === true : i.archived !== true) &&
     (cat === 'Vše' || i.category === cat) &&
-    (!search.trim() || i.name.toLowerCase().includes(search.trim().toLowerCase())));
+    obsahuje(i.name, search));
 
   const setParked = (item: Item, archived: boolean) => {
     setItems(list => list.map(x => x.id === item.id ? { ...x, archived } : x));

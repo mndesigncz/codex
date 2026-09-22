@@ -13,6 +13,7 @@ import { czDay } from '@/lib/clientSlots';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { okJson } from '@/lib/api';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -288,7 +289,7 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
   const pickKeys = useResultKeys(pickList, pickInput, { onEscape: () => setQ('') });
   const chosen = new Set(value.map(v => v.itemId));
   const needle = q.trim().toLowerCase();
-  const found = needle ? items.filter(i => !chosen.has(i.id) && i.name.toLowerCase().includes(needle)).slice(0, 6) : [];
+  const found = needle ? items.filter(i => !chosen.has(i.id) && obsahuje(i.name, needle)).slice(0, 6) : [];
   const unpaired = items.length > 0 && value.some(v => items.find(i => i.id === v.itemId)?.paired === false);
   return (
     <div>

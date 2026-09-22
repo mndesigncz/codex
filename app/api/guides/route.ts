@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers, notifyUser } from '@/lib/push';
+import { pripniNavodKPolozce } from '@/lib/navodyDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
     rows = categoryId
       ? await sql`
           SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
-                 g.require_read,
+                 g.item_id, g.require_read,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
                  EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
           FROM guides g
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
           ORDER BY g.updated_at DESC`
       : await sql`
           SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
-                 g.require_read,
+                 g.item_id, g.require_read,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
                  EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
           FROM guides g
@@ -98,6 +99,7 @@ export async function GET(request: Request) {
     excerpt: excerpt(g.content),
     hasChecklist: checklistLength(g.checklist) > 0,
     productId: g.product_id ?? null,
+    itemId: g.item_id != null ? Number(g.item_id) : null,
   }));
 
   return NextResponse.json({ guides });
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
   const { title, content, categoryId, checklist } = body;
   const productId = body.productId ? String(body.productId).trim().slice(0, 120) : null;
   const productName = body.productName ? String(body.productName).trim().slice(0, 160) : null;
+  const itemId = Number(body.itemId) > 0 ? Number(body.itemId) : null;
   if (!title || !String(title).trim()) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
   const steps = normalizeChecklist(checklist);
@@ -142,6 +145,9 @@ export async function POST(request: Request) {
         await sql`UPDATE guides SET product_id = ${productId}, product_name = ${productName} WHERE id = ${guide.id}`;
       } catch { /* migrace ještě neproběhla */ }
     }
+    // Vazba na skladovou položku „vyrábíme sami“ — ověřuje tým, takže cizí
+    // položku připnout nejde.
+    if (itemId && guide?.id) await pripniNavodKPolozce(c.teamId, Number(guide.id), itemId);
   } catch {
     // approval columns not migrated yet — insert the old shape (auto-approved)
     [guide] = await sql`

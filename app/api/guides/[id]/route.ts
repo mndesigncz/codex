@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { pripniNavodKPolozce } from '@/lib/navodyDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,9 +41,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   try {
     [g] = await sql`
       SELECT g.id, g.title, g.content, g.checklist, g.category_id, g.updated_at, g.created_at,
-             g.product_id, g.product_name, u.name AS author
+             g.product_id, g.product_name, g.item_id, i.name AS item_name,
+             i.made_in_house AS item_made, u.name AS author
       FROM guides g
       LEFT JOIN users u ON u.id = g.created_by
+      LEFT JOIN inventory_items i ON i.id = g.item_id AND i.team_id = g.team_id
       WHERE g.id = ${id} AND g.team_id = ${c.teamId}`;
   } catch {
     // Vazba na produkt je novější sloupec — bez migrace se návod přečte i tak.
@@ -67,6 +70,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       author: g.author,
       productId: g.product_id ?? null,
       productName: g.product_name ?? null,
+      itemId: g.item_id != null ? Number(g.item_id) : null,
+      itemName: g.item_name ?? null,
+      itemMadeInHouse: g.item_made === true,
     },
   });
 }
@@ -131,6 +137,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const hasProduct = Object.prototype.hasOwnProperty.call(body, 'productId');
   const productId = body.productId ? String(body.productId).trim().slice(0, 120) : null;
   const productName = body.productName ? String(body.productName).trim().slice(0, 160) : null;
+  // Stejná sémantika jako u produktu: klíč chybí → vazba se nesahá,
+  // klíč je tam s null → vazba se ruší.
+  const hasItem = Object.prototype.hasOwnProperty.call(body, 'itemId');
+  const itemId = Number(body.itemId) > 0 ? Number(body.itemId) : null;
 
   const nextTitle = title !== undefined && String(title).trim() ? String(title).trim() : null;
   const nextContent = content !== undefined ? content : null;
@@ -159,6 +169,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       await sql`UPDATE guides SET product_id = ${productId}, product_name = ${productName} WHERE id = ${id}`;
     } catch { /* sloupce ještě nejsou — vazba se prostě neuloží */ }
   }
+  if (hasItem && c.teamId) await pripniNavodKPolozce(Number(c.teamId), id, itemId);
 
   return NextResponse.json({
     guide: {

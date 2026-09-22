@@ -69,13 +69,20 @@ export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
   // Deep links from notifications: /employee/shifts?view=X
   useEffect(() => {
-    const v = new URLSearchParams(window.location.search).get('view');
+    const p = new URLSearchParams(window.location.search);
+    const v = p.get('view');
     if (v && (byId[v] || v === 'settings')) setCurrentView(v);
+    const g = Number(p.get('guide'));
+    if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  // Proklik na KONKRÉTNÍ návod — z úkolu „Vyrobit X“ nebo z výrobní tabule.
+  // Bez toho vede každý odkaz jen na seznam návodů.
+  const [guideId, setGuideId] = useState<number | null>(null);
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    setGuideId(view === 'guides' && arg ? Number(arg) : null);
     setCurrentView(view);
   };
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -110,7 +117,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'tasks':        return <Tasks user={user as any} />;
       case 'rewards':      return <MyRewards />;
       case 'chat':         return <ChatView user={user as any} />;
-      case 'guides':       return <Guides user={user as any} />;
+      case 'guides':       return <Guides user={user as any} openGuideId={guideId} />;
       case 'suggestions':  return <SuggestionsBoard />;
       case 'settings':     return <Settings user={user as any} initialTab="account" />;
       default:             return <EmployeeDashboard user={user as any} onNavigate={navigate} />;

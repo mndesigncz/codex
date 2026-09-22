@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/Icons';
 import { Modal, Avatar, SearchField, EmptyState, ErrorState } from '../ui';
 import { startDirect, Conversation } from './useChat';
+import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Mate {
   id: number;
@@ -62,8 +63,7 @@ export default function NewConversation({ open, onClose, meId, conversations, on
     const needle = q.trim().toLowerCase();
     if (!needle) return list;
     return list.filter(u =>
-      u.name.toLowerCase().includes(needle) ||
-      (u.jobTitle ?? '').toLowerCase().includes(needle));
+      obsahujeNekde(needle, u.name, u.jobTitle));
   }, [mates, q]);
 
   const pick = async (u: Mate) => {
