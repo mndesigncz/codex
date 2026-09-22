@@ -773,6 +773,14 @@ export async function GET(request: Request) {
     // the shift that earned it. Older rows simply mirror `date`.
     await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_date TEXT`);
     try { await sql`UPDATE cash_closings SET shift_date = date WHERE shift_date IS NULL`; } catch { /* best-effort */ }
+    // Dva sloupce, dvě pravdy. `date` byl den, kdy se formulář odeslal,
+    // `shift_date` den směny — a půlka aplikace četla ten první (chybějící
+    // uzávěrky, kalendář, připomínka, přehled vedení), půlka ten druhý
+    // (finance, docházka, hodnocení). Sobotní směna zavřená po půlnoci pak
+    // v přehledu ležela pod nedělí a sobota se hlásila jako nezavřená.
+    // Od teď je `date` obchodní den a tady se to srovná i zpětně — jen tam,
+    // kde server obchodní den skutečně spočítal (shift_date není NULL).
+    try { await sql`UPDATE cash_closings SET date = shift_date WHERE shift_date IS NOT NULL AND shift_date <> date`; } catch { /* best-effort */ }
 
     // ---- Shift reviews: whole-shift scope, flags, per-item scoring ----
     await ddl(sql`ALTER TABLE shift_reviews ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'individual'`);

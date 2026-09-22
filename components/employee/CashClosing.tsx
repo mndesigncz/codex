@@ -347,6 +347,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [diffNote, setDiffNote] = useState('');
   // The previous closing's counted cash — offered as this shift's opening cash.
   const [carry, setCarry] = useState<{ amount: number; date: string; label: string | null } | null>(null);
+  // Dny mezi poslední uzávěrkou a dneškem, kdy někdo pracoval, ale nikdo
+  // nezavřel. Hotovost z nich leží v kase, ale v rovnici pro dnešek není —
+  // vyšel by přebytek přesně ve výši té tržby a člověk by ji „srovnal" tím,
+  // že ji dopíše do dneška. Přesně tak sobota potichu splynula s pondělím.
+  const [gapDays, setGapDays] = useState<string[]>([]);
   // Today's procedure runs — the closing is the natural moment to notice an
   // unfinished closing checklist.
   const [todayRuns, setTodayRuns] = useState<any[]>([]);
@@ -426,6 +431,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       // old (or a covered stub) and would manufacture a phantom manko.
       try {
         const dd = await fetch('/api/closings/drawer').then(okJson);
+        setGapDays(Array.isArray(dd?.gapDays) ? dd.gapDays.map(String) : []);
         const prev = dd?.drawer;
         if (prev) {
           const left = Math.round(Number(prev.amount) || 0);
@@ -803,6 +809,14 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               {closings.some(c => c.date === form.date) && (
                 <p className="text-[11px] font-medium text-wait-ink bg-wait/[0.1] border border-wait/25 rounded-xl px-3 py-2">
                   Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
+                </p>
+              )}
+              {gapDays.length > 0 && gapDays.every(d => d < form.date) && (
+                <p role="alert" className="text-[11px] font-medium text-bad-ink bg-bad/[0.08] border border-bad/25 rounded-xl px-3 py-2">
+                  Mezi poslední uzávěrkou a dneškem chybí uzávěrka za{' '}
+                  {gapDays.map(d => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })).join(', ')}.
+                  Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící,
+                  jinak dnešek vyjde s přebytkem, který není jeho.
                 </p>
               )}
               {carry && (

@@ -62,3 +62,25 @@ export function denPrichodu({ at, smenyVcera = [], otevrenoVcera = null }: DenPr
 
   return dnes;
 }
+
+/**
+ * Ke kterému dni patří UZÁVĚRKA?
+ *
+ * Formulář posílá datum vždy — má pole s hodnotou, takže „bez data" ze
+ * strany klienta nikdy nepřijde. Server proto nesmí brát zvolené datum jako
+ * hotovou věc: kdo zavírá sobotní směnu deset minut po půlnoci, má v poli
+ * neděli jen proto, že tak stály hodiny na zdi, ne proto, že by v neděli
+ * pracoval. Tahle funkce zvolené datum přebije jen v jednom případě —
+ * když je to „dnes" a příchod by se podle stejného pravidla zapsal na
+ * včera. Starší datum zůstává: to je vedení, které doplňuje chybějící den,
+ * nebo zaměstnanec, který si směnu vybral ze seznamu.
+ *
+ * Pravidlo „patří včerejšku" je totéž jako u příchodu (`denPrichodu`).
+ * Kdyby bylo jiné, příchod by směnu založil na sobotu a uzávěrka by ji
+ * hledala pod nedělí — přesně ta chyba, která tu byla.
+ */
+export function denUzaverky(zvoleno: string | null | undefined, vstup: DenPrichoduVstup): string {
+  const dnes = pragueDayOf(vstup.at);
+  if (zvoleno && /^\d{4}-\d{2}-\d{2}$/.test(zvoleno) && zvoleno < dnes) return zvoleno;
+  return denPrichodu(vstup);
+}
