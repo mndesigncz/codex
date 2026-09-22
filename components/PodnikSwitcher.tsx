@@ -15,7 +15,7 @@ import { okJson } from '@/lib/api';
 interface Podnik { teamId: number; teamName: string; role: 'employer' | 'employee' }
 interface Data { activeTeamId: number | null; teams: Podnik[]; organization: { name: string; isOwner: boolean } | null }
 
-export default function PodnikSwitcher({ compact = false, canCreate = false }: { compact?: boolean; canCreate?: boolean }) {
+export default function PodnikSwitcher({ compact = false, canCreate = false, onOverview }: { compact?: boolean; canCreate?: boolean; onOverview?: () => void }) {
   const { update } = useSession();
   const [data, setData] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
@@ -108,6 +108,15 @@ export default function PodnikSwitcher({ compact = false, canCreate = false }: {
               {t.teamId === data.activeTeamId && <Icon name="check" size={14} className="shrink-0 text-[#5B7A08]" />}
             </button>
           ))}
+          {onOverview && vicPodniku && (
+            <>
+              <div className="h-px bg-black/[0.06] my-1" />
+              <button type="button" role="menuitem" onClick={() => { setOpen(false); onOverview(); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition">
+                <Icon name="trend" size={15} /> Všechny podniky
+              </button>
+            </>
+          )}
           {canCreate && (
             <>
               <div className="h-px bg-black/[0.06] my-1" />

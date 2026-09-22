@@ -76,8 +76,8 @@ export default function OrganizationSettings() {
       <div className="space-y-2">
         <Prepinac klic="sdileniLidi" title="Sdílení lidí mezi podniky"
           hint="Zaměstnanec může být členem víc podniků a přepínat mezi nimi. Vedení může vždy." />
-        <Prepinac klic="konsolidovanyPrehled" title="Přehled za všechny podniky" brzy
-          hint="Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce." />
+        <Prepinac klic="konsolidovanyPrehled" title="Přehled za všechny podniky"
+          hint="Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce — v přepínači podniku nahoře, položka „Všechny podniky“." />
         <Prepinac klic="sdileneCiselniky" title="Sdílené číselníky" brzy
           hint="Kategorie skladu, receptury a návody společné pro celou organizaci." />
         <div className="flex items-start justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">

@@ -47,6 +47,7 @@ const Inventory = naLine(() => import('./Inventory'));
 const PlanningBoard = naLine(() => import('./PlanningBoard'));
 const EventsView = naLine(() => import('./EventsView'));
 const ClosingsOverview = naLine(() => import('./ClosingsOverview'));
+const OrgOverview = naLine(() => import('./OrgOverview'));
 const FinanceView = naLine(() => import('./FinanceView'));
 const MenuEditor = naLine(() => import('./MenuEditor'));
 const SuggestionsBoard = naLine(() => import('../SuggestionsBoard'));
@@ -149,6 +150,14 @@ export default function EmployerLayout({ user }: Props) {
   // návodů a hledal ten svůj znovu ručně. Teď na něj míří i úkol „Vyrobit X“,
   // takže mrtvý odkaz by byl vidět mnohem víc.
   const [guideId, setGuideId] = useState<number | null>(null);
+  // Z přehledu organizace do konkrétního podniku: přepnout členství na
+  // serveru a načíst znovu — stejná cesta jako přepínač v hlavičce.
+  const prepniAOtevri = async (teamId: number) => {
+    try {
+      const res = await fetch('/api/teams/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId }) });
+      if (res.ok) window.location.href = '/employer/overview';
+    } catch { /* zůstane přehled */ }
+  };
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
@@ -164,7 +173,7 @@ export default function EmployerLayout({ user }: Props) {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const v = p.get('view');
-    if (v && (byId[v] || v === 'settings' || v === 'team-settings')) setCurrentView(v);
+    if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentView(v);
     const g = Number(p.get('guide'));
     if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
@@ -215,6 +224,7 @@ export default function EmployerLayout({ user }: Props) {
         </div>
       );
       case 'reports':   return <ClosingsOverview />;
+      case 'org':       return <OrgOverview onOpenTeam={prepniAOtevri} />;
       case 'finance':   return <FinanceView />;
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} />;
@@ -226,6 +236,7 @@ export default function EmployerLayout({ user }: Props) {
   const active = navItems.find(n => n.id === currentView);
   const title = currentView === 'settings' ? 'Nastavení'
     : currentView === 'team-settings' ? 'Nastavení týmu'
+    : currentView === 'org' ? 'Všechny podniky'
     : active?.label;
   const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
   // Same categories as the sidebar, minus whatever is already in the bottom dock.
@@ -290,7 +301,7 @@ export default function EmployerLayout({ user }: Props) {
         {/* Který podnik právě spravuju. Do kola 55 tu název podniku nebyl
             vůbec — s jedním to nevadilo, s třemi je to první otázka. */}
         <div className={`border-b border-black/[0.07] ${sidebarOpen ? 'px-2 py-1.5' : 'px-1 py-1.5'}`}>
-          <PodnikSwitcher compact={!sidebarOpen} canCreate />
+          <PodnikSwitcher compact={!sidebarOpen} canCreate onOverview={() => setCurrentView('org')} />
         </div>
         {/* Šestnáct položek se na notebooku s 900 px na výšku nevejde. Dřív se
             poslední („Nápady") prostě uřízla a nic nenaznačilo, že se rail

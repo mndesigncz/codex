@@ -25,6 +25,7 @@ import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
 import { parseStep, serializeStep, parseSteps } from '../lib/steps.ts';
 import { odkazNaNavod } from '../lib/otevriNavod.ts';
 import { normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, VYCHOZI_NASTAVENI } from '../lib/organizace.ts';
+import { souhrn, podnikyProPrehled, procNejde, hraniceMesice } from '../lib/prehledOrganizace.ts';
 import { describe as popisUkolu } from '../lib/productionPlan.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
 import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
@@ -714,6 +715,36 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('organizace: vedení sdílet jde vždy', smiSdiletZamestnance({ ...VYCHOZI_NASTAVENI, sdileniLidi: false }, 'employer'), true);
   eq('organizace: zaměstnanec jen se zapnutým sdílením', smiSdiletZamestnance({ ...VYCHOZI_NASTAVENI, sdileniLidi: false }, 'employee'), false);
   eq('organizace: zaměstnanec se zapnutým sdílením ano', smiSdiletZamestnance(VYCHOZI_NASTAVENI, 'employee'), true);
+
+  // ---- Konsolidovaný přehled ---------------------------------------------
+  {
+    const r = (o: Partial<Parameters<typeof souhrn>[0][number]>) => ({
+      teamId: 1, name: 'A', currency: 'CZK', revenue: 0, wages: 0, closings: 0, missingClosings: 0,
+      pendingApproval: 0, members: 0, onShiftNow: 0, stockAlerts: 0, ...o,
+    });
+    const s = souhrn([r({ revenue: 100000, wages: 30000, missingClosings: 1 }), r({ teamId: 2, revenue: 50000, wages: 10000, pendingApproval: 2 })]);
+    eq('přehled: tržby a mzdy se sečtou', [s.revenue, s.wages], [150000, 40000]);
+    eq('přehled: podíl mezd z celku, ne průměr podílů', s.laborPct, 26.7);
+    eq('přehled: chybějící uzávěrky a schválení se sečtou', [s.missingClosings, s.pendingApproval], [1, 2]);
+    const mix = souhrn([r({ revenue: 100000 }), r({ teamId: 2, currency: 'EUR', revenue: 4000 })]);
+    eq('přehled: koruny s eury se NESČÍTAJÍ — celek přizná různé měny', [mix.currency, mix.revenue, mix.laborPct], [null, 0, null]);
+    eq('přehled: bez tržeb není podíl mezd', souhrn([r({ wages: 500 })]).laborPct, null);
+    eq('přehled: prázdno má měnu null', souhrn([]).currency, null);
+  }
+  {
+    const cl = [
+      { teamId: 1, role: 'employer' as const, teamName: 'A', organizationId: 9 },
+      { teamId: 2, role: 'employee' as const, teamName: 'B', organizationId: 9 },
+      { teamId: 3, role: 'employer' as const, teamName: 'C', organizationId: 7 },
+    ];
+    eq('přehled: jen podniky organizace, kde jsem vedení', podnikyProPrehled(cl, 9), [1]);
+    eq('přehled: bez organizace → důvod', procNejde(null, [1, 2]), 'bez_organizace');
+    eq('přehled: vypnuto v nastavení → důvod', procNejde({ nastaveni: { ...VYCHOZI_NASTAVENI, konsolidovanyPrehled: false } }, [1, 2]), 'vypnuto');
+    eq('přehled: jeden viditelný podnik → není co sčítat', procNejde({ nastaveni: VYCHOZI_NASTAVENI }, [1]), 'jeden_podnik');
+    eq('přehled: dva podniky a zapnuto → jde', procNejde({ nastaveni: VYCHOZI_NASTAVENI }, [1, 2]), null);
+  }
+  eq('přehled: hranice února v přestupném roce', hraniceMesice('2028-02'), ['2028-02-01', '2028-02-29']);
+  eq('přehled: nesmysl místo měsíce → null', hraniceMesice('2026-13'), null);
 
   // ---- Postup v úkolu: návod bije holý text -----------------------------
   {
