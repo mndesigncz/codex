@@ -68,7 +68,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   /* Kopie menu z jiného podniku organizace. Editor vidí jen vedení, takže
      stačí hlídat, jestli vůbec existuje odkud kopírovat. */
   const [kopieOpen, setKopieOpen] = useState(false);
-  const { jine: jinePodniky } = useJinePodniky();
+  const { jine: jinePodniky, cil: nazevPodniku, chyba: chybaPodniku, znovu: znovuPodniky } = useJinePodniky();
 
   /* `potichu`: obnovit seznam bez stavu „Načítám menu…" — ten by nahradil
      celou obrazovku a s ní zavřel i okno kopie dřív, než člověk uvidí výsledek. */
@@ -411,7 +411,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
      výsledek s poznámkou „menu je vypnuté" by zmizel a člověk by
      kopíroval podruhé. */
   const kopieOkno = kopieOpen && (
-    <KopieZPodniku entita="menu" podniky={jinePodniky} onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); }} />
+    <KopieZPodniku entita="menu" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); }} />
   );
 
   if (!board) {
@@ -442,6 +442,14 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             </button>
           )}
         </div>
+        {/* Prázdný editor je místo, kde je kopie hlavní cestou — tady se
+            nepovedené načtení ostatních podniků nesmí tvářit jako „žádné nejsou". */}
+        {chybaPodniku && (
+          <p className="text-xs text-black/55">
+            Nepodařilo se zjistit, jestli jde menu zkopírovat z jiného podniku.{' '}
+            <button type="button" onClick={znovuPodniky} className="underline font-medium text-black/70">Zkusit znovu</button>
+          </p>
+        )}
         {posPripojena && (
           <p className="text-xs text-black/45">
             Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.

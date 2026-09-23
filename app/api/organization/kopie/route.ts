@@ -74,8 +74,8 @@ export async function GET(request: Request) {
   const v = await zdroj(searchParams.get('entita'), searchParams.get('z'));
   if (jeChyba(v)) return NextResponse.json({ error: v.error }, { status: v.status });
   try {
-    const polozky = await seznamKeKopii(v.entita, v.z);
-    return NextResponse.json({ podnik: { id: v.z, name: v.nazevZdroje }, polozky });
+    const { polozky, celkem } = await seznamKeKopii(v.entita, v.z);
+    return NextResponse.json({ podnik: { id: v.z, name: v.nazevZdroje }, polozky, celkem });
   } catch (e) {
     console.error('[kopie] seznam selhal:', e);
     return NextResponse.json({ error: 'Seznam se nepodařilo načíst. Zkus to znovu.' }, { status: 500 });

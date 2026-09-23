@@ -79,7 +79,10 @@ export async function POST(request: Request) {
     for (let i = 2; i < 50; i++) {
       const [clash] = await sql`SELECT id FROM menu_boards WHERE slug = ${slug}`;
       if (!clash) break;
-      slug = `${cleanSlug(body?.slug ?? name) || 'menu'}-${i}`;
+      // Přípona se musí vejít do 40 znaků, které adresa smí mít — jinak by
+      // ji veřejná stránka ořezala zpátky na adresu cizího menu.
+      const zaklad = cleanSlug(body?.slug ?? name) || 'menu';
+      slug = `${zaklad.slice(0, 40 - String(i).length - 1).replace(/-+$/, '')}-${i}`;
     }
 
     const seed = body?.seed !== false;

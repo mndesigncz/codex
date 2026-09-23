@@ -18,6 +18,8 @@ const LABELS: Record<string, string> = {
   'reward.create': 'Přidána odměna',
   'reward.approved': 'Schválena odměna',
   'reward.declined': 'Zamítnuta odměna',
+  'organization.kopie': 'Zkopírováno z jiného podniku',
+  'organization.kopie.zdroj': 'Zkopírováno do jiného podniku',
 };
 
 export async function GET() {

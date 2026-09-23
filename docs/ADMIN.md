@@ -85,7 +85,11 @@ přemapují podle názvu položky ve skladu cíle, jinak se odpojí (a řekne se
 odkaz z kroku postupu na návod se přemapuje na stejnojmenný návod cíle —
 návody se proto kopírují dřív než postupy, které na ně ukazují. Zkopírované
 menu má novou adresu a je vypnuté, dokud vedení neprojde ceny; když kopie
-menu spadne uprostřed, rozpracovaná deska se smaže. Audit log má záznam
+menu spadne uprostřed, rozpracovaná deska se smaže. Příznaky, které patří
+podniku, se nepřenáší, ale okno je vyjmenuje: povinné čtení, návod
+k uzávěrce, vazba na produkt pokladny, povinnost postupu před uzávěrkou.
+Seznam ke kopírování ukáže nejvýš 200 položek a řekne, kolik jich je celkem.
+Audit log má záznam
 v cíli (`organization.kopie`, u každé položky) i ve zdroji
 (`organization.kopie.zdroj`, co a kam odešlo).
 

@@ -164,7 +164,7 @@ export default function Guides({ user, ticksFor, openGuideId }: {
   // Kopie z jiného podniku organizace — tlačítko jen vedení a jen když
   // takový podnik existuje; jinak by vedlo do prázdna.
   const [kopieOpen, setKopieOpen] = useState(false);
-  const { jine: jinePodniky } = useJinePodniky(isEmployer);
+  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(isEmployer);
 
   const [loadErr, setLoadErr] = useState('');
   const [reloadTick, setReloadTick] = useState(0);
@@ -702,7 +702,7 @@ export default function Guides({ user, ticksFor, openGuideId }: {
       )}
 
       {kopieOpen && isEmployer && (
-        <KopieZPodniku entita="navody" podniky={jinePodniky} onClose={() => setKopieOpen(false)}
+        <KopieZPodniku entita="navody" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)}
           onHotovo={() => setReloadTick(t => t + 1)} />
       )}
 

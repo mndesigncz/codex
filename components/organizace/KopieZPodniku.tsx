@@ -9,7 +9,7 @@
 // (odpojená surovina, chybějící kategorie, vypnuté menu), protože právě
 // ty rozhodují, co musí vedení po zkopírování ještě projít.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Modal, Button, SearchField, ErrorState, EmptyState, SelectBox } from '../ui';
 import { okJson, apiMessage } from '@/lib/api';
@@ -55,17 +55,30 @@ const TEXTY: Record<KopieEntita, { nadpis: string; nic: (podnik: string) => stri
  * `povoleno=false` nic nenačítá: zaměstnanec tlačítko nedostane a dotaz
  * navíc při každém otevření obrazovky by byl jen šum.
  */
-export function useJinePodniky(povoleno = true): { jine: Podnik[]; nacteno: boolean } {
+export function useJinePodniky(povoleno = true): {
+  jine: Podnik[]; nacteno: boolean;
+  /** Seznam se nenačetl — „žádný jiný podnik" to není, jen to nevíme. */
+  chyba: boolean; znovu: () => void;
+  /** Jméno podniku, DO kterého se kopíruje. */
+  cil: string | null;
+} {
   const [jine, setJine] = useState<Podnik[]>([]);
   const [nacteno, setNacteno] = useState(!povoleno);
+  const [chyba, setChyba] = useState(false);
+  const [cil, setCil] = useState<string | null>(null);
+  const [pokus, setPokus] = useState(0);
+  const znovu = useCallback(() => setPokus(n => n + 1), []);
 
   useEffect(() => {
     if (!povoleno) { setJine([]); setNacteno(true); return; }
     let platne = true;
+    setChyba(false);
     fetch('/api/teams/mine').then(okJson)
       .then(mine => {
         if (!platne) return;
         const aktivni = mine?.activeTeamId != null ? Number(mine.activeTeamId) : null;
+        const muj = Array.isArray(mine?.teams) ? mine.teams.find((t: any) => Number(t.teamId) === aktivni) : null;
+        setCil(muj?.teamName ? String(muj.teamName) : null);
         const orgId = mine?.organization?.id != null ? Number(mine.organization.id) : null;
         const teams: any[] = Array.isArray(mine?.teams) ? mine.teams : [];
         setJine(orgId == null ? [] : teams
@@ -73,20 +86,22 @@ export function useJinePodniky(povoleno = true): { jine: Podnik[]; nacteno: bool
           .map(t => ({ id: Number(t.teamId), name: String(t.teamName ?? '') }))
           .filter(t => Number.isFinite(t.id) && t.id !== aktivni));
       })
-      // Bez organizace (nebo bez spojení) prostě není odkud kopírovat —
-      // tlačítko se nenakreslí, nic dalšího tu není co hlásit.
-      .catch(() => { if (platne) setJine([]); })
+      // Bez spojení se tlačítko nenakreslí; kde je kopie hlavní cestou
+      // (prázdný editor menu), rodič podle `chyba` nabídne „Zkusit znovu".
+      .catch(() => { if (platne) { setJine([]); setChyba(true); } })
       .finally(() => { if (platne) setNacteno(true); });
     return () => { platne = false; };
-  }, [povoleno]);
+  }, [povoleno, pokus]);
 
-  return { jine, nacteno };
+  return { jine, nacteno, chyba, znovu, cil };
 }
 
-export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo }: {
+export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onHotovo }: {
   entita: KopieEntita;
   /** Odkud smí kopírovat — z `useJinePodniky` rodiče, ať se neptá dvakrát. */
   podniky: Podnik[];
+  /** Kam se kopíruje (aktivní podnik) — ať okno říká obě jména. */
+  cil?: string | null;
   onClose: () => void;
   /** Kopie proběhla — rodič si znovu načte seznam. */
   onHotovo: () => void;
@@ -96,6 +111,7 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
   // Jediný jiný podnik se nevybírá — rovnou se ukáže, co v něm je.
   const [zdroj, setZdroj] = useState<Podnik | null>(jine.length === 1 ? jine[0] : null);
   const [polozky, setPolozky] = useState<Polozka[] | null>(null);
+  const [celkem, setCelkem] = useState(0);
   const [nacitamSeznam, setNacitamSeznam] = useState(false);
   const [chybaSeznamu, setChybaSeznamu] = useState('');
   const [hledat, setHledat] = useState('');
@@ -108,16 +124,24 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
   // kdo okno zavře křížkem, nesmí koukat na starý seznam. Podruhé už ne.
   const [obnoveno, setObnoveno] = useState(false);
 
+  // Pořadí požadavků: kdo rychle přepne podnik, nesmí dostat seznam
+  // PŘEDCHOZÍHO podniku jen proto, že jeho odpověď přišla později — id by
+  // pak mířila do jiného zdroje, než jaký okno ukazuje.
+  const pozadavek = useRef(0);
   const nactiSeznam = useCallback(async (p: Podnik) => {
+    const moje = ++pozadavek.current;
     setNacitamSeznam(true); setChybaSeznamu(''); setPolozky(null); setVybrane(new Set());
     try {
       const d = await fetch(`/api/organization/kopie?entita=${entita}&z=${p.id}`).then(okJson);
+      if (moje !== pozadavek.current) return;
       const seznam: Polozka[] = Array.isArray(d?.polozky) ? d.polozky : [];
       setPolozky(seznam);
+      setCelkem(Number(d?.celkem) || seznam.length);
     } catch (e) {
+      if (moje !== pozadavek.current) return;
       setChybaSeznamu(apiMessage(e, 'Seznam z druhého podniku se nenačetl.'));
     } finally {
-      setNacitamSeznam(false);
+      if (moje === pozadavek.current) setNacitamSeznam(false);
     }
   }, [entita]);
 
@@ -164,21 +188,30 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
   };
 
   const krok: 'podnik' | 'vyber' | 'vysledek' = vysledky ? 'vysledek' : zdroj ? 'vyber' : 'podnik';
+
+  // Během kopírování okno nezavírat (křížek, Escape, Zrušit): kopie na
+  // serveru běží dál, seznam za oknem by se obnovil a poznámky, co se
+  // nepřeneslo, by nikdo neviděl.
+  const zavrit = () => { if (!kopiruji) onClose(); };
+
+  // Po kopii zmizí tlačítko s fokusem — fokus na výsledek, ať odečítač
+  // přečte souhrn a Tab nezačíná od začátku stránky.
+  const vysledekRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (krok === 'vysledek') vysledekRef.current?.focus(); }, [krok]);
   const uspesne = vysledky?.filter(r => r.noveId != null).length ?? 0;
   const presDavku = vybrane.size > MAX_DAVKA;
 
   const podtitul = krok === 'podnik'
     ? 'Vyber, odkud se má kopírovat.'
     : krok === 'vyber' && zdroj
-      ? `Z podniku ${zdroj.name} do toho, ve kterém teď jsi. Vznikne kopie — další úpravy už spolu nesouvisí.`
-      : zdroj ? `Z podniku ${zdroj.name}` : undefined;
+      ? `Z podniku ${zdroj.name} do ${cil ? `podniku ${cil}` : 'toho, ve kterém teď jsi'}. Vznikne kopie — další úpravy už spolu nesouvisí.`
+      : zdroj ? `Z podniku ${zdroj.name}${cil ? ` do podniku ${cil}` : ''}` : undefined;
 
+  // Patička má jen dvě tlačítka: se třetím („Jiný podnik") se na telefonu
+  // nevejde a levé by skončilo za okrajem. Volba podniku je v těle okna.
   const paticka = krok === 'vyber' ? (
     <>
-      {jine.length > 1 && (
-        <Button variant="ghost" onClick={() => { setZdroj(null); setPolozky(null); setChybaSeznamu(''); }}>Jiný podnik</Button>
-      )}
-      <Button variant="ghost" onClick={onClose}>Zrušit</Button>
+      <Button variant="ghost" onClick={zavrit} disabled={kopiruji}>Zrušit</Button>
       <Button variant="accent" icon="copy" loading={kopiruji} disabled={vybrane.size === 0 || presDavku || !!chybaSeznamu}
         onClick={zkopirovat}>
         Zkopírovat ({vybrane.size})
@@ -189,7 +222,7 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
   ) : undefined;
 
   return (
-    <Modal open onClose={onClose} title={t.nadpis} subtitle={podtitul} size="lg" footer={paticka}>
+    <Modal open onClose={zavrit} title={t.nadpis} subtitle={podtitul} size="lg" footer={paticka}>
       {krok === 'podnik' && (
         jine.length === 0 ? (
           <EmptyState compact icon="box" title="Není odkud kopírovat"
@@ -210,6 +243,15 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
         )
       )}
 
+      {krok === 'vyber' && zdroj && jine.length > 1 && (
+        <div className="-mt-1 mb-3">
+          <Button variant="ghost" size="sm" disabled={kopiruji}
+            onClick={() => { pozadavek.current++; setZdroj(null); setPolozky(null); setChybaSeznamu(''); setNacitamSeznam(false); }}>
+            Vybrat jiný podnik
+          </Button>
+        </div>
+      )}
+
       {krok === 'vyber' && zdroj && (
         nacitamSeznam ? (
           <div className="flex justify-center py-10"><span className="spinner" aria-label="Načítám seznam" /></div>
@@ -228,6 +270,11 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
                 {vseVybrano ? 'Zrušit výběr' : 'Vybrat vše'}
               </Button>
             </div>
+            {polozky && celkem > polozky.length && (
+              <p className="note note-wait">
+                Zobrazeno {polozky.length} z {celkem} — co tu nevidíš, hledej podle názvu v menším výběru nebo zkopíruj po částech.
+              </p>
+            )}
             {presDavku && (
               <p role="alert" className="note note-wait">Najednou jde zkopírovat nejvýš {MAX_DAVKA} položek — odeber {vybrane.size - MAX_DAVKA}.</p>
             )}
@@ -263,8 +310,8 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
       )}
 
       {krok === 'vysledek' && vysledky && (
-        <div className="space-y-3">
-          <p className={`note ${uspesne === 0 ? 'note-danger' : uspesne < vysledky.length ? 'note-wait' : 'note-ok'}`}>
+        <div ref={vysledekRef} tabIndex={-1} className="space-y-3 outline-none">
+          <p role="status" className={`note ${uspesne === 0 ? 'note-danger' : uspesne < vysledky.length ? 'note-wait' : 'note-ok'}`}>
             {/* „2 z 3 návody" je špatný pád; číslo po „z" se proto neskloňuje
                 a podstatné jméno nese jen souhrn, když prošlo všechno. */}
             {uspesne === 0
@@ -281,7 +328,11 @@ export default function KopieZPodniku({ entita, podniky: jine, onClose, onHotovo
                   <Icon name={ok ? 'check' : 'warning'} size={16}
                     className={`shrink-0 mt-0.5 ${ok ? 'text-ok-ink' : 'text-bad-ink'}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-[#16181A] truncate">{r.nazev}</span>
+                    {/* Položka, která ve zdroji mezitím zmizela, přijde jako „#id" —
+                        okno ale její název zná ze seznamu. */}
+                    <span className="block text-sm font-medium text-[#16181A] truncate">
+                      {polozky?.find(p => p.id === r.id)?.nazev ?? r.nazev}
+                    </span>
                     {r.poznamky.map((pz, i) => (
                       <span key={i} className={`block text-xs mt-0.5 ${ok ? 'text-black/55' : 'text-bad-ink'}`}>{pz}</span>
                     ))}

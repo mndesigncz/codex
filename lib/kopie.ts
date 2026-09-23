@@ -94,18 +94,27 @@ export function premapujGuideId(
   return { items: out, poznamky };
 }
 
+/** Nejdelší adresa menu — tolik nechá cleanSlug (lib/menu) i veřejná stránka. */
+export const MAX_SLUG = 40;
+
 /**
  * Volná veřejná adresa menu. Slug je jedinečný napříč všemi podniky
  * (unikátní index), takže kopie nemůže dostat adresu originálu; přidá se
  * pořadové číslo jako při zakládání menu. Očištění (cleanSlug z lib/menu)
  * dělá volající — lib/menu se kvůli vzhledu menu nedá načíst v `npm test`.
  * Prázdný slug dostane „menu".
+ *
+ * I s příponou se musí vejít do MAX_SLUG: veřejná stránka i uložení adresu
+ * ořežou na 40 znaků, a z „…40 znaků-2" by se ořezem stala adresa
+ * ORIGINÁLU — host kopie by viděl menu zdrojového podniku a uložení kopie
+ * by spadlo na „adresa je obsazená".
  */
-export function volnySlug(slug: string, obsazene: Set<string>): string {
-  const zaklad = slug.trim() || 'menu';
+export function volnySlug(slug: string, obsazene: Set<string>, max = MAX_SLUG): string {
+  const zaklad = slug.trim().slice(0, max).replace(/-+$/, '') || 'menu';
   if (!obsazene.has(zaklad)) return zaklad;
   for (let i = 2; ; i++) {
-    const kandidat = `${zaklad}-${i}`;
+    const pripona = `-${i}`;
+    const kandidat = zaklad.slice(0, max - pripona.length).replace(/-+$/, '') + pripona;
     if (!obsazene.has(kandidat)) return kandidat;
   }
 }

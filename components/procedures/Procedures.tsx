@@ -131,7 +131,7 @@ export default function Procedures({ user }: Props) {
   // podnik existuje. Ukazuje se i bez postupů: kopie je rychlejší start než
   // ukázkové postupy.
   const [kopieOpen, setKopieOpen] = useState(false);
-  const { jine: jinePodniky } = useJinePodniky(isEmployer);
+  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(isEmployer);
 
   const approveProcedure = async (id: number) => {
     const res = await fetch(`/api/procedures/${id}`, {
@@ -426,7 +426,7 @@ export default function Procedures({ user }: Props) {
       )}
 
       {kopieOpen && isEmployer && (
-        <KopieZPodniku entita="postupy" podniky={jinePodniky} onClose={() => setKopieOpen(false)} onHotovo={() => { load(); }} />
+        <KopieZPodniku entita="postupy" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={() => { load(); }} />
       )}
 
       {detail && (

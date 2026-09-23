@@ -17,12 +17,19 @@ import { tymyCiselniku } from './tenant';
 import { verejnaHlaska } from './verejnaChyba';
 import { normName } from './menuPos';
 import { cleanSlug, DEFAULT_CURRENCY } from './menu';
+import { czCount, type CzNoun } from './czech';
 import {
   nazvyNormovane, premapujGuideId, premapujKroky, premapujPodleNazvu, volnySlug,
   type EntitaKopie, type VysledekKopie,
 } from './kopie';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+/** Nejvíc řádků v seznamu ke kopírování — víc se v okně stejně nedá projít. */
+const LIMIT_SEZNAMU = 200;
+
+/** Seznam i s celkovým počtem: když je delší než limit, okno to musí říct. */
+export interface SeznamKeKopii { polozky: PolozkaKeKopii[]; celkem: number }
 
 /** Řádek seznamu ke kopírování — tvar odpovědi GET. */
 export interface PolozkaKeKopii {
@@ -47,6 +54,12 @@ export interface ZadaniKopie {
 }
 
 const NEPOVEDLO = 'Kopie se nepovedla.';
+
+const JEDNOTKY_AUDITU: Record<EntitaKopie, CzNoun> = {
+  navody: { one: 'návod', few: 'návody', many: 'návodů' },
+  postupy: { one: 'postup', few: 'postupy', many: 'postupů' },
+  menu: { one: 'menu', few: 'menu', many: 'menu' },
+};
 const STEJNY_NAZEV = 'Stejný název tu už je.';
 
 /** Checklist z databáze: JSONB přijde jako pole, starší řádky jako text. */
@@ -70,39 +83,57 @@ const mapaNazvu = (rows: any[], klic = 'name') => new Map<number, string>(rows.m
 // Seznam ke kopírování
 // ---------------------------------------------------------------------------
 
-/** Co zdrojový podnik nabízí. Návrhy čekající na schválení se nenabízejí — nejsou hotové. */
-export async function seznamKeKopii(entita: EntitaKopie, z: number): Promise<PolozkaKeKopii[]> {
+/**
+ * Co zdrojový podnik nabízí. Návrhy čekající na schválení se nenabízejí —
+ * nejsou hotové. `celkem` je počet PŘED limitem (COUNT(*) OVER() se počítá
+ * před LIMIT), aby okno neřeklo „nic takového tu není" o položce, která
+ * jen neprošla do prvních dvou set.
+ */
+export async function seznamKeKopii(entita: EntitaKopie, z: number): Promise<SeznamKeKopii> {
+  const celkem = (rows: any[]) => (rows.length ? Number(rows[0].celkem) || rows.length : 0);
   if (entita === 'navody') {
+    // Kategorie jen z podniků, jejichž číselník zdroj vidí — holé id by
+    // vytáhlo název kategorie z libovolného podniku.
+    const tymyZ = await tymyCiselniku(z, 'kategorieNavodu');
     const rows = await sql`
-      SELECT g.id, g.title, g.content, g.checklist, c.name AS kategorie
-      FROM guides g LEFT JOIN guide_categories c ON c.id = g.category_id
+      SELECT g.id, g.title, g.content, g.checklist, c.name AS kategorie, COUNT(*) OVER() AS celkem
+      FROM guides g LEFT JOIN guide_categories c ON c.id = g.category_id AND c.team_id = ANY(${tymyZ})
       WHERE g.team_id = ${z} AND g.approved IS DISTINCT FROM FALSE
-      ORDER BY g.title ASC, g.id ASC LIMIT 200` as any[];
-    return rows.map(r => ({
-      id: Number(r.id), nazev: String(r.title ?? ''), popis: vyhozeno(r.content),
-      pocet: krokyZRadku(r.checklist).length, kategorie: r.kategorie != null ? String(r.kategorie) : null,
-    }));
+      ORDER BY g.title ASC, g.id ASC LIMIT ${LIMIT_SEZNAMU}` as any[];
+    return {
+      celkem: celkem(rows),
+      polozky: rows.map(r => ({
+        id: Number(r.id), nazev: String(r.title ?? ''), popis: vyhozeno(r.content),
+        pocet: krokyZRadku(r.checklist).length, kategorie: r.kategorie != null ? String(r.kategorie) : null,
+      })),
+    };
   }
   if (entita === 'postupy') {
     const rows = await sql`
-      SELECT id, name, description, items FROM procedures
+      SELECT id, name, description, items, COUNT(*) OVER() AS celkem FROM procedures
       WHERE team_id = ${z} AND approved IS DISTINCT FROM FALSE
-      ORDER BY name ASC, id ASC LIMIT 200` as any[];
-    return rows.map(r => ({
-      id: Number(r.id), nazev: String(r.name ?? ''), popis: r.description ? String(r.description) : null,
-      pocet: parseSteps(r.items).length, kategorie: null,
-    }));
+      ORDER BY name ASC, id ASC LIMIT ${LIMIT_SEZNAMU}` as any[];
+    return {
+      celkem: celkem(rows),
+      polozky: rows.map(r => ({
+        id: Number(r.id), nazev: String(r.name ?? ''), popis: r.description ? String(r.description) : null,
+        pocet: parseSteps(r.items).length, kategorie: null,
+      })),
+    };
   }
   const rows = await sql`
-    SELECT b.id, b.name, b.title,
+    SELECT b.id, b.name, b.title, COUNT(*) OVER() AS celkem,
            (SELECT COUNT(*)::int FROM menu_items i JOIN menu_sections s ON s.id = i.section_id WHERE s.board_id = b.id) AS pocet
     FROM menu_boards b
     WHERE b.team_id = ${z}
-    ORDER BY b.name ASC, b.id ASC LIMIT 200` as any[];
-  return rows.map(r => ({
-    id: Number(r.id), nazev: String(r.name ?? ''), popis: r.title ? String(r.title) : null,
-    pocet: Number(r.pocet) || 0, kategorie: null,
-  }));
+    ORDER BY b.name ASC, b.id ASC LIMIT ${LIMIT_SEZNAMU}` as any[];
+  return {
+    celkem: celkem(rows),
+    polozky: rows.map(r => ({
+      id: Number(r.id), nazev: String(r.name ?? ''), popis: r.title ? String(r.title) : null,
+      pocet: Number(r.pocet) || 0, kategorie: null,
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,10 +146,14 @@ export async function zkopirujDoPodniku(zadani: ZadaniKopie): Promise<VysledekKo
     : await kopieMenu(zadani);
   // Stopa i ve ZDROJI: audit_log je po podnicích, a bez tohohle řádku by
   // vedení podniku A nevidělo, že jeho receptury a ceny odešly jinam.
+  // Detail má jen 300 znaků, takže počet a prvních pár názvů — padesát
+  // názvů by se uřízlo uprostřed a nikdo by nevěděl, kolik jich odešlo.
   const hotove = vysledky.filter(r => r.noveId != null);
   if (hotove.length) {
+    const ukazka = hotove.slice(0, 5).map(r => r.nazev).join(', ');
+    const zbytek = hotove.length > 5 ? ` a další ${hotove.length - 5}` : '';
     audit(zadani.z, zadani.meId, 'organization.kopie.zdroj', zadani.entita, null,
-      `Do podniku „${zadani.nazevCile}": ${hotove.map(r => r.nazev).join(', ')}`);
+      `Do podniku „${zadani.nazevCile}": ${czCount(hotove.length, JEDNOTKY_AUDITU[zadani.entita])} — ${ukazka}${zbytek}`);
   }
   return vysledky;
 }
@@ -130,7 +165,7 @@ function chybejici(ids: number[], nalezene: Set<number>, co: string): VysledekKo
 
 async function kopieNavodu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Promise<VysledekKopie[]> {
   const zdroje = await sql`
-    SELECT id, title, content, checklist, category_id, item_id FROM guides
+    SELECT id, title, content, checklist, category_id, item_id, require_read, for_closing, product_id FROM guides
     WHERE team_id = ${z} AND id = ANY(${ids}) AND approved IS DISTINCT FROM FALSE
     ORDER BY id` as any[];
   const vysledky = chybejici(ids, new Set(zdroje.map(r => Number(r.id))), 'Návod');
@@ -140,7 +175,10 @@ async function kopieNavodu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): 
   // podniku organizace, takže se nefiltruje po team_id. Cíl vidí vlastní
   // kategorie i ty ze zdroje organizace — stejně jako POST /api/guides.
   const catIds = [...new Set(zdroje.map(r => Number(r.category_id)).filter(n => Number.isFinite(n) && n > 0))];
-  const kategorieZdroje = catIds.length ? mapaNazvu(await sql`SELECT id, name FROM guide_categories WHERE id = ANY(${catIds})`) : new Map<number, string>();
+  const tymyZ = catIds.length ? await tymyCiselniku(z, 'kategorieNavodu') : [];
+  const kategorieZdroje = catIds.length
+    ? mapaNazvu(await sql`SELECT id, name FROM guide_categories WHERE id = ANY(${catIds}) AND team_id = ANY(${tymyZ})`)
+    : new Map<number, string>();
   const tymy = await tymyCiselniku(teamId, 'kategorieNavodu');
   const kategorieCile = idNazev(await sql`SELECT id, name FROM guide_categories WHERE team_id = ANY(${tymy})`);
 
@@ -176,6 +214,13 @@ async function kopieNavodu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): 
         else if (pripnuto.has(cil)) poznamky.push(`Položka „${nazevPolozky}" tu už má jiný návod — nepřipnuto.`);
         else itemId = cil;
       }
+      // Příznaky patří podniku, ne textu návodu: povinné čtení by v cíli
+      // rozeslalo upozornění lidem, kteří návod ještě nikdo neprošel, a
+      // návod k uzávěrce smí mít podnik jen jeden. Nepřenáší se — ale říct
+      // se to musí, jinak vedení čeká, že se návod při uzávěrce otevře.
+      if (r.require_read === true) poznamky.push('Povinné přečtení se nepřeneslo — zapni ho, až návod projdeš.');
+      if (r.for_closing === true) poznamky.push('V původním podniku se návod otevíral při uzávěrce — tady zatím ne.');
+      if (r.product_id != null) poznamky.push('Vazba na produkt v pokladně se nepřenáší — pokladna je jiného podniku.');
       if (nazvyCile.has(normName(nazev))) poznamky.push(STEJNY_NAZEV);
 
       const [nove] = await sql`
@@ -198,7 +243,7 @@ async function kopieNavodu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): 
 
 async function kopiePostupu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Promise<VysledekKopie[]> {
   const zdroje = await sql`
-    SELECT id, name, description, icon, color, items, remind_at, remind_days, remind_anchor FROM procedures
+    SELECT id, name, description, icon, color, items, remind_at, remind_days, remind_anchor, require_before_closing FROM procedures
     WHERE team_id = ${z} AND id = ANY(${ids}) AND approved IS DISTINCT FROM FALSE
     ORDER BY id` as any[];
   const vysledky = chybejici(ids, new Set(zdroje.map(r => Number(r.id))), 'Postup');
@@ -225,6 +270,12 @@ async function kopiePostupu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie):
       if (nazvyCile.has(normName(nazev))) poznamky.push(STEJNY_NAZEV);
       const remindAnchor = ['open', 'close', 'time'].includes(r.remind_anchor) ? r.remind_anchor : 'time';
       const remindDays = Array.isArray(r.remind_days) ? r.remind_days : [];
+      // Povinnost před uzávěrkou by v cíli zablokovala uzávěrku postupem,
+      // který tam ještě nikdo nezná — nepřenáší se, ale řekne se to.
+      // Připomínky se přenesou (jsou součástí postupu), jen ať vedení ví,
+      // že hned zítra začnou chodit.
+      if (r.require_before_closing === true) poznamky.push('Ve zdroji byl postup povinný před uzávěrkou — tady zatím není.');
+      if (remindDays.length) poznamky.push('Připomínky se přenesly — zkontroluj, jestli sedí na zdejší provoz.');
       const [nove] = await sql`
         INSERT INTO procedures (team_id, name, description, icon, color, items, remind_at, remind_days, remind_anchor,
                                 require_before_closing, created_by, approved, submitted_by)

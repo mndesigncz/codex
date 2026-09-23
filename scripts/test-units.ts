@@ -916,6 +916,17 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   eq('slug: obsazený dostane pořadové číslo od 2', volnySlug('menu', new Set(['menu'])), 'menu-2');
   eq('slug: přeskočí obsazená čísla', volnySlug('menu', new Set(['menu', 'menu-2', 'menu-3'])), 'menu-4');
   eq('slug: prázdný → menu (a číslo, když je obsazené)', [volnySlug('', new Set()), volnySlug('  ', new Set(['menu']))], ['menu', 'menu-2']);
+  {
+    // 40 znaků je strop adresy; „…-2" navíc by veřejná stránka ořízla zpátky
+    // na adresu originálu a host kopie by viděl cizí menu.
+    const s40 = 'a'.repeat(40), s39 = 'b'.repeat(38) + '-c';
+    const k40 = volnySlug(s40, new Set([s40]));
+    const k39 = volnySlug(s39, new Set([s39]));
+    ok('slug: kopie 40znakové adresy se vejde do 40 znaků', k40.length <= 40 && k40 !== s40 && k40.endsWith('-2'));
+    ok('slug: kopie 39znakové adresy se vejde a liší se od originálu', k39.length <= 40 && k39 !== s39 && k39.slice(0, 40) !== s39);
+    ok('slug: po zkrácení nekončí základ pomlčkou („b…b--2")', !/--/.test(volnySlug('x'.repeat(37) + '-yy', new Set(['x'.repeat(37) + '-yy']))));
+    eq('slug: dvouciferná přípona se taky vejde', volnySlug(s40, new Set([s40, ...Array.from({ length: 8 }, (_, i) => 'a'.repeat(38) + '-' + (i + 2))])).length <= 40, true);
+  }
   eq('kopie: množina názvů pro „Stejný název tu už je."', [...nazvyNormovane(['Latté', 'latte', '', null, 'Čaj'])], ['latte', 'caj']);
 }
 
