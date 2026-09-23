@@ -114,7 +114,8 @@ async function mappedItem(id: number, teamId: number | null) {
 }
 
 // PATCH: employees may only change quantity; employers may edit all fields.
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
@@ -444,11 +445,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   await afterStockChange(me.teamId);
-    return NextResponse.json(await mappedItem(id, me.teamId));
+  return NextResponse.json(await mappedItem(id, me.teamId));
 }
 
 // DELETE (employer): remove item.
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });

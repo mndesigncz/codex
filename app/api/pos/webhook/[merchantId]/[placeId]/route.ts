@@ -52,9 +52,9 @@ async function handle(request: Request, params: { merchantId: string; placeId: s
   return new NextResponse(null, { status: 204 });
 }
 
-export async function POST(request: Request, ctx: { params: { merchantId: string; placeId: string } }) {
-  return handle(request, ctx.params);
+export async function POST(request: Request, ctx: { params: Promise<{ merchantId: string; placeId: string }> }) {
+  return handle(request, (await ctx.params));
 }
-export async function PUT(request: Request, ctx: { params: { merchantId: string; placeId: string } }) {
-  return handle(request, ctx.params);
+export async function PUT(request: Request, ctx: { params: Promise<{ merchantId: string; placeId: string }> }) {
+  return handle(request, (await ctx.params));
 }

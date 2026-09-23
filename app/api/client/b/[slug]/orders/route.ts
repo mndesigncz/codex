@@ -8,7 +8,8 @@ import { hit } from '@/lib/rateLimit';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
   const p = await profileBySlug(params.slug);
@@ -64,7 +65,8 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   return NextResponse.json({ ok: true, straight, posNote: straight ? null : auto?.posNote ?? null, order: { ...o, status: auto?.posOk ? 'confirmed' : o.status, tableName: table.name } });
 }
 
-export async function GET(_req: Request, { params }: { params: { slug: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ orders: [] });
   const p = await profileBySlug(params.slug);

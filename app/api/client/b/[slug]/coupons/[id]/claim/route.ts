@@ -10,7 +10,8 @@ import { claimBlocker } from '@/lib/coupons';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export async function POST(_req: Request, { params }: { params: { slug: string; id: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ slug: string; id: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
   const p = await profileBySlug(params.slug);

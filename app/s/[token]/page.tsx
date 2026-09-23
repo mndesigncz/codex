@@ -31,7 +31,8 @@ async function loadLink(token: string) {
   }
 }
 
-export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const link = await loadLink(params.token);
   if (!link) return { title: 'Nenalezeno' };
   let name = '';
@@ -43,7 +44,8 @@ export async function generateMetadata({ params }: { params: { token: string } }
   return { title, description: link.note ?? undefined, robots: { index: false } };
 }
 
-export default async function SharePage({ params }: { params: { token: string } }) {
+export default async function SharePage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const link = await loadLink(params.token);
   if (!link) notFound();
 

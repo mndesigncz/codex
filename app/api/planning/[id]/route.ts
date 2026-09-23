@@ -31,7 +31,8 @@ async function ownedByTeam(id: number, teamId: number) {
   return !!row;
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await employerTeam();
   if (me.status === 401) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (me.status === 403 || !me.teamId) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -65,7 +66,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await employerTeam();
   if (me.status === 401) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (me.status === 403 || !me.teamId) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });

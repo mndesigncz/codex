@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type JSX } from 'react';
 import { Icon } from './Icons';
 import { EmptyState, Button, PageHeader , SearchField, ApproveAllBar, runBulk, ErrorState } from './ui';
 import StepTimeline from './procedures/StepTimeline';

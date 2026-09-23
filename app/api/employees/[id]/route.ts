@@ -12,7 +12,8 @@ const sql = neon(process.env.DATABASE_URL!);
 // GET — everything the employer needs about one employee in a single view:
 // identity, level & points, shifts (upcoming + recent, with review status),
 // reviews and per-item feedback, attendance hours and closings.
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const s = await getServerSession(authOptions);
   if (!s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((s.user as any).id);

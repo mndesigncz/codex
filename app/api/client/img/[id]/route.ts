@@ -14,7 +14,8 @@ export const fetchCache = 'force-no-store';
 /** Zobrazit se smí jen obrázek, a jen typ, který prohlížeč nespustí. */
 const INLINE_OK = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif', 'image/gif']);
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = parseInt(params.id, 10);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 

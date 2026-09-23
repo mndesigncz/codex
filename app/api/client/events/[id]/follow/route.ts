@@ -23,7 +23,8 @@ async function counts(eventId: number) {
   return { followers: Number(c?.followers) || 0, going: Number(c?.going) || 0 };
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se, ať ti akce neuteče.' }, { status: 401 });
   const id = parseInt(params.id);
@@ -44,7 +45,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ ok: true, myFollow: true, myGoing: going, ...(await counts(id)) });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const id = parseInt(params.id);

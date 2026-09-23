@@ -18,7 +18,8 @@ async function me() {
 }
 
 // GET: výrobní receptura položky včetně toho, co je ve skladu (každá role).
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await me();
   if (!c?.teamId) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const id = parseInt(params.id);
@@ -29,7 +30,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 // PUT: uložit recepturu — jen vedení.
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await me();
   if (!c?.teamId) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (c.role !== 'employer') return NextResponse.json({ error: 'Recepturu nastavuje vedení' }, { status: 403 });

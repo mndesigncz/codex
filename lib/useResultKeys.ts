@@ -19,8 +19,8 @@ import { useCallback, type KeyboardEvent, type RefObject } from 'react';
 const ITEMS = 'button:not([disabled]), a[href]';
 
 export function useResultKeys(
-  listRef: RefObject<HTMLElement>,
-  inputRef: RefObject<HTMLInputElement>,
+  listRef: RefObject<HTMLElement | null>,
+  inputRef: RefObject<HTMLInputElement | null>,
   opts: { onEscape?: () => void } = {},
 ) {
   const { onEscape } = opts;

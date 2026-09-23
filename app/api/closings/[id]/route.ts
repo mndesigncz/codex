@@ -24,7 +24,8 @@ const sql = neon(process.env.DATABASE_URL!);
 // Všechno kolem uzávěrky je best-effort: chybějící migrace ani nedostupná
 // pokladna nesmí shodit detail. Když se něco nepodaří, řekne se to (`notes`),
 // místo aby tam tiše chyběla čísla.
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((session.user as any).id);
@@ -245,7 +246,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 // PATCH — employer approves a pending closing.
-export async function PATCH(_req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((session.user as any).id);
@@ -270,7 +272,8 @@ export async function PATCH(_req: Request, { params }: { params: { id: string } 
 }
 
 // DELETE — remove a closing. Author may delete their own; employer may delete any in the team.
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((session.user as any).id);

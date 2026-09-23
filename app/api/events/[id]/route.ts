@@ -36,7 +36,8 @@ async function notifyFollowers(eventId: number, teamId: number, payload: { title
 
 const czDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const u = await me();
   if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const id = parseInt(params.id);
@@ -245,7 +246,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true, event: fresh });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const u = await me();
   if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const id = parseInt(params.id);

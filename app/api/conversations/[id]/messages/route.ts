@@ -22,7 +22,8 @@ async function isMember(conversationId: number, userId: number) {
   return rows.length > 0;
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const conversationId = parseInt(params.id);
@@ -65,7 +66,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   return NextResponse.json({ messages: out });
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const conversationId = parseInt(params.id);

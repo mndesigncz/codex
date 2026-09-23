@@ -6,7 +6,8 @@ import { pragueToday } from '@/lib/pragueTime';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
   const id = parseInt(params.id, 10);
