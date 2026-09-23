@@ -206,8 +206,16 @@ function RewardsViewInner() {
                 // pixelů. Teď má na mobilu vlastní řádek a ovládání se zalomí pod něj.
                 <div key={rw.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 ${rw.active === false ? 'opacity-50' : ''}`}>
                   <span className="text-xl shrink-0">{rw.icon ?? '🎁'}</span>
-                  <span className="min-w-0 flex-1 basis-[calc(100%-2.75rem)] sm:basis-0 text-sm font-medium text-[#16181A]">{rw.title}</span>
+                  <span className="min-w-0 flex-1 basis-[calc(100%-2.75rem)] sm:basis-0 text-sm font-medium text-[#16181A]">
+                    {rw.title}
+                    {rw.zOrganizace && <span className="ml-2 chip chip-sm chip-muted align-middle">z organizace</span>}
+                    {rw.sdileno && <span className="ml-2 chip chip-sm chip-info align-middle" title="Vidí a nabízejí ji i ostatní podniky organizace">sdíleno</span>}
+                    {rw.zOrganizace && rw.spravuje && <span className="block text-xs font-normal text-black/45 truncate">Spravuje: {rw.spravuje}</span>}
+                  </span>
                   <span className="shrink-0 text-xs text-black/45 tabular-nums ml-auto sm:ml-0">{rw.cost} b.</span>
+                  {/* Odměnu ze zdrojového podniku organizace (kolo 60) upraví jen jeho
+                      vedení — vypínač i koš by tu jen vracely 404, tak se neukazují. */}
+                  {!rw.zOrganizace && (<>
                   <button onClick={async () => {
                     await fetch('/api/rewards/catalog', {
                       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -222,6 +230,7 @@ function RewardsViewInner() {
                     await fetch(`/api/rewards/catalog?id=${rw.id}`, { method: 'DELETE' }).catch(() => null);
                     await loadShop();
                   }} className="tap-target-sm shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-bad-ink text-xs"><Icon name="close" size={15} /></button>
+                  </>)}
                 </div>
               ))}
             </div>

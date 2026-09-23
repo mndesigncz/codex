@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers, notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,18 @@ async function ctx() {
   const role = (session.user as any).role;
   const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
   return { meId, role, teamId: u?.team_id ?? null };
+}
+
+/**
+ * Je kategorie viditelná pro podnik? Vlastní, nebo ze zdrojového podniku
+ * organizace (kolo 60). Návod je řádek podniku, ukazuje ale na kategorii, a
+ * ukazatel se ověřuje proti viditelným podnikům — nikdy proti holému id,
+ * jinak by šlo návod zařadit do kategorie cizí organizace.
+ */
+async function kategorieViditelna(teamId: number, categoryId: number): Promise<boolean> {
+  const tymy = await tymyCiselniku(teamId, 'kategorieNavodu');
+  const [row] = await sql`SELECT 1 AS ok FROM guide_categories WHERE id = ${categoryId} AND team_id = ANY(${tymy})`;
+  return !!row;
 }
 
 function excerpt(content: string) {
@@ -122,6 +135,13 @@ export async function POST(request: Request) {
   const itemId = Number(body.itemId) > 0 ? Number(body.itemId) : null;
   if (!title || !String(title).trim()) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
+  // Kategorie se dřív neověřovala vůbec; se sdílenými číselníky musí být
+  // viditelná pro tenhle podnik (vlastní nebo ze zdroje organizace).
+  const catId = categoryId ? parseInt(categoryId) : null;
+  if (catId != null && (!Number.isInteger(catId) || !(await kategorieViditelna(Number(c.teamId), catId)))) {
+    return NextResponse.json({ error: 'Kategorie neexistuje' }, { status: 400 });
+  }
+
   const steps = normalizeChecklist(checklist);
 
   let guide: any;
@@ -130,7 +150,7 @@ export async function POST(request: Request) {
     INSERT INTO guides (team_id, category_id, title, content, checklist, created_by, updated_at, approved, submitted_by)
     VALUES (
       ${c.teamId},
-      ${categoryId ? parseInt(categoryId) : null},
+      ${catId},
       ${String(title).trim()},
       ${content || ''},
       ${JSON.stringify(steps)},
@@ -155,7 +175,7 @@ export async function POST(request: Request) {
     INSERT INTO guides (team_id, category_id, title, content, checklist, created_by, updated_at)
     VALUES (
       ${c.teamId},
-      ${categoryId ? parseInt(categoryId) : null},
+      ${catId},
       ${String(title).trim()},
       ${content || ''},
       ${JSON.stringify(steps)},

@@ -193,6 +193,8 @@ export default function NewStockEntry({
                   ? 'seg-on'
                   : 'glass text-black/60 hover:text-[#16181A]'}`}>
                 {depth > 0 && <span className="opacity-40">{'· '.repeat(depth)}</span>}{cat.name}
+                {/* Kategorie zdrojového podniku organizace — ať jde poznat od stejnojmenné vlastní. */}
+                {cat.zOrganizace && <span className="opacity-40"> · z organizace</span>}
               </button>
             ))}
           </div>

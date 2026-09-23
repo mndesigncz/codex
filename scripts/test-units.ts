@@ -24,7 +24,7 @@ import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
 import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
 import { parseStep, serializeStep, parseSteps } from '../lib/steps.ts';
 import { odkazNaNavod } from '../lib/otevriNavod.ts';
-import { normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, VYCHOZI_NASTAVENI, tymyProCiselnik, ocistiZdroje, coSeVypina, coSeSlucuje, normalizujZdroje } from '../lib/organizace.ts';
+import { CISELNIKY, normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, VYCHOZI_NASTAVENI, tymyProCiselnik, ocistiZdroje, coSeVypina, coSeSlucuje, normalizujZdroje } from '../lib/organizace.ts';
 import { kategorieKeKopirovani, premapujRodice, seradVlastniPrvni } from '../lib/sdileneCiselniky.ts';
 import { souhrn, podnikyProPrehled, procNejde, hraniceMesice } from '../lib/prehledOrganizace.ts';
 import { describe as popisUkolu } from '../lib/productionPlan.ts';
@@ -894,6 +894,7 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   eq('číselníky: změna zdroje A → C vypíná A a slučuje k C', [coSeVypina(stare, N({ kategorieSkladu: 3, dodavatele: 1 })), coSeSlucuje(stare, N({ kategorieSkladu: 3, dodavatele: 1 }))], [[{ ciselnik: 'kategorieSkladu', zdroj: 1 }], [{ ciselnik: 'kategorieSkladu', zdroj: 3 }]]);
   eq('číselníky: beze změny nic', [coSeVypina(stare, stare), coSeSlucuje(stare, stare)], [[], []]);
   eq('číselníky: zapnutí nic nevypíná, slučuje k zdroji', [coSeVypina(N({}, false), stare), coSeSlucuje(N({}, false), stare)], [[], [{ ciselnik: 'kategorieSkladu', zdroj: 1 }, { ciselnik: 'dodavatele', zdroj: 1 }]]);
+  eq('číselníky: kopie vznikají jen tam, kde na řádky něco ukazuje po id', CISELNIKY.filter(c => c.kopie).map(c => c.klic), ['kategorieSkladu', 'typySmen', 'kategorieNavodu']);
   // strom: 1 Nápoje → 2 Sirupy → 3 Domácí; 4 Pečivo; 5 Sirupy/Kupované
   const strom = [
     { id: 1, name: 'Nápoje', parent_id: null }, { id: 2, name: 'Sirupy', parent_id: 1 }, { id: 3, name: 'Domácí', parent_id: 2 },

@@ -18,12 +18,16 @@ export type Fakturace = 'per_team' | 'per_org';
  * v druhém podniku odkazoval do prázdna. Ty potřebují kopii, ne sdílení.
  */
 export type Ciselnik = 'kategorieSkladu' | 'dodavatele' | 'typySmen' | 'kategorieNavodu' | 'odmeny';
-export const CISELNIKY: { klic: Ciselnik; nazev: string; hint: string }[] = [
-  { klic: 'kategorieSkladu', nazev: 'Kategorie skladu', hint: 'strom kategorií včetně balení a předvyplnění' },
-  { klic: 'dodavatele', nazev: 'Dodavatelé', hint: 'včetně e-mailu a telefonu' },
-  { klic: 'typySmen', nazev: 'Typy směn', hint: 'časy se překládají podle otevírací doby každého podniku' },
-  { klic: 'kategorieNavodu', nazev: 'Kategorie návodů', hint: 'jen kategorie, návody samotné zůstávají v podniku' },
-  { klic: 'odmeny', nazev: 'Katalog odměn', hint: 'body se sbírají v podniku, kde člověk pracuje' },
+// `kopie`: při vypnutí sdílení dostanou podniky vlastní kopie jen u číselníků,
+// na které něco ukazuje po id (položky, pevné směny, návody). Dodavatelé
+// a odměny se jen přestanou číst — objednávky nesou jméno dodavatele
+// v textu a body se sbírají v podniku, takže jim nic nezmizí.
+export const CISELNIKY: { klic: Ciselnik; nazev: string; hint: string; kopie: boolean }[] = [
+  { klic: 'kategorieSkladu', nazev: 'Kategorie skladu', hint: 'strom kategorií včetně balení a předvyplnění', kopie: true },
+  { klic: 'dodavatele', nazev: 'Dodavatelé', hint: 'včetně e-mailu a telefonu', kopie: false },
+  { klic: 'typySmen', nazev: 'Typy směn', hint: 'časy se překládají podle otevírací doby každého podniku', kopie: true },
+  { klic: 'kategorieNavodu', nazev: 'Kategorie návodů', hint: 'jen kategorie, návody samotné zůstávají v podniku', kopie: true },
+  { klic: 'odmeny', nazev: 'Katalog odměn', hint: 'body se sbírají v podniku, kde člověk pracuje', kopie: false },
 ];
 export type ZdrojeCiselniku = Record<Ciselnik, number | null>;
 

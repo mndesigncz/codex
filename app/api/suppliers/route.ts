@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
+import { ciselnikPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,14 +20,32 @@ async function me() {
   return u ?? null;
 }
 
+// GET — dodavatelé podniku; se sdílenými číselníky (kolo 60) i dodavatelé
+// zdrojového podniku organizace, vlastní první. Vazba položka→dodavatel je
+// jen text (jméno), takže sjednocený seznam jmen stačí našeptávači i
+// nákupnímu seznamu beze změny. E-mail a telefon ze zdroje vidí každý člen —
+// stejný majitel, stejná organizace; hint v nastavení to říká.
 export async function GET() {
   const u = await me();
   if (!u?.team_id) return NextResponse.json({ suppliers: [] });
+  const teamId = Number(u.team_id);
   try {
+    // Zdroj vidí jen své řádky, ale má vědět, že úprava se propíše do celé
+    // organizace — proto chip „sdíleno". Název zdroje pro „Spravuje: …" vidí
+    // každý člen organizace i v seznamu podniků, takže tím nic neprozrazujeme.
+    const { tymy, jsemZdroj, spravuje } = await ciselnikPodniku(teamId, 'dodavatele');
     const rows = await sql`
-      SELECT id, name, email, phone, note FROM suppliers
-      WHERE team_id = ${u.team_id} ORDER BY name ASC`;
-    return NextResponse.json({ suppliers: rows });
+      SELECT id, team_id, name, email, phone, note FROM suppliers
+      WHERE team_id = ANY(${tymy}) ORDER BY (team_id = ${teamId}) DESC, name ASC`;
+    return NextResponse.json({
+      suppliers: (rows as any[]).map(r => {
+        const zOrganizace = Number(r.team_id) !== teamId;
+        return {
+          id: r.id, name: r.name, email: r.email, phone: r.phone, note: r.note,
+          zOrganizace, sdileno: !zOrganizace && jsemZdroj, spravuje: zOrganizace ? spravuje : null,
+        };
+      }),
+    });
   } catch { return NextResponse.json({ suppliers: [] }); }
 }
 

@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { organizaceTymu } from '@/lib/tenant';
-import { normalizujNastaveni } from '@/lib/organizace';
+import { organizaceTymu, podnikyOrganizace } from '@/lib/tenant';
+import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, normalizujZdroje, ocistiZdroje } from '@/lib/organizace';
+import { provedZmenuZdroju, type VysledekKopie } from '@/lib/sdileneCiselnikyDb';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -41,9 +42,43 @@ export async function PATCH(req: Request) {
   if (!org) return NextResponse.json({ error: 'Podnik není v organizaci.' }, { status: 404 });
   if (org.ownerId !== c.meId) return NextResponse.json({ error: 'Nastavení organizace mění jen její vlastník.' }, { status: 403 });
   const b = await req.json().catch(() => ({}));
-  const nastaveni = normalizujNastaveni({ ...org.nastaveni, ...(b.settings ?? {}) });
+  const patch: Record<string, unknown> = b.settings && typeof b.settings === 'object' ? { ...b.settings } : {};
+
+  // Zdroje číselníků (kolo 60) projdou jen jako podniky TÉHLE organizace.
+  // Cizí id se nevynuluje potichu, ale odmítne — klient by jinak nevěděl,
+  // že jeho volba propadla. Tohle je první ze dvou kontrol; druhá je při
+  // každém čtení (tymyProCiselnik), aby stará hodnota po odchodu podniku
+  // z organizace nikdy nic nepustila.
+  const podniky = await podnikyOrganizace(org.id);
+  if ('zdrojeCiselniku' in patch) {
+    const chtene = normalizujZdroje(patch.zdrojeCiselniku);
+    const ocistene = ocistiZdroje(patch.zdrojeCiselniku, podniky);
+    if (CISELNIKY.some(k => chtene[k.klic] != null && ocistene[k.klic] == null)) {
+      return NextResponse.json({ error: 'Podnik není v organizaci.' }, { status: 400 });
+    }
+    patch.zdrojeCiselniku = ocistene;
+  }
+  // Mělké sloučení: klient posílá celou mapu zdrojů, ne jeden klíč.
+  const nastaveni = normalizujNastaveni({ ...org.nastaveni, ...patch });
   const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 80) : org.name;
+
+  // Kopie a sloučení běží PŘED uložením: dokud platí staré nastavení, podnik
+  // B ještě řádky zdroje čte, takže se dá zjistit, které z nich používá.
+  // Chyba u jednoho podniku uložení nezastaví — vrací se v `kopie`, ať UI
+  // neřekne „Uloženo" nad podnikem, kterému kopie nevznikla.
+  const vypina = coSeVypina(org.nastaveni, nastaveni);
+  const slucuje = coSeSlucuje(org.nastaveni, nastaveni);
+  let kopie: VysledekKopie[] = [];
+  if (vypina.length || slucuje.length) {
+    kopie = await provedZmenuZdroju({ orgId: org.id, meId: c.meId, podniky, vypina, slucuje });
+  }
+
   await sql`UPDATE organizations SET name = ${name}, settings = ${JSON.stringify(nastaveni)}::jsonb WHERE id = ${org.id}`;
   audit(c.teamId, c.meId, 'organization.settings', 'organization', org.id, JSON.stringify(nastaveni));
-  return NextResponse.json({ ok: true, organization: { id: org.id, name, settings: nastaveni } });
+  // Změna zdrojů zvlášť: audit_log nemá organization_id, píše se k aktivnímu podniku jako dosud.
+  if (vypina.length || slucuje.length || JSON.stringify(org.nastaveni.zdrojeCiselniku) !== JSON.stringify(nastaveni.zdrojeCiselniku)) {
+    audit(c.teamId, c.meId, 'organization.ciselniky', 'organization', org.id,
+      JSON.stringify({ sdileneCiselniky: nastaveni.sdileneCiselniky, zdroje: nastaveni.zdrojeCiselniku }));
+  }
+  return NextResponse.json({ ok: true, organization: { id: org.id, name, settings: nastaveni }, kopie });
 }

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { prefAllowsSlot, dayPrefLabel, type PrefType } from '@/lib/dayPrefs';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -166,15 +167,21 @@ export async function POST(req: Request) {
     }
     timeOffByEmp.set(t.employee_id, set);
   }
+  // I typy ze zdrojového podniku organizace (kolo 60), vlastní první.
+  // „Od otevření / do zavření" se níž překládá proti otevírací době TOHOHLE
+  // podniku (resolveTimes), takže sdílená definice sedí každému.
+  const tymy = await tymyCiselniku(ctx.teamId, 'typySmen');
   let shiftTypes: any[];
   try {
     shiftTypes = await sql`
       SELECT id, name, start_time, end_time, color, position, starts_at_open, ends_at_close
-      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+      FROM shift_types WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${ctx.teamId}) DESC, position ASC, id ASC`;
   } catch {
     shiftTypes = await sql`
       SELECT id, name, start_time, end_time, color, position
-      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+      FROM shift_types WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${ctx.teamId}) DESC, position ASC, id ASC`;
   }
   const fixedRows = await sql`
     SELECT employee_id, weekday, shift_type_id FROM fixed_assignments WHERE team_id = ${ctx.teamId}`;

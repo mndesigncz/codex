@@ -11,6 +11,7 @@ import { audit } from '@/lib/audit';
 import { pointsAvailableFor } from '@/lib/pointsBalance';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueToday } from '@/lib/pragueTime';
+import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +28,32 @@ async function me() {
 export async function GET() {
   const u = await me();
   if (!u?.team_id) return NextResponse.json({ catalog: [], redemptions: [] });
+  const teamId = Number(u.team_id);
   try {
-    const catalog = u.role === 'employer'
-      ? await sql`SELECT * FROM rewards_catalog WHERE team_id = ${u.team_id} ORDER BY cost ASC`
-      : await sql`SELECT * FROM rewards_catalog WHERE team_id = ${u.team_id} AND active = TRUE ORDER BY cost ASC`;
+    // Sdílené číselníky (kolo 60): katalog může spravovat jiný podnik
+    // organizace. Které podniky čteme, rozhoduje jediné místo (lib/tenant.ts);
+    // tady se pole jen dosadí do predikátu. Vlastní odměny první, ať se
+    // zaměstnanci i vedení nejdřív ukáže to, co si podnik nastavil sám.
+    // Zdroj vidí jen své řádky, ale vedení má vědět, že úprava se propíše do
+    // celé organizace — proto chip „sdíleno"; jméno zdroje pro „Spravuje: …"
+    // vidí každý člen organizace i v seznamu podniků. Zaměstnanec katalog
+    // jen čte, takže oba údaje dostane jen vedení.
+    const { tymy, jsemZdroj, spravuje } = await ciselnikPodniku(teamId, 'odmeny');
+    const rows = u.role === 'employer'
+      ? await sql`
+          SELECT id, team_id, title, icon, cost, active, created_at FROM rewards_catalog
+          WHERE team_id = ANY(${tymy})
+          ORDER BY (team_id = ${teamId}) DESC, cost ASC, id ASC`
+      : await sql`
+          SELECT id, team_id, title, icon, cost, active, created_at FROM rewards_catalog
+          WHERE team_id = ANY(${tymy}) AND active = TRUE
+          ORDER BY (team_id = ${teamId}) DESC, cost ASC, id ASC`;
+    const catalog = (rows as any[]).map(r => {
+      const zOrganizace = Number(r.team_id) !== teamId;
+      return u.role === 'employer'
+        ? { ...r, zOrganizace, sdileno: !zOrganizace && jsemZdroj, spravuje: zOrganizace ? spravuje : null }
+        : { ...r, zOrganizace };
+    });
     const redemptions = u.role === 'employer'
       ? await sql`
           SELECT rr.*, us.name AS employee_name, us.avatar AS employee_avatar
@@ -73,8 +96,14 @@ export async function POST(req: NextRequest) {
   if (u.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const rewardId = parseInt(b.rewardId);
   if (!Number.isFinite(rewardId)) return NextResponse.json({ error: 'Chybí odměna' }, { status: 400 });
+  // Vyměnit jde i odměnu ze zdrojového podniku organizace (kolo 60): cíl se
+  // ověřuje proti viditelným podnikům, nikdy proti holému id. Žádost sama
+  // zůstává řádkem TOHOTO podniku (team_id = u.team_id, title i cost
+  // zkopírované), takže body se odečtou tam, kde člověk pracuje.
+  const tymy = await tymyCiselniku(Number(u.team_id), 'odmeny');
   const [reward] = await sql`
-    SELECT * FROM rewards_catalog WHERE id = ${rewardId} AND team_id = ${u.team_id} AND active = TRUE`;
+    SELECT id, title, cost FROM rewards_catalog
+    WHERE id = ${rewardId} AND team_id = ANY(${tymy}) AND active = TRUE`;
   if (!reward) return NextResponse.json({ error: 'Odměna nenalezena' }, { status: 404 });
 
   // Points must exist before they're spent — pending requests count as spoken for.

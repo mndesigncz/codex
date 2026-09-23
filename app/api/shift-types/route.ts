@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { ciselnikPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,23 +30,37 @@ function mapRow(r: any) {
   };
 }
 
-// GET — team shift types ordered by position
+// GET — typy směn podniku; se sdílenými číselníky (kolo 60) i typy zdrojového
+// podniku organizace, vlastní první. Časy „od otevření / do zavření" se
+// překládají až při generování proti otevírací době KAŽDÉHO podniku, takže
+// jedna definice sedí všem.
 export async function GET() {
   const ctx = await context();
   if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!ctx.teamId) return NextResponse.json({ shiftTypes: [] });
 
+  // Zdroj vidí jen své řádky, ale má vědět, že úprava se propíše do celé
+  // organizace — proto chip „sdíleno". Název zdroje pro „Spravuje: …" vidí
+  // každý člen organizace i v seznamu podniků, takže tím nic neprozrazujeme.
+  const { tymy, jsemZdroj, spravuje } = await ciselnikPodniku(ctx.teamId, 'typySmen');
   let rows: any[];
   try {
     rows = await sql`
       SELECT id, team_id, name, start_time, end_time, color, position, starts_at_open, ends_at_close
-      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+      FROM shift_types WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${ctx.teamId}) DESC, position ASC, id ASC`;
   } catch {
     rows = await sql`
       SELECT id, team_id, name, start_time, end_time, color, position
-      FROM shift_types WHERE team_id = ${ctx.teamId} ORDER BY position ASC, id ASC`;
+      FROM shift_types WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${ctx.teamId}) DESC, position ASC, id ASC`;
   }
-  return NextResponse.json({ shiftTypes: rows.map(mapRow) });
+  return NextResponse.json({
+    shiftTypes: rows.map(r => {
+      const zOrganizace = Number(r.team_id) !== ctx.teamId;
+      return { ...mapRow(r), zOrganizace, sdileno: !zOrganizace && jsemZdroj, spravuje: zOrganizace ? spravuje : null };
+    }),
+  });
 }
 
 // POST (employer) — { name, startTime, endTime, color? }

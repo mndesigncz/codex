@@ -11,6 +11,7 @@ import { sendDigestEmail } from '@/lib/email';
 import { cashDifference, czk } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
 import { escHtml } from '@/lib/email';
+import { tymyCiselnikuHromadne } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -32,6 +33,9 @@ export async function GET(request: Request) {
 
   try {
     const teams = await sql`SELECT id, name FROM teams ORDER BY id`;
+    // Které kategorie skladu podnik čte (kolo 60) — pro všechny podniky
+    // najednou, ne dotaz na organizaci uvnitř smyčky za každý podnik.
+    const tymyKategorii = await tymyCiselnikuHromadne((teams as any[]).map(t => Number(t.id)), 'kategorieSkladu');
     for (const team of teams as any[]) {
       const employers = await sql`
         SELECT id, email FROM users WHERE team_id = ${team.id} AND role = 'employer'`;
@@ -114,9 +118,12 @@ export async function GET(request: Request) {
           WHERE team_id = ${team.id} AND archived IS NOT TRUE AND (approved IS DISTINCT FROM FALSE)`;
         let cats: any[] = [];
         try {
+          // I kategorie zdrojového podniku organizace (kolo 60) — položka
+          // na ně smí ukazovat a balení se dědí z nich.
+          const tymy = tymyKategorii.get(Number(team.id)) ?? [Number(team.id)];
           cats = await sql`
-            SELECT id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
-            FROM inventory_categories WHERE team_id = ${team.id}`;
+            SELECT id, team_id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
+            FROM inventory_categories WHERE team_id = ANY(${tymy})`;
         } catch { /* pre-migration */ }
         const { stockStatus, normalizeCategoryPackaging } = await import('@/lib/packaging');
         const { packagingSourceOf } = await import('@/lib/categoryTree');
@@ -124,11 +131,14 @@ export async function GET(request: Request) {
           id: Number(c.id), name: String(c.name), position: 0,
           parentId: c.parent_id != null ? Number(c.parent_id) : null,
           tracksOpen: c.tracks_open === true,
+          vlastni: Number(c.team_id) === Number(team.id),
         }));
         for (const i of items as any[]) {
+          // Podle jména jen z vlastních řádků, ať se položka bez id nechytne
+          // na cizí stejnojmennou kategorii.
           const own = i.category_id != null
             ? nodes.find(n => n.id === Number(i.category_id))
-            : nodes.find(n => n.name === i.category);
+            : nodes.find(n => n.vlastni && n.name === i.category);
           const src = own ? packagingSourceOf(nodes, own) : null;
           const packaging = src
             ? normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id))

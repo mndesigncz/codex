@@ -54,6 +54,17 @@ uzávěrky nebo mzdy podniku, mazat podniky. První je bezpečnostní díra,
 druhé není potřeba k podpoře, třetí je nevratné — a nevratné věci
 nepatří na tlačítko.
 
+Pozastavení a sdílené číselníky organizace: když je pozastavený podnik
+v nastavení organizace zvolený jako zdroj (spravuje kategorie skladu,
+dodavatele, typy směn, kategorie návodů nebo katalog odměn), ostatní
+podniky organizace jeho řádky dál čtou a používají. Blokace míří na lidi
+podniku (423 na API, `/pozastaveno`), ne na definice — kdyby zmizely,
+položkám v ostatních podnicích by ze dne na den chyběly kategorie. Kdo
+chce sdílení zastavit, vypne ho v nastavení organizace; podniky pak
+dostanou vlastní kopie toho, co používaly (kategorie skladu, typy směn,
+kategorie návodů — dodavatelé a katalog odměn se jen přestanou číst,
+protože na ně nic neukazuje po id).
+
 ## Jak to zapnout (jednou, na Vercelu)
 
 Dvě proměnné prostředí, obě v Settings → Environment Variables projektu:

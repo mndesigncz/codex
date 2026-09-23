@@ -65,12 +65,27 @@ export async function organizaceTymu(teamId: number): Promise<{ id: number; name
   } catch { return null; }
 }
 
+/** Podniky organizace i s názvy — „Spravuje: …" se pak obejde bez dalšího dotazu. */
+async function podnikyOrganizaceSNazvy(organizationId: number): Promise<{ id: number; name: string }[]> {
+  try {
+    const rows = await sql`SELECT id, name FROM teams WHERE organization_id = ${organizationId}`;
+    return (rows as any[]).map(r => ({ id: Number(r.id), name: String(r.name ?? '') }));
+  } catch { return []; }
+}
+
 /** Id všech podniků organizace. Prázdné, když tabulka ještě není. */
 export async function podnikyOrganizace(organizationId: number): Promise<number[]> {
-  try {
-    const rows = await sql`SELECT id FROM teams WHERE organization_id = ${organizationId}`;
-    return (rows as any[]).map(r => Number(r.id));
-  } catch { return []; }
+  return (await podnikyOrganizaceSNazvy(organizationId)).map(p => p.id);
+}
+
+/** Co GET číselníku potřebuje kromě predikátu: chip „sdíleno" u zdroje a jméno zdroje u cizích řádků. */
+export interface CiselnikPodniku {
+  /** Predikát pro dotaz: `team_id = ANY(${tymy})`. Vlastní podnik vždy první. */
+  tymy: number[];
+  /** Moje řádky čtou ostatní podniky organizace — v UI chip „sdíleno". */
+  jsemZdroj: boolean;
+  /** Název zdrojového podniku pro „Spravuje: …", jen když čtu cizí řádky. */
+  spravuje: string | null;
 }
 
 /**
@@ -82,11 +97,59 @@ export async function podnikyOrganizace(organizationId: number): Promise<number[
  * nebere nic z požadavku. Predikát pro dotaz: `team_id = ANY(${tymy})`.
  */
 export async function tymyCiselniku(teamId: number, ciselnik: Ciselnik): Promise<number[]> {
+  return (await ciselnikPodniku(teamId, ciselnik)).tymy;
+}
+
+/**
+ * Totéž rozhodnutí jako tymyCiselniku, plus co seznam číselníku ukazuje
+ * vedle řádků. Organizace se čte JEDNOU: podnik bez organizace (většina)
+ * stojí jeden dotaz, podnik se sdílením dva — dřív si routy pro chip
+ * „sdíleno" a pro jméno zdroje dělaly další dva navíc.
+ */
+export async function ciselnikPodniku(teamId: number, ciselnik: Ciselnik): Promise<CiselnikPodniku> {
+  const sam: CiselnikPodniku = { tymy: [teamId], jsemZdroj: false, spravuje: null };
   const org = await organizaceTymu(teamId);
-  if (!org?.nastaveni.sdileneCiselniky) return [teamId];
-  const teamIds = await podnikyOrganizace(org.id);
-  if (!teamIds.length) return [teamId];
-  return tymyProCiselnik(teamId, { nastaveni: org.nastaveni, teamIds }, ciselnik);
+  if (!org?.nastaveni.sdileneCiselniky) return sam;
+  const podniky = await podnikyOrganizaceSNazvy(org.id);
+  if (!podniky.length) return sam;
+  const tymy = tymyProCiselnik(teamId, { nastaveni: org.nastaveni, teamIds: podniky.map(p => p.id) }, ciselnik);
+  return {
+    tymy,
+    jsemZdroj: org.nastaveni.zdrojeCiselniku[ciselnik] === teamId,
+    spravuje: tymy.length > 1 ? podniky.find(p => p.id === tymy[1])?.name ?? null : null,
+  };
+}
+
+/**
+ * tymyCiselniku pro mnoho podniků najednou (cron): dva dotazy na všechny
+ * místo jednoho na každý podnik — i na ty bez organizace, kterých je
+ * většina. Podnik bez organizace nebo se sdílením vypnutým dostane [sebe].
+ */
+export async function tymyCiselnikuHromadne(teamIds: number[], ciselnik: Ciselnik): Promise<Map<number, number[]>> {
+  const out = new Map<number, number[]>(teamIds.map(id => [id, [id]]));
+  if (!teamIds.length) return out;
+  try {
+    const orgs = await sql`
+      SELECT t.id AS team_id, o.id AS org_id, o.settings
+      FROM teams t JOIN organizations o ON o.id = t.organization_id
+      WHERE t.id = ANY(${teamIds})` as any[];
+    if (!orgs.length) return out;
+    const clenove = await sql`
+      SELECT id, organization_id FROM teams
+      WHERE organization_id = ANY(${[...new Set(orgs.map(r => Number(r.org_id)))]})` as any[];
+    const podleOrg = new Map<number, number[]>();
+    for (const r of clenove) {
+      const o = Number(r.organization_id);
+      podleOrg.set(o, [...(podleOrg.get(o) ?? []), Number(r.id)]);
+    }
+    for (const r of orgs) {
+      const nastaveni = normalizujNastaveni(r.settings);
+      if (!nastaveni.sdileneCiselniky) continue;
+      const teamId = Number(r.team_id);
+      out.set(teamId, tymyProCiselnik(teamId, { nastaveni, teamIds: podleOrg.get(Number(r.org_id)) ?? [] }, ciselnik));
+    }
+  } catch { /* před migrací organizací čte každý podnik jen sebe */ }
+  return out;
 }
 
 /**

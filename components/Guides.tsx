@@ -27,6 +27,12 @@ interface Category {
   name: string;
   icon: string;
   position: number;
+  /** Kategorie zdrojového podniku organizace — jen ke čtení, spravuje ji jeho vedení. */
+  zOrganizace?: boolean;
+  /** Vlastní kategorie, kterou vidí i ostatní podniky organizace. */
+  sdileno?: boolean;
+  /** Název podniku, který kategorii spravuje (jen u `zOrganizace`). */
+  spravuje?: string | null;
 }
 
 interface GuideSummary {
@@ -1200,21 +1206,36 @@ function ManageCategories({
               <span className="text-black/55">
                 <Icon name={c.icon} size={18} />
               </span>
-              <input
-                defaultValue={c.name}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (v && v !== c.name) rename(c.id, v);
-                }}
-                className="flex-1 bg-transparent text-[#16181A] text-sm focus:outline-none min-w-0"
-              />
-              <button
-                onClick={() => remove(c.id)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-bad-ink transition text-xs flex-shrink-0"
-                title="Smazat"
-              >
-                <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-              </button>
+              {/* Kategorii ze zdrojového podniku organizace upraví jen jeho vedení —
+                  pole i koš by tu jen vracely 403, tak se ukáže jen jméno a odkud je. */}
+              {c.zOrganizace ? (
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#16181A] text-sm truncate">
+                    {c.name}
+                    <span className="ml-2 chip chip-sm chip-muted align-middle">z organizace</span>
+                  </p>
+                  {c.spravuje && <p className="text-xs text-black/45 truncate">Spravuje: {c.spravuje}</p>}
+                </div>
+              ) : (
+                <>
+                  <input
+                    defaultValue={c.name}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v && v !== c.name) rename(c.id, v);
+                    }}
+                    className="flex-1 bg-transparent text-[#16181A] text-sm focus:outline-none min-w-0"
+                  />
+                  {c.sdileno && <span className="chip chip-sm chip-info flex-shrink-0">sdíleno</span>}
+                  <button
+                    onClick={() => remove(c.id)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-bad-ink transition text-xs flex-shrink-0"
+                    title="Smazat"
+                  >
+                    <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
+                  </button>
+                </>
+              )}
             </div>
           ))}
         </div>

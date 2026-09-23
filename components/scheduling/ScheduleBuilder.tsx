@@ -67,6 +67,12 @@ interface ShiftType {
   position: number;
   startsAtOpen?: boolean;
   endsAtClose?: boolean;
+  /** Typ ze zdrojového podniku organizace (kolo 60) — jen ke čtení. */
+  zOrganizace?: boolean;
+  /** Vlastní typ, který organizace sdílí do ostatních podniků. */
+  sdileno?: boolean;
+  /** Název podniku, který sdílený typ spravuje. */
+  spravuje?: string | null;
 }
 interface FixedAssignment {
   id: number;
@@ -1578,21 +1584,29 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
 
   const save = async () => {
     if (!name.trim()) return;
+    setErr('');
     setBusy(true);
     try {
       const payload = { name: name.trim(), startTime: start, endTime: end, color, startsAtOpen, endsAtClose };
+      let res: Response | null = null;
       if (editing === 'new') {
-        await fetch('/api/shift-types', {
+        res = await fetch('/api/shift-types', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else if (typeof editing === 'number') {
-        await fetch(`/api/shift-types/${editing}`, {
+        res = await fetch(`/api/shift-types/${editing}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+      }
+      if (res && !res.ok) {
+        // Server umí říct, že typ spravuje jiný podnik organizace — ať to člověk vidí.
+        const d = await res.json().catch(() => ({}));
+        setErr(d?.error || 'Typ směny se nepodařilo uložit.');
+        return;
       }
       setEditing(null);
       await onReload();
@@ -1663,17 +1677,27 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
             >
               <span className="h-4 w-4 rounded-md flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-[#16181A] truncate">{t.name}</p>
+                <p className="font-medium text-[#16181A] truncate">
+                  {t.name}
+                  {t.zOrganizace && <span className="ml-2 chip chip-sm chip-muted align-middle">z organizace</span>}
+                  {t.sdileno && <span className="ml-2 chip chip-sm chip-info align-middle">sdíleno</span>}
+                </p>
                 <p className="text-xs text-black/45">
                   {t.startsAtOpen ? 'otevření' : t.startTime}–{t.endsAtClose ? 'zavření' : t.endTime}
+                  {t.zOrganizace && t.spravuje && <> · Spravuje: {t.spravuje}</>}
                 </p>
               </div>
-              <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5 flex-shrink-0" title="Upravit">
-                <Icon name="settings" size={18} />
-              </button>
-              <button onClick={() => remove(t.id)} className="text-black/30 hover:text-bad-ink p-1.5 flex-shrink-0" title="Smazat">
-                ×
-              </button>
+              {/* Typ ze zdrojového podniku upraví jen jeho vedení — tlačítka by jen vracela 403. */}
+              {!t.zOrganizace && (
+                <>
+                  <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5 flex-shrink-0" title="Upravit">
+                    <Icon name="settings" size={18} />
+                  </button>
+                  <button onClick={() => remove(t.id)} className="text-black/30 hover:text-bad-ink p-1.5 flex-shrink-0" title="Smazat">
+                    ×
+                  </button>
+                </>
+              )}
             </div>
           ),
         )}
