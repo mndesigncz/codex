@@ -10,7 +10,7 @@ const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\
   const bare = p.replace(/[/]/g, '_'); return have.has(bare) ? bare : null; };
 const tok = (r) => execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${r}`, { encoding: 'utf8' }).trim();
 
-const b = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 
 async function ctxFor(w) {
   const ctx = await b.newContext({ viewport: { width: w, height: w <= 500 ? 844 : 860 }, locale: 'cs-CZ', isMobile: w <= 500, hasTouch: w <= 500, deviceScaleFactor: 1 });

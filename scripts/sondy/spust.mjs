@@ -14,7 +14,7 @@
 // má tenhle proces (sondy si podle něj razí session cookie).
 
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 
 const DIR = new URL('./', import.meta.url).pathname;
 
@@ -85,6 +85,13 @@ export const ZELENE = [
   'tyden',
   'zamek',
   'zasah',
+  'hledani',
+  'k53',
+  'koncept2',
+  'navody',
+  'prepnuti',
+  'search',
+  'slib',
 ];
 
 const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody']);
@@ -104,13 +111,16 @@ if (!env.SONDY_CHROMIUM) {
   if (existsSync(kandidat)) env.SONDY_CHROMIUM = kandidat;
 }
 
+// Snímky obrazovek (shots/, v .gitignore) se píšou vedle sond, ne do kořene repa.
+mkdirSync(DIR + 'shots', { recursive: true });
+
 const SOUBEZNE = Number(env.SONDY_SOUBEZNE ?? 3);
 const LIMIT_MS = Number(env.SONDY_LIMIT_MS ?? 240_000);
 
 function spust(jmeno) {
   return new Promise(resolve => {
     const start = Date.now();
-    const p = spawn(process.execPath, [DIR + jmeno + '.mjs'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(process.execPath, [DIR + jmeno + '.mjs'], { env, cwd: DIR, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     p.stdout.on('data', d => { out += d; });
     p.stderr.on('data', d => { out += d; });

@@ -31,6 +31,8 @@ const kontext = async (role) => {
   const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=chat', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1600);
+  // Na počítači chat neotevře konverzaci sám („Vyberte konverzaci").
+  await p.getByText('Týmový chat').first().click().catch(() => {}); await p.waitForTimeout(800);
   const okno = p.locator('textarea:visible').first();
   if (await okno.count()) {
     await okno.click();
@@ -39,6 +41,7 @@ const kontext = async (role) => {
     await p.goto('http://localhost:3000/employer/overview?view=tasks', { waitUntil: 'networkidle' });
     await p.waitForTimeout(700);
     await p.goto('http://localhost:3000/employer/overview?view=chat', { waitUntil: 'networkidle' });
+    await p.waitForTimeout(800); await p.getByText('Týmový chat').first().click().catch(() => {});
     await p.waitForTimeout(1800);
     const v = await p.locator('textarea:visible').first().inputValue().catch(() => '');
     kontrola('chat: rozepsaná zpráva je zpátky v okně', v.includes('rozepsana'));
@@ -55,7 +58,9 @@ const kontext = async (role) => {
 {
   const ctx = await kontext('employer');
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?mode=client&tab=broadcast', { waitUntil: 'networkidle' });
+  await p.goto('http://localhost:3000/employer/overview?mode=client&tab=customers', { waitUntil: 'networkidle' });
+  // Rozeslání je pod Zákazníci → Zprávy členům.
+  await p.waitForTimeout(700); await p.getByRole('tab', { name: 'Zprávy členům' }).first().click().catch(() => {}); await p.waitForTimeout(500);
   await p.waitForTimeout(1800);
   const pole = p.locator('#bc-body, textarea:visible').first();
   if (await pole.count()) {
@@ -64,7 +69,9 @@ const kontext = async (role) => {
     await p.waitForTimeout(400);
     await p.goto('http://localhost:3000/employer/overview?mode=client&tab=events', { waitUntil: 'networkidle' });
     await p.waitForTimeout(700);
-    await p.goto('http://localhost:3000/employer/overview?mode=client&tab=broadcast', { waitUntil: 'networkidle' });
+    await p.goto('http://localhost:3000/employer/overview?mode=client&tab=customers', { waitUntil: 'networkidle' });
+  // Rozeslání je pod Zákazníci → Zprávy členům.
+  await p.waitForTimeout(700); await p.getByRole('tab', { name: 'Zprávy členům' }).first().click().catch(() => {}); await p.waitForTimeout(500);
     await p.waitForTimeout(1800);
     const v = await p.locator('#bc-body, textarea:visible').first().inputValue().catch(() => '');
     kontrola('rozeslání: koncept je zpátky', v.includes('rozepsane'));

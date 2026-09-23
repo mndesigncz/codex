@@ -11,7 +11,7 @@ const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\
   const wq = (p + (u.search || '')).replace(/[?/=&]/g, '_'); if (have.has(wq)) return wq;
   const bare = p.replace(/[/]/g, '_'); return have.has(bare) ? bare : null; };
 const tok = (r) => execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${r}`, { encoding: 'utf8' }).trim();
-const b = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const files = (process.env.SCREENS ?? 'screens.json,screens-client.json').split(',');
 const SCREENS = files.flatMap(f => JSON.parse(readFileSync(new URL('./' + f, import.meta.url).pathname, 'utf8')));
 let nA = 0, nB = 0, nC = 0;

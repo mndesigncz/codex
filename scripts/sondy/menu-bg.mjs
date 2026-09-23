@@ -30,7 +30,7 @@ for (const [role, path, theme] of [['employer', '/employer/overview', 'light'], 
     const menu = p.getByRole('menu').first();
     const bg = await menu.evaluate(el => getComputedStyle(el).backgroundColor);
     tvrdi(`${tag}: přepínač podniku má pevné pozadí (${bg})`, alfa(bg) >= 0.85, bg);
-    await p.screenshot({ path: `${process.env.S}/menu-${role}-${theme}-podnik.png`, clip: { x: 0, y: 0, width: 320, height: 420 } });
+    await p.screenshot({ path: `shots/menu-${role}-${theme}-podnik.png`, clip: { x: 0, y: 0, width: 320, height: 420 } });
     await p.keyboard.press('Escape'); await p.mouse.click(900, 500); await p.waitForTimeout(250);
   }
   // účtové menu: tlačítko se jménem dole v liště
@@ -41,7 +41,7 @@ for (const [role, path, theme] of [['employer', '/employer/overview', 'light'], 
   const n = await panel.count();
   const bg2 = n ? await panel.evaluate(el => getComputedStyle(el).backgroundColor) : 'nenalezeno';
   tvrdi(`${tag}: účtové menu má pevné pozadí (${bg2})`, n > 0 && alfa(bg2) >= 0.85, bg2);
-  await p.screenshot({ path: `${process.env.S}/menu-${role}-${theme}-ucet.png`, clip: { x: 0, y: 480, width: 320, height: 420 } });
+  await p.screenshot({ path: `shots/menu-${role}-${theme}-ucet.png`, clip: { x: 0, y: 480, width: 320, height: 420 } });
   await ctx.close();
 }
 await b.close();

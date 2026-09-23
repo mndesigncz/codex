@@ -11,9 +11,11 @@ const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || 
 for (const [name, width, url, role, type] of [
   ['search-inventory-open', 1280, '/employer/inventory', 'employer', 'click'],
   ['search-inventory-open-m', 390, '/employer/inventory', 'employer', 'click'],
-  ['search-guides-typed', 1280, '/employer/guides', 'employer', 'type'],
+  ['search-guides-typed', 1280, '/employer/overview?view=guides', 'employer', 'type'],
 ]) {
   const ctx = await b.newContext({ viewport: { width, height: width <= 500 ? 844 : 900 }, locale: 'cs-CZ', isMobile: width <= 500, hasTouch: width <= 500 });
+  // Na telefonu je výchozí režim TO GO bez hledání — sonda měří plnou aplikaci.
+  await ctx.addInitScript(() => { try { localStorage.setItem('managero-app-mode', 'full'); } catch {} });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok(role), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
@@ -32,7 +34,7 @@ for (const [name, width, url, role, type] of [
   await input.click();
   await p.waitForTimeout(400);
   if (type === 'type') { await input.pressSequentially('ka', { delay: 70 }); await p.waitForTimeout(500); }
-  await p.screenshot({ path: `shots/${name}.png` });
+  await p.screenshot({ path: new URL(`./shots/${name}.png`, import.meta.url).pathname });
   console.log(errs.length ? `✗ ${name} PAGEERROR: ${errs.join(' | ')}` : `✓ ${name}`);
   await ctx.close();
 }

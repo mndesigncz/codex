@@ -59,6 +59,10 @@ if (await odkaz.count() > 0) {
 }
 
 // ---- 3. Uzávěrka ---------------------------------------------------------
+// Uzávěrku dělá zaměstnanec na směně — s cookie vedení se /employee/*
+// přesměruje jinam. Stejné podvržené API, jiná role.
+const tokZam = execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} employee`, { encoding: 'utf8' }).trim();
+await ctx.addCookies([{ name: 'next-auth.session-token', value: tokZam, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
 await p.goto('http://localhost:3000/employee/shifts?view=closing', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const telo = await p.locator('body').innerText();
@@ -75,6 +79,7 @@ if (jeUzaverka) {
 }
 
 // ---- 4. Kdo nečetl -------------------------------------------------------
+await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
 await p.goto('http://localhost:3000/employer/overview?view=guides&guide=1', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const ctecka = p.locator('[role="dialog"]').first();
@@ -85,7 +90,7 @@ if (await kdo.count() > 0) {
   await kdo.click();
   await p.waitForTimeout(700);
   const t = await ctecka.innerText();
-  tvrdi('seznam jmenuje, kdo NEčetl', t.includes('Nepřečetli (2)') && t.includes('Jakub Horák'), t.slice(0, 300));
+  tvrdi('seznam jmenuje, kdo NEčetl', t.toLowerCase().includes('nepřečetli (2)') && t.includes('Jakub Horák'), t.slice(0, 300));
   tvrdi('seznam jmenuje i toho, kdo četl', t.includes('Eva Testová'), t.slice(0, 300));
 }
 
