@@ -75,6 +75,24 @@ v `sql\`…\`` hlídá `scripts/check-sql.mjs`: gramatika Postgresu bez databáz
 a od kola 63 i schéma — tabulky a sloupce se berou z DDL v `app/api/init/route.ts`,
 takže překlep ve sloupci nebo v názvu tabulky spadne v CI, ne u tabletu.
 
+Kopie do podniku (kolo 64): návody, postupy a menu se mezi podniky
+organizace nesdílí živě (vazby na sklad a lidi jednoho podniku), ale vedení
+si je zkopíruje — tlačítko „Z jiného podniku" v Návodech, Postupech a Menu.
+Kopírovat jde jen z podniku téže organizace, kde je člověk členem VEDENÍ
+(stejné pravidlo jako konsolidovaný přehled), a ne z pozastaveného podniku.
+Kopie je vlastní řádek cíle: suroviny v krocích a připnutá položka se
+přemapují podle názvu položky ve skladu cíle, jinak se odpojí (a řekne se to);
+odkaz z kroku postupu na návod se přemapuje na stejnojmenný návod cíle —
+návody se proto kopírují dřív než postupy, které na ně ukazují. Zkopírované
+menu má novou adresu a je vypnuté, dokud vedení neprojde ceny; když kopie
+menu spadne uprostřed, rozpracovaná deska se smaže. Příznaky, které patří
+podniku, se nepřenáší, ale okno je vyjmenuje: povinné čtení, návod
+k uzávěrce, vazba na produkt pokladny, povinnost postupu před uzávěrkou.
+Seznam ke kopírování ukáže nejvýš 200 položek a řekne, kolik jich je celkem.
+Audit log má záznam
+v cíli (`organization.kopie`, u každé položky) i ve zdroji
+(`organization.kopie.zdroj`, co a kam odešlo).
+
 Pozastavení a sdílené číselníky organizace: když je pozastavený podnik
 v nastavení organizace zvolený jako zdroj (spravuje kategorie skladu,
 dodavatele, typy směn, kategorie návodů nebo katalog odměn), ostatní

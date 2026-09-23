@@ -17,6 +17,7 @@ import { czCount } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 
 interface Item {
   id?: number;
@@ -64,9 +65,15 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
    * naživo, ať se na to nepřijde až u stánku.
    */
   const [zive, setZive] = useState<'ceka' | 'ok' | 'chybi' | 'vypnuto' | 'neznamo'>('ceka');
+  /* Kopie menu z jiného podniku organizace. Editor vidí jen vedení, takže
+     stačí hlídat, jestli vůbec existuje odkud kopírovat. */
+  const [kopieOpen, setKopieOpen] = useState(false);
+  const { jine: jinePodniky, cil: nazevPodniku, chyba: chybaPodniku, znovu: znovuPodniky } = useJinePodniky();
 
-  const load = useCallback(async () => {
-    setNacitam(true);
+  /* `potichu`: obnovit seznam bez stavu „Načítám menu…" — ten by nahradil
+     celou obrazovku a s ní zavřel i okno kopie dřív, než člověk uvidí výsledek. */
+  const load = useCallback(async (potichu = false) => {
+    if (!potichu) setNacitam(true);
     try {
       const r = await fetch('/api/menu');
       const d = await r.json().catch(() => ({}));
@@ -397,8 +404,19 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     );
   }
 
+  /* Okno kopie je v obou větvích na TÉŽE pozici (druhé dítě fragmentu).
+     Po úspěšné kopii do prázdného editoru se načte první menu a obrazovka
+     přejde z prázdné větve do hlavní — kdyby okno leželo uvnitř každé
+     větve jinde, React by ho odmontoval a namontoval znovu prázdné,
+     výsledek s poznámkou „menu je vypnuté" by zmizel a člověk by
+     kopíroval podruhé. */
+  const kopieOkno = kopieOpen && (
+    <KopieZPodniku entita="menu" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); }} />
+  );
+
   if (!board) {
     return (
+      <>
       <div className="glass-card p-6 space-y-3">
         <div>
           <h2 className="t-section">Menu pro hosty</h2>
@@ -417,7 +435,21 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${posPripojena ? 'border border-black/10 text-black/70' : 'seg-on'}`}>
             {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
           </button>
+          {jinePodniky.length > 0 && (
+            <button type="button" onClick={() => setKopieOpen(true)} disabled={ukladam || !!importuji}
+              className="rounded-full font-semibold px-5 py-2.5 text-sm border border-black/10 text-black/70 disabled:opacity-50">
+              Zkopírovat z jiného podniku
+            </button>
+          )}
         </div>
+        {/* Prázdný editor je místo, kde je kopie hlavní cestou — tady se
+            nepovedené načtení ostatních podniků nesmí tvářit jako „žádné nejsou". */}
+        {chybaPodniku && (
+          <p className="text-xs text-black/55">
+            Nepodařilo se zjistit, jestli jde menu zkopírovat z jiného podniku.{' '}
+            <button type="button" onClick={znovuPodniky} className="underline font-medium text-black/70">Zkusit znovu</button>
+          </p>
+        )}
         {posPripojena && (
           <p className="text-xs text-black/45">
             Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.
@@ -426,6 +458,8 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         {chyba && <p className="text-bad-ink text-sm">{chyba}</p>}
         {hlaska && <p className="text-sm text-[#3E5406]">{hlaska}</p>}
       </div>
+      {kopieOkno}
+      </>
     );
   }
 
@@ -435,6 +469,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   const adresa = typeof window === 'undefined' ? cesta : window.location.origin + cesta;
 
   return (
+    <>
     <div className="space-y-4">
       {/* Nadpis obrazovky. Uvnitř karty byl h2 „Menu pro hosty" — vypadal
           jako nadpis sekce, ne obrazovky, takže Menu jako jediná položka
@@ -474,6 +509,16 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             <span className="text-xl leading-none">＋</span>
             <span className="text-xs font-semibold">Nové menu</span>
           </button>
+          {/* Při neuložených změnách ne: obnova seznamu po kopii by rozpracovanou
+              desku přepsala tím, co je v databázi. */}
+          {jinePodniky.length > 0 && (
+            <button type="button" onClick={() => setKopieOpen(true)} disabled={ukladam || neulozeno}
+              title={neulozeno ? 'Nejdřív ulož rozdělané změny' : undefined}
+              className="col-span-full sm:col-span-1 rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col sm:flex-col items-center justify-center gap-1 min-h-[56px] sm:min-h-[104px]">
+              <Icon name="copy" size={18} />
+              <span className="text-xs font-semibold">Z jiného podniku</span>
+            </button>
+          )}
         </div>
 
         <div className="well border border-black/[0.06] p-4 space-y-2">
@@ -953,5 +998,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         </div>
       )}
     </div>
+    {kopieOkno}
+    </>
   );
 }

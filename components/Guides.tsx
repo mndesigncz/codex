@@ -15,6 +15,7 @@ import { okJson, apiMessage } from '@/lib/api';
 import { czCount, KATEGORIE } from '@/lib/czech';
 import { DiscardGuard } from './ui/DiscardGuard';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import KopieZPodniku, { useJinePodniky } from './organizace/KopieZPodniku';
 
 interface User {
   id: number;
@@ -160,6 +161,10 @@ export default function Guides({ user, ticksFor, openGuideId }: {
   const [editing, setEditing] = useState<GuideFull | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const [creatingCat, setCreatingCat] = useState(false);
+  // Kopie z jiného podniku organizace — tlačítko jen vedení a jen když
+  // takový podnik existuje; jinak by vedlo do prázdna.
+  const [kopieOpen, setKopieOpen] = useState(false);
+  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(isEmployer);
 
   const [loadErr, setLoadErr] = useState('');
   const [reloadTick, setReloadTick] = useState(0);
@@ -308,9 +313,14 @@ export default function Guides({ user, ticksFor, openGuideId }: {
       <div className="mb-6">
       <PageHeader hintId="guides" title="Návody" subtitle="Jak se co dělá — s obrázky, na baru po ruce."
         primary={user.role !== 'kiosk' && (
-          <Button variant="accent" icon="plus" onClick={() => openEditor()} title={isEmployer ? undefined : 'Návrh schválí vedení'}>
-            {isEmployer ? 'Nový návod' : 'Navrhnout návod'}
-          </Button>
+          <>
+            {isEmployer && jinePodniky.length > 0 && (
+              <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+            )}
+            <Button variant="accent" icon="plus" onClick={() => openEditor()} title={isEmployer ? undefined : 'Návrh schválí vedení'}>
+              {isEmployer ? 'Nový návod' : 'Navrhnout návod'}
+            </Button>
+          </>
         )} />
       </div>
 
@@ -689,6 +699,11 @@ export default function Guides({ user, ticksFor, openGuideId }: {
           onClose={closeEditor}
           onSaved={afterSave}
         />
+      )}
+
+      {kopieOpen && isEmployer && (
+        <KopieZPodniku entita="navody" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)}
+          onHotovo={() => setReloadTick(t => t + 1)} />
       )}
 
       {/* Manage categories modal */}
