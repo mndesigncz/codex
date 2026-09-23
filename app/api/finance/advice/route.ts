@@ -511,10 +511,12 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Sklad, který leží.
+  // Sklad, který leží. Dotaz dřív chtěl i `low_stock` — sloupec, který
+  // inventory_items nikdy neměly; padal do catch a rada se nikdy neukázala.
+  // Odhalila to až kontrola SQL proti schématu (kolo 63).
   try {
     const items = await sql`
-      SELECT name, quantity::float AS qty, unit_cost, low_stock
+      SELECT name, quantity::float AS qty, unit_cost
       FROM inventory_items WHERE team_id = ${teamId} AND (approved IS NULL OR approved = TRUE)`;
     let stockValue = 0;
     const noCost: string[] = [];
