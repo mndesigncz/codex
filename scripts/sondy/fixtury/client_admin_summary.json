@@ -1,0 +1,34 @@
+{
+ "enabled": true,
+ "slug": "cajovna-pangea",
+ "reservations": {
+  "requested": 2,
+  "today": 3
+ },
+ "orders": {
+  "new": 2,
+  "today": 9
+ },
+ "members": 148,
+ "newMembers30": 23,
+ "attention": 4,
+ "reviews": {
+  "count": 61,
+  "avg": 4.6,
+  "new7": 5,
+  "low7": 1
+ },
+ "setup": {
+  "enabled": true,
+  "menu": true,
+  "tables": 4,
+  "tablesPaired": 2,
+  "pos": true,
+  "location": true,
+  "reservationsOn": true,
+  "orderingOn": true,
+  "loyaltyOn": true,
+  "pointsPer100": 10,
+  "stampTarget": 8
+ }
+}

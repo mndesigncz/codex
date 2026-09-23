@@ -1,0 +1,26 @@
+[
+ {
+  "id": 1,
+  "name": "Martin Nemeškal",
+  "avatar": "🧑",
+  "role": "employer",
+  "jobTitle": "Vedení",
+  "hourlyRate": 0
+ },
+ {
+  "id": 2,
+  "name": "Eva Testová",
+  "avatar": "👩",
+  "role": "employee",
+  "jobTitle": "Barista",
+  "hourlyRate": 190
+ },
+ {
+  "id": 3,
+  "name": "Jakub Horák",
+  "avatar": "🧔",
+  "role": "employee",
+  "jobTitle": "Barista",
+  "hourlyRate": 190
+ }
+]

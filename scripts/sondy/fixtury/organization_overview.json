@@ -1,0 +1,10 @@
+{
+ "available": true,
+ "month": "2026-09",
+ "organization": { "id": 9, "name": "Moje kavárny" },
+ "teams": [
+  { "teamId": 1, "name": "Kavárna Vinohrady", "currency": "CZK", "revenue": 120000, "wages": 36000, "closings": 18, "missingClosings": 0, "pendingApproval": 0, "members": 6, "onShiftNow": 2, "stockAlerts": 0 },
+  { "teamId": 2, "name": "Kavárna Karlín", "currency": "CZK", "revenue": 80000, "wages": 20000, "closings": 15, "missingClosings": 2, "pendingApproval": 1, "members": 4, "onShiftNow": 1, "stockAlerts": 3 }
+ ],
+ "total": { "currency": "CZK", "revenue": 200000, "wages": 56000, "laborPct": 28, "missingClosings": 2, "pendingApproval": 1, "onShiftNow": 3, "stockAlerts": 3 }
+}

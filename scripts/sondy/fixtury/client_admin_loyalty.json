@@ -1,0 +1,158 @@
+{
+ "summary": {
+  "members": 148,
+  "newMembers30": 23,
+  "points": 18420,
+  "credit": 3150,
+  "stamps": 612,
+  "visits": 1840,
+  "couponsOpen": 9,
+  "couponsRedeemed": 47,
+  "pointsGiven30": 2310,
+  "pointsSpent30": 1180
+ },
+ "recent": [
+  {
+   "id": 1,
+   "customer_name": "Jana Dvořáková",
+   "delta": 40,
+   "note": "Útrata 400 Kč",
+   "created_at": "2026-09-17T10:12:00Z"
+  },
+  {
+   "id": 2,
+   "customer_name": "Tereza Málková",
+   "delta": -120,
+   "note": "Kupon: Filtr dne zdarma",
+   "created_at": "2026-09-16T18:40:00Z"
+  },
+  {
+   "id": 3,
+   "customer_name": "Petr Novák",
+   "delta": 25,
+   "note": "Útrata 250 Kč",
+   "created_at": "2026-09-16T12:05:00Z"
+  }
+ ],
+ "series": [
+  {
+   "day": "2026-09-01",
+   "points_given": 41,
+   "points_spent": 11,
+   "new_members": 1,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-02",
+   "points_given": 42,
+   "points_spent": 12,
+   "new_members": 2,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-03",
+   "points_given": 43,
+   "points_spent": 13,
+   "new_members": 0,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-04",
+   "points_given": 44,
+   "points_spent": 14,
+   "new_members": 1,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-05",
+   "points_given": 45,
+   "points_spent": 15,
+   "new_members": 2,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-06",
+   "points_given": 46,
+   "points_spent": 16,
+   "new_members": 0,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-07",
+   "points_given": 47,
+   "points_spent": 17,
+   "new_members": 1,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-08",
+   "points_given": 48,
+   "points_spent": 18,
+   "new_members": 2,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-09",
+   "points_given": 49,
+   "points_spent": 19,
+   "new_members": 0,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-10",
+   "points_given": 50,
+   "points_spent": 20,
+   "new_members": 1,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-11",
+   "points_given": 51,
+   "points_spent": 21,
+   "new_members": 2,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-12",
+   "points_given": 52,
+   "points_spent": 22,
+   "new_members": 0,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-13",
+   "points_given": 53,
+   "points_spent": 23,
+   "new_members": 1,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-14",
+   "points_given": 54,
+   "points_spent": 24,
+   "new_members": 2,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-15",
+   "points_given": 55,
+   "points_spent": 25,
+   "new_members": 0,
+   "redeemed": 1
+  },
+  {
+   "day": "2026-09-16",
+   "points_given": 56,
+   "points_spent": 26,
+   "new_members": 1,
+   "redeemed": 0
+  },
+  {
+   "day": "2026-09-17",
+   "points_given": 57,
+   "points_spent": 27,
+   "new_members": 2,
+   "redeemed": 1
+  }
+ ]
+}

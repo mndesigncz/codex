@@ -1,0 +1,24 @@
+{
+ "suppliers": [
+  {
+   "id": 1,
+   "name": "Velkoobchod Čaj",
+   "email": "objednavky@velkoobchod.cz",
+   "phone": "+420 777 000 111",
+   "note": null,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 904,
+   "name": "Sirupy Karlín",
+   "email": "sirupy@karlin.cz",
+   "phone": null,
+   "note": null,
+   "zOrganizace": true,
+   "sdileno": false,
+   "spravuje": "Kavárna Vinohrady"
+  }
+ ]
+}

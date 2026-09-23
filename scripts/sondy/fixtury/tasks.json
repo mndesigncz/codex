@@ -1,0 +1,32 @@
+[
+ {
+  "id": 91,
+  "title": "Vyrobit Domácí limonáda",
+  "description": "2× dávka po 5 l.",
+  "priority": "high",
+  "status": "pending",
+  "dueDate": "2026-09-22",
+  "teamTask": true,
+  "source": "production",
+  "sourceMeta": {
+   "itemId": 4,
+   "batches": 2,
+   "guideId": 2,
+   "guideTitle": "Domácí limonáda — postup"
+  },
+  "checklist": [
+   {
+    "text": "Nakrájet citrony",
+    "done": false
+   },
+   {
+    "text": "Svařit sirup s vodou",
+    "done": false
+   },
+   {
+    "text": "Nechat vychladnout a stočit",
+    "done": false
+   }
+  ]
+ }
+]

@@ -1,0 +1,161 @@
+{
+ "planInfo": {
+  "plan": "max",
+  "effective": "max",
+  "trialEndsAt": null,
+  "trialDaysLeft": 0,
+  "trialing": false,
+  "pastDue": false,
+  "cancelAt": null,
+  "interval": null,
+  "subscriptionStatus": null,
+  "maxOfferUntil": null,
+  "hadSubscription": false
+ },
+ "pinnedShare": null,
+ "team": {
+  "id": 1,
+  "name": "Čajovna Pangea",
+  "join_code": "N9TPWB",
+  "owner_id": 15,
+  "week_start": 1,
+  "labor_target_pct": null,
+  "low_stock_default": 5,
+  "critical_stock_default": 2,
+  "business_type": "cajovna",
+  "pay_daily_cash": false,
+  "closing_requires_shift": true,
+  "show_team_schedule": true,
+  "payout_from_register": false,
+  "tips_in_drawer": false,
+  "drawer_float": null,
+  "dashboard_config": {},
+  "levels_config": [],
+  "points_config": {}
+ },
+ "members": [
+  {
+   "id": 15,
+   "name": "Martin Nemeškal",
+   "email": "m@t.cz",
+   "role": "employer",
+   "avatar": "🧑",
+   "phone": null,
+   "job_title": "Provozovatel",
+   "shift_preference": null,
+   "hourly_rate": 0
+  },
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "email": "e@t.cz",
+   "role": "employee",
+   "avatar": "🧑",
+   "phone": null,
+   "job_title": "Barista",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "email": "x17@x.cz",
+   "role": "employee",
+   "avatar": "🧔",
+   "phone": null,
+   "job_title": "Barista",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 18,
+   "name": "Tereza Malá",
+   "email": "x18@x.cz",
+   "role": "employee",
+   "avatar": "👱‍♀️",
+   "phone": null,
+   "job_title": "Servírka",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 19,
+   "name": "Ondřej Kučera",
+   "email": "x19@x.cz",
+   "role": "employee",
+   "avatar": null,
+   "phone": null,
+   "job_title": "Kuchař",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 20,
+   "name": "Petra Dvořáková",
+   "email": "x20@x.cz",
+   "role": "employee",
+   "avatar": "👩‍🦰",
+   "phone": null,
+   "job_title": "Barista",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 21,
+   "name": "Lukáš Beneš",
+   "email": "x21@x.cz",
+   "role": "employee",
+   "avatar": "🧑‍🍳",
+   "phone": null,
+   "job_title": "Kuchař",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 22,
+   "name": "Nikola Šťastná",
+   "email": "x22@x.cz",
+   "role": "employee",
+   "avatar": "👩‍🦱",
+   "phone": null,
+   "job_title": "Servírka",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 23,
+   "name": "Adam Pokorný",
+   "email": "x23@x.cz",
+   "role": "employee",
+   "avatar": null,
+   "phone": null,
+   "job_title": "Brigádník",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 24,
+   "name": "Klára Vlčková",
+   "email": "x24@x.cz",
+   "role": "employee",
+   "avatar": "👱‍♀️",
+   "phone": null,
+   "job_title": "Barista",
+   "shift_preference": null,
+   "hourly_rate": 150
+  },
+  {
+   "id": 17,
+   "name": "Jakub Přepnutý",
+   "email": "j@t.cz",
+   "role": "employee",
+   "avatar": "🧑",
+   "phone": null,
+   "job_title": "Barista",
+   "shift_preference": null,
+   "hourly_rate": 160,
+   "aktivni_jinde": true
+  }
+ ],
+ "isOwner": true
+}

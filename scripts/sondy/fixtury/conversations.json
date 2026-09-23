@@ -1,0 +1,34 @@
+{
+ "conversations": [
+  {
+   "id": 1,
+   "type": "team",
+   "name": "Týmový chat",
+   "avatar": null,
+   "otherUserId": null,
+   "lastMessage": "Já můžu, mám ranní.",
+   "lastTime": "2026-09-17T18:42:00Z",
+   "unreadCount": 2
+  },
+  {
+   "id": 2,
+   "type": "direct",
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "otherUserId": 2,
+   "lastMessage": "Díky, vyřídím to ráno.",
+   "lastTime": "2026-09-17T16:05:00Z",
+   "unreadCount": 0
+  },
+  {
+   "id": 3,
+   "type": "direct",
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "otherUserId": 3,
+   "lastMessage": "Příloha",
+   "lastTime": "2026-09-16T20:18:00Z",
+   "unreadCount": 1
+  }
+ ]
+}

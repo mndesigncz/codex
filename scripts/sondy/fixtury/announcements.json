@@ -1,0 +1,124 @@
+{
+ "announcements": [
+  {
+   "id": 1,
+   "content": "V pátek zavíráme v 18:00 kvůli soukromé akci.",
+   "pinned": true,
+   "createdAt": "2026-09-16T09:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 2,
+   "content": "Nová dodavatelka pečiva od pondělí — ceník je v Nákupu.",
+   "pinned": true,
+   "createdAt": "2026-09-14T08:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 3,
+   "content": "Starý vzkaz č. 1 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-03T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 4,
+   "content": "Starý vzkaz č. 2 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-04T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 5,
+   "content": "Starý vzkaz č. 3 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-05T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 6,
+   "content": "Starý vzkaz č. 4 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-06T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 7,
+   "content": "Starý vzkaz č. 5 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-07T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 8,
+   "content": "Starý vzkaz č. 6 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-08T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 9,
+   "content": "Starý vzkaz č. 7 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-09T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 10,
+   "content": "Starý vzkaz č. 8 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-10T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 11,
+   "content": "Starý vzkaz č. 9 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-11T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 12,
+   "content": "Starý vzkaz č. 10 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-12T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 13,
+   "content": "Starý vzkaz č. 11 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-13T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 14,
+   "content": "Starý vzkaz č. 12 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-14T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  },
+  {
+   "id": 15,
+   "content": "Starý vzkaz č. 13 — už neplatí.",
+   "pinned": false,
+   "createdAt": "2026-08-15T10:00:00Z",
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑"
+  }
+ ]
+}

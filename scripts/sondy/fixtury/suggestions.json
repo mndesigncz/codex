@@ -1,0 +1,66 @@
+{
+ "isEmployer": true,
+ "meId": 15,
+ "suggestions": [
+  {
+   "id": 1,
+   "title": "Druhý mlýnek na kávu",
+   "content": "O špičce se čeká na jeden mlýnek, bezkofeinová brzdí frontu.",
+   "status": "new",
+   "authorId": 2,
+   "createdAt": "2026-09-16T10:00:00Z",
+   "authorName": "Eva Testová",
+   "authorAvatar": "👩",
+   "votes": 2,
+   "hasVoted": false
+  },
+  {
+   "id": 2,
+   "title": "Kelímky na s sebou o velikost větší",
+   "content": "Latté přetéká, hosté si stěžují.",
+   "status": "planned",
+   "authorId": 3,
+   "createdAt": "2026-09-15T08:30:00Z",
+   "authorName": "Jakub Horák",
+   "authorAvatar": "🧔",
+   "votes": 7,
+   "hasVoted": true
+  },
+  {
+   "id": 3,
+   "title": "Vyhřívání na zahrádce",
+   "content": "Od září po sedmé hodině venku nikdo nesedí.",
+   "status": "new",
+   "authorId": 4,
+   "createdAt": "2026-09-14T17:45:00Z",
+   "authorName": "Tereza Malá",
+   "authorAvatar": "👱‍♀️",
+   "votes": 5,
+   "hasVoted": false
+  },
+  {
+   "id": 4,
+   "title": "Jiný dodavatel pečiva",
+   "content": "Současný vozí pozdě a v pátek často nedoveze.",
+   "status": "done",
+   "authorId": 2,
+   "createdAt": "2026-09-10T07:00:00Z",
+   "authorName": "Eva Testová",
+   "authorAvatar": "👩",
+   "votes": 9,
+   "hasVoted": true
+  },
+  {
+   "id": 5,
+   "title": "Tabule s denní nabídkou ven",
+   "content": "Lidi chodí kolem a nevědí, co máme.",
+   "status": "new",
+   "authorId": 5,
+   "createdAt": "2026-09-09T12:00:00Z",
+   "authorName": "Ondřej Kučera",
+   "authorAvatar": null,
+   "votes": 1,
+   "hasVoted": false
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+[
+ {
+  "employeeId": 2,
+  "employeeName": "Eva Testová",
+  "month": "2026-10",
+  "days": {
+   "2026-10-05": "off",
+   "2026-10-06": "morning"
+  },
+  "note": "Ve středu mám školu.",
+  "submitted": true
+ },
+ {
+  "employeeId": 3,
+  "employeeName": "Jakub Horák",
+  "month": "2026-10",
+  "days": {
+   "2026-10-12": "off"
+  },
+  "note": null,
+  "submitted": true
+ }
+]

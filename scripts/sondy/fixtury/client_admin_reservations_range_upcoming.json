@@ -1,0 +1,100 @@
+{
+ "reservations": [
+  {
+   "id": 11,
+   "date": "2026-09-17",
+   "time": "17:30",
+   "party": 4,
+   "status": "requested",
+   "note": "Oslava narozenin, prosíme o klidnější stůl.",
+   "customer_name": "Jana Dvořáková",
+   "customer_email": "jana.dvorakova@email.cz",
+   "table_id": 1,
+   "table_name": "U okna",
+   "phone": "+420 776 221 004"
+  },
+  {
+   "id": 12,
+   "date": "2026-09-17",
+   "time": "18:00",
+   "party": 2,
+   "status": "confirmed",
+   "note": null,
+   "customer_name": "Petr Novák",
+   "customer_email": "p.novak@email.cz",
+   "table_id": 3,
+   "table_name": "Zahrádka 1",
+   "phone": "+420 605 118 992"
+  },
+  {
+   "id": 13,
+   "date": "2026-09-17",
+   "time": "19:15",
+   "party": 8,
+   "status": "confirmed",
+   "note": "Firemní degustace čajů — domluveno telefonicky.",
+   "customer_name": "Tereza Málková",
+   "customer_email": "t.malkova@firma.cz",
+   "table_id": 2,
+   "table_name": "Velký stůl",
+   "phone": "+420 777 431 220"
+  },
+  {
+   "id": 14,
+   "date": "2026-09-18",
+   "time": "16:00",
+   "party": 3,
+   "status": "requested",
+   "note": null,
+   "customer_name": "Ondřej Beneš",
+   "customer_email": "benes.o@email.cz",
+   "table_id": null,
+   "table_name": null,
+   "phone": "+420 733 904 511"
+  },
+  {
+   "id": 15,
+   "date": "2026-09-19",
+   "time": "11:00",
+   "party": 2,
+   "status": "confirmed",
+   "note": null,
+   "customer_name": "Klára Šimková",
+   "customer_email": "klara.s@email.cz",
+   "table_id": 1,
+   "table_name": "U okna",
+   "phone": "+420 720 664 130"
+  }
+ ],
+ "tables": [
+  {
+   "id": 1,
+   "name": "U okna",
+   "seats": 4,
+   "storyous_desk_id": "12",
+   "active": true
+  },
+  {
+   "id": 2,
+   "name": "Velký stůl",
+   "seats": 8,
+   "storyous_desk_id": null,
+   "active": true
+  },
+  {
+   "id": 3,
+   "name": "Zahrádka 1",
+   "seats": 2,
+   "storyous_desk_id": "31",
+   "active": true
+  },
+  {
+   "id": 4,
+   "name": "Bar",
+   "seats": 3,
+   "storyous_desk_id": null,
+   "active": true
+  }
+ ],
+ "today": "2026-09-17"
+}

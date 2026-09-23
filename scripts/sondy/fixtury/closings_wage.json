@@ -1,0 +1,20 @@
+{
+ "available": true,
+ "employeeId": 1,
+ "wage": {
+  "ms": 27600000,
+  "rate": 150,
+  "earned": 1150,
+  "open": true,
+  "suspicious": false,
+  "noEntries": false
+ },
+ "points": {
+  "tasks": 2,
+  "procedures": 1,
+  "taskPts": 10,
+  "procPts": 10,
+  "closingPts": 15,
+  "total": 35
+ }
+}

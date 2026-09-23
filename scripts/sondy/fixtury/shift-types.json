@@ -1,0 +1,30 @@
+{
+ "shiftTypes": [
+  {
+   "id": 1,
+   "name": "Ranní",
+   "startTime": "07:00",
+   "endTime": "15:00",
+   "color": "lime",
+   "position": 0,
+   "startsAtOpen": true,
+   "endsAtClose": false,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 902,
+   "name": "Noční z organizace",
+   "startTime": "18:00",
+   "endTime": "02:00",
+   "color": "ink",
+   "position": 1,
+   "startsAtOpen": false,
+   "endsAtClose": true,
+   "zOrganizace": true,
+   "sdileno": false,
+   "spravuje": "Kavárna Vinohrady"
+  }
+ ]
+}

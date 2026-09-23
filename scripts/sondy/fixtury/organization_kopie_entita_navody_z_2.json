@@ -1,0 +1,22 @@
+{
+ "podnik": {
+  "id": 2,
+  "name": "Kavárna Karlín"
+ },
+ "polozky": [
+  {
+   "id": 5,
+   "nazev": "Čištění kávovaru",
+   "popis": null,
+   "pocet": 6,
+   "kategorie": "Bar"
+  },
+  {
+   "id": 6,
+   "nazev": "Blue Lagoon",
+   "popis": null,
+   "pocet": 4,
+   "kategorie": "Nápoje"
+  }
+ ]
+}

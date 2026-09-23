@@ -1,0 +1,15 @@
+{
+ "podnik": {
+  "id": 2,
+  "name": "Kavárna Karlín"
+ },
+ "polozky": [
+  {
+   "id": 9,
+   "nazev": "Zavírání",
+   "popis": "Krok za krokem na konci směny",
+   "pocet": 8,
+   "kategorie": null
+  }
+ ]
+}

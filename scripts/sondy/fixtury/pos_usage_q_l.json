@@ -1,0 +1,28 @@
+{
+ "products": [
+  {
+   "productId": "p1",
+   "name": "Latté",
+   "category": "Káva",
+   "price": 69
+  },
+  {
+   "productId": "p2",
+   "name": "Flat white",
+   "category": "Káva",
+   "price": 75
+  },
+  {
+   "productId": "p3",
+   "name": "Cappuccino",
+   "category": "Káva",
+   "price": 65
+  },
+  {
+   "productId": "p4",
+   "name": "Domácí limonáda",
+   "category": "Nápoje",
+   "price": 59
+  }
+ ]
+}

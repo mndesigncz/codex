@@ -1,0 +1,103 @@
+{
+ "catalog": [
+  {
+   "id": 1,
+   "team_id": 1,
+   "title": "Káva zdarma na směně",
+   "cost": 50,
+   "active": true,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 2,
+   "team_id": 1,
+   "title": "Volný pátek",
+   "cost": 300,
+   "active": true,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 3,
+   "team_id": 1,
+   "title": "Oběd na účet podniku",
+   "cost": 120,
+   "active": true,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 931,
+   "team_id": 1,
+   "title": "Volný den z organizace",
+   "icon": "🌴",
+   "cost": 500,
+   "active": true,
+   "created_at": "2026-09-01T10:00:00Z",
+   "zOrganizace": true,
+   "sdileno": false,
+   "spravuje": "Kavárna Vinohrady"
+  }
+ ],
+ "redemptions": [
+  {
+   "id": 21,
+   "team_id": 1,
+   "employee_id": 2,
+   "title": "Káva zdarma na směně",
+   "cost": 50,
+   "status": "pending",
+   "created_at": "2026-09-17T10:00:00Z",
+   "employee_name": "Eva Testová",
+   "employee_avatar": "👩"
+  },
+  {
+   "id": 22,
+   "team_id": 1,
+   "employee_id": 3,
+   "title": "Oběd na účet podniku",
+   "cost": 120,
+   "status": "pending",
+   "created_at": "2026-09-17T09:30:00Z",
+   "employee_name": "Jakub Horák",
+   "employee_avatar": "🧔"
+  },
+  {
+   "id": 23,
+   "team_id": 1,
+   "employee_id": 4,
+   "title": "Volný pátek",
+   "cost": 300,
+   "status": "pending",
+   "created_at": "2026-09-16T18:00:00Z",
+   "employee_name": "Tereza Malá",
+   "employee_avatar": "👱‍♀️"
+  },
+  {
+   "id": 24,
+   "team_id": 1,
+   "employee_id": 5,
+   "title": "Káva zdarma na směně",
+   "cost": 50,
+   "status": "pending",
+   "created_at": "2026-09-16T08:00:00Z",
+   "employee_name": "Ondřej Kučera",
+   "employee_avatar": null
+  },
+  {
+   "id": 25,
+   "team_id": 1,
+   "employee_id": 2,
+   "title": "Káva zdarma na směně",
+   "cost": 50,
+   "status": "approved",
+   "created_at": "2026-09-10T08:00:00Z",
+   "employee_name": "Eva Testová",
+   "employee_avatar": "👩"
+  }
+ ]
+}
