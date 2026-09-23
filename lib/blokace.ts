@@ -21,6 +21,10 @@ export const VYJIMKY = [
   '/api/register',
   '/api/billing/webhook', // Stripe nemá session, ale ať je to napsané
   '/pozastaveno',     // stránka, kam se přesměrovává
+  // Kdo má víc podniků, musí se z pozastaveného dostat do zdravého: switch
+  // sám do pozastaveného cíle nepustí (423), mine jen vypíše členství.
+  '/api/teams/switch',
+  '/api/teams/mine',
 ];
 
 export function rozhodni(vstup: {

@@ -54,6 +54,15 @@ uzávěrky nebo mzdy podniku, mazat podniky. První je bezpečnostní díra,
 druhé není potřeba k podpoře, třetí je nevratné — a nevratné věci
 nepatří na tlačítko.
 
+Kdo zakládá další podnik: jen VLASTNÍK aktivního podniku (`teams.owner_id`),
+a když už podnik organizaci má, jen její vlastník. Manažer povýšený na
+vedení ani cizí majitel pozvaný jako vedení další podnik nezaloží (403)
+a tlačítko „Přidat podnik" nevidí — jinak by si založil organizaci nad
+cizím podnikem a stal se jejím vlastníkem. Přepínač „Sdílení lidí mezi
+podniky" platí při pozvání i přijetí pozvánky: s vypnutým sdílením
+zaměstnanec, který už pracuje v jiném podniku organizace, členství
+nedostane (409). Vedení vždy.
+
 Pozastavení a sdílené číselníky organizace: když je pozastavený podnik
 v nastavení organizace zvolený jako zdroj (spravuje kategorie skladu,
 dodavatele, typy směn, kategorie návodů nebo katalog odměn), ostatní

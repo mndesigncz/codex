@@ -7,6 +7,7 @@
 // vedle sebe přehled řekne, že celek nedává smysl, místo aby ho vymyslel.
 
 import { useEffect, useState } from 'react';
+import { czCount, czVerb, POLOZKA } from '@/lib/czech';
 import { Icon } from '../Icons';
 import { PageHeader, ErrorState } from '../ui';
 import { okJson, apiMessage } from '@/lib/api';
@@ -23,20 +24,33 @@ const posunMesic = (m: string, o: number) => {
 };
 const nazevMesice = (m: string) => new Date(m + '-01T12:00:00Z').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 
-export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: number) => void }) {
+export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: number) => Promise<string | null> }) {
   const [month, setMonth] = useState(() => pragueToday().slice(0, 7));
   const [data, setData] = useState<Data | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
+  /** Jiný měsíc se načítá: karty zůstávají, ale ztlumené — ne nový nadpis nad starými čísly. */
+  const [nacita, setNacita] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    setErr('');
+    setErr(''); setNacita(true);
     fetch(`/api/organization/overview?month=${month}`).then(okJson)
       .then(d => { if (alive) setData(d); })
-      .catch(e => { if (alive) setErr(apiMessage(e, 'Přehled se nenačetl.')); });
+      .catch(e => { if (alive) setErr(apiMessage(e, 'Přehled se nenačetl.')); })
+      .finally(() => { if (alive) setNacita(false); });
     return () => { alive = false; };
   }, [month, tick]);
+
+  // „Otevřít" přepíná podnik na serveru; když to nevyjde (třeba vlastník
+  // organizace není členem toho podniku), řekne se to u seznamu — ne jako
+  // „Přehled se nenačetl", který by načtená čísla schoval.
+  const [chybaPrepnuti, setChybaPrepnuti] = useState('');
+  const otevri = async (teamId: number) => {
+    setChybaPrepnuti('');
+    const chyba = await onOpenTeam?.(teamId);
+    if (chyba) setChybaPrepnuti(chyba);
+  };
 
   const penize = (n: number, cur: string) => formatMoney(n, cur);
 
@@ -55,8 +69,9 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
         </div>
       )}
 
-      {data?.available && data.teams && data.total && (
-        <>
+      {data?.available && data.teams && data.total && !err && (
+        <div className={nacita ? 'opacity-50 pointer-events-none transition-opacity' : 'transition-opacity'} aria-busy={nacita}>
+          {chybaPrepnuti && <p role="alert" className="note note-danger mb-3">{chybaPrepnuti}</p>}
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setMonth(m => posunMesic(m, -1))} aria-label="Předchozí měsíc" className="btn-icon"><Icon name="chevron" size={16} className="rotate-90" /></button>
             <p className="font-semibold text-[#16181A] cz-sentence min-w-[10rem] text-center">{nazevMesice(month)}</p>
@@ -86,7 +101,7 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
             <div className="glass-card rounded-3xl p-4">
               <p className="t-label text-black/45">Právě na směně</p>
               <p className="text-2xl font-bold tabular-nums text-[#16181A] mt-1">{data.total.onShiftNow}</p>
-              {data.total.stockAlerts > 0 && <p className="text-xs text-wait-ink mt-0.5">{data.total.stockAlerts} položek dochází</p>}
+              {data.total.stockAlerts > 0 && <p className="text-xs text-wait-ink mt-0.5">{czCount(data.total.stockAlerts, POLOZKA)} {czVerb(data.total.stockAlerts, 'dochází', 'docházejí')}</p>}
             </div>
           </div>
 
@@ -100,7 +115,7 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
                     <p className="text-xs text-black/45">{t.members} {t.members === 1 ? 'člen' : t.members < 5 ? 'členové' : 'členů'} · {t.closings} {t.closings === 1 ? 'uzávěrka' : t.closings < 5 ? 'uzávěrky' : 'uzávěrek'}</p>
                   </div>
                   {onOpenTeam && (
-                    <button type="button" onClick={() => onOpenTeam(t.teamId)} className="btn btn-secondary btn-sm shrink-0">Otevřít</button>
+                    <button type="button" onClick={() => otevri(t.teamId)} className="btn btn-secondary btn-sm shrink-0">Otevřít</button>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -118,7 +133,7 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
       {!data && !err && <div className="flex items-center justify-center h-40"><div className="spinner" /></div>}
     </div>

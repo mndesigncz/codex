@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { clenstviUzivatele, organizaceTymu } from '@/lib/tenant';
+import { clenstviUzivatele, organizaceTymu, smiZalozitDalsiPodnik } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
@@ -16,9 +16,14 @@ export async function GET() {
   const activeTeamId = u?.team_id != null ? Number(u.team_id) : null;
   const teams = await clenstviUzivatele(meId);
   const org = activeTeamId ? await organizaceTymu(activeTeamId) : null;
+  // „Přidat podnik" jen tomu, komu to server dovolí: vlastník podniku
+  // (a jeho organizace). Přepínač tlačítko jinak nekreslí.
+  const muzuZalozit = activeTeamId != null && (s.user as any).role === 'employer'
+    ? await smiZalozitDalsiPodnik(meId, activeTeamId) : false;
   return NextResponse.json({
     activeTeamId,
     teams,
+    muzuZalozit,
     organization: org ? { id: org.id, name: org.name, isOwner: org.ownerId === meId, settings: org.nastaveni } : null,
   });
 }

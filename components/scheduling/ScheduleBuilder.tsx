@@ -1610,6 +1610,8 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
       }
       setEditing(null);
       await onReload();
+    } catch {
+      setErr('Nepodařilo se spojit se serverem.');
     } finally {
       setBusy(false);
     }

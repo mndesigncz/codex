@@ -12,7 +12,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { neon } from '@neondatabase/serverless';
-import { rozhodni, ZPRAVA_423 } from '@/lib/blokace';
+import { rozhodni, ZPRAVA_423, VYJIMKY } from '@/lib/blokace';
 import { ciziPuvod } from '@/lib/puvod';
 
 export const config = {
@@ -62,6 +62,15 @@ export async function middleware(req: NextRequest) {
   }
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return NextResponse.next();
+  const cesta = req.nextUrl.pathname;
+  if (VYJIMKY.some(v => cesta === v || cesta.startsWith(v + '/') || cesta.startsWith(v))) {
+    // Přepnutí podniku: zapamatovaný aktivní tým je od téhle chvíle starý.
+    // Zahodit ho TADY, a tým se pro tenhle požadavek už nečíst — jinak by se
+    // mezipaměť naplnila pozastaveným podnikem těsně před přepnutím a
+    // člověk by se po něm 30 s točil mezi /pozastaveno a /employer.
+    if (req.method === 'POST' && cesta === '/api/teams/switch' && token.sub) tymCache.delete(Number(token.sub));
+    return NextResponse.next();
+  }
   const raw = (token as { teamId?: unknown }).teamId;
   const tokenTeam = raw == null ? null : Number(raw);
   const blok = await blokovane();

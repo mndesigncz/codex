@@ -22,12 +22,12 @@ type Interval = 'month' | 'year';
 function Bunka({ v, zvyraznit = false }: { v: string | boolean; zvyraznit?: boolean }) {
   if (v === true) {
     return (
-      <span className={`inline-grid h-6 w-6 place-items-center rounded-full ${zvyraznit ? 'bg-[#C8F542] text-[#3E5406]' : 'bg-[#C8F542]/40 text-[#3E5406]'}`} aria-label="ano">
+      <span role="img" className={`inline-grid h-6 w-6 place-items-center rounded-full ${zvyraznit ? 'bg-[#C8F542] text-[#3E5406]' : 'bg-[#C8F542]/40 text-[#3E5406]'}`} aria-label="ano">
         <Icon name="check" size={13} />
       </span>
     );
   }
-  if (v === false) return <span className="inline-block h-1.5 w-1.5 rounded-full bg-black/15" aria-label="ne" />;
+  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-black/15" aria-label="ne" />;
   return <span className="text-xs font-semibold text-[#16181A]">{v}</span>;
 }
 

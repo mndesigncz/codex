@@ -225,6 +225,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  // Bez podniku se položka nezakládá: řádek s team_id NULL by nepatřil nikomu
+  // — a denní doplnění podniku v /api/init by ho přiřadilo nejstaršímu
+  // podniku na platformě.
+  if (!me.teamId) return NextResponse.json({ error: 'Nejsi v žádném podniku.' }, { status: 400 });
   const isProposal = me.role !== 'employer';
 
   const body = await request.json();

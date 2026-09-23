@@ -9,7 +9,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from './team';
-import { normalizujNastaveni, normalizujRoli, smiPrepnout, tymyProCiselnik, type Ciselnik, type Clenstvi, type NastaveniOrganizace, type RoleClenstvi } from './organizace';
+import { normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, tymyProCiselnik, type Ciselnik, type Clenstvi, type NastaveniOrganizace, type RoleClenstvi } from './organizace';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -38,10 +38,22 @@ export async function prepniTym(userId: number, teamId: number): Promise<Clenstv
   const clenstvi = await clenstviUzivatele(userId);
   const cil = smiPrepnout(clenstvi, teamId);
   if (!cil) return null;
-  await sql`
-    UPDATE users SET team_id = ${cil.teamId}, active_team_id = ${cil.teamId}, role = ${cil.role},
-      employer_id = (SELECT owner_id FROM teams WHERE id = ${cil.teamId})
-    WHERE id = ${userId}`;
+  // Sazba a pozice jdou s podnikem (team_members), ne s člověkem: dřív si
+  // barista přepnutím vzal sazbu z podniku A do podniku B, kde mu ji nikdo
+  // nenastavil — a mzdy B se počítaly cizí sazbou.
+  try {
+    await sql`
+      UPDATE users u SET team_id = ${cil.teamId}, active_team_id = ${cil.teamId}, role = ${cil.role},
+        employer_id = (SELECT owner_id FROM teams WHERE id = ${cil.teamId}),
+        hourly_rate = m.hourly_rate, job_title = COALESCE(m.job_title, u.job_title)
+      FROM team_members m
+      WHERE u.id = ${userId} AND m.user_id = u.id AND m.team_id = ${cil.teamId}`;
+  } catch {
+    await sql`
+      UPDATE users SET team_id = ${cil.teamId}, active_team_id = ${cil.teamId}, role = ${cil.role},
+        employer_id = (SELECT owner_id FROM teams WHERE id = ${cil.teamId})
+      WHERE id = ${userId}`;
+  }
   return cil;
 }
 
@@ -152,6 +164,41 @@ export async function tymyCiselnikuHromadne(teamIds: number[], ciselnik: Ciselni
   return out;
 }
 
+/** Volající není vlastník podniku (ani jeho organizace) — další podnik zakládat nesmí. */
+export class NeniVlastnikPodniku extends Error {
+  constructor() { super('Další podnik zakládá vlastník podniku.'); }
+}
+
+/**
+ * Další podnik — a tím organizaci NAD tím aktivním — smí založit jen
+ * VLASTNÍK aktivního podniku; když už podnik organizaci má, jen její
+ * vlastník. Role vedení nestačí: manažer povýšený přes Tým, nebo cizí
+ * majitel pozvaný jako vedení, by si jinak založil organizaci nad podnikem,
+ * který mu nepatří, stal se jejím vlastníkem, skutečnému majiteli zavřel
+ * nastavení organizace a přes sdílené číselníky z jeho podniku četl.
+ */
+export async function smiZalozitDalsiPodnik(userId: number, teamId: number): Promise<boolean> {
+  try {
+    const [t] = await sql`SELECT owner_id FROM teams WHERE id = ${teamId}`;
+    if (!t || Number(t.owner_id) !== userId) return false;
+    const org = await organizaceTymu(teamId);
+    return !org || org.ownerId === userId;
+  } catch { return false; }
+}
+
+/**
+ * Smí člověk dostat členství v tomhle podniku? Vedení vždy. Zaměstnanec jen
+ * když organizace sdílení lidí má zapnuté — nebo když v žádném jejím jiném
+ * podniku ještě není (první členství není sdílení). Bez organizace vždy.
+ * Přepínač „Sdílení lidí" se dřív jen ukládal; tohle je místo, kde platí.
+ */
+export async function smiPridatClena(userId: number, teamId: number, role: RoleClenstvi): Promise<boolean> {
+  const org = await organizaceTymu(teamId);
+  if (!org || smiSdiletZamestnance(org.nastaveni, role)) return true;
+  const jinde = (await clenstviUzivatele(userId)).some(c => c.organizationId === org.id && c.teamId !== teamId);
+  return !jinde;
+}
+
 /**
  * Organizaci má podnik až ve chvíli, kdy má majitel druhý podnik. První
  * podnik se do ní zapíše zpětně, aby oba byly pod jednou střechou.
@@ -166,6 +213,8 @@ export async function zajistiOrganizaci(ownerId: number, prvniTeamId: number, na
 
 /** Založí další podnik majiteli — pod jeho organizací, s členstvím jako vedení. */
 export async function zalozDalsiPodnik(ownerId: number, aktivniTeamId: number, nazev: string): Promise<{ teamId: number; organizationId: number }> {
+  // Routa se ptá dřív; tady ještě jednou, ať se tudy nikdy neprojde bez kontroly.
+  if (!(await smiZalozitDalsiPodnik(ownerId, aktivniTeamId))) throw new NeniVlastnikPodniku();
   const [akt] = await sql`SELECT name FROM teams WHERE id = ${aktivniTeamId}`;
   const organizationId = await zajistiOrganizaci(ownerId, aktivniTeamId, String(akt?.name ?? 'Moje podniky'));
   let joinCode = generateJoinCode();

@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { okJson } from '@/lib/api';
-import { CISELNIKY, coSeVypina, normalizujNastaveni, type Ciselnik, type NastaveniOrganizace, type ZdrojeCiselniku } from '@/lib/organizace';
+import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, type Ciselnik, type NastaveniOrganizace, type ZdrojeCiselniku } from '@/lib/organizace';
 import { czCount, type CzNoun } from '@/lib/czech';
 
 interface Org { id: number; name: string; isOwner: boolean; settings: NastaveniOrganizace; teams: { id: number; name: string }[] }
@@ -30,6 +30,30 @@ const RADKY: Partial<Record<Ciselnik, CzNoun>> = {
 };
 
 const selectClass = 'field border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] max-w-full';
+
+/**
+ * Přepínač stojí MIMO komponentu nastavení: definovaný uvnitř by při každém
+ * renderu vznikl jako nový typ, React by ho odmontoval a namontoval znovu
+ * a po kliknutí by se ztratil fokus (klávesnice, odečítač).
+ */
+function Prepinac({ on, title, hint, brzy, disabled, onToggle }: { on: boolean; title: string; hint: string; brzy?: boolean; disabled: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-[#16181A]">{title}{brzy && <span className="ml-2 chip chip-sm chip-muted align-middle">připravuje se</span>}</p>
+        <p className="text-xs text-black/45 mt-0.5">{hint}</p>
+      </div>
+      {/* aria-disabled místo disabled: zakázané tlačítko prohlížeč odfokusuje,
+          a přepínač je během ukládání zakázaný vždycky — klávesnice by po
+          každém přepnutí začínala od začátku stránky. */}
+      <button type="button" role="switch" aria-checked={on} aria-label={title} aria-disabled={disabled}
+        onClick={() => { if (!disabled) onToggle(); }}
+        className={`tap-target-sm relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition aria-disabled:opacity-50 aria-disabled:cursor-not-allowed ${on ? 'bg-[#16181A]' : 'bg-black/15'}`}>
+        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
+      </button>
+    </div>
+  );
+}
 
 export default function OrganizationSettings() {
   const [org, setOrg] = useState<Org | null>(null);
@@ -74,15 +98,20 @@ export default function OrganizationSettings() {
     // pravdě, ne slíbit kopii, která nevznikne. Názvy stojí za dvojtečkou
     // v prvním pádu, ať se nemusí skloňovat.
     const nove = normalizujNastaveni({ ...org.settings, ...patch });
+    const popis = (ciselnik: Ciselnik) => CISELNIKY.find(c => c.klic === ciselnik);
+    const nazvy = (v: { ciselnik: Ciselnik }[]) => v.map(x => popis(x.ciselnik)?.nazev.toLocaleLowerCase('cs') ?? x.ciselnik).join(', ');
+    // Zapnutí nebo změna zdroje je opak vypnutí: kopie z dřívějšího sdílení
+    // se nahradí originálem a co si v nich podniky upravily, se ztratí.
+    // Jedno okno pro obojí — změna zdroje A → B vypíná A a zapíná B naráz.
+    const slucuje = coSeSlucuje(org.settings, nove).filter(s => popis(s.ciselnik)?.kopie);
     const vypina = coSeVypina(org.settings, nove);
-    if (vypina.length) {
-      const popis = (ciselnik: Ciselnik) => CISELNIKY.find(c => c.klic === ciselnik);
-      const nazvy = (v: typeof vypina) => v.map(x => popis(x.ciselnik)?.nazev.toLocaleLowerCase('cs') ?? x.ciselnik).join(', ');
+    if (slucuje.length || vypina.length) {
       const sKopii = vypina.filter(v => popis(v.ciselnik)?.kopie);
       const bezKopie = vypina.filter(v => !popis(v.ciselnik)?.kopie);
       const veta = [
         sKopii.length ? `Podniky dostanou vlastní kopie toho, co z organizace používají: ${nazvy(sKopii)}.` : '',
         bezKopie.length ? `Řádky z organizace přestanou být v podnicích vidět: ${nazvy(bezKopie)}.` : '',
+        slucuje.length ? `Pokud mají podniky kopie z dřívějšího sdílení, nahradí je originál ze zdroje: ${nazvy(slucuje)} — co si v nich upravily, se ztratí.` : '',
         'Pokračovat?',
       ].filter(Boolean).join(' ');
       if (!confirm(veta)) return;
@@ -111,23 +140,6 @@ export default function OrganizationSettings() {
   const ulozZdroje = (zdroje: ZdrojeCiselniku) => uloz({ zdrojeCiselniku: zdroje });
   const hodnota = (v: string): number | null => (v === '' ? null : Number(v));
 
-  const Prepinac = ({ klic, title, hint, brzy }: { klic: keyof NastaveniOrganizace; title: string; hint: string; brzy?: boolean }) => {
-    const on = org.settings[klic] === true;
-    return (
-      <div className="flex items-start justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#16181A]">{title}{brzy && <span className="ml-2 chip chip-sm chip-muted align-middle">připravuje se</span>}</p>
-          <p className="text-xs text-black/45 mt-0.5">{hint}</p>
-        </div>
-        <button type="button" role="switch" aria-checked={on} aria-label={title} disabled={!org.isOwner || busy}
-          onClick={() => uloz({ [klic]: !on } as Partial<NastaveniOrganizace>)}
-          className={`tap-target-sm relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${on ? 'bg-[#16181A]' : 'bg-black/15'}`}>
-          <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-      </div>
-    );
-  };
-
   const zdroje = org.settings.zdrojeCiselniku;
   const vsechnyStejne = CISELNIKY.every(c => zdroje[c.klic] === zdroje[CISELNIKY[0].klic]);
   const spolecny = vsechnyStejne ? (zdroje[CISELNIKY[0].klic] == null ? '' : String(zdroje[CISELNIKY[0].klic])) : 'ruzne';
@@ -145,11 +157,11 @@ export default function OrganizationSettings() {
         {msg && <span className={`text-xs font-semibold ${msg.endsWith('✓') ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>{msg}</span>}
       </div>
       <div className="space-y-2">
-        <Prepinac klic="sdileniLidi" title="Sdílení lidí mezi podniky"
+        <Prepinac on={org.settings.sdileniLidi === true} disabled={!org.isOwner || busy} onToggle={() => uloz({ sdileniLidi: !(org.settings.sdileniLidi === true) })} title="Sdílení lidí mezi podniky"
           hint="Zaměstnanec může být členem víc podniků a přepínat mezi nimi. Vedení může vždy." />
-        <Prepinac klic="konsolidovanyPrehled" title="Přehled za všechny podniky"
+        <Prepinac on={org.settings.konsolidovanyPrehled === true} disabled={!org.isOwner || busy} onToggle={() => uloz({ konsolidovanyPrehled: !(org.settings.konsolidovanyPrehled === true) })} title="Přehled za všechny podniky"
           hint="Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce — v přepínači podniku nahoře, položka „Všechny podniky“." />
-        <Prepinac klic="sdileneCiselniky" title="Sdílené číselníky"
+        <Prepinac on={org.settings.sdileneCiselniky === true} disabled={!org.isOwner || busy} onToggle={() => uloz({ sdileneCiselniky: !(org.settings.sdileneCiselniky === true) })} title="Sdílené číselníky"
           hint="Jeden podnik číselník spravuje, ostatní ho vidí a používají. U každé položky je vidět, odkud je. Kontakty dodavatelů uvidí i ostatní podniky." />
         {org.settings.sdileneCiselniky && (
           <div role="group" aria-labelledby="org-zdroje-nadpis" className="rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3 space-y-2">

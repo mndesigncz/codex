@@ -11,6 +11,7 @@ import { neon } from '@neondatabase/serverless';
 import type { Metadata } from 'next';
 import { authOptions } from '@/lib/auth';
 import OdhlasitButton from '@/components/admin/OdhlasitButton';
+import PodnikSwitcher from '@/components/PodnikSwitcher';
 
 export const metadata: Metadata = { title: 'Podnik je pozastavený' };
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,8 @@ export default async function Pozastaveno() {
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-2.5">
           <OdhlasitButton />
+          {/* Kdo má i jiný podnik, přepne se do něj — přepínač se s jediným členstvím nekreslí. */}
+          <PodnikSwitcher />
         </div>
       </div>
     </main>

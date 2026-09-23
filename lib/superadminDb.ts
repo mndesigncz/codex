@@ -15,7 +15,17 @@ export async function jeSpravcePodleDb(userId: number): Promise<boolean> {
   try {
     const [u] = await sql`SELECT id, role FROM users WHERE id = ${userId}`;
     if (!u) return false;
-    return rozhodniSpravce({ id: u.id, role: u.role });
+    // users.role je role v AKTIVNÍM podniku. Správce, který se přepnul do
+    // podniku, kde je jen zaměstnancem, správcem zůstává — rozhoduje, jestli
+    // je NĚKDE vedením. Tablet a host členství vedení nemají nikdy.
+    let role = String(u.role);
+    if (role === 'employee') {
+      try {
+        const [m] = await sql`SELECT 1 FROM team_members WHERE user_id = ${userId} AND role = 'employer' LIMIT 1`;
+        if (m) role = 'employer';
+      } catch { /* před migrací */ }
+    }
+    return rozhodniSpravce({ id: u.id, role });
   } catch {
     // Bez databáze není správce — radši zavřené dveře než otevřené.
     return false;

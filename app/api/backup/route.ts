@@ -22,6 +22,10 @@ export const maxDuration = 60;
  */
 const TABLES: { name: string; team?: boolean; user?: string; conversation?: boolean; scopedBy?: string }[] = [
   { name: 'invitations', team: true },
+  // Členství a organizace (kolo 55): role, pozice a sazba v členství i
+  // nastavení organizace (zdroje sdílených číselníků) patří do zálohy.
+  { name: 'team_members', team: true },
+  { name: 'organizations', scopedBy: 'id = (SELECT organization_id FROM teams WHERE id = $1)' },
   { name: 'shifts', team: true, user: 'employee_id' },
   { name: 'shift_requests', team: true, user: 'employee_id' },
   { name: 'availability_requests', team: true, user: 'employee_id' },
@@ -65,31 +69,31 @@ async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string
   const put = (name: string, rows: any[]) => { dump[name] = rows; rowCount += rows.length; };
 
   try {
-    put('teams', await sql('SELECT * FROM teams WHERE id = $1', [teamId]));
+    put('teams', await sql.query('SELECT * FROM teams WHERE id = $1', [teamId]));
   } catch { dump['teams'] = []; }
   try {
-    put('users', await sql(USERS_QUERY, [teamId]));
+    put('users', await sql.query(USERS_QUERY, [teamId]));
   } catch { dump['users'] = []; }
 
   for (const t of TABLES) {
     let rows: any[] | null = null;
     if (t.team) {
-      try { rows = await sql(`SELECT * FROM ${t.name} WHERE team_id = $1`, [teamId]); } catch { rows = null; }
+      try { rows = await sql.query(`SELECT * FROM ${t.name} WHERE team_id = $1`, [teamId]); } catch { rows = null; }
     }
     if (rows === null && t.user) {
       try {
-        rows = await sql(
+        rows = await sql.query(
           `SELECT * FROM ${t.name} WHERE ${t.user} IN (SELECT id FROM users WHERE team_id = $1)`,
           [teamId],
         );
       } catch { rows = null; }
     }
     if (rows === null && t.scopedBy) {
-      try { rows = await sql(`SELECT * FROM ${t.name} WHERE ${t.scopedBy}`, [teamId]); } catch { rows = null; }
+      try { rows = await sql.query(`SELECT * FROM ${t.name} WHERE ${t.scopedBy}`, [teamId]); } catch { rows = null; }
     }
     if (rows === null && t.conversation) {
       try {
-        rows = await sql(
+        rows = await sql.query(
           `SELECT * FROM ${t.name} WHERE conversation_id IN (SELECT id FROM conversations WHERE team_id = $1)`,
           [teamId],
         );
