@@ -69,12 +69,14 @@ export async function GET(req: NextRequest) {
     } catch { /* před migrací */ }
 
     try {
-      // Sazba z členství v podniku ZÁZNAMU; bez členství ze zrcadla. Člen
-      // s členstvím bez sazby má 0 — dřív COALESCE sáhl po zrcadle, tedy
-      // po sazbě jiného podniku, a Finance a Přehled dávaly různá čísla (kolo 62).
+      // Sazba z členství v podniku ZÁZNAMU; bez členství ze zrcadla, ale jen
+      // když zrcadlo ukazuje na TENTO podnik — jinak by člověk odebraný z A
+      // a přepnutý do B dostal v A sazbu z B. Člen s členstvím bez sazby má 0.
+      // Stejný výraz jako Finance, ať dávají totéž číslo (kolo 62).
       const entries = await sql`
         SELECT te.clock_in, te.clock_out,
-               CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(us.hourly_rate, 0) END AS rate
+               CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0)
+                    WHEN us.team_id = te.team_id THEN COALESCE(us.hourly_rate, 0) ELSE 0 END AS rate
         FROM time_entries te
         JOIN users us ON us.id = te.employee_id
         LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id

@@ -358,7 +358,8 @@ export async function GET(req: NextRequest) {
     // jako Finance, ať „mzdy jsou X % tržeb" sedí s přehledem.
     for (const r of await sql`
       SELECT u.name,
-             CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(u.hourly_rate, 0) END AS hourly_rate,
+             CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0)
+                  WHEN u.team_id = te.team_id THEN COALESCE(u.hourly_rate, 0) ELSE 0 END AS hourly_rate,
              EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) AS secs
       FROM time_entries te JOIN users u ON u.id = te.employee_id
       LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id

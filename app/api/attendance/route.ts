@@ -301,6 +301,7 @@ export async function POST(req: NextRequest) {
       const [planned] = await sql`
         SELECT start_time FROM shifts
         WHERE employee_id = ${employeeId} AND date = ${denSmenyPrichodu} AND start_time IS NOT NULL
+          AND team_id = ${c.teamId}
         ORDER BY start_time ASC LIMIT 1`;
       if (planned?.start_time) {
         const [ph, pm] = String(planned.start_time).split(':').map(Number);

@@ -83,15 +83,38 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   const ids = new Set<number>();
   const pridej = (v: any) => { const n = Number(v); if (Number.isFinite(n) && n > 0) ids.add(n); };
   pridej(c.created_by);
+  pridej(c.approved_by);
   for (const x of (Array.isArray(c.shift_employees) ? c.shift_employees : [])) pridej(x);
   for (const s of plannedRows) pridej(s.employee_id);
   for (const t of attendanceRows) pridej(t.employee_id);
   try {
     if (ids.size) for (const p of await sql`SELECT id, name, avatar FROM users WHERE id = ANY(${[...ids]})` as any[]) {
-      people.set(p.id, { id: p.id, name: p.name, avatar: p.avatar ?? null });
+      people.set(Number(p.id), { id: Number(p.id), name: p.name, avatar: p.avatar ?? null });
     }
   } catch { /* nepodstatné */ }
-  const person = (pid: any) => people.get(Number(pid)) ?? null;
+  // Kdo v první dávce nebyl (postup, úkol nebo účtenka od člověka mimo
+  // osádku dne), dostane zástupný objekt a jméno se mu doplní jedním dotazem
+  // před odpovědí — objekt je tentýž, takže se doplní i v už sestavených
+  // sekcích. Dřív se načítal celý podnik a taková jména chyběla po přepisu.
+  const chybi = new Map<number, { id: number; name: string; avatar: string | null }[]>();
+  const person = (pid: any) => {
+    const n = Number(pid);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const p = people.get(n);
+    if (p) return p;
+    const zastupce = { id: n, name: '—', avatar: null as string | null };
+    chybi.set(n, [...(chybi.get(n) ?? []), zastupce]);
+    return zastupce;
+  };
+  const doplnJmena = async () => {
+    if (!chybi.size) return;
+    try {
+      for (const p of await sql`SELECT id, name, avatar FROM users WHERE id = ANY(${[...chybi.keys()]})` as any[]) {
+        for (const z of chybi.get(Number(p.id)) ?? []) { z.name = p.name; z.avatar = p.avatar ?? null; }
+        people.set(Number(p.id), { id: Number(p.id), name: p.name, avatar: p.avatar ?? null });
+      }
+    } catch { /* nepodstatné */ }
+  };
 
   const crew = (Array.isArray(c.shift_employees) ? c.shift_employees : [])
     .map((x: any) => person(x)).filter(Boolean);
@@ -245,6 +268,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       ORDER BY qty DESC LIMIT 40` as any[]).map(p => ({ name: p.name, qty: p.qty }));
   } catch { /* nepodstatné */ }
 
+  await doplnJmena();
   return NextResponse.json({
     closing: {
       ...c,
