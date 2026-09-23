@@ -67,33 +67,39 @@ export async function PATCH(req: Request) {
   // Chyba u jednoho podniku uložení nezastaví — vrací se v `kopie`, ať UI
   // neřekne „Uloženo" nad podnikem, kterému kopie nevznikla.
   const vypina = coSeVypina(org.nastaveni, nastaveni);
-  const slucuje = coSeSlucuje(org.nastaveni, nastaveni);
+  // Sloučení běží pro KAŽDÝ číselník, který má po uložení zdroj — ne jen
+  // pro ten, který ho právě dostal. Je idempotentní (kopie bez originálu ve
+  // zdroji nechá být), takže „Zkuste to znovu" znamená uložit totéž znovu:
+  // podnik, kterému sloučení minule selhalo, se sloučí teď. Vracet kvůli
+  // němu zdroj zpátky nejde — ostatní podniky už na nový zdroj ukazují.
+  const slucuje = nastaveni.sdileneCiselniky
+    ? CISELNIKY.flatMap(k => { const z = nastaveni.zdrojeCiselniku[k.klic]; return k.kopie && z != null ? [{ ciselnik: k.klic, zdroj: z }] : []; })
+    : [];
   let kopie: VysledekKopie[] = [];
   if (vypina.length || slucuje.length) {
     kopie = await provedZmenuZdroju({ orgId: org.id, meId: c.meId, podniky, vypina, slucuje });
   }
-  // Kde kopie nebo sloučení u některého podniku selhalo, zůstane pro TEN
-  // číselník staré nastavení: podniky ho dál čtou a „Zkuste to znovu" má
-  // co zopakovat. Dřív se nové nastavení uložilo i tak — a opakovaný pokus
-  // se stejnými hodnotami už žádnou změnu neviděl, takže nic neudělal.
-  const selhaly = new Set(kopie.filter(k => !k.ok).map(k => k.ciselnik));
-  if (selhaly.size) {
+  // Kde KOPIE u některého podniku selhala, zůstane pro ten číselník staré
+  // nastavení: podniky ho dál čtou a vypnutí se dá zopakovat. Dřív se nové
+  // nastavení uložilo i tak — a opakovaný pokus se stejnými hodnotami už
+  // žádnou změnu neviděl, takže nic neudělal.
+  const selhalaKopie = new Set(kopie.filter(k => !k.ok && k.akce === 'kopie').map(k => k.ciselnik));
+  if (selhalaKopie.size) {
     const vypnutoVse = org.nastaveni.sdileneCiselniky && !nastaveni.sdileneCiselniky;
     if (vypnutoVse) nastaveni.sdileneCiselniky = true;
     for (const v of vypina) {
-      nastaveni.zdrojeCiselniku[v.ciselnik] = selhaly.has(v.ciselnik)
+      nastaveni.zdrojeCiselniku[v.ciselnik] = selhalaKopie.has(v.ciselnik)
         ? org.nastaveni.zdrojeCiselniku[v.ciselnik]
         : (vypnutoVse ? null : nastaveni.zdrojeCiselniku[v.ciselnik]);
-    }
-    for (const s of slucuje) {
-      if (selhaly.has(s.ciselnik)) nastaveni.zdrojeCiselniku[s.ciselnik] = org.nastaveni.zdrojeCiselniku[s.ciselnik];
     }
   }
 
   await sql`UPDATE organizations SET name = ${name}, settings = ${JSON.stringify(nastaveni)}::jsonb WHERE id = ${org.id}`;
   audit(c.teamId, c.meId, 'organization.settings', 'organization', org.id, JSON.stringify(nastaveni));
   // Změna zdrojů zvlášť: audit_log nemá organization_id, píše se k aktivnímu podniku jako dosud.
-  if (vypina.length || slucuje.length || JSON.stringify(org.nastaveni.zdrojeCiselniku) !== JSON.stringify(nastaveni.zdrojeCiselniku)) {
+  const zmenaZdroju = vypina.length > 0 || coSeSlucuje(org.nastaveni, nastaveni).length > 0
+    || JSON.stringify(org.nastaveni.zdrojeCiselniku) !== JSON.stringify(nastaveni.zdrojeCiselniku);
+  if (zmenaZdroju || kopie.some(k => !k.ok || k.pocet > 0)) {
     audit(c.teamId, c.meId, 'organization.ciselniky', 'organization', org.id,
       JSON.stringify({ sdileneCiselniky: nastaveni.sdileneCiselniky, zdroje: nastaveni.zdrojeCiselniku }));
   }

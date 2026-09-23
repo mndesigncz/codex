@@ -100,19 +100,18 @@ export default function OrganizationSettings() {
     const nove = normalizujNastaveni({ ...org.settings, ...patch });
     const popis = (ciselnik: Ciselnik) => CISELNIKY.find(c => c.klic === ciselnik);
     const nazvy = (v: { ciselnik: Ciselnik }[]) => v.map(x => popis(x.ciselnik)?.nazev.toLocaleLowerCase('cs') ?? x.ciselnik).join(', ');
-    // Zapnutí nebo změna zdroje je opak: kopie v podnicích se nahradí
-    // originálem a co si v nich podniky upravily, se ztratí. Ptá se stejně.
+    // Zapnutí nebo změna zdroje je opak vypnutí: kopie z dřívějšího sdílení
+    // se nahradí originálem a co si v nich podniky upravily, se ztratí.
+    // Jedno okno pro obojí — změna zdroje A → B vypíná A a zapíná B naráz.
     const slucuje = coSeSlucuje(org.settings, nove).filter(s => popis(s.ciselnik)?.kopie);
-    if (slucuje.length) {
-      if (!confirm(`Kopie v ostatních podnicích se nahradí originálem ze zdroje: ${nazvy(slucuje)}. Co si v nich podniky upravily, se ztratí. Pokračovat?`)) return;
-    }
     const vypina = coSeVypina(org.settings, nove);
-    if (vypina.length) {
+    if (slucuje.length || vypina.length) {
       const sKopii = vypina.filter(v => popis(v.ciselnik)?.kopie);
       const bezKopie = vypina.filter(v => !popis(v.ciselnik)?.kopie);
       const veta = [
         sKopii.length ? `Podniky dostanou vlastní kopie toho, co z organizace používají: ${nazvy(sKopii)}.` : '',
         bezKopie.length ? `Řádky z organizace přestanou být v podnicích vidět: ${nazvy(bezKopie)}.` : '',
+        slucuje.length ? `Pokud mají podniky kopie z dřívějšího sdílení, nahradí je originál ze zdroje: ${nazvy(slucuje)} — co si v nich upravily, se ztratí.` : '',
         'Pokračovat?',
       ].filter(Boolean).join(' ');
       if (!confirm(veta)) return;

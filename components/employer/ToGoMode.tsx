@@ -134,7 +134,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
           </div>
           {/* Majitel víc podniků se na telefonu přepíná tady — boční pás tu není.
               S jedním podnikem se nic nekreslí. */}
-          <PodnikSwitcher compact onOverview={() => onOpenView('org')} />
+          <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
           <button onClick={onExit}
             className="btn btn-accent btn-sm shrink-0">
             Administrace →

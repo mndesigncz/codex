@@ -388,7 +388,7 @@ export default function EmployerLayout({ user }: Props) {
           {/* Přepínač podniků byl jen v bočním pásu, který na telefonu není —
               majitel tří podniků se na mobilu nepřepnul a „Všechny podniky"
               nenašel. S jedním podnikem se nic nekreslí. */}
-          <div className="md:hidden shrink-0"><PodnikSwitcher compact canCreate onOverview={() => setCurrentView('org')} /></div>
+          <div className="md:hidden shrink-0"><PodnikSwitcher compact canCreate jenPrepinani onOverview={() => setCurrentView('org')} /></div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>

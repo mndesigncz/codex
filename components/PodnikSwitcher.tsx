@@ -24,7 +24,20 @@ export function uklidKonceptu() {
   } catch { /* soukromý režim */ }
 }
 
-export default function PodnikSwitcher({ compact = false, canCreate = false, onOverview }: { compact?: boolean; canCreate?: boolean; onOverview?: () => void }) {
+// Dva přepínače na stránce (boční pás + hlavička telefonu) sdílí jeden
+// požadavek na /api/teams/mine; druhý by jen zdvojil čtyři dotazy do databáze.
+let sdileneNacteni: Promise<any> | null = null;
+function nactiPodniky(znovu: boolean): Promise<any> {
+  if (znovu || !sdileneNacteni) sdileneNacteni = fetch('/api/teams/mine').then(okJson).catch(e => { sdileneNacteni = null; throw e; });
+  return sdileneNacteni;
+}
+
+/**
+ * `jenPrepinani`: v hlavičce telefonu se kreslí jen tomu, kdo má víc podniků
+ * — s jedním by tam jen ubíral místo názvu obrazovky (na 320 px zbývalo
+ * 64 px). Založit další podnik jde z bočního pásu.
+ */
+export default function PodnikSwitcher({ compact = false, canCreate = false, jenPrepinani = false, onOverview }: { compact?: boolean; canCreate?: boolean; jenPrepinani?: boolean; onOverview?: () => void }) {
   const { update } = useSession();
   const [data, setData] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
@@ -40,7 +53,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
   useEffect(() => {
     let alive = true;
     setChybaSeznamu(false);
-    fetch('/api/teams/mine').then(okJson)
+    nactiPodniky(pokus > 0)
       .then(d => { if (alive) setData({ activeTeamId: d.activeTeamId ?? null, teams: d.teams ?? [], organization: d.organization ?? null, muzuZalozit: d.muzuZalozit === true }); })
       .catch(() => { if (alive) setChybaSeznamu(true); });
     return () => { alive = false; };
@@ -71,8 +84,8 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
       </button>
     );
   }
-  // Jeden podnik a nemůžu přidat další → není co přepínat, nic nekreslit.
-  if (!vicPodniku && !mohuZalozit) return null;
+  // Jeden podnik a nemůžu (nebo tady nemám) přidat další → není co přepínat.
+  if (!vicPodniku && (jenPrepinani || !mohuZalozit)) return null;
 
 
   const prepni = async (teamId: number) => {

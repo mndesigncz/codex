@@ -82,7 +82,7 @@ async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string
     }
     if (rows === null && t.user) {
       try {
-        rows = await sql(
+        rows = await sql.query(
           `SELECT * FROM ${t.name} WHERE ${t.user} IN (SELECT id FROM users WHERE team_id = $1)`,
           [teamId],
         );
@@ -93,7 +93,7 @@ async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string
     }
     if (rows === null && t.conversation) {
       try {
-        rows = await sql(
+        rows = await sql.query(
           `SELECT * FROM ${t.name} WHERE conversation_id IN (SELECT id FROM conversations WHERE team_id = $1)`,
           [teamId],
         );

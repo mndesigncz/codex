@@ -42,10 +42,14 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
     return () => { alive = false; };
   }, [month, tick]);
 
-  // „Otevřít" přepíná podnik na serveru; když to nevyjde, chyba patří sem.
+  // „Otevřít" přepíná podnik na serveru; když to nevyjde (třeba vlastník
+  // organizace není členem toho podniku), řekne se to u seznamu — ne jako
+  // „Přehled se nenačetl", který by načtená čísla schoval.
+  const [chybaPrepnuti, setChybaPrepnuti] = useState('');
   const otevri = async (teamId: number) => {
+    setChybaPrepnuti('');
     const chyba = await onOpenTeam?.(teamId);
-    if (chyba) setErr(chyba);
+    if (chyba) setChybaPrepnuti(chyba);
   };
 
   const penize = (n: number, cur: string) => formatMoney(n, cur);
@@ -67,6 +71,7 @@ export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: numb
 
       {data?.available && data.teams && data.total && !err && (
         <div className={nacita ? 'opacity-50 pointer-events-none transition-opacity' : 'transition-opacity'} aria-busy={nacita}>
+          {chybaPrepnuti && <p role="alert" className="note note-danger mb-3">{chybaPrepnuti}</p>}
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setMonth(m => posunMesic(m, -1))} aria-label="Předchozí měsíc" className="btn-icon"><Icon name="chevron" size={16} className="rotate-90" /></button>
             <p className="font-semibold text-[#16181A] cz-sentence min-w-[10rem] text-center">{nazevMesice(month)}</p>

@@ -1801,13 +1801,16 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS rewards_catalog_team ON rewards_catalog (team_id)`);
 
     // ---- Sazba a pozice v členství ----
-    // team_members.hourly_rate/job_title se plnily jen při založení členství;
-    // změny šly do users.* (zrcadlo aktivního podniku). Kde členství hodnotu
-    // nemá a zrcadlo ano, doplní se — jen NULL, nic se nepřepisuje.
+    // team_members.hourly_rate/job_title se naplnily jednou (kolo 55) a pak
+    // se změny psaly jen do users.* — zrcadla AKTIVNÍHO podniku. Pro aktivní
+    // podnik je tedy zrcadlo pravda a členství se mu srovná; od kola 61 se
+    // píše obojí naráz, takže po prvním běhu už tohle nic nemění.
     await ddl(sql`UPDATE team_members m SET hourly_rate = u.hourly_rate FROM users u
-                  WHERE m.user_id = u.id AND m.team_id = u.team_id AND m.hourly_rate IS NULL AND u.hourly_rate IS NOT NULL`);
+                  WHERE m.user_id = u.id AND m.team_id = u.team_id AND u.hourly_rate IS NOT NULL
+                    AND m.hourly_rate IS DISTINCT FROM u.hourly_rate`);
     await ddl(sql`UPDATE team_members m SET job_title = u.job_title FROM users u
-                  WHERE m.user_id = u.id AND m.team_id = u.team_id AND m.job_title IS NULL AND u.job_title IS NOT NULL`);
+                  WHERE m.user_id = u.id AND m.team_id = u.team_id AND u.job_title IS NOT NULL
+                    AND m.job_title IS DISTINCT FROM u.job_title`);
 
     // ---- Řádky bez podniku ----
     // Sklad a uzávěrky z doby před sloupcem team_id měly podnik NULL a dotazy

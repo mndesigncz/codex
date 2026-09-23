@@ -155,10 +155,15 @@ async function zkopirujKategorieSkladu(zdroj: number, teamId: number): Promise<n
     SELECT id, origin_id FROM inventory_categories
     WHERE team_id = ${teamId} AND origin_id = ANY(${keKopii.map(koren)})` as any[];
   for (const r of stavajici) podleKorene.set(Number(r.origin_id), Number(r.id));
+  // Kořenový originál může ležet v TOMHLE podniku (B bylo zdrojem, A dostalo
+  // kopie, pak zdrojem bylo A a B jeho kopie použilo): pak se položky
+  // přepojí na vlastní řádek a nic se nekopíruje.
+  const vlastni = new Set(ids(await sql`
+    SELECT id FROM inventory_categories WHERE team_id = ${teamId} AND id = ANY(${keKopii.map(koren)})`));
 
   let pocet = 0;
   for (const c of keKopii) {
-    let noveId = podleKorene.get(koren(c));
+    let noveId = vlastni.has(koren(c)) ? koren(c) : podleKorene.get(koren(c));
     if (noveId == null) {
       const [row] = await sql`
         INSERT INTO inventory_categories
@@ -191,11 +196,13 @@ async function zkopirujTypySmen(zdroj: number, teamId: number): Promise<number> 
   const stavajici = await sql`
     SELECT id, origin_id FROM shift_types WHERE team_id = ${teamId} AND origin_id = ANY(${pouzite.map(koren)})` as any[];
   const podleKorene = new Map<number, number>(stavajici.map(r => [Number(r.origin_id), Number(r.id)]));
+  // Kořenový originál ve vlastním podniku → přepojit na něj, nekopírovat.
+  const vlastni = new Set(ids(await sql`SELECT id FROM shift_types WHERE team_id = ${teamId} AND id = ANY(${pouzite.map(koren)})`));
   const mapa = new Map<number, number>();
   let pocet = 0;
   for (const t of pouzite) {
     const puvodni = Number(t.id);
-    let noveId = podleKorene.get(koren(t));
+    let noveId = vlastni.has(koren(t)) ? koren(t) : podleKorene.get(koren(t));
     if (noveId == null) {
       const [row] = await sql`
         INSERT INTO shift_types (team_id, origin_id, name, start_time, end_time, color, position, starts_at_open, ends_at_close)
@@ -223,10 +230,12 @@ async function zkopirujKategorieNavodu(zdroj: number, teamId: number): Promise<n
   const stavajici = await sql`
     SELECT id, origin_id FROM guide_categories WHERE team_id = ${teamId} AND origin_id = ANY(${pouzite.map(koren)})` as any[];
   const podleKorene = new Map<number, number>(stavajici.map(r => [Number(r.origin_id), Number(r.id)]));
+  // Kořenový originál ve vlastním podniku → přepojit na něj, nekopírovat.
+  const vlastni = new Set(ids(await sql`SELECT id FROM guide_categories WHERE team_id = ${teamId} AND id = ANY(${pouzite.map(koren)})`));
   let pocet = 0;
   for (const k of pouzite) {
     const puvodni = Number(k.id);
-    let noveId = podleKorene.get(koren(k));
+    let noveId = vlastni.has(koren(k)) ? koren(k) : podleKorene.get(koren(k));
     if (noveId == null) {
       const [row] = await sql`
         INSERT INTO guide_categories (team_id, origin_id, name, icon, position)
