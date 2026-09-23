@@ -72,6 +72,23 @@ export async function PATCH(req: Request) {
   if (vypina.length || slucuje.length) {
     kopie = await provedZmenuZdroju({ orgId: org.id, meId: c.meId, podniky, vypina, slucuje });
   }
+  // Kde kopie nebo sloučení u některého podniku selhalo, zůstane pro TEN
+  // číselník staré nastavení: podniky ho dál čtou a „Zkuste to znovu" má
+  // co zopakovat. Dřív se nové nastavení uložilo i tak — a opakovaný pokus
+  // se stejnými hodnotami už žádnou změnu neviděl, takže nic neudělal.
+  const selhaly = new Set(kopie.filter(k => !k.ok).map(k => k.ciselnik));
+  if (selhaly.size) {
+    const vypnutoVse = org.nastaveni.sdileneCiselniky && !nastaveni.sdileneCiselniky;
+    if (vypnutoVse) nastaveni.sdileneCiselniky = true;
+    for (const v of vypina) {
+      nastaveni.zdrojeCiselniku[v.ciselnik] = selhaly.has(v.ciselnik)
+        ? org.nastaveni.zdrojeCiselniku[v.ciselnik]
+        : (vypnutoVse ? null : nastaveni.zdrojeCiselniku[v.ciselnik]);
+    }
+    for (const s of slucuje) {
+      if (selhaly.has(s.ciselnik)) nastaveni.zdrojeCiselniku[s.ciselnik] = org.nastaveni.zdrojeCiselniku[s.ciselnik];
+    }
+  }
 
   await sql`UPDATE organizations SET name = ${name}, settings = ${JSON.stringify(nastaveni)}::jsonb WHERE id = ${org.id}`;
   audit(c.teamId, c.meId, 'organization.settings', 'organization', org.id, JSON.stringify(nastaveni));

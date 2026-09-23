@@ -215,6 +215,8 @@ export default function EmployeeLayout({ user }: Props) {
             <Icon name="menu" size={20} />
           </button>
           <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
+          {/* Barista mezi pobočkami se přepíná hlavně z telefonu — boční pás tam není. */}
+          <div className="md:hidden shrink-0"><PodnikSwitcher compact /></div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>

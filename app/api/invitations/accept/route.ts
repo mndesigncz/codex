@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { linkNewMember } from '@/lib/chat';
 import { notifyUser } from '@/lib/push';
-import { pridejClenstvi } from '@/lib/tenant';
+import { pridejClenstvi, smiPridatClena } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +44,25 @@ export async function POST(request: Request) {
       if (await memberLimitHit(sql, inv.team_id)) {
         return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
       }
-      await pridejClenstvi(Number(existing.id), Number(team.id), inv.role === 'employer' ? 'employer' : 'employee', { jobTitle: inv.job_title || null });
+      const role = inv.role === 'employer' ? 'employer' : 'employee';
+      // Přepínač organizace „Sdílení lidí" platí i při přijetí — pozvánka
+      // mohla vzniknout dřív, než ho vlastník vypnul.
+      if (!(await smiPridatClena(Number(existing.id), Number(team.id), role))) {
+        return NextResponse.json({ error: 'Už pracuješ v jiném podniku téhle organizace a sdílení lidí mezi podniky je vypnuté. Zapne ho vlastník organizace.' }, { status: 409 });
+      }
+      try {
+        await pridejClenstvi(Number(existing.id), Number(team.id), role, { jobTitle: inv.job_title || null });
+      } catch {
+        // team_members ještě není (init po nasazení neproběhl): říct to,
+        // ne padnout na obecnou pětistovku. Pozvánka zůstává platná.
+        return NextResponse.json({ error: 'Přidání do dalšího podniku bude dostupné po dokončení aktualizace — zkus to za chvíli.' }, { status: 503 });
+      }
+      // Kdo právě žádný aktivní podnik nemá (odebraný z toho jediného), se do
+      // nového rovnou přepne — jinak by se přihlásil do prázdna.
+      try {
+        await sql`UPDATE users SET team_id = ${team.id}, role = ${role}, employer_id = ${team.owner_id}
+                  WHERE id = ${existing.id} AND team_id IS NULL`;
+      } catch { /* zrcadlo se doplní při přihlášení */ }
       await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
       try { await linkNewMember(sql, team.id, team.owner_id, Number(existing.id)); } catch { /* chat je volitelný */ }
       notifyUser(team.owner_id, {

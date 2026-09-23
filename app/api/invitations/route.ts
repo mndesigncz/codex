@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { generateInviteToken } from '@/lib/team';
 import { sendTeamInvitation } from '@/lib/email';
+import { smiPridatClena } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,13 @@ export async function GET() {
   const me = await currentEmployer();
   if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const sql = neon(process.env.DATABASE_URL!);
-  const [team] = await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
+  // Aktivní podnik, stejně jako POST a DELETE. Dřív „první vlastněný" —
+  // majitel dvou podniků v tom druhém viděl pozvánky toho prvního a nová
+  // pozvánka mu v seznamu chyběla.
+  const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
+  const [team] = dbMe?.team_id
+    ? await sql`SELECT id FROM teams WHERE id = ${dbMe.team_id}`
+    : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ invitations: [] });
   // token is included so the employer can copy a working join link and share
   // it directly (email delivery is best-effort and may be unconfigured).
@@ -42,6 +49,7 @@ export async function POST(request: Request) {
     : await sql`SELECT id, name FROM teams WHERE owner_id = ${me.id}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
 
+  const invRole = role === 'employer' ? 'employer' : 'employee';
   // Existující účet jde pozvat do DALŠÍHO podniku (přijetí mu přidá členství).
   // Nejde pozvat tablet ani hosta, a nejde pozvat někoho, kdo už tu je.
   const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE email = ${email}`;
@@ -55,10 +63,13 @@ export async function POST(request: Request) {
       uzClen = uzClen || !!m;
     } catch { /* před migrací */ }
     if (uzClen) return NextResponse.json({ error: 'Tenhle člověk už v týmu je.' }, { status: 409 });
+    // „Sdílení lidí mezi podniky" organizace platí i tady, ne jen v nastavení.
+    if (!(await smiPridatClena(Number(existingUser.id), Number(team.id), invRole))) {
+      return NextResponse.json({ error: 'Tenhle člověk už pracuje v jiném podniku organizace a sdílení lidí mezi podniky je vypnuté. Zapne ho vlastník organizace v Nastavení.' }, { status: 409 });
+    }
   }
 
   const token = generateInviteToken();
-  const invRole = role === 'employer' ? 'employer' : 'employee';
   try {
 
   if (await memberLimitHit(sql, team.id)) {

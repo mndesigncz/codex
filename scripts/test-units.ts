@@ -894,6 +894,10 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   eq('číselníky: změna zdroje A → C vypíná A a slučuje k C', [coSeVypina(stare, N({ kategorieSkladu: 3, dodavatele: 1 })), coSeSlucuje(stare, N({ kategorieSkladu: 3, dodavatele: 1 }))], [[{ ciselnik: 'kategorieSkladu', zdroj: 1 }], [{ ciselnik: 'kategorieSkladu', zdroj: 3 }]]);
   eq('číselníky: beze změny nic', [coSeVypina(stare, stare), coSeSlucuje(stare, stare)], [[], []]);
   eq('číselníky: zapnutí nic nevypíná, slučuje k zdroji', [coSeVypina(N({}, false), stare), coSeSlucuje(N({}, false), stare)], [[], [{ ciselnik: 'kategorieSkladu', zdroj: 1 }, { ciselnik: 'dodavatele', zdroj: 1 }]]);
+  // kolo 61: z pozastaveného podniku se musí jít přepnout do zdravého
+  eq('blokace: přepínač podniků projde i z pozastaveného', rozhodni({ pathname: '/api/teams/switch', teamId: 1, blokovane: new Set([1]), superadmin: false }).akce, 'pustit');
+  eq('blokace: seznam podniků projde i z pozastaveného', rozhodni({ pathname: '/api/teams/mine', teamId: 1, blokovane: new Set([1]), superadmin: false }).akce, 'pustit');
+  eq('blokace: ostatní API z pozastaveného dál 423', rozhodni({ pathname: '/api/teams', teamId: 1, blokovane: new Set([1]), superadmin: false }).akce, 'api');
   eq('číselníky: kopie vznikají jen tam, kde na řádky něco ukazuje po id', CISELNIKY.filter(c => c.kopie).map(c => c.klic), ['kategorieSkladu', 'typySmen', 'kategorieNavodu']);
   // strom: 1 Nápoje → 2 Sirupy → 3 Domácí; 4 Pečivo; 5 Sirupy/Kupované
   const strom = [

@@ -13,7 +13,16 @@ import { Icon } from './Icons';
 import { okJson } from '@/lib/api';
 
 interface Podnik { teamId: number; teamName: string; role: 'employer' | 'employee' }
-interface Data { activeTeamId: number | null; teams: Podnik[]; organization: { name: string; isOwner: boolean } | null }
+interface Data { activeTeamId: number | null; teams: Podnik[]; organization: { name: string; isOwner: boolean } | null; muzuZalozit: boolean }
+
+/** Rozepsané formuláře patří ke starému podniku — po přepnutí se zahodí. Sdílí to i „Otevřít" z přehledu organizace. */
+export function uklidKonceptu() {
+  try {
+    const klice: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (k && k.startsWith('managero-koncept-')) klice.push(k); }
+    klice.forEach(k => sessionStorage.removeItem(k));
+  } catch { /* soukromý režim */ }
+}
 
 export default function PodnikSwitcher({ compact = false, canCreate = false, onOverview }: { compact?: boolean; canCreate?: boolean; onOverview?: () => void }) {
   const { update } = useSession();
@@ -23,15 +32,19 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  /** Seznam podniků se nenačetl — místo tichého zmizení tlačítko „zkusit znovu". */
+  const [chybaSeznamu, setChybaSeznamu] = useState(false);
+  const [pokus, setPokus] = useState(0);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
+    setChybaSeznamu(false);
     fetch('/api/teams/mine').then(okJson)
-      .then(d => { if (alive) setData({ activeTeamId: d.activeTeamId ?? null, teams: d.teams ?? [], organization: d.organization ?? null }); })
-      .catch(() => { /* bez seznamu se přepínač prostě neukáže */ });
+      .then(d => { if (alive) setData({ activeTeamId: d.activeTeamId ?? null, teams: d.teams ?? [], organization: d.organization ?? null, muzuZalozit: d.muzuZalozit === true }); })
+      .catch(() => { if (alive) setChybaSeznamu(true); });
     return () => { alive = false; };
-  }, []);
+  }, [pokus]);
 
   useEffect(() => {
     if (!open) return;
@@ -43,16 +56,24 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
 
   const aktivni = data?.teams.find(t => t.teamId === data.activeTeamId) ?? null;
   const vicPodniku = (data?.teams.length ?? 0) > 1;
+  // Další podnik zakládá jen vlastník toho aktivního — rozhodl server
+  // (/api/teams/mine). Manažer s rolí vedení tlačítko nevidí.
+  const mohuZalozit = canCreate && data?.muzuZalozit === true;
+  if (!data) {
+    // Bez seznamu dřív přepínač zmizel beze slova — barista se pak nemohl
+    // přepnout a nevěděl proč. Teď je tam tlačítko, které to zkusí znovu.
+    if (!chybaSeznamu) return null;
+    return (
+      <button type="button" onClick={() => setPokus(p => p + 1)} title="Seznam podniků se nenačetl — zkusit znovu"
+        className={`flex items-center gap-2 rounded-2xl text-bad-ink transition ${compact ? 'p-2 justify-center' : 'px-3 py-2 w-full text-left'} hover:bg-black/[0.05]`}>
+        <Icon name="box" size={18} className="shrink-0" />
+        {!compact && <span className="text-sm font-semibold truncate">Podniky se nenačetly · zkusit znovu</span>}
+      </button>
+    );
+  }
   // Jeden podnik a nemůžu přidat další → není co přepínat, nic nekreslit.
-  if (!data || (!vicPodniku && !canCreate)) return null;
+  if (!vicPodniku && !mohuZalozit) return null;
 
-  const uklidKonceptu = () => {
-    try {
-      const klice: string[] = [];
-      for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (k && k.startsWith('managero-koncept-')) klice.push(k); }
-      klice.forEach(k => sessionStorage.removeItem(k));
-    } catch { /* soukromý režim */ }
-  };
 
   const prepni = async (teamId: number) => {
     if (busy || teamId === data.activeTeamId) { setOpen(false); return; }
@@ -62,7 +83,9 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(d.error || 'Přepnutí se nepodařilo.'); setBusy(false); return; }
       uklidKonceptu();
-      await update();
+      // Server už přepnul; když selže obnova tokenu, načtení stránky si tým
+      // vezme z databáze samo. Hlásit „nepodařilo" by lhalo.
+      try { await update(); } catch { /* token se obnoví při načtení */ }
       window.location.href = window.location.pathname;
     } catch { setErr('Přepnutí se nepodařilo.'); setBusy(false); }
   };
@@ -76,7 +99,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(d.error || 'Podnik se nepodařilo založit.'); setBusy(false); return; }
       uklidKonceptu();
-      await update();
+      try { await update(); } catch { /* token se obnoví při načtení */ }
       window.location.href = window.location.pathname;
     } catch { setErr('Podnik se nepodařilo založit.'); setBusy(false); }
   };
@@ -117,7 +140,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, onO
               </button>
             </>
           )}
-          {canCreate && (
+          {mohuZalozit && (
             <>
               <div className="h-px bg-black/[0.06] my-1" />
               {creating ? (

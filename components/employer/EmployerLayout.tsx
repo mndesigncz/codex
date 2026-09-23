@@ -1,8 +1,10 @@
 'use client';
 
+import { useSession } from 'next-auth/react';
+
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
-import PodnikSwitcher from '../PodnikSwitcher';
+import PodnikSwitcher, { uklidKonceptu } from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary } from '../ui';
 import NotificationBell from '../NotificationBell';
@@ -152,11 +154,19 @@ export default function EmployerLayout({ user }: Props) {
   const [guideId, setGuideId] = useState<number | null>(null);
   // Z přehledu organizace do konkrétního podniku: přepnout členství na
   // serveru a načíst znovu — stejná cesta jako přepínač v hlavičce.
-  const prepniAOtevri = async (teamId: number) => {
+  // Stejná cesta jako v přepínači: koncepty starého podniku pryč, token
+  // obnovit, načíst znovu. Chyba se vrací přehledu, ať ji ukáže.
+  const { update: obnovRelaci } = useSession();
+  const prepniAOtevri = async (teamId: number): Promise<string | null> => {
     try {
       const res = await fetch('/api/teams/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId }) });
-      if (res.ok) window.location.href = '/employer/overview';
-    } catch { /* zůstane přehled */ }
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) return d?.error || 'Přepnutí se nepodařilo.';
+      uklidKonceptu();
+      try { await obnovRelaci(); } catch { /* token se obnoví při načtení */ }
+      window.location.href = '/employer/overview';
+      return null;
+    } catch { return 'Nepodařilo se spojit se serverem.'; }
   };
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
@@ -375,6 +385,10 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="menu" size={20} />
           </button>
           <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
+          {/* Přepínač podniků byl jen v bočním pásu, který na telefonu není —
+              majitel tří podniků se na mobilu nepřepnul a „Všechny podniky"
+              nenašel. S jedním podnikem se nic nekreslí. */}
+          <div className="md:hidden shrink-0"><PodnikSwitcher compact canCreate onOverview={() => setCurrentView('org')} /></div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>

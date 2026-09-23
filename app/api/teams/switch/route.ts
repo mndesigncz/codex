@@ -2,7 +2,7 @@
 // session.update(), aby si token vzal nový tým z databáze.
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, zneplatniStav } from '@/lib/auth';
 import { prepniTym } from '@/lib/tenant';
 import { audit } from '@/lib/audit';
 import { neon } from '@neondatabase/serverless';
@@ -30,6 +30,8 @@ export async function POST(req: Request) {
   } catch { /* sloupec před migrací */ }
   const cil = await prepniTym(meId, teamId);
   if (!cil) return NextResponse.json({ error: 'V tomhle podniku nejsi členem.' }, { status: 403 });
+  // getServerSession výš si stav zapamatoval s rolí ze starého podniku.
+  zneplatniStav(meId);
   audit(cil.teamId, meId, 'team.switch', 'team', cil.teamId, `Přepnuto na „${cil.teamName}"`);
   return NextResponse.json({ ok: true, teamId: cil.teamId, role: cil.role, teamName: cil.teamName });
 }

@@ -83,7 +83,7 @@ async function send({ label, to, subject, html, replyTo, attachments }: SendArgs
       to,
       subject,
       html,
-      ...(replyTo ? { reply_to: replyTo } : {}),
+      ...(replyTo ? { replyTo } : {}),
       ...(attachments ? { attachments } : {}),
     });
     if (error) {

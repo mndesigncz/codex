@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
+import PodnikSwitcher from '../PodnikSwitcher';
 import { Avatar } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { useTheme } from '../ThemeProvider';
@@ -131,6 +132,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
               {greeting}{firstName ? `, ${firstName}` : ''}
             </h1>
           </div>
+          {/* Majitel víc podniků se na telefonu přepíná tady — boční pás tu není.
+              S jedním podnikem se nic nekreslí. */}
+          <PodnikSwitcher compact onOverview={() => onOpenView('org')} />
           <button onClick={onExit}
             className="btn btn-accent btn-sm shrink-0">
             Administrace →

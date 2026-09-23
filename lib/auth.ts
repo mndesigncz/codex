@@ -9,7 +9,7 @@ import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
 import { generateJoinCode } from './team';
 import { jeSpravcePodleDb } from './superadminDb';
-import { zajistiClenstvi } from './tenant';
+import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -47,6 +47,14 @@ async function ensureEmployerTeam(userId: number, name: string, currentTeamId: n
 // role je proti třiceti dnům zanedbatelné. update() ji obchází.
 const STAV_TTL_MS = 5_000;
 const stavCache = new Map<number, { at: number; v: { role: string; teamId: number | null } | 'smazan' }>();
+/**
+ * Zahodí zapamatovaný stav — volá se tam, kde se role nebo podnik právě
+ * změnily (přepnutí podniku, změna role, odebrání člena). Bez toho by token
+ * v témž isolátu držel až 5 s roli vedení z podniku, ze kterého člověk
+ * právě odešel. Jiné isoláty dožijí svých pět vteřin; to je cena za to,
+ * že se databáze neptáme při každém požadavku dvakrát.
+ */
+export function zneplatniStav(userId: number): void { stavCache.delete(userId); }
 async function stavUzivatele(id: number, cerstve: boolean): Promise<{ role: string; teamId: number | null } | 'smazan' | null> {
   if (!Number.isFinite(id)) return 'smazan';
   const c = stavCache.get(id);
@@ -103,6 +111,16 @@ export const authOptions: NextAuthOptions = {
         // Členství v podniku (kolo 55): kdo má tým z doby před migrací, dostane
         // řádek v team_members — přepínač podniků ho jinak nevidí.
         await zajistiClenstvi(user.id, teamId, user.role);
+        // Zaměstnanec bez aktivního podniku, ale s členstvím (odebraný z jednoho
+        // podniku, pozvaný do druhého): přepne se do prvního, kde členem je.
+        // Jinak by se přihlásil do prázdna a přepínač se mu s jedním členstvím
+        // ani neukáže.
+        if (!teamId && user.role === 'employee') {
+          try {
+            const cl = await clenstviUzivatele(user.id);
+            if (cl.length) { const c = await prepniTym(user.id, cl[0].teamId); if (c) teamId = c.teamId; }
+          } catch { /* před migrací zůstane bez podniku */ }
+        }
         // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
         // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
         const superadmin = await jeSpravcePodleDb(user.id);

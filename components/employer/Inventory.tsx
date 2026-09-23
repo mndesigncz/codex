@@ -2440,14 +2440,18 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
         {err && <p className="text-xs font-medium text-bad-ink">{err}</p>}
 
-        {own.length === 0 ? (
+        {own.length === 0 ? (cizi.length > 0 ? (
+          // Bez vlastních kategorií, ale s kategoriemi z organizace: sklad
+          // prázdný není a výchozí sada by se dublovala s tou sdílenou.
+          <p className="text-sm text-black/55 py-2">Vlastní kategorie zatím nemáš — používáš kategorie z organizace níže. Vlastní přidáš nahoře.</p>
+        ) : (
           <div className="text-center space-y-3 py-4">
             <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit." compact />
             <button onClick={seedDefaults} disabled={busy} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm font-medium disabled:opacity-40">
               Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}
             </button>
           </div>
-        ) : (
+        )) : (
           <div className="divide-y divide-black/[0.06]">
             {tree.map(node => renderNode(node, tree.map(t => t.cat), 0))}
           </div>

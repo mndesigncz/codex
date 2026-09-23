@@ -22,11 +22,16 @@ export async function GET() {
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!c.teamId) return NextResponse.json([]);
 
-  const cards = await sql`
-    SELECT p.* FROM planning_cards p
-    WHERE p.team_id = ${c.teamId}
-    ORDER BY p.position ASC, p.created_at ASC`;
-  return NextResponse.json(cards);
+  try {
+    const cards = await sql`
+      SELECT p.* FROM planning_cards p
+      WHERE p.team_id = ${c.teamId}
+      ORDER BY p.position ASC, p.created_at ASC`;
+    return NextResponse.json(cards);
+  } catch {
+    // Před migrací (team_id ještě není) nebo výpadek: hláška, ne holá pětistovka.
+    return NextResponse.json({ error: 'Plánování se nepodařilo načíst. Zkuste to prosím znovu.' }, { status: 500 });
+  }
 }
 
 // POST — create a card (any team member; board UI is employer-side).

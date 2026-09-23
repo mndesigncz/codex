@@ -1800,18 +1800,36 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS guide_categories_team ON guide_categories (team_id)`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS rewards_catalog_team ON rewards_catalog (team_id)`);
 
+    // ---- Sazba a pozice v členství ----
+    // team_members.hourly_rate/job_title se plnily jen při založení členství;
+    // změny šly do users.* (zrcadlo aktivního podniku). Kde členství hodnotu
+    // nemá a zrcadlo ano, doplní se — jen NULL, nic se nepřepisuje.
+    await ddl(sql`UPDATE team_members m SET hourly_rate = u.hourly_rate FROM users u
+                  WHERE m.user_id = u.id AND m.team_id = u.team_id AND m.hourly_rate IS NULL AND u.hourly_rate IS NOT NULL`);
+    await ddl(sql`UPDATE team_members m SET job_title = u.job_title FROM users u
+                  WHERE m.user_id = u.id AND m.team_id = u.team_id AND m.job_title IS NULL AND u.job_title IS NOT NULL`);
+
     // ---- Řádky bez podniku ----
     // Sklad a uzávěrky z doby před sloupcem team_id měly podnik NULL a dotazy
     // je pouštěly k „team_id = můj OR team_id IS NULL" — tedy KAŽDÉMU podniku
     // na platformě, včetně úprav a mazání. Tým se doplní podle autora;
     // co autora nemá, pochází z doby jediného (referenčního) podniku a patří
     // nejstaršímu týmu. Potom dotazy na NULL přestanou sahat.
+    //
+    // Tohle běží každý den, ne jednou. Proto k nejstaršímu podniku smí jen
+    // řádek STARŠÍ než druhý podnik na platformě — z doby, kdy jiný podnik
+    // neexistoval. Novější řádek bez podniku (chyba zápisu) zůstane NULL
+    // a tím neviditelný; přiřadit ho cizímu podniku by byl únik dat.
     await ddl(sql`UPDATE inventory_items i SET team_id = u.team_id FROM users u
                   WHERE i.team_id IS NULL AND i.created_by = u.id AND u.team_id IS NOT NULL`);
-    await ddl(sql`UPDATE inventory_items SET team_id = (SELECT MIN(id) FROM teams) WHERE team_id IS NULL`);
+    await ddl(sql`UPDATE inventory_items SET team_id = (SELECT MIN(id) FROM teams)
+                  WHERE team_id IS NULL
+                    AND updated_at < (SELECT MIN(created_at) FROM teams WHERE id <> (SELECT MIN(id) FROM teams))`);
     await ddl(sql`UPDATE cash_closings c SET team_id = u.team_id FROM users u
                   WHERE c.team_id IS NULL AND c.created_by = u.id AND u.team_id IS NOT NULL`);
-    await ddl(sql`UPDATE cash_closings SET team_id = (SELECT MIN(id) FROM teams) WHERE team_id IS NULL`);
+    await ddl(sql`UPDATE cash_closings SET team_id = (SELECT MIN(id) FROM teams)
+                  WHERE team_id IS NULL
+                    AND created_at < (SELECT MIN(created_at) FROM teams WHERE id <> (SELECT MIN(id) FROM teams))`);
 
     // ---- Adresy s nebezpečným schématem ----
     // Web dodavatele, fotka položky, příloha v chatu a fotka účtenky se

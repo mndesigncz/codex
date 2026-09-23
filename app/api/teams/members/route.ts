@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, zneplatniStav } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
@@ -62,22 +62,53 @@ export async function PATCH(request: Request) {
     // obnovil roli vedení z team_members, kde zůstala stará.
     try { await sql`UPDATE team_members SET role = ${role} WHERE user_id = ${targetId} AND team_id = ${team.id}`; } catch { /* před migrací */ }
     await sql`UPDATE users SET role = ${role} WHERE id = ${targetId} AND team_id = ${team.id}`;
+    zneplatniStav(targetId);
   }
 
+  // Sazba a pozice platí PRO TENHLE podnik: pravda je v team_members (kolo
+  // 55), users.* je jen zrcadlo aktivního podniku. Dřív se psalo jen do
+  // zrcadla s podmínkou team_id = tenhle podnik — člen přepnutý do jiného
+  // podniku dostal „ok" a nic se nezměnilo. Když se nezapíše nikam, řekne
+  // se to, místo úspěchu nad nezměněným řádkem.
+  let zapsano = false;
   if (hourlyRate !== undefined) {
     const rate = Math.max(0, Math.round(Number(hourlyRate)) || 0);
     try {
-      await sql`UPDATE users SET hourly_rate = ${rate} WHERE id = ${targetId} AND team_id = ${team.id}`;
+      const r = await sql`UPDATE team_members SET hourly_rate = ${rate} WHERE user_id = ${targetId} AND team_id = ${team.id} RETURNING user_id`;
+      zapsano = zapsano || r.length > 0;
+    } catch { /* před migrací */ }
+    try {
+      const r = await sql`UPDATE users SET hourly_rate = ${rate} WHERE id = ${targetId} AND team_id = ${team.id} RETURNING id`;
+      zapsano = zapsano || r.length > 0;
     } catch { /* column not migrated yet */ }
   }
 
   if (jobTitle !== undefined) {
-    await sql`UPDATE users SET job_title = ${jobTitle} WHERE id = ${targetId} AND team_id = ${team.id}`;
+    try {
+      const r = await sql`UPDATE team_members SET job_title = ${jobTitle} WHERE user_id = ${targetId} AND team_id = ${team.id} RETURNING user_id`;
+      zapsano = zapsano || r.length > 0;
+    } catch { /* před migrací */ }
+    const r = await sql`UPDATE users SET job_title = ${jobTitle} WHERE id = ${targetId} AND team_id = ${team.id} RETURNING id`;
+    zapsano = zapsano || r.length > 0;
   }
 
-  const [updated] = await sql`
-    SELECT id, name, email, role, avatar, phone, job_title, shift_preference
-    FROM users WHERE id = ${targetId}`;
+  if ((hourlyRate !== undefined || jobTitle !== undefined) && !zapsano) {
+    return NextResponse.json({ error: 'Změna se neuložila — člen je právě přepnutý do jiného podniku a členství tu nemá zapsané. Ať se sem jednou přihlásí, nebo ho pozvi znovu.' }, { status: 409 });
+  }
+
+  // Vrací se pozice pro TENHLE podnik, ne z aktivního zrcadla.
+  let updated: any;
+  try {
+    [updated] = await sql`
+      SELECT u.id, u.name, u.email, COALESCE(m.role, u.role) AS role, u.avatar, u.phone,
+             COALESCE(m.job_title, u.job_title) AS job_title, u.shift_preference
+      FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${team.id}
+      WHERE u.id = ${targetId}`;
+  } catch {
+    [updated] = await sql`
+      SELECT id, name, email, role, avatar, phone, job_title, shift_preference
+      FROM users WHERE id = ${targetId}`;
+  }
 
   return NextResponse.json({ ok: true, member: updated });
 }
@@ -107,6 +138,7 @@ export async function DELETE(request: Request) {
   // Zrcadlo se nuluje jen tehdy, když byl aktivní právě tenhle podnik —
   // jiný podnik, kde člověk dál pracuje, mu nebereme. Historie zůstává.
   await sql`UPDATE users SET team_id = NULL WHERE id = ${targetId} AND team_id = ${team.id}`;
+  zneplatniStav(targetId);
   // Chat access rides on conversation_members, not on team_id — drop the rows
   // so an ex-member can't keep reading or writing in the team's conversations.
   try {
