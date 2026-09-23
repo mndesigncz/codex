@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { mzdaZaSmenu, bodyZaSmenu } from '@/lib/mzdaSmeny';
+import { jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +35,8 @@ export async function GET(req: NextRequest) {
   let employeeId = meId;
   const want = parseInt(searchParams.get('employeeId') ?? '');
   if (role === 'employer' && Number.isFinite(want) && want !== meId) {
-    const [emp] = await sql`SELECT id FROM users WHERE id = ${want} AND team_id = ${u.team_id}`;
-    if (!emp) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
+    // Kolo 62: členství nebo zrcadlo — přepnutý člen tu dřív dostal odmítnutí.
+    if (!(await jeClenem(want, Number(u.team_id)))) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
     employeeId = want;
   }
 

@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers, notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,9 +188,10 @@ export async function POST(request: Request) {
 
   if (isProposal) {
     try {
-      const employers = await sql`SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer'`;
+      // Kolo 62: vedení podle členství — provozovatel přepnutý jinam návrh uvidí.
+      const employers = await vedeniPodniku(c.teamId);
       const [author] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
-      await notifyUsers((employers as any[]).map(e => e.id), {
+      await notifyUsers(employers, {
         title: '📖 Návrh návodu ke schválení',
         body: `${author?.name ?? 'Zaměstnanec'} navrhuje návod „${String(title).trim()}".`,
         type: 'info',

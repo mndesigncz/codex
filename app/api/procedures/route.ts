@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { sanitizeSteps } from '@/lib/steps';
 import { notifyUsers } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
+import { vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,9 +127,10 @@ export async function POST(request: Request) {
 
   if (isProposal) {
     try {
-      const employers = await sql`SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+      // Kolo 62: vedení podle členství, ne zrcadla.
+      const employers = await vedeniPodniku(me.teamId);
       const [author] = await sql`SELECT name FROM users WHERE id = ${me.id}`;
-      await notifyUsers((employers as any[]).map(e => e.id), {
+      await notifyUsers(employers, {
         title: '📋 Návrh postupu ke schválení',
         body: `${author?.name ?? 'Zaměstnanec'} navrhuje postup „${name}".`,
         type: 'info',

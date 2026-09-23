@@ -7,7 +7,7 @@ import { parseSteps } from '@/lib/steps';
 import { expectedCash, cashDifference } from '@/lib/closing';
 import { computeAutoPoints, normalizePoints, PointsConfig } from '@/lib/rewardLevels';
 import { shiftSpanFor, graceSpan, shiftsOverlap, type ShiftWindow } from '@/lib/shiftWindow';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, clenovePodniku, clenPodniku, jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -228,9 +228,10 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
   const coIds = coworkerIdsFor(dayRows, employeeId, date);
   let coworkers: { id: number; name: string; avatar: string | null }[] = [];
   if (coIds.length) {
-    const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${teamId} AND role = 'employee' ORDER BY name ASC`;
-    coworkers = members.filter((m: any) => coIds.includes(m.id))
-      .map((m: any) => ({ id: m.id, name: m.name, avatar: m.avatar ?? null }));
+    // Kolegové podle členství (kolo 62): kolega přepnutý jinam se dřív neukázal.
+    const members = await clenovePodniku(teamId, { role: 'employee' });
+    coworkers = members.filter((m) => coIds.includes(m.id))
+      .map((m) => ({ id: m.id, name: m.name, avatar: m.avatar ?? null }));
   }
 
   const mark = await itemMarks(employeeId, date);
@@ -341,8 +342,10 @@ export async function GET(req: NextRequest) {
   if (!employeeIdRaw && month) {
     if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
     const from = `${month}-01`, to = `${month}-31`;
-    const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
-    const memberById = new Map(members.map((m: any) => [m.id, m]));
+    // Filtr podle členství (kolo 62): směny a uzávěrky člena přepnutého
+    // jinam se dřív v měsíčním přehledu zahodily, ač nesou team_id tohohle podniku.
+    const members = await clenovePodniku(c.teamId, { role: 'employee' });
+    const memberById = new Map(members.map((m) => [m.id, m]));
 
     let shiftRows: any[] = [], closingRows: any[] = [], reviewRows: any[] = [];
     try {
@@ -401,7 +404,8 @@ export async function GET(req: NextRequest) {
 
   // ---- Roster mode (no employeeId): who worked that day and who's been rated. ----
   if (!employeeIdRaw) {
-    const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name`;
+    // Soupiska podle členství (kolo 62): člen přepnutý jinam má směnu tady, ale chyběl.
+    const members = await clenovePodniku(c.teamId, { role: 'employee' });
     let reviews: any[] = [];
     try {
       reviews = await sql`SELECT employee_id, rating, points, flagged FROM shift_reviews WHERE team_id = ${c.teamId} AND work_date = ${date}`;
@@ -456,8 +460,9 @@ export async function GET(req: NextRequest) {
   if (c.role === 'kiosk') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
   const employeeId = parseInt(employeeIdRaw);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Neplatný zaměstnanec' }, { status: 400 });
-  const [emp] = await sql`SELECT id, name, avatar, team_id FROM users WHERE id = ${employeeId}`;
-  if (!emp || emp.team_id !== c.teamId) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
+  // Členství, ne zrcadlo (kolo 62).
+  const emp = await clenPodniku(employeeId, c.teamId);
+  if (!emp) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
 
   const pt = await teamPoints(c.teamId);
   return NextResponse.json(await buildSummary(c.teamId, emp, date, pt));
@@ -478,8 +483,9 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(employeeId) || !isDate(date)) {
     return NextResponse.json({ error: 'Chybí zaměstnanec nebo datum' }, { status: 400 });
   }
-  const [emp] = await sql`SELECT id, name, avatar, team_id FROM users WHERE id = ${employeeId}`;
-  if (!emp || emp.team_id !== c.teamId) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
+  // Členství, ne zrcadlo (kolo 62).
+  const emp = await clenPodniku(employeeId, c.teamId);
+  if (!emp) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
 
   const rating = Math.max(0, Math.min(5, Math.round(Number(b.rating) || 0)));
   const note = b.note ? String(b.note).slice(0, 1000) : null;
@@ -499,8 +505,9 @@ export async function POST(req: NextRequest) {
   let targets: any[] = [{ id: emp.id, name: emp.name, avatar: emp.avatar }];
   if (targetIds.length > 1) {
     // Only teammates survive the filter, so a stray id can never be rated.
-    const members = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
-    targets = members.filter((m: any) => targetIds.includes(m.id));
+    // Podle členství (kolo 62): kolega přepnutý jinam dřív z hromadného hodnocení vypadl.
+    const members = await clenovePodniku(c.teamId, { role: 'employee' });
+    targets = members.filter((m) => targetIds.includes(m.id));
     if (!targets.some((t: any) => t.id === emp.id)) targets.unshift({ id: emp.id, name: emp.name, avatar: emp.avatar });
   }
 
@@ -578,8 +585,8 @@ export async function PATCH(req: NextRequest) {
   let itemSaved = false;
   const saveItem = async () => {
     if (!wantsItem || !Number.isFinite(itemEmployeeId) || !isDate(itemDate)) return;
-    const [target] = await sql`SELECT id, team_id FROM users WHERE id = ${itemEmployeeId}`;
-    if (!target || target.team_id !== c.teamId) return;
+    // Členství, ne zrcadlo (kolo 62): body k položce se u člena přepnutého jinam tiše neukládaly.
+    if (!(await jeClenem(itemEmployeeId, c.teamId!))) return;
     let existing: any = null;
     try {
       const [r] = await sql`
@@ -601,11 +608,16 @@ export async function PATCH(req: NextRequest) {
   };
 
   if (kind === 'task') {
+    // Úkol bez team_id (před kolem 55) se pozná podle přiřazeného člověka —
+    // členstvím NEBO zrcadlem (kolo 62), ne jen zrcadlem.
     const [t] = await sql`
-      SELECT t.id, t.team_id, u.team_id AS assignee_team FROM tasks t
+      SELECT t.id, t.team_id,
+             (EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = t.assigned_to AND m.team_id = ${c.teamId})
+              OR u.team_id = ${c.teamId}) AS assignee_in_team
+      FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to WHERE t.id = ${id}`;
-    const taskTeam = t?.team_id ?? t?.assignee_team;
-    if (!t || taskTeam !== c.teamId) return NextResponse.json({ error: 'Úkol nenalezen' }, { status: 404 });
+    const taskOk = t && (t.team_id != null ? Number(t.team_id) === c.teamId : t.assignee_in_team === true);
+    if (!taskOk) return NextResponse.json({ error: 'Úkol nenalezen' }, { status: 404 });
     if (Array.isArray(b.checklist)) {
       const cl = b.checklist.map((i: any) => ({ text: String(i?.text ?? '').slice(0, 300), done: !!i?.done }))
         .filter((i: any) => i.text).slice(0, 50);

@@ -11,7 +11,7 @@ import { audit } from '@/lib/audit';
 import { pointsAvailableFor } from '@/lib/pointsBalance';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueToday } from '@/lib/pragueTime';
-import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
+import { ciselnikPodniku, tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,8 +119,9 @@ export async function POST(req: NextRequest) {
     VALUES (${u.team_id}, ${u.id}, ${rewardId}, ${reward.title}, ${reward.cost})
     RETURNING *`;
   try {
-    const employers = await sql`SELECT id FROM users WHERE team_id = ${u.team_id} AND role = 'employer'`;
-    await notifyUsers((employers as any[]).map(e => e.id), {
+    // Kolo 62: vedení podle členství, ne zrcadla.
+    const employers = await vedeniPodniku(u.team_id);
+    await notifyUsers(employers, {
       title: '🎁 Žádost o odměnu',
       body: `${u.name ?? 'Zaměstnanec'} chce vyměnit ${reward.cost} bodů za „${reward.title}".`,
       type: 'info',

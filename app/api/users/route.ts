@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { pridejClenstvi, pocetClenu } from '@/lib/tenant';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -25,11 +26,17 @@ export async function GET() {
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!c.teamId) return NextResponse.json([]);
 
+  // Členství NEBO zrcadlo (kolo 62): výběry lidí (rozvrh, docházka) dřív
+  // neviděly člena přepnutého do jiného podniku. Vlastní JOIN kvůli
+  // createdAt, které helper nevrací; tablet tu záměrně zůstává (jde přes
+  // zrcadlo). Role a pozice jsou z členství v TOMHLE podniku.
   const rows = await sql`
-    SELECT id, name, email, role, avatar, phone,
-           job_title AS "jobTitle", shift_preference AS "shiftPreference", created_at AS "createdAt"
-    FROM users WHERE team_id = ${c.teamId}
-    ORDER BY role DESC, name ASC`;
+    SELECT u.id, u.name, u.email, COALESCE(m.role, u.role) AS role, u.avatar, u.phone,
+           COALESCE(m.job_title, u.job_title) AS "jobTitle", u.shift_preference AS "shiftPreference", u.created_at AS "createdAt"
+    FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${c.teamId}
+    WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
+      AND COALESCE(m.role, u.role) IN ('employer', 'employee', 'kiosk')
+    ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
   return NextResponse.json(rows);
 }
 
@@ -44,9 +51,8 @@ export async function POST(req: NextRequest) {
   // side door around the Free plan's team size.
   try {
     const [row] = await sql`SELECT plan, plan_override, trial_ends_at FROM teams WHERE id = ${c.teamId}`;
-    const [cnt] = await sql`
-      SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${c.teamId} AND role <> 'kiosk'`;
-    if (!canAddMember(planInfoOf(row), Number(cnt?.n) || 0)) {
+    // Stejné počítání jako u pozvánek: členství NEBO zrcadlo (kolo 62).
+    if (!canAddMember(planInfoOf(row), await pocetClenu(c.teamId))) {
       return NextResponse.json({ error: MEMBER_LIMIT_MSG }, { status: 403 });
     }
   } catch { /* plan columns not migrated — no limit */ }
@@ -67,6 +73,9 @@ export async function POST(req: NextRequest) {
     VALUES (${name}, ${email}, ${passwordHash}, 'employee', ${avatar ?? '👤'}, ${phone ?? null},
             ${jobTitle ?? 'Barista'}, ${c.meId}, ${c.teamId})
     RETURNING id, name, email`;
+  // Členství hned při založení — ne až při prvním přihlášení (kolo 62):
+  // sazbu, kterou vedení nastaví ještě před ním, má členství nést.
+  try { await pridejClenstvi(Number(newUser.id), Number(c.teamId), 'employee', { jobTitle: jobTitle ?? 'Barista' }); } catch { /* před migrací */ }
 
   // Účet vznikl, ať e-mail dopadne jakkoli — ale jestli přístupové údaje
   // odešly, se nesmí jen předpokládat. Bez nich se člověk nepřihlásí.

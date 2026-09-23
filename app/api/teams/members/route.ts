@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, zneplatniStav } from '@/lib/auth';
+import { jeClenem } from '@/lib/tenant';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
@@ -22,17 +23,9 @@ async function ownedTeam(employerId: number) {
   return team ?? null;
 }
 
-// Je člověk členem tohoto podniku? Pravda je v team_members (kolo 55);
-// users.team_id je jen zrcadlo AKTIVNÍHO podniku. Kdo je zrovna přepnutý
-// jinam, je pořád člen — a musí jít upravit i odebrat.
-async function jeClen(userId: number, teamId: number): Promise<boolean> {
-  try {
-    const [m] = await sql`SELECT 1 FROM team_members WHERE user_id = ${userId} AND team_id = ${teamId}`;
-    if (m) return true;
-  } catch { /* team_members před migrací */ }
-  const [u] = await sql`SELECT 1 FROM users WHERE id = ${userId} AND team_id = ${teamId}`;
-  return !!u;
-}
+// Kdo je zrovna přepnutý jinam, je pořád člen — a musí jít upravit i
+// odebrat. Členství NEBO zrcadlo řeší jedno místo v lib/tenant (kolo 62).
+const jeClen = (userId: number, teamId: number) => jeClenem(userId, teamId);
 
 export async function PATCH(request: Request) {
   const me = await currentEmployer();

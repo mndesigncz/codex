@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,8 +69,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
     }
     if (c.role === 'employer') {
-      const [target] = await sql`SELECT team_id FROM users WHERE id = ${employeeId}`;
-      if (!target || target.team_id !== c.teamId) return NextResponse.json([]);
+      // Členství, ne zrcadlo (kolo 62): směny člena přepnutého jinam nesou team_id tohohle podniku.
+      if (!c.teamId || !(await jeClenem(employeeId, c.teamId))) return NextResponse.json([]);
     }
     const resolve = await typeResolver(c.teamId);
     // Filtr týmu: člověk ve dvou podnicích má směny v obou a vedení A nemá
@@ -140,8 +140,8 @@ export async function POST(req: NextRequest) {
   const employeeId = parseInt(b.employeeId);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Chybí zaměstnanec' }, { status: 400 });
 
-  const [target] = await sql`SELECT team_id FROM users WHERE id = ${employeeId}`;
-  if (!target || target.team_id !== c.teamId) {
+  // Členství, ne zrcadlo (kolo 62); tablet směnu nedostane.
+  if (!c.teamId || !(await jeClenem(employeeId, c.teamId))) {
     return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
   }
 

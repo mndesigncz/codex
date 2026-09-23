@@ -13,7 +13,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { prefAllowsSlot, dayPrefLabel, isRestrictingPref, type PrefType } from '@/lib/dayPrefs';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, clenovePodniku, clenPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +81,9 @@ export async function POST(req: Request) {
       } else if (ch.action === 'reassign') {
         const toId = parseInt(ch?.toEmployeeId);
         if (!Number.isFinite(toId)) continue;
-        const [emp] = await sql`SELECT id, name FROM users WHERE id = ${toId} AND team_id = ${c.teamId}`;
+        // Stejné členství jako náhled níž (kolo 62) — jinak by se potvrzený
+        // návrh na člena přepnutého jinam tiše přeskočil.
+        const emp = await clenPodniku(toId, c.teamId);
         if (!emp) continue;
         await sql`UPDATE shifts SET employee_id = ${toId} WHERE id = ${shiftId}`;
         applied++;
@@ -104,9 +106,9 @@ export async function POST(req: Request) {
   }
 
   // ---- Preview: find clashes and propose fixes. ----
-  const employees = await sql`
-    SELECT id, name, avatar FROM users
-    WHERE team_id = ${c.teamId} AND role IN ('employee', 'employer') ORDER BY name ASC`;
+  // Kandidáti podle členství (kolo 62): držitel směny přepnutý do jiného
+  // podniku dřív v `people` chyběl a jeho kolize se vůbec neřešila.
+  const employees = await clenovePodniku(c.teamId, { role: 'lide' });
   const shifts = await sql`
     SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time, s.type
     FROM shifts s JOIN users u ON u.id = s.employee_id
@@ -162,7 +164,8 @@ export async function POST(req: Request) {
   const personalMax = new Map<number, number | null>();
   const personalHours = new Map<number, number | null>();
   try {
-    const rows = await sql`SELECT id, max_consecutive_days, max_month_hours FROM users WHERE team_id = ${c.teamId}`;
+    // Limity jsou sloupce users (na člověka), proto podle id členů, ne podle zrcadla.
+    const rows = await sql`SELECT id, max_consecutive_days, max_month_hours FROM users WHERE id = ANY(${employees.map(e => e.id)})`;
     rows.forEach((r: any) => {
       personalMax.set(r.id, r.max_consecutive_days ?? null);
       personalHours.set(r.id, r.max_month_hours ?? null);
@@ -201,10 +204,10 @@ export async function POST(req: Request) {
     workedDates: Set<string>; monthShifts: number; monthHours: number;
   }
   const people = new Map<number, P>();
-  for (const u of employees as any[]) {
+  for (const u of employees) {
     const a = availByEmp.get(u.id);
     people.set(u.id, {
-      id: u.id, name: u.name, avatar: u.avatar ?? '👤',
+      id: u.id, name: u.name, avatar: u.avatar,
       unavailable: new Set<string>([...(a?.unavailable_dates ?? []), ...Array.from(timeOffByEmp.get(u.id) ?? [])]),
       dayPrefs: (a?.day_preferences ?? {}) as Record<string, string>,
       preferredShift: a?.preferred_shift ?? null,

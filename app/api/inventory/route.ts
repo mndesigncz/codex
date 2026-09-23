@@ -8,7 +8,7 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { webovaUrl, souborUrl } from '@/lib/bezpecnaUrl';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -267,11 +267,12 @@ export async function POST(request: Request) {
   if (isProposal) {
     try {
       await sql`UPDATE inventory_items SET approved = FALSE, submitted_by = ${authorId} WHERE id = ${item.id}`;
-      const employers = await sql`SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+      // Kolo 62: vedení podle členství, ne zrcadla.
+      const employers = await vedeniPodniku(me.teamId);
       const [author] = await sql`SELECT name FROM users WHERE id = ${authorId}`;
       const who = author?.name ?? (me.role === 'kiosk' ? 'Někdo na iPadu' : 'Zaměstnanec');
       const howMuch = quantity > 0 ? ` · ${quantity} ${unit}` : '';
-      await notifyUsers((employers as any[]).map(e => e.id), {
+      await notifyUsers(employers, {
         title: '📦 Nová věc ve skladu ke schválení',
         body: `${who} zapsal/a „${name}"${howMuch}. Zkontroluj a potvrď.`,
         type: 'info',

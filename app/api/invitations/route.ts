@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { generateInviteToken } from '@/lib/team';
 import { sendTeamInvitation } from '@/lib/email';
-import { smiPridatClena } from '@/lib/tenant';
+import { smiPridatClena, pocetClenu } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,8 +129,7 @@ async function memberLimitHit(sql: any, teamId: number): Promise<boolean> {
     plan = planInfoOf(row);
   } catch { return false; }
   if (plan.effective === 'pro') return false;
-  try {
-    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${teamId} AND role <> 'kiosk'`;
-    return !canAddMember(plan, Number(n) || 0);
-  } catch { return false; }
+  // Počítají se členové (členství NEBO zrcadlo) — i ti právě přepnutí do
+  // jiného podniku, jinak se limit obešel přepnutím (kolo 62).
+  try { return !canAddMember(plan, await pocetClenu(teamId)); } catch { return false; }
 }

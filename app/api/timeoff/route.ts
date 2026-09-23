@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
+import { vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,10 +69,10 @@ export async function POST(req: NextRequest) {
     VALUES (${c.teamId}, ${c.meId}, ${from}, ${to}, ${type}, ${b.note || null})
     RETURNING *`;
 
+  // Vedení podle členství (kolo 62): vedoucí přepnutý jinam žádost jinak neuvidí.
   try {
-    const employers = await sql`
-      SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${c.meId}`;
-    await notifyUsers(employers.map((e: any) => e.id), {
+    const employers = await vedeniPodniku(c.teamId, { krome: c.meId });
+    await notifyUsers(employers, {
       title: 'Žádost o volno',
       body: `${c.name}: ${from === to ? from : `${from} až ${to}`}`,
       type: 'info',

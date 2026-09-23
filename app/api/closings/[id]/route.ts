@@ -54,10 +54,40 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   // vedení. Zaměstnanci se vrací jeho vlastní uzávěrka a nic navíc.
   const full = role === 'employer';
 
+  // --- plánovaná směna a kdo měl ten den službu (surové řádky) ---
+  let plannedRows: any[] = [];
+  if (full) try {
+    plannedRows = await sql`
+      SELECT s.employee_id, s.start_time, s.end_time, s.type, s.auto_created
+      FROM shifts s WHERE s.team_id = ${teamId} AND s.date = ${day}
+      ORDER BY s.start_time` as any[];
+  } catch { /* nepodstatné */ }
+
+  // --- docházka: kdo byl doopravdy odpíchnutý (surové řádky) ---
+  // Obchodní den končí po půlnoci, takže se berou i záznamy z noci na další den.
+  let attendanceRows: any[] = [];
+  if (full) try {
+    attendanceRows = await sql`
+      SELECT te.id, te.employee_id, te.clock_in, te.clock_out, te.source, te.note
+      FROM time_entries te
+      WHERE te.team_id = ${teamId}
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${day}
+      ORDER BY te.clock_in` as any[];
+  } catch { /* nepodstatné */ }
+
   // --- lidé: kdo na směně byl a kdo uzávěrku pokrývá ---
+  // Kolo 62: jména se berou z id v samotné uzávěrce, směnách a docházce, ne
+  // ze seznamu členů podniku — člen přepnutý jinam (nebo bývalý) by z osádky
+  // historického dne vypadl. Přístup k řádkům už hlídá cc.team_id výš.
   const people = new Map<number, { id: number; name: string; avatar: string | null }>();
+  const ids = new Set<number>();
+  const pridej = (v: any) => { const n = Number(v); if (Number.isFinite(n) && n > 0) ids.add(n); };
+  pridej(c.created_by);
+  for (const x of (Array.isArray(c.shift_employees) ? c.shift_employees : [])) pridej(x);
+  for (const s of plannedRows) pridej(s.employee_id);
+  for (const t of attendanceRows) pridej(t.employee_id);
   try {
-    for (const p of await sql`SELECT id, name, avatar FROM users WHERE team_id = ${teamId}` as any[]) {
+    if (ids.size) for (const p of await sql`SELECT id, name, avatar FROM users WHERE id = ANY(${[...ids]})` as any[]) {
       people.set(p.id, { id: p.id, name: p.name, avatar: p.avatar ?? null });
     }
   } catch { /* nepodstatné */ }
@@ -82,35 +112,18 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       }));
   } catch { /* sloupec ještě není */ }
 
-  // --- plánovaná směna a kdo měl ten den službu ---
-  let planned: any[] = [];
-  if (full) try {
-    planned = (await sql`
-      SELECT s.employee_id, s.start_time, s.end_time, s.type, s.auto_created
-      FROM shifts s WHERE s.team_id = ${teamId} AND s.date = ${day}
-      ORDER BY s.start_time` as any[]).map(s => ({
-        employee: person(s.employee_id), startTime: s.start_time, endTime: s.end_time,
-        type: s.type, autoCreated: !!s.auto_created,
-      }));
-  } catch { /* nepodstatné */ }
+  const planned: any[] = plannedRows.map(s => ({
+    employee: person(s.employee_id), startTime: s.start_time, endTime: s.end_time,
+    type: s.type, autoCreated: !!s.auto_created,
+  }));
 
-  // --- docházka: kdo byl doopravdy odpíchnutý ---
-  // Obchodní den končí po půlnoci, takže se berou i záznamy z noci na další den.
-  let attendance: any[] = [];
-  if (full) try {
-    attendance = (await sql`
-      SELECT te.id, te.employee_id, te.clock_in, te.clock_out, te.source, te.note
-      FROM time_entries te
-      WHERE te.team_id = ${teamId}
-        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${day}
-      ORDER BY te.clock_in` as any[]).map(t => ({
-        id: t.id, employee: person(t.employee_id),
-        clockIn: t.clock_in, clockOut: t.clock_out, source: t.source, note: t.note,
-        minutes: t.clock_out
-          ? Math.max(0, Math.round((new Date(t.clock_out).getTime() - new Date(t.clock_in).getTime()) / 60000))
-          : null,
-      }));
-  } catch { /* nepodstatné */ }
+  const attendance: any[] = attendanceRows.map(t => ({
+    id: t.id, employee: person(t.employee_id),
+    clockIn: t.clock_in, clockOut: t.clock_out, source: t.source, note: t.note,
+    minutes: t.clock_out
+      ? Math.max(0, Math.round((new Date(t.clock_out).getTime() - new Date(t.clock_in).getTime()) / 60000))
+      : null,
+  }));
 
   // --- postupy dokončené ten den ---
   let procedures: any[] = [];

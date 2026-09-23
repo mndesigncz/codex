@@ -4,7 +4,7 @@ import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, idClenu } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,9 +112,8 @@ export async function POST(req: Request) {
   // Kdo z týmu smí dostat směnu — načteno jednou. Bez téhle kontroly by šlo
   // uhádnutým employeeId založit směnu cizímu uživateli (jeho jméno pak uniká
   // do rozvrhu týmu A a oběti se objeví fantomová směna v jejím rozvrhu/docházce).
-  const memberIds = new Set(
-    ((await sql`SELECT id FROM users WHERE team_id = ${ctx.teamId}`) as any[]).map(u => u.id),
-  );
+  // Podle členství (kolo 62), ať člen přepnutý jinam není tiše přeskočen.
+  const memberIds = new Set(await idClenu(ctx.teamId));
 
   let inserted = 0;
   for (const s of list) {

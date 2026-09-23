@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos, resolveEventMenu } from '@/lib/events';
+import { clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,8 +54,10 @@ function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; clos
 }
 
 async function teamPeople(teamId: number) {
-  const rows = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${teamId} AND role <> 'kiosk'`;
-  return new Map((rows as any[]).map(r => [Number(r.id), { id: Number(r.id), name: r.name, avatar: r.avatar ?? '👤' }]));
+  // Kolo 62: obsluha podle členství — člen přepnutý jinam by se v akci
+  // ukázal jako „Neznámý".
+  const rows = await clenovePodniku(teamId, { role: 'lide' });
+  return new Map(rows.map(r => [r.id, { id: r.id, name: r.name, avatar: r.avatar }]));
 }
 
 export async function GET() {

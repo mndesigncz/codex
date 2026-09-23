@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos } from '@/lib/events';
+import { clenovePodniku, idClenu } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,9 +105,11 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     const removed = prev.filter(x => !next.includes(x));
     const start = ev.start_time ?? '18:00';
     const end = ev.end_time ?? '22:00';
+    // Kolo 62: obsluha akce podle členství — člen přepnutý do jiného podniku
+    // by se jinak tiše přeskočil a směnu na akci nedostal.
+    const clenove = new Set(added.length ? await idClenu(u.team_id) : []);
     for (const empId of added) {
-      const [member] = await sql`SELECT id FROM users WHERE id = ${empId} AND team_id = ${u.team_id}`;
-      if (!member) continue;
+      if (!clenove.has(Number(empId))) continue;
       try {
         await sql`
           INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, event_id)
@@ -233,10 +236,10 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
 
   // ---- publish: tell the whole team ----
   if (b.publishToTeam === true) {
-    const members = await sql`
-      SELECT id, role FROM users WHERE team_id = ${u.team_id} AND id <> ${u.id} AND role <> 'kiosk'`;
-    const ees = (members as any[]).filter(m => m.role !== 'employer').map(m => m.id);
-    const emp = (members as any[]).filter(m => m.role === 'employer').map(m => m.id);
+    // Kolo 62: celý tým = členství, role pro volbu odkazu z TOHOTO podniku.
+    const members = await clenovePodniku(u.team_id, { role: 'lide', krome: u.id });
+    const ees = members.filter(m => m.role !== 'employer').map(m => m.id);
+    const emp = members.filter(m => m.role === 'employer').map(m => m.id);
     const body = `${new Date(ev.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}${ev.start_time ? ` od ${ev.start_time}` : ''}${ev.location ? ` · ${ev.location}` : ''}`;
     if (ees.length) await notifyUsers(ees, { title: `📅 ${ev.title}`, body, type: 'info', link: '/employee/shifts' }).catch(() => {});
     if (emp.length) await notifyUsers(emp, { title: `📅 ${ev.title}`, body, type: 'info', link: '/employer/overview?view=events' }).catch(() => {});

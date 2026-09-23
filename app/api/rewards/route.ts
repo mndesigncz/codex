@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
 import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
 import { pragueToday } from '@/lib/pragueTime';
+import { clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,13 +99,14 @@ export async function GET() {
   const points = normalizePoints(pointsRaw);
 
   if (c.role === 'employer' || c.role === 'kiosk') {
-    const members = await sql`
-      SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
+    // Kolo 62: žebříček podle členství — zaměstnanec přepnutý jinam má v tomhle
+    // podniku body, tak v něm musí zůstat i v pořadí.
+    const members = await clenovePodniku(c.teamId, { role: 'employee' });
     // Dřív 6 dotazů na každého člena (N+1). Teď dvě dávkové sady GROUP BY.
-    const memberIds = (members as any[]).map(m => m.id);
+    const memberIds = members.map(m => m.id);
     const breakdowns = await breakdownForTeam(c.teamId, memberIds);
     const pendings = await pendingForTeam(memberIds);
-    const standings = (members as any[]).map(m => {
+    const standings = members.map(m => {
       const b = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
       const total = totalPoints(b, points);
       const st = standingForPoints(levels, total);

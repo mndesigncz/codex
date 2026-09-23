@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
+import { idClenu, vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,11 +73,11 @@ export async function POST(req: NextRequest) {
     VALUES (${c.teamId}, ${shiftId}, ${c.meId}, ${note})
     RETURNING id`;
 
-  // Let colleagues know a shift is up for grabs.
+  // Kolegové podle členství (kolo 62): i ten, kdo je zrovna přepnutý jinam,
+  // má o volné směně vědět.
   try {
-    const mates = await sql`
-      SELECT id FROM users WHERE team_id = ${c.teamId} AND role IN ('employee','employer') AND id <> ${c.meId}`;
-    await notifyUsers(mates.map((m: any) => m.id), {
+    const mates = await idClenu(c.teamId, { role: 'lide', krome: c.meId });
+    await notifyUsers(mates, {
       title: '🔄 Volná směna v burze',
       body: `${c.name ?? 'Kolega'} nabízí směnu ${shift.date}. Vezmi si ji, pokud můžeš.`,
       type: 'shift', category: 'shift', link: '/employee/shifts?view=availability',
@@ -113,8 +114,9 @@ export async function PATCH(req: NextRequest) {
         body: `${c.name ?? 'Kolega'} si chce vzít směnu ${o.date}. Čeká na schválení vedení.`,
         type: 'shift', category: 'shift', link: '/employee/shifts?view=availability',
       });
-      const employers = await sql`SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer'`;
-      await notifyUsers(employers.map((e: any) => e.id), {
+      // Vedení podle členství (kolo 62), ať schválení nečeká na vedoucího přepnutého jinam.
+      const employers = await vedeniPodniku(c.teamId);
+      await notifyUsers(employers, {
         title: '🔄 Výměna směny ke schválení',
         body: `${c.name ?? 'Kolega'} si bere směnu ${o.date} — schval ji ve Směnách.`,
         type: 'shift', category: 'shift', link: '/employer/overview?view=shifts',

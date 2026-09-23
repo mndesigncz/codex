@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { prefAllowsSlot, dayPrefLabel, type PrefType } from '@/lib/dayPrefs';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, idClenu } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,12 +118,14 @@ export async function POST(req: Request) {
         DELETE FROM shifts
         WHERE team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}`;
     }
+    // Členství jednou před cyklem (kolo 62) — stejná množina lidí, ze které
+    // vzešel náhled, jinak se směny člena přepnutého jinam tiše zahodí.
+    const clenove = new Set(await idClenu(ctx.teamId));
     let inserted = 0;
     for (const s of list) {
       const employeeId = parseInt(s.employeeId);
       if (!employeeId || !s.date || !s.startTime || !s.endTime) continue;
-      const [emp] = await sql`SELECT id FROM users WHERE id = ${employeeId} AND team_id = ${ctx.teamId}`;
-      if (!emp) continue;
+      if (!clenove.has(employeeId)) continue;
       await sql`
         INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
         VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${s.startTime}, ${s.endTime}, ${s.type ?? 'flexible'})`;
@@ -135,17 +137,22 @@ export async function POST(req: Request) {
   // ---- Preview path: run the algorithm ----
   // Employees always; employers only when they submitted availability for
   // the month (i.e. they want to be scheduled too).
+  // Členství NEBO zrcadlo a role z členství (kolo 62): člen přepnutý do
+  // jiného podniku dřív z rozvrhu úplně vypadl. Dostupnost jen z TOHOHLE
+  // podniku — vedoucí dvou podniků, který ji zadal jen v B, se v A neplánuje.
   const employeeRows = await sql`
     SELECT u.id, u.name, u.avatar FROM users u
-    WHERE u.team_id = ${ctx.teamId} AND (
-      u.role = 'employee' OR (
-        u.role = 'employer' AND EXISTS (
+    LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${ctx.teamId}
+    WHERE (m.user_id IS NOT NULL OR u.team_id = ${ctx.teamId}) AND (
+      COALESCE(m.role, u.role) = 'employee' OR (
+        COALESCE(m.role, u.role) = 'employer' AND EXISTS (
           SELECT 1 FROM availability_requests a
-          WHERE a.employee_id = u.id AND a.month = ${month}
+          WHERE a.employee_id = u.id AND a.month = ${month} AND a.team_id = ${ctx.teamId}
         )
       )
     )
     ORDER BY u.name ASC`;
+  const employeeIds = (employeeRows as any[]).map(r => Number(r.id));
   const availRows = await sql`
     SELECT employee_id, unavailable_dates, day_preferences, preferred_shift, max_shifts
     FROM availability_requests WHERE team_id = ${ctx.teamId} AND month = ${month}`;
@@ -213,9 +220,10 @@ export async function POST(req: Request) {
   const personalMax = new Map<number, number | null>();
   const personalHours = new Map<number, number | null>();
   const splitOk = new Map<number, boolean>();
+  // Limity jsou sloupce users (na člověka), proto podle id osazenstva, ne podle zrcadla.
   try {
     const rows = await sql`
-      SELECT id, max_consecutive_days, max_month_hours, split_shifts_ok FROM users WHERE team_id = ${ctx.teamId}`;
+      SELECT id, max_consecutive_days, max_month_hours, split_shifts_ok FROM users WHERE id = ANY(${employeeIds})`;
     rows.forEach((r: any) => {
       personalMax.set(r.id, r.max_consecutive_days ?? null);
       personalHours.set(r.id, r.max_month_hours ?? null);
@@ -224,7 +232,7 @@ export async function POST(req: Request) {
   } catch {
     try {
       const rows = await sql`
-        SELECT id, max_consecutive_days FROM users WHERE team_id = ${ctx.teamId}`;
+        SELECT id, max_consecutive_days FROM users WHERE id = ANY(${employeeIds})`;
       rows.forEach((r: any) => personalMax.set(r.id, r.max_consecutive_days ?? null));
     } catch { /* not migrated yet */ }
   }

@@ -201,9 +201,15 @@ export async function GET(req: NextRequest) {
   // ---- Wages from attendance × hourly rates (the payroll view of labour). ----
   let wagesWorked = 0;
   try {
+    // Sazba z členství v podniku ZÁZNAMU, ne ze zrcadla (kolo 62): člen
+    // přepnutý jinam by měl mzdu z cizí sazby nebo 0. Stejný výraz jako
+    // Přehled organizace, ať dají totéž číslo.
     const entries = await sql`
-      SELECT te.clock_in, te.clock_out, us.hourly_rate FROM time_entries te
+      SELECT te.clock_in, te.clock_out,
+             CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(us.hourly_rate, 0) END AS hourly_rate
+      FROM time_entries te
       JOIN users us ON us.id = te.employee_id
+      LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id
       WHERE te.team_id = ${u.team_id} AND te.clock_out IS NOT NULL
         AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}`;
     // Jedno pravidlo pro celou aplikaci — viz lib/wages.

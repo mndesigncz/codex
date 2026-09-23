@@ -25,19 +25,22 @@ export async function GET(req: NextRequest) {
 
   // A closing covers the whole shift, so someone already listed in an existing
   // closing's shift_employees is done too — not just its author.
+  // Kolo 62: kolega je ten, kdo má v podniku členství NEBO zrcadlo, a jeho
+  // směna se hledá jen v tomhle podniku — jinak by „měl směnu" podle podniku B.
   try {
     const rows = await sql`
       SELECT u.id, u.name, u.avatar,
              sh.start_time AS "startTime", sh.end_time AS "endTime",
              (sh.id IS NOT NULL) AS "hadShift"
       FROM users u
+      LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${teamId}
       LEFT JOIN LATERAL (
         SELECT id, start_time, end_time FROM shifts
-        WHERE employee_id = u.id AND date = ${date}
+        WHERE employee_id = u.id AND date = ${date} AND team_id = ${teamId}
         ORDER BY start_time ASC LIMIT 1
       ) sh ON TRUE
-      WHERE u.team_id = ${teamId}
-        AND u.role IN ('employee','employer')
+      WHERE (m.user_id IS NOT NULL OR u.team_id = ${teamId})
+        AND COALESCE(m.role, u.role) IN ('employee','employer')
         AND u.id <> ${exclude}
         AND NOT EXISTS (
           SELECT 1 FROM cash_closings cc
@@ -54,13 +57,14 @@ export async function GET(req: NextRequest) {
                sh.start_time AS "startTime", sh.end_time AS "endTime",
                (sh.id IS NOT NULL) AS "hadShift"
         FROM users u
+        LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${teamId}
         LEFT JOIN LATERAL (
           SELECT id, start_time, end_time FROM shifts
-          WHERE employee_id = u.id AND date = ${date}
+          WHERE employee_id = u.id AND date = ${date} AND team_id = ${teamId}
           ORDER BY start_time ASC LIMIT 1
         ) sh ON TRUE
-        WHERE u.team_id = ${teamId}
-          AND u.role IN ('employee','employer')
+        WHERE (m.user_id IS NOT NULL OR u.team_id = ${teamId})
+          AND COALESCE(m.role, u.role) IN ('employee','employer')
           AND u.id <> ${exclude}
           AND NOT EXISTS (
             SELECT 1 FROM cash_closings cc

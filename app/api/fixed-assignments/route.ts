@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,8 +67,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Neplatná data' }, { status: 400 });
   }
 
-  const [emp] = await sql`SELECT id FROM users WHERE id = ${employeeId} AND team_id = ${ctx.teamId}`;
-  if (!emp) return NextResponse.json({ error: 'Zaměstnanec není v týmu' }, { status: 400 });
+  // Členství, ne zrcadlo (kolo 62); tablet pevný den nedostane.
+  if (!(await jeClenem(employeeId, ctx.teamId))) return NextResponse.json({ error: 'Zaměstnanec není v týmu' }, { status: 400 });
 
   if (shiftTypeId != null) {
     // Pevný den je řádek podniku, ale smí ukázat i na typ ze zdrojového

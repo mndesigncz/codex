@@ -9,7 +9,7 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { ensureProductionTasks } from '@/lib/production';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
 
 // Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
 // úkol „vyrobit“, doplněný ho zavře, chybějící suroviny dostanou vlajku do nákupu.
@@ -210,11 +210,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       : (size > 0 ? next.quantity + (next.openAmount ?? 0) / size : next.quantity);
     const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
     if (status !== 'ok') {
-      const employers = await sql`
-        SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+      // Kolo 62: vedení podle členství — provozovatel přepnutý jinam se o zásobách dozví.
+      const employers = await vedeniPodniku(me.teamId);
       await Promise.all(
-        employers.map((e: any) =>
-          notifyUser(e.id, {
+        employers.map(id =>
+          notifyUser(id, {
             title: 'Nízké zásoby',
             body: `${item.name} dochází — zbývá ${next.quantity} ${item.unit}${(next.openAmount ?? 0) > 0 ? ` + načaté balení` : ''}`,
             type: 'inventory',
@@ -294,11 +294,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         : (size > 0 ? newQty + (newOpen ?? 0) / size : newQty);
       const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
       if (status !== 'ok') {
-        const employers = await sql`
-          SELECT id FROM users WHERE team_id = ${me.teamId} AND role = 'employer'`;
+        // Kolo 62: vedení podle členství, ne zrcadla.
+        const employers = await vedeniPodniku(me.teamId);
         await Promise.all(
-          employers.map((e: any) =>
-            notifyUser(e.id, {
+          employers.map(id =>
+            notifyUser(id, {
               title: 'Nízké zásoby',
               body: `${item.name} je na ${newQty} ${item.unit}`,
               type: 'inventory',

@@ -77,18 +77,27 @@ export async function GET() {
     splitShifts = t?.allow_split_shifts === true;
   } catch { /* not migrated yet */ }
 
+  // Lidé podle členství a role z členství (kolo 62); limity zůstávají na
+  // users. Alias `p`, protože `u` je tu volající.
   let members: any[] = [];
   try {
     members = await sql`
-      SELECT id, name, avatar, role, max_consecutive_days AS "maxConsecutive",
-             max_month_hours AS "maxHours", (split_shifts_ok IS NOT FALSE) AS "splitOk"
-      FROM users WHERE team_id = ${u.team_id} AND role IN ('employee','employer')
-      ORDER BY role DESC, name ASC`;
+      SELECT p.id, p.name, p.avatar, COALESCE(m.role, p.role) AS role,
+             p.max_consecutive_days AS "maxConsecutive",
+             p.max_month_hours AS "maxHours", (p.split_shifts_ok IS NOT FALSE) AS "splitOk"
+      FROM users p
+      LEFT JOIN team_members m ON m.user_id = p.id AND m.team_id = ${u.team_id}
+      WHERE (m.user_id IS NOT NULL OR p.team_id = ${u.team_id})
+        AND COALESCE(m.role, p.role) IN ('employee','employer')
+      ORDER BY COALESCE(m.role, p.role) DESC, p.name ASC`;
   } catch {
     members = await sql`
-      SELECT id, name, avatar, role, NULL AS "maxConsecutive"
-      FROM users WHERE team_id = ${u.team_id} AND role IN ('employee','employer')
-      ORDER BY role DESC, name ASC`;
+      SELECT p.id, p.name, p.avatar, COALESCE(m.role, p.role) AS role, NULL AS "maxConsecutive"
+      FROM users p
+      LEFT JOIN team_members m ON m.user_id = p.id AND m.team_id = ${u.team_id}
+      WHERE (m.user_id IS NOT NULL OR p.team_id = ${u.team_id})
+        AND COALESCE(m.role, p.role) IN ('employee','employer')
+      ORDER BY COALESCE(m.role, p.role) DESC, p.name ASC`;
   }
 
   return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, splitShifts, members });
@@ -118,20 +127,25 @@ export async function PUT(req: NextRequest) {
         const id = parseInt(o?.id);
         if (!Number.isFinite(id)) continue;
         // Team-scoped: a stray id can never rewrite someone else's rota rule.
+        // Členství NEBO zrcadlo (kolo 62): výjimka pro člena přepnutého jinam
+        // se dřív tiše neuložila (UPDATE 0 řádků).
         if (o?.maxConsecutive !== undefined) {
           await sql`
             UPDATE users SET max_consecutive_days = ${cleanPersonLimit(o?.maxConsecutive)}
-            WHERE id = ${id} AND team_id = ${u.team_id}`;
+            WHERE id = ${id} AND (team_id = ${u.team_id}
+              OR EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = users.id AND m.team_id = ${u.team_id}))`;
         }
         if (o?.maxHours !== undefined) {
           await sql`
             UPDATE users SET max_month_hours = ${cleanPersonHours(o?.maxHours)}
-            WHERE id = ${id} AND team_id = ${u.team_id}`;
+            WHERE id = ${id} AND (team_id = ${u.team_id}
+              OR EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = users.id AND m.team_id = ${u.team_id}))`;
         }
         if (o?.splitOk !== undefined) {
           await sql`
             UPDATE users SET split_shifts_ok = ${o.splitOk === true}
-            WHERE id = ${id} AND team_id = ${u.team_id}`;
+            WHERE id = ${id} AND (team_id = ${u.team_id}
+              OR EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = users.id AND m.team_id = ${u.team_id}))`;
         }
       }
     }

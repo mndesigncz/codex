@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
-import { clenstviUzivatele, organizaceTymu } from '@/lib/tenant';
+import { clenstviUzivatele, organizaceTymu, pocetClenu } from '@/lib/tenant';
 import { podnikyProPrehled, procNejde, souhrn, hraniceMesice, type RadekPodniku } from '@/lib/prehledOrganizace';
 import { wagesTotal } from '@/lib/wages';
 import { teamStock } from '@/lib/production';
@@ -69,9 +69,12 @@ export async function GET(req: NextRequest) {
     } catch { /* před migrací */ }
 
     try {
-      // Sazba z členství v TOMHLE podniku; starší účty ji mají jen na users.
+      // Sazba z členství v podniku ZÁZNAMU; bez členství ze zrcadla. Člen
+      // s členstvím bez sazby má 0 — dřív COALESCE sáhl po zrcadle, tedy
+      // po sazbě jiného podniku, a Finance a Přehled dávaly různá čísla (kolo 62).
       const entries = await sql`
-        SELECT te.clock_in, te.clock_out, COALESCE(m.hourly_rate, us.hourly_rate, 0) AS rate
+        SELECT te.clock_in, te.clock_out,
+               CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(us.hourly_rate, 0) END AS rate
         FROM time_entries te
         JOIN users us ON us.id = te.employee_id
         LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id
@@ -93,12 +96,8 @@ export async function GET(req: NextRequest) {
       radek.missingClosings = new Set((dny as any[]).filter(d => !smenaBezUzaverky(d, zavreno)).map(d => String(d.date))).size;
     } catch { /* před migrací */ }
 
-    try {
-      const [m] = await sql`SELECT COUNT(*)::int AS n FROM team_members WHERE team_id = ${teamId}`;
-      radek.members = Number(m?.n) || 0;
-    } catch {
-      try { const [m] = await sql`SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${teamId} AND role IN ('employer','employee')`; radek.members = Number(m?.n) || 0; } catch { /* ignore */ }
-    }
+    // Stejné číslo jako limit plánu: členství NEBO zrcadlo, bez tabletu (kolo 62).
+    try { radek.members = await pocetClenu(teamId); } catch { /* ignore */ }
     try {
       const [o] = await sql`SELECT COUNT(DISTINCT employee_id)::int AS n FROM time_entries WHERE team_id = ${teamId} AND clock_out IS NULL`;
       radek.onShiftNow = Number(o?.n) || 0;
