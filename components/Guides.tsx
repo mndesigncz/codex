@@ -702,7 +702,7 @@ export default function Guides({ user, ticksFor, openGuideId }: {
       )}
 
       {kopieOpen && isEmployer && (
-        <KopieZPodniku entita="navody" onClose={() => setKopieOpen(false)}
+        <KopieZPodniku entita="navody" podniky={jinePodniky} onClose={() => setKopieOpen(false)}
           onHotovo={() => setReloadTick(t => t + 1)} />
       )}
 

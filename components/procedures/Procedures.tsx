@@ -426,7 +426,7 @@ export default function Procedures({ user }: Props) {
       )}
 
       {kopieOpen && isEmployer && (
-        <KopieZPodniku entita="postupy" onClose={() => setKopieOpen(false)} onHotovo={() => { load(); }} />
+        <KopieZPodniku entita="postupy" podniky={jinePodniky} onClose={() => setKopieOpen(false)} onHotovo={() => { load(); }} />
       )}
 
       {detail && (

@@ -22,6 +22,9 @@ export const jeEntitaKopie = (v: unknown): v is EntitaKopie => ENTITY_KOPIE.incl
 /** Nejvíc položek v jedné dávce — víc by v jednom požadavku běželo příliš dlouho. */
 export const MAX_IDS_KOPIE = 50;
 
+/** Nejvyšší id, které se vejde do sloupce INTEGER — větší by shodilo dotaz `id = ANY(...)` celé dávky. */
+export const MAX_ID = 2147483647;
+
 /**
  * Řádek cíle se stejným názvem (normName: bez diakritiky, velikosti písmen
  * a interpunkce), jinak null. Při víc shodách vyhraje nejnižší id — to je

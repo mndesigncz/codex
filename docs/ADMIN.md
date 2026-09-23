@@ -78,20 +78,16 @@ takže překlep ve sloupci nebo v názvu tabulky spadne v CI, ne u tabletu.
 Kopie do podniku (kolo 64): návody, postupy a menu se mezi podniky
 organizace nesdílí živě (vazby na sklad a lidi jednoho podniku), ale vedení
 si je zkopíruje — tlačítko „Z jiného podniku" v Návodech, Postupech a Menu.
+Kopírovat jde jen z podniku téže organizace, kde je člověk členem VEDENÍ
+(stejné pravidlo jako konsolidovaný přehled), a ne z pozastaveného podniku.
 Kopie je vlastní řádek cíle: suroviny v krocích a připnutá položka se
 přemapují podle názvu položky ve skladu cíle, jinak se odpojí (a řekne se to);
-odkazy z postupu na návod se přemapují na návod kopírovaný v téže dávce nebo
-na stejnojmenný návod cíle; zkopírované menu má novou adresu a je vypnuté,
-dokud vedení neprojde ceny. Každá kopie je v audit logu (`organization.kopie`).
-
-Kopie do podniku (kolo 64): návody, postupy a menu se mezi podniky
-organizace nesdílí živě (vazby na sklad a lidi jednoho podniku), ale vedení
-si je zkopíruje — tlačítko „Z jiného podniku" v Návodech, Postupech a Menu.
-Kopie je vlastní řádek cíle: suroviny v krocích a připnutá položka se
-přemapují podle názvu položky ve skladu cíle, jinak se odpojí (a řekne se to);
-odkazy z postupu na návod se přemapují na návod kopírovaný v téže dávce nebo
-na stejnojmenný návod cíle; zkopírované menu má novou adresu a je vypnuté,
-dokud vedení neprojde ceny. Každá kopie je v audit logu (`organization.kopie`).
+odkaz z kroku postupu na návod se přemapuje na stejnojmenný návod cíle —
+návody se proto kopírují dřív než postupy, které na ně ukazují. Zkopírované
+menu má novou adresu a je vypnuté, dokud vedení neprojde ceny; když kopie
+menu spadne uprostřed, rozpracovaná deska se smaže. Audit log má záznam
+v cíli (`organization.kopie`, u každé položky) i ve zdroji
+(`organization.kopie.zdroj`, co a kam odešlo).
 
 Pozastavení a sdílené číselníky organizace: když je pozastavený podnik
 v nastavení organizace zvolený jako zdroj (spravuje kategorie skladu,

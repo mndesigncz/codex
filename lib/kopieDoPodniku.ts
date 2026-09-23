@@ -38,6 +38,8 @@ export interface ZadaniKopie {
   /** Zdrojový podnik — ověřený routou proti organizaci. */
   z: number;
   nazevZdroje: string;
+  /** Název cíle — do auditu zdrojového podniku. */
+  nazevCile: string;
   /** Cílový (aktivní) podnik volajícího. */
   teamId: number;
   meId: number;
@@ -108,9 +110,17 @@ export async function seznamKeKopii(entita: EntitaKopie, z: number): Promise<Pol
 // ---------------------------------------------------------------------------
 
 export async function zkopirujDoPodniku(zadani: ZadaniKopie): Promise<VysledekKopie[]> {
-  if (zadani.entita === 'navody') return kopieNavodu(zadani);
-  if (zadani.entita === 'postupy') return kopiePostupu(zadani);
-  return kopieMenu(zadani);
+  const vysledky = zadani.entita === 'navody' ? await kopieNavodu(zadani)
+    : zadani.entita === 'postupy' ? await kopiePostupu(zadani)
+    : await kopieMenu(zadani);
+  // Stopa i ve ZDROJI: audit_log je po podnicích, a bez tohohle řádku by
+  // vedení podniku A nevidělo, že jeho receptury a ceny odešly jinam.
+  const hotove = vysledky.filter(r => r.noveId != null);
+  if (hotove.length) {
+    audit(zadani.z, zadani.meId, 'organization.kopie.zdroj', zadani.entita, null,
+      `Do podniku „${zadani.nazevCile}": ${hotove.map(r => r.nazev).join(', ')}`);
+  }
+  return vysledky;
 }
 
 /** Vyžádané id, které ve zdroji není (nebo je jen návrh) — do výsledků, ať UI nemlčí. */
@@ -248,6 +258,7 @@ async function kopieMenu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Pr
     const id = Number(r.id);
     const nazev = String(r.name ?? '');
     const poznamky: string[] = [];
+    let noveId: number | null = null;
     try {
       const slug = volnySlug(cleanSlug(r.slug ?? nazev), obsazene);
       if (nazvyCile.has(normName(nazev))) poznamky.push(STEJNY_NAZEV);
@@ -257,7 +268,7 @@ async function kopieMenu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Pr
         VALUES (${teamId}, ${slug}, ${nazev}, ${r.eyebrow ?? null}, ${r.title ?? null}, ${r.note ?? null}, ${r.currency ?? DEFAULT_CURRENCY},
                 ${r.theme != null ? JSON.stringify(r.theme) : null}::jsonb, NULL, NULL, NULL, FALSE, ${meId})
         RETURNING id`;
-      const noveId = Number(nove.id);
+      noveId = Number(nove.id);
       obsazene.add(slug);
       nazvyCile.add(normName(nazev));
 
@@ -270,22 +281,37 @@ async function kopieMenu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Pr
             SELECT section_id, name, price, description, position FROM menu_items
             WHERE section_id = ANY(${sekce.map(s => Number(s.id))}) ORDER BY position, id` as any[]
         : [];
+      // Položky sekce jedním dotazem (unnest polí), ne po jedné: menu smí mít
+      // desítky sekcí po stovce položek a po jednom by to byly tisíce dotazů
+      // v jednom požadavku.
       let sp = 0;
       for (const s of sekce) {
         const [nova] = await sql`
           INSERT INTO menu_sections (board_id, title, column_no, position)
           VALUES (${noveId}, ${String(s.title ?? '')}, ${Number(s.column_no) === 2 ? 2 : 1}, ${sp++}) RETURNING id`;
-        let ip = 0;
-        for (const it of polozky.filter(p => Number(p.section_id) === Number(s.id))) {
-          await sql`
-            INSERT INTO menu_items (section_id, name, price, description, sold_out, pos_product_id, position)
-            VALUES (${nova.id}, ${String(it.name ?? '')}, ${Number(it.price) || 0}, ${it.description ?? null}, FALSE, NULL, ${ip++})`;
-        }
+        const jeho = polozky.filter(p => Number(p.section_id) === Number(s.id));
+        if (!jeho.length) continue;
+        await sql`
+          INSERT INTO menu_items (section_id, name, price, description, sold_out, pos_product_id, position)
+          SELECT ${nova.id}, x.name, x.price, x.description, FALSE, NULL, x.position
+          FROM unnest(${jeho.map(it => String(it.name ?? ''))}::text[], ${jeho.map(it => Math.round(Number(it.price) || 0))}::int[],
+                      ${jeho.map(it => (it.description ?? null) as string | null)}::text[], ${jeho.map((_, i) => i)}::int[])
+               AS x(name, price, description, position)`;
       }
-      poznamky.push(`Menu je po zkopírování vypnuté a má novou adresu /${slug} — zapni ho, až projdeš ceny.`);
+      poznamky.push(`Menu je po zkopírování vypnuté a má novou adresu /menu-akce.html?menu=${slug} — zapni ho, až projdeš ceny.`);
       audit(teamId, meId, 'organization.kopie', 'menu', noveId, `Z podniku „${nazevZdroje}": ${nazev}`);
       vysledky.push({ id, noveId, nazev, poznamky });
     } catch (e) {
+      // Deska mohla vzniknout a spadnout až u sekcí — hlásit „nepovedlo" a
+      // nechat v cíli vypnuté torzo by znamenalo, že další pokus založí
+      // druhé. Úklid je best-effort; tabulky nemají ON DELETE CASCADE.
+      if (noveId != null) {
+        try {
+          await sql`DELETE FROM menu_items WHERE section_id IN (SELECT id FROM menu_sections WHERE board_id = ${noveId})`;
+          await sql`DELETE FROM menu_sections WHERE board_id = ${noveId}`;
+          await sql`DELETE FROM menu_boards WHERE id = ${noveId} AND team_id = ${teamId}`;
+        } catch (e2) { console.error('[kopie] úklid menu selhal:', e2); }
+      }
       vysledky.push({ id, noveId: null, nazev, poznamky: [verejnaHlaska(e, NEPOVEDLO, '[kopie] menu')] });
     }
   }
