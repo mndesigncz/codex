@@ -38,6 +38,7 @@ import { normalizePlan } from '../lib/floorplan.ts';
 import { verejnaHlaska } from '../lib/verejnaChyba.ts';
 import { planInfoOf } from '../lib/plan.ts';
 import { pragueMomentOf } from '../lib/pragueTime.ts';
+import { premapujPodleNazvu, premapujKroky, premapujGuideId, volnySlug, nazvyNormovane } from '../lib/kopie.ts';
 
 let failed = 0;
 // Testy, co musí doběhnout, než se sáhne na návratový kód.
@@ -873,6 +874,50 @@ eq('chyba: NeonDbError → obecná', verejnaHlaska(Object.assign(new Error('rela
 eq('chyba: Stripe → obecná', verejnaHlaska(Object.assign(new Error('No such customer: cus_1'), { type: 'StripeInvalidRequestError' }), 'Nepovedlo se.'), 'Nepovedlo se.');
 eq('chyba: TypeError → obecná', verejnaHlaska(new TypeError("Cannot read properties of undefined (reading 'id')"), 'Nepovedlo se.'), 'Nepovedlo se.');
 eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepovedlo se.'), 'Nepovedlo se.');
+
+// ——— Kopie do podniku (kolo 64) ———
+{
+  const cil = [{ id: 7, name: 'Mléko plnotučné' }, { id: 3, name: 'mleko  PLNOTUCNE' }, { id: 9, name: 'Cukr' }];
+  eq('kopie: přemapování podle názvu bez diakritiky a velikosti písmen', premapujPodleNazvu('MLÉKO plnotučné', cil), 3);
+  eq('kopie: víc shod → nejnižší id', premapujPodleNazvu('Cukr', [{ id: 12, name: 'cukr' }, { id: 4, name: 'Cukr' }, { id: 8, name: 'CUKR' }]), 4);
+  eq('kopie: bez shody, prázdno a null → null', [premapujPodleNazvu('Sůl', cil), premapujPodleNazvu('', cil), premapujPodleNazvu(null, cil), premapujPodleNazvu('Cukr', [])], [null, null, null, null]);
+
+  const nazvyZdroje = new Map([[1, 'Mléko plnotučné'], [2, 'Sirup vanilkový']]);
+  const kroky = [
+    { text: 'Nahřát šálek' },
+    { text: 'Nalít mléko', itemId: 1, amount: 0.2, unit: 'l' },
+    { text: 'Přidat sirup', itemId: 2, amount: 20, unit: 'ml' },
+    { text: 'Zamíchat', itemId: 99, amount: 1, unit: 'ks' },
+  ];
+  const k = premapujKroky(kroky, nazvyZdroje, cil);
+  eq('kopie: krok se surovinou v cíli dostane její id, ostatní se odpojí bez množství',
+    k.kroky, [{ text: 'Nahřát šálek' }, { text: 'Nalít mléko', itemId: 3, amount: 0.2, unit: 'l' }, { text: 'Přidat sirup' }, { text: 'Zamíchat' }]);
+  eq('kopie: poznámka jmenuje krok i surovinu; smazaná položka zdroje bez názvu', k.poznamky, [
+    'Krok „Přidat sirup": surovina „Sirup vanilkový" v tomhle podniku není — odpojeno.',
+    'Krok „Zamíchat": surovina ve zdroji už není — odpojeno.',
+  ]);
+  eq('kopie: kroky bez surovin projdou beze změny a bez poznámek', premapujKroky([{ text: 'A' }, { text: 'B' }], new Map(), []), { kroky: [{ text: 'A' }, { text: 'B' }], poznamky: [] });
+  const dlouhy = premapujKroky([{ text: 'x'.repeat(60), itemId: 5 }], new Map([[5, 'Led']]), []);
+  ok('kopie: dlouhý text kroku se v poznámce zkrátí', dlouhy.poznamky[0].includes('x'.repeat(40) + '…') && !dlouhy.poznamky[0].includes('x'.repeat(41)));
+
+  const krok = (text: string, guideId: number | null) => ({ text, minutes: null, note: null, emoji: null, weight: 'normal' as const, penalty: null, guideId });
+  const navodyCile = [{ id: 50, title: 'Čištění kávovaru' }, { id: 51, title: 'Otevírání' }];
+  const g = premapujGuideId(
+    [krok('Vyčistit kávovar', 10), krok('Otevřít', 11), krok('Zamknout', 12), krok('Bez návodu', null)],
+    new Map([[10, 500]]), navodyCile, new Map([[10, 'Čištění kávovaru'], [11, 'otevírání'], [12, 'Zamykání']]),
+  );
+  eq('kopie: guideId z dávky vyhraje nad názvem, jinak podle názvu, jinak null',
+    g.items.map(s => s.guideId), [500, 51, null, null]);
+  eq('kopie: poznámka jen u odpojeného odkazu', g.poznamky, ['Krok „Zamknout": návod „Zamykání" tu není — odkaz odpojen.']);
+  eq('kopie: odkaz na smazaný návod zdroje → odpojen s obecnou poznámkou',
+    premapujGuideId([krok('X', 77)], new Map(), navodyCile, new Map()).poznamky, ['Krok „X": návod ve zdroji už není — odkaz odpojen.']);
+
+  eq('slug: volný zůstává', volnySlug('menu', new Set(['jine'])), 'menu');
+  eq('slug: obsazený dostane pořadové číslo od 2', volnySlug('menu', new Set(['menu'])), 'menu-2');
+  eq('slug: přeskočí obsazená čísla', volnySlug('menu', new Set(['menu', 'menu-2', 'menu-3'])), 'menu-4');
+  eq('slug: prázdný → menu (a číslo, když je obsazené)', [volnySlug('', new Set()), volnySlug('  ', new Set(['menu']))], ['menu', 'menu-2']);
+  eq('kopie: množina názvů pro „Stejný název tu už je."', [...nazvyNormovane(['Latté', 'latte', '', null, 'Čaj'])], ['latte', 'caj']);
+}
 
 // ——— Sdílené číselníky (kolo 60) ———
 {

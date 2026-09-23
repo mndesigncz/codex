@@ -16,6 +16,7 @@ import { okJson, apiMessage } from '@/lib/api';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
+import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -126,6 +127,11 @@ export default function Procedures({ user }: Props) {
   const [confirmDel, setConfirmDel] = useState<Procedure | null>(null);
   const delModal = useModal(!!confirmDel, () => setConfirmDel(null), 'Smazat postup');
   const [deleting, setDeleting] = useState(false);
+  // Kopie z jiného podniku organizace — jen vedení a jen když takový
+  // podnik existuje. Ukazuje se i bez postupů: kopie je rychlejší start než
+  // ukázkové postupy.
+  const [kopieOpen, setKopieOpen] = useState(false);
+  const { jine: jinePodniky } = useJinePodniky(isEmployer);
 
   const approveProcedure = async (id: number) => {
     const res = await fetch(`/api/procedures/${id}`, {
@@ -205,8 +211,13 @@ export default function Procedures({ user }: Props) {
     <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
       {/* Header */}
       <PageHeader hintId="procedures" className="pb-5" title="Postupy" subtitle="Krok za krokem — otevírání, zavírání a další rutiny."
-        primary={isEmployer && procedures.length > 0 && (
-          <Button variant="accent" icon="plus" onClick={openNew}>Nový postup</Button>
+        primary={isEmployer && (procedures.length > 0 || jinePodniky.length > 0) && (
+          <>
+            {jinePodniky.length > 0 && (
+              <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+            )}
+            {procedures.length > 0 && <Button variant="accent" icon="plus" onClick={openNew}>Nový postup</Button>}
+          </>
         )} />
 
       {loading ? (
@@ -412,6 +423,10 @@ export default function Procedures({ user }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {kopieOpen && isEmployer && (
+        <KopieZPodniku entita="postupy" onClose={() => setKopieOpen(false)} onHotovo={() => { load(); }} />
       )}
 
       {detail && (

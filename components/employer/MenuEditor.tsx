@@ -17,6 +17,7 @@ import { czCount } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 
 interface Item {
   id?: number;
@@ -64,9 +65,15 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
    * naživo, ať se na to nepřijde až u stánku.
    */
   const [zive, setZive] = useState<'ceka' | 'ok' | 'chybi' | 'vypnuto' | 'neznamo'>('ceka');
+  /* Kopie menu z jiného podniku organizace. Editor vidí jen vedení, takže
+     stačí hlídat, jestli vůbec existuje odkud kopírovat. */
+  const [kopieOpen, setKopieOpen] = useState(false);
+  const { jine: jinePodniky } = useJinePodniky();
 
-  const load = useCallback(async () => {
-    setNacitam(true);
+  /* `potichu`: obnovit seznam bez stavu „Načítám menu…" — ten by nahradil
+     celou obrazovku a s ní zavřel i okno kopie dřív, než člověk uvidí výsledek. */
+  const load = useCallback(async (potichu = false) => {
+    if (!potichu) setNacitam(true);
     try {
       const r = await fetch('/api/menu');
       const d = await r.json().catch(() => ({}));
@@ -417,7 +424,16 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${posPripojena ? 'border border-black/10 text-black/70' : 'seg-on'}`}>
             {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
           </button>
+          {jinePodniky.length > 0 && (
+            <button type="button" onClick={() => setKopieOpen(true)} disabled={ukladam || !!importuji}
+              className="rounded-full font-semibold px-5 py-2.5 text-sm border border-black/10 text-black/70 disabled:opacity-50">
+              Zkopírovat z jiného podniku
+            </button>
+          )}
         </div>
+        {kopieOpen && (
+          <KopieZPodniku entita="menu" onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); }} />
+        )}
         {posPripojena && (
           <p className="text-xs text-black/45">
             Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.
@@ -474,6 +490,13 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             <span className="text-xl leading-none">＋</span>
             <span className="text-xs font-semibold">Nové menu</span>
           </button>
+          {jinePodniky.length > 0 && (
+            <button type="button" onClick={() => setKopieOpen(true)} disabled={ukladam}
+              className="col-span-full sm:col-span-1 rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col sm:flex-col items-center justify-center gap-1 min-h-[56px] sm:min-h-[104px]">
+              <Icon name="copy" size={18} />
+              <span className="text-xs font-semibold">Z jiného podniku</span>
+            </button>
+          )}
         </div>
 
         <div className="well border border-black/[0.06] p-4 space-y-2">
@@ -941,6 +964,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         v polovině seznamu, snadno odejde v domnění, že je hotovo — a změny
         se nikam neuloží. Dokud něco čeká, drží se ukládání na očích.
       */}
+      {kopieOpen && (
+        <KopieZPodniku entita="menu" onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); }} />
+      )}
+
       {neulozeno && (
         <div className="sticky bottom-4 z-20 flex justify-center pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#16181A] text-white shadow-lg pl-5 pr-2 py-2">
