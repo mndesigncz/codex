@@ -9,7 +9,7 @@ for (const [name, vp] of [['desk', { width: 1440, height: 900 }], ['mob', { widt
   // stěna po scrollu do obrazu
   const stena = p.locator('.stena').first();
   await stena.scrollIntoViewIfNeeded(); await p.evaluate(() => window.scrollBy(0, 160)); await p.waitForTimeout(900);
-  await p.screenshot({ path: `${process.env.S}/k57-${name}-stena.png` });
+  await p.screenshot({ path: `shots/k57-${name}-stena.png` });
   out[`${name}.header.posunuto`] = await p.locator('.lg-bar.posunuto').count();
   // panel funkcí: výška zařízení přes všech 12 scén
   const vysky = [];
@@ -24,7 +24,7 @@ for (const [name, vp] of [['desk', { width: 1440, height: 900 }], ['mob', { widt
   out[`${name}.zarizeni[h,panel]`] = vysky;
   await p.locator('#funkce').scrollIntoViewIfNeeded(); await p.waitForTimeout(500);
   out[`${name}.nav.aktivni`] = await p.locator('header [data-on="true"]').textContent().catch(() => null);
-  await p.screenshot({ path: `${process.env.S}/k57-${name}-funkce.png` });
+  await p.screenshot({ path: `shots/k57-${name}-funkce.png` });
   await ctx.close();
 }
 console.log(JSON.stringify(out, null, 1));
