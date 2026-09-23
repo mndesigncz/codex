@@ -5,7 +5,8 @@ import { pragueToday } from '@/lib/pragueTime';
 import { hit } from '@/lib/rateLimit';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
   const p = await profileBySlug(params.slug);
@@ -22,7 +23,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   try { await sql`INSERT INTO client_promo_uses (promo_id, customer_id) VALUES (${promo.id}, ${me.id})`; }
   catch { return NextResponse.json({ error: 'Tenhle kód už jsi použil.' }, { status: 409 }); }
   await sql`UPDATE client_promos SET uses = uses + 1 WHERE id = ${promo.id}`;
-  let points: number | null = null; let coupon: string | null = null;
+  let points: number | null = null;let coupon: string | null = null;
   if (Number(promo.points) > 0) points = await award(teamId, me.id, Number(promo.points), 'manual', `promo:${promo.code}`, `Promo kód ${promo.title}`);
   if (promo.coupon_id) {
     const c = couponCode();

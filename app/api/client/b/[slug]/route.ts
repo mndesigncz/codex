@@ -41,7 +41,8 @@ async function menuFor(teamId: number, menuSlug: string | null) {
   } catch { return null; }
 }
 
-export async function GET(_req: Request, { params }: { params: { slug: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const p = await profileBySlug(params.slug);
   if (!p) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
   const teamId = Number(p.team_id);

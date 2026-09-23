@@ -17,7 +17,8 @@ async function employer() {
   return u?.team_id ? { meId, teamId: Number(u.team_id) } : null;
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await employer();
   if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
@@ -58,7 +59,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await employer();
   if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const id = parseInt(params.id);

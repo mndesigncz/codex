@@ -13,7 +13,8 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export async function GET(_request: Request, { params }: { params: { slug: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const slug = cleanSlug(params.slug);
   if (!slug) return NextResponse.json({ error: 'Neplatná adresa menu' }, { status: 400 });
 
@@ -31,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
       ORDER BY id LIMIT 1`;
     // Pozastavený podnik nemá ani veřejné menu — host vidí totéž, co když
     // menu neexistuje. `team_id` se ven neposílá (níž se vypisují sloupce).
-    if (board && await podnikJePozastaveny(board.team_id)) {
+    if (board && (await podnikJePozastaveny(board.team_id))) {
       return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
     }
     if (!board) {

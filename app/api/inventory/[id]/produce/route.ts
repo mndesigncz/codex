@@ -12,7 +12,8 @@ const sql = neon(process.env.DATABASE_URL!);
 
 // POST { batches } — „vyrobeno": naskladní dávky a odepíše suroviny.
 // Smí každý na směně; na sdíleném tabletu se připíše tomu, kdo ho zrovna používá.
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const s = await getServerSession(authOptions);
   if (!s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((s.user as any).id);

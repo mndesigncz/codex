@@ -4,7 +4,8 @@ import { odmitnuto, odpoved, idZ } from '../../../_odpoved';
 export const dynamic = 'force-dynamic';
 
 /** { plan: 'free' | 'pro' | 'max' | null } — null vrátí tarif podle Stripe. */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = await requireSuperadmin(request);
   if (!g.ok) return odmitnuto(g);
   const b = await request.json().catch(() => ({}));

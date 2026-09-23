@@ -6,7 +6,8 @@ import { refreshPosState } from '@/lib/clientOrders';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const [o] = await sql`SELECT o.*, t.name AS table_name FROM client_orders o LEFT JOIN client_tables t ON t.id = o.table_id WHERE o.id = ${parseInt(params.id, 10)} AND o.customer_id = ${me.id}`;

@@ -32,7 +32,8 @@ function parseChecklist(raw: any) {
 const normalizeChecklist = normalizeSteps;
 
 // GET — single guide full content (team members only)
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
@@ -78,7 +79,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 // PATCH (employer) — update title/content/category, bump updated_at
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -200,7 +202,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE (employer)
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -214,7 +217,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 }
 
 // POST — the reader confirms they read a required guide: { markRead: true }.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (c.role === 'kiosk') return NextResponse.json({ error: 'Potvrzení čtení je osobní — přihlas se svým účtem.' }, { status: 403 });

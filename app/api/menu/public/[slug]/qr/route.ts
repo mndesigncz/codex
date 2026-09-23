@@ -25,7 +25,8 @@ function verejnaAdresa(request: Request, slug: string): string {
   return `${proto}://${host}${cesta}`;
 }
 
-export async function GET(request: Request, { params }: { params: { slug: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const slug = cleanSlug(params.slug);
   if (!slug) return NextResponse.json({ error: 'Neplatná adresa menu' }, { status: 400 });
 
@@ -35,7 +36,7 @@ export async function GET(request: Request, { params }: { params: { slug: string
     const [board] = await sql`
       SELECT team_id, id FROM menu_boards WHERE slug = ${slug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
     // Pozastavený podnik nemá ani veřejné menu (viz lib/blokaceDb).
-    if (board && await podnikJePozastaveny(board.team_id)) return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
+    if (board && (await podnikJePozastaveny(board.team_id))) return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
     if (!board) return NextResponse.json({ error: 'Menu nenalezeno' }, { status: 404 });
   } catch {
     return NextResponse.json({ error: 'Menu zatím není nastavené' }, { status: 404 });

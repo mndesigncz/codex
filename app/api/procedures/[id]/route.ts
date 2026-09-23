@@ -32,7 +32,8 @@ async function currentUser() {
 }
 
 // PATCH (employer): update a procedure
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -112,7 +113,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE (employer): delete a procedure
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const me = await currentUser();
   if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });

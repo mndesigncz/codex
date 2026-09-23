@@ -34,7 +34,8 @@ async function jeObsluha(teamId: number): Promise<boolean> {
   }
 }
 
-export async function POST(request: Request, { params }: { params: { slug: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const slug = cleanSlug(params.slug);
   if (!slug) return NextResponse.json({ error: 'Neplatná adresa menu' }, { status: 400 });
 
@@ -54,7 +55,7 @@ export async function POST(request: Request, { params }: { params: { slug: strin
       WHERE slug = ${slug} AND enabled IS NOT FALSE
       ORDER BY id LIMIT 1`;
     // Pozastavený podnik nemá ani veřejné menu (viz lib/blokaceDb).
-    if (row && await podnikJePozastaveny(row.team_id)) return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
+    if (row && (await podnikJePozastaveny(row.team_id))) return NextResponse.json({ error: 'Menu tu není.' }, { status: 404 });
     board = row;
   } catch {
     return NextResponse.json({ error: 'Menu zatím není nastavené' }, { status: 404 });

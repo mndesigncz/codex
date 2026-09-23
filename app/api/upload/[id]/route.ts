@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((session.user as any).id);

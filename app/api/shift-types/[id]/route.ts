@@ -30,7 +30,8 @@ function mapRow(r: any) {
 }
 
 // PATCH (employer) — { name?, startTime?, endTime?, color? }
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await context();
   if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
@@ -75,7 +76,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 // DELETE (employer)
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await context();
   if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });

@@ -28,7 +28,8 @@ const STATUS_LABEL: Record<string, string> = {
 // PATCH — two actions on one endpoint:
 //   { toggleVote: true }  → anyone on the team adds/removes their +1
 //   { status }            → employer moves the suggestion along the pipeline
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!c.teamId || c.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -99,7 +100,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE — the author can remove their own; an employer can remove any.
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await ctx();
   if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 400 });
