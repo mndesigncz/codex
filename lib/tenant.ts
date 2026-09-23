@@ -9,7 +9,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from './team';
-import { normalizujNastaveni, normalizujRoli, smiPrepnout, type Clenstvi, type NastaveniOrganizace, type RoleClenstvi } from './organizace';
+import { normalizujNastaveni, normalizujRoli, smiPrepnout, tymyProCiselnik, type Ciselnik, type Clenstvi, type NastaveniOrganizace, type RoleClenstvi } from './organizace';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -63,6 +63,30 @@ export async function organizaceTymu(teamId: number): Promise<{ id: number; name
     if (!o) return null;
     return { id: Number(o.id), name: String(o.name), ownerId: Number(o.ownerId), nastaveni: normalizujNastaveni(o.settings) };
   } catch { return null; }
+}
+
+/** Id všech podniků organizace. Prázdné, když tabulka ještě není. */
+export async function podnikyOrganizace(organizationId: number): Promise<number[]> {
+  try {
+    const rows = await sql`SELECT id FROM teams WHERE organization_id = ${organizationId}`;
+    return (rows as any[]).map(r => Number(r.id));
+  } catch { return []; }
+}
+
+/**
+ * Podniky, jejichž řádky daného číselníku aktivní podnik čte (kolo 60).
+ * Jediné místo, kde se sdílení rozhoduje: aktivní podnik přijde z databáze
+ * (volající ho má z `SELECT team_id FROM users`), organizace z jeho
+ * `teams.organization_id`, zdroj z jejího nastavení a ověřený proti
+ * seznamu jejích podniků. Nikdy neobsahuje podnik mimo organizaci a nikdy
+ * nebere nic z požadavku. Predikát pro dotaz: `team_id = ANY(${tymy})`.
+ */
+export async function tymyCiselniku(teamId: number, ciselnik: Ciselnik): Promise<number[]> {
+  const org = await organizaceTymu(teamId);
+  if (!org?.nastaveni.sdileneCiselniky) return [teamId];
+  const teamIds = await podnikyOrganizace(org.id);
+  if (!teamIds.length) return [teamId];
+  return tymyProCiselnik(teamId, { nastaveni: org.nastaveni, teamIds }, ciselnik);
 }
 
 /**

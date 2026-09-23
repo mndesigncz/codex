@@ -21,7 +21,7 @@ export interface TreeNode<T extends CategoryNode = CategoryNode> {
 }
 
 /** Depth guard: a malformed parent chain must never hang the UI. */
-const MAX_DEPTH = 12;
+export const MAX_DEPTH = 12;
 
 function order<T extends CategoryNode>(a: T, b: T) {
   return (a.position - b.position) || a.name.localeCompare(b.name, 'cs');
