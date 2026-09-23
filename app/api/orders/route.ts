@@ -103,11 +103,15 @@ export async function POST(req: NextRequest) {
             await sql`UPDATE orders SET email_sent_at = NOW() WHERE id = ${row.id}`;
             emailed = true;
           } else {
-            emailError = res.error ?? 'Odeslání se nepovedlo.';
+            // Text chyby odesílací služby ven nejde (umí prozradit adresu
+            // účtu); do logu ano.
+            console.error('[orders] e-mail dodavateli neodešel', res.error);
+            emailError = 'E-mail dodavateli se nepodařilo odeslat. Zkontroluj jeho adresu, nebo objednávku pošli jinak.';
           }
         }
       } catch (e: any) {
-        emailError = e?.message ?? 'Odeslání se nepovedlo.';
+        console.error('[orders] e-mail dodavateli neodešel', e);
+        emailError = 'E-mail dodavateli se nepodařilo odeslat. Zkontroluj jeho adresu, nebo objednávku pošli jinak.';
       }
     }
   }
@@ -152,13 +156,13 @@ export async function PATCH(req: NextRequest) {
         if (it.itemId) {
           updated = await sql`
             UPDATE inventory_items SET quantity = quantity + ${it.qty}, updated_by = ${c.meId}, updated_at = NOW()
-            WHERE id = ${it.itemId} AND (team_id = ${c.teamId} OR team_id IS NULL)
+            WHERE id = ${it.itemId} AND team_id = ${c.teamId}
             RETURNING id, quantity`;
         }
         if (updated.length === 0) {
           updated = await sql`
             UPDATE inventory_items SET quantity = quantity + ${it.qty}, updated_by = ${c.meId}, updated_at = NOW()
-            WHERE LOWER(name) = LOWER(${it.name}) AND (team_id = ${c.teamId} OR team_id IS NULL)
+            WHERE LOWER(name) = LOWER(${it.name}) AND team_id = ${c.teamId}
             RETURNING id, quantity`;
         }
         if (updated.length > 0) {

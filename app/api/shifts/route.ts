@@ -67,7 +67,9 @@ export async function GET(req: NextRequest) {
       if (!target || target.team_id !== c.teamId) return NextResponse.json([]);
     }
     const resolve = await typeResolver(c.teamId);
-    const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${employeeId} ORDER BY date ASC`;
+    // Filtr týmu: člověk ve dvou podnicích má směny v obou a vedení A nemá
+    // vidět jeho rozvrh v B (ani on sám ho tady, kde je přepnutý do A).
+    const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${employeeId} AND team_id = ${c.teamId} ORDER BY date ASC`;
     return NextResponse.json(rows.map((r: any) => shape(r, resolve)));
   }
 

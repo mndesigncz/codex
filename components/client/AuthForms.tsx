@@ -7,6 +7,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '../Icons';
+import { mistniCesta } from '@/lib/bezpecnaUrl';
 
 const input = 'field text-sm';
 const label = 'field-label';
@@ -24,7 +25,7 @@ function Field({ id, label: l, hint, error, children }: { id: string; label: str
 export function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') || '/client';
+  const next = mistniCesta(params.get('next'), '/client');
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
   // Kód z pozvánky (?ref=…) se předvyplní; jde přepsat i vyplnit ručně.
   const [ref, setRef] = useState(() => (params.get('ref') ?? '').toUpperCase());
@@ -60,7 +61,7 @@ export function RegisterForm() {
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') || '/client';
+  const next = mistniCesta(params.get('next'), '/client');
   const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {

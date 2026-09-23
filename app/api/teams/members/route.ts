@@ -22,6 +22,18 @@ async function ownedTeam(employerId: number) {
   return team ?? null;
 }
 
+// Je člověk členem tohoto podniku? Pravda je v team_members (kolo 55);
+// users.team_id je jen zrcadlo AKTIVNÍHO podniku. Kdo je zrovna přepnutý
+// jinam, je pořád člen — a musí jít upravit i odebrat.
+async function jeClen(userId: number, teamId: number): Promise<boolean> {
+  try {
+    const [m] = await sql`SELECT 1 FROM team_members WHERE user_id = ${userId} AND team_id = ${teamId}`;
+    if (m) return true;
+  } catch { /* team_members před migrací */ }
+  const [u] = await sql`SELECT 1 FROM users WHERE id = ${userId} AND team_id = ${teamId}`;
+  return !!u;
+}
+
 export async function PATCH(request: Request) {
   const me = await currentEmployer();
   if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
@@ -39,13 +51,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Vlastníka týmu nelze upravit.' }, { status: 400 });
   }
 
-  const [member] = await sql`SELECT id FROM users WHERE id = ${targetId} AND team_id = ${team.id}`;
-  if (!member) return NextResponse.json({ error: 'Člen týmu nenalezen' }, { status: 404 });
+  if (!(await jeClen(targetId, team.id))) return NextResponse.json({ error: 'Člen týmu nenalezen' }, { status: 404 });
 
   if (role !== undefined) {
     if (role !== 'employer' && role !== 'employee') {
       return NextResponse.json({ error: 'Neplatná role.' }, { status: 400 });
     }
+    // Role se mění v členství, ne jen v zrcadle. Dřív se přepsal jen
+    // users.role — a degradovaný manažer si přepnutím podniku sem a zpět
+    // obnovil roli vedení z team_members, kde zůstala stará.
+    try { await sql`UPDATE team_members SET role = ${role} WHERE user_id = ${targetId} AND team_id = ${team.id}`; } catch { /* před migrací */ }
     await sql`UPDATE users SET role = ${role} WHERE id = ${targetId} AND team_id = ${team.id}`;
   }
 
@@ -83,11 +98,15 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Vlastníka týmu nelze odebrat.' }, { status: 400 });
   }
 
-  const [member] = await sql`SELECT id FROM users WHERE id = ${targetId} AND team_id = ${team.id}`;
-  if (!member) return NextResponse.json({ error: 'Člen týmu nenalezen' }, { status: 404 });
+  if (!(await jeClen(targetId, team.id))) return NextResponse.json({ error: 'Člen týmu nenalezen' }, { status: 404 });
 
-  // Detach the member from the team (keeps user record + history intact).
-  await sql`UPDATE users SET team_id = NULL WHERE id = ${targetId}`;
+  // Odebrat znamená smazat ČLENSTVÍ. Dřív se jen vynulovalo users.team_id
+  // a řádek v team_members zůstal — propuštěný zaměstnanec se pak přes
+  // přepínač podniků (POST /api/teams/switch) vrátil zpátky, i do chatu.
+  try { await sql`DELETE FROM team_members WHERE user_id = ${targetId} AND team_id = ${team.id}`; } catch { /* před migrací */ }
+  // Zrcadlo se nuluje jen tehdy, když byl aktivní právě tenhle podnik —
+  // jiný podnik, kde člověk dál pracuje, mu nebereme. Historie zůstává.
+  await sql`UPDATE users SET team_id = NULL WHERE id = ${targetId} AND team_id = ${team.id}`;
   // Chat access rides on conversation_members, not on team_id — drop the rows
   // so an ex-member can't keep reading or writing in the team's conversations.
   try {

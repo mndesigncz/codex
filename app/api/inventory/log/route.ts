@@ -70,7 +70,7 @@ export async function GET(request: Request) {
     FROM inventory_log l
     LEFT JOIN users u ON u.id = l.user_id
     JOIN inventory_items i ON i.id = l.item_id
-    WHERE i.team_id = ${me.teamId} OR i.team_id IS NULL
+    WHERE i.team_id = ${me.teamId}
     ORDER BY l.created_at DESC
     LIMIT 20`;
 

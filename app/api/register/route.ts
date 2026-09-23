@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
+import { hit } from '@/lib/rateLimit';
+import { klientIp } from '@/lib/klientIp';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,13 @@ export async function POST(request: Request) {
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Všechna pole jsou povinná' }, { status: 400 });
+    }
+    // Každá registrace zakládá podnik, tým a (s kartou) zkušební předplatné.
+    // Pět za hodinu z jedné adresy poctivému nevadí; skript by jinak mohl
+    // databázi zaplnit prázdnými podniky a zkoušet, které e-maily existují.
+    const gate = await hit(`register-ip:${klientIp(request.headers)}`, 5, 60 * 60);
+    if (!gate.ok) {
+      return NextResponse.json({ error: `Příliš mnoho registrací z této sítě. Zkus to znovu za ${Math.ceil(gate.retryAfter / 60)} min.` }, { status: 429, headers: { 'Retry-After': String(gate.retryAfter) } });
     }
     if (password.length < 8) {
       return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků' }, { status: 400 });

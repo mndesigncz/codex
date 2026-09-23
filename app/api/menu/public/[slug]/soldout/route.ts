@@ -14,6 +14,7 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { cleanSlug } from '@/lib/menu';
 import { podnikJePozastaveny } from '@/lib/blokaceDb';
+import { hit, clear } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,8 +75,18 @@ export async function POST(request: Request, { params }: { params: { slug: strin
     if (!board.pin_hash || !pin) {
       return NextResponse.json({ error: 'Zadej PIN menu' }, { status: 401 });
     }
+    // PIN má 4–8 číslic. Bez limitu se deset tisíc kombinací dalo projít
+    // skriptem za pár minut a pak komukoli přepínat „vyprodáno" v cizím
+    // menu. Deset neúspěchů na menu za čtvrt hodinu, stejně jako PIN na
+    // docházkovém kiosku; úspěch počítadlo vynuluje.
+    const klic = `menu-pin:${board.id}`;
+    const gate = await hit(klic, 10, 15 * 60, { failClosed: true });
+    if (!gate.ok) {
+      return NextResponse.json({ error: `Příliš mnoho pokusů o PIN. Zkus to za ${Math.ceil(gate.retryAfter / 60)} min.` }, { status: 429, headers: { 'Retry-After': String(gate.retryAfter) } });
+    }
     try { smi = await bcrypt.compare(pin, String(board.pin_hash)); } catch { smi = false; }
     if (!smi) return NextResponse.json({ error: 'Nesprávný PIN' }, { status: 401 });
+    await clear(klic);
   }
 
   await sql`UPDATE menu_items SET sold_out = ${soldOut} WHERE id = ${itemId}`;

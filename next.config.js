@@ -29,7 +29,10 @@ const nextConfig = {
               "default-src 'self'",
               // Stripe: vložená pokladna (js.stripe.com) běží v rámu na naší
               // stránce, karta nikdy neprojde naším kódem.
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+              // 'unsafe-eval' jen ve vývoji: potřebuje ho React Refresh.
+              // Produkční build eval nepoužívá a s ním by CSP pustila
+              // eval()/new Function() z vloženého skriptu.
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"} https://js.stripe.com`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { produceBatch } from '@/lib/production';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { verejnaHlaska } from '@/lib/verejnaChyba';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const r = await produceBatch(teamId, id, Number(b.batches) || 1, actor, { taskId: b.taskId ? Number(b.taskId) : null });
     return NextResponse.json({ ok: true, ...r });
   } catch (e: any) {
-    const msg = String(e?.message ?? 'Výroba se nepodařila.');
+    const msg = verejnaHlaska(e, 'Výroba se nepodařila.', '[produce]');
     return NextResponse.json({ error: msg }, { status: msg.includes('nenalezena') ? 404 : 400 });
   }
 }

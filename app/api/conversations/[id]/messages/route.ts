@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { souborUrl } from '@/lib/bezpecnaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,7 +77,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const body = await request.json();
   const content = (body.content ?? '').toString().trim() || null;
-  const attachmentUrl = body.attachmentUrl ?? null;
+  // Příloha je vždy soubor nahraný přes /api/upload — nic jiného chat neposílá.
+  const attachmentUrl = souborUrl(body.attachmentUrl);
   const attachmentType = body.attachmentType ?? null;
   const attachmentName = body.attachmentName ?? null;
 

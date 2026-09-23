@@ -8,6 +8,7 @@ import { normalizeCategoryPackaging, stockStatus, consumeContent } from '@/lib/p
 import { resolveActingUser } from '@/lib/kioskActing';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { ensureProductionTasks } from '@/lib/production';
+import { webovaUrl } from '@/lib/bezpecnaUrl';
 
 // Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
 // úkol „vyrobit“, doplněný ho zavře, chybějící suroviny dostanou vlajku do nákupu.
@@ -122,7 +123,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   // lookup would let anyone edit another business's stock.
   const [item] = await sql`
     SELECT * FROM inventory_items
-    WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+    WHERE id = ${id} AND team_id = ${me.teamId}`;
   if (!item) return NextResponse.json({ error: 'Položka nenalezena' }, { status: 404 });
 
   const body = await request.json();
@@ -304,7 +305,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const unit = body.unit !== undefined ? body.unit : item.unit;
   const supplier = body.supplier !== undefined ? body.supplier : item.supplier;
   const supplierUrl = body.supplierUrl !== undefined
-    ? (body.supplierUrl ? String(body.supplierUrl).trim() || null : null)
+    ? webovaUrl(body.supplierUrl)
     : item.supplier_url;
 
   await sql`
@@ -374,7 +375,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.highlight !== undefined) {
     const h = body.highlight === 'new' || body.highlight === 'tip' ? body.highlight : null;
     try {
-      await sql`UPDATE inventory_items SET highlight = ${h} WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+      await sql`UPDATE inventory_items SET highlight = ${h} WHERE id = ${id} AND team_id = ${me.teamId}`;
     } catch { /* not migrated yet */ }
   }
 
@@ -383,7 +384,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     try {
       await sql`
         UPDATE inventory_items SET hide_from_overview = ${body.hideFromOverview === true}, updated_by = ${me.meId}, updated_at = NOW()
-        WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+        WHERE id = ${id} AND team_id = ${me.teamId}`;
     } catch { /* not migrated yet */ }
   }
 
@@ -455,7 +456,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   const id = parseInt(params.id);
   const [item] = await sql`
     SELECT id FROM inventory_items
-    WHERE id = ${id} AND (team_id = ${me.teamId} OR team_id IS NULL)`;
+    WHERE id = ${id} AND team_id = ${me.teamId}`;
   if (!item) return NextResponse.json({ error: 'Položka nenalezena' }, { status: 404 });
   await sql`DELETE FROM inventory_log WHERE item_id = ${id}`;
   await sql`DELETE FROM inventory_items WHERE id = ${id}`;

@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     // obecná hláška — což se nám už jednou vymstilo při hledání chyby.
     console.error('[menu] založení menu selhalo:', e?.message ?? e);
     return NextResponse.json(
-      { error: `Menu se nepodařilo založit: ${e?.message ?? 'neznámá chyba'}` },
+      { error: 'Menu se nepodařilo založit. Zkus to znovu; když to nepůjde, napiš podpoře.' },
       { status: 500 },
     );
   }

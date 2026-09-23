@@ -10,6 +10,7 @@ import { notifyUser, notifyUsers } from '@/lib/push';
 import { sendDigestEmail } from '@/lib/email';
 import { cashDifference, czk } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
+import { escHtml } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -233,17 +234,20 @@ export async function GET(request: Request) {
         reviewLine,
       ].filter(Boolean).join(' · ');
 
+      // Jména, postupy a akce píše tým sám; do HTML e-mailu šly bez escapování,
+      // takže jméno `<a href=…>` se vedoucímu vykreslilo jako odkaz. Všechny
+      // ostatní šablony v lib/email.ts escapují — tahle byla vynechaná.
       const emailHtml = `
         <table style="width:100%; border-collapse: collapse; font-size: 15px;">
           <tr><td style="padding:8px 0; color:#666;">Tržba</td><td style="text-align:right; font-weight:700;">${czk(revenue)}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${verdict}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${[...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—'}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + procsMissing.join(', ') : 'hotové ✓'}</td></tr>
+          <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${escHtml(verdict)}</td></tr>
+          <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${escHtml([...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—')}</td></tr>
+          <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + escHtml(procsMissing.join(', ')) : 'hotové ✓'}</td></tr>
           <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' + (makeCount ? ` (${makeCount} k výrobě)` : '') : 'nic ✓'}</td></tr>
-          ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${posLine.replace('Pokladna: ', '')}</td></tr>` : ''}
-          ${guestLine ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${guestLine}</td></tr>` : ''}
-          ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${reviewLine}</td></tr>` : ''}
-          ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', ')}</td></tr>` : ''}
+          ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${escHtml(posLine.replace('Pokladna: ', ''))}</td></tr>` : ''}
+          ${guestLine ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${escHtml(guestLine)}</td></tr>` : ''}
+          ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${escHtml(reviewLine)}</td></tr>` : ''}
+          ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${escHtml(tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', '))}</td></tr>` : ''}
         </table>`;
 
       for (const e of employers as any[]) {

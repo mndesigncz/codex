@@ -271,6 +271,7 @@ function ChatWindow({
     setSendError('');
     setUploading(true);
     const up = await uploadFile(file);
+    if ('error' in up) { setSendError(up.error); setUploading(false); return; }
     if (up) {
       await doSend({ attachmentUrl: up.url, attachmentType: up.type, attachmentName: up.name });
     } else {

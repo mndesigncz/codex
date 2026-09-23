@@ -30,6 +30,11 @@ import { describe as popisUkolu } from '../lib/productionPlan.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
 import { adminTokenOk, MIN_TOKEN_LENGTH } from '../lib/adminToken.ts';
 import { rozhodni } from '../lib/blokace.ts';
+import { ciziPuvod } from '../lib/puvod.ts';
+import { klientIp } from '../lib/klientIp.ts';
+import { webovaUrl, souborUrl, mistniCesta } from '../lib/bezpecnaUrl.ts';
+import { normalizePlan } from '../lib/floorplan.ts';
+import { verejnaHlaska } from '../lib/verejnaChyba.ts';
 import { planInfoOf } from '../lib/plan.ts';
 import { pragueMomentOf } from '../lib/pragueTime.ts';
 
@@ -818,6 +823,55 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   eq('otevírací doba: pondělí má klíč 0', weekdayKey('2026-09-14'), '0');
   eq('otevírací doba: neděle má klíč 6', weekdayKey('2026-09-20'), '6');
 }
+
+// ——— CSRF: požadavek z cizí stránky ———
+eq('původ: POST ze stejné domény projde', ciziPuvod('POST', 'https://managero.cz', 'managero.cz'), false);
+eq('původ: POST z cizí domény se zamítne', ciziPuvod('POST', 'https://zly.example', 'managero.cz'), true);
+eq('původ: subdoména je cizí', ciziPuvod('POST', 'https://x.managero.cz', 'managero.cz'), true);
+eq('původ: bez Origin (webhook, cron) projde', ciziPuvod('POST', null, 'managero.cz'), false);
+eq('původ: GET se nehlídá', ciziPuvod('GET', 'https://zly.example', 'managero.cz'), false);
+eq('původ: DELETE z cizí domény se zamítne', ciziPuvod('delete', 'https://zly.example', 'managero.cz'), true);
+eq('původ: Origin null (sandbox) se zamítne', ciziPuvod('POST', 'null', 'managero.cz'), true);
+eq('původ: port patří k hostiteli', ciziPuvod('POST', 'http://localhost:3000', 'localhost:3000'), false);
+eq('původ: nesmyslný Origin se zamítne', ciziPuvod('POST', '::nesmysl', 'managero.cz'), true);
+// ——— IP pro limity ———
+eq('ip: první z x-forwarded-for', klientIp(new Headers({ 'x-forwarded-for': '1.2.3.4, 10.0.0.1' })), '1.2.3.4');
+eq('ip: x-real-ip jako záloha', klientIp(new Headers({ 'x-real-ip': '5.6.7.8' })), '5.6.7.8');
+eq('ip: prostý objekt hlaviček (NextAuth)', klientIp({ 'x-forwarded-for': '9.9.9.9' }), '9.9.9.9');
+eq('ip: nic → jeden kbelík', klientIp(undefined), 'neznama');
+
+// ——— Adresy od uživatele ———
+eq('url: https projde', webovaUrl('https://makro.cz/objednat'), 'https://makro.cz/objednat');
+eq('url: holá doména dostane https', webovaUrl('www.makro.cz'), 'https://www.makro.cz');
+eq('url: javascript: neprojde', webovaUrl('javascript:alert(1)'), null);
+eq('url: JaVaScRiPt: s mezerou neprojde', webovaUrl('  JaVaScRiPt:alert(1)'), null);
+eq('url: data: neprojde', webovaUrl('data:text/html,<script>'), null);
+eq('soubor: vlastní upload projde', souborUrl('/api/upload/12'), '/api/upload/12');
+eq('soubor: //cizí doména neprojde', souborUrl('//zly.example/x'), null);
+eq('soubor: javascript: neprojde', souborUrl('javascript:alert(1)'), null);
+eq('soubor: http bez s neprojde', souborUrl('http://x.cz/a.png'), null);
+eq('next: vlastní cesta projde', mistniCesta('/client/b/pangea', '/client'), '/client/b/pangea');
+eq('next: cizí doména → výchozí', mistniCesta('https://zly.example', '/client'), '/client');
+eq('next: //zly → výchozí', mistniCesta('//zly.example', '/client'), '/client');
+eq('next: javascript: → výchozí', mistniCesta('javascript:alert(1)', '/client'), '/client');
+eq('next: zpětné lomítko → výchozí', mistniCesta('/\\zly.example', '/client'), '/client');
+// ——— Půdorys: SVG se čistí při každém průchodu ———
+{
+  const zly = normalizePlan({ bg: { svg: '<svg viewBox="0 0 10 10"><img src=x onerror=alert(1)><rect width="5" height="5" onclick="alert(2)"/><a href="javascript:alert(3)"><circle r="2"/></a><script>alert(4)</script></svg>' } });
+  const svg = (zly.bg as { svg?: string } | null)?.svg ?? '';
+  eq('půdorys: onerror/onclick/javascript:/script pryč', /onerror|onclick|javascript:|<script/i.test(svg), false);
+  eq('půdorys: kresba zůstane', svg.includes('<rect'), true);
+  eq('půdorys: druhý průchod nic nemění', JSON.stringify(normalizePlan(zly).bg), JSON.stringify(zly.bg));
+  eq('půdorys: nesmysl místo SVG → bez pozadí', normalizePlan({ bg: { svg: '<img src=x onerror=alert(1)>' } }).bg, null);
+}
+
+// ——— Co z výjimky smí do prohlížeče ———
+eq('chyba: vlastní hláška projde', verejnaHlaska(new Error('Na výrobu chybí mléko.'), 'x'), 'Na výrobu chybí mléko.');
+eq('chyba: Postgres (SQLSTATE) → obecná', verejnaHlaska(Object.assign(new Error('column "foo" does not exist'), { code: '42703' }), 'Nepovedlo se.'), 'Nepovedlo se.');
+eq('chyba: NeonDbError → obecná', verejnaHlaska(Object.assign(new Error('relation x'), { name: 'NeonDbError' }), 'Nepovedlo se.'), 'Nepovedlo se.');
+eq('chyba: Stripe → obecná', verejnaHlaska(Object.assign(new Error('No such customer: cus_1'), { type: 'StripeInvalidRequestError' }), 'Nepovedlo se.'), 'Nepovedlo se.');
+eq('chyba: TypeError → obecná', verejnaHlaska(new TypeError("Cannot read properties of undefined (reading 'id')"), 'Nepovedlo se.'), 'Nepovedlo se.');
+eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepovedlo se.'), 'Nepovedlo se.');
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
 // souboru — všechno pod ní se sice vypsalo, ale do návratového kódu se

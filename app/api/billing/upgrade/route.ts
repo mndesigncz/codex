@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { employerCtx } from '../_auth';
 import { upgradeToMax, NOT_CONFIGURED, stripe } from '@/lib/billing';
+import { verejnaHlaska } from '@/lib/verejnaChyba';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,6 @@ export async function POST() {
   try {
     return NextResponse.json({ ok: true, ...(await upgradeToMax(c.teamId)) });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? 'Přechod se nepodařil.') }, { status: 400 });
+    return NextResponse.json({ error: verejnaHlaska(e, 'Přechod se nepodařil.', '[billing] upgrade') }, { status: 400 });
   }
 }

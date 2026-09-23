@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
+import { klientIp } from './klientIp';
 import { neon } from '@neondatabase/serverless';
 import { hit, clear } from './rateLimit';
 import { db } from './db';
@@ -41,6 +42,27 @@ async function ensureEmployerTeam(userId: number, name: string, currentTeamId: n
   }
 }
 
+// Stav uživatele z databáze pro token. Krátká mezipaměť v isolátu: jedna
+// stránka čte relaci i několikrát za sebou a pět vteřin zpoždění po změně
+// role je proti třiceti dnům zanedbatelné. update() ji obchází.
+const STAV_TTL_MS = 5_000;
+const stavCache = new Map<number, { at: number; v: { role: string; teamId: number | null } | 'smazan' }>();
+async function stavUzivatele(id: number, cerstve: boolean): Promise<{ role: string; teamId: number | null } | 'smazan' | null> {
+  if (!Number.isFinite(id)) return 'smazan';
+  const c = stavCache.get(id);
+  if (!cerstve && c && Date.now() - c.at < STAV_TTL_MS) return c.v;
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    const [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
+    const v = u ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id) } : 'smazan' as const;
+    if (stavCache.size > 5000) stavCache.clear();
+    stavCache.set(id, { at: Date.now(), v });
+    return v;
+  } catch {
+    return null;
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -49,8 +71,15 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Heslo', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
+        // Limit na e-mail nestačí: kdo zkouší jedno uniklé heslo proti
+        // tisícům e-mailů (credential stuffing), trefí každý účet jen jednou.
+        // Třicet pokusů z jedné adresy za čtvrt hodinu podnik s tabletem
+        // a pár telefony nevyčerpá, skript ano. Počítá se i úspěch — jinak
+        // by si útočník počítadlo nulovat přihlášením do vlastního účtu.
+        const ipGate = await hit(`login-ip:${klientIp(req?.headers)}`, 30, 15 * 60, { failClosed: true });
+        if (!ipGate.ok) return null;
         // Deset neúspěchů na e-mail za čtvrt hodiny. Bez tohohle šlo heslo
         // hádat donekonečna — bcrypt sice zdržuje, ale útočníka neodradí.
         const email = String(credentials.email).trim().toLowerCase();
@@ -107,14 +136,28 @@ export const authOptions: NextAuthOptions = {
         if (session.user.name) token.name = session.user.name;
         if ((session.user as any).avatar) token.avatar = (session.user as any).avatar;
       }
-      // Tým se osvěží ze zdroje pravdy, ne z toho, co pošle klient.
-      if (trigger === 'update' && token.sub) {
-        try {
-          const sql = neon(process.env.DATABASE_URL!);
-          const [u] = await sql`SELECT team_id, role FROM users WHERE id = ${parseInt(String(token.sub))}`;
-          if (u) { token.teamId = u.team_id ?? null; token.role = u.role; }
-          token.superadmin = await jeSpravcePodleDb(parseInt(String(token.sub)));
-        } catch { /* při výpadku databáze zůstane token, jaký byl */ }
+      // Role a tým se berou z databáze při KAŽDÉM čtení relace, ne jen když
+      // prohlížeč sám zavolá update(). Token platí 30 dní a asi 68 rout čte
+      // roli z něj: degradovaný manažer si dřív nechal práva vedení až do
+      // vypršení tokenu, a kdo se přepnul do podniku, kde je jen zaměstnanec,
+      // a update() schválně nezavolal, měl tam práva vedení z podniku, odkud
+      // přišel. Teď token nese vždy to, co je v databázi.
+      if (token.sub && !user) {
+        const id = parseInt(String(token.sub));
+        const u = await stavUzivatele(id, trigger === 'update');
+        if (u === 'smazan') {
+          // Účet zmizel: relace nese prázdnou roli a žádná routa ji nepustí.
+          token.role = null; token.teamId = null; token.superadmin = false;
+        } else if (u) {
+          token.teamId = u.teamId; token.role = u.role;
+          // Správce se ověřuje znovu jen u toho, kdo jím je, nebo při update():
+          // ostatní za to neplatí dotazem navíc.
+          if (token.superadmin === true || trigger === 'update') {
+            try { token.superadmin = await jeSpravcePodleDb(id); } catch { /* zůstane */ }
+          }
+        }
+        // u === null: databáze nejde — token zůstane, jaký byl, ať výpadek
+        // neodhlásí celý podnik uprostřed směny.
       }
       return token;
     },

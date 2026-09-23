@@ -176,7 +176,7 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
              cash_removed, self_payout, closing_cash, customers, notes, review_note, covered_by,
              payout_from_register, tips_in_drawer, created_by, created_at, date
       FROM cash_closings
-      WHERE (team_id = ${teamId} OR team_id IS NULL)
+      WHERE team_id = ${teamId}
         AND (created_by = ${employeeId} OR shift_employees @> to_jsonb(${employeeId}::int))
         AND (COALESCE(shift_date, date) = ${dayA}
              OR (date = ${dayB} AND created_at >= ${fromIso} AND created_at <= ${toIso}))
