@@ -1,0 +1,27 @@
+{
+ "read": [
+  {
+   "id": 5,
+   "name": "Eva Testová",
+   "avatar": "🙂",
+   "jobTitle": "Barista",
+   "readAt": "2026-09-18T08:00:00Z"
+  }
+ ],
+ "unread": [
+  {
+   "id": 6,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "jobTitle": "Barista",
+   "readAt": null
+  },
+  {
+   "id": 7,
+   "name": "Tereza Malá",
+   "avatar": "👩",
+   "jobTitle": "Servírka",
+   "readAt": null
+  }
+ ]
+}

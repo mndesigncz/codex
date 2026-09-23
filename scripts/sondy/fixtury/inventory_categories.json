@@ -1,0 +1,63 @@
+[
+ {
+  "id": 1,
+  "name": "Čaje sypané",
+  "position": 0,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 2,
+  "name": "Sirupy",
+  "position": 1,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 3,
+  "name": "Nealko",
+  "position": 2,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 4,
+  "name": "Dobroty",
+  "position": 3,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 5,
+  "name": "Drogerie",
+  "position": 4,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 900,
+  "name": "Sirupy z organizace",
+  "position": 99,
+  "zOrganizace": true,
+  "sdileno": false,
+  "spravuje": "Kavárna Vinohrady",
+  "parentId": null,
+  "tracksOpen": false,
+  "contentUnit": null,
+  "defaultPackageSize": null,
+  "thresholdUnit": "package",
+  "defaults": null,
+  "scale": null,
+  "hideFromOverview": false
+ }
+]

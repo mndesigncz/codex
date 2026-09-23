@@ -1,0 +1,77 @@
+{
+ "isEmployer": true,
+ "requests": [
+  {
+   "id": 1,
+   "employeeId": "2",
+   "fromDate": "2026-09-28",
+   "toDate": "2026-10-02",
+   "type": "vacation",
+   "note": "Dovolená u moře",
+   "status": "pending",
+   "createdAt": "2026-09-10T08:00:00Z",
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩"
+  },
+  {
+   "id": 2,
+   "employeeId": "3",
+   "fromDate": "2026-09-24",
+   "toDate": "2026-09-26",
+   "type": "vacation",
+   "note": null,
+   "status": "pending",
+   "createdAt": "2026-09-11T09:20:00Z",
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔"
+  },
+  {
+   "id": 3,
+   "employeeId": "4",
+   "fromDate": "2026-09-21",
+   "toDate": "2026-09-21",
+   "type": "sick",
+   "note": "Doktor",
+   "status": "pending",
+   "createdAt": "2026-09-12T07:05:00Z",
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️"
+  },
+  {
+   "id": 4,
+   "employeeId": "5",
+   "fromDate": "2026-10-05",
+   "toDate": "2026-10-09",
+   "type": "vacation",
+   "note": null,
+   "status": "pending",
+   "createdAt": "2026-09-13T10:00:00Z",
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null
+  },
+  {
+   "id": 5,
+   "employeeId": "2",
+   "fromDate": "2026-09-19",
+   "toDate": "2026-09-19",
+   "type": "other",
+   "note": "Stěhování",
+   "status": "pending",
+   "createdAt": "2026-09-14T11:30:00Z",
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩"
+  },
+  {
+   "id": 6,
+   "employeeId": "3",
+   "fromDate": "2026-09-30",
+   "toDate": "2026-09-30",
+   "type": "vacation",
+   "note": null,
+   "status": "approved",
+   "createdAt": "2026-09-01T08:00:00Z",
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔"
+  }
+ ]
+}

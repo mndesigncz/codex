@@ -1,0 +1,12 @@
+[
+ ["k40-uzaverky","employer","/employer/overview?view=closings"],
+ ["k40-finance","employer","/employer/overview?view=finance"],
+ ["k40-ukoly","employer","/employer/overview?view=tasks"],
+ ["k40-dochazka","employer","/employer/overview?view=attendance"],
+ ["k40-nastenka","employer","/employer/overview?view=announcements"],
+ ["k40-menu","employer","/employer/overview?view=menu"],
+ ["k40-stoly","employer","/employer/overview?mode=client&tab=tables"],
+ ["k40-vernost","employer","/employer/overview?mode=client&tab=loyalty"],
+ ["k40-akce","employer","/employer/overview?mode=client&tab=events"],
+ ["k40-postupy","employer","/employer/overview?view=procedures"]
+]

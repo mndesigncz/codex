@@ -1,0 +1,65 @@
+{
+ "customers": [
+  {
+   "id": 101,
+   "name": "Jana Dvořáková",
+   "email": "jana.dvorakova@email.cz",
+   "points": 320,
+   "stamps": 6,
+   "visits": 18,
+   "joined_at": "2026-02-11",
+   "last_visit_at": "2026-09-15",
+   "reservations": 7,
+   "open_coupons": 1
+  },
+  {
+   "id": 102,
+   "name": "Petr Novák",
+   "email": "p.novak@email.cz",
+   "points": 140,
+   "stamps": 2,
+   "visits": 9,
+   "joined_at": "2026-04-02",
+   "last_visit_at": "2026-09-12",
+   "reservations": 3,
+   "open_coupons": 0
+  },
+  {
+   "id": 103,
+   "name": "Tereza Málková",
+   "email": "t.malkova@firma.cz",
+   "points": 880,
+   "stamps": 7,
+   "visits": 41,
+   "joined_at": "2025-11-20",
+   "last_visit_at": "2026-09-16",
+   "reservations": 12,
+   "open_coupons": 2
+  },
+  {
+   "id": 104,
+   "name": "Ondřej Beneš",
+   "email": "benes.o@email.cz",
+   "points": 60,
+   "stamps": 1,
+   "visits": 4,
+   "joined_at": "2026-08-29",
+   "last_visit_at": "2026-09-03",
+   "reservations": 1,
+   "open_coupons": 0
+  },
+  {
+   "id": 105,
+   "name": "Klára Šimková",
+   "email": "klara.s@email.cz",
+   "points": 455,
+   "stamps": 4,
+   "visits": 22,
+   "joined_at": "2026-01-08",
+   "last_visit_at": "2026-09-14",
+   "reservations": 6,
+   "open_coupons": 1
+  }
+ ],
+ "total": 148
+}

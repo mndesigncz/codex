@@ -1,0 +1,17 @@
+{
+ "itemId": 4,
+ "name": "Domácí limonáda",
+ "unit": "l",
+ "madeInHouse": true,
+ "batchYield": 5,
+ "batchSteps": "Starý text, co nikdo neudržuje",
+ "productionLabel": "",
+ "taskTitle": "Vyrobit Domácí limonáda",
+ "status": "low",
+ "batches": 2,
+ "ingredients": [],
+ "guideId": 2,
+ "guideTitle": "Domácí limonáda — postup",
+ "guideSteps": 3,
+ "guideApproved": true
+}

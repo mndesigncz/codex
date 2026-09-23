@@ -1,0 +1,5 @@
+[["c-home", "customer", "/client"],
+ ["c-podnik", "customer", "/client/kavarna-u-lipy"],
+ ["c-me", "customer", "/client/me"],
+ ["c-login", null, "/client/login"],
+ ["c-register", null, "/client/register"]]

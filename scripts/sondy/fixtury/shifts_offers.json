@@ -1,0 +1,57 @@
+{
+ "meId": 15,
+ "isEmployer": true,
+ "offers": [
+  {
+   "id": 11,
+   "shiftId": 101,
+   "offeredBy": 2,
+   "claimedBy": 3,
+   "status": "claimed",
+   "note": null,
+   "createdAt": "2026-09-16T10:00:00Z",
+   "date": "2026-09-22",
+   "startTime": "07:00",
+   "endTime": "15:00",
+   "type": "ranní",
+   "offeredByName": "Eva Testová",
+   "offeredByAvatar": "👩",
+   "claimedByName": "Jakub Horák",
+   "claimedByAvatar": "🧔"
+  },
+  {
+   "id": 12,
+   "shiftId": 102,
+   "offeredBy": 4,
+   "claimedBy": 5,
+   "status": "claimed",
+   "note": null,
+   "createdAt": "2026-09-16T12:00:00Z",
+   "date": "2026-09-23",
+   "startTime": "12:00",
+   "endTime": "20:00",
+   "type": "odpolední",
+   "offeredByName": "Tereza Malá",
+   "offeredByAvatar": "👱‍♀️",
+   "claimedByName": "Ondřej Kučera",
+   "claimedByAvatar": null
+  },
+  {
+   "id": 13,
+   "shiftId": 103,
+   "offeredBy": 3,
+   "claimedBy": 2,
+   "status": "claimed",
+   "note": null,
+   "createdAt": "2026-09-17T09:00:00Z",
+   "date": "2026-09-25",
+   "startTime": "07:00",
+   "endTime": "15:00",
+   "type": "ranní",
+   "offeredByName": "Jakub Horák",
+   "offeredByAvatar": "🧔",
+   "claimedByName": "Eva Testová",
+   "claimedByAvatar": "👩"
+  }
+ ]
+}

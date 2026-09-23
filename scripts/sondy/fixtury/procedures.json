@@ -1,0 +1,152 @@
+{
+ "procedures": [
+  {
+   "id": 1,
+   "name": "Otevírací rutina",
+   "description": "Co se dělá před otevřením.",
+   "icon": "sun",
+   "color": "1",
+   "items": [
+    {
+     "text": "Zapnout kávovar a nechat nahřát",
+     "emoji": "☕",
+     "guideId": 1
+    },
+    {
+     "text": "Zkontrolovat mléko v lednici",
+     "emoji": "🥛"
+    },
+    {
+     "text": "Vyndat pečivo z mrazáku",
+     "emoji": "🥐"
+    },
+    {
+     "text": "Spustit kasu a zkontrolovat zůstatek",
+     "emoji": "💶"
+    }
+   ],
+   "remindAt": "07:30",
+   "remindDays": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "remindAnchor": "open",
+   "requireBeforeClosing": false,
+   "approved": true,
+   "submittedBy": null
+  },
+  {
+   "id": 2,
+   "name": "Zavírací rutina",
+   "description": "Co se dělá po zavření.",
+   "icon": "moon",
+   "color": "3",
+   "items": [
+    {
+     "text": "Odvápnit kávovar",
+     "emoji": "🧼"
+    },
+    {
+     "text": "Sepsat uzávěrku",
+     "emoji": "🧾"
+    },
+    {
+     "text": "Vynést odpad",
+     "emoji": "🗑️"
+    }
+   ],
+   "remindAt": "21:30",
+   "remindDays": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    0
+   ],
+   "remindAnchor": "close",
+   "requireBeforeClosing": true,
+   "approved": true,
+   "submittedBy": null
+  },
+  {
+   "id": 3,
+   "name": "Týdenní úklid skladu",
+   "description": "Návrh od Evy, čeká na schválení.",
+   "icon": "box",
+   "color": "5",
+   "items": [
+    {
+     "text": "Zkontrolovat data spotřeby",
+     "emoji": "📅"
+    },
+    {
+     "text": "Přerovnat regály",
+     "emoji": "📦"
+    }
+   ],
+   "remindAt": null,
+   "remindDays": [],
+   "remindAnchor": null,
+   "requireBeforeClosing": false,
+   "approved": false,
+   "submittedBy": 2
+  },
+  {
+   "id": 4,
+   "name": "Příprava zahrádky",
+   "description": "Návrh od Jakuba.",
+   "icon": "sun",
+   "color": "2",
+   "items": [
+    {
+     "text": "Rozložit slunečníky",
+     "emoji": "⛱️"
+    },
+    {
+     "text": "Otřít stoly",
+     "emoji": "🧽"
+    }
+   ],
+   "remindAt": null,
+   "remindDays": [],
+   "remindAnchor": null,
+   "requireBeforeClosing": false,
+   "approved": false,
+   "submittedBy": 3
+  },
+  {
+   "id": 5,
+   "name": "Měsíční inventura",
+   "description": "Návrh od Terezy.",
+   "icon": "box",
+   "color": "4",
+   "items": [
+    {
+     "text": "Spočítat zásoby",
+     "emoji": "🔢"
+    },
+    {
+     "text": "Zapsat rozdíly",
+     "emoji": "📝"
+    }
+   ],
+   "remindAt": null,
+   "remindDays": [],
+   "remindAnchor": null,
+   "requireBeforeClosing": false,
+   "approved": false,
+   "submittedBy": 4
+  }
+ ],
+ "hasShiftToday": true,
+ "openingToday": {
+  "open": "08:00",
+  "close": "20:00",
+  "closed": false
+ }
+}

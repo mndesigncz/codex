@@ -1,0 +1,114 @@
+{
+ "role": "employer",
+ "levels": [
+  {
+   "name": "Nováček",
+   "minPoints": 0,
+   "perks": ""
+  },
+  {
+   "name": "Barista",
+   "minPoints": 150,
+   "perks": "Sleva 10 % na vlastní nákup"
+  },
+  {
+   "name": "Mistr",
+   "minPoints": 500,
+   "perks": "Sleva 20 % + přednostní výběr směn"
+  },
+  {
+   "name": "Legenda",
+   "minPoints": 1200,
+   "perks": "Sleva 30 % + bonus k výplatě"
+  }
+ ],
+ "points": {
+  "task": 10,
+  "procedure": 15,
+  "closing": 20,
+  "review": 25
+ },
+ "standings": [
+  {
+   "id": 2,
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "points": 640,
+   "breakdown": {
+    "tasks": 180,
+    "procedures": 120,
+    "closings": 90,
+    "reviewPoints": 210,
+    "itemPoints": 40,
+    "autoPoints": 390,
+    "flagged": false
+   },
+   "flagged": false,
+   "pending": 1,
+   "oldestPending": "2026-09-14",
+   "levelName": "Mistr",
+   "levelIndex": 2,
+   "next": {
+    "name": "Legenda",
+    "minPoints": 1200
+   },
+   "pctToNext": 20,
+   "pointsIntoLevel": 140,
+   "pointsForNext": 700
+  },
+  {
+   "id": 3,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "points": 310,
+   "breakdown": {
+    "tasks": 120,
+    "procedures": 60,
+    "closings": 40,
+    "reviewPoints": 70,
+    "itemPoints": 20,
+    "autoPoints": 220,
+    "flagged": false
+   },
+   "flagged": false,
+   "pending": 0,
+   "oldestPending": null,
+   "levelName": "Barista",
+   "levelIndex": 1,
+   "next": {
+    "name": "Mistr",
+    "minPoints": 500
+   },
+   "pctToNext": 46,
+   "pointsIntoLevel": 160,
+   "pointsForNext": 350
+  },
+  {
+   "id": 1,
+   "name": "Martin Nemeškal",
+   "avatar": "🧑",
+   "points": 95,
+   "breakdown": {
+    "tasks": 40,
+    "procedures": 20,
+    "closings": 15,
+    "reviewPoints": 20,
+    "itemPoints": 0,
+    "autoPoints": 75,
+    "flagged": false
+   },
+   "flagged": false,
+   "pending": 0,
+   "oldestPending": null,
+   "levelName": "Nováček",
+   "levelIndex": 0,
+   "next": {
+    "name": "Barista",
+    "minPoints": 150
+   },
+   "pctToNext": 63,
+   "pointsIntoLevel": 95,
+   "pointsForNext": 150
+  }
+ ]
+}

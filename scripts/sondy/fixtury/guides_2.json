@@ -1,0 +1,27 @@
+{
+ "guide": {
+  "id": 2,
+  "title": "Domácí limonáda — postup",
+  "content": "Dělá se ráno, vydrží tři dny.",
+  "checklist": [
+   {
+    "text": "Nakrájet citrony"
+   },
+   {
+    "text": "Svařit sirup s vodou"
+   },
+   {
+    "text": "Nechat vychladnout a stočit"
+   }
+  ],
+  "categoryId": 2,
+  "updatedAt": "2026-09-12T14:02:00Z",
+  "createdAt": "2026-09-01T08:00:00Z",
+  "author": "Martin",
+  "productId": null,
+  "productName": null,
+  "itemId": 4,
+  "itemName": "Domácí limonáda",
+  "itemMadeInHouse": true
+ }
+}

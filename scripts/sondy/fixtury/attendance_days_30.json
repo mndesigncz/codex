@@ -1,0 +1,332 @@
+{
+ "roster": [
+  {
+   "id": 1,
+   "name": "Martin Nemeškal",
+   "avatar": "🧑",
+   "hourlyRate": 0,
+   "hasPin": true,
+   "openSince": "2026-09-17T06:58:00Z",
+   "openEntryId": 501,
+   "nudgedAt": null,
+   "shiftStart": "08:00",
+   "shiftEnd": "16:00"
+  },
+  {
+   "id": 2,
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "hourlyRate": 195,
+   "hasPin": true,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": "12:00",
+   "shiftEnd": "20:00"
+  },
+  {
+   "id": 3,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "hourlyRate": 180,
+   "hasPin": false,
+   "openSince": "2026-09-17T09:12:00Z",
+   "openEntryId": 502,
+   "nudgedAt": null,
+   "shiftStart": "09:00",
+   "shiftEnd": "17:00"
+  }
+ ],
+ "entries": [
+  {
+   "id": 501,
+   "employeeId": 1,
+   "employeeName": "Martin Nemeškal",
+   "employeeAvatar": "🧑",
+   "clockIn": "2026-09-17T06:58:00Z",
+   "clockOut": null,
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 499,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-16T10:02:00Z",
+   "clockOut": "2026-09-16T18:11:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 498,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-16T08:55:00Z",
+   "clockOut": "2026-09-16T17:03:00Z",
+   "source": "app",
+   "note": "Přijel dřív kvůli dodávce."
+  },
+  {
+   "id": 497,
+   "employeeId": 1,
+   "employeeName": "Martin Nemeškal",
+   "employeeAvatar": "🧑",
+   "clockIn": "2026-09-15T07:01:00Z",
+   "clockOut": "2026-09-15T16:28:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 496,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-15T11:58:00Z",
+   "clockOut": "2026-09-15T20:04:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 502,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-11T06:00:00Z",
+   "clockOut": "2026-09-11T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 503,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-11T06:00:00Z",
+   "clockOut": "2026-09-11T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 504,
+   "employeeId": 4,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "clockIn": "2026-09-11T06:00:00Z",
+   "clockOut": "2026-09-11T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 505,
+   "employeeId": 5,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "clockIn": "2026-09-11T06:00:00Z",
+   "clockOut": "2026-09-11T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 506,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-12T06:00:00Z",
+   "clockOut": "2026-09-12T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 507,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-12T06:00:00Z",
+   "clockOut": "2026-09-12T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 508,
+   "employeeId": 4,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "clockIn": "2026-09-12T06:00:00Z",
+   "clockOut": "2026-09-12T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 509,
+   "employeeId": 5,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "clockIn": "2026-09-12T06:00:00Z",
+   "clockOut": "2026-09-12T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 510,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-13T06:00:00Z",
+   "clockOut": "2026-09-13T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 511,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-13T06:00:00Z",
+   "clockOut": "2026-09-13T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 512,
+   "employeeId": 4,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "clockIn": "2026-09-13T06:00:00Z",
+   "clockOut": "2026-09-13T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 513,
+   "employeeId": 5,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "clockIn": "2026-09-13T06:00:00Z",
+   "clockOut": "2026-09-13T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 514,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-14T06:00:00Z",
+   "clockOut": "2026-09-14T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 515,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-14T06:00:00Z",
+   "clockOut": "2026-09-14T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 516,
+   "employeeId": 4,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "clockIn": "2026-09-14T06:00:00Z",
+   "clockOut": "2026-09-14T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 517,
+   "employeeId": 5,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "clockIn": "2026-09-14T06:00:00Z",
+   "clockOut": "2026-09-14T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 518,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-15T06:00:00Z",
+   "clockOut": "2026-09-15T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 519,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-15T06:00:00Z",
+   "clockOut": "2026-09-15T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 520,
+   "employeeId": 4,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "clockIn": "2026-09-15T06:00:00Z",
+   "clockOut": "2026-09-15T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 521,
+   "employeeId": 5,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "clockIn": "2026-09-15T06:00:00Z",
+   "clockOut": "2026-09-15T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 522,
+   "employeeId": 2,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "2026-09-16T06:00:00Z",
+   "clockOut": "2026-09-16T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 523,
+   "employeeId": 3,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "2026-09-16T06:00:00Z",
+   "clockOut": "2026-09-16T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 524,
+   "employeeId": 4,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "clockIn": "2026-09-16T06:00:00Z",
+   "clockOut": "2026-09-16T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 525,
+   "employeeId": 5,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "clockIn": "2026-09-16T06:00:00Z",
+   "clockOut": "2026-09-16T14:00:00Z",
+   "source": "kiosk",
+   "note": null
+  }
+ ]
+}

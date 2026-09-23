@@ -1,0 +1,30 @@
+{
+ "organization": {
+  "id": 9,
+  "name": "Moje kavárny",
+  "isOwner": true,
+  "settings": {
+   "sdileniLidi": true,
+   "konsolidovanyPrehled": true,
+   "sdileneCiselniky": true,
+   "fakturace": "per_team",
+   "zdrojeCiselniku": {
+    "kategorieSkladu": 1,
+    "dodavatele": 1,
+    "typySmen": 1,
+    "kategorieNavodu": 1,
+    "odmeny": null
+   }
+  },
+  "teams": [
+   {
+    "id": 1,
+    "name": "Kavárna Vinohrady"
+   },
+   {
+    "id": 2,
+    "name": "Kavárna Karlín"
+   }
+  ]
+ }
+}

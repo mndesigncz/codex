@@ -1,0 +1,88 @@
+{
+ "messages": [
+  {
+   "id": 1,
+   "conversationId": 1,
+   "senderId": 1,
+   "content": "Od pondělí máme novou dodavatelku pečiva. Ceník je v Nákupu.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-15T08:12:00Z",
+   "senderName": "Martin Nemeškal",
+   "senderAvatar": "🧑"
+  },
+  {
+   "id": 2,
+   "conversationId": 1,
+   "senderId": 2,
+   "content": "Super. Mám ráno objednat i croissanty, nebo zatím ne?",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-15T08:20:00Z",
+   "senderName": "Eva Testová",
+   "senderAvatar": "👩"
+  },
+  {
+   "id": 3,
+   "conversationId": 1,
+   "senderId": 1,
+   "content": "Zatím ne, počkáme na první závoz.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-15T08:22:00Z",
+   "senderName": "Martin Nemeškal",
+   "senderAvatar": "🧑"
+  },
+  {
+   "id": 4,
+   "conversationId": 1,
+   "senderId": 3,
+   "content": "Kávovar dneska ráno pískal, odvápnil jsem ho. Vypadá to dobře.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-16T07:05:00Z",
+   "senderName": "Jakub Horák",
+   "senderAvatar": "🧔"
+  },
+  {
+   "id": 5,
+   "conversationId": 1,
+   "senderId": 2,
+   "content": "Díky! Zapsala jsem to do údržby.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-16T07:31:00Z",
+   "senderName": "Eva Testová",
+   "senderAvatar": "👩"
+  },
+  {
+   "id": 6,
+   "conversationId": 1,
+   "senderId": 1,
+   "content": "Zítra dorazí dodávka kolem desáté, někdo ji vezme?\n\nPotřebuju vědět do večera, ať to nemusím rušit.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-17T17:40:00Z",
+   "senderName": "Martin Nemeškal",
+   "senderAvatar": "🧑"
+  },
+  {
+   "id": 7,
+   "conversationId": 1,
+   "senderId": 3,
+   "content": "Já můžu, mám ranní.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-17T18:42:00Z",
+   "senderName": "Jakub Horák",
+   "senderAvatar": "🧔"
+  }
+ ]
+}

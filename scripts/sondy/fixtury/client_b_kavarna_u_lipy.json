@@ -1,0 +1,287 @@
+{
+ "business": {
+  "slug": "kavarna-u-lipy",
+  "name": "Kavárna U Lípy",
+  "tagline": "Káva, snídaně a klid na práci",
+  "description": "Malý podnik v přízemí starého domu. Sedí se u stolů i na baru. Pražíme si sami, pečeme denně.",
+  "address": "Lipová 14, Brno",
+  "coverUrl": "",
+  "hours": {
+   "0": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "1": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "2": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "3": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "4": {
+    "open": "08:00",
+    "close": "20:00"
+   },
+   "5": {
+    "open": "09:00",
+    "close": "20:00"
+   },
+   "6": {
+    "open": "09:00",
+    "close": "16:00"
+   }
+  },
+  "currency": "CZK",
+  "reservationsOn": true,
+  "orderingOn": true,
+  "loyaltyOn": true,
+  "pointsPer100": 10,
+  "tiers": {
+   "silverAt": 10,
+   "goldAt": 25,
+   "platinumAt": 0,
+   "memberDiscount": 0,
+   "silverDiscount": 5,
+   "goldDiscount": 10,
+   "platinumDiscount": 0
+  },
+  "cashbackPct": 0,
+  "stampTarget": 8,
+  "stampReward": "Káva zdarma",
+  "maxParty": 8,
+  "leadDays": 30,
+  "slotMinutes": 30,
+  "logoUrl": "",
+  "gallery": [],
+  "accent": "",
+  "orderQrRequired": false,
+  "orderGeo": "off"
+ },
+ "menu": {
+  "id": 1,
+  "slug": "kavarna",
+  "name": "Denní nabídka",
+  "eyebrow": "Dnes u nás",
+  "title": "Nabídka",
+  "note": "Ceny včetně DPH.",
+  "wifiSsid": "Kavarna-Host",
+  "wifiPassword": "dobrakava",
+  "currency": "CZK",
+  "enabled": true,
+  "theme": {
+   "id": "pangea",
+   "label": "Zlatá a krémová"
+  },
+  "sections": [
+   {
+    "id": 1,
+    "title": "Káva",
+    "column": 1,
+    "position": 1,
+    "items": [
+     {
+      "id": 1,
+      "name": "Espresso",
+      "price": 59,
+      "description": null,
+      "soldOut": false,
+      "posProductId": null,
+      "position": 1
+     },
+     {
+      "id": 2,
+      "name": "Flat white",
+      "price": 79,
+      "description": "Dvojité espresso a našlehané mléko.",
+      "soldOut": false,
+      "posProductId": null,
+      "position": 2
+     },
+     {
+      "id": 3,
+      "name": "Filtr dne",
+      "price": 69,
+      "description": "Etiopie Guji, ovocná a čistá.",
+      "soldOut": false,
+      "posProductId": null,
+      "position": 3
+     },
+     {
+      "id": 4,
+      "name": "Cappuccino",
+      "price": 75,
+      "description": null,
+      "soldOut": false,
+      "posProductId": null,
+      "position": 4
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "title": "Nealko",
+    "column": 1,
+    "position": 2,
+    "items": [
+     {
+      "id": 5,
+      "name": "Domácí limonáda",
+      "price": 65,
+      "description": "Zázvor a citron.",
+      "soldOut": false,
+      "posProductId": null,
+      "position": 5
+     },
+     {
+      "id": 6,
+      "name": "Matcha latte",
+      "price": 89,
+      "description": null,
+      "soldOut": true,
+      "posProductId": null,
+      "position": 6
+     },
+     {
+      "id": 7,
+      "name": "Čerstvý džus",
+      "price": 79,
+      "description": null,
+      "soldOut": false,
+      "posProductId": null,
+      "position": 7
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "title": "K tomu",
+    "column": 2,
+    "position": 1,
+    "items": [
+     {
+      "id": 8,
+      "name": "Croissant",
+      "price": 45,
+      "description": null,
+      "soldOut": false,
+      "posProductId": null,
+      "position": 8
+     },
+     {
+      "id": 9,
+      "name": "Cheesecake",
+      "price": 89,
+      "description": "Pečený, s malinovou omáčkou.",
+      "soldOut": false,
+      "posProductId": null,
+      "position": 9
+     },
+     {
+      "id": 10,
+      "name": "Quiche dne",
+      "price": 139,
+      "description": "S listovým salátem.",
+      "soldOut": false,
+      "posProductId": null,
+      "position": 10
+     }
+    ]
+   }
+  ]
+ },
+ "tables": [
+  {
+   "id": 1,
+   "name": "U okna",
+   "seats": 4,
+   "map_x": 12,
+   "map_y": 20,
+   "map_w": 14,
+   "map_h": 14,
+   "map_shape": "round",
+   "map_rot": 0
+  },
+  {
+   "id": 2,
+   "name": "Velký stůl",
+   "seats": 8,
+   "map_x": 45,
+   "map_y": 30,
+   "map_w": 26,
+   "map_h": 14,
+   "map_shape": "rect",
+   "map_rot": 0
+  },
+  {
+   "id": 3,
+   "name": "Zahrádka 1",
+   "seats": 2,
+   "map_x": 72,
+   "map_y": 60,
+   "map_w": 12,
+   "map_h": 12,
+   "map_shape": "round",
+   "map_rot": 0
+  }
+ ],
+ "plan": {
+  "shapes": [],
+  "bg": null,
+  "bgOpacity": 0.5
+ },
+ "coupons": [
+  {
+   "id": 1,
+   "title": "Filtr dne zdarma",
+   "cost_points": 200,
+   "kind": "offer",
+   "valid_until": null
+  },
+  {
+   "id": 2,
+   "title": "Sleva 20 % na dort",
+   "cost_points": 120,
+   "kind": "offer",
+   "valid_until": null
+  }
+ ],
+ "news": [],
+ "events": [
+  {
+   "id": 1,
+   "title": "Degustace nové pražírny",
+   "description": "Ochutnávka tří nových káv s pražičem.",
+   "kind": "event",
+   "date": "2026-09-24",
+   "start_time": "18:00",
+   "end_time": "20:00",
+   "location": "U nás v podniku",
+   "offsite": false,
+   "capacity": 20,
+   "photos": [],
+   "menu": [],
+   "going": 7,
+   "public": true
+  }
+ ],
+ "stampCampaigns": [
+  {
+   "id": 1,
+   "title": "Osmá káva zdarma",
+   "target": 8
+  }
+ ],
+ "me": {
+  "points": 320,
+  "stamps": 6,
+  "visits": 18,
+  "tier": "silver"
+ },
+ "signedIn": true,
+ "today": "2026-09-17"
+}

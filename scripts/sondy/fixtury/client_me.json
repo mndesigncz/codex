@@ -1,0 +1,36 @@
+{
+ "customer": {
+  "id": 101,
+  "name": "Jana Dvořáková",
+  "email": "jana.dvorakova@email.cz"
+ },
+ "memberships": [
+  {
+   "teamId": 1,
+   "slug": "kavarna-u-lipy",
+   "name": "Kavárna U Lípy",
+   "points": 320,
+   "stamps": 6,
+   "visits": 18,
+   "tier": "silver"
+  }
+ ],
+ "claims": [
+  {
+   "id": 5,
+   "title": "Filtr dne zdarma",
+   "redeemed_at": null,
+   "business": "Kavárna U Lípy"
+  }
+ ],
+ "reservations": [
+  {
+   "id": 11,
+   "date": "2026-09-19",
+   "time": "11:00",
+   "party": 2,
+   "status": "confirmed",
+   "business": "Kavárna U Lípy"
+  }
+ ]
+}

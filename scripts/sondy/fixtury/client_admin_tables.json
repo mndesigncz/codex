@@ -1,0 +1,33 @@
+{
+ "tables": [
+  {
+   "id": 1,
+   "name": "U okna",
+   "seats": 4,
+   "storyous_desk_id": "12",
+   "active": true
+  },
+  {
+   "id": 2,
+   "name": "Velký stůl",
+   "seats": 8,
+   "storyous_desk_id": null,
+   "active": true
+  },
+  {
+   "id": 3,
+   "name": "Zahrádka 1",
+   "seats": 2,
+   "storyous_desk_id": "31",
+   "active": true
+  },
+  {
+   "id": 4,
+   "name": "Bar",
+   "seats": 3,
+   "storyous_desk_id": null,
+   "active": true
+  }
+ ],
+ "posConnected": true
+}

@@ -1,0 +1,90 @@
+[
+ {
+  "id": 15,
+  "name": "Martin Nemeškal",
+  "email": "m@x.cz",
+  "role": "employer",
+  "avatar": "🧑",
+  "jobTitle": "Provozní"
+ },
+ {
+  "id": 2,
+  "name": "Eva Testová",
+  "email": "e@x.cz",
+  "role": "employee",
+  "avatar": "👩",
+  "jobTitle": "Barista"
+ },
+ {
+  "id": 3,
+  "name": "Jakub Horák",
+  "email": "j@x.cz",
+  "role": "employee",
+  "avatar": "🧔",
+  "jobTitle": "Barista"
+ },
+ {
+  "id": 4,
+  "name": "Tereza Malá",
+  "email": "t@x.cz",
+  "role": "employee",
+  "avatar": "👱‍♀️",
+  "jobTitle": "Servírka"
+ },
+ {
+  "id": 5,
+  "name": "Ondřej Kučera",
+  "email": "o@x.cz",
+  "role": "employee",
+  "avatar": null,
+  "jobTitle": "Kuchař"
+ },
+ {
+  "id": 9,
+  "name": "Kiosk",
+  "email": "k@x.cz",
+  "role": "kiosk",
+  "avatar": null,
+  "jobTitle": null
+ },
+ {
+  "id": 16,
+  "name": "Petra Dvořáková",
+  "email": "x16@x.cz",
+  "role": "employee",
+  "avatar": "👩‍🦰",
+  "jobTitle": "Barista"
+ },
+ {
+  "id": 17,
+  "name": "Lukáš Beneš",
+  "email": "x17@x.cz",
+  "role": "employee",
+  "avatar": "🧑‍🍳",
+  "jobTitle": "Kuchař"
+ },
+ {
+  "id": 18,
+  "name": "Nikola Šťastná",
+  "email": "x18@x.cz",
+  "role": "employee",
+  "avatar": "👩‍🦱",
+  "jobTitle": "Servírka"
+ },
+ {
+  "id": 19,
+  "name": "Adam Pokorný",
+  "email": "x19@x.cz",
+  "role": "employee",
+  "avatar": null,
+  "jobTitle": "Brigádník"
+ },
+ {
+  "id": 20,
+  "name": "Klára Vlčková",
+  "email": "x20@x.cz",
+  "role": "employee",
+  "avatar": "👱‍♀️",
+  "jobTitle": "Barista"
+ }
+]

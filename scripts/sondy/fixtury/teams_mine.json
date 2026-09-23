@@ -1,0 +1,29 @@
+{
+ "activeTeamId": 1,
+ "teams": [
+  {
+   "teamId": 1,
+   "role": "employer",
+   "teamName": "Kavárna Vinohrady",
+   "organizationId": 9
+  },
+  {
+   "teamId": 2,
+   "role": "employer",
+   "teamName": "Kavárna Karlín",
+   "organizationId": 9
+  }
+ ],
+ "organization": {
+  "id": 9,
+  "name": "Moje kavárny",
+  "isOwner": true,
+  "settings": {
+   "sdileniLidi": true,
+   "konsolidovanyPrehled": true,
+   "sdileneCiselniky": false,
+   "fakturace": "per_team"
+  }
+ },
+ "muzuZalozit": true
+}

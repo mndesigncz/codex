@@ -1,0 +1,40 @@
+{
+ "messages": [
+  {
+   "id": 11,
+   "conversationId": 2,
+   "senderId": 2,
+   "content": "Můžeš se mrknout na uzávěrku z pátku? Sedí mi to o 120 Kč jinak.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-17T15:40:00Z",
+   "senderName": "Eva Testová",
+   "senderAvatar": "👩"
+  },
+  {
+   "id": 12,
+   "conversationId": 2,
+   "senderId": 1,
+   "content": "Kouknu na to po zavíračce.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-17T15:52:00Z",
+   "senderName": "Martin Nemeškal",
+   "senderAvatar": "🧑"
+  },
+  {
+   "id": 13,
+   "conversationId": 2,
+   "senderId": 2,
+   "content": "Díky, vyřídím to ráno.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-17T16:05:00Z",
+   "senderName": "Eva Testová",
+   "senderAvatar": "👩"
+  }
+ ]
+}

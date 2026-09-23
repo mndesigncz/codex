@@ -6,3 +6,6 @@ dist/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Snímky ze sond v prohlížeči
+scripts/sondy/shots/

@@ -1,0 +1,28 @@
+{
+ "messages": [
+  {
+   "id": 21,
+   "conversationId": 3,
+   "senderId": 3,
+   "content": "Posílám fotku toho rozbitého těsnění.",
+   "attachmentUrl": null,
+   "attachmentType": null,
+   "attachmentName": null,
+   "createdAt": "2026-09-16T20:15:00Z",
+   "senderName": "Jakub Horák",
+   "senderAvatar": "🧔"
+  },
+  {
+   "id": 22,
+   "conversationId": 3,
+   "senderId": 3,
+   "content": null,
+   "attachmentUrl": "/illu/chat.svg",
+   "attachmentType": "image",
+   "attachmentName": "tesneni.jpg",
+   "createdAt": "2026-09-16T20:18:00Z",
+   "senderName": "Jakub Horák",
+   "senderAvatar": "🧔"
+  }
+ ]
+}

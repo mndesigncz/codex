@@ -1,0 +1,12 @@
+{
+ "gapDays": [
+  "2026-09-12"
+ ],
+ "drawer": {
+  "date": "2026-09-11",
+  "shiftLabel": "16:00–23:00",
+  "authorName": "Eva Testová",
+  "amount": 3200,
+  "finalRemoval": 0
+ }
+}
