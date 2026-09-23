@@ -25,7 +25,7 @@ import { krokyNavodu } from './navody';
 import { pragueToday } from './pragueTime';
 import { notifyUsers } from './push';
 import { audit } from './audit';
-import { tymyCiselniku } from './tenant';
+import { clenovePodniku, tymyCiselniku, vedeniPodniku } from './tenant';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -112,8 +112,10 @@ async function recipesFor(teamId: number, itemIds: number[]): Promise<Map<number
 
 async function oldestEmployer(teamId: number): Promise<number | null> {
   try {
-    const [u] = await sql`SELECT id FROM users WHERE team_id = ${teamId} AND role = 'employer' ORDER BY id LIMIT 1`;
-    return u ? Number(u.id) : null;
+    // Kolo 62: vedení podle členství — podnik, jehož jediný provozovatel je
+    // přepnutý jinam, by jinak neměl aktéra a výroba by se nezakládala.
+    const vedeni = await vedeniPodniku(teamId);
+    return vedeni.length ? Math.min(...vedeni) : null;
   } catch { return null; }
 }
 
@@ -212,10 +214,11 @@ export async function ensureProductionTasks(teamId: number, actorId?: number | n
 
   if (created > 0) {
     try {
-      const users = await sql`SELECT id, role FROM users WHERE team_id = ${teamId} AND role IN ('employer', 'employee')`;
+      // Kolo 62: příjemci podle členství; role (odkaz v push) z TOHOTO podniku.
+      const users = await clenovePodniku(teamId, { role: 'lide' });
       const body = createdTitles.slice(0, 3).join(', ') + (createdTitles.length > 3 ? ` a další ${createdTitles.length - 3}` : '');
-      const emp = users.filter((u: any) => u.role === 'employer').map((u: any) => Number(u.id));
-      const crew = users.filter((u: any) => u.role === 'employee').map((u: any) => Number(u.id));
+      const emp = users.filter(u => u.role === 'employer').map(u => u.id);
+      const crew = users.filter(u => u.role === 'employee').map(u => u.id);
       await Promise.all([
         notifyUsers(crew, { title: 'K výrobě na směně', body, type: 'task', category: 'stock', link: '/employee/shifts?view=tasks' }),
         notifyUsers(emp, { title: 'K výrobě na směně', body, type: 'task', category: 'stock', link: '/employer/overview?view=tasks' }),

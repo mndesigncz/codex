@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,9 +129,9 @@ export async function POST(request: Request) {
   const teamId = u?.team_id;
   if (!teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
 
-  // Verify the other user is in the same team.
-  const [other] = await sql`SELECT id, team_id FROM users WHERE id = ${otherId}`;
-  if (!other || other.team_id !== teamId) {
+  // Kolega je členem podniku (členství NEBO zrcadlo, kolo 62) — i když je
+  // právě přepnutý jinam; konverzace zůstává v podniku volajícího.
+  if (!(await jeClenem(otherId, teamId))) {
     return NextResponse.json({ error: 'Uživatel není ve stejném týmu' }, { status: 400 });
   }
 

@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
+import { clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,10 +67,10 @@ export async function POST(req: NextRequest) {
       VALUES (${u.team_id}, ${question}, ${JSON.stringify(options)}::jsonb, ${u.id})
       RETURNING id`;
     try {
-      const members = await sql`
-        SELECT id, role FROM users WHERE team_id = ${u.team_id} AND id <> ${u.id} AND role <> 'kiosk'`;
-      const ees = (members as any[]).filter(m => m.role !== 'employer').map(m => m.id);
-      const emp = (members as any[]).filter(m => m.role === 'employer').map(m => m.id);
+      // Kolo 62: příjemci podle členství; role (odkaz v push) z TOHOTO podniku.
+      const members = await clenovePodniku(u.team_id, { role: 'lide', krome: u.id });
+      const ees = members.filter(m => m.role !== 'employer').map(m => m.id);
+      const emp = members.filter(m => m.role === 'employer').map(m => m.id);
       if (ees.length) await notifyUsers(ees, { title: '📊 Nová anketa', body: question, type: 'info', link: '/employee/chat' });
       if (emp.length) await notifyUsers(emp, { title: '📊 Nová anketa', body: question, type: 'info', link: '/employer/chat' });
     } catch { /* best-effort */ }

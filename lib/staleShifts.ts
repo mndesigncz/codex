@@ -19,6 +19,7 @@ import { pragueHourOf, pragueDayOf, dayPlus } from '@/lib/pragueTime';
 import { denPrichodu, denUzaverky, type DenPrichoduVstup } from '@/lib/businessDay';
 import { weekdayKey, type OpeningDay } from '@/lib/coverage';
 import type { ShiftRow } from '@/lib/shiftWindow';
+import { vedeniPodniku } from '@/lib/tenant';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -270,8 +271,9 @@ export async function autoCloseEntry(entry: { id: number; employee_id: number; t
     const hhmm = closeAt.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
     try {
       const [emp] = await sql`SELECT name FROM users WHERE id = ${entry.employee_id}`;
-      const employers = await sql`
-        SELECT id FROM users WHERE team_id = ${entry.team_id} AND role = 'employer' AND id <> ${entry.employee_id}`;
+      // Kolo 62: vedení podniku ZÁZNAMU podle členství — provozovatel
+      // přepnutý jinam se o automaticky zavřené směně jinak nedozví.
+      const employers = await vedeniPodniku(entry.team_id, { krome: entry.employee_id });
       let missingClosing = false;
       try {
         const [has] = await sql`
@@ -280,7 +282,7 @@ export async function autoCloseEntry(entry: { id: number; employee_id: number; t
             AND COALESCE(shift_date, date) = ${await denSmeny(entry.team_id, entry.employee_id, inTs)}`;
         missingClosing = !has;
       } catch { /* volitelné */ }
-      await notifyUsers((employers as any[]).map(e => e.id), {
+      await notifyUsers(employers, {
         title: '⏱️ Směna uzavřena automaticky',
         body: `${emp?.name ?? 'Zaměstnanec'} se zapomněl/a odpíchnout — směna uzavřena v ${hhmm} (${why}).`
           + (missingClosing ? ' K tomuhle dni navíc chybí uzávěrka.' : '')

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
 import { planInfoOf } from '@/lib/plan';
+import { clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,17 +123,16 @@ export async function GET() {
       if (ps) pinnedShare = { token: ps.token, title: ps.title ?? null, kind: ps.kind };
     } catch { /* not migrated yet */ }
 
-    let members: any[];
-    try {
-      members = await sql`
-        SELECT id, name, email, role, avatar, phone, job_title, shift_preference,
-               CASE WHEN ${me.role === 'employer'} THEN COALESCE(hourly_rate, 0) ELSE NULL END AS hourly_rate
-        FROM users WHERE team_id = ${teamId} AND role <> 'kiosk' ORDER BY role DESC, name ASC`;
-    } catch {
-      members = await sql`
-        SELECT id, name, email, role, avatar, phone, job_title, shift_preference
-        FROM users WHERE team_id = ${teamId} AND role <> 'kiosk' ORDER BY role DESC, name ASC`;
-    }
+    // Členství NEBO zrcadlo (kolo 62): člen přepnutý do jiného podniku tu
+    // dřív zmizel. Role, pozice a sazba jsou z členství v TOMHLE podniku;
+    // sazbu vidí jen vedení. Klíče odpovědi zůstávají, přibylo aktivni_jinde.
+    const jeVedeni = me.role === 'employer';
+    const members = (await clenovePodniku(teamId, { sSazbou: jeVedeni })).map(c => ({
+      id: c.id, name: c.name, email: c.email, role: c.role, avatar: c.avatar, phone: c.phone,
+      job_title: c.jobTitle, shift_preference: c.shiftPreference,
+      hourly_rate: jeVedeni ? (c.hourlyRate ?? 0) : null,
+      aktivni_jinde: c.aktivniJinde,
+    }));
 
     return NextResponse.json({
       planInfo,

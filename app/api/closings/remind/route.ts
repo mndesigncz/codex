@@ -3,6 +3,7 @@ import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { windowOf } from '@/lib/shiftWindow';
+import { vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,11 +76,12 @@ export async function GET(request: Request) {
       GROUP BY cc.team_id`;
     for (const t of pending as any[]) {
       if (!t.team_id || !t.n) continue;
-      const employers = await sql`
-        SELECT id FROM users WHERE team_id = ${t.team_id} AND role = 'employer'`;
-      for (const e of employers as any[]) {
+      // Kolo 62: vedení podle členství — provozovatel přepnutý do jiného
+      // podniku o čekajících uzávěrkách dřív nedostal ani slovo.
+      const employers = await vedeniPodniku(Number(t.team_id));
+      for (const eid of employers) {
         try {
-          await notifyUser(e.id, {
+          await notifyUser(eid, {
             title: '⚠️ Uzávěrky ke schválení',
             body: `${t.n} ${t.n === 1 ? 'uzávěrka čeká' : t.n <= 4 ? 'uzávěrky čekají' : 'uzávěrek čeká'} na tvoje schválení.`,
             type: 'warning',

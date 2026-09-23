@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,9 +77,8 @@ export async function POST(req: NextRequest) {
       if (me.role !== 'employer' || !me.teamId) {
         return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
       }
-      const [member] = await sql`
-        SELECT id FROM users WHERE id = ${asked} AND team_id = ${me.teamId}`;
-      if (!member) return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
+      // Členství, ne zrcadlo (kolo 62): žádost za člena přepnutého jinam musí jít založit.
+      if (!(await jeClenem(asked, me.teamId))) return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
       employeeId = asked;
     }
 

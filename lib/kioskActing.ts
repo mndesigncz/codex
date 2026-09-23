@@ -9,6 +9,7 @@
 // Anything else silently falls back to the session user.
 
 import { neon } from '@neondatabase/serverless';
+import { jeClenem } from './tenant';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -42,13 +43,15 @@ export async function resolveActingUser(
   if (candidate == null) return meId;
 
   try {
+    // Kolo 62: příslušnost podle členství nebo zrcadla (tablet helper
+    // vyloučí sám). Otevřený příchod musí být z TOHOHLE podniku — kdo je
+    // odpíchnutý v podniku B, nesmí přes tablet v A jednat za sebe; NULL jsou
+    // řádky z doby před sloupcem team_id.
+    if (!(await jeClenem(candidate, teamId))) return meId;
     const [row] = await sql`
-      SELECT u.id FROM users u
-      WHERE u.id = ${candidate} AND u.team_id = ${teamId} AND u.role <> 'kiosk'
-        AND EXISTS (
-          SELECT 1 FROM time_entries te
-          WHERE te.employee_id = u.id AND te.clock_out IS NULL
-        )
+      SELECT 1 AS ok FROM time_entries te
+      WHERE te.employee_id = ${candidate} AND te.clock_out IS NULL
+        AND (te.team_id = ${teamId} OR te.team_id IS NULL)
       LIMIT 1`;
     return row ? candidate : meId;
   } catch {

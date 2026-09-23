@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
+import { jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,8 +82,9 @@ export async function PATCH(req: NextRequest) {
   const pin = b.pin === null || b.pin === '' ? null : String(b.pin).replace(/\D/g, '').slice(0, 6);
   if (pin !== null && pin.length < 4) return NextResponse.json({ error: 'PIN musí mít 4–6 číslic.' }, { status: 400 });
 
-  const [target] = await sql`SELECT id FROM users WHERE id = ${userId} AND team_id = ${c.teamId} AND role <> 'kiosk'`;
-  if (!target) return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
+  // Kolo 62: členství nebo zrcadlo (tablet helper vyloučí sám). PIN leží na
+  // osobě, takže platí ve všech jejích podnicích — to je záměr, ne chyba.
+  if (!(await jeClenem(userId, c.teamId))) return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
 
   // PIN se ukládá zahašovaný. Dřív ležel v databázi čitelný, takže kdo se
   // dostal k výpisu, mohl se odpíchnout za kohokoli z týmu.

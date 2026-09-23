@@ -9,6 +9,7 @@
 // veřejné adresy, členství, věrnostní účet (body, razítka, návštěvy) a kupony.
 
 import { neon } from '@neondatabase/serverless';
+import { vedeniPodniku } from './tenant';
 import { getServerSession } from 'next-auth';
 import { randomBytes } from 'crypto';
 import { authOptions } from './auth';
@@ -327,8 +328,9 @@ export function couponCode(): string {
 
 export async function notifyTeamEmployers(teamId: number, payload: { title: string; body?: string; link?: string; type?: string }) {
   try {
-    const rows = await sql`SELECT id FROM users WHERE team_id = ${teamId} AND role = 'employer'`;
-    const ids = (rows as any[]).map(r => Number(r.id));
+    // Vedení podle členství (kolo 62): provozovatel přepnutý do jiného
+    // podniku dostane rezervaci a objednávku hostů pořád.
+    const ids = await vedeniPodniku(teamId);
     if (ids.length) await notifyUsers(ids, { ...payload, category: 'general' });
   } catch { /* oznámení je best-effort */ }
 }

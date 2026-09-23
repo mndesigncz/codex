@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints, PointsConfig } from '@/lib/rewardLevels';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
+import { clenPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,15 +27,11 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   const employeeId = parseInt(params.id);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  let emp: any;
-  try {
-    [emp] = await sql`
-      SELECT id, name, avatar, email, phone, job_title, hourly_rate, team_id, role
-      FROM users WHERE id = ${employeeId}`;
-  } catch {
-    [emp] = await sql`SELECT id, name, avatar, email, team_id, role FROM users WHERE id = ${employeeId}`;
-  }
-  if (!emp || emp.team_id !== teamId || emp.role === 'kiosk') {
+  // Členství NEBO zrcadlo (kolo 62): člen přepnutý do jiného podniku dřív
+  // dostal 404. Pozice a sazba jsou z členství v TOMHLE podniku, ne ze
+  // zrcadla podniku, kam je právě přepnutý. Tablet helper vylučuje sám.
+  const emp = await clenPodniku(employeeId, teamId);
+  if (!emp) {
     return NextResponse.json({ error: 'Zaměstnanec nenalezen' }, { status: 404 });
   }
 
@@ -217,7 +214,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     employee: {
       id: emp.id, name: emp.name, avatar: emp.avatar,
       email: emp.email ?? null, phone: emp.phone ?? null,
-      jobTitle: emp.job_title ?? null, hourlyRate: emp.hourly_rate ?? null,
+      jobTitle: emp.jobTitle, hourlyRate: emp.hourlyRate,
     },
     standing: {
       points: totalPoints,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { idClenu } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,9 @@ export async function POST(req: Request) {
   const rows: any[] = Array.isArray(body.rows) ? body.rows : [];
   if (rows.length === 0) return NextResponse.json({ inserted: 0 });
 
+  // Členství jednou před cyklem (kolo 62): člen přepnutý jinam dřív dostal
+  // „není v týmu" a jeden dotaz na řádek CSV byl zbytečný.
+  const clenove = new Set(await idClenu(ctx.teamId));
   let inserted = 0;
   const errors: string[] = [];
   for (const r of rows) {
@@ -36,9 +40,7 @@ export async function POST(req: Request) {
       errors.push(`Přeskočen neúplný řádek: ${JSON.stringify(r)}`);
       continue;
     }
-    // ensure the employee belongs to this team
-    const [emp] = await sql`SELECT id FROM users WHERE id = ${employeeId} AND team_id = ${ctx.teamId}`;
-    if (!emp) {
+    if (!clenove.has(employeeId)) {
       errors.push(`Zaměstnanec #${employeeId} není v týmu`);
       continue;
     }

@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { pragueToday, pragueDaySafe, parseDbTime } from '@/lib/pragueTime';
 import { autoCloseEntry, isForgottenClockOut, pragueMoment, denSmeny } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
+import { jeClenem, vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,26 +55,36 @@ export async function GET(req: NextRequest) {
     // Roster: every employee + their currently-open entry (if clocked in)
     // + today's planned shift so the kiosk can show plan vs reality.
     const today = pragueToday();
+    // Kolo 62: v rosteru je každý, kdo má v podniku ČLENSTVÍ nebo zrcadlo —
+    // člen přepnutý do jiného podniku z tabletu nezmizí. Sazba je z členství
+    // v TOMHLE podniku (nikdy ze zrcadla cizího). Otevřený příchod i směna se
+    // berou jen odsud, jinak by watchdog níž zavřel příchod z podniku B pod
+    // hlavičkou A; NULL u time_entries jsou řádky z doby před sloupcem team_id.
     const rosterQuery = (withRate: boolean) => sql`
       SELECT u.id, u.name, u.avatar,
-             CASE WHEN ${withRate} THEN COALESCE(u.hourly_rate, 0) ELSE NULL END AS "hourlyRate",
+             CASE WHEN ${withRate}
+                  THEN (CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(u.hourly_rate, 0) END)
+                  ELSE NULL END AS "hourlyRate",
              (u.pin IS NOT NULL AND u.pin <> '') AS "hasPin",
              te.clock_in AS "openSince",
              te.id AS "openEntryId", te.nudged_at AS "nudgedAt",
              sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
       FROM users u
+      LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${c.teamId}
       LEFT JOIN LATERAL (
         SELECT id, clock_in, nudged_at FROM time_entries
         WHERE employee_id = u.id AND clock_out IS NULL
+          AND (team_id = ${c.teamId} OR team_id IS NULL)
         ORDER BY clock_in DESC LIMIT 1
       ) te ON TRUE
       LEFT JOIN LATERAL (
         SELECT start_time, end_time FROM shifts
-        WHERE employee_id = u.id AND date = ${today}
+        WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
         ORDER BY start_time ASC LIMIT 1
       ) sh ON TRUE
-      WHERE u.team_id = ${c.teamId} AND u.role IN ('employee','employer')
-      ORDER BY u.role DESC, u.name ASC`;
+      WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
+        AND COALESCE(m.role, u.role) IN ('employee','employer')
+      ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
     let roster: any[];
     try {
       roster = await rosterQuery(c.role === 'employer');
@@ -85,18 +96,21 @@ export async function GET(req: NextRequest) {
                te.clock_in AS "openSince",
                sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
         FROM users u
+        LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${c.teamId}
         LEFT JOIN LATERAL (
           SELECT clock_in FROM time_entries
           WHERE employee_id = u.id AND clock_out IS NULL
+            AND (team_id = ${c.teamId} OR team_id IS NULL)
           ORDER BY clock_in DESC LIMIT 1
         ) te ON TRUE
         LEFT JOIN LATERAL (
           SELECT start_time, end_time FROM shifts
-          WHERE employee_id = u.id AND date = ${today}
+          WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
           ORDER BY start_time ASC LIMIT 1
         ) sh ON TRUE
-        WHERE u.team_id = ${c.teamId} AND u.role IN ('employee','employer')
-        ORDER BY u.role DESC, u.name ASC`;
+        WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
+          AND COALESCE(m.role, u.role) IN ('employee','employer')
+        ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
     }
 
     // Inline watchdog: the shop kiosk polls this endpoint all day, so every
@@ -174,8 +188,9 @@ export async function POST(req: NextRequest) {
   // Manual complete entry: the employer backfills a forgotten punch for a
   // member of their own team ({ employeeId, clockIn, clockOut } as ISO).
   if (c.role === 'employer' && b.clockIn && b.clockOut) {
-    const [emp0] = await sql`SELECT id, team_id FROM users WHERE id = ${employeeId}`;
-    if (!emp0 || emp0.team_id !== c.teamId) {
+    // Kolo 62: členství nebo zrcadlo — člen přepnutý jinam tu dřív dostal
+    // „není ve vašem týmu".
+    if (!(await jeClenem(employeeId, c.teamId))) {
       return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
     }
     const ci = new Date(b.clockIn), co = new Date(b.clockOut);
@@ -198,12 +213,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   }
   let empPinHash: string | null = null;
-  const [emp] = await sql`SELECT id, team_id, pin FROM users WHERE id = ${employeeId}`;
+  // PIN je na osobě (users), ne na členství — čte se zvlášť; příslušnost
+  // k podniku rozhoduje členství nebo zrcadlo (kolo 62).
+  const [emp] = await sql`SELECT id, pin FROM users WHERE id = ${employeeId}`;
   try {
     const [h] = await sql`SELECT pin_hash FROM users WHERE id = ${employeeId}`;
     empPinHash = h?.pin_hash ?? null;
   } catch { /* sloupec ještě není — jede se po staru */ }
-  if (!emp || emp.team_id !== c.teamId) {
+  if (!emp || !(await jeClenem(employeeId, c.teamId))) {
     return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
   }
   // PIN check for shared-kiosk clock-ins when the employee has one set.
@@ -284,6 +301,7 @@ export async function POST(req: NextRequest) {
       const [planned] = await sql`
         SELECT start_time FROM shifts
         WHERE employee_id = ${employeeId} AND date = ${denSmenyPrichodu} AND start_time IS NOT NULL
+          AND team_id = ${c.teamId}
         ORDER BY start_time ASC LIMIT 1`;
       if (planned?.start_time) {
         const [ph, pm] = String(planned.start_time).split(':').map(Number);
@@ -291,10 +309,9 @@ export async function POST(req: NextRequest) {
         const lateMin = (nh * 60 + nm) - (ph * 60 + pm);
         if (lateMin > 10 && lateMin < 12 * 60) {
           const [emp2] = await sql`SELECT name FROM users WHERE id = ${employeeId}`;
-          const employers = await sql`
-            SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${employeeId}`;
+          const employers = await vedeniPodniku(c.teamId, { krome: employeeId });
           const { notifyUsers } = await import('@/lib/push');
-          await notifyUsers((employers as any[]).map(e => e.id), {
+          await notifyUsers(employers, {
             title: '⏰ Pozdní příchod',
             body: `${emp2?.name ?? 'Zaměstnanec'} se odpíchl/a v ${now} — směna začínala v ${String(planned.start_time).slice(0, 5)} (+${lateMin} min).`,
             type: 'warning',

@@ -11,7 +11,7 @@ import { sendDigestEmail } from '@/lib/email';
 import { cashDifference, czk } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
 import { escHtml } from '@/lib/email';
-import { tymyCiselnikuHromadne } from '@/lib/tenant';
+import { tymyCiselnikuHromadne, clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -37,8 +37,9 @@ export async function GET(request: Request) {
     // najednou, ne dotaz na organizaci uvnitř smyčky za každý podnik.
     const tymyKategorii = await tymyCiselnikuHromadne((teams as any[]).map(t => Number(t.id)), 'kategorieSkladu');
     for (const team of teams as any[]) {
-      const employers = await sql`
-        SELECT id, email FROM users WHERE team_id = ${team.id} AND role = 'employer'`;
+      // Vedení podle členství (kolo 62): provozovatel právě přepnutý do
+      // jiného podniku dřív souhrn tohohle podniku nedostal.
+      const employers = await clenovePodniku(team.id, { role: 'employer' });
       if (!employers.length) continue;
 
       // --- closings today ---

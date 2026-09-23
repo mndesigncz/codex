@@ -10,6 +10,7 @@ import { denSmeny, denUzaverkyPro, zavreneDnyTydne, smenaBezUzaverky } from '@/l
 import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
+import { clenovePodniku, clenPodniku, idClenu, vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,11 +103,16 @@ export async function GET() {
 
   // A closing belongs to the whole shift — resolve the stored ids into people
   // so the UI can render "Směna: Anna + Petr".
+  // Kolo 62: jména podle id z uzávěrek samotných, ne ze seznamu členů —
+  // člen přepnutý jinam (nebo bývalý) by se v historii ukázal jako „Neznámý".
   const peopleById = new Map<number, ShiftPerson>();
   if (rows.length) {
     try {
-      const team = await sql`SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId}`;
-      for (const u of team as any[]) peopleById.set(u.id, { id: u.id, name: u.name, avatar: u.avatar });
+      const ids = [...new Set((rows as any[]).flatMap(r => idsOf(r.shift_employees)))];
+      if (ids.length) {
+        const team = await sql`SELECT id, name, avatar FROM users WHERE id = ANY(${ids})`;
+        for (const u of team as any[]) peopleById.set(u.id, { id: u.id, name: u.name, avatar: u.avatar });
+      }
     } catch { /* fall back to ids only */ }
   }
   const closings = (rows as any[]).map(r => ({
@@ -203,10 +209,8 @@ export async function GET() {
   let missingClosings: { date: string; employees: any[] }[] = [];
   if (c.role === 'employer') {
     try {
-      members = await sql`
-        SELECT id, name, avatar FROM users
-        WHERE team_id = ${c.teamId} AND role IN ('employee','employer')
-        ORDER BY role DESC, name ASC`;
+      // Kolo 62: „odeslat za" nabízí členy podniku (členství nebo zrcadlo).
+      members = (await clenovePodniku(c.teamId)).map(m => ({ id: m.id, name: m.name, avatar: m.avatar, aktivniJinde: m.aktivniJinde }));
     } catch { /* ignore */ }
 
     try {
@@ -312,8 +316,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
   }
   if ((isKiosk || isEmployer) && Number.isFinite(wantEmployeeId) && wantEmployeeId !== c.meId) {
-    const [emp] = await sql`SELECT id, team_id, role FROM users WHERE id = ${wantEmployeeId}`;
-    if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') {
+    // Kolo 62: členství nebo zrcadlo; tablet helper bez volby vyloučí sám.
+    const emp = await clenPodniku(wantEmployeeId, c.teamId);
+    if (!emp) {
       return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
     }
     actorId = wantEmployeeId;
@@ -619,14 +624,13 @@ export async function POST(request: Request) {
 
   // Notify team employers (except the author).
   try {
-    const employers = await sql`
-      SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${actorId}`;
+    const employers = await vedeniPodniku(c.teamId, { krome: actorId });
     if (employers.length) {
       const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
       const diff = cashDifference({ ...(row as any), tips_in_drawer: tipsInDrawer });
       const verdict = diff === 0 ? 'kasa sedí' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
       const name = author?.name ?? 'Zaměstnanec';
-      await Promise.allSettled(employers.map((e: any) => notifyUser(e.id, {
+      await Promise.allSettled(employers.map(eid => notifyUser(eid, {
         title: approved ? 'Nová uzávěrka' : '⚠️ Uzávěrka ke schválení',
         body: approved
           ? `${name} odeslal uzávěrku (${row.date}) — ${verdict}.`
@@ -656,12 +660,13 @@ export async function POST(request: Request) {
 
   const coveredIds: number[] = [];
   if (eventId == null && Array.isArray(b.coworkers) && b.coworkers.length && row?.id) {
+    // Kolo 62: členové podniku jednou před cyklem (členství nebo zrcadlo, bez tabletu).
+    const clenove = new Set(await idClenu(c.teamId));
     for (const cw of b.coworkers) {
       const cid = parseInt(cw?.employeeId);
       if (!Number.isFinite(cid) || cid === actorId) continue;
       try {
-        const [emp] = await sql`SELECT id, team_id, role, name FROM users WHERE id = ${cid}`;
-        if (!emp || emp.team_id !== c.teamId || emp.role === 'kiosk') continue;
+        if (!clenove.has(cid)) continue;
         const [cwDupe] = await sql`SELECT id FROM cash_closings WHERE created_by = ${cid} AND date = ${shiftDate}`;
         if (cwDupe) continue;
 

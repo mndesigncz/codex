@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
-import { tymyCiselniku } from '@/lib/tenant';
+import { idClenu, tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,10 +97,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     try {
       await sql`UPDATE guides SET require_read = ${body.requireRead === true} WHERE id = ${id} AND team_id = ${c.teamId}`;
       if (body.requireRead === true) {
-        const members = await sql`SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employee'`;
+        // Kolo 62: zaměstnanci podle členství v tomhle podniku, ne zrcadla.
+        const members = await idClenu(c.teamId, { role: 'employee' });
         const [g2] = await sql`SELECT title FROM guides WHERE id = ${id}`;
         const { notifyUsers } = await import('@/lib/push');
-        await notifyUsers((members as any[]).map(m => m.id), {
+        await notifyUsers(members, {
           title: '📖 Povinné čtení',
           body: `Návod „${g2?.title ?? ''}" je povinný — přečti a potvrď.`,
           type: 'info',

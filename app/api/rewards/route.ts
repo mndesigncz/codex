@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
 import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
 import { pragueToday } from '@/lib/pragueTime';
+import { clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ async function ctx() {
 // "to rate" backlog. Older shifts are ignored so the number stays actionable.
 // Nehodnocené směnodny za posledních 60 dní, per zaměstnanec — jeden dotaz
 // pro celý tým (dřív jeden na člena).
-async function pendingForTeam(userIds: number[]): Promise<Map<number, { n: number; oldest: string | null }>> {
+async function pendingForTeam(teamId: number, userIds: number[]): Promise<Map<number, { n: number; oldest: string | null }>> {
   const map = new Map<number, { n: number; oldest: string | null }>();
   for (const id of userIds) map.set(id, { n: 0, oldest: null });
   if (userIds.length === 0) return map;
@@ -35,6 +36,7 @@ async function pendingForTeam(userIds: number[]): Promise<Map<number, { n: numbe
       SELECT uid, COUNT(*)::int AS n, MIN(d) AS oldest FROM (
         SELECT DISTINCT s.employee_id AS uid, s.date AS d FROM shifts s
         WHERE s.employee_id = ANY(${userIds}) AND s.date >= ${from} AND s.date <= ${to}
+          AND (s.team_id = ${teamId} OR s.team_id IS NULL)
           AND NOT EXISTS (SELECT 1 FROM shift_reviews r WHERE r.employee_id = s.employee_id AND r.work_date = s.date)
       ) x GROUP BY uid`;
     for (const r of rows as any[]) map.set(r.uid, { n: r.n ?? 0, oldest: r.oldest ?? null });
@@ -98,13 +100,14 @@ export async function GET() {
   const points = normalizePoints(pointsRaw);
 
   if (c.role === 'employer' || c.role === 'kiosk') {
-    const members = await sql`
-      SELECT id, name, avatar FROM users WHERE team_id = ${c.teamId} AND role = 'employee' ORDER BY name ASC`;
+    // Kolo 62: žebříček podle členství — zaměstnanec přepnutý jinam má v tomhle
+    // podniku body, tak v něm musí zůstat i v pořadí.
+    const members = await clenovePodniku(c.teamId, { role: 'employee' });
     // Dřív 6 dotazů na každého člena (N+1). Teď dvě dávkové sady GROUP BY.
-    const memberIds = (members as any[]).map(m => m.id);
+    const memberIds = members.map(m => m.id);
     const breakdowns = await breakdownForTeam(c.teamId, memberIds);
-    const pendings = await pendingForTeam(memberIds);
-    const standings = (members as any[]).map(m => {
+    const pendings = await pendingForTeam(c.teamId, memberIds);
+    const standings = members.map(m => {
       const b = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
       const total = totalPoints(b, points);
       const st = standingForPoints(levels, total);

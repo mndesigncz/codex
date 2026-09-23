@@ -63,6 +63,16 @@ podniky" platí při pozvání i přijetí pozvánky: s vypnutým sdílením
 zaměstnanec, který už pracuje v jiném podniku organizace, členství
 nedostane (409). Vedení vždy.
 
+Kdo je v podniku (kolo 62): pravda je `team_members` (členství); `users.team_id`
+je jen zrcadlo podniku, kam je člověk právě přepnutý. Seznam Týmu, tablet,
+rozvrh, oznámení i mzdy berou lidi z členství NEBO ze zrcadla (to druhé kvůli
+tabletu a účtům, které se od migrace nepřihlásily) — helpery v `lib/tenant.ts`
+(`clenovePodniku`, `jeClenem`, `vedeniPodniku`, `sazbaVPodniku`, `pocetClenu`).
+Sazba a pozice jsou VŽDY z členství v daném podniku; člen bez sazby má
+v mzdách 0, nikdy sazbu z jiného podniku. Limit plánu Zdarma počítá lidi
+podle členství, tedy i ty, kdo jsou právě přepnutí jinam. Každý dotaz
+v `sql\`…\`` hlídá `scripts/check-sql.mjs` (gramatika Postgresu bez databáze).
+
 Pozastavení a sdílené číselníky organizace: když je pozastavený podnik
 v nastavení organizace zvolený jako zdroj (spravuje kategorie skladu,
 dodavatele, typy směn, kategorie návodů nebo katalog odměn), ostatní

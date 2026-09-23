@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
+import { vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,12 +58,12 @@ export async function POST(req: NextRequest) {
 
     // The report is FOR the employers — tell them it exists.
     try {
-      const employers = await sql`
-        SELECT id FROM users WHERE team_id = ${u.team_id} AND role = 'employer' AND id <> ${u.id}`;
+      // Kolo 62: vedení podle členství — provozovatel přepnutý jinam hlášení dostane.
+      const employers = await vedeniPodniku(u.team_id, { krome: u.id });
       let count = 0;
       try { count = JSON.parse(items)?.length ?? 0; } catch {}
       const [author] = await sql`SELECT name FROM users WHERE id = ${u.id}`;
-      await notifyUsers((employers as any[]).map(e => e.id), {
+      await notifyUsers(employers, {
         title: '📦 Hlášení ze skladu',
         body: `${author?.name ?? 'Zaměstnanec'} hlásí ${count || 'chybějící'} položky k doplnění.`,
         type: 'warning',

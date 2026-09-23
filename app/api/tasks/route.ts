@@ -7,6 +7,7 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { ensureProductionTasks, produceBatch } from '@/lib/production';
 import { pragueToday } from '@/lib/pragueTime';
 import { sazebnikBodu } from '@/lib/mzdaSmeny';
+import { jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -178,8 +179,9 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(assignedTo)) return NextResponse.json({ error: 'Neplatný zaměstnanec' }, { status: 400 });
     if (assignedTo !== c.meId) {
       if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-      const [target] = await sql`SELECT team_id FROM users WHERE id = ${assignedTo}`;
-      if (!target || target.team_id !== c.teamId) {
+      // Kolo 62: členství, ne zrcadlo — kolega přepnutý do jiného podniku
+      // úkol dostat může.
+      if (!c.teamId || !(await jeClenem(assignedTo, c.teamId))) {
         return NextResponse.json({ error: 'Uživatel není ve vašem týmu' }, { status: 400 });
       }
     }
@@ -308,8 +310,9 @@ export async function PATCH(req: NextRequest) {
       } else {
         const a = parseInt(b.assignedTo);
         if (Number.isFinite(a)) {
-          const [t] = await sql`SELECT team_id FROM users WHERE id = ${a}`;
-          if (t && t.team_id === c.teamId) assignedTo = a;
+          // Kolo 62: členství, ne zrcadlo — jinak se přiřazení členovi
+          // přepnutému jinam tiše zahodilo.
+          if (c.teamId && await jeClenem(a, c.teamId)) assignedTo = a;
         }
       }
     }

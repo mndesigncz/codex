@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
+import { clenovePodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,11 +71,12 @@ export async function POST(req: NextRequest) {
     RETURNING id, content, pinned, created_at AS "createdAt"`;
 
   try {
-    const members = await sql`
-      SELECT id, role FROM users WHERE team_id = ${c.teamId} AND id <> ${c.meId} AND role <> 'kiosk'`;
+    // Kolo 62: příjemci podle členství, ne zrcadla — člen přepnutý do jiného
+    // podniku oznámení dostane; role (a tím odkaz v push) je z TOHOTO podniku.
+    const members = await clenovePodniku(c.teamId, { role: 'lide', krome: c.meId });
     const body = content.length > 120 ? content.slice(0, 117) + '…' : content;
-    const emp = (members as any[]).filter(m => m.role === 'employer').map(m => m.id);
-    const ees = (members as any[]).filter(m => m.role !== 'employer').map(m => m.id);
+    const emp = members.filter(m => m.role === 'employer').map(m => m.id);
+    const ees = members.filter(m => m.role !== 'employer').map(m => m.id);
     if (ees.length) await notifyUsers(ees, { title: '📌 Nové oznámení', body, type: 'info', link: '/employee/shifts' });
     if (emp.length) await notifyUsers(emp, { title: '📌 Nové oznámení', body, type: 'info', link: '/employer/overview' });
 

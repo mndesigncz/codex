@@ -354,10 +354,15 @@ export async function GET(req: NextRequest) {
   let workedMin = 0, wageCost = 0;
   const workedByPerson = new Map<string, { min: number; cost: number }>();
   try {
+    // Sazba z členství v podniku ZÁZNAMU, ne ze zrcadla (kolo 62) — stejně
+    // jako Finance, ať „mzdy jsou X % tržeb" sedí s přehledem.
     for (const r of await sql`
-      SELECT u.name, u.hourly_rate,
+      SELECT u.name,
+             CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0)
+                  WHEN u.team_id = te.team_id THEN COALESCE(u.hourly_rate, 0) ELSE 0 END AS hourly_rate,
              EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) AS secs
       FROM time_entries te JOIN users u ON u.id = te.employee_id
+      LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id
       WHERE te.team_id = ${teamId} AND te.clock_out IS NOT NULL
         AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') >= ${from}
         AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') < ${till}` as any[]) {

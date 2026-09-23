@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { pridejClenstvi, pocetClenu } from '@/lib/tenant';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
       VALUES (${name}, ${email}, ${passwordHash}, 'employee', '👤', ${team.id}, ${team.owner_id})
       RETURNING id, name, email, role`;
 
+    // Členství hned při vstupu — ne až při prvním přihlášení (kolo 62).
+    try { await pridejClenstvi(Number(user.id), Number(team.id), 'employee', { jobTitle: null }); } catch { /* před migrací */ }
     await linkNewMember(sql, team.id, team.owner_id, user.id);
 
     notifyUser(team.owner_id, {
@@ -77,8 +80,7 @@ async function memberLimitHit(sql: any, teamId: number): Promise<boolean> {
     plan = planInfoOf(row);
   } catch { return false; }
   if (plan.effective === 'pro') return false;
-  try {
-    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${teamId} AND role <> 'kiosk'`;
-    return !canAddMember(plan, Number(n) || 0);
-  } catch { return false; }
+  // Počítají se členové (členství NEBO zrcadlo) — i ti právě přepnutí do
+  // jiného podniku, jinak se limit obešel přepnutím (kolo 62).
+  try { return !canAddMember(plan, await pocetClenu(teamId)); } catch { return false; }
 }

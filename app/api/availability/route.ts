@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { tymyCiselniku } from '@/lib/tenant';
+import { tymyCiselniku, vedeniPodniku, jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,18 +147,18 @@ export async function POST(req: Request) {
        ${JSON.stringify(dayPreferences)}, ${preferredShift}, ${maxShifts}, ${note}, 'submitted')
     RETURNING id`;
 
-  // Notify the employer(s) of the team
+  // Vedení podle členství (kolo 62): vedoucí právě přepnutý do jiného
+  // podniku by se jinak o zadané dostupnosti nedozvěděl.
   try {
-    const employers = await sql`
-      SELECT id FROM users WHERE team_id = ${ctx.teamId} AND role = 'employer' AND id <> ${ctx.meId}`;
+    const employers = await vedeniPodniku(ctx.teamId, { krome: ctx.meId });
     const [my, ye] = month.split('-');
     const monthLabel = new Date(parseInt(my), parseInt(ye) - 1, 1).toLocaleDateString('cs-CZ', {
       month: 'long',
       year: 'numeric',
     });
     await Promise.all(
-      employers.map((e: any) =>
-        notifyUser(e.id, {
+      employers.map((id) =>
+        notifyUser(id, {
           title: 'Zadaná dostupnost',
           body: `${ctx.name ?? 'Zaměstnanec'} zadal/a dostupnost na ${monthLabel}`,
           type: 'shift',
@@ -191,8 +191,9 @@ export async function PATCH(req: Request) {
   if (!Number.isFinite(employeeId) || !/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json({ error: 'Chybí zaměstnanec nebo měsíc' }, { status: 400 });
   }
-  const [emp] = await sql`SELECT id, name, team_id FROM users WHERE id = ${employeeId}`;
-  if (!emp || emp.team_id !== ctx.teamId) {
+  // Členství, ne zrcadlo (kolo 62): člen přepnutý do jiného podniku má
+  // dostupnost tady pořád a vedení ji smí opravit.
+  if (!(await jeClenem(employeeId, ctx.teamId))) {
     return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
   }
 

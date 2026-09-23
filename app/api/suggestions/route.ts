@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
+import { vedeniPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,10 +72,10 @@ export async function POST(req: NextRequest) {
 
   // Notify the team's employers (unless the author IS an employer).
   try {
-    const employers = await sql`
-      SELECT id FROM users WHERE team_id = ${c.teamId} AND role = 'employer' AND id <> ${c.meId}`;
+    // Kolo 62: vedení podle členství — provozovatel přepnutý jinam podnět dostane.
+    const employers = await vedeniPodniku(c.teamId, { krome: c.meId });
     if (employers.length) {
-      await notifyUsers(employers.map((e: any) => e.id), {
+      await notifyUsers(employers, {
         title: '💡 Nový podnět na vylepšení',
         body: `${c.name ?? 'Někdo'}: ${title.length > 100 ? title.slice(0, 97) + '…' : title}`,
         type: 'info',

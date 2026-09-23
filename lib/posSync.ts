@@ -7,6 +7,7 @@ import { getConnection } from './storyous';
 import { audit } from './audit';
 import { ensureProductionTasks } from './production';
 import { pragueToday, dayPlus } from './pragueTime';
+import { vedeniPodniku } from './tenant';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -38,9 +39,10 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   let actor = userId;
   if (actor == null) {
     try {
-      const [owner] = await sql`
-        SELECT id FROM users WHERE team_id = ${teamId} AND role = 'employer' ORDER BY id ASC LIMIT 1`;
-      if (owner?.id) actor = Number(owner.id);
+      // Kolo 62: vedení podle členství — provozovatel přepnutý do jiného
+      // podniku by jinak chyběl a u pohybu nestál nikdo. Nejnižší id = nejstarší.
+      const vedeni = await vedeniPodniku(teamId);
+      if (vedeni.length) actor = Math.min(...vedeni);
     } catch { /* zůstane null */ }
   }
 

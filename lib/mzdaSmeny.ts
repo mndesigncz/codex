@@ -17,6 +17,7 @@
 import { neon } from '@neondatabase/serverless';
 import { earnedFor, MAX_SHIFT_HOURS } from './wages';
 import { normalizePoints, type PointsConfig } from './rewardLevels';
+import { sazbaVPodniku } from './tenant';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -38,8 +39,9 @@ export interface MzdaZaSmenu {
 export async function mzdaZaSmenu(teamId: number, employeeId: number, den: string, now = new Date()): Promise<MzdaZaSmenu> {
   let rate = 0;
   try {
-    const [u] = await sql`SELECT COALESCE(hourly_rate, 0) AS rate FROM users WHERE id = ${employeeId} AND team_id = ${teamId}`;
-    rate = Math.max(0, Number(u?.rate) || 0);
+    // Kolo 62: sazba z členství v TOMHLE podniku — člen přepnutý jinam dřív
+    // dostal 0 („mzda 0"), a nikdy sazba ze zrcadla cizího podniku.
+    rate = Math.max(0, Number(await sazbaVPodniku(employeeId, teamId)) || 0);
   } catch { /* sloupec chybí → sazba 0 */ }
 
   let rows: any[] = [];

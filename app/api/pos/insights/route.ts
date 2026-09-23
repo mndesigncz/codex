@@ -95,9 +95,13 @@ export async function GET(req: NextRequest) {
     let staffTotal = 0;
     let wageSum = 0, wageHours = 0;
     try {
+      // Sazba z členství v podniku SMĚNY, ne ze zrcadla (kolo 62).
       const shifts = await sql`
-        SELECT s.date, s.start_time, s.end_time, u.hourly_rate
+        SELECT s.date, s.start_time, s.end_time,
+               CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0)
+                    WHEN u.team_id = s.team_id THEN COALESCE(u.hourly_rate, 0) ELSE 0 END AS hourly_rate
         FROM shifts s LEFT JOIN users u ON u.id = s.employee_id
+        LEFT JOIN team_members m ON m.user_id = s.employee_id AND m.team_id = s.team_id
         WHERE s.team_id = ${u.team_id}
           AND s.date >= ${dayPlus(from, -1)} AND s.date < ${till}`;
       for (const sh of shifts as any[]) {

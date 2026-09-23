@@ -69,22 +69,36 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
   }
   if (userIds.length === 0) return map;
 
+  // Jen řádky TOHOHLE podniku (kolo 62): člen dvou podniků má v žebříčku A
+  // jen úkoly, postupy a uzávěrky z A. NULL jsou řádky z doby před sloupcem.
   try {
-    const rows = await sql`SELECT completed_by AS uid, COUNT(*)::int AS n FROM tasks WHERE completed_by = ANY(${userIds}) AND status = 'done' GROUP BY completed_by`;
+    const rows = await sql`
+      SELECT completed_by AS uid, COUNT(*)::int AS n FROM tasks
+      WHERE completed_by = ANY(${userIds}) AND status = 'done' AND (team_id = ${teamId} OR team_id IS NULL)
+      GROUP BY completed_by`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.tasks = r.n; }
   } catch { /* column missing */ }
 
   try {
-    const rows = await sql`SELECT user_id AS uid, COUNT(*)::int AS n FROM procedure_runs WHERE user_id = ANY(${userIds}) AND status = 'completed' GROUP BY user_id`;
+    const rows = await sql`
+      SELECT user_id AS uid, COUNT(*)::int AS n FROM procedure_runs
+      WHERE user_id = ANY(${userIds}) AND status = 'completed' AND (team_id = ${teamId} OR team_id IS NULL)
+      GROUP BY user_id`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.procedures = r.n; }
   } catch { /* ignore */ }
 
   try {
-    const rows = await sql`SELECT created_by AS uid, COUNT(*)::int AS n FROM cash_closings WHERE created_by = ANY(${userIds}) AND covered_by IS NULL GROUP BY created_by`;
+    const rows = await sql`
+      SELECT created_by AS uid, COUNT(*)::int AS n FROM cash_closings
+      WHERE created_by = ANY(${userIds}) AND covered_by IS NULL AND (team_id = ${teamId} OR team_id IS NULL)
+      GROUP BY created_by`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.closings = r.n; }
   } catch {
     try {
-      const rows = await sql`SELECT created_by AS uid, COUNT(*)::int AS n FROM cash_closings WHERE created_by = ANY(${userIds}) GROUP BY created_by`;
+      const rows = await sql`
+        SELECT created_by AS uid, COUNT(*)::int AS n FROM cash_closings
+        WHERE created_by = ANY(${userIds}) AND (team_id = ${teamId} OR team_id IS NULL)
+        GROUP BY created_by`;
       for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.closings = r.n; }
     } catch { /* ignore */ }
   }
