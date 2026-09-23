@@ -168,3 +168,37 @@ jobs:
 
       - name: SQL podle gramatiky Postgresu
         run: node scripts/check-sql.mjs
+
+  sondy:
+    name: Sondy v prohlížeči
+    # Aplikace v opravdovém Chromiu: každá sonda otevře obrazovku, API
+    # podvrhne fixturami ze scripts/sondy/fixtury a tvrdí, co má být vidět.
+    # Databáze není potřeba — žádná stránka se na ni pod sondou neptá.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      DATABASE_URL: postgresql://u:p@localhost/db
+      NEXTAUTH_SECRET: sondy-ci-secret-0123456789abcdef
+      NEXTAUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalace závislostí
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: Start aplikace
+        run: |
+          nohup npx next start -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done
+          cat next.log; exit 1
+      - name: Sondy
+        run: npm run sondy
+      - name: Log serveru
+        if: failure()
+        run: tail -200 next.log

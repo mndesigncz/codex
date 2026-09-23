@@ -52,7 +52,10 @@ async function jeTam(p) {
   await ctx.setOffline(true);
   try { await p.reload({ waitUntil: 'domcontentloaded', timeout: 12000 }); } catch {}
   await ctx.setOffline(false);
-  await p.reload({ waitUntil: 'networkidle' });
+  // Offline stránka service workeru se po návratu sítě sama obnoví — první
+  // reload se s ní může potkat a skončit ERR_ABORTED. Počkat a zkusit znovu.
+  await p.waitForTimeout(800);
+  await p.reload({ waitUntil: 'networkidle' }).catch(async () => { await p.waitForTimeout(1000); await p.reload({ waitUntil: 'networkidle' }); });
   const r = await jeTam(p);
   console.log(`výpadek + obnovení téže záložky: text zpátky=${r.text ? 'ano ✓' : 'NE ✗'} · nabídka „z minula"=${r.note ? 'ano' : 'ne'}`);
   await ctx.close();

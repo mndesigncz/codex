@@ -13,10 +13,12 @@ const keyFor = (u2) => { const u = new URL(u2); const p = u.pathname.replace(/^\
   const bare = p.replace(/[/]/g, '_'); return have.has(bare) ? bare : null; };
 const tok = (r) => execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} ${r}`, { encoding: 'utf8' }).trim();
 
-const ZALOZKY = ['Rozvrh', 'Sklad', 'Úkoly', 'Chat', 'Postupy', 'Finance'];
+// Chat je v postranním panelu počítače jen jako ikona v hlavičce (položka je
+// v doku telefonu), měří se proto Návody.
+const ZALOZKY = ['Rozvrh', 'Sklad', 'Úkoly', 'Návody', 'Postupy', 'Finance'];
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 
-for (const [popis, rychlost] of [['bez omezení', null], ['pomalá 3G', { download: 400 * 1024 / 8, upload: 400 * 1024 / 8, latency: 400 }]]) {
+for (const [popis, rychlost] of [['bez omezení', null], ['pomalá 3G', { downloadThroughput: 400 * 1024 / 8, uploadThroughput: 400 * 1024 / 8, latency: 400 }]]) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, locale: 'cs-CZ' });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok('employer'), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
   await ctx.route('**/api/**', async route => {
@@ -32,7 +34,7 @@ for (const [popis, rychlost] of [['bez omezení', null], ['pomalá 3G', { downlo
   await p.waitForTimeout(1500);
   console.log(`\n=== ${popis} ===`);
   for (const z of ZALOZKY) {
-    const btn = p.locator('button:visible, a:visible').filter({ hasText: new RegExp(`^${z}$`) }).first();
+    const btn = p.locator('button:visible, a:visible').filter({ hasText: new RegExp(`^${z}(\\s*\\d+)?$`) }) // „Chat 3" — položka s počtem nepřečtených.first();
     if (!(await btn.count().catch(() => 0))) { console.log(`  ? ${z}: nenalezeno`); continue; }
     const t0 = Date.now();
     await btn.click({ timeout: 5000 }).catch(() => {});

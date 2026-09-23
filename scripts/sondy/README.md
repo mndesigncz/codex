@@ -13,6 +13,8 @@ něj razí session cookie (`cookie-role.mjs`). Chromium se bere
 ze `SONDY_CHROMIUM`, jinak z `/opt/pw-browsers`, jinak z instalace
 `npx playwright-core install chromium`.
 
-Zatím neprochází: `navody` a `k53` (fixtury návodů k výrobě a uzávěrce),
-`hledani` a `search` (hledání ve skladu), `koncept2` a `prepnuti` (chat),
-`slib`, `escape` a `dvakrat` (běží přes 4 minuty).
+V CI běží jako úloha „Sondy v prohlížeči" (.github/workflows/pages.yml):
+build, `next start` bez databáze (API podvrhují fixtury) a `npm run sondy`.
+
+Mimo seznam ZELENE jsou `escape` a `dvakrat` — procházejí všechny obrazovky
+a trvají přes 4 minuty; pouštěj je ručně (`SONDY_LIMIT_MS=900000`).

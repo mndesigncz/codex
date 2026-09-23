@@ -1,6 +1,8 @@
 // Důkaz v prohlížeči: napsat do hledání ve Skladu dotaz BEZ diakritiky
 // a ověřit, že se položka S diakritikou najde. Fixture má „Mléko
-// plnotučné", „Zrnková káva Brasil", „Sirup vanilkový".
+// zázvorová", „Zrnková káva Brasil", „Sirup Monin Levandule". Počet
+// výsledků je POSLEDNÍ „N položek" na stránce — nad ním jsou souhrn skladu
+// a dlaždice kategorií, které se hledáním nemění.
 import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
@@ -25,8 +27,8 @@ const p = await ctx.newPage();
 await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' });
 await p.waitForTimeout(900);
 let fails = 0;
-const pocet = async () => (await p.locator('text=/^\\d+ (položka|položky|položek)/').first().innerText()).trim();
-for (const [dotaz, ceka] of [['', null], ['plnotucne', 'Mléko plnotučné'], ['zrnkova', 'Zrnková káva Brasil'], ['vanilkovy', 'Sirup vanilkový'], ['domaci', 'Domácí limonáda'], ['bramboro', null]]) {
+const pocet = async () => (await p.locator('text=/^\\d+ (položka|položky|položek)/').last().innerText()).trim();
+for (const [dotaz, ceka] of [['', null], ['zazvorova', 'Domácí limonáda zázvorová'], ['zrnkova', 'Zrnková káva Brasil'], ['levandule', 'Sirup Monin Levandule'], ['citrony', 'Citrony'], ['bramboro', null]]) {
   const pole = p.locator('input[placeholder*="Hledat"]').first();
   await pole.fill(dotaz); await p.waitForTimeout(450);
   const txt = (await p.locator('main').innerText());

@@ -42,7 +42,13 @@ const tvrdi = (popis, podminka, co = '') => {
 await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' });
 await p.waitForTimeout(700);
 // Otevřít detail položky „Domácí limonáda".
-await p.getByText('Domácí limonáda', { exact: false }).first().click();
+// Název položky v seznamu — nad ním je souhrn „dochází", který jméno
+// obsahuje taky, ale nic neotevře.
+// Karta položky v mřížce skladu; editor otevírá její tlačítko „Upravit".
+const karta = p.locator('p.font-semibold', { hasText: 'Domácí limonáda' }).first()
+  .locator('xpath=ancestor::*[.//button[@aria-label="Upravit"]][1]');
+await karta.hover();
+await karta.getByRole('button', { name: 'Upravit' }).first().click({ force: true });
 await p.waitForTimeout(900);
 const editor = await p.locator('body').innerText();
 tvrdi('editor výroby ukáže připnutý návod',
