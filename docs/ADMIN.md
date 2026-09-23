@@ -71,7 +71,9 @@ tabletu a účtům, které se od migrace nepřihlásily) — helpery v `lib/tena
 Sazba a pozice jsou VŽDY z členství v daném podniku; člen bez sazby má
 v mzdách 0, nikdy sazbu z jiného podniku. Limit plánu Zdarma počítá lidi
 podle členství, tedy i ty, kdo jsou právě přepnutí jinam. Každý dotaz
-v `sql\`…\`` hlídá `scripts/check-sql.mjs` (gramatika Postgresu bez databáze).
+v `sql\`…\`` hlídá `scripts/check-sql.mjs`: gramatika Postgresu bez databáze
+a od kola 63 i schéma — tabulky a sloupce se berou z DDL v `app/api/init/route.ts`,
+takže překlep ve sloupci nebo v názvu tabulky spadne v CI, ne u tabletu.
 
 Pozastavení a sdílené číselníky organizace: když je pozastavený podnik
 v nastavení organizace zvolený jako zdroj (spravuje kategorie skladu,
