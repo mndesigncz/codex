@@ -24,7 +24,8 @@ import { proHledani, obsahuje, obsahujeNekde } from '../lib/hledani.ts';
 import { navodyPodlePolozek, navodZRadku, krokyNavodu } from '../lib/navody.ts';
 import { parseStep, serializeStep, parseSteps } from '../lib/steps.ts';
 import { odkazNaNavod } from '../lib/otevriNavod.ts';
-import { normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, VYCHOZI_NASTAVENI } from '../lib/organizace.ts';
+import { CISELNIKY, normalizujNastaveni, normalizujRoli, smiPrepnout, smiSdiletZamestnance, VYCHOZI_NASTAVENI, tymyProCiselnik, ocistiZdroje, coSeVypina, coSeSlucuje, normalizujZdroje } from '../lib/organizace.ts';
+import { kategorieKeKopirovani, premapujRodice, seradVlastniPrvni } from '../lib/sdileneCiselniky.ts';
 import { souhrn, podnikyProPrehled, procNejde, hraniceMesice } from '../lib/prehledOrganizace.ts';
 import { describe as popisUkolu } from '../lib/productionPlan.ts';
 import { superadminIds, isSuperadminId, rozhodniSpravce } from '../lib/superadmin.ts';
@@ -872,6 +873,43 @@ eq('chyba: NeonDbError → obecná', verejnaHlaska(Object.assign(new Error('rela
 eq('chyba: Stripe → obecná', verejnaHlaska(Object.assign(new Error('No such customer: cus_1'), { type: 'StripeInvalidRequestError' }), 'Nepovedlo se.'), 'Nepovedlo se.');
 eq('chyba: TypeError → obecná', verejnaHlaska(new TypeError("Cannot read properties of undefined (reading 'id')"), 'Nepovedlo se.'), 'Nepovedlo se.');
 eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepovedlo se.'), 'Nepovedlo se.');
+
+// ——— Sdílené číselníky (kolo 60) ———
+{
+  const N = (z: Partial<Record<string, number | null>>, zap = true) => normalizujNastaveni({ sdileneCiselniky: zap, zdrojeCiselniku: z });
+  eq('číselníky: bez zdrojů → všech pět null', normalizujZdroje(undefined), VYCHOZI_NASTAVENI.zdrojeCiselniku);
+  eq('číselníky: řetězec, desetinné, nula, záporné → null', normalizujZdroje({ kategorieSkladu: '7', dodavatele: 1.5, typySmen: 0, kategorieNavodu: -3 }), VYCHOZI_NASTAVENI.zdrojeCiselniku);
+  eq('číselníky: platné id projde, neznámý klíč se zahodí', normalizujZdroje({ odmeny: 7, menu: 3 }), { ...VYCHOZI_NASTAVENI.zdrojeCiselniku, odmeny: 7 });
+  const org = { nastaveni: N({ kategorieSkladu: 1, typySmen: 9 }), teamIds: [1, 2, 3] };
+  eq('číselníky: bez organizace → jen já', tymyProCiselnik(2, null, 'kategorieSkladu'), [2]);
+  eq('číselníky: hlavní vypínač OFF → jen já', tymyProCiselnik(2, { ...org, nastaveni: N({ kategorieSkladu: 1 }, false) }, 'kategorieSkladu'), [2]);
+  eq('číselníky: zdroj null → jen já', tymyProCiselnik(2, org, 'dodavatele'), [2]);
+  eq('číselníky: zdroj jsem já → jen já', tymyProCiselnik(1, org, 'kategorieSkladu'), [1]);
+  eq('číselníky: zdroj mimo organizaci → jen já', tymyProCiselnik(2, org, 'typySmen'), [2]);
+  eq('číselníky: zdroj v organizaci → [já, zdroj]', tymyProCiselnik(2, org, 'kategorieSkladu'), [2, 1]);
+  eq('číselníky: ocištění zdrojů: cizí → null, vlastní projde', ocistiZdroje({ kategorieSkladu: 9, dodavatele: 2, typySmen: 'x' }, [1, 2, 3]), { ...VYCHOZI_NASTAVENI.zdrojeCiselniku, dodavatele: 2 });
+  const stare = N({ kategorieSkladu: 1, dodavatele: 1 });
+  eq('číselníky: vypnutí hlavního vypínače vypíná oba', coSeVypina(stare, N({ kategorieSkladu: 1, dodavatele: 1 }, false)), [{ ciselnik: 'kategorieSkladu', zdroj: 1 }, { ciselnik: 'dodavatele', zdroj: 1 }]);
+  eq('číselníky: zdroj → null vypíná jeden', coSeVypina(stare, N({ kategorieSkladu: null, dodavatele: 1 })), [{ ciselnik: 'kategorieSkladu', zdroj: 1 }]);
+  eq('číselníky: změna zdroje A → C vypíná A a slučuje k C', [coSeVypina(stare, N({ kategorieSkladu: 3, dodavatele: 1 })), coSeSlucuje(stare, N({ kategorieSkladu: 3, dodavatele: 1 }))], [[{ ciselnik: 'kategorieSkladu', zdroj: 1 }], [{ ciselnik: 'kategorieSkladu', zdroj: 3 }]]);
+  eq('číselníky: beze změny nic', [coSeVypina(stare, stare), coSeSlucuje(stare, stare)], [[], []]);
+  eq('číselníky: zapnutí nic nevypíná, slučuje k zdroji', [coSeVypina(N({}, false), stare), coSeSlucuje(N({}, false), stare)], [[], [{ ciselnik: 'kategorieSkladu', zdroj: 1 }, { ciselnik: 'dodavatele', zdroj: 1 }]]);
+  eq('číselníky: kopie vznikají jen tam, kde na řádky něco ukazuje po id', CISELNIKY.filter(c => c.kopie).map(c => c.klic), ['kategorieSkladu', 'typySmen', 'kategorieNavodu']);
+  // strom: 1 Nápoje → 2 Sirupy → 3 Domácí; 4 Pečivo; 5 Sirupy/Kupované
+  const strom = [
+    { id: 1, name: 'Nápoje', parent_id: null }, { id: 2, name: 'Sirupy', parent_id: 1 }, { id: 3, name: 'Domácí', parent_id: 2 },
+    { id: 4, name: 'Pečivo', parent_id: null }, { id: 5, name: 'Kupované', parent_id: 2 },
+  ];
+  eq('kopie: použitá podkategorie táhne rodiče i prarodiče, rodič první', kategorieKeKopirovani(strom, [3]).map(c => c.id), [1, 2, 3]);
+  eq('kopie: nepoužitá větev se nekopíruje', kategorieKeKopirovani(strom, [4]).map(c => c.id), [4]);
+  eq('kopie: id mimo strom se ignoruje, prázdno → []', [kategorieKeKopirovani(strom, [99]).length, kategorieKeKopirovani(strom, []).length], [0, 0]);
+  eq('kopie: dvě použité v jedné větvi bez duplikátů', kategorieKeKopirovani(strom, [3, 5]).map(c => c.id).sort(), [1, 2, 3, 5]);
+  const cyklus = [{ id: 1, name: 'a', parent_id: 2 }, { id: 2, name: 'b', parent_id: 1 }];
+  eq('kopie: cyklus v parent_id neskončí smyčkou', kategorieKeKopirovani(cyklus, [1]).length, 2);
+  const mapa = new Map([[1, 101], [2, 102]]);
+  eq('kopie: přemapování rodiče', [premapujRodice(null, mapa), premapujRodice(2, mapa), premapujRodice(7, mapa)], [null, 102, null]);
+  eq('řazení: vlastní první, pak position, pak id', seradVlastniPrvni([{ id: 5, team_id: 9, position: 0 }, { id: 3, team_id: 2, position: 2 }, { id: 4, team_id: 2, position: 1 }, { id: 1, team_id: 9, position: 0 }], 2).map(r => r.id), [4, 3, 1, 5]);
+}
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
 // souboru — všechno pod ní se sice vypsalo, ale do návratového kódu se

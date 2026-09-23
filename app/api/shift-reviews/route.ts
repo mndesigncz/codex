@@ -7,6 +7,7 @@ import { parseSteps } from '@/lib/steps';
 import { expectedCash, cashDifference } from '@/lib/closing';
 import { computeAutoPoints, normalizePoints, PointsConfig } from '@/lib/rewardLevels';
 import { shiftSpanFor, graceSpan, shiftsOverlap, type ShiftWindow } from '@/lib/shiftWindow';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,10 +39,14 @@ async function teamPoints(teamId: number): Promise<PointsConfig> {
 // Display name of a shift, resolved against the team's configured shift types
 // (matched by name, then by exact times) with the legacy labels as fallback.
 const LEGACY_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Odpolední', flexible: 'Vlastní' };
+// Typy ze zdrojového podniku organizace (kolo 60) jdou za vlastními.
 async function shiftLabeller(teamId: number) {
   let types: any[] = [];
   try {
-    types = await sql`SELECT name, start_time, end_time FROM shift_types WHERE team_id = ${teamId} ORDER BY position ASC, id ASC`;
+    const tymy = await tymyCiselniku(teamId, 'typySmen');
+    types = await sql`
+      SELECT name, start_time, end_time FROM shift_types WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${teamId}) DESC, position ASC, id ASC`;
   } catch { /* table missing */ }
   return (s: any): string => {
     if (!s) return '';

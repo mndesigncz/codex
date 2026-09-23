@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,10 @@ export async function POST(req: Request) {
   if (!emp) return NextResponse.json({ error: 'Zaměstnanec není v týmu' }, { status: 400 });
 
   if (shiftTypeId != null) {
-    const [st] = await sql`SELECT id FROM shift_types WHERE id = ${shiftTypeId} AND team_id = ${ctx.teamId}`;
+    // Pevný den je řádek podniku, ale smí ukázat i na typ ze zdrojového
+    // podniku organizace (kolo 60) — proto ANY(tymy), ne holé id.
+    const tymy = await tymyCiselniku(ctx.teamId, 'typySmen');
+    const [st] = await sql`SELECT id FROM shift_types WHERE id = ${shiftTypeId} AND team_id = ANY(${tymy})`;
     if (!st) return NextResponse.json({ error: 'Typ směny nenalezen' }, { status: 400 });
   }
 
@@ -97,7 +101,8 @@ export async function PATCH(req: Request) {
       ? null
       : parseInt(body.shiftTypeId);
   if (shiftTypeId != null) {
-    const [st] = await sql`SELECT id FROM shift_types WHERE id = ${shiftTypeId} AND team_id = ${ctx.teamId}`;
+    const tymy = await tymyCiselniku(ctx.teamId, 'typySmen');
+    const [st] = await sql`SELECT id FROM shift_types WHERE id = ${shiftTypeId} AND team_id = ANY(${tymy})`;
     if (!st) return NextResponse.json({ error: 'Typ směny nenalezen' }, { status: 400 });
   }
   const [row] = await sql`

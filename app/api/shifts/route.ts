@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +21,16 @@ const LEGACY_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Od
 
 // Resolve a shift's display name + colour from the team's configured shift
 // types (by name, then by exact times), falling back to the legacy labels.
+// Typy ze zdrojového podniku organizace (kolo 60) jdou za vlastními, takže
+// lokální stejnojmenný typ vyhraje.
 async function typeResolver(teamId: number | null) {
   let types: any[] = [];
   if (teamId) {
     try {
-      types = await sql`SELECT name, start_time, end_time, color FROM shift_types WHERE team_id = ${teamId} ORDER BY position ASC, id ASC`;
+      const tymy = await tymyCiselniku(teamId, 'typySmen');
+      types = await sql`
+        SELECT name, start_time, end_time, color FROM shift_types WHERE team_id = ANY(${tymy})
+        ORDER BY (team_id = ${teamId}) DESC, position ASC, id ASC`;
     } catch { /* table issue */ }
   }
   return (r: any): { label: string; color: string } => {

@@ -30,6 +30,8 @@ import { DiscardGuard } from '../ui/DiscardGuard';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 const pluralPolozka = (n: number) => czForm(n, POLOZKA);
+/** „1 kategorie / 3 kategorie / 5 kategorií" — nominativ pro počet v chipu. */
+const pocetKategorii = (n: number) => czCount(n, { one: 'kategorie', few: 'kategorie', many: 'kategorií' });
 
 interface Item {
   id: number;
@@ -75,6 +77,12 @@ interface Category {
   defaultPackageSize?: number | null;
   scale?: any;
   hideFromOverview?: boolean;
+  /** Kategorie zdrojového podniku organizace (kolo 60) — jen ke čtení. */
+  zOrganizace?: boolean;
+  /** Naše kategorie, kterou vidí i ostatní podniky organizace. */
+  sdileno?: boolean;
+  /** Název podniku, který cizí kategorii spravuje. */
+  spravuje?: string | null;
 }
 
 interface OrderItem {
@@ -304,6 +312,9 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   }, [categories, items]);
 
   const flatCats = useMemo(() => flattenTree(categories), [categories]);
+  // Nová kategorie jde zanořit jen pod vlastní — kategorie z organizace
+  // spravuje jiný podnik a server zanoření pod ně odmítne.
+  const flatOwnCats = useMemo(() => flattenTree(categories.filter(c => !c.zOrganizace)), [categories]);
   // Category strings used by items but no longer configured — kept at the top
   // level so nothing becomes unreachable.
   const orphanNames = useMemo(() => {
@@ -983,7 +994,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       {flatCats.map(({ cat: c, depth }) => (
                         <div key={c.id} style={{ paddingLeft: depth * 14 }}
                           className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
-                          <CatChip name={c.name} active={form.categoryId === c.id} small={depth > 0}
+                          <CatChip name={c.zOrganizace ? `${c.name} · z organizace` : c.name} active={form.categoryId === c.id} small={depth > 0}
                             onPick={() => pickCategory(c.id)} />
                         </div>
                       ))}
@@ -1012,7 +1023,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
                       title="Kam novou kategorii zařadit"
                       className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
                       <option value="">Hlavní</option>
-                      {flatCats.map(({ cat: c, depth }) => (
+                      {flatOwnCats.map(({ cat: c, depth }) => (
                         <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
                       ))}
                     </select>
@@ -1497,7 +1508,7 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
                       className={`${inputClass} py-2`}>
                       <option value="">— vyber kategorii —</option>
                       {flat.map(({ cat: c, depth }) => (
-                        <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}{c.name}</option>
+                        <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}{c.name}{c.zOrganizace ? ' \u00B7 z organizace' : ''}</option>
                       ))}
                     </select>
                   ) : f.kind === 'multiline' ? (
@@ -2252,31 +2263,38 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   const [prefillId, setPrefillId] = useState<number | null>(null);
   const [err, setErr] = useState('');
 
-  const tree = useMemo(() => buildTree(categories), [categories]);
-  const flat = useMemo(() => flattenTree(categories), [categories]);
+  // Vlastní a cizí zvlášť: kategorie z organizace (kolo 60) se tu jen čtou
+  // a mají vlastní blok pod našimi. Rodič se vždy drží uvnitř skupiny
+  // (server zanoření napříč podniky odmítá), takže dva stromy jsou bezpečné.
+  const own = useMemo(() => categories.filter(c => !c.zOrganizace), [categories]);
+  const cizi = useMemo(() => categories.filter(c => c.zOrganizace), [categories]);
+  const tree = useMemo(() => buildTree(own), [own]);
+  const ciziTree = useMemo(() => buildTree(cizi), [cizi]);
+  const flat = useMemo(() => flattenTree(own), [own]);
+  const spravuje = cizi.find(c => c.spravuje)?.spravuje ?? null;
 
   // Nesting has no fixed depth, so a branch renders itself.
-  const renderNode = (node: TreeNode<Category>, siblings: Category[], depth: number): React.ReactNode => {
+  const renderNode = (node: TreeNode<Category>, siblings: Category[], depth: number, readOnly = false): React.ReactNode => {
     const c = node.cat;
     const idx = siblings.findIndex(s => s.id === c.id);
-    const inherited = packagingSourceOf(categories, c.name);
+    const inherited = packagingSourceOf(readOnly ? cizi : own, c.name);
     return (
       <div key={c.id} className={depth === 0 ? 'py-2.5 space-y-2' : 'space-y-2'}>
         <CategoryRow
-          c={c} siblings={siblings} idx={idx} busy={busy} nested={depth > 0}
+          c={c} siblings={siblings} idx={idx} busy={busy} nested={depth > 0} readOnly={readOnly}
           editing={editId === c.id} editName={editName} setEditName={setEditName}
           startEdit={() => { setEditId(c.id); setEditName(c.name); }}
           cancelEdit={() => setEditId(null)} saveRename={() => saveRename(c.id)}
           move={move} onDelete={() => del(c)}
           packOpen={packId === c.id} togglePack={() => setPackId(packId === c.id ? null : c.id)}
           moveOpen={moveId === c.id} toggleMove={() => { setMoveId(moveId === c.id ? null : c.id); setErr(''); }}
-          parentOptions={possibleParents(categories, c.id)} setParent={p => setParent(c, p)}
+          parentOptions={readOnly ? [] : possibleParents(own, c.id)} setParent={p => setParent(c, p)}
           childCount={node.children.length}
           inheritsPackaging={!c.tracksOpen && inherited != null}
           prefillOpen={prefillId === c.id}
           togglePrefill={() => setPrefillId(prefillId === c.id ? null : c.id)}
           hasPrefill={hasDefaults(c.defaults)}
-          pathLabel={target => pathOfId(categories, target)}
+          pathLabel={target => pathOfId(own, target)}
           onToggleHide={async () => {
             const res = await fetch(`/api/inventory/categories/${c.id}`, {
               method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -2286,17 +2304,17 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
             else setErr('Skrytí kategorie se nepodařilo uložit.');
           }}
         />
-        {prefillId === c.id && (
+        {!readOnly && prefillId === c.id && (
           <DefaultsEditor
             category={c}
-            inherited={mergeDefaults(ancestryOfId(categories, c.id).slice(0, -1).map(a => a.defaults))}
+            inherited={mergeDefaults(ancestryOfId(own, c.id).slice(0, -1).map(a => a.defaults))}
             onSaved={onChanged}
           />
         )}
-        {packId === c.id && <PackagingEditor category={c} onSaved={onChanged} />}
+        {!readOnly && packId === c.id && <PackagingEditor category={c} onSaved={onChanged} />}
         {node.children.length > 0 && (
           <div className="ml-3 pl-3 border-l border-black/[0.08] space-y-2">
-            {node.children.map(child => renderNode(child, node.children.map(n => n.cat), depth + 1))}
+            {node.children.map(child => renderNode(child, node.children.map(n => n.cat), depth + 1, readOnly))}
           </div>
         )}
       </div>
@@ -2333,7 +2351,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
   const seedDefaults = async () => {
     setBusy(true);
-    const existing = new Set(categories.map(c => c.name.toLowerCase()));
+    const existing = new Set(own.map(c => c.name.toLowerCase()));
     for (const name of DEFAULT_CATEGORIES) {
       if (!existing.has(name.toLowerCase())) await createCategory(name);
     }
@@ -2382,7 +2400,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
   };
 
   const del = async (c: Category) => {
-    const kids = categories.filter(x => x.parentId === c.id).length;
+    const kids = own.filter(x => x.parentId === c.id).length;
     const extra = kids > 0 ? ` ${czCount(kids, { one: 'podkategorie', few: 'podkategorie', many: 'podkategorií' })} se ${czVerb(kids, 'přesune', 'přesunou')} na hlavní úroveň.` : '';
     if (!confirm(`Smazat kategorii „${c.name}"? Položky si svůj štítek ponechají.${extra}`)) return;
     setBusy(true); setErr('');
@@ -2422,7 +2440,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
         {err && <p className="text-xs font-medium text-bad-ink">{err}</p>}
 
-        {categories.length === 0 ? (
+        {own.length === 0 ? (
           <div className="text-center space-y-3 py-4">
             <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit." compact />
             <button onClick={seedDefaults} disabled={busy} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm font-medium disabled:opacity-40">
@@ -2435,6 +2453,20 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
           </div>
         )}
 
+        {/* Kategorie zdrojového podniku organizace — jen ke čtení; položky
+            na ně můžou ukazovat, ale upraví je vedení podniku, který je spravuje. */}
+        {ciziTree.length > 0 && (
+          <div className="space-y-1 pt-2">
+            <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
+              Z organizace <span className="chip chip-sm chip-muted normal-case tracking-normal">{pocetKategorii(cizi.length)}</span>
+            </p>
+            {spravuje && <p className="text-xs text-black/45">Spravuje: {spravuje}. Upraví je jeho vedení.</p>}
+            <div className="divide-y divide-black/[0.06]">
+              {ciziTree.map(node => renderNode(node, ciziTree.map(t => t.cat), 0, true))}
+            </div>
+          </div>
+        )}
+
         <button onClick={onClose} className="w-full rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Hotovo</button>
       </div>
     </div>
@@ -2443,11 +2475,13 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
 
 /* ---------- One row in the category manager ---------- */
 function CategoryRow({
-  c, siblings, idx, busy, nested, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
+  c, siblings, idx, busy, nested, readOnly, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
   move, onDelete, packOpen, togglePack, moveOpen, toggleMove, parentOptions, setParent, childCount,
   inheritsPackaging, prefillOpen, togglePrefill, hasPrefill, pathLabel, onToggleHide,
 }: {
   c: Category; siblings: Category[]; idx: number; busy: boolean; nested?: boolean;
+  /** Kategorie z organizace: bez tužky, šipek, přesunu, koše i editorů. */
+  readOnly?: boolean;
   onToggleHide: () => void;
   editing: boolean; editName: string; setEditName: (v: string) => void;
   startEdit: () => void; cancelEdit: () => void; saveRename: () => void;
@@ -2464,6 +2498,18 @@ function CategoryRow({
   // Anything can be re-filed except under its own branch, which possibleParents
   // has already excluded.
   const canMove = parentOptions.length > 0 || c.parentId != null;
+  if (readOnly) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
+          {c.name}
+          {childCount > 0 && <span className="text-[11px] text-black/30 ml-1.5">{childCount} podkat.</span>}
+          {inheritsPackaging && !c.tracksOpen && <span className="text-[11px] text-black/30 ml-1.5">balení dědí</span>}
+        </span>
+        <span className="chip chip-sm chip-muted shrink-0" title={c.spravuje ? `Spravuje: ${c.spravuje}` : undefined}>z organizace</span>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -2483,6 +2529,7 @@ function CategoryRow({
             {c.name}
             {childCount > 0 && <span className="text-[11px] text-black/30 ml-1.5">{childCount} podkat.</span>}
             {inheritsPackaging && !c.tracksOpen && <span className="text-[11px] text-black/30 ml-1.5">balení dědí</span>}
+            {c.sdileno && <span className="ml-1.5 chip chip-sm chip-info align-middle" title="Vidí a používají ji i ostatní podniky organizace">sdíleno</span>}
           </span>
         )}
         {canMove && (
@@ -2808,8 +2855,15 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
           <div className="divide-y divide-black/[0.06] rounded-2xl border border-black/[0.06] overflow-hidden">
             {suppliers.map(sp => (
               <div key={sp.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
-                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">{sp.name}</span>
-                {editId === sp.id ? (
+                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">
+                  {sp.name}
+                  {sp.zOrganizace && <span className="ml-1.5 chip chip-sm chip-muted align-middle" title={sp.spravuje ? `Spravuje: ${sp.spravuje}` : undefined}>z organizace</span>}
+                  {sp.sdileno && <span className="ml-1.5 chip chip-sm chip-info align-middle" title="Vidí a používají ho i ostatní podniky organizace">sdíleno</span>}
+                </span>
+                {/* Dodavatele z organizace spravuje jiný podnik — tady se jen čte. */}
+                {sp.zOrganizace ? (
+                  <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-wait-ink'}`}>{sp.email ?? 'bez e-mailu'}</span>
+                ) : editId === sp.id ? (
                   <span className="flex items-center gap-1.5">
                     <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="e-mail"
                       className="tap-target-sm w-52 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />

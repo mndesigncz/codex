@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -169,6 +170,16 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       : categoryId === null || categoryId === ''
       ? null
       : parseInt(categoryId);
+  // Nově nastavená kategorie musí být pro podnik viditelná — vlastní, nebo ze
+  // zdrojového podniku organizace (kolo 60). Dřív se neověřovala vůbec; teď se
+  // ukazatel ověřuje proti viditelným podnikům, nikdy proti holému id.
+  if (categoryId !== undefined && nextCategory != null && c.teamId) {
+    const tymy = await tymyCiselniku(Number(c.teamId), 'kategorieNavodu');
+    const [kat] = Number.isInteger(nextCategory)
+      ? await sql`SELECT 1 AS ok FROM guide_categories WHERE id = ${nextCategory} AND team_id = ANY(${tymy})`
+      : [];
+    if (!kat) return NextResponse.json({ error: 'Kategorie neexistuje' }, { status: 400 });
+  }
   // checklist: undefined keeps existing; anything else is normalized (empty array clears).
   const nextChecklist = checklist === undefined ? null : JSON.stringify(normalizeChecklist(checklist));
 

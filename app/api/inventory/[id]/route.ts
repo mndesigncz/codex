@@ -9,6 +9,7 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { ensureProductionTasks } from '@/lib/production';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
+import { tymyCiselniku } from '@/lib/tenant';
 
 // Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
 // úkol „vyrobit“, doplněný ho zavře, chybějící suroviny dostanou vlajku do nákupu.
@@ -37,13 +38,18 @@ function statusOf(quantity: number, min: number, critical: number): 'ok' | 'low'
   return 'ok';
 }
 
-/** The category's packaging settings, inherited from a parent when nested. */
-async function packagingFor(teamId: number | null, categoryName: string, categoryId?: number | null) {
+/**
+ * The category's packaging settings, inherited from a parent when nested.
+ * `tymy` jsou podniky, jejichž kategorie položka smí používat (vlastní +
+ * zdroj organizace, kolo 60); podle jména se ale hledá jen ve vlastních,
+ * ať se položka bez id nechytne na cizí stejnojmennou kategorii.
+ */
+async function packagingFor(teamId: number | null, tymy: number[], categoryName: string, categoryId?: number | null) {
   let cats: any[] = [];
   try {
     cats = await sql`
-      SELECT id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
-      FROM inventory_categories WHERE team_id = ${teamId}`;
+      SELECT id, team_id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
+      FROM inventory_categories WHERE team_id = ANY(${tymy})`;
   } catch {
     return null;
   }
@@ -51,18 +57,38 @@ async function packagingFor(teamId: number | null, categoryName: string, categor
     id: Number(c.id), name: String(c.name), position: 0,
     parentId: c.parent_id != null ? Number(c.parent_id) : null,
     tracksOpen: c.tracks_open === true,
+    vlastni: Number(c.team_id) === Number(teamId),
   }));
   // Resolve by id when the item has one — names may repeat across branches.
   const own = categoryId != null
     ? nodes.find(n => n.id === categoryId)
-    : nodes.find(n => n.name === categoryName);
+    : nodes.find(n => n.vlastni && n.name === categoryName);
   if (!own) return null;
   const src = packagingSourceOf(nodes, own);
   return src ? normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id)) : null;
 }
 
+/**
+ * Počítá se limit v balení, nebo v obsahu? Rozhoduje kategorie položky —
+ * podle id, když ho položka má (i sdílená z organizace, kolo 60), jinak
+ * podle jména jen ve vlastním podniku. Hledání podle id zároveň opravuje
+ * dřívější záměnu stejnojmenných podkategorií.
+ */
+async function limitVObsahu(item: any, teamId: number | null, tymy: number[]): Promise<boolean> {
+  try {
+    const [c] = item.category_id != null
+      ? await sql`
+          SELECT threshold_unit, tracks_open FROM inventory_categories
+          WHERE id = ${item.category_id} AND team_id = ANY(${tymy})`
+      : await sql`
+          SELECT threshold_unit, tracks_open FROM inventory_categories
+          WHERE team_id = ${teamId} AND name = ${item.category}`;
+    return c?.tracks_open === true && c?.threshold_unit === 'content';
+  } catch { return false; /* pre-migration DB: stay on packages */ }
+}
+
 // Return the item in the same shape the list endpoint uses (camelCase fields).
-async function mappedItem(id: number, teamId: number | null) {
+async function mappedItem(id: number, teamId: number | null, tymy: number[]) {
   try {
     const [row] = await sql`
       SELECT
@@ -90,7 +116,7 @@ async function mappedItem(id: number, teamId: number | null) {
       openAmount: row.openAmount != null ? Number(row.openAmount) : null,
     };
     // Ship the status with the item so no screen has to re-derive it.
-    const packaging = await packagingFor(teamId, item.category, item.categoryId ?? null);
+    const packaging = await packagingFor(teamId, tymy, item.category, item.categoryId ?? null);
     const sized = packaging
       ? { ...item, packageSize: item.packageSize ?? packaging.defaultPackageSize }
       : item;
@@ -126,6 +152,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     SELECT * FROM inventory_items
     WHERE id = ${id} AND team_id = ${me.teamId}`;
   if (!item) return NextResponse.json({ error: 'Položka nenalezena' }, { status: 404 });
+  // Kategorie, na které smí položka ukazovat: vlastní a zdroj organizace.
+  // Líně a jednou: odpověď (stav podle balení kategorie) ji potřebuje vždy,
+  // ale odmítnutý požadavek — a tablet u baru jich pošle nejvíc — nemá za
+  // rozhodnutí o organizaci platit dřív, než se vůbec dostane k zápisu.
+  let _tymy: number[] | null = null;
+  const tymy = async () => (_tymy ??= await tymyCiselniku(me.teamId, 'kategorieSkladu'));
 
   const body = await request.json();
   const note = body.note ?? null;
@@ -172,13 +204,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     // Same low-stock alert as a manual count change — the drop matters,
     // not which door it left through.
     const size = item.package_size != null ? Number(item.package_size) : 0;
-    let byContent = false;
-    try {
-      const [c] = await sql`
-        SELECT threshold_unit, tracks_open FROM inventory_categories
-        WHERE team_id = ${me.teamId} AND name = ${item.category}`;
-      byContent = c?.tracks_open === true && c?.threshold_unit === 'content';
-    } catch { /* pre-migration DB: stay on packages */ }
+    const byContent = await limitVObsahu(item, me.teamId, await tymy());
     const effective = byContent
       ? next.quantity * size + (next.openAmount ?? 0)
       : (size > 0 ? next.quantity + (next.openAmount ?? 0) / size : next.quantity);
@@ -199,7 +225,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       );
     }
     await afterStockChange(me.teamId);
-    return NextResponse.json(await mappedItem(id, me.teamId));
+    return NextResponse.json(await mappedItem(id, me.teamId, await tymy()));
   }
 
   if (me.role !== 'employer') {
@@ -262,13 +288,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       // decides whether the thresholds are counted in packages or in content,
       // so the alert fires on the same number the employer sees on screen.
       const size = item.package_size != null ? Number(item.package_size) : 0;
-      let byContent = false;
-      try {
-        const [c] = await sql`
-          SELECT threshold_unit, tracks_open FROM inventory_categories
-          WHERE team_id = ${me.teamId} AND name = ${item.category}`;
-        byContent = c?.tracks_open === true && c?.threshold_unit === 'content';
-      } catch { /* pre-migration DB: stay on packages */ }
+      const byContent = await limitVObsahu(item, me.teamId, await tymy());
       const effective = byContent
         ? newQty * size + (newOpen ?? 0)
         : (size > 0 ? newQty + (newOpen ?? 0) / size : newQty);
@@ -291,7 +311,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     await afterStockChange(me.teamId);
-    return NextResponse.json(await mappedItem(id, me.teamId));
+    return NextResponse.json(await mappedItem(id, me.teamId, await tymy()));
   }
 
   // Employer: full edit.
@@ -338,10 +358,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       if (wanted == null) {
         await sql`UPDATE inventory_items SET category_id = NULL WHERE id = ${id}`;
       } else if (Number.isFinite(wanted)) {
+        // Cíl proti viditelným podnikům (vlastní + zdroj organizace), nikdy
+        // proti holému id — kategorie cizí organizace neprojde.
         await sql`
           UPDATE inventory_items SET category_id = ${wanted}
           WHERE id = ${id} AND EXISTS (
-            SELECT 1 FROM inventory_categories c WHERE c.id = ${wanted} AND c.team_id = ${me.teamId})`;
+            SELECT 1 FROM inventory_categories c WHERE c.id = ${wanted} AND c.team_id = ANY(${await tymy()}))`;
       }
     } catch { /* column not migrated yet */ }
   }
@@ -445,7 +467,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   await afterStockChange(me.teamId);
-  return NextResponse.json(await mappedItem(id, me.teamId));
+  return NextResponse.json(await mappedItem(id, me.teamId, await tymy()));
 }
 
 // DELETE (employer): remove item.

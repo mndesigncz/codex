@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { ensureProductionTasks } from '@/lib/production';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +88,11 @@ export async function POST(req: NextRequest) {
     try { await sql`UPDATE orders SET supplier_id = ${supplierId} WHERE id = ${row.id}`; } catch { /* not migrated */ }
     if (b.sendEmail === true) {
       try {
-        const [sup] = await sql`SELECT name, email FROM suppliers WHERE id = ${supplierId} AND team_id = ${c.teamId}`;
+        // Dodavatel smí být i ze zdrojového podniku organizace (kolo 60);
+        // objednávka sama zůstává řádek tohoto podniku a e-mail odchází
+        // z účtu toho, kdo objednává.
+        const tymy = await tymyCiselniku(c.teamId, 'dodavatele');
+        const [sup] = await sql`SELECT name, email FROM suppliers WHERE id = ${supplierId} AND team_id = ANY(${tymy})`;
         if (!sup?.email) {
           emailError = 'Dodavatel nemá uložený e-mail.';
         } else {

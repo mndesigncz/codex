@@ -1785,6 +1785,21 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`);
 
+    // ---- Sdílené číselníky (kolo 60) ----
+    // Řádek číselníku patří dál svému podniku; sdílení je jen ve čtení
+    // (lib/tenant.ts tymyCiselniku). `origin_id` dostane kopie, která vznikla
+    // při VYPNUTÍ sdílení — díky ní se při opětovném zapnutí kopie zase sloučí
+    // s originálem místo dvojího „Sirupy". Indexy: čtení má teď v predikátu
+    // dva podniky a tyhle tabulky neměly index na team_id vůbec.
+    await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS origin_id INTEGER`);
+    await ddl(sql`ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS origin_id INTEGER`);
+    await ddl(sql`ALTER TABLE guide_categories ADD COLUMN IF NOT EXISTS origin_id INTEGER`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS inventory_categories_team ON inventory_categories (team_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS suppliers_team ON suppliers (team_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS shift_types_team ON shift_types (team_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS guide_categories_team ON guide_categories (team_id)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS rewards_catalog_team ON rewards_catalog (team_id)`);
+
     // ---- Řádky bez podniku ----
     // Sklad a uzávěrky z doby před sloupcem team_id měly podnik NULL a dotazy
     // je pouštěly k „team_id = můj OR team_id IS NULL" — tedy KAŽDÉMU podniku

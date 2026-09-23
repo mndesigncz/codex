@@ -3,10 +3,45 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+const vMesici = (month: string) => (d: unknown) =>
+  typeof d === 'string' && d.startsWith(month + '-') && /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+/**
+ * Preference po dnech: 'off' | 'morning' | 'afternoon' | 'flexible' zůstávají,
+ * 'type:<id>' ukazuje na typ směny a projde jen s VIDITELNÝM typem —
+ * vlastním, nebo ze zdrojového podniku organizace (kolo 60). Cizí id se tiše
+ * zahodí, generátor by ho stejně ignoroval. Společné pro zaměstnance (POST)
+ * i vedení (PATCH): oba zápisy pouští přesně totéž. Typy se načítají jen
+ * když v preferencích nějaké 'type:' vůbec je.
+ */
+async function ocistiPreference(teamId: number, month: string, raw: unknown): Promise<Record<string, string>> {
+  if (!raw || typeof raw !== 'object') return {};
+  const staticOk = (v: string) => ['off', 'morning', 'afternoon', 'flexible'].includes(v);
+  const inMonth = vMesici(month);
+  let viditelneTypy: Set<number> | null = null;
+  if (Object.values(raw as Record<string, unknown>).some(v => /^type:\d+$/.test(String(v)))) {
+    try {
+      const tymy = await tymyCiselniku(teamId, 'typySmen');
+      const rows = await sql`SELECT id FROM shift_types WHERE team_id = ANY(${tymy})`;
+      viditelneTypy = new Set((rows as any[]).map(r => Number(r.id)));
+    } catch { /* bez tabulky žádný typ neprojde */ }
+  }
+  const typeOk = (v: string) => {
+    const m = /^type:(\d+)$/.exec(v);
+    return !!m && !!viditelneTypy?.has(Number(m[1]));
+  };
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (inMonth(k) && (staticOk(String(v)) || typeOk(String(v)))) out[k] = String(v);
+  }
+  return out;
+}
 
 async function context() {
   const session = await getServerSession(authOptions);
@@ -86,8 +121,6 @@ export async function POST(req: Request) {
   const body = await req.json();
   const month: string = body.month;
   const unavailableDates: string[] = Array.isArray(body.unavailableDates) ? body.unavailableDates : [];
-  const dayPreferences: Record<string, string> =
-    body.dayPreferences && typeof body.dayPreferences === 'object' ? body.dayPreferences : {};
   const preferredShift: string | null = body.preferredShift ?? null;
   const maxShifts: number | null =
     body.maxShifts === null || body.maxShifts === undefined || body.maxShifts === ''
@@ -98,6 +131,8 @@ export async function POST(req: Request) {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
   }
+  // Až po kontrole měsíce: filtr potřebuje vědět, do kterého měsíce dny patří.
+  const dayPreferences = await ocistiPreference(ctx.teamId, month, body.dayPreferences);
 
   // delete existing for this employee+month, then insert
   await sql`
@@ -167,19 +202,13 @@ export async function PATCH(req: Request) {
     WHERE team_id = ${ctx.teamId} AND employee_id = ${employeeId} AND month = ${month}
     LIMIT 1`;
 
-  const inMonth = (d: string) => typeof d === 'string' && d.startsWith(month + '-') && /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const inMonth = vMesici(month);
   const unavailableDates: string[] = Array.isArray(body.unavailableDates)
     ? Array.from(new Set(body.unavailableDates.filter(inMonth))).slice(0, 62) as string[]
     : (existing?.unavailable_dates ?? []);
-  // 'type:<id>' references one of the team's shift types; the binary values stay accepted.
-  const prefOk = (v: string) => ['off', 'morning', 'afternoon', 'flexible'].includes(v) || /^type:\d+$/.test(v);
-  let dayPreferences: Record<string, string> = existing?.day_preferences ?? {};
-  if (body.dayPreferences && typeof body.dayPreferences === 'object') {
-    dayPreferences = {};
-    for (const [k, v] of Object.entries(body.dayPreferences)) {
-      if (inMonth(k) && prefOk(String(v))) dayPreferences[k] = String(v);
-    }
-  }
+  const dayPreferences: Record<string, string> = body.dayPreferences && typeof body.dayPreferences === 'object'
+    ? await ocistiPreference(ctx.teamId, month, body.dayPreferences)
+    : (existing?.day_preferences ?? {});
   const preferredShift = body.preferredShift !== undefined
     ? (['morning', 'afternoon', 'flexible'].includes(String(body.preferredShift)) ? String(body.preferredShift) : null)
     : (existing?.preferred_shift ?? null);

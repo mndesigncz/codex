@@ -8,6 +8,7 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { webovaUrl, souborUrl } from '@/lib/bezpecnaUrl';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,16 +152,19 @@ export async function GET() {
   // The category decides whether the thresholds mean packages or content, so the
   // status is computed once here. Every screen reads `status` instead of
   // re-deriving it and reaching a different answer than the stock view.
+  // Položka smí ukazovat i na kategorii zdrojového podniku organizace
+  // (kolo 60), takže balení se hledá i v jeho řádcích.
+  const tymy = await tymyCiselniku(me.teamId, 'kategorieSkladu');
   let cats: any[] = [];
   try {
     cats = await sql`
-      SELECT name, tracks_open, content_unit, default_package_size, threshold_unit, scale, parent_id, id
-      FROM inventory_categories WHERE team_id = ${me.teamId}`;
+      SELECT name, team_id, tracks_open, content_unit, default_package_size, threshold_unit, scale, parent_id, id
+      FROM inventory_categories WHERE team_id = ANY(${tymy})`;
   } catch {
     try {
       cats = await sql`
-        SELECT name, tracks_open, content_unit, default_package_size, scale, parent_id, id
-        FROM inventory_categories WHERE team_id = ${me.teamId}`;
+        SELECT name, team_id, tracks_open, content_unit, default_package_size, scale, parent_id, id
+        FROM inventory_categories WHERE team_id = ANY(${tymy})`;
     } catch { cats = []; }
   }
 
@@ -170,6 +174,7 @@ export async function GET() {
     id: Number(c.id), name: String(c.name), position: 0,
     parentId: c.parent_id != null ? Number(c.parent_id) : null,
     tracksOpen: c.tracks_open === true,
+    vlastni: Number(c.team_id) === Number(me.teamId),
   }));
   // Keyed by id: two categories may share a name under different parents.
   const packagingById = new Map<number, CategoryPackaging>();
@@ -179,8 +184,10 @@ export async function GET() {
     if (!src) return;
     const settings = normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id));
     packagingById.set(n.id, settings);
-    // Name lookup stays as the fallback for items with no category_id yet.
-    if (!packagingByName.has(n.name)) packagingByName.set(n.name, settings);
+    // Name lookup stays as the fallback for items with no category_id yet —
+    // a jen z vlastních řádků, ať se položka bez id nechytne na cizí
+    // stejnojmennou kategorii.
+    if (n.vlastni && !packagingByName.has(n.name)) packagingByName.set(n.name, settings);
   });
 
   return NextResponse.json(items.map((i: any) => {
@@ -297,13 +304,16 @@ export async function POST(request: Request) {
     } catch { /* columns not migrated yet */ }
   }
   // The category pointer is what filters run on; the text stays as the label.
+  // Cíl se ověřuje proti viditelným podnikům (vlastní + zdroj organizace),
+  // nikdy proti holému id — cizí kategorie mimo organizaci neprojde.
   const categoryId = Number(body.categoryId);
   if (Number.isFinite(categoryId) && categoryId > 0) {
     try {
+      const tymy = await tymyCiselniku(me.teamId, 'kategorieSkladu');
       await sql`
         UPDATE inventory_items SET category_id = ${categoryId}
         WHERE id = ${item.id} AND EXISTS (
-          SELECT 1 FROM inventory_categories c WHERE c.id = ${categoryId} AND c.team_id = ${me.teamId})`;
+          SELECT 1 FROM inventory_categories c WHERE c.id = ${categoryId} AND c.team_id = ANY(${tymy}))`;
     } catch { /* column not migrated yet */ }
   }
 

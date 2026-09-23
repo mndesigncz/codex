@@ -25,10 +25,16 @@ import { krokyNavodu } from './navody';
 import { pragueToday } from './pragueTime';
 import { notifyUsers } from './push';
 import { audit } from './audit';
+import { tymyCiselniku } from './tenant';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-/** Celý sklad týmu se stavem, tak jak ho počítá obrazovka Sklad. */
+/**
+ * Celý sklad týmu se stavem, tak jak ho počítá obrazovka Sklad. Signatura
+ * zůstává (teamId): balení kategorií sdílených z organizace (kolo 60) se
+ * dohledá uvnitř, takže výroba, úkoly, přehled organizace i digest ho
+ * dostanou bez další změny.
+ */
 export async function teamStock(teamId: number): Promise<Map<number, StockRow>> {
   let rows: any[] = [];
   try {
@@ -43,20 +49,24 @@ export async function teamStock(teamId: number): Promise<Map<number, StockRow>> 
   }
   let cats: any[] = [];
   try {
+    const tymy = await tymyCiselniku(teamId, 'kategorieSkladu');
     cats = await sql`
-      SELECT id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
-      FROM inventory_categories WHERE team_id = ${teamId}`;
+      SELECT id, team_id, name, parent_id, tracks_open, content_unit, default_package_size, threshold_unit, scale
+      FROM inventory_categories WHERE team_id = ANY(${tymy})`;
   } catch { /* bez kategorií */ }
   const nodes = cats.map((c: any) => ({
     id: Number(c.id), name: String(c.name), position: 0,
     parentId: c.parent_id != null ? Number(c.parent_id) : null,
     tracksOpen: c.tracks_open === true,
+    vlastni: Number(c.team_id) === teamId,
   }));
   const out = new Map<number, StockRow>();
   for (const i of rows) {
+    // Podle jména jen z vlastních řádků — položka bez id se nesmí chytnout
+    // na cizí stejnojmennou kategorii.
     const own = i.category_id != null
       ? nodes.find(n => n.id === Number(i.category_id))
-      : nodes.find(n => n.name === i.category);
+      : nodes.find(n => n.vlastni && n.name === i.category);
     const src = own ? packagingSourceOf(nodes, own) : null;
     const packaging = src ? normalizeCategoryPackaging(cats.find((c: any) => Number(c.id) === src.id)) : null;
     const row: StockRow = {

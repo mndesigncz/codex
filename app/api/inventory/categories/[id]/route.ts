@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { normalizeScale, normalizeThresholdUnit } from '@/lib/packaging';
 import { wouldCycle } from '@/lib/categoryTree';
 import { normalizeDefaults } from '@/lib/itemDefaults';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,27 @@ async function currentUser() {
   return { meId, role, teamId };
 }
 
+/**
+ * Když kategorie není naše, ale vidíme ji z organizace (kolo 60), vrátí název
+ * podniku, který ji spravuje — ať odpověď říká „upraví to jeho vedení" místo
+ * matoucího „nenalezena". Zápis samotný zůstává `team_id = můj`; tohle je
+ * jen hláška.
+ */
+async function spravceZOrganizace(id: number, teamId: number): Promise<string | null> {
+  const tymy = await tymyCiselniku(teamId, 'kategorieSkladu');
+  if (tymy.length < 2) return null;
+  try {
+    const [t] = await sql`
+      SELECT t.name FROM inventory_categories c JOIN teams t ON t.id = c.team_id
+      WHERE c.id = ${id} AND c.team_id = ANY(${tymy}) AND c.team_id <> ${teamId}`;
+    return t?.name ? String(t.name) : null;
+  } catch { return null; }
+}
+
+function cizi(kdo: string) {
+  return NextResponse.json({ error: `Tohle spravuje podnik ${kdo} — upraví to jeho vedení.` }, { status: 403 });
+}
+
 // PATCH (employer): rename and/or reorder a category.
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -30,7 +52,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   const id = parseInt(params.id);
   const [cat] = await sql`
     SELECT * FROM inventory_categories WHERE id = ${id} AND team_id = ${me.teamId}`;
-  if (!cat) return NextResponse.json({ error: 'Kategorie nenalezena' }, { status: 404 });
+  if (!cat) {
+    const kdo = await spravceZOrganizace(id, me.teamId);
+    if (kdo) return cizi(kdo);
+    return NextResponse.json({ error: 'Kategorie nenalezena' }, { status: 404 });
+  }
 
   const body = await request.json();
   const name = body.name !== undefined ? String(body.name).trim() : cat.name;
@@ -46,9 +72,16 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // Items point at the category by id; `category` is only the display label, so
   // a rename updates the label of exactly this category's items. Matching by the
   // old name would also hit a same-named category under a different parent.
+  //
+  // Záměrně BEZ filtru team_id (kolo 60, jedna ze tří zdokumentovaných
+  // výjimek): řádek kategorie je nahoře ověřený jako náš a id je globální
+  // SERIAL, takže `category_id = id` jsou přesně položky, které na ni
+  // ukazují — i v ostatních podnicích organizace, které ji přes sdílený
+  // číselník používají. To je definice sdíleného číselníku: přejmenování
+  // ve zdroji se propíše všem. Fallback podle jména níž zůstává jen vlastní.
   if (name !== oldName) {
     try {
-      await sql`UPDATE inventory_items SET category = ${name} WHERE team_id = ${me.teamId} AND category_id = ${id}`;
+      await sql`UPDATE inventory_items SET category = ${name} WHERE category_id = ${id}`;
     } catch {
       // Pre-migration DB has no category_id — fall back to the old behaviour.
       try {
@@ -80,6 +113,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           parentId: c.parent_id != null ? Number(c.parent_id) : null,
         }));
         if (!all.some(c => c.id === wanted)) {
+          // Zanořit jde jen pod vlastní kategorii — strom napříč podniky by při
+          // smazání rodiče ve zdroji nechal tady sirotky bez děděného balení.
+          const kdo = await spravceZOrganizace(wanted, me.teamId);
+          if (kdo) return NextResponse.json({ error: 'Podkategorii pod kategorií z organizace založí podnik, který ji spravuje.' }, { status: 400 });
           return NextResponse.json({ error: 'Nadřazená kategorie neexistuje' }, { status: 400 });
         }
         if (wouldCycle(all, id, wanted)) {
@@ -158,6 +195,17 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
   if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   const id = parseInt(params.id);
+  // Vlastnictví se ověří dřív, než se čehokoli dotkneme: NULLování ukazatelů
+  // níž běží přes id bez team filtru a smí se spustit jen pro náš řádek.
+  const [own] = await sql`
+    SELECT id FROM inventory_categories WHERE id = ${id} AND team_id = ${me.teamId}`;
+  if (!own) {
+    const kdo = await spravceZOrganizace(id, me.teamId);
+    if (kdo) return cizi(kdo);
+    // Už smazaná kategorie: mazání zůstává idempotentní jako dosud — druhý
+    // klik na „Smazat" nemá hlásit chybu nad řádkem, který právě zmizel.
+    return NextResponse.json({ ok: true });
+  }
   // Subcategories move up to take the deleted category's place rather than
   // disappearing with it — their items keep their own category label either way.
   try {
@@ -172,8 +220,13 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
   } catch { /* pre-migration DB has no parent_id */ }
   // Items keep their label but lose the pointer, so they surface as uncategorised
   // instead of pointing at a row that no longer exists.
+  //
+  // Záměrně BEZ filtru team_id (kolo 60, zdokumentovaná výjimka): řádek je
+  // nahoře ověřený jako náš, id je globální SERIAL, a položky v ostatních
+  // podnicích organizace, které na sdílenou kategorii ukazují, nesmí zůstat
+  // s ukazatelem do prázdna.
   try {
-    await sql`UPDATE inventory_items SET category_id = NULL WHERE team_id = ${me.teamId} AND category_id = ${id}`;
+    await sql`UPDATE inventory_items SET category_id = NULL WHERE category_id = ${id}`;
   } catch { /* column not migrated yet */ }
   await sql`DELETE FROM inventory_categories WHERE id = ${id} AND team_id = ${me.teamId}`;
 

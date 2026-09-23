@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,8 +51,11 @@ export async function PATCH(request: Request) {
   if (patch.categoryId !== undefined) {
     const catId = num(patch.categoryId);
     if (catId != null) {
+      // Cíl proti viditelným podnikům (vlastní + zdroj organizace, kolo 60),
+      // nikdy proti holému id — kategorie cizí organizace neprojde.
+      const tymy = await tymyCiselniku(me.teamId, 'kategorieSkladu');
       const [cat] = await sql`
-        SELECT id, name FROM inventory_categories WHERE id = ${catId} AND team_id = ${me.teamId}`;
+        SELECT id, name FROM inventory_categories WHERE id = ${catId} AND team_id = ANY(${tymy})`;
       if (!cat) return NextResponse.json({ error: 'Kategorie neexistuje' }, { status: 400 });
       await sql`
         UPDATE inventory_items SET category = ${cat.name}, updated_by = ${me.meId}, updated_at = NOW()

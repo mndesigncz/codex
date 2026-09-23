@@ -4,6 +4,7 @@ import { audit } from '@/lib/audit';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,9 +67,13 @@ export async function GET(req: Request) {
       // měsíc by jinak svítil celý červeně.
       const dates = Array.from(byDate.keys()).sort();
       gaps = coverageGaps(oh as any, byDate, dates);
+      // I typy ze zdrojového podniku organizace (kolo 60) — obsazují se
+      // podle otevírací doby TOHOHLE podniku.
+      const tymy = await tymyCiselniku(ctx.teamId, 'typySmen');
       const types = await sql`
         SELECT name, start_time, end_time, starts_at_open, ends_at_close
-        FROM shift_types WHERE team_id = ${ctx.teamId}` as any[];
+        FROM shift_types WHERE team_id = ANY(${tymy})
+        ORDER BY (team_id = ${ctx.teamId}) DESC, position ASC, id ASC` as any[];
       understaffed = missingSlots(oh as any, types as any, byDate, dates);
     }
   } catch { /* bez otevírací doby se pokrytí neřeší */ }

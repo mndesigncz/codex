@@ -13,6 +13,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { prefAllowsSlot, dayPrefLabel, isRestrictingPref, type PrefType } from '@/lib/dayPrefs';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,12 +116,16 @@ export async function POST(req: Request) {
   const avail = await sql`
     SELECT employee_id, unavailable_dates, day_preferences, preferred_shift, max_shifts
     FROM availability_requests WHERE team_id = ${c.teamId} AND month = ${month}`;
-  // The morning/afternoon category follows the team's OWN shift types where the
+  // The morning/afternoon category follows the team's shift types where the
   // shift carries a type name — a noon-straddling "Odpolední" must not flip to
-  // morning just because it starts at 11:30.
+  // morning just because it starts at 11:30. Typy ze zdrojového podniku
+  // organizace (kolo 60) jdou za vlastními, ať jméno napřed chytne lokální.
   let shiftTypes: any[] = [];
   try {
-    shiftTypes = await sql`SELECT id, name, start_time FROM shift_types WHERE team_id = ${c.teamId}`;
+    const tymy = await tymyCiselniku(c.teamId, 'typySmen');
+    shiftTypes = await sql`
+      SELECT id, name, start_time FROM shift_types WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${c.teamId}) DESC, position ASC, id ASC`;
   } catch { /* ignore */ }
   // Otevírací doba — přeplánování smí sáhnout jen tam, kde po něm zůstane
   // podnik obsazený. Když návrh znamená „zrušit", musí být vidět, že tím

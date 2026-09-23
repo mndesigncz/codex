@@ -12,6 +12,7 @@ import { normalizeTheme, normalizeExcluded, isDark, type ShareTheme } from '@/li
 import { buildTree, type CategoryNode, type TreeNode } from '@/lib/categoryTree';
 import { pragueToday } from '@/lib/pragueTime';
 import { podnikJePozastaveny } from '@/lib/blokaceDb';
+import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -218,8 +219,12 @@ type Section = { key: string; title: string; depth: number; entries: Entry[] };
 async function inventorySections(teamId: number, rootId: number | null, excluded: Set<number>): Promise<Section[]> {
   let cats: any[] = [];
   try {
+    // Položky mohou ukazovat i na kategorie zdrojového podniku organizace
+    // (kolo 60). Podnik je ze share_links.team_id, nikdy z URL — a víc než
+    // vlastní podnik + jeho zdroj tymyCiselniku nikdy nevrátí.
+    const tymy = await tymyCiselniku(teamId, 'kategorieSkladu');
     cats = await sql`
-      SELECT id, name, position, parent_id FROM inventory_categories WHERE team_id = ${teamId}`;
+      SELECT id, name, position, parent_id FROM inventory_categories WHERE team_id = ANY(${tymy})`;
   } catch { cats = []; }
 
   const nodes: CategoryNode[] = cats.map(c => ({
@@ -312,8 +317,12 @@ async function inventorySections(teamId: number, rootId: number | null, excluded
 async function guideSections(teamId: number, excluded: Set<number>): Promise<Section[]> {
   let cats: any[] = [];
   try {
+    // Návody podniku mohou ukazovat na kategorie zdrojového podniku
+    // organizace (kolo 60); vlastní kategorie první.
+    const tymy = await tymyCiselniku(teamId, 'kategorieNavodu');
     cats = await sql`
-      SELECT id, name, position FROM guide_categories WHERE team_id = ${teamId} ORDER BY position ASC, name ASC`;
+      SELECT id, name, position FROM guide_categories WHERE team_id = ANY(${tymy})
+      ORDER BY (team_id = ${teamId}) DESC, position ASC, name ASC`;
   } catch { cats = []; }
 
   let guides: any[] = [];
