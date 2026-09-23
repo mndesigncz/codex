@@ -28,6 +28,8 @@ interface Member {
   job_title?: string;
   shift_preference?: string;
   hourly_rate?: number | null;
+  /** Právě přepnutý do jiného podniku organizace (kolo 62) — je členem, jen tu teď nestojí. */
+  aktivni_jinde?: boolean;
 }
 
 interface Team {
@@ -716,6 +718,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       >{m.name}</p>
                       <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
                       {owner && <span className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
+                      {m.aktivni_jinde && <span className="chip chip-sm chip-muted" title="Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.">právě v jiném podniku</span>}
                     </div>
                     <p className="text-sm text-black/45 line-clamp-2 break-all sm:break-normal">{m.email}{m.job_title ? ` · ${m.job_title}` : ''}</p>
                   </div>

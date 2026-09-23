@@ -65,6 +65,146 @@ export async function pridejClenstvi(userId: number, teamId: number, role: RoleC
     ON CONFLICT (user_id, team_id) DO UPDATE SET role = EXCLUDED.role`;
 }
 
+// ---------------------------------------------------------------------------
+// Členové podniku (kolo 62)
+//
+// Do kola 62 braly desítky rout seznam členů, kontrolu členství, příjemce
+// oznámení i sazbu ze zrcadla users.team_id — člen přepnutý do jiného
+// podniku v tom původním zmizel: ze seznamu Týmu, z tabletu („Zaměstnanec
+// není ve vašem týmu"), z rozvrhu, a mzda mu vyšla 0. Tohle je JEDINÉ
+// místo, které říká, kdo je v podniku: členství (team_members) NEBO
+// zrcadlo — to druhé kvůli tabletu (kiosk) a účtům, které se od migrace
+// nepřihlásily. Role, pozice a sazba jsou z členství; sazba se NIKDY
+// nebere ze zrcadla jiného podniku (člen bez sazby tady má NULL).
+// JOIN je 1:1 díky UNIQUE(user_id, team_id) a `m.team_id = podnik` v ON.
+// ---------------------------------------------------------------------------
+
+/** 'lide' = vedení i zaměstnanci (bez tabletu). */
+export type FiltrRole = 'employer' | 'employee' | 'lide';
+const ROLE_FILTR: Record<FiltrRole, string[]> = { employer: ['employer'], employee: ['employee'], lide: ['employer', 'employee'] };
+
+export interface ClenPodniku {
+  id: number; name: string; avatar: string; email: string | null; phone: string | null;
+  role: 'employer' | 'employee' | 'kiosk';
+  jobTitle: string | null;
+  /** Sazba V TOMHLE podniku; null = nenastavená (nikdy sazba z jiného podniku). Jen se `sSazbou`. */
+  hourlyRate: number | null;
+  shiftPreference: string | null;
+  /** Má řádek v team_members (false = jen zrcadlo: tablet, nepřihlášený účet). */
+  clenstvi: boolean;
+  /** Právě přepnutý do jiného podniku — v UI chip, ať vedení ví, proč nereaguje. */
+  aktivniJinde: boolean;
+}
+export interface VolbaClenu { role?: FiltrRole; sKioskem?: boolean; krome?: number; sSazbou?: boolean }
+
+function clenZRadku(r: any, teamId: number): ClenPodniku {
+  return {
+    id: Number(r.id), name: String(r.name ?? ''), avatar: r.avatar ?? '👤', email: r.email ?? null, phone: r.phone ?? null,
+    role: r.role === 'employer' || r.role === 'kiosk' ? r.role : 'employee',
+    jobTitle: r.job_title ?? null,
+    hourlyRate: r.hourly_rate == null ? null : Number(r.hourly_rate),
+    shiftPreference: r.shift_preference ?? null,
+    clenstvi: r.clenstvi === true,
+    aktivniJinde: r.aktivni_team_id != null && Number(r.aktivni_team_id) !== teamId,
+  };
+}
+
+/** Členové podniku. Výchozí bez tabletu; `sKioskem` ho přidá (jde jen přes zrcadlo). */
+export async function clenovePodniku(teamId: number, volba: VolbaClenu = {}): Promise<ClenPodniku[]> {
+  if (!teamId) return [];
+  const role = [...ROLE_FILTR[volba.role ?? 'lide'], ...(volba.sKioskem ? ['kiosk'] : [])];
+  const sSazbou = volba.sSazbou === true;
+  const krome = volba.krome ?? -1;
+  let rows: any[];
+  try {
+    rows = await sql`
+      SELECT u.id, u.name, u.avatar, u.email, u.phone, u.shift_preference, u.team_id AS aktivni_team_id,
+             COALESCE(m.role, u.role) AS role,
+             COALESCE(m.job_title, u.job_title) AS job_title,
+             CASE WHEN ${sSazbou} THEN (CASE WHEN m.user_id IS NOT NULL THEN m.hourly_rate ELSE u.hourly_rate END) ELSE NULL END AS hourly_rate,
+             (m.user_id IS NOT NULL) AS clenstvi
+      FROM users u
+      LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${teamId}
+      WHERE (m.user_id IS NOT NULL OR u.team_id = ${teamId})
+        AND COALESCE(m.role, u.role) = ANY(${role})
+        AND u.id <> ${krome}
+      ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
+  } catch {
+    // Před migrací (team_members nebo hourly_rate ještě není): zrcadlo jako dřív.
+    rows = await sql`
+      SELECT u.id, u.name, u.avatar, u.email, u.phone, u.shift_preference, u.team_id AS aktivni_team_id,
+             u.role, u.job_title, NULL AS hourly_rate, FALSE AS clenstvi
+      FROM users u
+      WHERE u.team_id = ${teamId} AND u.role = ANY(${role}) AND u.id <> ${krome}
+      ORDER BY u.role DESC, u.name ASC`;
+  }
+  return rows.map(r => clenZRadku(r, teamId));
+}
+
+/** Jen id — pro notifyUsers a pro Set v cyklech. */
+export async function idClenu(teamId: number, volba?: VolbaClenu): Promise<number[]> {
+  return (await clenovePodniku(teamId, volba)).map(c => c.id);
+}
+
+/** Vedení podniku — příjemci oznámení. Nahrazuje kopie `SELECT id FROM users WHERE team_id AND role = 'employer'`. */
+export async function vedeniPodniku(teamId: number, volba: { krome?: number } = {}): Promise<number[]> {
+  return idClenu(teamId, { role: 'employer', krome: volba.krome });
+}
+
+/** Jeden člen podniku, nebo null. Tablet jen se `sKioskem`. Sazba je vždy z členství. */
+export async function clenPodniku(userId: number, teamId: number, volba: { sKioskem?: boolean } = {}): Promise<ClenPodniku | null> {
+  if (!userId || !teamId || !Number.isFinite(userId)) return null;
+  const role = ['employer', 'employee', ...(volba.sKioskem ? ['kiosk'] : [])];
+  let r: any;
+  try {
+    [r] = await sql`
+      SELECT u.id, u.name, u.avatar, u.email, u.phone, u.shift_preference, u.team_id AS aktivni_team_id,
+             COALESCE(m.role, u.role) AS role,
+             COALESCE(m.job_title, u.job_title) AS job_title,
+             (CASE WHEN m.user_id IS NOT NULL THEN m.hourly_rate ELSE u.hourly_rate END) AS hourly_rate,
+             (m.user_id IS NOT NULL) AS clenstvi
+      FROM users u
+      LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${teamId}
+      WHERE u.id = ${userId}
+        AND (m.user_id IS NOT NULL OR u.team_id = ${teamId})
+        AND COALESCE(m.role, u.role) = ANY(${role})`;
+  } catch {
+    [r] = await sql`
+      SELECT u.id, u.name, u.avatar, u.email, u.phone, u.shift_preference, u.team_id AS aktivni_team_id,
+             u.role, u.job_title, NULL AS hourly_rate, FALSE AS clenstvi
+      FROM users u WHERE u.id = ${userId} AND u.team_id = ${teamId} AND u.role = ANY(${role})`;
+  }
+  return r ? clenZRadku(r, teamId) : null;
+}
+
+/** Je člověk v podniku? Členství nebo zrcadlo; tablet jen se `sKioskem`. */
+export async function jeClenem(userId: number, teamId: number, volba?: { sKioskem?: boolean }): Promise<boolean> {
+  return !!(await clenPodniku(userId, teamId, volba));
+}
+
+/** Sazba člena V TOMHLE podniku; 0 když není nastavená nebo člověk v podniku není. */
+export async function sazbaVPodniku(userId: number, teamId: number): Promise<number> {
+  return (await clenPodniku(userId, teamId))?.hourlyRate ?? 0;
+}
+
+/**
+ * Počet lidí (bez tabletu) pro limit plánu Zdarma — členství nebo zrcadlo.
+ * Počítá i členy právě přepnuté do jiného podniku: platí se za lidi, ne za
+ * to, kde zrovna stojí.
+ */
+export async function pocetClenu(teamId: number): Promise<number> {
+  try {
+    const [r] = await sql`
+      SELECT COUNT(DISTINCT u.id)::int AS n
+      FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${teamId}
+      WHERE (m.user_id IS NOT NULL OR u.team_id = ${teamId}) AND COALESCE(m.role, u.role) <> 'kiosk'`;
+    return Number(r?.n ?? 0);
+  } catch {
+    const [r] = await sql`SELECT COUNT(*)::int AS n FROM users WHERE team_id = ${teamId} AND role <> 'kiosk'`;
+    return Number(r?.n ?? 0);
+  }
+}
+
 /** Organizace podniku (nebo null). */
 export async function organizaceTymu(teamId: number): Promise<{ id: number; name: string; ownerId: number; nastaveni: NastaveniOrganizace } | null> {
   try {
@@ -245,9 +385,13 @@ export async function zalozDalsiPodnik(ownerId: number, aktivniTeamId: number, n
 export async function zajistiClenstvi(userId: number, teamId: number | null, role: string): Promise<void> {
   if (!teamId || (role !== 'employer' && role !== 'employee')) return;
   try {
+    // Pozice a sazba jdou se členstvím: při přihlášení je zrcadlo tohohle
+    // podniku (users.team_id = teamId), takže se vezmou odtud. Bez toho by
+    // člověk, kterému vedení nastavilo sazbu před prvním přihlášením, měl
+    // v členství NULL — a mzdu 0.
     await sql`
-      INSERT INTO team_members (user_id, team_id, role)
-      VALUES (${userId}, ${teamId}, ${role})
+      INSERT INTO team_members (user_id, team_id, role, job_title, hourly_rate)
+      SELECT id, ${teamId}, ${role}, job_title, hourly_rate FROM users WHERE id = ${userId}
       ON CONFLICT (user_id, team_id) DO NOTHING`;
   } catch { /* před migrací */ }
 }

@@ -165,3 +165,6 @@ jobs:
       # navigaci pod sebou. Plovoucí panel patří na `.glass-strong`.
       - name: Plovoucí panely s pozadím
         run: node scripts/check-floating-glass.mjs
+
+      - name: SQL podle gramatiky Postgresu
+        run: node scripts/check-sql.mjs

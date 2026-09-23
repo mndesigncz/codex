@@ -13,6 +13,7 @@
 // účet fungují bez ID v env — stačí STRIPE_SECRET_KEY a STRIPE_WEBHOOK_SECRET.
 
 import Stripe from 'stripe';
+import { vedeniPodniku } from './tenant';
 import { neon } from '@neondatabase/serverless';
 import { PRICES, REFERRALS_PER_MONTH, MAX_OFFER_DAYS, TRIAL_DAYS, type Interval, type PlanId, planInfoOf } from './plan';
 import { generateJoinCode } from './team';
@@ -239,10 +240,8 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<numbe
 }
 
 async function employersOf(teamId: number): Promise<number[]> {
-  try {
-    const rows = await sql`SELECT id FROM users WHERE team_id = ${teamId} AND role = 'employer'`;
-    return rows.map((r: any) => Number(r.id));
-  } catch { return []; }
+  // Vedení podle členství (kolo 62): upozornění na platbu dojde i tomu, kdo je právě přepnutý jinam.
+  try { return await vedeniPodniku(teamId); } catch { return []; }
 }
 
 // ---- Affiliate: měsíc zdarma za první platbu doporučeného podniku ----
