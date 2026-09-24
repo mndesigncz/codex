@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { clenstviUzivatele, organizaceTymu, smiZalozitDalsiPodnik } from '@/lib/tenant';
+import { roleClena } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
@@ -20,7 +21,12 @@ export async function GET() {
   // (a jeho organizace). Přepínač tlačítko jinak nekreslí.
   const muzuZalozit = activeTeamId != null && (s.user as any).role === 'employer'
     ? await smiZalozitDalsiPodnik(meId, activeTeamId) : false;
+  // Oprávnění v aktivním podniku (kolo 67) — klient podle nich skládá
+  // navigaci a skrývá akce. Rozhoduje ale server: tohle je jen nápověda UI.
+  const r = activeTeamId != null ? await roleClena(meId, activeTeamId) : null;
   return NextResponse.json({
+    role: r ? { klic: r.klic, roleId: r.roleId, nazev: r.nazev, typ: r.typ, jeVlastnik: r.jeVlastnik } : null,
+    opravneni: r ? [...r.opravneni].sort() : [],
     activeTeamId,
     teams,
     muzuZalozit,

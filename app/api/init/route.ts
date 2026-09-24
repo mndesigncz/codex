@@ -937,6 +937,31 @@ export async function GET(request: Request) {
         UNIQUE (user_id, team_id)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS team_members_team ON team_members (team_id)`);
+    // Role a oprávnění (kolo 67). Přednastavené role žijí v kódu
+    // (lib/opravneniKatalog.ts); tady jsou jen VLASTNÍ role podniku.
+    // Člen ukazuje buď na systémovou roli (role_klic), nebo na vlastní
+    // (role_id); když nemá ani jedno, platí role odvozená z typu účtu
+    // (employer → Vedení, employee → Barista, kiosk → Kiosk) — takže
+    // existující podniky po nasazení fungují beze změny a bez přepisu dat.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS roles (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        nazev TEXT NOT NULL,
+        popis TEXT,
+        typ TEXT NOT NULL DEFAULT 'zamestnanec',
+        opravneni JSONB NOT NULL DEFAULT '[]',
+        zdroj TEXT,
+        verze INTEGER NOT NULL DEFAULT 1,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS roles_team ON roles (team_id)`);
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS role_id INTEGER`);
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS role_klic TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS vychozi_role_id INTEGER`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS vychozi_role_klic TEXT`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS active_team_id INTEGER`);
     // Zpětné naplnění: každý, kdo má tým, je jeho členem se svou dnešní rolí.
     // Idempotentní — ON CONFLICT nic nepřepíše, takže pozdější změna role
