@@ -3,7 +3,8 @@
 // nejvýš jedno denně; body podle pravidel podniku (bodů za 100 Kč).
 import { NextRequest, NextResponse } from 'next/server';
 import { tierFor } from '@/lib/clientSlots';
-import { sql, teamMember, customerByCard, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, normalizeCardCode } from '@/lib/client';
+import { sql, customerByCard, ensureProfile, join, membership, award, awardCredit, spendCredit, stampVisit, normalizeCardCode } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 import { activeCampaigns, progressFor, addStamps, applyBillToCampaigns } from '@/lib/stamps';
@@ -44,8 +45,9 @@ async function summary(teamId: number, customerId: number, p?: any) {
 }
 
 export async function GET(req: NextRequest) {
-  const u = await teamMember();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('vernost.karta');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const code = normalizeCardCode(String(new URL(req.url).searchParams.get('code') ?? ''));
   if (!code) return NextResponse.json({ error: 'Kód má osm znaků.' }, { status: 400 });
   const c = await customerByCard(code);
@@ -70,15 +72,23 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await teamMember();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj(['vernost.karta', 'vernost.body_z_castky', 'vernost.platba_kreditem']);
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const c = await customerByCard(String(b.code ?? ''));
   if (!c) return NextResponse.json({ error: 'Takovou kartičku neznáme.' }, { status: 404 });
+  const action = String(b.action ?? '');
+  // Razítko a připsání z účtenky jsou běžná práce u kasy; body z ručně
+  // zadané částky a placení kreditem hýbou penězi hosta, a tak mají svá
+  // oprávnění. Kontroluje se dřív, než se host stane členem (join níž).
+  const klic = action === 'points' ? 'vernost.body_z_castky' : action === 'credit' ? 'vernost.platba_kreditem' : 'vernost.karta';
+  if (!ctx.role.opravneni.has(klic)) {
+    return NextResponse.json({ error: action === 'credit' ? 'Platbu kreditem nemáš povolenou.' : action === 'points' ? 'Připisovat body z částky nemáš povoleno.' : 'Pracovat s kartičkou hosta nemáš povoleno.' }, { status: 403 });
+  }
   const p = await ensureProfile(u.team_id);
   if (!p.loyalty_on) return NextResponse.json({ error: 'Podnik nemá věrnost zapnutou.' }, { status: 400 });
   await join(c.id, u.team_id);
-  const action = String(b.action ?? '');
   let msg = '';
   if (action === 'stamp') {
     const before = await summary(u.team_id, c.id);

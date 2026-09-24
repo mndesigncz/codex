@@ -36,13 +36,18 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   }
   if (!ref) {
     // Vedení si potřebuje prohlédnout fotky i u akce, která ještě veřejná
-    // není — vlastnímu týmu se soubor vydá po přihlášení.
+    // není — vlastnímu týmu se soubor vydá po přihlášení. Aktivní podnik
+    // z users.team_id nestačí: host s vyplněným team_id členem není, proto
+    // se členství ověřuje v team_members (vlastník podniku vždy).
     const session = await getServerSession(authOptions);
     const meId = session?.user ? parseInt((session.user as any).id) : NaN;
     if (Number.isFinite(meId)) {
       [ref] = await sql`
         SELECT up.team_id FROM uploads up JOIN users us ON us.team_id = up.team_id
-        WHERE up.id = ${id} AND us.id = ${meId} LIMIT 1`;
+        WHERE up.id = ${id} AND us.id = ${meId}
+          AND (EXISTS (SELECT 1 FROM team_members m WHERE m.user_id = us.id AND m.team_id = up.team_id)
+               OR EXISTS (SELECT 1 FROM teams t WHERE t.id = up.team_id AND t.owner_id = us.id))
+        LIMIT 1`;
     }
   }
   if (!ref) return NextResponse.json({ error: 'Obrázek nenalezen' }, { status: 404 });

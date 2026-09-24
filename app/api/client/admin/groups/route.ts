@@ -2,14 +2,16 @@
 // zpráv. GET vrací skupiny s počty, POST zakládá, PATCH přejmenuje nebo
 // mění členy (add/remove), DELETE maže skupinu i členství v ní.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   try {
     const groups = await sql`
       SELECT g.id, g.name, (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
@@ -36,8 +38,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.skupiny');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const name = String(b.name ?? '').trim().slice(0, 60);
   if (!name) return NextResponse.json({ error: 'Zadej název skupiny.' }, { status: 400 });
@@ -48,8 +51,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.skupiny');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);
   const [g] = await sql`SELECT id FROM client_groups WHERE id = ${id} AND team_id = ${u.team_id}`;
@@ -77,8 +81,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.skupiny');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatná skupina' }, { status: 400 });
   await sql`DELETE FROM client_group_members WHERE group_id = ${id} AND team_id = ${u.team_id}`;

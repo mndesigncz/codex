@@ -17,8 +17,7 @@
 // a cash_closings, takže se nemusí stahovat tisíce účtenek kvůli jedné radě.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference } from '@/lib/closing';
 import { czCount } from '@/lib/czech';
@@ -63,14 +62,15 @@ function monthRange(month: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
-  const teamId = u.team_id as number;
+  // Kolo 67: rada podle oprávnění, podnik z databáze. Skupina Lidé stojí
+  // na sazbách (finance.mzdy), Hosté na datech zákazníků
+  // (zakaznici.zobrazit) — bez nich se ty skupiny vůbec nepošlou.
+  const c = await pozaduj('finance.analyza');
+  if (jeOdpoved(c)) return c;
+  const teamId = c.teamId;
+  const skupiny = new Set<AdviceGroup>(['revenue', 'products', 'stock']);
+  if (c.role.opravneni.has('finance.mzdy')) skupiny.add('people');
+  if (c.role.opravneni.has('zakaznici.zobrazit')) skupiny.add('guests');
 
   const month = String(new URL(req.url).searchParams.get('month') ?? '');
   if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
   const out: Advice[] = [];
   /** Co jsme chtěli spočítat a nešlo to. Slepá místa se přiznávají. */
   const blind: string[] = [];
-  const add = (a: Advice) => { out.push(a); };
+  const add = (a: Advice) => { if (skupiny.has(a.group)) out.push(a); };
 
   // ---------------------------------------------------------------- tržby --
   let revenue = 0, prevRevenue = 0, cash = 0, card = 0, tips = 0, customers = 0;

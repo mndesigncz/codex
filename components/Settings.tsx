@@ -10,8 +10,14 @@ import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { okJson } from '@/lib/api';
+import { useOpravneni } from './role/useOpravneni';
+import dynamic from 'next/dynamic';
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos';
+// Editor rolí nese celý katalog oprávnění (přes sto šedesát položek
+// s popisy) — stahuje se, až když ho někdo otevře, ne s každým Nastavením.
+const RoleEditor = dynamic(() => import('./role/RoleEditor'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
+
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -196,6 +202,9 @@ export default function Settings({ user, initialTab }: Props) {
   const [notifsLoaded, setNotifsLoaded] = useState(false);
 
   const isEmployer = (account?.role ?? user.role) === 'employer';
+  // Záložky podniku podle oprávnění (kolo 67). Vedení má všechno, takže
+  // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
+  const { ma } = useOpravneni();
 
   // Plan & trial for the billing section (employer only).
   const [plan, setPlan] = useState<PlanInfo | null>(null);
@@ -356,9 +365,10 @@ export default function Settings({ user, initialTab }: Props) {
     { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
-    ...(isEmployer ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
-    ...(isEmployer ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
-    ...(isEmployer ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
+    ...(isEmployer && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
+    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
+    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
+    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
   ];
 
   const unreadCount = notifs.filter(n => !n.is_read).length;
@@ -802,6 +812,8 @@ export default function Settings({ user, initialTab }: Props) {
                 </div>
               )}
             </div>
+          ) : section === 'roles' ? (
+            <RoleEditor />
           ) : section === 'audit' ? (
             <div className="glass-card p-6">
               <h3 className={cardTitle}>Historie změn</h3>

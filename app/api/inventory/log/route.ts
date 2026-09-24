@@ -1,30 +1,24 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id ?? null;
-  return { meId, role, teamId };
-}
 
 // GET ?itemId= : recent log entries for one item, or recent team-wide movements.
 //
 // Pohyb může být jen v načatém balení (odpis 0,04 l z lahve) — pak se počet
 // kusů nezmění a bez old_open/new_open by to v historii vypadalo, že se
 // nestalo nic.
+//
+// Kolo 67: `sklad.historie`. Historie nese jména (kdo co odepsal), a tak ji
+// dřív bez kontroly role dostal každý včetně tabletu, přestože ji UI ukazuje
+// jen ve skladu vedení — záměrně zavíraný únik.
 export async function GET(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj('sklad.historie');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   const { searchParams } = new URL(request.url);
   const itemId = searchParams.get('itemId');

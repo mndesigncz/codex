@@ -17,6 +17,8 @@ import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { DiscardGuard } from './ui/DiscardGuard';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { useOpravneni, obnovOpravneni } from './role/useOpravneni';
+import { Select } from './ui';
 
 interface Member {
   id: number;
@@ -30,7 +32,17 @@ interface Member {
   hourly_rate?: number | null;
   /** Právě přepnutý do jiného podniku organizace (kolo 62) — je členem, jen tu teď nestojí. */
   aktivni_jinde?: boolean;
+  /** Role s oprávněními (kolo 67): systémová podle klíče, vlastní podle id. `role` výš je jen typ účtu. */
+  role_klic?: string | null;
+  role_id?: number | null;
+  role_nazev?: string | null;
 }
+
+/** Role, jak ji vrací /api/roles — pro výběr u člena. */
+interface VolbaRole { klic: string | null; id: number | null; nazev: string; typ: 'vedeni' | 'zamestnanec' | 'kiosk'; opravneni: string[] }
+const hodnotaRole = (r: { klic?: string | null; id?: number | null }) => (r.id != null ? `id:${r.id}` : r.klic ? `k:${r.klic}` : '');
+/** Hodnota role člena pro <select>; prázdná, když server roli neposlal (starší odpověď). */
+const roleClena = (m: Member) => hodnotaRole({ klic: m.role_klic ?? null, id: m.role_id ?? null });
 
 interface Team {
   id: number;
@@ -70,6 +82,17 @@ function roleChip(role: string) {
 function roleLabel(role: string) {
   return role === 'employer' ? 'Vedoucí' : 'Zaměstnanec';
 }
+/**
+ * Název role člena. Server posílá role_klic / role_id; dokud je nepošle
+ * (nebo je role smazaná), zůstane starý popisek podle typu účtu — raději
+ * méně přesně než vymyšlený název.
+ */
+function nazevRole(m: Member, role: VolbaRole[]): string {
+  if (m.role_nazev) return m.role_nazev;
+  const v = roleClena(m);
+  const r = v ? role.find(x => hodnotaRole(x) === v) : null;
+  return r?.nazev ?? roleLabel(m.role);
+}
 
 function statusChip(status: string) {
   if (status === 'accepted') return 'bg-[#C8F542]/15 text-[#5B7A08]';
@@ -86,6 +109,15 @@ function statusLabel(status: string) {
 
 export default function TeamManagement({ user }: { user: { id: number; name: string; role: string; avatar?: string } }) {
   const symbol = useSymbol();
+  // Co smí přihlášený v tomhle podniku (kolo 67). Akce, na které nemá,
+  // se neukazují: tlačítko, které vždycky skončí 403, je jen past.
+  const { ma, role: mojeRole } = useOpravneni();
+  const smiPrirazovat = ma('tym.role_prirazovat');
+  const smiPozici = ma('tym.upravit');
+  const smiSazbu = ma('finance.sazby_upravit');
+  const smiOdebrat = ma('tym.odebrat');
+  const smiPozvat = ma('tym.pozvat');
+  const [role, setRole] = useState<VolbaRole[]>([]);
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -119,7 +151,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     return members.filter(m =>
       obsahujeNekde(q, m.name, m.email, (m as any).jobTitle));
   })();
-  const [editRole, setEditRole] = useState<string>('employee');
+  // Hodnota výběru role: `k:barista` (přednastavená) nebo `id:12` (vlastní).
+  const [editRole, setEditRole] = useState<string>('');
   const [editJob, setEditJob] = useState<string>('');
   const [editRate, setEditRate] = useState<string>('');
   const [savingMember, setSavingMember] = useState(false);
@@ -156,8 +189,22 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     setInvitations(data.invitations ?? []);
   };
 
+  // Role pro výběr u člena. Selhání není důvod schovat tým — výběr role
+  // se pak jen nenabídne a zbytek obrazovky funguje dál.
+  const loadRoles = () => fetch('/api/roles').then(okJson)
+    .then((d: any) => {
+      const sys = Array.isArray(d?.system) ? d.system : [];
+      const vl = Array.isArray(d?.vlastni) ? d.vlastni : [];
+      setRole([
+        ...sys.map((r: any) => ({ klic: r.klic, id: null, nazev: r.nazev, typ: r.typ, opravneni: r.opravneni ?? [] })),
+        ...vl.map((r: any) => ({ klic: null, id: r.id, nazev: r.nazev, typ: r.typ, opravneni: r.opravneni ?? [] })),
+      ]);
+    })
+    .catch(() => setRole([]));
+
   useEffect(() => {
     Promise.all([loadTeam(), loadInvites()]).finally(() => setLoading(false));
+    loadRoles();
     fetch('/api/inventory/categories').then(okJson)
       .then(c => { if (Array.isArray(c)) setInvCategories(c); })
       .catch(() => { /* shortcuts just lose the category options */ });
@@ -426,7 +473,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   const startEdit = (m: Member) => {
     setEditMemberId(m.id);
-    setEditRole(m.role);
+    setEditRole(roleClena(m));
     setEditJob(m.job_title ?? '');
     setEditRate(m.hourly_rate ? String(m.hourly_rate) : '');
     setError('');
@@ -434,21 +481,50 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   const saveMember = async () => {
     if (editMemberId == null) return;
+    const m = members.find(x => x.id === editMemberId);
+    if (!m) return;
+    // Posílá se jen to, co se změnilo A na co má přihlášený oprávnění.
+    // Server odmítne celý požadavek, když chybí oprávnění k jedinému poli
+    // (teams/members PATCH) — a sazba, kterou server neposlal (bez
+    // finance.mzdy přijde null), by se jinak „uložila" jako nula.
+    const telo: Record<string, unknown> = { userId: editMemberId };
+    const vybrana = role.find(r => hodnotaRole(r) === editRole);
+    if (smiPrirazovat && vybrana && editRole !== roleClena(m)) {
+      if (vybrana.id != null) telo.roleId = vybrana.id; else telo.roleKlic = vybrana.klic;
+    }
+    if (smiPozici && editJob !== (m.job_title ?? '')) telo.jobTitle = editJob;
+    const sazba = editRate === '' ? 0 : parseInt(editRate) || 0;
+    if (smiSazbu && m.hourly_rate != null && sazba !== (m.hourly_rate ?? 0)) telo.hourlyRate = sazba;
+    else if (smiSazbu && m.hourly_rate == null && editRate !== '') telo.hourlyRate = sazba;
+    if (Object.keys(telo).length === 1) { setEditMemberId(null); return; }
     setSavingMember(true);
     try {
       const res = await fetch('/api/teams/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: editMemberId, role: editRole, jobTitle: editJob, hourlyRate: editRate === '' ? 0 : parseInt(editRate) || 0 }),
+        body: JSON.stringify(telo),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setMembers(ms => ms.map(m => (m.id === editMemberId ? { ...m, role: editRole, job_title: editJob, hourly_rate: editRate === '' ? 0 : parseInt(editRate) || 0 } : m)));
+        setMembers(ms => ms.map(x => (x.id !== editMemberId ? x : {
+          ...x,
+          ...(telo.jobTitle !== undefined ? { job_title: editJob } : {}),
+          ...(telo.hourlyRate !== undefined ? { hourly_rate: sazba } : {}),
+          ...(vybrana && (telo.roleId !== undefined || telo.roleKlic !== undefined) ? {
+            role_klic: vybrana.klic, role_id: vybrana.id, role_nazev: vybrana.nazev,
+            // Typ účtu jde s rolí (rozhraní, rozvrh, žebříček) — stejně jako na serveru.
+            role: vybrana.typ === 'vedeni' ? 'employer' : vybrana.typ === 'kiosk' ? 'kiosk' : 'employee',
+          } : {}),
+        })));
         setEditMemberId(null);
         flash('Změny člena byly uloženy.');
+        if (telo.roleId !== undefined || telo.roleKlic !== undefined) loadRoles(); // počty lidí u rolí
       } else {
+        // 403 říká server česky a přesně („Roli Vedení dává a bere jen vlastník…").
         setError(data.error || 'Změny se nepodařilo uložit.');
       }
+    } catch {
+      setError('Změny se nepodařilo uložit — spojení se serverem vypadlo.');
     } finally {
       setSavingMember(false);
     }
@@ -509,6 +585,18 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   }
 
   const isOwner = team.owner_id === user.id;
+  // Role, které jde člověku přidělit: tablet (Kiosk) patří jen účtu tabletu.
+  // Role s oprávněními navíc proti mým server odmítne — v nabídce zůstanou,
+  // ale zamčené, ať je vidět proč.
+  const vlastnik = isOwner || !!mojeRole?.jeVlastnik;
+  const volbyRole = role.filter(r => r.typ !== 'kiosk');
+  const zamekRole = (r: VolbaRole): string | null => {
+    if (vlastnik) return null;
+    if (r.klic === 'vedeni') return 'jen vlastník';
+    if (mojeRole != null && r.opravneni.some(k => !ma(k))) return 'víc než tvoje role';
+    return null;
+  };
+  const smiUpravitClena = smiPrirazovat || smiPozici || smiSazbu;
   const pending = invitations.filter(i => i.status === 'pending');
 
   return (
@@ -548,14 +636,19 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         ) : (
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <p className="text-2xl font-bold tracking-tight text-[#16181A] min-w-0 line-clamp-2">{team.name}</p>
+            {ma('podnik.nastaveni') && (
             <button onClick={() => setEditingName(true)}
               className="btn btn-secondary flex-shrink-0 whitespace-nowrap">
               Přejmenovat
             </button>
+            )}
           </div>
         )}
       </div>
 
+      {/* Kód i pozvánky jsou vstupenka do podniku — jen s tym.pozvat
+          (server bez něj kód ani nevrátí). */}
+      {smiPozvat && (<>
       {/* Join code */}
       <div className="glass-card p-6 space-y-4">
         <div className="t-label flex items-center gap-2">
@@ -592,7 +685,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex gap-1 glass rounded-full p-1">
-              {[['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']].map(([val, label]) => (
+              {/* Pozvat jako vedení = přidělit roli; bez tym.role_prirazovat
+                  jde pozvat jen do výchozí role podniku. */}
+              {(smiPrirazovat ? [['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']] : [['employee', 'Zaměstnanec']]).map(([val, label]) => (
                 <button key={val} type="button" onClick={() => setInviteRole(val)}
                   className={`filter-pill ${inviteRole === val ? 'seg-on' : 'seg-off'}`}>
                   {label}
@@ -678,6 +773,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
       </div>
 
+      </>)}
+
       {/* Members */}
       <div className="glass-card p-6 space-y-4">
         <div className="t-label flex items-center gap-2">
@@ -716,7 +813,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                         className={`font-bold tracking-tight text-[#16181A] truncate ${m.role === 'employee' ? 'cursor-pointer hover:underline decoration-black/25 underline-offset-2' : ''}`}
                         title={m.role === 'employee' ? 'Zobrazit profil' : undefined}
                       >{m.name}</p>
-                      <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{roleLabel(m.role)}</span>
+                      <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${roleChip(m.role)}`}>{nazevRole(m, role)}</span>
                       {owner && <span className="tap-target-sm rounded-full px-3 py-1 text-xs font-medium bg-black/[0.06] text-black/60">Vlastník</span>}
                       {m.aktivni_jinde && <span className="chip chip-sm chip-muted" title="Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.">právě v jiném podniku</span>}
                     </div>
@@ -730,41 +827,66 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                           Profil
                         </button>
                       )}
+                      {smiUpravitClena && (
                       <button onClick={() => startEdit(m)}
                         className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition whitespace-nowrap">
                         Upravit
                       </button>
+                      )}
+                      {smiOdebrat && (
                       <button onClick={() => setRemoveTarget(m)}
                         className="rounded-full px-4 py-2 text-sm font-medium text-bad-ink hover:bg-bad/10 transition whitespace-nowrap">
                         Odebrat
                       </button>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {editing && (
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pl-0 sm:pl-15">
-                    <div>
-                      <label className="field-label">Role</label>
-                      <select value={editRole} aria-label="Role člena" onChange={e => setEditRole(e.target.value)}
-                        className={inputClass + ' appearance-none'}>
-                        <option value="employee" className="bg-neutral-900">Zaměstnanec</option>
-                        <option value="employer" className="bg-neutral-900">Vedoucí</option>
-                      </select>
+                    <div className="min-w-0">
+                      <label className="field-label" htmlFor={`clen-role-${m.id}`}>Role</label>
+                      {/* Role = sada oprávnění (kolo 67). Přednastavené i vlastní
+                          role podniku; co přidělit nesmím, je vidět, ale zamčené. */}
+                      <Select id={`clen-role-${m.id}`} value={editRole} onChange={e => setEditRole(e.target.value)}
+                        disabled={!smiPrirazovat || volbyRole.length === 0}>
+                        {editRole === '' && <option value="">{roleLabel(m.role)} (beze změny)</option>}
+                        <optgroup label="Přednastavené">
+                          {volbyRole.filter(r => r.id == null).map(r => {
+                            const z = zamekRole(r);
+                            return <option key={hodnotaRole(r)} value={hodnotaRole(r)} disabled={!!z && hodnotaRole(r) !== roleClena(m)}>{r.nazev}{z ? ` — ${z}` : ''}</option>;
+                          })}
+                        </optgroup>
+                        {volbyRole.some(r => r.id != null) && (
+                          <optgroup label="Vlastní role">
+                            {volbyRole.filter(r => r.id != null).map(r => {
+                              const z = zamekRole(r);
+                              return <option key={hodnotaRole(r)} value={hodnotaRole(r)} disabled={!!z && hodnotaRole(r) !== roleClena(m)}>{r.nazev}{z ? ` — ${z}` : ''}</option>;
+                            })}
+                          </optgroup>
+                        )}
+                      </Select>
+                      <p className="text-[11px] text-black/40 mt-1.5">
+                        {!smiPrirazovat ? 'Na přidělování rolí nemáš oprávnění.'
+                          : volbyRole.length === 0 ? 'Role se nepodařilo načíst — zkus obrazovku otevřít znovu.'
+                          : 'Co role smí, nastavíš v Nastavení → Role a oprávnění.'}
+                      </p>
                     </div>
-                    <div>
-                      <label className="field-label">Pozice</label>
-                      <input value={editJob} onChange={e => setEditJob(e.target.value)} className={inputClass} />
+                    <div className="min-w-0">
+                      <label className="field-label" htmlFor={`clen-pozice-${m.id}`}>Pozice</label>
+                      <input id={`clen-pozice-${m.id}`} value={editJob} onChange={e => setEditJob(e.target.value)} className={inputClass} disabled={!smiPozici} />
+                      {!smiPozici && <p className="text-[11px] text-black/40 mt-1.5">Na úpravu pozice nemáš oprávnění.</p>}
                     </div>
-                    <div>
-                      <label className="field-label">Hodinová sazba</label>
+                    <div className="min-w-0">
+                      <label className="field-label" htmlFor={`clen-sazba-${m.id}`}>Hodinová sazba</label>
                       <div className="relative">
-                        <input value={editRate} inputMode="numeric"
+                        <input id={`clen-sazba-${m.id}`} value={editRate} inputMode="numeric" disabled={!smiSazbu}
                           onChange={e => setEditRate(e.target.value.replace(/\D/g, ''))}
-                          placeholder="0" className={`${inputClass} pr-14`} />
+                          placeholder={m.hourly_rate == null && !ma('finance.mzdy') ? 'skrytá' : '0'} className={`${inputClass} pr-14`} />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}/h</span>
                       </div>
-                      <p className="text-[11px] text-black/40 mt-1.5">Použije se pro výpočet mezd v Docházce.</p>
+                      <p className="text-[11px] text-black/40 mt-1.5">{smiSazbu ? 'Použije se pro výpočet mezd v Docházce.' : 'Na úpravu sazeb nemáš oprávnění.'}</p>
                     </div>
                     <div className="sm:col-span-2 flex gap-2">
                       <button onClick={saveMember} disabled={savingMember}
@@ -784,7 +906,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
       </div>
 
-      {/* Business / localization settings — makes the app fit any team */}
+      {/* Nastavení podniku podle oprávnění (kolo 67) — bez nich by každá
+          změna skončila „nepodařilo se uložit". */}
+      {ma(['podnik.nastaveni', 'finance.nastaveni']) && (
+      /* Business / localization settings — makes the app fit any team */
       <div className="glass-card p-6 space-y-5">
         <div>
           <h3 className="t-card flex items-center gap-2">
@@ -837,7 +962,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </div>
       </div>
 
+      )}
+
       {/* Dashboard customization */}
+      {ma('podnik.nastaveni') && (
       <div className="glass-card p-6 space-y-5">
         <div>
           <h3 className="t-card flex items-center gap-2">
@@ -877,10 +1005,13 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         ))}
       </div>
 
+      )}
+
       {/* Public share links + their look */}
       <ShareSettings />
 
       {/* Payout / cash settings */}
+      {ma('uzaverky.nastaveni') && (
       <div className="glass-card p-6 space-y-4">
         <div>
           <h3 className="t-card flex items-center gap-2">
@@ -970,8 +1101,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </label>
       </div>
 
-      {/* Noisium integration */}
-      <KioskSettings />
+      )}
+
+      {/* Tablet: účet (kiosk.spravovat) a PINy lidí (dochazka.piny). */}
+      {ma(['kiosk.spravovat', 'dochazka.piny']) && <KioskSettings />}
 
       <NoisiumConnect />
 

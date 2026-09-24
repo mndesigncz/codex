@@ -11,10 +11,11 @@
 //
 // Uspořádání sekcí je čistě naše: podnik si položky může přesunout kamkoli,
 // vazba na produkt drží u položky, ne u sekce.
+//
+// Kolo 67: `menu.upravit`. Ceny sem přicházejí z kasy, ne od člověka, proto
+// import nepotřebuje `menu.ceny` — kasa je u cen ta hlavní pravda.
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { syncMenu } from '@/lib/posMirror';
@@ -22,6 +23,7 @@ import { buildBoard, cleanPrice, DEFAULT_CURRENCY } from '@/lib/menu';
 import { VYCHOZI_THEME, zeSdilenehoVzhledu } from '@/lib/menuTheme';
 import { matchByName, sectionTitles, type PosCatalogItem } from '@/lib/menuPos';
 import { audit } from '@/lib/audit';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -31,14 +33,6 @@ const sql = neon(process.env.DATABASE_URL!);
 /** Stejné stropy jako při ukládání menu, ať se import nevejde tam, kde uložení ne. */
 const MAX_SECTIONS = 40;
 const MAX_ITEMS = 100;
-
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') return null;
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return u?.team_id ? { meId, teamId: Number(u.team_id) } : null;
-}
 
 async function loadBoard(row: any) {
   const sections = await sql`SELECT * FROM menu_sections WHERE board_id = ${row.id} ORDER BY position, id`;
@@ -62,8 +56,9 @@ async function catalog(teamId: number): Promise<PosCatalogItem[]> {
 }
 
 export async function POST(request: Request) {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('menu.upravit');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   const body = await request.json().catch(() => ({}));
   const mode = ['new', 'fill', 'match'].includes(String(body?.mode)) ? String(body.mode) : '';

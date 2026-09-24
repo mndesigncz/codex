@@ -4,10 +4,14 @@
 // Ukládá se celá deska najednou: sekce a položky, které v požadavku nejsou,
 // se smažou. Id existujících položek se přitom drží, aby se nerozbilo
 // „vyprodáno“ přepnuté od stánku ani nic, co na id odkazuje.
+//
+// Kolo 67: jedno uložení dělá obsah, ceny i zveřejnění, takže se každá
+// část hlídá svým oprávněním — obsah `menu.upravit`, ceny `menu.ceny`,
+// zapnutí, adresa a PIN `menu.zverejnit` (PIN pouští k „vyprodáno" od stánku
+// bez přihlášení). Chybí-li oprávnění k jediné části, neuloží se nic:
+// půlka změny by vypadala jako úspěch.
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import {
@@ -15,19 +19,33 @@ import {
   MAX_NAME, MAX_DESC, SEED_BOARD, DEFAULT_CURRENCY,
 } from '@/lib/menu';
 import { normalizeMenuTheme, zeSdilenehoVzhledu, VYCHOZI_THEME } from '@/lib/menuTheme';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  if (role !== 'employer') return null;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return u?.team_id ? { meId, teamId: Number(u.team_id) } : null;
+/**
+ * Zasahuje uložení do cen? Existující položka se změněnou cenou, nebo nová
+ * položka s nenulovou cenou. Položka přesunutá do jiné sekce se ukládá jako
+ * nová, proto se ceny porovnávají podle id napříč celou deskou.
+ */
+async function meniCeny(boardId: number, sections: unknown): Promise<boolean> {
+  if (!Array.isArray(sections)) return false;
+  const stare = await sql`
+    SELECT i.id, i.price FROM menu_items i
+    JOIN menu_sections s ON s.id = i.section_id
+    WHERE s.board_id = ${boardId}` as any[];
+  const cenaPodleId = new Map(stare.map((r: any) => [Number(r.id), Number(r.price) || 0]));
+  for (const s of sections.slice(0, 40)) {
+    for (const it of (Array.isArray((s as any)?.items) ? (s as any).items : []).slice(0, 100)) {
+      if (!cleanText(it?.name, MAX_NAME)) continue;
+      const cena = cleanPrice(it?.price);
+      const puvodni = cenaPodleId.get(Number(it?.id));
+      if (puvodni === undefined ? cena > 0 : puvodni !== cena) return true;
+    }
+  }
+  return false;
 }
 
 async function loadBoard(boardRow: any) {
@@ -45,8 +63,9 @@ async function loadBoard(boardRow: any) {
 // ---------------------------------------------------------------------------
 
 export async function GET() {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('menu.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   let rows: any[] = [];
   try {
@@ -64,8 +83,9 @@ export async function GET() {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('menu.upravit');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   let body: any;
   try { body = await request.json(); } catch { body = {}; }
@@ -139,8 +159,9 @@ export async function POST(request: Request) {
 // ---------------------------------------------------------------------------
 
 export async function PUT(request: Request) {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('menu.upravit');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   let body: any;
   try { body = await request.json(); } catch { body = {}; }
@@ -155,6 +176,17 @@ export async function PUT(request: Request) {
   // ---- hlavička desky ----
   const name = cleanText(body?.name, MAX_NAME) || board.name;
   const slug = cleanSlug(body?.slug) || board.slug;
+
+  // ---- oprávnění k jednotlivým částem, dřív než se cokoli zapíše ----
+  const zverejneni = slug !== board.slug
+    || (body?.enabled !== false) !== (board.enabled !== false)
+    || Object.prototype.hasOwnProperty.call(body ?? {}, 'pin');
+  if (zverejneni && !c.role.opravneni.has('menu.zverejnit')) {
+    return NextResponse.json({ error: 'Zveřejnění menu, jeho adresu a PIN mění jen ten, kdo smí menu zveřejnit.' }, { status: 403 });
+  }
+  if (!c.role.opravneni.has('menu.ceny') && await meniCeny(id, body?.sections)) {
+    return NextResponse.json({ error: 'Na změnu cen v menu nemáš oprávnění.' }, { status: 403 });
+  }
   if (slug !== board.slug) {
     const [clash] = await sql`
       SELECT id, team_id, name FROM menu_boards WHERE slug = ${slug} AND id <> ${id}`;
@@ -296,8 +328,9 @@ export async function PUT(request: Request) {
 // ---------------------------------------------------------------------------
 
 export async function DELETE(request: Request) {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('menu.mazat');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   const id = Number(new URL(request.url).searchParams.get('id'));
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí menu' }, { status: 400 });

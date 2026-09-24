@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { createNoisiumTask } from '@/lib/noisium';
 
 export const dynamic = 'force-dynamic';
 
 // POST { cardId } — publish a planning card as a task in the team's Noisium project.
+// Publikuje se karta plánování přes token integrace: je potřeba smět
+// integraci používat (integrace.spravovat) i plánování upravovat — publikace
+// kartě zapisuje vazbu na úkol v Noisiu.
 export async function POST(request: Request) {
-  const s = await getServerSession(authOptions);
-  if (!s?.user || (s.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('integrace.spravovat');
+  if (jeOdpoved(c)) return c;
+  if (!c.role.opravneni.has('planovani.upravit')) {
+    return NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
   }
-  const meId = parseInt((s.user as any).id);
   const sql = neon(process.env.DATABASE_URL!);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id;
-  if (!teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const teamId = c.teamId;
 
   const [team] = await sql`SELECT noisium_token, noisium_project_id, noisium_base_url FROM teams WHERE id = ${teamId}`;
   if (!team?.noisium_token || !team?.noisium_project_id) {

@@ -2,26 +2,16 @@
 //
 // SECURITY: planning_cards has no team column, so ownership is established
 // through the creator's team — the same way the list endpoint scopes it.
-// Checking only the role would let an employer of one business edit or delete
+// Checking only the permission would let an employer of one business edit or delete
 // another business's card by guessing an id.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function employerTeam() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return { status: 401 as const, teamId: null };
-  if ((session.user as any).role !== 'employer') return { status: 403 as const, teamId: null };
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { status: 200 as const, teamId: (u?.team_id ?? null) as number | null };
-}
 
 /** True when the card was created by a member of this team. */
 async function ownedByTeam(id: number, teamId: number) {
@@ -33,9 +23,8 @@ async function ownedByTeam(id: number, teamId: number) {
 
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await employerTeam();
-  if (me.status === 401) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.status === 403 || !me.teamId) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await pozaduj('planovani.upravit');
+  if (jeOdpoved(me)) return me;
 
   try {
     const id = parseInt(params.id);
@@ -68,9 +57,8 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
 
 export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await employerTeam();
-  if (me.status === 401) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.status === 403 || !me.teamId) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await pozaduj('planovani.upravit');
+  if (jeOdpoved(me)) return me;
 
   try {
     const id = parseInt(params.id);

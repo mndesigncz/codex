@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { pragueToday } from '@/lib/pragueTime';
 import { zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
@@ -9,25 +8,20 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null };
-}
-
 const todayStr = () => pragueToday();
 
 // GET ?month=YYYY-MM&scope=me — a calendar of who was on shift and who did (or
 // still owes) the closing each day. Employer sees the whole team (including the
 // day's revenue); employees (and any scope=me request) see only their own days
 // and no money figures.
+// Kolo 67: celý tým s uzaverky.zobrazit_vse, tržba dne navíc jen s
+// finance.trzby; kdo nemá ani jedno, vidí vlastní dny (vlastní data).
 export async function GET(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId || c.role === 'kiosk') return NextResponse.json({ days: {} });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  // Tablet nemá vlastní směny a na sdílené obrazovce kalendář týmu nemá co
+  // dělat — rozhoduje typ účtu, stejně jako dřív.
+  if (c.role.typ === 'kiosk') return NextResponse.json({ days: {} });
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? todayStr().slice(0, 7);
@@ -36,7 +30,8 @@ export async function GET(req: NextRequest) {
   const [y, m] = month.split('-').map(Number);
   const end = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
 
-  const selfOnly = c.role !== 'employer' || searchParams.get('scope') === 'me';
+  const selfOnly = !c.role.opravneni.has('uzaverky.zobrazit_vse') || searchParams.get('scope') === 'me';
+  const sTrzbou = !selfOnly && c.role.opravneni.has('finance.trzby');
 
   try {
     const shifts = selfOnly
@@ -136,8 +131,9 @@ export async function GET(req: NextRequest) {
       const d = days[date];
       d.hasClosing = (coveredByDate.get(date)?.size ?? 0) > 0;
       d.missing = d.onShift.length > 0 && !d.hasClosing && date < tstr;
-      // Money stays out of the employee-scoped payload.
-      if (!selfOnly) d.revenue = revenueByDate.get(date) ?? 0;
+      // Money stays out of the employee-scoped payload — and out of the team
+      // view for roles without finance.trzby.
+      if (sTrzbou) d.revenue = revenueByDate.get(date) ?? 0;
     }
 
     return NextResponse.json({ days, month, selfOnly });

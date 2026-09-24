@@ -1,55 +1,62 @@
+// Pozvánky do podniku. Kolo 67: místo „jen vedení" je hlídá oprávnění
+// tym.pozvat. Pozvánka jde do výchozí role podniku; pozvat „jako vedení"
+// (starý tvar role=employer) je přidělení role — potřebuje navíc
+// tym.role_prirazovat a stejná pravidla jako změna role u člena (Vedení
+// dává jen vlastník). Při přijetí se to ověřuje znovu (invitations/accept).
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { generateInviteToken } from '@/lib/team';
 import { sendTeamInvitation } from '@/lib/email';
 import { smiPridatClena, pocetClenu } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { smiPriraditRoli } from '@/lib/opravneni';
+import { roleVedeni, vychoziRolePodniku, typUctu } from '../teams/_role';
 
 export const dynamic = 'force-dynamic';
 
-async function currentEmployer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') return null;
-  return { id: parseInt((session.user as any).id), name: session.user.name as string };
-}
-
 export async function GET() {
-  const me = await currentEmployer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('tym.pozvat');
+  if (jeOdpoved(c)) return c;
   const sql = neon(process.env.DATABASE_URL!);
-  // Aktivní podnik, stejně jako POST a DELETE. Dřív „první vlastněný" —
-  // majitel dvou podniků v tom druhém viděl pozvánky toho prvního a nová
-  // pozvánka mu v seznamu chyběla.
-  const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const [team] = dbMe?.team_id
-    ? await sql`SELECT id FROM teams WHERE id = ${dbMe.team_id}`
-    : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
-  if (!team) return NextResponse.json({ invitations: [] });
+  // Aktivní podnik z databáze (pozaduj), stejně jako POST a DELETE.
   // token is included so the employer can copy a working join link and share
   // it directly (email delivery is best-effort and may be unconfigured).
+  // Token je klíč do podniku — vidí ho jen ten, kdo smí zvát (tym.pozvat).
   const invitations = await sql`
     SELECT id, email, job_title, status, token, created_at FROM invitations
-    WHERE team_id = ${team.id} ORDER BY created_at DESC`;
+    WHERE team_id = ${c.teamId} ORDER BY created_at DESC`;
   return NextResponse.json({ invitations });
 }
 
 export async function POST(request: Request) {
-  const me = await currentEmployer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('tym.pozvat');
+  if (jeOdpoved(c)) return c;
   const { email, jobTitle, role } = await request.json();
   if (!email) return NextResponse.json({ error: 'Email je povinný' }, { status: 400 });
 
   const sql = neon(process.env.DATABASE_URL!);
-  // Any employer of the team can invite (multi-employer teams).
-  const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const [team] = dbMe?.team_id
-    ? await sql`SELECT id, name FROM teams WHERE id = ${dbMe.team_id}`
-    : await sql`SELECT id, name FROM teams WHERE owner_id = ${me.id}`;
+  const [team] = await sql`SELECT id, name FROM teams WHERE id = ${c.teamId}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const [meRow] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
+  const me = { id: c.meId, name: String(meRow?.name ?? '') };
 
   const invRole = role === 'employer' ? 'employer' : 'employee';
+  // Jiná než výchozí role = přidělení role: stejná pravidla jako u člena.
+  // Bez nich by pozvánka byla boční dveře, kudy dát Vedení i tomu, komu ho
+  // změnou role dát nejde.
+  if (invRole === 'employer') {
+    if (!c.role.opravneni.has('tym.role_prirazovat')) {
+      return NextResponse.json({ error: 'Pozvat jde jen do výchozí role — na přidělování rolí nemáš oprávnění.' }, { status: 403 });
+    }
+    const vedeni = roleVedeni();
+    const v = smiPriraditRoli({ jeVlastnik: c.role.jeVlastnik, opravneni: c.role.opravneni },
+      { jeVlastnik: false, jeTo: false, soucasna: [], soucasnaKlic: null }, { opravneni: vedeni.opravneni, klic: vedeni.klic });
+    if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 403 });
+  }
+  // Pro kontrolu sdílení lidí mezi podniky rozhoduje typ účtu, se kterým
+  // člověk přijde — u výchozí role ten její.
+  const typPrijeti = invRole === 'employer' ? 'employer' : typUctu(await vychoziRolePodniku(Number(team.id)));
   // Existující účet jde pozvat do DALŠÍHO podniku (přijetí mu přidá členství).
   // Nejde pozvat tablet ani hosta, a nejde pozvat někoho, kdo už tu je.
   const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE email = ${email}`;
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
     } catch { /* před migrací */ }
     if (uzClen) return NextResponse.json({ error: 'Tenhle člověk už v týmu je.' }, { status: 409 });
     // „Sdílení lidí mezi podniky" organizace platí i tady, ne jen v nastavení.
-    if (!(await smiPridatClena(Number(existingUser.id), Number(team.id), invRole))) {
+    if (!(await smiPridatClena(Number(existingUser.id), Number(team.id), typPrijeti))) {
       return NextResponse.json({ error: 'Tenhle člověk už pracuje v jiném podniku organizace a sdílení lidí mezi podniky je vypnuté. Zapne ho vlastník organizace v Nastavení.' }, { status: 409 });
     }
   }
@@ -100,18 +107,13 @@ export async function POST(request: Request) {
 // DELETE ?id= — revoke a pending invitation (typo in the e-mail, wrong person…).
 // The token stops working immediately; the row stays for the audit trail.
 export async function DELETE(request: Request) {
-  const me = await currentEmployer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('tym.pozvat');
+  if (jeOdpoved(c)) return c;
   const sql = neon(process.env.DATABASE_URL!);
   const url = new URL(request.url);
   const id = parseInt(url.searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
-
-  const [meRow] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const [team] = meRow?.team_id
-    ? await sql`SELECT id FROM teams WHERE id = ${meRow.team_id}`
-    : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
-  if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const team = { id: c.teamId };
 
   const [row] = await sql`
     UPDATE invitations SET status = 'revoked'

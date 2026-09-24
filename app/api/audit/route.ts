@@ -1,7 +1,6 @@
 // The employer's answer to "kdo to změnil?" — recent audit entries, newest first.
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
@@ -20,16 +19,18 @@ const LABELS: Record<string, string> = {
   'reward.declined': 'Zamítnuta odměna',
   'organization.kopie': 'Zkopírováno z jiného podniku',
   'organization.kopie.zdroj': 'Zkopírováno do jiného podniku',
+  'role.create': 'Vytvořena role',
+  'role.update': 'Upravena role',
+  'role.delete': 'Smazána role',
+  'role.assign': 'Změněna role člena',
 };
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ entries: [] });
+  // Historie změn prozrazuje, kdo co mazal a měnil — jen s oprávněním,
+  // podnik z databáze (ne z role v tokenu).
+  const c = await pozaduj('audit.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const u = { team_id: c.teamId };
   try {
     const rows = await sql`
       SELECT a.*, us.name AS user_name, us.avatar AS user_avatar

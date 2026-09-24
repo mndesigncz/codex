@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import { audit } from '@/lib/audit';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus, consumeContent } from '@/lib/packaging';
@@ -9,7 +7,9 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { ensureProductionTasks } from '@/lib/production';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
-import { tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
+import { tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { typNaUcet } from '@/lib/opravneni';
 
 // Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
 // úkol „vyrobit“, doplněný ho zavře, chybějící suroviny dostanou vlajku do nákupu.
@@ -22,15 +22,19 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id ?? null;
-  return { meId, role, teamId };
-}
+/**
+ * Kdo dostane upozornění „dochází". Dřív vedení; teď ti, kdo z toho mají
+ * udělat objednávku (`nakup.vytvorit`) — Vedení ho má, takže pro dnešní
+ * podniky se příjemci nemění.
+ */
+const prijemciNizkehoStavu = (teamId: number) => clenoveSOpravnenim(teamId, 'nakup.vytvorit');
+
+// Pole plné úpravy položky (kromě ceny, množství a schválení) — `sklad.upravit`.
+const POLE_UPRAVY = [
+  'name', 'category', 'categoryId', 'minQuantity', 'criticalQuantity', 'maxQuantity', 'unit',
+  'supplier', 'supplierUrl', 'hideFromOverview', 'brand', 'description', 'packageSize',
+  'contentUnit', 'portions',
+] as const;
 
 function statusOf(quantity: number, min: number, critical: number): 'ok' | 'low' | 'critical' {
   if (quantity <= critical) return 'critical';
@@ -88,7 +92,14 @@ async function limitVObsahu(item: any, teamId: number | null, tymy: number[]): P
 }
 
 // Return the item in the same shape the list endpoint uses (camelCase fields).
-async function mappedItem(id: number, teamId: number | null, tymy: number[]) {
+// Nákupní cena jen se `sklad.ceny` — stejně jako v seznamu (kolo 67).
+async function mappedItem(id: number, teamId: number | null, tymy: number[], vidiCeny: boolean) {
+  const r = await mappedItemRaw(id, teamId, tymy);
+  if (!r || vidiCeny || !('unitCost' in r)) return r;
+  return { ...r, unitCost: null };
+}
+
+async function mappedItemRaw(id: number, teamId: number | null, tymy: number[]) {
   try {
     const [row] = await sql`
       SELECT
@@ -140,10 +151,21 @@ async function mappedItem(id: number, teamId: number | null, tymy: number[]) {
 }
 
 // PATCH: employees may only change quantity; employers may edit all fields.
+//
+// Kolo 67: místo „vedení / ostatní" rozhodují oprávnění. Omezená větev
+// (počet, načaté balení, „nevedeme") chce `sklad.zapsat_stav`; plná úprava
+// hlídá každou skupinu polí zvlášť — `sklad.upravit`, cena
+// `sklad.ceny_upravit`, schválení `sklad.schvalovat`, odznak pro hosty
+// `menu.upravit`. Chybí-li oprávnění k jedinému poli, neuloží se nic.
+// Barista i tablet žádné z „velkých" oprávnění nemají, takže jdou omezenou
+// větví přesně jako dřív; Vedení má všechno a jde plnou.
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId, role: typNaUcet(c.role.typ) };
+  const ma = (k: string) => c.role.opravneni.has(k);
+  const vidiCeny = ma('sklad.ceny');
 
   const id = parseInt(params.id);
   // Scoped to the caller's team — item ids are sequential, so an unscoped
@@ -166,13 +188,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // way the POS sync does, so a partial pour never costs a whole bottle.
   // Available to every role; whoever poured the wine is the one who writes it off.
   if (body.consume !== undefined) {
+    if (!ma('sklad.zapsat_stav')) return bezOpravneni();
     const amount = Number(body.consume);
     if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ error: 'Neplatné množství' }, { status: 400 });
     }
-    const authorId = me.role === 'employer'
-      ? me.meId
-      : await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
+    // Za někoho jiného jedná jen tablet; ostatním resolveActingUser vrátí je samé.
+    const authorId = await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
     const oldQty = Number(item.quantity);
     const oldOpen = item.open_amount != null ? Number(item.open_amount) : null;
     const next = consumeContent({
@@ -210,8 +232,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       : (size > 0 ? next.quantity + (next.openAmount ?? 0) / size : next.quantity);
     const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
     if (status !== 'ok') {
-      // Kolo 62: vedení podle členství — provozovatel přepnutý jinam se o zásobách dozví.
-      const employers = await vedeniPodniku(me.teamId);
+      // Podle členství — kdo je přepnutý jinam, se o zásobách dozví.
+      const employers = await prijemciNizkehoStavu(me.teamId);
       await Promise.all(
         employers.map(id =>
           notifyUser(id, {
@@ -225,16 +247,25 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       );
     }
     await afterStockChange(me.teamId);
-    return NextResponse.json(await mappedItem(id, me.teamId, await tymy()));
+    return NextResponse.json(await mappedItem(id, me.teamId, await tymy(), vidiCeny));
   }
 
-  if (me.role !== 'employer') {
+  // Omezenou větví jde, kdo nemá plnou úpravu a nežádá nic, na co by
+  // plná větev byla potřeba a co smí (schválit, cena, odznak). Tak barista
+  // i tablet — dřív „kdokoli kromě vedení" — dostanou přesně totéž co dřív,
+  // včetně toho, že přibalená pole navíc se tiše ignorují.
+  const omezena = !ma('sklad.upravit')
+    && !(body.approve === true && ma('sklad.schvalovat'))
+    && !(body.highlight !== undefined && ma('menu.upravit'))
+    && !(body.unitCost !== undefined && ma('sklad.ceny_upravit'));
+  if (omezena) {
+    if (!ma('sklad.zapsat_stav')) return bezOpravneni();
     // Employees and the shared kiosk may change the stock count, how much is
     // left in the open package, and whether we currently carry the item at all —
     // the person at the counter is the one who knows it ran out.
     if ((body.quantity === undefined || body.quantity === null)
         && body.openAmount === undefined && body.archived === undefined) {
-      return NextResponse.json({ error: 'Zaměstnanec může upravit pouze množství' }, { status: 403 });
+      return NextResponse.json({ error: 'Tady můžeš upravit jen množství.' }, { status: 403 });
     }
     // On the shared tablet the write belongs to whoever is clocked in, not to
     // the tablet account — same attribution as tasks and procedure runs.
@@ -294,8 +325,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         : (size > 0 ? newQty + (newOpen ?? 0) / size : newQty);
       const status = statusOf(effective, Number(item.min_quantity), Number(item.critical_quantity));
       if (status !== 'ok') {
-        // Kolo 62: vedení podle členství, ne zrcadla.
-        const employers = await vedeniPodniku(me.teamId);
+        // Podle členství, ne zrcadla.
+        const employers = await prijemciNizkehoStavu(me.teamId);
         await Promise.all(
           employers.map(id =>
             notifyUser(id, {
@@ -311,11 +342,17 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     await afterStockChange(me.teamId);
-    return NextResponse.json(await mappedItem(id, me.teamId, await tymy()));
+    return NextResponse.json(await mappedItem(id, me.teamId, await tymy(), vidiCeny));
   }
 
-  // Employer: full edit.
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  // Plná úprava: každé poslané pole musí mít své oprávnění, jinak se
+  // neuloží nic — půlka změny by vypadala jako úspěch.
+  if (POLE_UPRAVY.some(k => body[k] !== undefined) && !ma('sklad.upravit')) return bezOpravneni();
+  if ((body.quantity !== undefined || body.openAmount !== undefined || body.archived !== undefined)
+      && !ma('sklad.upravit') && !ma('sklad.zapsat_stav')) return bezOpravneni();
+  if (body.unitCost !== undefined && !ma('sklad.ceny_upravit')) return bezOpravneni('Na nákupní ceny nemáš oprávnění.');
+  if (body.approve === true && !ma('sklad.schvalovat')) return bezOpravneni('Na schvalování položek nemáš oprávnění.');
+  if (body.highlight !== undefined && !ma('menu.upravit')) return bezOpravneni();
 
   const name = body.name !== undefined ? body.name : item.name;
   const category = body.category !== undefined ? body.category : item.category;
@@ -467,21 +504,40 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   await afterStockChange(me.teamId);
-  return NextResponse.json(await mappedItem(id, me.teamId, await tymy()));
+  return NextResponse.json(await mappedItem(id, me.teamId, await tymy(), vidiCeny));
 }
 
-// DELETE (employer): remove item.
+function bezOpravneni(error = 'Na tuhle úpravu položky nemáš oprávnění.') {
+  return NextResponse.json({ error }, { status: 403 });
+}
+
+// DELETE: remove item.
+//
+// Kolo 67: `sklad.mazat`. Zamítnutí návrhu se v UI dělá právě tímhle
+// DELETE, proto neschválený návrh smaže i ten, kdo má jen `sklad.schvalovat`
+// — jinak by schvalovatel neměl jak návrh odmítnout.
 export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj(['sklad.mazat', 'sklad.schvalovat']);
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   const id = parseInt(params.id);
-  const [item] = await sql`
-    SELECT id FROM inventory_items
-    WHERE id = ${id} AND team_id = ${me.teamId}`;
+  let item: any;
+  try {
+    [item] = await sql`
+      SELECT id, approved FROM inventory_items
+      WHERE id = ${id} AND team_id = ${me.teamId}`;
+  } catch {
+    // Před migrací schvalování: všechno je platné, mazat smí jen `sklad.mazat`.
+    [item] = await sql`
+      SELECT id FROM inventory_items
+      WHERE id = ${id} AND team_id = ${me.teamId}`;
+  }
   if (!item) return NextResponse.json({ error: 'Položka nenalezena' }, { status: 404 });
+  if (!c.role.opravneni.has('sklad.mazat') && item.approved !== false) {
+    return NextResponse.json({ error: 'Mazat položky nemáš oprávnění — zamítnout jde jen neschválený návrh.' }, { status: 403 });
+  }
   await sql`DELETE FROM inventory_log WHERE item_id = ${id}`;
   await sql`DELETE FROM inventory_items WHERE id = ${id}`;
   audit(me.teamId, me.meId, 'inventory.delete', 'item', id);

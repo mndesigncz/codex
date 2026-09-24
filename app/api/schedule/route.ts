@@ -1,29 +1,21 @@
 import { NextResponse } from 'next/server';
 import { coverageGaps, missingSlots } from '@/lib/coverage';
 import { audit } from '@/lib/audit';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { tymyCiselniku, idClenu } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
-
 // GET ?month=YYYY-MM — all shifts in month for the team, joined with employee name+avatar
+// Plánovač rozvrhu (kolo 67): dřív ho API vydalo komukoli z podniku, i když
+// zaměstnanci vidí jen náhled přes /api/shifts?team=1 (a ten jde vypnout).
+// Poptávka z rezervací jsou jen počty na den, proto nevyžaduje rezervace.zobrazit.
 export async function GET(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!ctx.teamId) return NextResponse.json({ shifts: [] });
+  const ctx = await pozaduj('rozvrh.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month');
@@ -100,10 +92,8 @@ export async function GET(req: Request) {
 
 // POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type}] } bulk append
 export async function POST(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.upravit');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json();
   const list: any[] = Array.isArray(body.shifts) ? body.shifts : [];
@@ -128,16 +118,15 @@ export async function POST(req: Request) {
   return NextResponse.json({ inserted });
 }
 
-// DELETE ?id= (single) or ?month= (clear month) — employer
+// DELETE ?id= (single) or ?month= (clear month)
+// Smazání jedné směny je běžná úprava; vymazání celého měsíce je hromadná
+// nevratná akce, proto má vlastní klíč (Provozní ho nemá).
 export async function DELETE(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
-
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   const month = searchParams.get('month');
+  const ctx = await pozaduj(id ? 'rozvrh.upravit' : 'rozvrh.mazat_mesic');
+  if (jeOdpoved(ctx)) return ctx;
 
   if (id) {
     await sql`DELETE FROM shifts WHERE id = ${parseInt(id)} AND team_id = ${ctx.teamId}`;
@@ -147,7 +136,7 @@ export async function DELETE(req: Request) {
     await sql`
       DELETE FROM shifts
       WHERE team_id = ${ctx.teamId} AND to_char(date::date, 'YYYY-MM') = ${month}`;
-    audit(ctx.teamId, ctx.meId ?? null, 'schedule.clearMonth', 'schedule', null, month);
+    audit(ctx.teamId, ctx.meId, 'schedule.clearMonth', 'schedule', null, month);
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: 'Chybí id nebo měsíc' }, { status: 400 });

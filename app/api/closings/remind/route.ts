@@ -3,15 +3,15 @@ import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { windowOf } from '@/lib/shiftWindow';
-import { vedeniPodniku } from '@/lib/tenant';
+import { clenoveSOpravnenim, maOpravneni } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // Daily cron (21:00 UTC): remind anyone whose shift today has ended but who
-// hasn't submitted a cash closing yet, and nudge employers about closings
-// still waiting for their approval.
+// hasn't submitted a cash closing yet, and nudge those who may approve
+// (uzaverky.schvalovat) about closings still waiting for approval.
 export async function GET(request: Request) {
   // Protected like the other crons: Vercel sends Authorization: Bearer $CRON_SECRET.
   const gate = checkCron(request);
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     // měla ve 23:00 „02:00" menší než „23:00" a člověk uprostřed směny dostal
     // „tvoje směna skončila, vyplň uzávěrku".
     const due = await sql`
-      SELECT s.employee_id AS id, s.date, s.start_time, s.end_time, u.name
+      SELECT s.employee_id AS id, s.team_id, s.date, s.start_time, s.end_time, u.name
       FROM shifts s
       JOIN users u ON u.id = s.employee_id
       WHERE s.date = ${today}
@@ -51,6 +51,10 @@ export async function GET(request: Request) {
       const skoncila = w ? now.getTime() >= w.end.getTime() : String(r.end_time ?? '') <= nowHM;
       if (!skoncila) continue;
       if (seen.has(r.id)) continue;
+      // Připomínat uzávěrku tomu, kdo ji podle své role vyplnit nesmí (třeba
+      // Kuchař), by jen otravovalo — kolo 67. Vedení i Barista ji smí, pro ně
+      // se nic nemění. Směna bez podniku (stará data) jde postaru.
+      if (r.team_id != null && !(await maOpravneni(Number(r.id), Number(r.team_id), 'uzaverky.vytvorit'))) continue;
       seen.add(r.id);
       try {
         await notifyUser(r.id, {
@@ -76,9 +80,10 @@ export async function GET(request: Request) {
       GROUP BY cc.team_id`;
     for (const t of pending as any[]) {
       if (!t.team_id || !t.n) continue;
-      // Kolo 62: vedení podle členství — provozovatel přepnutý do jiného
-      // podniku o čekajících uzávěrkách dřív nedostal ani slovo.
-      const employers = await vedeniPodniku(Number(t.team_id));
+      // Kolo 62: podle členství — provozovatel přepnutý do jiného podniku
+      // o čekajících uzávěrkách dřív nedostal ani slovo. Kolo 67: příjemce
+      // určuje oprávnění uzaverky.schvalovat, ne typ účtu.
+      const employers = await clenoveSOpravnenim(Number(t.team_id), 'uzaverky.schvalovat');
       for (const eid of employers) {
         try {
           await notifyUser(eid, {

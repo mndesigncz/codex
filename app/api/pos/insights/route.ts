@@ -5,16 +5,20 @@
 // o sobě je hodinová křivka jen hezký graf — teprve porovnaná s rozvrhem
 // řekne, jestli se v šest večer stíhá a jestli se v deset ráno platí lidi za
 // prázdnou místnost.
+//
+// Kolo 67: analýza je `finance.analyza`. Uvnitř jsou ale dvě citlivější věci
+// s vlastním klíčem: jména lidí (tržby po lidech, kdo psal uzávěrku, která
+// nesedí) jen s `finance.trzby_lide` a průměrná hodinová sazba jen
+// s `finance.mzdy` — z průměru u malého týmu snadno vyčteš cizí mzdu.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { billsOfDays } from '@/lib/posMirror';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -23,13 +27,11 @@ export const maxDuration = 60;
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ connected: false });
+  const c = await pozaduj('finance.analyza');
+  if (jeOdpoved(c)) return c;
+  const u = { team_id: c.teamId };
+  const jmena = c.role.opravneni.has('finance.trzby_lide');
+  const mzdy = c.role.opravneni.has('finance.mzdy');
   if (!(await teamIsPro(u.team_id))) {
     return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
   }
@@ -128,7 +130,7 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* bez rozvrhu prostě nebude srovnání */ }
 
-    const avgRate = wageHours > 0 ? Math.round(wageSum / wageHours) : null;
+    const avgRate = mzdy && wageHours > 0 ? Math.round(wageSum / wageHours) : null;
     const staffing: { hour: number; revenueShare: number; staffShare: number; perHour: number | null }[] = [];
     for (let h = 0; h < 24; h++) {
       if (!hours[h] && !staff[h]) continue;
@@ -194,11 +196,11 @@ export async function GET(req: NextRequest) {
     for (const [day, v] of Array.from(posByDay.entries())) {
       dayMap.set(day, { day, pos: v, cash: 0, card: 0, n: 0, people: null });
     }
-    for (const c of closingRows as any[]) {
-      const day = String(c.day);
+    for (const cl of closingRows as any[]) {
+      const day = String(cl.day);
       const row = dayMap.get(day) ?? { day, pos: null, cash: 0, card: 0, n: 0, people: null };
-      row.cash = Number(c.cash) || 0; row.card = Number(c.card) || 0;
-      row.n = Number(c.n) || 0; row.people = c.people ?? null;
+      row.cash = Number(cl.cash) || 0; row.card = Number(cl.card) || 0;
+      row.n = Number(cl.n) || 0; row.people = jmena ? (cl.people ?? null) : null;
       dayMap.set(day, row);
     }
     const days = Array.from(dayMap.values()).map(r => {
@@ -266,9 +268,11 @@ export async function GET(req: NextRequest) {
       avgBill: bills ? Math.round(total / bills) : 0,
       avgPersons: personBills ? Math.round((persons / personBills) * 10) / 10 : null,
       hours,
-      byPerson: Array.from(byPerson.entries())
-        .map(([name, v]) => ({ name, ...v }))
-        .sort((a, b) => b.total - a.total).slice(0, 10),
+      byPerson: jmena
+        ? Array.from(byPerson.entries())
+          .map(([name, v]) => ({ name, ...v }))
+          .sort((a, b) => b.total - a.total).slice(0, 10)
+        : [],
       refunds: { count: refundCount, total: refundTotal },
     });
   } catch {

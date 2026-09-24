@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { normalizeExcluded } from '@/lib/share';
 
@@ -8,19 +7,17 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  if ((session.user as any).role !== 'employer') return null;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return u?.team_id ? { meId, teamId: Number(u.team_id) } : null;
+// Veřejné sdílené odkazy spravuje ten, kdo má sdileni.spravovat.
+async function spravce() {
+  const c = await pozaduj('sdileni.spravovat');
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, opr: c.role.opravneni };
 }
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await spravce();
+  if (jeOdpoved(me)) return me;
 
   const id = parseInt(params.id);
   const b = await request.json();
@@ -61,8 +58,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
 export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await spravce();
+  if (jeOdpoved(me)) return me;
   const id = parseInt(params.id);
   await sql`DELETE FROM share_links WHERE id = ${id} AND team_id = ${me.teamId}`;
   return NextResponse.json({ ok: true });

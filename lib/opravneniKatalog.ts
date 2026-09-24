@@ -625,7 +625,7 @@ export const KATALOG: Opravneni[] = [
   "id": "finance.ztraty",
   "oblast": "Finance",
   "nazev": "Ztráty a manka",
-  "popis": "Ztráty z inventur vyčíslené v Kč a v procentech z prodaného.",
+  "popis": "Ztráty z inventur vyčíslené v penězích a v procentech z prodaného.",
   "citlivost": "vysoká",
   "vyzaduje": [
    "sklad.ceny"
@@ -1276,7 +1276,7 @@ export const KATALOG: Opravneni[] = [
  {
   "id": "vernost.kredit_upravit",
   "oblast": "Zákazníci a menu",
-  "nazev": "Ručně upravit kredit v Kč",
+  "nazev": "Ručně upravit kredit (peníze hosta)",
   "popis": "Připsat nebo odebrat kredit, tedy peníze hosta. Zapisuje se do auditu.",
   "citlivost": "vysoká",
   "vyzaduje": [

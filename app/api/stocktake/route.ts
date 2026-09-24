@@ -10,30 +10,40 @@
 // který na place dávno není.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${id}`;
-  return u ?? null;
+/**
+ * Kolo 67: brána oprávněním v aktivním podniku (z databáze). Tvar `{ id,
+ * team_id }` drží dotazy níž beze změny; `ma` pro další kontroly uvnitř.
+ */
+async function me(klic: string) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, team_id: c.teamId, ma: (k: string) => c.role.opravneni.has(k) };
 }
 
-const shape = (r: any) => ({
-  id: r.id, status: r.status, data: Array.isArray(r.data) ? r.data : [],
-  createdAt: r.created_at, completedAt: r.completed_at ?? null,
-});
+// Snímek inventury nese nákupní cenu každé položky. Kdo nemá `sklad.ceny`,
+// dostane ji jako null — dřív ji dostal každý, kdo pomáhal počítat, i když
+// ji počítací obrazovka nikdy neukázala (záměrně zavíraný únik).
+const shape = (r: any, vidiCeny: boolean) => {
+  const data = Array.isArray(r.data) ? r.data : [];
+  return {
+    id: r.id, status: r.status,
+    data: vidiCeny ? data : data.map((d: any) => ({ ...d, unitCost: null })),
+    createdAt: r.created_at, completedAt: r.completed_at ?? null,
+  };
+};
 
+// GET: `inventura.pocitat` — mají ho všechny tři dnešní role, počítá se i na tabletu.
 export async function GET() {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const u = await me('inventura.pocitat');
+  if (jeOdpoved(u)) return u;
+  const vidiCeny = u.ma('sklad.ceny');
   try {
     const [open] = await sql`
       SELECT * FROM stocktakes WHERE team_id = ${u.team_id} AND status = 'open'
@@ -42,19 +52,18 @@ export async function GET() {
       SELECT * FROM stocktakes WHERE team_id = ${u.team_id} AND status = 'done'
       ORDER BY completed_at DESC LIMIT 10`;
     return NextResponse.json({
-      open: open ? shape(open) : null,
-      history: (history as any[]).map(shape),
+      open: open ? shape(open, vidiCeny) : null,
+      history: (history as any[]).map(r => shape(r, vidiCeny)),
     });
   } catch {
     return NextResponse.json({ open: null, history: [], notMigrated: true });
   }
 }
 
-// Start a new stocktake (employer). Snapshot = active, approved items.
+// Start a new stocktake (`inventura.spravovat`). Snapshot = active, approved items.
 export async function POST() {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Inventuru zahajuje vedení.' }, { status: 403 });
+  const u = await me('inventura.spravovat');
+  if (jeOdpoved(u)) return u;
   try {
     const [existing] = await sql`
       SELECT id FROM stocktakes WHERE team_id = ${u.team_id} AND status = 'open' LIMIT 1`;
@@ -90,16 +99,19 @@ export async function POST() {
       INSERT INTO stocktakes (team_id, created_by, status, data)
       VALUES (${u.team_id}, ${u.id}, 'open', ${JSON.stringify(data)}::jsonb)
       RETURNING *`;
-    return NextResponse.json({ open: shape(row) });
+    return NextResponse.json({ open: shape(row, u.ma('sklad.ceny')) });
   } catch {
     return NextResponse.json({ error: 'Inventura není dostupná — spusť /api/init.' }, { status: 400 });
   }
 }
 
-// Update counts (anyone on the team), complete or cancel (employer).
+// Update counts (`inventura.pocitat`), complete (`inventura.dokoncit`) or
+// cancel (`inventura.spravovat`). Dokončení i zrušení mají svou kontrolu níž,
+// ve stejném pořadí jako dřív: spočítané kusy poslané spolu s dokončením se
+// uloží, i když dokončit volající nesmí.
 export async function PATCH(req: NextRequest) {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const u = await me('inventura.pocitat');
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
@@ -110,7 +122,7 @@ export async function PATCH(req: NextRequest) {
   const data: any[] = Array.isArray(row.data) ? row.data : [];
 
   if (b.cancel === true) {
-    if (u.role !== 'employer') return NextResponse.json({ error: 'Zrušit může jen vedení.' }, { status: 403 });
+    if (!u.ma('inventura.spravovat')) return NextResponse.json({ error: 'Na zrušení inventury nemáš oprávnění.' }, { status: 403 });
     await sql`DELETE FROM stocktakes WHERE id = ${id}`;
     return NextResponse.json({ ok: true });
   }
@@ -144,7 +156,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (b.complete === true) {
-    if (u.role !== 'employer') return NextResponse.json({ error: 'Dokončit může jen vedení.' }, { status: 403 });
+    if (!u.ma('inventura.dokoncit')) return NextResponse.json({ error: 'Na dokončení inventury nemáš oprávnění.' }, { status: 403 });
     const final: any[] = Array.isArray(row.data) ? row.data : data;
     let applied = 0, diffs = 0;
     for (const d of final) {
@@ -193,7 +205,7 @@ export async function PATCH(req: NextRequest) {
     }
     const [done] = await sql`
       UPDATE stocktakes SET status = 'done', completed_at = NOW() WHERE id = ${id} RETURNING *`;
-    return NextResponse.json({ ok: true, applied, diffs, stocktake: shape(done) });
+    return NextResponse.json({ ok: true, applied, diffs, stocktake: shape(done, u.ma('sklad.ceny')) });
   }
 
   return NextResponse.json({ ok: true });

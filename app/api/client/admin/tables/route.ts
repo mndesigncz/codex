@@ -1,7 +1,8 @@
 // Stoly podniku. Ručně, nebo naimportované z pokladny (Deskview API), aby
 // rezervace a objednávky seděly na stejná čísla, jaká má obsluha na kase.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved, type Kontext } from '@/lib/opravneniDb';
 import { getConnection, listDesks } from '@/lib/storyous';
 import { randomBytes } from 'crypto';
 
@@ -10,20 +11,33 @@ import { randomBytes } from 'crypto';
 const coordPct = (v: any) => { if (v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.max(2, Math.min(98, Math.round(n * 10) / 10)) : null; };
 const tableToken = () => randomBytes(8).toString('base64url').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10).padEnd(10, 'X');
 
+/**
+ * Tajný kód stolu je vstupenka k objednávce „od stolu" — kdo ho zná, objedná
+ * i z domova. Vidí ho jen ten, kdo smí tisknout QR (stoly.qr); ostatním
+ * se ze stolu vrátí všechno kromě kódu.
+ */
+const bezTokenu = (ctx: Kontext) => (t: any) => {
+  if (!t || ctx.role.opravneni.has('stoly.qr')) return t;
+  const { token: _t, ...r } = t;
+  return r;
+};
+
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const tables = await sql`SELECT * FROM client_tables WHERE team_id = ${u.team_id} ORDER BY position, id`;
   const conn = await getConnection(u.team_id);
-  return NextResponse.json({ tables, posConnected: !!conn });
+  return NextResponse.json({ tables: (tables as any[]).map(bezTokenu(ctx)), posConnected: !!conn });
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.upravit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   if (b.action === 'import') {
     const conn = await getConnection(u.team_id);
@@ -39,20 +53,26 @@ export async function POST(req: NextRequest) {
       added++;
     }
     const tables = await sql`SELECT * FROM client_tables WHERE team_id = ${u.team_id} ORDER BY position, id`;
-    return NextResponse.json({ ok: true, added, total: desks.length, tables });
+    return NextResponse.json({ ok: true, added, total: desks.length, tables: (tables as any[]).map(bezTokenu(ctx)) });
   }
   const name = String(b.name ?? '').trim().slice(0, 40);
   if (!name) return NextResponse.json({ error: 'Stůl potřebuje jméno.' }, { status: 400 });
   const seats = Math.max(1, Math.min(40, parseInt(String(b.seats ?? '2'), 10) || 2));
   const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM client_tables WHERE team_id = ${u.team_id}` as any[];
   const [t] = await sql`INSERT INTO client_tables (team_id, name, seats, position, token) VALUES (${u.team_id}, ${name}, ${seats}, ${Number(n)}, ${tableToken()}) RETURNING *`;
-  return NextResponse.json({ ok: true, table: t });
+  return NextResponse.json({ ok: true, table: bezTokenu(ctx)(t) });
 }
 
 export async function PATCH(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.upravit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
+  // Nový kód zneplatní vytištěné QR na stole — to je rozhodnutí toho, kdo
+  // QR spravuje, ne každého, kdo smí stůl přejmenovat.
+  if (b.rotate_token && !ctx.role.opravneni.has('stoly.qr')) {
+    return NextResponse.json({ error: 'Měnit kód QR na stole nemáš povoleno.' }, { status: 403 });
+  }
   const id = parseInt(String(b.id), 10);
   const [cur] = await sql`SELECT * FROM client_tables WHERE id = ${id} AND team_id = ${u.team_id}`;
   if (!cur) return NextResponse.json({ error: 'Stůl nenalezen' }, { status: 404 });
@@ -66,12 +86,13 @@ export async function PATCH(req: NextRequest) {
       map_x = ${b.map_x !== undefined ? coordPct(b.map_x) : cur.map_x},
       map_y = ${b.map_y !== undefined ? coordPct(b.map_y) : cur.map_y}
     WHERE id = ${id} RETURNING *`;
-  return NextResponse.json({ ok: true, table: t });
+  return NextResponse.json({ ok: true, table: bezTokenu(ctx)(t) });
 }
 
 export async function DELETE(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.upravit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const id = parseInt(String(new URL(req.url).searchParams.get('id')), 10);
   await sql`DELETE FROM client_tables WHERE id = ${id} AND team_id = ${u.team_id}`;
   return NextResponse.json({ ok: true });

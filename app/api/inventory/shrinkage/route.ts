@@ -7,9 +7,8 @@
 // 0,5 l chybějící vodky je u dvou lahví jiný příběh než u dvaceti.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,16 +37,13 @@ export interface ShrinkRow {
   value: number | null;
 }
 
+// Kolo 67: `finance.ztraty` — ztráty v Kč jsou peníze a nepřímo podezření na
+// krádež. Dřív rozhodovala role z tokenu (vedení), teď oprávnění v aktivním
+// podniku z databáze.
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if ((session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
-  const teamId = u.team_id as number;
+  const c = await pozaduj('finance.ztraty');
+  if (jeOdpoved(c)) return c;
+  const teamId = c.teamId;
 
   const idParam = new URL(req.url).searchParams.get('id');
   const wantId = idParam ? parseInt(idParam) : null;

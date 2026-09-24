@@ -1,19 +1,22 @@
 // Promo kódy: na letáku, v příspěvku, na účtence. Host ho zadá a dostane body
 // nebo kupon. Omezený počet použití, každý host jednou.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 const clean = (v: any) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('kupony.spravovat');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const promos = await sql`SELECT p.*, c.title AS coupon_title FROM client_promos p LEFT JOIN client_coupons c ON c.id = p.coupon_id WHERE p.team_id = ${u.team_id} ORDER BY p.active DESC, p.created_at DESC`;
   return NextResponse.json({ promos });
 }
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('kupony.spravovat');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const code = clean(b.code);
   const title = String(b.title ?? '').trim().slice(0, 80);
@@ -33,8 +36,9 @@ export async function POST(req: NextRequest) {
   } catch { return NextResponse.json({ error: 'Tenhle kód už někdo používá. Zvol jiný.' }, { status: 409 }); }
 }
 export async function PATCH(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('kupony.spravovat');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const [p] = await sql`UPDATE client_promos SET active = ${!!b.active} WHERE id = ${parseInt(String(b.id), 10)} AND team_id = ${u.team_id} RETURNING *`;
   if (!p) return NextResponse.json({ error: 'Kód nenalezen' }, { status: 404 });

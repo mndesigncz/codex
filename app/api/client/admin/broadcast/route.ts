@@ -2,7 +2,8 @@
 // v aplikaci a push na telefon. Umí počkat na naplánovaný čas, mířit na
 // publikum (úrovně, skupiny, spáči) a vzít hosta na konkrétní místo.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { dispatchDueBroadcasts, sendNow, AUDIENCES } from '@/lib/broadcasts';
 import { hit } from '@/lib/rateLimit';
 import { audit } from '@/lib/audit';
@@ -16,8 +17,9 @@ function validAudience(a: string): boolean {
 }
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.zpravy');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   await dispatchDueBroadcasts();
   // Ke každé zprávě i to, co po ní přišlo: kolik různých členů se v sedmi
   // dnech po odeslání objevilo u kasy, a kolik jich přišlo sedm dní předtím.
@@ -63,8 +65,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.zpravy');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const title = String(b.title ?? '').trim().slice(0, 80);
   const body = String(b.body ?? '').trim().slice(0, 300);
@@ -98,8 +101,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.zpravy');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatná zpráva' }, { status: 400 });
   // Zrušit jde jen to, co ještě neodešlo.

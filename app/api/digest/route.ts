@@ -1,4 +1,4 @@
-// Evening digest: one message per employer per day — revenue, drawer, who
+// Evening digest: one message per recipient (notifikace.denni_souhrn) per day — revenue, drawer, who
 // worked, procedures, and what's running low. All of it already lives in the
 // app; this just serves it without being asked.
 // Protected like the other crons: Vercel sends Authorization: Bearer $CRON_SECRET.
@@ -11,7 +11,8 @@ import { sendDigestEmail } from '@/lib/email';
 import { cashDifference, czk } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
 import { escHtml } from '@/lib/email';
-import { tymyCiselnikuHromadne, clenovePodniku } from '@/lib/tenant';
+import { tymyCiselnikuHromadne } from '@/lib/tenant';
+import { clenoveSOpravnenim, maOpravneni } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -37,9 +38,12 @@ export async function GET(request: Request) {
     // najednou, ne dotaz na organizaci uvnitř smyčky za každý podnik.
     const tymyKategorii = await tymyCiselnikuHromadne((teams as any[]).map(t => Number(t.id)), 'kategorieSkladu');
     for (const team of teams as any[]) {
-      // Vedení podle členství (kolo 62): provozovatel právě přepnutý do
-      // jiného podniku dřív souhrn tohohle podniku nedostal.
-      const employers = await clenovePodniku(team.id, { role: 'employer' });
+      // Příjemci podle oprávnění z členství (kolo 67), ne podle typu účtu —
+      // souhrn si podnik může dát i provoznímu. Členství místo zrcadla
+      // (kolo 62) platí dál: kdo je přepnutý jinam, souhrn dostane.
+      const ids = await clenoveSOpravnenim(Number(team.id), 'notifikace.denni_souhrn');
+      if (!ids.length) continue;
+      const employers = await sql`SELECT id, email FROM users WHERE id = ANY(${ids}::int[])` as any[];
       if (!employers.length) continue;
 
       // --- closings today ---
@@ -206,6 +210,7 @@ export async function GET(request: Request) {
       // Objednávky od stolu, hodnocení a noví členové končily dosud jen
       // v Managero client. Vedení je má vidět ve stejném souhrnu jako kasu.
       let guestLine: string | null = null;
+      let guestLineBez: string | null = null;
       let reviewLine: string | null = null;
       let offPos = 0;
       try {
@@ -214,12 +219,15 @@ export async function GET(request: Request) {
                  COUNT(*) FILTER (WHERE storyous_order_id IS NULL)::int AS off_pos
           FROM client_orders WHERE team_id = ${team.id} AND status = 'done' AND created_at::date = ${today}::date` as any[];
         const [gm] = await sql`SELECT COUNT(*)::int AS n FROM client_memberships WHERE team_id = ${team.id} AND joined_at::date = ${today}::date` as any[];
+        // Dvě verze: částka objednávek je tržba, takže bez finance.trzby jde
+        // jen počet.
         const parts: string[] = [];
-        if (Number(go?.n) > 0) parts.push(`${go.n}× objednávka od stolu (${czk(Number(go.total))})`);
-        if (Number(gm?.n) > 0) parts.push(`${gm.n} nových členů`);
+        const partsBez: string[] = [];
+        if (Number(go?.n) > 0) { parts.push(`${go.n}× objednávka od stolu (${czk(Number(go.total))})`); partsBez.push(`${go.n}× objednávka od stolu`); }
+        if (Number(gm?.n) > 0) { parts.push(`${gm.n} nových členů`); partsBez.push(`${gm.n} nových členů`); }
         offPos = Number(go?.off_pos) || 0;
-        if (offPos > 0) parts.push(`⚠️ ${offPos} objednávek nedoteklo do pokladny`);
-        if (parts.length) guestLine = parts.join(', ');
+        if (offPos > 0) { parts.push(`⚠️ ${offPos} objednávek nedoteklo do pokladny`); partsBez.push(`⚠️ ${offPos} objednávek nedoteklo do pokladny`); }
+        if (parts.length) { guestLine = parts.join(', '); guestLineBez = partsBez.join(', '); }
       } catch { /* hostovská část nemusí být zapnutá */ }
       try {
         const [rv] = await sql`
@@ -231,42 +239,53 @@ export async function GET(request: Request) {
       // Nothing at all happened and nothing needs eyes — stay silent.
       if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0 && !guestLine && !reviewLine) continue;
 
-      const verdict = real.length === 0
-        ? 'uzávěrka chybí'
-        : diff === 0 ? 'kasa sedí ✓' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
-      const pushBody = [
-        real.length ? `Tržba ${czk(revenue)} · ${verdict}` : 'Bez uzávěrky',
-        worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` + (stillOn.length ? `, ${stillOn.length} ještě na směně` : '') : stillOn.length ? `${stillOn.length} ještě na směně` : null,
-        procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
-        lowCount ? `${lowCount} položek dochází${makeCount ? ` (${makeCount} k výrobě)` : ''}` : null,
-        tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
-        posLine,
-        guestLine,
-        reviewLine,
-      ].filter(Boolean).join(' · ');
+      // Tržby a rozdíl v kase jen pro příjemce s finance.trzby (kolo 67):
+      // souhrn může dostávat i role, která peníze vidět nemá. Vedení má obojí,
+      // takže jeho souhrn je stejný jako dřív.
+      const souhrn = (trzby: boolean) => {
+        const verdict = real.length === 0
+          ? 'uzávěrka chybí'
+          : !trzby ? 'uzávěrka hotová ✓'
+          : diff === 0 ? 'kasa sedí ✓' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
+        const guest = trzby ? guestLine : guestLineBez;
+        const pushBody = [
+          real.length ? (trzby ? `Tržba ${czk(revenue)} · ${verdict}` : verdict) : 'Bez uzávěrky',
+          worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` + (stillOn.length ? `, ${stillOn.length} ještě na směně` : '') : stillOn.length ? `${stillOn.length} ještě na směně` : null,
+          procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
+          lowCount ? `${lowCount} položek dochází${makeCount ? ` (${makeCount} k výrobě)` : ''}` : null,
+          tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
+          trzby ? posLine : null,
+          guest,
+          reviewLine,
+        ].filter(Boolean).join(' · ');
 
-      // Jména, postupy a akce píše tým sám; do HTML e-mailu šly bez escapování,
-      // takže jméno `<a href=…>` se vedoucímu vykreslilo jako odkaz. Všechny
-      // ostatní šablony v lib/email.ts escapují — tahle byla vynechaná.
-      const emailHtml = `
-        <table style="width:100%; border-collapse: collapse; font-size: 15px;">
-          <tr><td style="padding:8px 0; color:#666;">Tržba</td><td style="text-align:right; font-weight:700;">${czk(revenue)}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${escHtml(verdict)}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${escHtml([...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—')}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + escHtml(procsMissing.join(', ')) : 'hotové ✓'}</td></tr>
-          <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' + (makeCount ? ` (${makeCount} k výrobě)` : '') : 'nic ✓'}</td></tr>
-          ${posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${escHtml(posLine.replace('Pokladna: ', ''))}</td></tr>` : ''}
-          ${guestLine ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${escHtml(guestLine)}</td></tr>` : ''}
-          ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${escHtml(reviewLine)}</td></tr>` : ''}
-          ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${escHtml(tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', '))}</td></tr>` : ''}
-        </table>`;
+        // Jména, postupy a akce píše tým sám; do HTML e-mailu šly bez escapování,
+        // takže jméno `<a href=…>` se vedoucímu vykreslilo jako odkaz. Všechny
+        // ostatní šablony v lib/email.ts escapují — tahle byla vynechaná.
+        const emailHtml = `
+          <table style="width:100%; border-collapse: collapse; font-size: 15px;">
+            ${trzby ? `<tr><td style="padding:8px 0; color:#666;">Tržba</td><td style="text-align:right; font-weight:700;">${czk(revenue)}</td></tr>` : ''}
+            <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${escHtml(verdict)}</td></tr>
+            <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${escHtml([...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—')}</td></tr>
+            <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + escHtml(procsMissing.join(', ')) : 'hotové ✓'}</td></tr>
+            <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' + (makeCount ? ` (${makeCount} k výrobě)` : '') : 'nic ✓'}</td></tr>
+            ${trzby && posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${escHtml(posLine.replace('Pokladna: ', ''))}</td></tr>` : ''}
+            ${guest ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${escHtml(guest)}</td></tr>` : ''}
+            ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${escHtml(reviewLine)}</td></tr>` : ''}
+            ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${escHtml(tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', '))}</td></tr>` : ''}
+          </table>`;
+        return { verdict, pushBody, emailHtml, warning: (trzby && diff < 0) || procsMissing.length > 0 };
+      };
+      const sTrzbami = souhrn(true);
+      const bezTrzeb = souhrn(false);
 
       for (const e of employers as any[]) {
         try {
-          await notifyUser(e.id, {
+          const { verdict, pushBody, emailHtml, warning } = (await maOpravneni(Number(e.id), Number(team.id), 'finance.trzby')) ? sTrzbami : bezTrzeb;
+          await notifyUser(Number(e.id), {
             title: `🌙 Souhrn dne — ${verdict}`,
             body: pushBody,
-            type: diff < 0 || procsMissing.length ? 'warning' : 'info',
+            type: warning ? 'warning' : 'info',
             link: '/employer/overview?view=reports',
           });
           // Souhrn je „nice to have", ale i tak se nepočítá mezi odeslané,

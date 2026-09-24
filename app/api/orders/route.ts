@@ -1,23 +1,21 @@
+// Objednávky u dodavatelů.
+//
+// Kolo 67: dřív „jen vedení, jde o peníze". Teď se rozlišuje, co kdo dělá:
+// sestavit objednávku (`nakup.vytvorit`) a odeslat ji dodavateli e-mailem
+// (`nakup.odeslat`) jsou dvě věci — odeslání je závazek navenek. Nákupní
+// cenu objednávky vidí jen `sklad.ceny` a zapisuje při příjmu jen
+// `sklad.ceny_upravit`; zboží přijmout může i ten, kdo ceny nevidí.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { sendOrderEmail } from '@/lib/email';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { ensureProductionTasks } from '@/lib/production';
 import { tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null };
-}
 
 interface OrderItem { name: string; qty: number; unit: string; itemId?: number | null }
 
@@ -33,18 +31,17 @@ function cleanItems(raw: any): OrderItem[] {
     .filter(i => i.name);
 }
 
-const shape = (r: any) => ({
-  id: r.id, supplier: r.supplier, items: r.items ?? [], totalCost: r.total_cost,
+const shape = (r: any, sCenou: boolean) => ({
+  id: r.id, supplier: r.supplier, items: r.items ?? [], totalCost: sCenou ? r.total_cost : null,
   status: r.status, note: r.note, createdAt: r.created_at, receivedAt: r.received_at,
   createdByName: r.created_by_name ?? null,
 });
 
-// GET — the team's orders (employer only; money is involved).
+// GET — objednávky podniku.
 export async function GET() {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  if (!c.teamId) return NextResponse.json({ orders: [] });
+  const c = await pozaduj('nakup.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const sCenou = c.role.opravneni.has('sklad.ceny');
   try {
     const rows = await sql`
       SELECT o.*, u.name AS created_by_name
@@ -52,20 +49,23 @@ export async function GET() {
       WHERE o.team_id = ${c.teamId}
       ORDER BY (o.status = 'ordered') DESC, o.created_at DESC
       LIMIT 100`;
-    return NextResponse.json({ orders: rows.map(shape) });
+    return NextResponse.json({ orders: rows.map(r => shape(r, sCenou)) });
   } catch {
     return NextResponse.json({ orders: [] });
   }
 }
 
-// POST (employer) — create an order: { supplier?, items: [{name, qty, unit, itemId?}], note? }.
+// POST — create an order: { supplier?, items: [{name, qty, unit, itemId?}], note?, supplierId?, sendEmail? }.
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 400 });
+  const c = await pozaduj('nakup.vytvorit');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
+  // Odeslání se ověří dřív, než objednávka vznikne — jinak by vznikla
+  // a člověk by si myslel, že odešla.
+  if (b.sendEmail === true && !c.role.opravneni.has('nakup.odeslat')) {
+    return NextResponse.json({ error: 'Objednávku dodavateli odesílá jen ten, kdo na to má oprávnění. Ulož ji bez odeslání.' }, { status: 403 });
+  }
   const items = cleanItems(b.items);
   if (items.length === 0) return NextResponse.json({ error: 'Objednávka nemá žádné položky.' }, { status: 400 });
 
@@ -120,15 +120,14 @@ export async function POST(req: NextRequest) {
       }
     }
   }
-  return NextResponse.json({ ok: true, order: shape(row), emailed, emailError });
+  return NextResponse.json({ ok: true, order: shape(row, c.role.opravneni.has('sklad.ceny')), emailed, emailError });
 }
 
-// PATCH (employer) — receive or cancel: { id, action: 'received'|'cancelled', totalCost?, restock? }.
+// PATCH — receive or cancel: { id, action: 'received'|'cancelled', totalCost?, restock? }.
 // Receiving with restock=true adds the ordered quantities to matching stock items.
 export async function PATCH(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('nakup.prijmout');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
@@ -142,6 +141,9 @@ export async function PATCH(req: NextRequest) {
   const totalCost = action === 'received' && b.totalCost !== undefined && b.totalCost !== null && b.totalCost !== ''
     ? Math.max(0, Math.round(Number(b.totalCost)) || 0)
     : null;
+  if (totalCost != null && !c.role.opravneni.has('sklad.ceny_upravit')) {
+    return NextResponse.json({ error: 'Nákupní cenu zapisuje jen ten, kdo smí měnit ceny. Přijmi zboží bez ní.' }, { status: 403 });
+  }
 
   const [row] = await sql`
     UPDATE orders
@@ -183,15 +185,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Příjem surovin může odblokovat výrobu (vlajky v nákupu zmizí, úkol se přepíše).
-  if (restocked > 0 && c.teamId) { try { await ensureProductionTasks(c.teamId, c.meId); } catch { /* před migrací */ } }
-  return NextResponse.json({ ok: true, order: shape(row), restocked });
+  if (restocked > 0) { try { await ensureProductionTasks(c.teamId, c.meId); } catch { /* před migrací */ } }
+  return NextResponse.json({ ok: true, order: shape(row, c.role.opravneni.has('sklad.ceny')), restocked });
 }
 
-// DELETE ?id= (employer) — remove an order record.
+// DELETE ?id= — remove an order record.
 export async function DELETE(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('nakup.prijmout');
+  if (jeOdpoved(c)) return c;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
   await sql`DELETE FROM orders WHERE id = ${id} AND team_id = ${c.teamId}`;

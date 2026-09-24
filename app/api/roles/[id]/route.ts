@@ -6,6 +6,10 @@ import { neon } from '@neondatabase/serverless';
 import { SYSTEMOVE_ROLE, sZavislostmi, vycisti, smiUpravitRoli, smiBytVychozi, navic, type TypRole } from '@/lib/opravneni';
 import { pozaduj, jeOdpoved, vlastniRole, zneplatniOpravneni } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
+import { czCount, czVerb } from '@/lib/czech';
+
+// „člověk“ má v množném čísle jiný kmen (lidé/lidí), proto vlastní tvar.
+const CLOVEK = { one: 'člověk', few: 'lidé', many: 'lidí' };
 
 export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
@@ -81,7 +85,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const v = smiUpravitRoli({ jeVlastnik: c.role.jeVlastnik, opravneni: c.role.opravneni }, role.opravneni, [], { jeJehoRole: c.role.roleId === role.id });
   if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 403 });
   const lide = await drzitele(c.teamId, role.id);
-  if (lide.length) return NextResponse.json({ error: `Roli má ${lide.length === 1 ? 'jeden člověk' : `${lide.length} lidí`} — nejdřív jim dej jinou.` }, { status: 409 });
+  if (lide.length) return NextResponse.json({ error: `Roli ${czVerb(lide.length, 'má', 'mají')} ${czCount(lide.length, CLOVEK)} — nejdřív jim dej jinou.` }, { status: 409 });
   try {
     const [t] = await sql`SELECT vychozi_role_id FROM teams WHERE id = ${c.teamId}`;
     if (Number(t?.vychozi_role_id) === role.id) return NextResponse.json({ error: 'Tohle je výchozí role pro nové členy — nejdřív nastav jinou.' }, { status: 409 });

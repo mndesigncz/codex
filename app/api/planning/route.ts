@@ -1,26 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null };
-}
+// Nástěnka je v UI jen u vedení, ale API ji dřív vydalo a nechalo zakládat
+// komukoli přihlášenému (i tabletu, hostovi s team_id, a bez podniku vznikla
+// osiřelá karta). Kolo 67 to zavírá oprávněním v aktivním podniku.
 
 // GET — cards created by members of my team (cards have no team_id; scope via creator).
 export async function GET() {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json([]);
+  const c = await pozaduj('planovani.zobrazit');
+  if (jeOdpoved(c)) return c;
 
   try {
     const cards = await sql`
@@ -34,10 +27,10 @@ export async function GET() {
   }
 }
 
-// POST — create a card (any team member; board UI is employer-side).
+// POST — create a card.
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj('planovani.upravit');
+  if (jeOdpoved(c)) return c;
 
   const body = await req.json().catch(() => ({}));
   const title = String(body.title ?? '').trim();

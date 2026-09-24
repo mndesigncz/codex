@@ -1,33 +1,31 @@
-// Events API. Everyone on the team sees events; the employer manages them.
-// Crew assignment creates real shifts (shifts.event_id) so the schedule, the
-// closing logic and "Moje směny" all see the event without special cases.
+// Events API. Crew assignment creates real shifts (shifts.event_id) so the
+// schedule, the closing logic and "Moje směny" all see the event without
+// special cases.
+//
+// Kolo 67: akce vidí `akce.zobrazit`, spravuje `akce.upravit`. Peníze akce
+// (tržba, náklady, součet uzávěrek) chodily každému členovi i tabletu, přestože
+// je UI zaměstnance ani tabletu nikdy neukazovalo — teď jen s `akce.finance`.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos, resolveEventMenu } from '@/lib/events';
 import { clenovePodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id, name FROM users WHERE id = ${id}`;
-  return u ?? null;
-}
-
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
-function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number; menuById?: Map<number, { name: string; price: number | null }>; menuBoards?: Map<number, { name: string; count: number }> }) {
+function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; closings?: { n: number; total: number }; followers?: number; going?: number; menuById?: Map<number, { name: string; price: number | null }>; menuBoards?: Map<number, { name: string; count: number }>; finance?: boolean }) {
   const crew = normalizeCrew(r.crew);
+  // Bez `extra` jde o odpověď po založení akce — tu dostane jen ten, kdo akci
+  // spravuje, a finance nové akce jsou stejně prázdné.
+  const finance = extra?.finance ?? true;
   return {
     id: r.id, title: r.title, description: r.description ?? null,
     kind: r.kind ?? 'other', date: r.date,
@@ -45,10 +43,10 @@ function shape(r: any, people: Map<number, any>, extra?: { onShift?: any[]; clos
     // U akce v podniku je základ obsluhy ten, kdo má ten den běžnou směnu.
     onShift: extra?.onShift ?? [],
     closingsCount: extra?.closings?.n ?? 0,
-    closingsTotal: extra?.closings?.total ?? 0,
+    closingsTotal: finance ? (extra?.closings?.total ?? 0) : null,
     followers: extra?.followers ?? 0,
     going: extra?.going ?? 0,
-    revenue: r.revenue ?? null, costs: r.costs ?? null,
+    revenue: finance ? (r.revenue ?? null) : null, costs: finance ? (r.costs ?? null) : null,
     notes: r.notes ?? null, createdBy: r.created_by ?? null,
   };
 }
@@ -61,8 +59,10 @@ async function teamPeople(teamId: number) {
 }
 
 export async function GET() {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ events: [] });
+  const c = await pozaduj('akce.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
+  const finance = c.role.opravneni.has('akce.finance');
   try {
     const rows = await sql`
       SELECT * FROM events WHERE team_id = ${u.team_id}
@@ -118,8 +118,10 @@ export async function GET() {
         going: followsBy.get(Number(r.id))?.going,
         menuById,
         menuBoards,
+        finance,
       })),
-      isEmployer: u.role === 'employer',
+      // Dnes to žádná obrazovka nečte; znamená „smí akce spravovat".
+      isEmployer: c.role.opravneni.has('akce.upravit'),
     });
   } catch {
     return NextResponse.json({ events: [], notMigrated: true });
@@ -127,9 +129,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Akce zakládá vedení.' }, { status: 403 });
+  const c = await pozaduj('akce.upravit');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
   const b = await req.json().catch(() => ({}));
   const title = String(b.title ?? '').trim().slice(0, 160);
   const date = String(b.date ?? '');

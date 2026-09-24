@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { normalizeCategoryPackaging, stockStatus, type CategoryPackaging } from '@/lib/packaging';
@@ -8,26 +6,24 @@ import { resolveActingUser } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 import { packagingSourceOf } from '@/lib/categoryTree';
 import { webovaUrl, souborUrl } from '@/lib/bezpecnaUrl';
-import { tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
+import { tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { typNaUcet } from '@/lib/opravneni';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id ?? null;
-  return { meId, role, teamId };
-}
-
 // GET: list the team's inventory items (incl. legacy items with null team_id)
+//
+// Kolo 67: sklad vidí každý se `sklad.zobrazit` (dnes všechny tři role), ale
+// nákupní cena jen se `sklad.ceny`. Dřív šla unitCost každému včetně tabletu,
+// i když ji UI zaměstnanci nikdy neukázalo — tohle je záměrně zavíraný únik.
 export async function GET() {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj('sklad.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
+  const vidiCeny = c.role.opravneni.has('sklad.ceny');
 
   // unit_cost is newer — try to include it, fall back if not yet migrated.
   let items: any[];
@@ -214,6 +210,8 @@ export async function GET() {
       batchYield: i.batchYield != null ? Number(i.batchYield) : null,
       productionLabel: i.productionLabel ?? null,
       buyFor: buyFor.get(Number(i.id)) ?? [],
+      // Null místo vynechání: klient s cenou počítá jako „nevyplněno".
+      ...(vidiCeny ? {} : { unitCost: null }),
     };
   }));
 }
@@ -222,14 +220,18 @@ export async function GET() {
 // shared tablet) WRITES ONE IN — it counts as stock right away but waits for
 // the employer's tick. On the kiosk the entry is attributed to whoever is
 // clocked in, so „kdo to zapsal" is a person, not the tablet.
+//
+// Kolo 67: kdo má `sklad.pridat`, zakládá rovnou platnou položku; kdo má jen
+// `sklad.navrhnout`, zapisuje návrh ke schválení (dřív rozhodovalo „není
+// vedení"). Bez podniku se položka nezakládá — pozaduj() bere podnik
+// z databáze a bez něj vrátí 403: řádek s team_id NULL by nepatřil nikomu.
 export async function POST(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  // Bez podniku se položka nezakládá: řádek s team_id NULL by nepatřil nikomu
-  // — a denní doplnění podniku v /api/init by ho přiřadilo nejstaršímu
-  // podniku na platformě.
-  if (!me.teamId) return NextResponse.json({ error: 'Nejsi v žádném podniku.' }, { status: 400 });
-  const isProposal = me.role !== 'employer';
+  const c = await pozaduj(['sklad.pridat', 'sklad.navrhnout']);
+  if (jeOdpoved(c)) return c;
+  // Typ účtu (vedení / zaměstnanec / tablet) jen kvůli připsání autorovi na
+  // tabletu a textům — o tom, co smí, rozhodují oprávnění.
+  const me = { meId: c.meId, teamId: c.teamId, role: typNaUcet(c.role.typ) };
+  const isProposal = !c.role.opravneni.has('sklad.pridat');
 
   const body = await request.json();
   const authorId = await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
@@ -245,7 +247,11 @@ export async function POST(request: Request) {
   const supplier = body.supplier ?? null;
   const supplierUrl = webovaUrl(body.supplierUrl);
 
-  const unitCost = body.unitCost === '' || body.unitCost == null ? null : Math.max(0, Math.round(Number(body.unitCost)));
+  // Nákupní cenu nastaví jen `sklad.ceny_upravit`. Bez něj se pole tiše
+  // zahodí, neodmítá se celý zápis: formulář návrhu (NewStockEntry) ho může
+  // ještě posílat a barista u baru má položku zapsat i tak.
+  const unitCost = !c.role.opravneni.has('sklad.ceny_upravit') || body.unitCost === '' || body.unitCost == null
+    ? null : Math.max(0, Math.round(Number(body.unitCost)));
 
   let item: any;
   try {
@@ -267,8 +273,9 @@ export async function POST(request: Request) {
   if (isProposal) {
     try {
       await sql`UPDATE inventory_items SET approved = FALSE, submitted_by = ${authorId} WHERE id = ${item.id}`;
-      // Kolo 62: vedení podle členství, ne zrcadla.
-      const employers = await vedeniPodniku(me.teamId);
+      // Kolo 67: návrh dostane ten, kdo ho smí schválit.
+      // Autor sám sobě nepíše (vlastní role může mít schvalování bez přidávání).
+      const employers = (await clenoveSOpravnenim(me.teamId, 'sklad.schvalovat')).filter(id => id !== authorId && id !== me.meId);
       const [author] = await sql`SELECT name FROM users WHERE id = ${authorId}`;
       const who = author?.name ?? (me.role === 'kiosk' ? 'Někdo na iPadu' : 'Zaměstnanec');
       const howMuch = quantity > 0 ? ` · ${quantity} ${unit}` : '';

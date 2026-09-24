@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { audit } from '@/lib/audit';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { getConnection } from '@/lib/storyous';
@@ -26,33 +25,39 @@ const sql = neon(process.env.DATABASE_URL!);
 // místo aby tam tiše chyběla čísla.
 export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  if (role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  // Kolo 67: vlastní uzávěrku vidí každý člen, cizí jen s
+  // uzaverky.zobrazit_vse. Sdílený tablet historii nečte (typ účtu).
+  const ctx = await pozaduj(null);
+  if (jeOdpoved(ctx)) return ctx;
+  const meId = ctx.meId;
+  const ma = (k: string) => ctx.role.opravneni.has(k);
+  if (ctx.role.typ === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const u = { team_id: ctx.teamId };
 
   const [c] = await sql`
     SELECT cc.*, us.name AS author_name, us.avatar AS author_avatar
     FROM cash_closings cc LEFT JOIN users us ON us.id = cc.created_by
     WHERE cc.id = ${id} AND cc.team_id = ${u.team_id}`;
   if (!c) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
-  // Zaměstnanec vidí jen svoji.
-  if (role !== 'employer' && c.created_by !== meId) {
+  // Bez uzaverky.zobrazit_vse jen svoji.
+  if (!ma('uzaverky.zobrazit_vse') && c.created_by !== meId) {
     return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   }
 
   const teamId = u.team_id as number;
   const day: string = String(c.shift_date || c.date);
   const notes: string[] = [];
-  // Kontext celého dne — tržba z pokladny, docházka týmu, účtenky — je pohled
-  // vedení. Zaměstnanci se vrací jeho vlastní uzávěrka a nic navíc.
-  const full = role === 'employer';
+  // Kontext celého dne — docházka týmu, účtenky, postupy — patří k
+  // uzaverky.zobrazit_vse; porovnání s tržbou z pokladny navíc k
+  // finance.trzby. Ostatním se vrací jejich vlastní uzávěrka a nic navíc.
+  const full = ma('uzaverky.zobrazit_vse');
+  const sTrzbou = full && ma('finance.trzby');
+  // Mzdový snímek: cizí jen s finance.mzdy, vlastní s finance.moje_mzda.
+  const sMzdou = ma('finance.mzdy') || (c.created_by === meId && ma('finance.moje_mzda'));
+  if (!sMzdou) { delete c.wage_rate; delete c.wage_earned; delete c.worked_ms; }
 
   // --- plánovaná směna a kdo měl ten den službu (surové řádky) ---
   let plannedRows: any[] = [];
@@ -212,7 +217,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   // Tohle je ta nejdůležitější kontrola, takže se nesmí tvářit, že sedí, když
   // nesedí. Buď přijdou čísla, nebo důvod, proč nejsou.
   let pos: any = null;
-  if (full) try {
+  if (sTrzbou) try {
     const conn = await getConnection(teamId);
     if (!conn) {
       notes.push('Pokladna není připojená, takže není s čím tržbu porovnat.');
@@ -261,7 +266,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
 
   // --- prodané produkty toho dne (z naší tabulky, bez volání kasy) ---
   let products: any[] = [];
-  if (full) try {
+  if (sTrzbou) try {
     products = (await sql`
       SELECT product_name AS name, qty::float AS qty FROM pos_sales
       WHERE team_id = ${teamId} AND date = ${day}
@@ -282,20 +287,18 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   });
 }
 
-// PATCH — employer approves a pending closing.
+// PATCH — schválení čekající uzávěrky (uzaverky.schvalovat).
 export async function PATCH(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  if (role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('uzaverky.schvalovat');
+  if (jeOdpoved(ctx)) return ctx;
+  const meId = ctx.meId;
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
+  const u = { team_id: ctx.teamId };
   const [row] = await sql`SELECT created_by, team_id, date FROM cash_closings WHERE id = ${id}`;
-  if (!row || row.team_id !== u?.team_id) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
+  if (!row || Number(row.team_id) !== u.team_id) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
 
   try {
     await sql`UPDATE cash_closings SET approved = TRUE, approved_by = ${meId} WHERE id = ${id}`;
@@ -308,25 +311,25 @@ export async function PATCH(_req: Request, props: { params: Promise<{ id: string
   return NextResponse.json({ ok: true });
 }
 
-// DELETE — remove a closing. Author may delete their own; employer may delete any in the team.
+// DELETE — smazat uzávěrku: jakoukoli v podniku s uzaverky.mazat, vlastní
+// s uzaverky.mazat_vlastni. Tablet vlastní (tj. jím založené) uzávěrky už
+// mazat nesmí — záměrná změna z oponentury (b6), UI mu mazání nenabízí.
 export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
+  const ctx = await pozaduj(['uzaverky.mazat', 'uzaverky.mazat_vlastni']);
+  if (jeOdpoved(ctx)) return ctx;
+  const meId = ctx.meId;
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id;
+  const teamId = ctx.teamId;
   const [row] = await sql`SELECT created_by, team_id, date FROM cash_closings WHERE id = ${id}`;
   if (!row) return NextResponse.json({ error: 'Uzávěrka nenalezena' }, { status: 404 });
 
-  const isOwnerOfTeam = role === 'employer' && row.team_id === teamId;
+  const isOwnerOfTeam = ctx.role.opravneni.has('uzaverky.mazat') && Number(row.team_id) === teamId;
   // I autor musí být ve stejném týmu jako řádek — jinak by po přesunu uživatele
   // mezi týmy zůstala cesta smazat cizí uzávěrku podle created_by.
-  const isAuthor = row.created_by === meId && row.team_id === teamId;
+  const isAuthor = ctx.role.opravneni.has('uzaverky.mazat_vlastni') && Number(row.created_by) === meId && Number(row.team_id) === teamId;
   if (!isOwnerOfTeam && !isAuthor) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   await sql`DELETE FROM cash_closings WHERE id = ${id}`;

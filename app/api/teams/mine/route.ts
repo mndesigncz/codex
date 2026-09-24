@@ -18,9 +18,9 @@ export async function GET() {
   const teams = await clenstviUzivatele(meId);
   const org = activeTeamId ? await organizaceTymu(activeTeamId) : null;
   // „Přidat podnik" jen tomu, komu to server dovolí: vlastník podniku
-  // (a jeho organizace). Přepínač tlačítko jinak nekreslí.
-  const muzuZalozit = activeTeamId != null && (s.user as any).role === 'employer'
-    ? await smiZalozitDalsiPodnik(meId, activeTeamId) : false;
+  // (a jeho organizace). Přepínač tlačítko jinak nekreslí. Rozhoduje
+  // vlastnictví, ne role z tokenu — stejně jako v /api/teams/create.
+  const muzuZalozit = activeTeamId != null ? await smiZalozitDalsiPodnik(meId, activeTeamId) : false;
   // Oprávnění v aktivním podniku (kolo 67) — klient podle nich skládá
   // navigaci a skrývá akce. Rozhoduje ale server: tohle je jen nápověda UI.
   const r = activeTeamId != null ? await roleClena(meId, activeTeamId) : null;

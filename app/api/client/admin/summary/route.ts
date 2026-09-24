@@ -1,6 +1,7 @@
 // Čísla pro přehled režimu Client a odznak v hlavičce.
 import { NextResponse } from 'next/server';
-import { sql, employer, ensureProfile } from '@/lib/client';
+import { sql, ensureProfile } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday } from '@/lib/pragueTime';
 import { getConnection } from '@/lib/storyous';
 
@@ -8,8 +9,9 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('klient.prehled');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const p = await ensureProfile(u.team_id);
   const today = pragueToday();
   const [[res], [ord], [mem], [tbl], [menu], [rev], conn] = await Promise.all([

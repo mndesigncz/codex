@@ -1,27 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { tymyCiselniku, jeClenem } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
+// Pevné dny vidí jen plánovač rozvrhu (dřív je API vydalo komukoli
+// z podniku, UI zaměstnance ani tabletu je nikdy neukazovalo — kolo 67).
 
 // GET — team fixed assignments joined with employee name + shift type info
 export async function GET() {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!ctx.teamId) return NextResponse.json({ assignments: [] });
+  const ctx = await pozaduj('rozvrh.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
 
   const rows = await sql`
     SELECT f.id, f.employee_id, f.weekday, f.shift_type_id,
@@ -50,10 +42,8 @@ export async function GET() {
 
 // POST (employer) — { employeeId, weekday, shiftTypeId? }
 export async function POST(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json();
   const employeeId = parseInt(body.employeeId);
@@ -88,10 +78,8 @@ export async function POST(req: Request) {
 // PATCH { id, shiftTypeId } — change the shift type of an existing fixed day
 // in place (no more delete + recreate).
 export async function PATCH(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json().catch(() => ({}));
   const id = parseInt(body.id);
@@ -115,10 +103,8 @@ export async function PATCH(req: Request) {
 
 // DELETE ?id= (employer)
 export async function DELETE(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(ctx)) return ctx;
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');

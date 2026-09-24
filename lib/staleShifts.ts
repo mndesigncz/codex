@@ -19,7 +19,7 @@ import { pragueHourOf, pragueDayOf, dayPlus } from '@/lib/pragueTime';
 import { denPrichodu, denUzaverky, type DenPrichoduVstup } from '@/lib/businessDay';
 import { weekdayKey, type OpeningDay } from '@/lib/coverage';
 import type { ShiftRow } from '@/lib/shiftWindow';
-import { vedeniPodniku } from '@/lib/tenant';
+import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -271,9 +271,10 @@ export async function autoCloseEntry(entry: { id: number; employee_id: number; t
     const hhmm = closeAt.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
     try {
       const [emp] = await sql`SELECT name FROM users WHERE id = ${entry.employee_id}`;
-      // Kolo 62: vedení podniku ZÁZNAMU podle členství — provozovatel
-      // přepnutý jinam se o automaticky zavřené směně jinak nedozví.
-      const employers = await vedeniPodniku(entry.team_id, { krome: entry.employee_id });
+      // Podnik ZÁZNAMU, příjemci podle oprávnění (kolo 67): automaticky
+      // zavřenou směnu opraví ten, kdo smí upravit docházku. Jde přes
+      // členství, takže to dojde i vedoucímu přepnutému jinam.
+      const employers = (await clenoveSOpravnenim(entry.team_id, 'dochazka.upravit')).filter(id => id !== entry.employee_id);
       let missingClosing = false;
       try {
         const [has] = await sql`

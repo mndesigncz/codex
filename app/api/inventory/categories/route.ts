@@ -1,30 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeDefaults } from '@/lib/itemDefaults';
 import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id ?? null;
-  return { meId, role, teamId };
+/** Kolo 67: brána oprávněním místo role z tokenu; podnik vždy z databáze. */
+async function currentUser(klic: string) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId };
 }
 
 // GET: list the team's custom categories ordered by position. Se sdílenými
 // číselníky (kolo 60) přibudou i kategorie zdrojového podniku organizace —
 // vlastní první, cizí označené `zOrganizace`, ať je na každé vidět, odkud je.
+//
+// `sklad.zobrazit` — mají ho všechny tři dnešní role; kategorie čte i tablet,
+// formulář zaměstnance a výběr surovin v Návodech.
 export async function GET() {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await currentUser('sklad.zobrazit');
+  if (jeOdpoved(me)) return me;
 
   // Které podniky čteme, rozhoduje jediné místo (lib/tenant.ts); tady se pole
   // jen dosadí do predikátu. Nikdy nepřijde z požadavku. Vedle predikátu
@@ -85,11 +84,10 @@ export async function GET() {
   })));
 }
 
-// POST (employer): create a new custom category.
+// POST (`sklad.kategorie`): create a new custom category.
 export async function POST(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await currentUser('sklad.kategorie');
+  if (jeOdpoved(me)) return me;
 
   const body = await request.json();
   const name = (body.name ?? '').trim();

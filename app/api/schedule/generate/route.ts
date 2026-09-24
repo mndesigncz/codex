@@ -1,23 +1,13 @@
 import { NextResponse } from 'next/server';
 import { openSpan, uncovered, gapText, type Interval } from '@/lib/coverage';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { prefAllowsSlot, dayPrefLabel, type PrefType } from '@/lib/dayPrefs';
 import { tymyCiselniku, idClenu } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
 
 // weekday 0=Mon..6=Sun from a YYYY-MM-DD date
 function weekdayOf(date: string) {
@@ -95,10 +85,8 @@ interface Emp {
 }
 
 export async function POST(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.generovat');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json();
   const month: string = body.month;
@@ -113,6 +101,11 @@ export async function POST(req: Request) {
     // replaceMonth: wipe the month only here, right before inserting — the old
     // client-side "DELETE, then hope the commit succeeds" lost the whole month
     // whenever the second request failed.
+    // Přepsání měsíce je zároveň vymazání měsíce — bez toho klíče by šel
+    // generátorem obejít (kontroluje se před zápisem, ať nevznikne půlka).
+    if (body.replaceMonth === true && !ctx.role.opravneni.has('rozvrh.mazat_mesic')) {
+      return NextResponse.json({ error: 'Na vymazání celého měsíce nemáš oprávnění — ulož návrh bez přepsání.' }, { status: 403 });
+    }
     if (body.replaceMonth === true && /^\d{4}-\d{2}$/.test(String(month))) {
       await sql`
         DELETE FROM shifts

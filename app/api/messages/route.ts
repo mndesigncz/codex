@@ -5,25 +5,24 @@
 // and take the author from the session — never from the request body.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Člen aktivního podniku s chat.pouzivat. Host s users.team_id dřív
+// nástěnku podniku četl i do ní psal — kolo 67 ho odřízne.
 async function caller() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, teamId: (u?.team_id ?? null) as number | null };
+  const c = await pozaduj('chat.pouzivat');
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId as number | null };
 }
 
 export async function GET(req: NextRequest) {
   const me = await caller();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(me)) return me;
   if (!me.teamId) return NextResponse.json([]);
 
   try {
@@ -48,7 +47,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const me = await caller();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(me)) return me;
 
   try {
     const body = await req.json();

@@ -3,6 +3,7 @@ import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { sendBackupEmail } from '@/lib/email';
 import { pragueToday } from '@/lib/pragueTime';
+import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 // Záloha stahuje obsah mnoha tabulek přes všechny týmy — default 10 s nestačí.
@@ -25,6 +26,9 @@ const TABLES: { name: string; team?: boolean; user?: string; conversation?: bool
   // Členství a organizace (kolo 55): role, pozice a sazba v členství i
   // nastavení organizace (zdroje sdílených číselníků) patří do zálohy.
   { name: 'team_members', team: true },
+  // Vlastní role podniku (kolo 67): bez nich by team_members.role_id po
+  // obnově ukazovalo do prázdna.
+  { name: 'roles', team: true },
   { name: 'organizations', scopedBy: 'id = (SELECT organization_id FROM teams WHERE id = $1)' },
   { name: 'shifts', team: true, user: 'employee_id' },
   { name: 'shift_requests', team: true, user: 'employee_id' },
@@ -105,7 +109,7 @@ async function dumpTeam(sql: any, teamId: number): Promise<{ dump: Record<string
 }
 
 // Daily backup: exports each team's data to JSON and e-mails it to THAT
-// team's employer(s) only, so a copy always lives outside the database and
+// team's members with data.zaloha only, so a copy always lives outside the database and
 // nobody ever receives another business's rows.
 // Protected: Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically.
 export async function GET(request: Request) {
@@ -123,9 +127,15 @@ export async function GET(request: Request) {
     const problems: string[] = [];
     for (const team of teams as any[]) {
       try {
+        // Příjemci podle oprávnění data.zaloha z členství (kolo 67). Dřív se
+        // četlo zrcadlo users.role/team_id, takže zálohu dostalo jen vedení,
+        // které mělo tenhle podnik zrovna aktivní — kdo byl přepnutý jinam,
+        // zůstal bez ní.
+        const ids = await clenoveSOpravnenim(Number(team.id), 'data.zaloha');
+        if (!ids.length) continue;
         const employers = await sql`
           SELECT DISTINCT email FROM users
-          WHERE role = 'employer' AND team_id = ${team.id} AND email IS NOT NULL`;
+          WHERE id = ANY(${ids}::int[]) AND email IS NOT NULL`;
         if (!employers.length) continue; // nobody to receive it — skip the work
 
         const { dump, rowCount } = await dumpTeam(sql, Number(team.id));

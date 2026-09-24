@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints, PointsConfig } from '@/lib/rewardLevels';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { clenPodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,16 +12,19 @@ const sql = neon(process.env.DATABASE_URL!);
 // GET — everything the employer needs about one employee in a single view:
 // identity, level & points, shifts (upcoming + recent, with review status),
 // reviews and per-item feedback, attendance hours and closings.
+//
+// Kolo 67: profil otevírá tym.profil (body, úroveň, směny, odpracované
+// hodiny, dochvilnost — tak ho popisuje katalog). Citlivé části jen
+// s vlastním oprávněním: sazba (finance.mzdy), e-mail a telefon
+// (tym.kontakty), hodnocení směn, výtky a body z hodnocení
+// (hodnoceni.zobrazit). Vedení má všechno, pro něj se nic nemění.
 export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  if (role !== 'employer') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
-  const [me] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = me?.team_id as number | null;
-  if (!teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
+  const c = await pozaduj('tym.profil');
+  if (jeOdpoved(c)) return c;
+  const teamId = c.teamId;
+  const ma = (k: string) => c.role.opravneni.has(k);
+  const hodnoceni = ma('hodnoceni.zobrazit');
 
   const employeeId = parseInt(params.id);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
@@ -107,10 +109,12 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   }
   const shapeShift = (r: any) => ({
     id: r.id, date: r.date, startTime: r.start_time, endTime: r.end_time, type: r.type,
-    reviewed: r.review_rating !== undefined && r.review_rating !== null,
-    rating: r.review_rating ?? 0,
-    flagged: r.review_flagged === true,
-    reviewPoints: r.review_points ?? 0,
+    // Hodnocení směny bez hodnoceni.zobrazit nejde ani naznačit (nehodnoceno
+    // vs. výtka) — směna se ukáže jako prostá směna.
+    reviewed: hodnoceni && r.review_rating !== undefined && r.review_rating !== null,
+    rating: hodnoceni ? (r.review_rating ?? 0) : 0,
+    flagged: hodnoceni && r.review_flagged === true,
+    reviewPoints: hodnoceni ? (r.review_points ?? 0) : 0,
   });
   const upcoming = shiftRows.filter((r: any) => r.date >= today).map(shapeShift).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 14);
   const recent = shiftRows.filter((r: any) => r.date < today).map(shapeShift).slice(0, 30);
@@ -210,11 +214,12 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     closingsMonth = r?.n ?? 0;
   } catch { /* ignore */ }
 
+  const kontakty = ma('tym.kontakty');
   return NextResponse.json({
     employee: {
       id: emp.id, name: emp.name, avatar: emp.avatar,
-      email: emp.email ?? null, phone: emp.phone ?? null,
-      jobTitle: emp.jobTitle, hourlyRate: emp.hourlyRate,
+      email: kontakty ? (emp.email ?? null) : null, phone: kontakty ? (emp.phone ?? null) : null,
+      jobTitle: emp.jobTitle, hourlyRate: ma('finance.mzdy') ? emp.hourlyRate : null,
     },
     standing: {
       points: totalPoints,
@@ -222,9 +227,13 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       next: st.next, pctToNext: st.pctToNext, pointsIntoLevel: st.pointsIntoLevel, pointsForNext: st.pointsForNext,
     },
     levels,
-    breakdown: { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, ratedShifts, flagged },
+    // Celkové body a úroveň (standing) zůstávají — body jsou vidět i
+    // v žebříčku. Z čeho se skládají hodnocení, jen s hodnoceni.zobrazit.
+    breakdown: hodnoceni
+      ? { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, ratedShifts, flagged }
+      : { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints: null, autoPoints: null, itemPoints: null, ratedShifts: null, flagged: null },
     shifts: { upcoming, recent },
-    reviews, items,
+    reviews: hodnoceni ? reviews : [], items: hodnoceni ? items : [],
     month: { hoursMs: monthMs, shifts: recent.filter(sh => sh.date.startsWith(monthKey)).length + upcoming.filter(sh => sh.date.startsWith(monthKey)).length, closings: closingsMonth },
     punctuality,
   });

@@ -1,29 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { idClenu } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
-
-// POST (employer) — { month, rows: [{employeeId, date, startTime, endTime, type}] }
+// POST — { month, rows: [{employeeId, date, startTime, endTime, type}] }
 // Rows are already parsed client-side from CSV; this just persists them.
 export async function POST(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  // Import je jen hromadné přidání směn — stejný klíč jako ruční přidání.
+  const ctx = await pozaduj('rozvrh.upravit');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json();
   const rows: any[] = Array.isArray(body.rows) ? body.rows : [];

@@ -66,6 +66,16 @@ async function nactiRoli(userId: number, teamId: number): Promise<RoleClena | nu
     // Před migrací kola 67 (roles, role_id ještě nejsou): role z typu účtu.
     try { [m] = await sql`SELECT role FROM team_members WHERE user_id = ${userId} AND team_id = ${teamId}`; } catch { m = null; }
   }
+  // Členství NEBO zrcadlo (stejná definice jako clenovePodniku v lib/tenant):
+  // tablet nemá řádek v team_members (zakládá se jen v users) a starší účty,
+  // které se od zavedení členství nepřihlásily, taky ne. Host (customer)
+  // se zrcadlem projít nesmí.
+  if (!m) {
+    try {
+      const [u] = await sql`SELECT role FROM users WHERE id = ${userId} AND team_id = ${teamId}`;
+      if (u && (u.role === 'kiosk' || u.role === 'employer' || u.role === 'employee')) m = { role: u.role };
+    } catch { /* bez zrcadla není člen */ }
+  }
   try { [t] = await sql`SELECT owner_id, show_team_schedule FROM teams WHERE id = ${teamId}`; } catch { t = null; }
   const jeVlastnik = t != null && Number(t.owner_id) === userId;
   if (!m && !jeVlastnik) return null;
@@ -96,7 +106,11 @@ export async function maOpravneni(userId: number, teamId: number, klic: string):
 export async function clenoveSOpravnenim(teamId: number, klic: string): Promise<number[]> {
   let ids: number[] = [];
   try {
-    const rows = await sql`SELECT user_id FROM team_members WHERE team_id = ${teamId}` as any[];
+    // Kandidáti jako dřív u vedeniPodniku: členství i zrcadlo (bez tabletu
+    // a hostů — ti upozornění nedostávali).
+    const rows = await sql`
+      SELECT user_id FROM team_members WHERE team_id = ${teamId}
+      UNION SELECT id AS user_id FROM users WHERE team_id = ${teamId} AND role IN ('employer', 'employee')` as any[];
     ids = rows.map(r => Number(r.user_id));
     const [t] = await sql`SELECT owner_id FROM teams WHERE id = ${teamId}`;
     if (t?.owner_id != null && !ids.includes(Number(t.owner_id))) ids.push(Number(t.owner_id));

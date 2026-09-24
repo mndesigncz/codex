@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { ciselnikPodniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
+// Typy směn čte každý člen — zaměstnanec podle nich vyplňuje dostupnost
+// (AvailabilitySubmit). Zakládat a měnit je patří k nastavení rozvrhu.
 
 function mapRow(r: any) {
   return {
@@ -35,9 +28,8 @@ function mapRow(r: any) {
 // překládají až při generování proti otevírací době KAŽDÉHO podniku, takže
 // jedna definice sedí všem.
 export async function GET() {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!ctx.teamId) return NextResponse.json({ shiftTypes: [] });
+  const ctx = await pozaduj(null);
+  if (jeOdpoved(ctx)) return ctx;
 
   // Zdroj vidí jen své řádky, ale má vědět, že úprava se propíše do celé
   // organizace — proto chip „sdíleno". Název zdroje pro „Spravuje: …" vidí
@@ -65,10 +57,8 @@ export async function GET() {
 
 // POST (employer) — { name, startTime, endTime, color? }
 export async function POST(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json();
   const name: string = (body.name ?? '').trim();

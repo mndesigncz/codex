@@ -3,7 +3,9 @@ import { pridejClenstvi, pocetClenu } from '@/lib/tenant';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
-import { notifyUser } from '@/lib/push';
+import { notifyUsers } from '@/lib/push';
+import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { vychoziRolePodniku, typUctu, zapisRoliClenstvi } from '../_role';
 import { linkNewMember } from '@/lib/chat';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
@@ -48,22 +50,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
     }
 
+    // Kolo 67: kdo přijde kódem, dostane výchozí roli podniku (bez
+    // nastavení Barista, tedy totéž co dřív „zaměstnanec"). Typ účtu jde
+    // s rolí — určuje, které rozhraní se po přihlášení otevře.
+    const role = await vychoziRolePodniku(Number(team.id));
+    const ucet = typUctu(role);
     const passwordHash = await bcrypt.hash(password, 12);
     const [user] = await sql`
       INSERT INTO users (name, email, password_hash, role, avatar, team_id, employer_id)
-      VALUES (${name}, ${email}, ${passwordHash}, 'employee', '👤', ${team.id}, ${team.owner_id})
+      VALUES (${name}, ${email}, ${passwordHash}, ${ucet}, '👤', ${team.id}, ${team.owner_id})
       RETURNING id, name, email, role`;
 
     // Členství hned při vstupu — ne až při prvním přihlášení (kolo 62).
-    try { await pridejClenstvi(Number(user.id), Number(team.id), 'employee', { jobTitle: null }); } catch { /* před migrací */ }
+    try {
+      await pridejClenstvi(Number(user.id), Number(team.id), ucet, { jobTitle: null });
+      await zapisRoliClenstvi(Number(user.id), Number(team.id), role);
+    } catch { /* před migrací */ }
     await linkNewMember(sql, team.id, team.owner_id, user.id);
 
-    notifyUser(team.owner_id, {
+    // O novém členovi ví, kdo tým zve a spravuje (tym.pozvat) — dřív jen
+    // vlastník, i když lidi do podniku přiváděl třeba provozní.
+    clenoveSOpravnenim(Number(team.id), 'tym.pozvat').then(ids => notifyUsers(ids, {
       title: 'Nový člen týmu',
       body: `${name} se právě připojil/a do týmu.`,
       type: 'invite',
       link: '/employer/overview?view=team-settings',
-    }).catch(() => {});
+    })).catch(() => {});
 
     return NextResponse.json({ ok: true, user });
   } catch (error) {

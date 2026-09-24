@@ -2,22 +2,22 @@
 // forty '+1's. One vote per person, results visible live.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
 import { clenovePodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Ankety patří k týmovému chatu (chat.pouzivat). Zakládat a hlasovat smí jen
+// osobní účet — `kiosk` je typ účtu, ne oprávnění: sdílený tablet by hlasoval
+// za kohokoli, kdo u něj zrovna stojí.
 async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id, name FROM users WHERE id = ${id}`;
-  return u ?? null;
+  const c = await pozaduj('chat.pouzivat');
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, team_id: c.teamId, kiosk: c.role.typ === 'kiosk', opr: c.role.opravneni };
 }
 
 async function shapePolls(teamId: number, meId: number) {
@@ -44,7 +44,7 @@ async function shapePolls(teamId: number, meId: number) {
 
 export async function GET() {
   const u = await me();
-  if (!u?.team_id) return NextResponse.json({ polls: [] });
+  if (jeOdpoved(u)) return u;
   try {
     return NextResponse.json({ polls: await shapePolls(u.team_id, u.id) });
   } catch { return NextResponse.json({ polls: [] }); }
@@ -52,8 +52,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role === 'kiosk') return NextResponse.json({ error: 'Anketu zakládá osobní účet.' }, { status: 403 });
+  if (jeOdpoved(u)) return u;
+  if (u.kiosk) return NextResponse.json({ error: 'Anketu zakládá osobní účet.' }, { status: 403 });
   const b = await req.json().catch(() => ({}));
   const question = String(b.question ?? '').trim().slice(0, 200);
   const options = (Array.isArray(b.options) ? b.options : [])
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       RETURNING id`;
     try {
       // Kolo 62: příjemci podle členství; role (odkaz v push) z TOHOTO podniku.
+      // Typ účtu tu určuje jen odkaz do správného rozhraní.
       const members = await clenovePodniku(u.team_id, { role: 'lide', krome: u.id });
       const ees = members.filter(m => m.role !== 'employer').map(m => m.id);
       const emp = members.filter(m => m.role === 'employer').map(m => m.id);
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
@@ -88,8 +89,9 @@ export async function PATCH(req: NextRequest) {
   if (!poll) return NextResponse.json({ error: 'Anketa nenalezena' }, { status: 404 });
 
   if (b.close === true) {
-    if (u.role !== 'employer' && poll.created_by !== u.id) {
-      return NextResponse.json({ error: 'Zavřít může autor nebo vedení.' }, { status: 403 });
+    // Vlastní anketu zavře autor, cizí ten, kdo spravuje oznámení a ankety.
+    if (!u.opr.has('oznameni.spravovat') && Number(poll.created_by) !== u.id) {
+      return NextResponse.json({ error: 'Zavřít může autor nebo ten, kdo spravuje ankety.' }, { status: 403 });
     }
     await sql`UPDATE polls SET closed = TRUE WHERE id = ${id}`;
     return NextResponse.json({ ok: true });
@@ -100,7 +102,7 @@ export async function PATCH(req: NextRequest) {
   if (!Number.isFinite(idx) || idx < 0 || idx >= optCount) {
     return NextResponse.json({ error: 'Neplatná volba' }, { status: 400 });
   }
-  if (u.role === 'kiosk') return NextResponse.json({ error: 'Hlasuje se z osobního účtu.' }, { status: 403 });
+  if (u.kiosk) return NextResponse.json({ error: 'Hlasuje se z osobního účtu.' }, { status: 403 });
   await sql`
     INSERT INTO poll_votes (poll_id, user_id, option_idx)
     VALUES (${id}, ${u.id}, ${idx})

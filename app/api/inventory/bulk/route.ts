@@ -3,24 +3,14 @@
 // has not migrated yet can't take the rest of the edit down with it.
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
 import { tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id ?? null };
-}
 
 function idsFrom(raw: any): number[] {
   if (!Array.isArray(raw)) return [];
@@ -34,16 +24,22 @@ const num = (v: any) => {
   return Number.isFinite(n) ? n : null;
 };
 
+// Kolo 67: `sklad.upravit`; nákupní cenu navíc `sklad.ceny_upravit` — jinak
+// by šlo cenu obejít hromadnou úpravou. Chybí-li oprávnění k ceně, odmítne
+// se celý požadavek, ať se neuloží půlka.
 export async function PATCH(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('sklad.upravit');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   const body = await request.json();
   const ids = idsFrom(body.ids);
   if (ids.length === 0) return NextResponse.json({ error: 'Nevybrány žádné položky' }, { status: 400 });
 
   const patch = body.patch ?? {};
+  if (patch.unitCost !== undefined && !c.role.opravneni.has('sklad.ceny_upravit')) {
+    return NextResponse.json({ error: 'Na nákupní ceny nemáš oprávnění.' }, { status: 403 });
+  }
   const applied: string[] = [];
   const skipped: string[] = [];
 
@@ -163,11 +159,11 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ ok: true, count: ids.length, applied, skipped });
 }
 
-// DELETE: remove the selected items outright.
+// DELETE: remove the selected items outright. Kolo 67: `sklad.mazat`.
 export async function DELETE(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('sklad.mazat');
+  if (jeOdpoved(c)) return c;
+  const me = { meId: c.meId, teamId: c.teamId };
 
   const body = await request.json().catch(() => ({}));
   const ids = idsFrom(body.ids);

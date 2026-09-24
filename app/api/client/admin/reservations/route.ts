@@ -2,7 +2,8 @@
 // requested → confirmed | declined → seated → done; cancelled ruší host.
 // Usazení s napojenou pokladnou otevře účet na stole (Reservations API).
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer, ensureProfile, stampVisit } from '@/lib/client';
+import { sql, ensureProfile, stampVisit } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { getConnection, seatReservation, StoryousError } from '@/lib/storyous';
 import { notifyUser } from '@/lib/push';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
@@ -18,8 +19,9 @@ const FLOW: Record<string, string[]> = {
 };
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('rezervace.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const range = String(new URL(req.url).searchParams.get('range') ?? 'upcoming');
   const today = pragueToday();
   const rows = range === 'today'
@@ -28,13 +30,33 @@ export async function GET(req: NextRequest) {
     ? await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date < ${today} ORDER BY r.date DESC, r.time DESC LIMIT 100`
     : await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date >= ${today} AND r.date <= ${dayPlus(today, 60)} ORDER BY r.date, r.time`;
   const tables = await sql`SELECT id, name, seats, storyous_desk_id FROM client_tables WHERE team_id = ${u.team_id} AND active = TRUE ORDER BY position, id`;
-  return NextResponse.json({ reservations: rows, tables, today });
+  // Kdo vidí rezervace, nemusí vidět kontakt na hosta — e-mail je osobní
+  // údaj a patří jen tomu, kdo smí hostům psát (zakaznici.kontakty).
+  const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
+  const reservations = kontakty ? rows : (rows as any[]).map(({ customer_email: _e, ...r }) => r);
+  return NextResponse.json({ reservations, tables, today });
 }
 
 export async function PATCH(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj(['rezervace.schvalovat', 'rezervace.usadit']);
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
+  // Potvrdit/odmítnout je rozhodnutí o kapacitě podniku (a jde z něj
+  // upozornění hostovi); usadit, přidělit stůl a uzavřít je práce u dveří.
+  // Jsou to různá oprávnění, takže se kontroluje každá část požadavku zvlášť
+  // a chybí-li kterákoli, neuloží se nic.
+  const chce = b.status ? String(b.status) : null;
+  const potreba = new Set<string>();
+  if (chce === 'confirmed' || chce === 'declined') potreba.add('rezervace.schvalovat');
+  else if (chce) potreba.add('rezervace.usadit');
+  if (b.tableId !== undefined) potreba.add('rezervace.usadit');
+  if (potreba.has('rezervace.schvalovat') && !ctx.role.opravneni.has('rezervace.schvalovat')) {
+    return NextResponse.json({ error: 'Potvrzovat a odmítat rezervace nemáš povoleno.' }, { status: 403 });
+  }
+  if (potreba.has('rezervace.usadit') && !ctx.role.opravneni.has('rezervace.usadit')) {
+    return NextResponse.json({ error: 'Usazovat hosty a přidělovat stoly nemáš povoleno.' }, { status: 403 });
+  }
   const id = parseInt(String(b.id), 10);
   const [r] = await sql`SELECT r.*, us.name AS customer_name FROM client_reservations r JOIN users us ON us.id = r.customer_id WHERE r.id = ${id} AND r.team_id = ${u.team_id}`;
   if (!r) return NextResponse.json({ error: 'Rezervace nenalezena' }, { status: 404 });

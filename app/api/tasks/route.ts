@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { resolveActingUser } from '@/lib/kioskActing';
@@ -8,18 +6,20 @@ import { ensureProductionTasks, produceBatch } from '@/lib/production';
 import { pragueToday } from '@/lib/pragueTime';
 import { sazebnikBodu } from '@/lib/mzdaSmeny';
 import { jeClenem } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { typNaUcet } from '@/lib/opravneni';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Kontext volajícího. Úkoly mají „vlastní" část (svoje úkoly, úkoly pro
+// kohokoli) pro každého člena a týmovou část podle oprávnění ukoly.*.
+// `role` je typ účtu — jen kvůli tabletu jednajícímu za píchnutou osobu.
 async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null };
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, role: typNaUcet(c.role.typ), opr: c.role.opravneni };
 }
 
 const shape = (r: any) => ({
@@ -112,10 +112,11 @@ async function topUpSeries(teamId: number) {
   }
 }
 
-// GET — employee: their own + team/day tasks; employer/kiosk: the whole team.
+// GET — vlastní úkoly a úkoly pro kohokoli; s ukoly.zobrazit_tym (Vedení,
+// tablet) celý tým.
 export async function GET() {
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(c)) return c;
 
   if (c.teamId) {
     try { await topUpSeries(c.teamId); } catch { /* ignore */ }
@@ -123,7 +124,7 @@ export async function GET() {
     try { await ensureProductionTasks(c.teamId, null); } catch { /* před migrací */ }
   }
 
-  const teamWide = (c.role === 'employer' || c.role === 'kiosk') && c.teamId;
+  const teamWide = c.opr.has('ukoly.zobrazit_tym');
   const order = `ORDER BY (t.status = 'done'), t.due_date ASC NULLS LAST, t.created_at DESC`;
   try {
     const rows = teamWide
@@ -162,7 +163,7 @@ export async function GET() {
 // (employer only). A recurrence generates the upcoming occurrences up front.
 export async function POST(req: NextRequest) {
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const title = String(b.title ?? '').trim();
@@ -172,13 +173,13 @@ export async function POST(req: NextRequest) {
   const rawAssignee = b.assignedTo;
   let assignedTo: number | null;
   if (rawAssignee === null || rawAssignee === undefined || rawAssignee === '' || rawAssignee === 0) {
-    if (c.role !== 'employer') return NextResponse.json({ error: 'Úkol pro kohokoliv může zadat jen vedení.' }, { status: 403 });
+    if (!c.opr.has('ukoly.zadavat')) return NextResponse.json({ error: 'Úkol pro kohokoliv může zadat jen ten, kdo smí zadávat úkoly.' }, { status: 403 });
     assignedTo = null; // team/day task
   } else {
     assignedTo = parseInt(rawAssignee);
     if (!Number.isFinite(assignedTo)) return NextResponse.json({ error: 'Neplatný zaměstnanec' }, { status: 400 });
     if (assignedTo !== c.meId) {
-      if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+      if (!c.opr.has('ukoly.zadavat')) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
       // Kolo 62: členství, ne zrcadlo — kolega přepnutý do jiného podniku
       // úkol dostat může.
       if (!c.teamId || !(await jeClenem(assignedTo, c.teamId))) {
@@ -237,7 +238,7 @@ export async function POST(req: NextRequest) {
 // DELETE — remove a task, or the whole recurring series (?series=1).
 export async function DELETE(req: NextRequest) {
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(c)) return c;
 
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get('id') ?? '');
@@ -256,7 +257,7 @@ export async function DELETE(req: NextRequest) {
   if (!task) return NextResponse.json({ error: 'Úkol nenalezen' }, { status: 404 });
 
   const taskTeam = task.team_id ?? task.assignee_team;
-  const allowed = task.created_by === c.meId || (c.role === 'employer' && taskTeam === c.teamId);
+  const allowed = Number(task.created_by) === c.meId || (c.opr.has('ukoly.mazat') && Number(taskTeam) === c.teamId);
   if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   // Deleting a recurring occurrence cancels the whole series (stops top-up).
@@ -272,7 +273,7 @@ export async function DELETE(req: NextRequest) {
 // the team; completing no longer respawns — upcoming occurrences already exist.
 export async function PATCH(req: NextRequest) {
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
@@ -285,16 +286,17 @@ export async function PATCH(req: NextRequest) {
   if (!task) return NextResponse.json({ error: 'Úkol nenalezen' }, { status: 404 });
 
   const taskTeam = task.team_id ?? task.assignee_team;
-  const allowed = task.assigned_to === c.meId || task.created_by === c.meId
-    || ((c.role === 'employer' || c.role === 'kiosk') && taskTeam === c.teamId)
-    || (task.assigned_to == null && taskTeam === c.teamId); // day task — anyone on the team
+  const vTymu = Number(taskTeam) === c.teamId;
+  const allowed = Number(task.assigned_to) === c.meId || Number(task.created_by) === c.meId
+    || (c.opr.has('ukoly.plnit') && vTymu)
+    || (task.assigned_to == null && vTymu); // day task — anyone on the team
   if (!allowed) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
   // Edit task fields — creator or a team employer only. Everything is editable,
   // just like when creating. For a recurring series, schedule/assignee/checklist
   // changes rewrite all FUTURE occurrences (past & done ones stay as history).
   if (b.edit) {
-    const canEdit = task.created_by === c.meId || (c.role === 'employer' && taskTeam === c.teamId);
+    const canEdit = Number(task.created_by) === c.meId || (c.opr.has('ukoly.upravit') && vTymu);
     if (!canEdit) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
     const today = todayStr();
@@ -302,17 +304,21 @@ export async function PATCH(req: NextRequest) {
     const description = b.description !== undefined ? (b.description || null) : task.description;
     const priority = b.priority !== undefined ? b.priority : task.priority;
 
-    // Resolve the assignee (null = team/day task; only employers may set that).
+    // Resolve the assignee (null = team/day task). Přiřadit úkol někomu
+    // jinému nebo „komukoli" smí jen ten, kdo smí úkoly zadávat — stejně
+    // jako při založení. Dřív šlo úpravou vlastního úkolu obejít zákaz
+    // z POST a úkol přehodit na kolegu; UI zaměstnance to nikdy nenabízelo.
     let assignedTo = task.assigned_to;
+    const zadava = c.opr.has('ukoly.zadavat');
     if (b.assignedTo !== undefined) {
       if (b.assignedTo === null || b.assignedTo === '' || b.assignedTo === 0) {
-        assignedTo = c.role === 'employer' ? null : task.assigned_to;
+        assignedTo = zadava ? null : task.assigned_to;
       } else {
         const a = parseInt(b.assignedTo);
-        if (Number.isFinite(a)) {
+        if (Number.isFinite(a) && (a === c.meId || zadava)) {
           // Kolo 62: členství, ne zrcadlo — jinak se přiřazení členovi
           // přepnutému jinam tiše zahodilo.
-          if (c.teamId && await jeClenem(a, c.teamId)) assignedTo = a;
+          if (await jeClenem(a, c.teamId)) assignedTo = a;
         }
       }
     }
@@ -408,7 +414,7 @@ export async function PATCH(req: NextRequest) {
 
   // Move a single occurrence to another day (drag & drop in the week board).
   if (b.move && b.dueDate !== undefined) {
-    const canMove = task.created_by === c.meId || (c.role === 'employer' && taskTeam === c.teamId);
+    const canMove = Number(task.created_by) === c.meId || (c.opr.has('ukoly.upravit') && vTymu);
     if (!canMove) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
     const [row] = await sql`UPDATE tasks SET due_date = ${b.dueDate || null} WHERE id = ${id} RETURNING *`;
     return NextResponse.json(shape(row));

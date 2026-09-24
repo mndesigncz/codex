@@ -96,6 +96,10 @@ export async function PATCH(request: Request) {
   }
 
   // Profile update flow (only provided fields)
+  // Kolo 67: vlastní profil je osobní věc účtu, ne podniku — žádná brána
+  // oprávněním (kiosk, host i člověk bez podniku si mění jméno a motiv).
+  // Pozici si tu člověk přepisuje sám odjakživa (Nastavení → Profil, i
+  // barista); tym.upravit hlídá pozici CIZÍHO člena v teams/members.
   await sql`
     UPDATE users SET
       name = COALESCE(${name ?? null}, name),

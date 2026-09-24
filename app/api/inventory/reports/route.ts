@@ -4,30 +4,30 @@
 // a report be filed under a colleague's name.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
-import { vedeniPodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${id}`;
-  return u ?? null;
+/**
+ * Kolo 67: brána oprávněním v aktivním podniku (z databáze). Tvar `{ id,
+ * team_id }` drží dotazy níž beze změny.
+ */
+async function me(klic: string) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, team_id: c.teamId };
 }
 
 // Employer: reports from their own team, newest first. This is the missing
 // other half of the feature — without it every report vanished into the table.
+// Kolo 67: `sklad.hlaseni_vyridit`.
 export async function GET() {
-  const u = await me();
-  if (!u) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await me('sklad.hlaseni_vyridit');
+  if (jeOdpoved(u)) return u;
   try {
     const rows = await sql`
       SELECT r.*, us.name AS author_name, us.avatar AS author_avatar
@@ -42,9 +42,11 @@ export async function GET() {
   }
 }
 
+// Kolo 67: `sklad.hlasit` (všechny tři dnešní role). Dřív stačilo
+// přihlášení, takže hlášení poslal i host — a s team_id NULL.
 export async function POST(req: NextRequest) {
-  const u = await me();
-  if (!u) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const u = await me('sklad.hlasit');
+  if (jeOdpoved(u)) return u;
 
   try {
     const body = await req.json();
@@ -58,8 +60,9 @@ export async function POST(req: NextRequest) {
 
     // The report is FOR the employers — tell them it exists.
     try {
-      // Kolo 62: vedení podle členství — provozovatel přepnutý jinam hlášení dostane.
-      const employers = await vedeniPodniku(u.team_id, { krome: u.id });
+      // Kolo 67: hlášení dostane, kdo ho smí vyřídit — podle členství, takže
+      // i ten, kdo je zrovna přepnutý jinam. Autor sám sobě nepíše.
+      const employers = (await clenoveSOpravnenim(u.team_id, 'sklad.hlaseni_vyridit')).filter(id => id !== u.id);
       let count = 0;
       try { count = JSON.parse(items)?.length ?? 0; } catch {}
       const [author] = await sql`SELECT name FROM users WHERE id = ${u.id}`;
@@ -80,9 +83,8 @@ export async function POST(req: NextRequest) {
 
 // Employer marks a report handled (or reopens it).
 export async function PATCH(req: NextRequest) {
-  const u = await me();
-  if (!u) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await me('sklad.hlaseni_vyridit');
+  if (jeOdpoved(u)) return u;
   try {
     const body = await req.json();
     const id = parseInt(body.id);

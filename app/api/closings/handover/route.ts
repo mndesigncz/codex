@@ -1,8 +1,8 @@
 // The latest shift handover for the team — what the previous shift left for
-// whoever opens next. Readable by every role including the kiosk.
+// whoever opens next. Kolo 67: s oprávněním uzaverky.predavka (Vedení,
+// Barista i Kiosk ho mají, takže se pro ně nic nemění).
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { normalizeHandover } from '@/lib/closing';
 
@@ -11,11 +11,9 @@ export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ handover: null });
+  const c = await pozaduj('uzaverky.predavka');
+  if (jeOdpoved(c)) return c;
+  const u = { team_id: c.teamId };
 
   try {
     const [row] = await sql`

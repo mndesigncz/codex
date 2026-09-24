@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
 import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
 import { pragueToday } from '@/lib/pragueTime';
 import { clenovePodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Vlastní body a hodnocení vidí každý člen; žebříček týmu odmeny.zebricek.
 async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const name = (s.user as any).name as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, name, teamId: u?.team_id as number | null };
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, opr: c.role.opravneni };
 }
 
 // Worked days in the recent past that still have no review — the employer's
@@ -87,8 +83,7 @@ async function itemsFor(teamId: number, userId: number) {
 
 export async function GET() {
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
+  if (jeOdpoved(c)) return c;
 
   // Team config.
   let levelsRaw: any = [], pointsRaw: any = {};
@@ -99,19 +94,26 @@ export async function GET() {
   const levels = normalizeLevels(levelsRaw);
   const points = normalizePoints(pointsRaw);
 
-  if (c.role === 'employer' || c.role === 'kiosk') {
+  if (c.opr.has('odmeny.zebricek')) {
+    // Výtky a nehodnocené směny jsou hodnocení lidí, ne pořadí — patří jen
+    // tomu, kdo hodnocení vidí (hodnoceni.zobrazit). Tablet je dřív dostával
+    // se žebříčkem, i když je nikde neukazoval (kolo 67 tenhle únik zavírá).
+    const vidiHodnoceni = c.opr.has('hodnoceni.zobrazit');
+    // Koho žebříček zahrnuje, určuje typ účtu (zaměstnanci), ne oprávnění —
+    // to je „koho se funkce týká".
     // Kolo 62: žebříček podle členství — zaměstnanec přepnutý jinam má v tomhle
     // podniku body, tak v něm musí zůstat i v pořadí.
     const members = await clenovePodniku(c.teamId, { role: 'employee' });
     // Dřív 6 dotazů na každého člena (N+1). Teď dvě dávkové sady GROUP BY.
     const memberIds = members.map(m => m.id);
     const breakdowns = await breakdownForTeam(c.teamId, memberIds);
-    const pendings = await pendingForTeam(c.teamId, memberIds);
+    const pendings = vidiHodnoceni ? await pendingForTeam(c.teamId, memberIds) : new Map<number, { n: number; oldest: string | null }>();
     const standings = members.map(m => {
-      const b = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
-      const total = totalPoints(b, points);
+      const b0 = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
+      const total = totalPoints(b0, points);
       const st = standingForPoints(levels, total);
-      const p = pendings.get(m.id) ?? { n: 0, oldest: null };
+      const b = vidiHodnoceni ? b0 : { ...b0, flagged: 0 };
+      const p = vidiHodnoceni ? (pendings.get(m.id) ?? { n: 0, oldest: null }) : { n: 0, oldest: null };
       return {
         id: m.id, name: m.name, avatar: m.avatar,
         points: total, breakdown: b,
@@ -173,8 +175,7 @@ export async function GET() {
 // POST { markSeen: true } — the employee acknowledged their new feedback.
 export async function POST(req: NextRequest) {
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   if (b?.markSeen !== true) return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });

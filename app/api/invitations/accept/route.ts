@@ -3,8 +3,10 @@ import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { linkNewMember } from '@/lib/chat';
-import { notifyUser } from '@/lib/push';
+import { notifyUser, notifyUsers } from '@/lib/push';
 import { pridejClenstvi, smiPridatClena, pocetClenu } from '@/lib/tenant';
+import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { roleVedeni, vychoziRolePodniku, smiDatRoli, typUctu, zapisRoliClenstvi, type RoleNoveho } from '../../teams/_role';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,29 @@ export async function GET(request: Request) {
   if (!inv) return NextResponse.json({ error: 'Neplatná pozvánka' }, { status: 404 });
   if (inv.status !== 'pending') return NextResponse.json({ error: 'Pozvánka již byla použita' }, { status: 410 });
   return NextResponse.json({ email: inv.email, teamName: inv.team_name });
+}
+
+/**
+ * Jakou roli pozvaný dostane (kolo 67). Pozvánka nese jen typ z doby před
+ * rolemi: „vedení", nebo nic (= výchozí role podniku). Mezi odesláním a
+ * přijetím mohl zvoucí přijít o právo zvát nebo přidělovat role, odejít
+ * z podniku, nebo mohla změnit výchozí role — proto se tu všechno ověřuje
+ * ZNOVU podle dnešního stavu. Když zvoucí Vedení dát už nesmí, pozvánka
+ * nepropadne: člověk přijde s výchozí rolí a vedení mu roli upraví.
+ */
+async function roleZPozvanky(inv: any, teamId: number): Promise<RoleNoveho> {
+  if (inv.role === 'employer') {
+    const vedeni = roleVedeni();
+    if (await smiDatRoli(Number(inv.invited_by), teamId, vedeni, ['tym.pozvat', 'tym.role_prirazovat'])) return vedeni;
+  }
+  return vychoziRolePodniku(teamId);
+}
+
+/** O přijaté pozvánce ví, kdo tým zve (tym.pozvat) — dřív jen vlastník. */
+function oznamPrijeti(teamId: number, body: string) {
+  clenoveSOpravnenim(teamId, 'tym.pozvat').then(ids => notifyUsers(ids, {
+    title: 'Pozvánka přijata', body, type: 'invite', link: '/employer/overview?view=team-settings',
+  })).catch(() => {});
 }
 
 // POST { token, name, password } → create employee account from invitation
@@ -44,7 +69,8 @@ export async function POST(request: Request) {
       if (await memberLimitHit(sql, inv.team_id)) {
         return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
       }
-      const role = inv.role === 'employer' ? 'employer' : 'employee';
+      const nova = await roleZPozvanky(inv, Number(team.id));
+      const role = typUctu(nova);
       // Přepínač organizace „Sdílení lidí" platí i při přijetí — pozvánka
       // mohla vzniknout dřív, než ho vlastník vypnul.
       if (!(await smiPridatClena(Number(existing.id), Number(team.id), role))) {
@@ -52,6 +78,7 @@ export async function POST(request: Request) {
       }
       try {
         await pridejClenstvi(Number(existing.id), Number(team.id), role, { jobTitle: inv.job_title || null });
+        await zapisRoliClenstvi(Number(existing.id), Number(team.id), nova);
       } catch {
         // team_members ještě není (init po nasazení neproběhl): říct to,
         // ne padnout na obecnou pětistovku. Pozvánka zůstává platná.
@@ -65,17 +92,13 @@ export async function POST(request: Request) {
       } catch { /* zrcadlo se doplní při přihlášení */ }
       await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
       try { await linkNewMember(sql, team.id, team.owner_id, Number(existing.id)); } catch { /* chat je volitelný */ }
-      notifyUser(team.owner_id, {
-        title: 'Pozvánka přijata',
-        body: `${existing.name} se připojil/a do týmu — už má účet, přibylo mu členství.`,
-        type: 'invite',
-        link: '/employer/overview?view=team-settings',
-      }).catch(() => {});
+      oznamPrijeti(Number(team.id), `${existing.name} se připojil/a do týmu — už má účet, přibylo mu členství.`);
       return NextResponse.json({ ok: true, user: { id: existing.id, name: existing.name, email: inv.email }, existingAccount: true });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const newRole = inv.role === 'employer' ? 'employer' : 'employee';
+    const nova = await roleZPozvanky(inv, Number(team.id));
+    const newRole = typUctu(nova);
 
     if (await memberLimitHit(sql, inv.team_id)) {
       return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
@@ -86,15 +109,11 @@ export async function POST(request: Request) {
       RETURNING id, name, email, role`;
 
     await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;
-    await pridejClenstvi(Number(user.id), Number(team.id), newRole, { jobTitle: inv.job_title || null }).catch(() => {});
+    await pridejClenstvi(Number(user.id), Number(team.id), newRole, { jobTitle: inv.job_title || null })
+      .then(() => zapisRoliClenstvi(Number(user.id), Number(team.id), nova)).catch(() => {});
     await linkNewMember(sql, team.id, team.owner_id, user.id);
 
-    notifyUser(team.owner_id, {
-      title: 'Pozvánka přijata',
-      body: `${name} přijal/a pozvánku a připojil/a se do týmu.`,
-      type: 'invite',
-      link: '/employer/overview?view=team-settings',
-    }).catch(() => {});
+    oznamPrijeti(Number(team.id), `${name} přijal/a pozvánku a připojil/a se do týmu.`);
 
     // Povinné čtení dávalo vědět JEN v okamžiku, kdy ho vedení zapnulo.
     // Kdo přišel do týmu později — tedy každý nový člověk — se o něm

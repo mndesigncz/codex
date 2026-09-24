@@ -1,7 +1,8 @@
 // Příjem u obsluhy: nové a rozpracované objednávky a dnešní rezervace.
-// Kdokoli z týmu — kiosk na baru, zaměstnanec v mobilu i vedení.
+// Kdo smí vidět objednávky od stolu — kiosk na baru, obsluha v mobilu i vedení.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, teamMember } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { setOrderStatus, refreshPosState, sendToPos } from '@/lib/clientOrders';
 import { getConnection } from '@/lib/storyous';
 import { pragueToday } from '@/lib/pragueTime';
@@ -12,8 +13,9 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function GET() {
-  const u = await teamMember();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('objednavky.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const today = pragueToday();
   let orders: any[] = [];
   try {
@@ -24,8 +26,10 @@ export async function GET() {
       ORDER BY CASE o.status WHEN 'new' THEN 0 WHEN 'confirmed' THEN 1 ELSE 2 END, o.created_at ASC` as any[];
     for (const o of orders) if (o.status === 'confirmed' && o.storyous_order_id) o.pos_state = await refreshPosState(u.team_id, o);
   } catch { orders = []; }
+  // Rezervace jsou jména hostů na konkrétní čas — patří jen tomu, kdo smí
+  // rezervace vidět. Obsluha v mobilu je v kompaktním příjmu stejně nezobrazuje.
   let reservations: any[] = [];
-  try {
+  if (ctx.role.opravneni.has('rezervace.zobrazit')) try {
     reservations = await sql`
       SELECT r.id, r.time, r.party, r.note, r.status, us.name AS customer_name, t.name AS table_name
       FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id
@@ -65,8 +69,9 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const u = await teamMember();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('objednavky.vyridit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);
 

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { tymyCiselniku, vedeniPodniku, jeClenem } from '@/lib/tenant';
+import { tymyCiselniku, jeClenem } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,28 +42,18 @@ async function ocistiPreference(teamId: number, month: string, raw: unknown): Pr
   return out;
 }
 
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id, name FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined, name: u?.name as string | undefined };
-}
-
 // GET ?month=YYYY-MM
-// employee → their own submission (or null)
-// employer → all team submissions joined with employee name+avatar
+// bez dostupnost.zobrazit (nebo s ?mine=1) → vlastní odeslaná dostupnost (nebo null)
+// s dostupnost.zobrazit → dostupnost celého týmu se jmény a avatary
 export async function GET(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!ctx.teamId) return NextResponse.json(ctx.role === 'employer' ? { submissions: [] } : null);
+  const ctx = await pozaduj(null);
+  if (jeOdpoved(ctx)) return ctx;
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month');
   if (!month) return NextResponse.json({ error: 'Chybí měsíc' }, { status: 400 });
 
-  if (ctx.role === 'employer' && !searchParams.get('mine')) {
+  if (ctx.role.opravneni.has('dostupnost.zobrazit') && !searchParams.get('mine')) {
     const rows = await sql`
       SELECT a.id, a.employee_id, a.month, a.unavailable_dates, a.day_preferences, a.preferred_shift,
              a.max_shifts, a.note, a.status, a.created_at,
@@ -111,12 +100,14 @@ export async function GET(req: Request) {
   });
 }
 
-// POST (employee) — upsert availability { month, unavailableDates, preferredShift, maxShifts, note }
+// POST — upsert vlastní dostupnosti { month, unavailableDates, preferredShift, maxShifts, note }
 export async function POST(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employee' && ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro členy týmu' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj(null);
+  if (jeOdpoved(ctx)) return ctx;
+  // Vlastní dostupnost má každý osobní účet; sdílený tablet do rozvrhu nepatří.
+  if (ctx.role.typ === 'kiosk') return NextResponse.json({ error: 'Pouze pro členy týmu' }, { status: 403 });
+  let jmeno: string | undefined;
+  try { [{ name: jmeno }] = await sql`SELECT name FROM users WHERE id = ${ctx.meId}` as any[]; } catch { /* jen do upozornění */ }
 
   const body = await req.json();
   const month: string = body.month;
@@ -147,10 +138,10 @@ export async function POST(req: Request) {
        ${JSON.stringify(dayPreferences)}, ${preferredShift}, ${maxShifts}, ${note}, 'submitted')
     RETURNING id`;
 
-  // Vedení podle členství (kolo 62): vedoucí právě přepnutý do jiného
-  // podniku by se jinak o zadané dostupnosti nedozvěděl.
+  // Kdo vidí dostupnost týmu (kolo 67), podle členství (kolo 62): vedoucí
+  // právě přepnutý do jiného podniku by se jinak o zadané dostupnosti nedozvěděl.
   try {
-    const employers = await vedeniPodniku(ctx.teamId, { krome: ctx.meId });
+    const employers = (await clenoveSOpravnenim(ctx.teamId, 'dostupnost.zobrazit')).filter(id => id !== ctx.meId);
     const [my, ye] = month.split('-');
     const monthLabel = new Date(parseInt(my), parseInt(ye) - 1, 1).toLocaleDateString('cs-CZ', {
       month: 'long',
@@ -160,7 +151,7 @@ export async function POST(req: Request) {
       employers.map((id) =>
         notifyUser(id, {
           title: 'Zadaná dostupnost',
-          body: `${ctx.name ?? 'Zaměstnanec'} zadal/a dostupnost na ${monthLabel}`,
+          body: `${jmeno ?? 'Zaměstnanec'} zadal/a dostupnost na ${monthLabel}`,
           type: 'shift',
           category: 'shift',
           link: '/employer/overview?view=shifts',
@@ -175,15 +166,13 @@ export async function POST(req: Request) {
 }
 
 
-// PATCH (employer) — fix a member's availability in place. The employee typed
+// PATCH (dostupnost.upravit) — fix a member's availability in place. The employee typed
 // it on a phone; when the employer spots a slip, they correct it here instead
 // of chasing the person to resubmit. The employee gets told about the change.
 // Body: { employeeId, month, unavailableDates?, dayPreferences?, preferredShift?, maxShifts?, note? }
 export async function PATCH(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('dostupnost.upravit');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json().catch(() => ({}));
   const employeeId = parseInt(body.employeeId);

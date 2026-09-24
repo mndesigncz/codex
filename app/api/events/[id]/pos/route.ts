@@ -6,14 +6,16 @@
 //     (pos_sales, zrcadlené nočním syncem).
 // Je to informativní pohled: tržba dne teče do financí přes běžnou uzávěrku,
 // tady se nic nezapisuje, jen čte.
+//
+// Kolo 67: tržba akce jsou peníze — `akce.finance`, stejně jako pole
+// Tržba a Náklady v detailu akce.
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
 import { normalizeEventMenu } from '@/lib/events';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -22,11 +24,9 @@ const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Jen pro vedení.' }, { status: 403 });
+  const c = await pozaduj('akce.finance');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
 
   const id = parseInt(params.id);
   const [ev] = await sql`SELECT * FROM events WHERE id = ${id} AND team_id = ${u.team_id}`;

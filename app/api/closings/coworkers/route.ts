@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
@@ -11,12 +10,11 @@ const sql = neon(process.env.DATABASE_URL!);
 // closing that day, so one person can close for them. Each is flagged whether
 // they actually had a shift; someone without one can still be added manually.
 export async function GET(req: NextRequest) {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return NextResponse.json({ coworkers: [] });
-  const meId = parseInt((s.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id;
-  if (!teamId) return NextResponse.json({ coworkers: [] });
+  // Spolupracovníky dne vidí, kdo vyplňuje uzávěrku (kolo 67).
+  const c = await pozaduj('uzaverky.vytvorit');
+  if (jeOdpoved(c)) return c;
+  const meId = c.meId;
+  const teamId = c.teamId;
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date') ?? '';
@@ -27,6 +25,8 @@ export async function GET(req: NextRequest) {
   // closing's shift_employees is done too — not just its author.
   // Kolo 62: kolega je ten, kdo má v podniku členství NEBO zrcadlo, a jeho
   // směna se hledá jen v tomhle podniku — jinak by „měl směnu" podle podniku B.
+  // Filtr na typ účtu (employee/employer, bez tabletu) říká, koho se
+  // uzávěrka týká, ne co kdo smí — proto zůstává i po kole 67.
   try {
     const rows = await sql`
       SELECT u.id, u.name, u.avatar,

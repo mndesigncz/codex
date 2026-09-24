@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { sanitizeSteps } from '@/lib/steps';
 import { notifyUsers } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
-import { vedeniPodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,20 +22,11 @@ function parseRemindDays(v: any): number[] {
   ).sort((a, b) => a - b);
 }
 
-async function currentUser() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const id = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${id}`;
-  return { id, role, teamId: u?.team_id as number | null };
-}
-
 // GET: list the team's procedures
 export async function GET() {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!me.teamId) return NextResponse.json({ procedures: [] });
+  const c = await pozaduj('postupy.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const me = { id: c.meId, teamId: c.teamId };
 
   let procedures: any[];
   try {
@@ -61,14 +50,19 @@ export async function GET() {
    }
   }
 
-  // Pending proposals are visible to the employer (to approve) and to their
-  // author (to see the state) — nobody else runs an unapproved procedure.
-  procedures = (procedures as any[]).filter((p: any) =>
-    p.approved !== false || me.role === 'employer' || p.submitted_by === me.id);
+  // Neschválené návrhy vidí jen ten, kdo je smí schválit — nikdo jiný
+  // neschválený postup nespouští. Dřívější kód chtěl pustit i autora, ale
+  // testoval p.submitted_by, zatímco sloupec se vrací jako "submittedBy",
+  // takže autor svůj návrh v seznamu nikdy neviděl. Převod na oprávnění
+  // (kolo 67) chování nemění; zda autorovi návrh ukázat, je samostatné
+  // rozhodnutí (UI pro spouštění s neschváleným postupem nepočítá).
+  const schvaluje = c.role.opravneni.has('postupy.schvalovat');
+  procedures = (procedures as any[]).filter((p: any) => p.approved !== false || schvaluje);
 
   // Does the current user work today? (kiosk = shared device, always yes.)
+  // Tablet je typ účtu, ne oprávnění — pro sdílené zařízení „směna" nemá smysl.
   const today = pragueToday();
-  let hasShiftToday = me.role === 'kiosk';
+  let hasShiftToday = c.role.typ === 'kiosk';
   if (!hasShiftToday) {
     try {
       const [sh] = await sql`SELECT id FROM shifts WHERE employee_id = ${me.id} AND date = ${today} LIMIT 1`;
@@ -88,14 +82,13 @@ export async function GET() {
   return NextResponse.json({ procedures, hasShiftToday, openingToday });
 }
 
-// POST (employer): create a procedure
+// POST: založit postup (postupy.vytvorit), nebo jen navrhnout
+// (postupy.navrhnout) — návrh čeká na schválení.
 export async function POST(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  if (!me.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
-  // Employees may PROPOSE a procedure — it waits for the employer's approval.
-  const isProposal = me.role !== 'employer';
+  const c = await pozaduj(['postupy.vytvorit', 'postupy.navrhnout']);
+  if (jeOdpoved(c)) return c;
+  const me = { id: c.meId, teamId: c.teamId };
+  const isProposal = !c.role.opravneni.has('postupy.vytvorit');
 
   const body = await request.json().catch(() => ({}));
   const name = String(body.name ?? '').trim();
@@ -127,8 +120,9 @@ export async function POST(request: Request) {
 
   if (isProposal) {
     try {
-      // Kolo 62: vedení podle členství, ne zrcadla.
-      const employers = await vedeniPodniku(me.teamId);
+      // Kolo 62: podle členství, ne zrcadla. Kolo 67: návrh dostane ten,
+      // kdo ho smí schválit.
+      const employers = await clenoveSOpravnenim(me.teamId, 'postupy.schvalovat');
       const [author] = await sql`SELECT name FROM users WHERE id = ${me.id}`;
       await notifyUsers(employers, {
         title: '📋 Návrh postupu ke schválení',

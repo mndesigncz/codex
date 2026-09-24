@@ -1,31 +1,27 @@
 // Product recipes: which stock items one sold product consumes, and how much.
 // A glass of wine = 150 ml from the bottle; svařák = 200 ml wine + spices.
 // GET also serves the "map me" queue — what sold recently without a recipe.
+//
+// Kolo 67: katalog kasy čte i editor menu (výběr produktu z kasy, párování),
+// takže GET pustí i toho, kdo menu upravuje — jen bez receptur a bez fronty
+// prodaných kusů, které patří k recepturám. Zápis receptury má svůj klíč.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
 import { productsFromMirror } from '@/lib/posMirror';
 import { audit } from '@/lib/audit';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${id}`;
-  if (!u || u.role !== 'employer' || !u.team_id) return null;
-  return u;
-}
-
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj(['receptury.zobrazit', 'menu.upravit']);
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
+  const sRecepturami = c.role.opravneni.has('receptury.zobrazit');
   const conn = await getConnection(u.team_id);
   if (!conn) return NextResponse.json({ connected: false, products: [], recipes: [], unmapped: [] });
 
@@ -38,6 +34,8 @@ export async function GET() {
     try { products = await menuProducts(conn); }
     catch { return NextResponse.json({ connected: true, products: [], recipes: [], unmapped: [], error: 'Menu se nepodařilo načíst.' }); }
   }
+
+  if (!sRecepturami) return NextResponse.json({ connected: true, products, recipes: [], unmapped: [] });
 
   // Recipes grouped per product.
   let rows: any[] = [];
@@ -81,8 +79,9 @@ export async function GET() {
 // Replace the whole recipe of one product: { productId, productName, ingredients: [{itemId, amount}] }.
 // Empty ingredients = remove the recipe.
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('receptury.upravit');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
   const b = await req.json().catch(() => ({}));
   const productId = String(b.productId ?? '').trim();
   if (!productId) return NextResponse.json({ error: 'Chybí produkt' }, { status: 400 });

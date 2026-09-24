@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
+// Otevírací dobu čte každý člen. Uložit ji smí podnik.oteviraci_doba —
+// oponentura kola 67 ji oddělila od podnik.nastaveni (měna, formát čísel),
+// protože na ní stojí rozvrh a potřebuje ji i Provozní.
 
 // Default: open 08:00–20:00 all week
 function defaults() {
@@ -25,21 +19,18 @@ function defaults() {
 
 // GET — team opening_hours (JSONB) keyed by weekday 0=Mon..6=Sun
 export async function GET() {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!ctx.teamId) return NextResponse.json({ openingHours: defaults() });
+  const ctx = await pozaduj(null);
+  if (jeOdpoved(ctx)) return ctx;
 
   const [team] = await sql`SELECT opening_hours FROM teams WHERE id = ${ctx.teamId}`;
   const openingHours = team?.opening_hours && Object.keys(team.opening_hours).length > 0 ? team.opening_hours : defaults();
   return NextResponse.json({ openingHours });
 }
 
-// PUT (employer) — save whole opening_hours object
+// PUT — save whole opening_hours object
 export async function PUT(req: Request) {
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('podnik.oteviraci_doba');
+  if (jeOdpoved(ctx)) return ctx;
 
   const body = await req.json();
   const raw = body.openingHours ?? body;
