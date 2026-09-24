@@ -12,6 +12,7 @@ import { Icon } from '../Icons';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
 import { okJson } from '@/lib/api';
+import { useOpravneni } from '../role/useOpravneni';
 
 /** Číslo z pole, které snese i desetinnou čárku — „0,7" jinak spadne na nulu. */
 const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
@@ -33,6 +34,12 @@ export default function NewStockEntry({
   variant = 'app', actingAs = null, initialCategoryId = null, onSaved, onCancel,
 }: Props) {
   const big = variant === 'kiosk';
+  // Kolo 67: nákupní cenu zapisuje jen ten, kdo smí upravovat ceny skladu —
+  // server ji ostatním stejně zahodí (/api/inventory). Baristovi a tabletu se
+  // proto pole schová, místo aby vyplněná cena tiše zmizela, a nepředvyplní
+  // se ani z výchozích hodnot kategorie (nákupní cenu nemají vidět).
+  const { ma } = useOpravneni();
+  const smiCenu = ma('sklad.ceny_upravit');
   const [cats, setCats] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId);
@@ -77,7 +84,7 @@ export default function NewStockEntry({
     if (d.brand) setBrand(d.brand);
     if (d.supplier) setSupplier(d.supplier);
     if (d.packageSize != null) setPackageSize(String(d.packageSize));
-    if (d.unitCost != null) setUnitCost(String(d.unitCost));
+    if (d.unitCost != null && smiCenu) setUnitCost(String(d.unitCost));
   };
 
   const onFile = async (f: File | null) => {
@@ -122,7 +129,7 @@ export default function NewStockEntry({
           description: note.trim() || undefined,
           brand: brand.trim() || undefined,
           packageSize: packageSize === '' ? undefined : dec(packageSize),
-          unitCost: unitCost === '' ? undefined : unitCost,
+          unitCost: unitCost === '' || !smiCenu ? undefined : unitCost,
           supplier: supplier.trim() || undefined,
           minQuantity: defaults.minQuantity ?? undefined,
           criticalQuantity: defaults.criticalQuantity ?? undefined,
@@ -248,11 +255,13 @@ export default function NewStockEntry({
             <input inputMode="decimal" value={packageSize}
               onChange={e => setPackageSize(e.target.value)} className={field} placeholder="0,7" />
           </div>
-          <div>
-            <label className={label}>Cena za kus</label>
-            <input type="number" inputMode="numeric" value={unitCost}
-              onChange={e => setUnitCost(e.target.value)} className={field} placeholder="Kč" />
-          </div>
+          {smiCenu && (
+            <div>
+              <label className={label}>Cena za kus</label>
+              <input type="number" inputMode="numeric" value={unitCost}
+                onChange={e => setUnitCost(e.target.value)} className={field} placeholder="Kč" />
+            </div>
+          )}
           <div>
             <label className={label}>Odkud je</label>
             <input value={supplier} onChange={e => setSupplier(e.target.value)} className={field} placeholder="Makro, dodavatel…" />

@@ -58,6 +58,15 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   // Mzdový snímek: cizí jen s finance.mzdy, vlastní s finance.moje_mzda.
   const sMzdou = ma('finance.mzdy') || (c.created_by === meId && ma('finance.moje_mzda'));
   if (!sMzdou) { delete c.wage_rate; delete c.wage_earned; delete c.worked_ms; }
+  // Tržba z kasy cizí uzávěrky jen s finance.trzby (stejně jako kalendář a
+  // seznam) — jinak by ji z detailu vyčetla role typu Provozní, které ji
+  // katalog slibuje skrýt. Vlastní uzávěrku autor vyplnil sám, vidí ji celou.
+  // Vedení má finance.trzby, ostatní dnešní role cizí detail nevidí.
+  let trzbaSkryta = false;
+  if (!ma('finance.trzby') && Number(c.created_by) !== meId) {
+    for (const k of ['cash_revenue', 'card_revenue', 'tips', 'tips_card', 'closing_cash', 'expected', 'event_breakdown']) delete c[k];
+    trzbaSkryta = true;
+  }
 
   // --- plánovaná směna a kdo měl ten den službu (surové řádky) ---
   let plannedRows: any[] = [];
@@ -281,6 +290,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       handover: normalizeHandover(c.handover),
       movements: normalizeMovements(c.movements),
       approvedByName: c.approved_by ? (person(c.approved_by)?.name ?? null) : null,
+      ...(trzbaSkryta ? { trzbaSkryta: true } : {}),
     },
     crew, covered, planned, attendance, procedures, missingProcedures,
     tasks, receipts, pos, products, notes, day,

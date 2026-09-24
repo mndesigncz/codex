@@ -7,6 +7,7 @@ import { generateJoinCode } from '@/lib/team';
 import { planInfoOf } from '@/lib/plan';
 import { clenovePodniku } from '@/lib/tenant';
 import { roleClena, pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { roleZTypu } from '@/lib/opravneni';
 
 export const dynamic = 'force-dynamic';
 
@@ -145,12 +146,26 @@ export async function GET() {
     // (rozhraní, rozvrh, žebříček), ne role s oprávněními.
     const sazby = ma('finance.mzdy');
     const kontakty = ma('tym.kontakty');
-    const members = (await clenovePodniku(teamId, { sSazbou: sazby })).map(c => ({
-      id: c.id, name: c.name, email: kontakty ? c.email : null, role: c.role, avatar: c.avatar, phone: kontakty ? c.phone : null,
-      job_title: c.jobTitle, shift_preference: c.shiftPreference,
-      hourly_rate: sazby ? (c.hourlyRate ?? 0) : null,
-      aktivni_jinde: c.aktivniJinde,
-    }));
+    // Role s oprávněními (role_klic / role_id / role_nazev) — bez nich
+    // Nastavení týmu ukazovalo jen typ účtu („Vedoucí") a vlastní role po
+    // obnovení stránky zmizela z výběru i ze štítku. Bere se z roleClena,
+    // aby seznam říkal totéž, co pak platí na serveru (včetně vlastníka
+    // a náhrady podle typu účtu, když role v členství chybí).
+    const clenove = await clenovePodniku(teamId, { sSazbou: sazby });
+    const role = await Promise.all(clenove.map(c => roleClena(c.id, Number(teamId)).catch(() => null)));
+    const members = clenove.map((c, i) => {
+      const rc = role[i];
+      const zTypu = roleZTypu(c.role);
+      return {
+        id: c.id, name: c.name, email: kontakty ? c.email : null, role: c.role, avatar: c.avatar, phone: kontakty ? c.phone : null,
+        job_title: c.jobTitle, shift_preference: c.shiftPreference,
+        hourly_rate: sazby ? (c.hourlyRate ?? 0) : null,
+        aktivni_jinde: c.aktivniJinde,
+        role_klic: rc ? rc.klic : zTypu.klic,
+        role_id: rc ? rc.roleId : null,
+        role_nazev: rc ? rc.nazev : zTypu.nazev,
+      };
+    });
 
     return NextResponse.json({
       planInfo,

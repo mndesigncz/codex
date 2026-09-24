@@ -67,7 +67,8 @@ interface Invitation {
   email: string;
   job_title?: string;
   status: string;
-  token?: string;
+  /** Null, když pozvánku vytvořil někdo jiný a její roli bych dát nesměl (server token schová). */
+  token?: string | null;
   created_at: string;
 }
 
@@ -394,10 +395,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   // Build a working join link from a token, using the current origin so it's
   // correct regardless of any server-side APP_URL config.
-  const inviteLink = (token?: string) =>
+  const inviteLink = (token?: string | null) =>
     token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join?token=${token}` : '';
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const copyInviteLink = async (token?: string) => {
+  const copyInviteLink = async (token?: string | null) => {
     const link = inviteLink(token);
     if (!link) return;
     try {
@@ -590,13 +591,27 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   // ale zamčené, ať je vidět proč.
   const vlastnik = isOwner || !!mojeRole?.jeVlastnik;
   const volbyRole = role.filter(r => r.typ !== 'kiosk');
+  // Pravidlo proti eskalaci (lib/opravneni.ts): nepřidělíš roli, která má
+  // něco navíc proti tvé, a nesáhneš na člena, který má víc než ty. Vedení
+  // proti Vedení nemá nic navíc, takže vedoucí dál spravuje i jiné vedoucí
+  // (jako před rolemi). Bez načtené vlastní role rozhoduje server.
+  const vejdeSe = (sada: string[]) => mojeRole == null || sada.every(k => ma(k));
   const zamekRole = (r: VolbaRole): string | null => {
     if (vlastnik) return null;
-    if (r.klic === 'vedeni') return 'jen vlastník';
-    if (mojeRole != null && r.opravneni.some(k => !ma(k))) return 'víc než tvoje role';
+    if (!vejdeSe(r.opravneni)) return 'víc než tvoje role';
     return null;
   };
+  // Sada člena z výběru rolí (podle role_klic / role_id ze serveru); když ji
+  // neznám (role se nenačetly), tlačítka nechám a rozhodne server.
+  const sadaClena = (m: Member): string[] | null => {
+    const v = roleClena(m);
+    return v ? role.find(r => hodnotaRole(r) === v)?.opravneni ?? null : null;
+  };
+  const nadeMnou = (m: Member) => { const s = sadaClena(m); return !vlastnik && s != null && !vejdeSe(s); };
   const smiUpravitClena = smiPrirazovat || smiPozici || smiSazbu;
+  // „Pozvat jako vedoucí" = přidělit Vedení: jen když se Vedení vejde do mé role.
+  const sadaVedeni = role.find(r => r.klic === 'vedeni')?.opravneni;
+  const smiPozvatVedeni = smiPrirazovat && (vlastnik || !sadaVedeni || vejdeSe(sadaVedeni));
   const pending = invitations.filter(i => i.status === 'pending');
 
   return (
@@ -687,7 +702,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
             <div className="flex gap-1 glass rounded-full p-1">
               {/* Pozvat jako vedení = přidělit roli; bez tym.role_prirazovat
                   jde pozvat jen do výchozí role podniku. */}
-              {(smiPrirazovat ? [['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']] : [['employee', 'Zaměstnanec']]).map(([val, label]) => (
+              {(smiPozvatVedeni ? [['employee', 'Zaměstnanec'], ['employer', 'Vedoucí']] : [['employee', 'Zaměstnanec']]).map(([val, label]) => (
                 <button key={val} type="button" onClick={() => setInviteRole(val)}
                   className={`filter-pill ${inviteRole === val ? 'seg-on' : 'seg-off'}`}>
                   {label}
@@ -827,13 +842,13 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                           Profil
                         </button>
                       )}
-                      {smiUpravitClena && (
+                      {smiUpravitClena && !nadeMnou(m) && (
                       <button onClick={() => startEdit(m)}
                         className="rounded-full glass border border-black/10 hover:bg-black/[0.06] text-[#16181A] px-4 py-2 text-sm font-medium transition whitespace-nowrap">
                         Upravit
                       </button>
                       )}
-                      {smiOdebrat && (
+                      {smiOdebrat && !nadeMnou(m) && m.id !== user.id && (
                       <button onClick={() => setRemoveTarget(m)}
                         className="rounded-full px-4 py-2 text-sm font-medium text-bad-ink hover:bg-bad/10 transition whitespace-nowrap">
                         Odebrat
@@ -851,7 +866,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                           role podniku; co přidělit nesmím, je vidět, ale zamčené. */}
                       <Select id={`clen-role-${m.id}`} value={editRole} onChange={e => setEditRole(e.target.value)}
                         disabled={!smiPrirazovat || volbyRole.length === 0}>
-                        {editRole === '' && <option value="">{roleLabel(m.role)} (beze změny)</option>}
+                        {editRole === '' && <option value="">{nazevRole(m, role)} (beze změny)</option>}
                         <optgroup label="Přednastavené">
                           {volbyRole.filter(r => r.id == null).map(r => {
                             const z = zamekRole(r);
@@ -1008,7 +1023,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       )}
 
       {/* Public share links + their look */}
-      <ShareSettings />
+      {/* Sdílené odkazy a Noisium jen s oprávněním — bez něj by seznam
+          odkazů vypadal prázdný a „Odpojit" by potichu nic neudělalo. */}
+      {ma('sdileni.spravovat') && <ShareSettings />}
 
       {/* Payout / cash settings */}
       {ma('uzaverky.nastaveni') && (
@@ -1106,7 +1123,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Tablet: účet (kiosk.spravovat) a PINy lidí (dochazka.piny). */}
       {ma(['kiosk.spravovat', 'dochazka.piny']) && <KioskSettings />}
 
-      <NoisiumConnect />
+      {ma('integrace.spravovat') && <NoisiumConnect />}
 
       {removeTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4"

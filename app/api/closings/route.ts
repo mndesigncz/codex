@@ -33,6 +33,7 @@ function prava(c: Kontext) {
     obejitPostupy: ma('uzaverky.obejit_postupy'),
     mzdy: ma('finance.mzdy'),
     mojeMzda: ma('finance.moje_mzda'),
+    trzby: ma('finance.trzby'),
   };
 }
 
@@ -42,6 +43,22 @@ function prava(c: Kontext) {
 function bezMzdy<T extends Record<string, any>>(r: T, meId: number, p: { mzdy: boolean; mojeMzda: boolean }): T {
   if (p.mzdy || (p.mojeMzda && Number(r.created_by) === meId)) return r;
   const { wage_rate: _a, wage_earned: _b, worked_ms: _c, ...rest } = r;
+  return rest as T;
+}
+
+// Kolo 67 (oponentura): tržba z kasy patří k finance.trzby. Kdo má jen
+// uzaverky.zobrazit_vse (systémová role Provozní, vlastní role bez financí),
+// by jinak ze seznamu cizích uzávěrek sečetl denní i měsíční obrat, který mu
+// kalendář i detail záměrně skrývají. Vlastní uzávěrku autor vyplnil sám,
+// takže ji vidí celou. Vedení má finance.trzby, Barista a tablet cizí
+// uzávěrky nevidí vůbec — pro dnešní role se tedy nic nemění.
+const TRZBA_POLE = ['cash_revenue', 'card_revenue', 'tips', 'tips_card', 'closing_cash', 'expected', 'event_breakdown'] as const;
+function bezTrzby<T extends Record<string, any>>(r: T, meId: number, sTrzbou: boolean): T {
+  if (sTrzbou || Number(r.created_by) === meId) return r;
+  const rest: Record<string, any> = { ...r };
+  for (const k of TRZBA_POLE) delete rest[k];
+  // Klient pozná, že čísla chybí záměrně, ne že je autor nevyplnil.
+  rest.trzbaSkryta = true;
   return rest as T;
 }
 
@@ -137,7 +154,7 @@ export async function GET() {
     } catch { /* fall back to ids only */ }
   }
   const closings = (rows as any[]).map(r => ({
-    ...bezMzdy(r, c.meId, p),
+    ...bezTrzby(bezMzdy(r, c.meId, p), c.meId, p.trzby),
     movements: normalizeMovements(r.movements),
     denominations: normalizeDenominations(r.denominations),
     shiftEmployees: idsOf(r.shift_employees)

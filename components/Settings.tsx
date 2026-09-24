@@ -11,6 +11,8 @@ import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { okJson } from '@/lib/api';
 import { useOpravneni } from './role/useOpravneni';
+import { useStrazRole, CO_SE_ZAHODI_ROLE } from './role/rozepsano';
+import { DiscardGuard } from './ui/DiscardGuard';
 import dynamic from 'next/dynamic';
 
 // Editor rolí nese celý katalog oprávnění (přes sto šedesát položek
@@ -102,7 +104,34 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
 export default function Settings({ user, initialTab }: Props) {
   const { update } = useSession();
   const { theme, setTheme } = useTheme();
-  const [section, setSection] = useState<SectionId>(initialTab ?? 'account');
+  const [zvolena, setZvolena] = useState<SectionId>(initialTab ?? 'account');
+  // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
+  const straz = useStrazRole();
+  const setSection = (id: SectionId) => { if (id !== zvolena) straz.pokus(() => setZvolena(id)); };
+  const [account, setAccount] = useState<Account | null>(null);
+  const [loading, setLoading] = useState(true);
+  const isEmployer = (account?.role ?? user.role) === 'employer';
+  // Záložky podniku podle oprávnění (kolo 67). Vedení má všechno, takže
+  // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
+  const { ma } = useOpravneni();
+  const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
+    { id: 'account', label: 'Účet', icon: 'settings', desc: 'Profil a osobní údaje' },
+    { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
+    { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
+    { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
+    ...(isEmployer && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
+    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
+    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
+    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
+  ];
+  // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
+  // (Receptury → „Nastavit pokladnu", banner předplatného) nebo když se
+  // oprávnění načetla až po otevření. Obsah by jinak ukázal formulář
+  // a jeho dotazy by skončily 403. Místo toho Účet — ten má každý.
+  // 'team' v seznamu není, ale obsah má (správa týmu); pouští se se stejným
+  // klíčem jako pohled Nastavení týmu, ať se jeho chování nemění.
+  const povolena = sections.some(s => s.id === zvolena) || (zvolena === 'team' && isEmployer && ma('tym.zobrazit'));
+  const section: SectionId = povolena ? zvolena : 'account';
   const [interestSent, setInterestSent] = useState(false);
   // Stav nápověd se čte až v prohlížeči — server localStorage nezná.
   const [hintsOn, setHintsOn] = useState(true);
@@ -172,9 +201,6 @@ export default function Settings({ user, initialTab }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
 
-  const [account, setAccount] = useState<Account | null>(null);
-  const [loading, setLoading] = useState(true);
-
   // Account form
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('👤');
@@ -200,11 +226,6 @@ export default function Settings({ user, initialTab }: Props) {
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
   const [notifsLoaded, setNotifsLoaded] = useState(false);
-
-  const isEmployer = (account?.role ?? user.role) === 'employer';
-  // Záložky podniku podle oprávnění (kolo 67). Vedení má všechno, takže
-  // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
-  const { ma } = useOpravneni();
 
   // Plan & trial for the billing section (employer only).
   const [plan, setPlan] = useState<PlanInfo | null>(null);
@@ -360,17 +381,6 @@ export default function Settings({ user, initialTab }: Props) {
     } catch { /* ignore */ }
   };
 
-  const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
-    { id: 'account', label: 'Účet', icon: 'settings', desc: 'Profil a osobní údaje' },
-    { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
-    { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
-    { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
-    ...(isEmployer && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
-    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
-    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
-    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
-  ];
-
   const unreadCount = notifs.filter(n => !n.is_read).length;
 
   return (
@@ -379,6 +389,7 @@ export default function Settings({ user, initialTab }: Props) {
         <h1 className="t-page">Nastavení</h1>
         <p className="text-black/45 text-sm mt-1">Spravujte svůj profil, aplikaci, oznámení a zabezpečení.</p>
       </div>
+      <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
       {/* Mobile: top pills */}
       <div className="md:hidden -mx-1 flex gap-1 overflow-x-auto scrollbar-thin pb-1 px-1">

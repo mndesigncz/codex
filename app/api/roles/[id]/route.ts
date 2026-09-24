@@ -53,11 +53,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const [t] = await sql`SELECT vychozi_role_id FROM teams WHERE id = ${c.teamId}`;
     if (Number(t?.vychozi_role_id) === role.id) {
+      // Výchozí role smí být jen typu zaměstnanec (viz roles/vychozi) —
+      // změnou typu by se to obešlo.
+      if (typ !== 'zamestnanec') return NextResponse.json({ error: 'Tohle je výchozí role pro nové členy a ta musí zůstat typu zaměstnanec. Nejdřív nastav jinou výchozí roli.' }, { status: 400 });
       const vy = smiBytVychozi(opravneni);
       if (!vy.ok) return NextResponse.json({ error: `Tohle je výchozí role pro nové členy a ${vy.proc}. Nejdřív nastav jinou výchozí roli.` }, { status: 400 });
     }
   } catch { /* před migrací */ }
 
+  // Tablet je jiný druh účtu, ne sada práv: přepnout na něj roli, kterou
+  // drží lidé, by z jejich osobních účtů udělalo tablety (a naopak).
+  if (typ !== role.typ && (typ === 'kiosk' || role.typ === 'kiosk') && (await drzitele(c.teamId, role.id)).length) {
+    return NextResponse.json({ error: 'Roli, kterou už někdo má, nejde přepnout na tablet ani z tabletu. Vytvoř novou roli.' }, { status: 409 });
+  }
   await sql`
     UPDATE roles SET nazev = ${nazev}, popis = ${popis}, typ = ${typ}, opravneni = ${JSON.stringify(opravneni)}::jsonb,
                      verze = verze + 1, updated_at = NOW()
@@ -91,7 +99,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (Number(t?.vychozi_role_id) === role.id) return NextResponse.json({ error: 'Tohle je výchozí role pro nové členy — nejdřív nastav jinou.' }, { status: 409 });
   } catch { /* před migrací */ }
   // Nepřijaté pozvánky s touhle rolí dostanou výchozí roli při přijetí.
-  await sql`DELETE FROM roles WHERE id = ${role.id} AND team_id = ${c.teamId}`;
+  // Smaže jen roli, kterou mezitím nikdo nedostal: kontrola držitelů výš a
+  // DELETE nejsou v transakci a souběžné přiřazení by jinak nechalo
+  // role_id mířit do prázdna.
+  const smazano = await sql`
+    DELETE FROM roles WHERE id = ${role.id} AND team_id = ${c.teamId}
+      AND NOT EXISTS (SELECT 1 FROM team_members WHERE team_id = ${c.teamId} AND role_id = ${role.id})
+    RETURNING id` as any[];
+  if (!smazano.length) return NextResponse.json({ error: 'Roli mezitím někdo dostal — nejdřív mu dej jinou.' }, { status: 409 });
   audit(c.teamId, c.meId, 'role.delete', 'role', role.id, role.nazev);
   return NextResponse.json({ ok: true });
 }

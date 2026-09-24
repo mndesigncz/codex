@@ -52,12 +52,14 @@ export const OBLASTI: string[] = [...new Set(KATALOG.map(o => o.oblast))];
  * Tablet smí dostat jen tohle. Kdo spravuje účet tabletu, se za tablet umí
  * přihlásit — role kiosku proto nesmí nést nic, co by tím obešlo jiné role
  * (finance, tým, nastavení).
+ * chat.prime je tu proto, že tablet dnes konverzace zakládá (invariant:
+ * přechod na role mu nic nebere).
  */
 export const KIOSK_BILA_LISTINA: ReadonlySet<string> = new Set([
   'dochazka.tablet', 'uzaverky.vytvorit', 'uzaverky.za_jineho', 'uzaverky.predavka',
   'ukoly.zobrazit_tym', 'ukoly.plnit', 'postupy.zobrazit', 'postupy.spoustet',
   'sklad.zobrazit', 'sklad.zapsat_stav', 'sklad.navrhnout', 'sklad.hlasit', 'inventura.pocitat',
-  'vyroba.vyrabet', 'navody.zobrazit', 'chat.pouzivat', 'objednavky.zobrazit', 'objednavky.vyridit',
+  'vyroba.vyrabet', 'navody.zobrazit', 'chat.pouzivat', 'chat.prime', 'objednavky.zobrazit', 'objednavky.vyridit',
   'rezervace.zobrazit', 'rezervace.usadit', 'vernost.karta', 'vernost.body_z_castky', 'vernost.platba_kreditem',
   'kupony.uplatnit', 'menu.vyprodano', 'akce.zobrazit', 'akce.checklist', 'odmeny.zebricek', 'rozvrh.nahled',
 ]);
@@ -157,14 +159,15 @@ export function smiUpravitRoli(v: Volajici, puvodni: Iterable<string>, nova: Ite
 /**
  * Smí volající dát členovi roli `nova` místo `soucasna`? Nikdo nesmí
  * přidělit víc, než sám má, ani sáhnout na člena, který má víc než on.
- * Vedení (systémová role) mění jen vlastník — dva vedoucí se stejnou
- * sadou by se jinak mohli navzájem sesadit.
+ * Roli Vedení smí dát i vzít každý, kdo sám má celou její sadu — dnes to
+ * smí každý vedoucí a přechod na role mu to nebere (invariant). Proti
+ * sesazení nadřízeného chrání jen porovnání sad: kdo má víc než volající,
+ * na toho volající nesáhne.
  */
 export function smiPriraditRoli(v: Volajici, cil: { jeVlastnik: boolean; jeTo: boolean; soucasna: Iterable<string>; soucasnaKlic?: string | null }, nova: { opravneni: Iterable<string>; klic?: string | null }): Verdikt {
   if (cil.jeVlastnik) return ne('Vlastníkovi podniku roli změnit nejde.');
   if (v.jeVlastnik) return ano;
   if (cil.jeTo) return ne('Svou vlastní roli si změnit nemůžeš.');
-  if (cil.soucasnaKlic === 'vedeni' || nova.klic === 'vedeni') return ne('Roli Vedení dává a bere jen vlastník podniku.');
   const mimoCil = navic(cil.soucasna, v.opravneni);
   if (mimoCil.length) return ne('Tenhle člověk má oprávnění, která ty nemáš — jeho roli změní jen někdo nad ním.');
   const mimoNova = navic(nova.opravneni, v.opravneni);
@@ -172,11 +175,14 @@ export function smiPriraditRoli(v: Volajici, cil: { jeVlastnik: boolean; jeTo: b
   return ano;
 }
 
-/** Smí volající upravit nebo odebrat člena? Stejná logika jako u role, bez nové sady. */
+/**
+ * Smí volající upravit nebo odebrat člena? Stejná logika jako u role, bez
+ * nové sady. Vedoucí smí spravovat jiného vedoucího (jako dnes), jen ne
+ * člověka, který má oprávnění navíc proti němu.
+ */
 export function smiSpravovatClena(v: Volajici, cil: { jeVlastnik: boolean; jeTo: boolean; soucasna: Iterable<string>; soucasnaKlic?: string | null }): Verdikt {
   if (cil.jeVlastnik) return ne('Vlastníka podniku upravit ani odebrat nejde.');
   if (v.jeVlastnik) return ano;
-  if (cil.soucasnaKlic === 'vedeni') return ne('Člověka s rolí Vedení upravuje jen vlastník podniku.');
   if (navic(cil.soucasna, v.opravneni).length) return ne('Tenhle člověk má oprávnění, která ty nemáš.');
   return ano;
 }

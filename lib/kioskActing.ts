@@ -3,7 +3,8 @@
 // messages land on their account instead of the anonymous tablet user.
 //
 // SECURITY: the impersonation is honoured ONLY when
-//   1. the session role is 'kiosk',
+//   1. the session role is 'kiosk' AND the session account really is the
+//      tablet (users.role = 'kiosk' in the database — see jeUcetTabletu),
 //   2. the target user belongs to the same team,
 //   3. the target is currently clocked in (open time entry).
 // Anything else silently falls back to the session user.
@@ -27,6 +28,26 @@ export function actingIdFromCookie(req: Request): number | null {
   return Number.isFinite(id) ? id : null;
 }
 
+/**
+ * Je účet skutečně tablet podniku? Rozhoduje users.role = 'kiosk' v databázi
+ * (tak tablet zakládá /api/kiosk), NE typ role člena. Od kola 67 jde roli
+ * typu Tablet vytvořit i přidělit — a kdyby o jednání za ostatní
+ * rozhodoval typ role, dostal by člověk s takovou rolí na vlastním telefonu
+ * možnost plnit úkoly, zapisovat sklad a měnit postupy za kohokoli
+ * odpíchnutého, bez PINu. Při chybě dotazu je odpověď „ne".
+ */
+export async function jeUcetTabletu(userId: number, teamId?: number | null): Promise<boolean> {
+  if (!Number.isFinite(userId)) return false;
+  try {
+    const [u] = teamId != null
+      ? await sql`SELECT role FROM users WHERE id = ${userId} AND team_id = ${teamId}`
+      : await sql`SELECT role FROM users WHERE id = ${userId}`;
+    return u?.role === 'kiosk';
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveActingUser(
   meId: number,
   role: string,
@@ -40,7 +61,8 @@ export async function resolveActingUser(
   const parsed = parseInt(String(explicit ?? ''), 10);
   if (Number.isFinite(parsed) && parsed > 0) candidate = parsed;
   if (candidate == null && req) candidate = actingIdFromCookie(req);
-  if (candidate == null) return meId;
+  if (candidate == null || candidate === meId) return meId;
+  if (!(await jeUcetTabletu(meId, teamId))) return meId;
 
   try {
     // Kolo 62: příslušnost podle členství nebo zrcadla (tablet helper

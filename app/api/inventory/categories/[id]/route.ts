@@ -17,7 +17,7 @@ const sql = neon(process.env.DATABASE_URL!);
 async function currentUser() {
   const c = await pozaduj('sklad.kategorie');
   if (jeOdpoved(c)) return c;
-  return { meId: c.meId, teamId: c.teamId };
+  return { meId: c.meId, teamId: c.teamId, smiCenu: c.role.opravneni.has('sklad.ceny_upravit') };
 }
 
 /**
@@ -132,6 +132,14 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // still take the rest of the edit.
   if (body.defaults !== undefined) {
     const defaults = normalizeDefaults(body.defaults);
+    // Nákupní cenu v předvyplnění mění jen `sklad.ceny_upravit`. Kdo ji
+    // nevidí (GET mu ji neposílá), by jinak uložením kategorie cenu smazal —
+    // proto se mu ponechá ta uložená. Vedení má klíč, pro něj beze změny.
+    if (!me.smiCenu) {
+      const puvodni = normalizeDefaults(cat.defaults);
+      if (puvodni.unitCost != null) defaults.unitCost = puvodni.unitCost;
+      else delete defaults.unitCost;
+    }
     try {
       await sql`
         UPDATE inventory_categories SET defaults = ${JSON.stringify(defaults)}::jsonb

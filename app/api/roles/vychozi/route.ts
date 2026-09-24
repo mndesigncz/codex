@@ -1,6 +1,8 @@
 // Výchozí role pro nové členy (kód pro připojení, pozvánka bez role).
 // Dostane ji každý, kdo zná kód — proto nesmí nést citlivá oprávnění ani
 // správu týmu (smiBytVychozi), a volající ji musí sám „pokrýt".
+// Typ smí být jen zaměstnanec: typ vedení by novému členovi otevřel
+// rozhraní vedení (employer) a typ kiosk patří jen účtu tabletu.
 
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
@@ -19,11 +21,12 @@ export async function PUT(request: Request) {
   if (b?.roleId != null) {
     const r = (await vlastniRole(c.teamId)).find(x => x.id === Number(b.roleId));
     if (!r) return NextResponse.json({ error: 'Role nenalezena.' }, { status: 404 });
-    if (r.typ === 'kiosk') return NextResponse.json({ error: 'Roli tabletu nejde dát jako výchozí.' }, { status: 400 });
+    if (r.typ !== 'zamestnanec') return NextResponse.json({ error: r.typ === 'kiosk' ? 'Roli tabletu nejde dát jako výchozí.' : 'Výchozí role musí být typu zaměstnanec — role typu vedení otevírá rozhraní vedení každému, kdo zná kód.' }, { status: 400 });
     sada = r.opravneni; roleId = r.id; nazev = r.nazev;
   } else {
     const r = systemovaRole(b?.klic);
-    if (!r || r.typ === 'kiosk') return NextResponse.json({ error: 'Neznámá role.' }, { status: 400 });
+    if (!r) return NextResponse.json({ error: 'Neznámá role.' }, { status: 400 });
+    if (r.typ !== 'zamestnanec') return NextResponse.json({ error: r.typ === 'kiosk' ? 'Roli tabletu nejde dát jako výchozí.' : 'Výchozí role musí být typu zaměstnanec — role typu vedení otevírá rozhraní vedení každému, kdo zná kód.' }, { status: 400 });
     sada = r.opravneni; klic = r.klic; nazev = r.nazev;
   }
   const vy = smiBytVychozi(sada);

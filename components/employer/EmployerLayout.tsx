@@ -27,6 +27,7 @@ import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
+import { useStrazRole, CO_SE_ZAHODI_ROLE } from '../role/rozepsano';
 
 // Pohledy se stahují až při otevření.
 //
@@ -135,7 +136,12 @@ export default function EmployerLayout({ user }: Props) {
   const { plan } = usePlan();
   const { ma, role } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
-  const [currentView, setCurrentView] = useState('overview');
+  const [currentView, setCurrentViewRaw] = useState('overview');
+  // Rozepsaná role v Nastavení (editor sedí na stránce, ne v okně): přechod
+  // na jiný pohled nebo do jiného režimu ji odmontuje, takže se nejdřív
+  // zeptá. Přechod na tentýž pohled nic neodmontuje, ten projde rovnou.
+  const straz = useStrazRole();
+  const setCurrentView = (v: string) => { if (v === currentView) setCurrentViewRaw(v); else straz.pokus(() => setCurrentViewRaw(v)); };
   // TO GO vs. full administration. Phones default to TO GO (the pocket view);
   // the choice is remembered and the switch is always one tap away.
   const [appMode, setAppMode] = useState<'togo' | 'full' | 'client' | null>(null);
@@ -167,8 +173,11 @@ export default function EmployerLayout({ user }: Props) {
     if (window.innerWidth < 1024) setSidebarOpen(false);
   }, []);
   const switchMode = (m: 'togo' | 'full' | 'client') => {
-    setAppMode(m);
-    try { localStorage.setItem('managero-app-mode', m); } catch { /* ignore */ }
+    const prepni = () => {
+      setAppMode(m);
+      try { localStorage.setItem('managero-app-mode', m); } catch { /* ignore */ }
+    };
+    if (m === appMode) prepni(); else straz.pokus(prepni);
   };
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
@@ -201,6 +210,10 @@ export default function EmployerLayout({ user }: Props) {
     } catch { return 'Nepodařilo se spojit se serverem.'; }
   };
   const navigate = (view: string, arg?: string) => {
+    if (view !== currentView) { straz.pokus(() => naviguj(view, arg)); return; }
+    naviguj(view, arg);
+  };
+  const naviguj = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
@@ -209,13 +222,13 @@ export default function EmployerLayout({ user }: Props) {
     // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
     // hledal dál sám.
     setSettingsTab(view === 'settings' ? arg : undefined);
-    setCurrentView(view);
+    setCurrentViewRaw(view);
   };
   // Deep links from notifications and old bookmarks: /employer/overview?view=X
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const v = p.get('view');
-    if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentView(v);
+    if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentViewRaw(v);
     const g = Number(p.get('guide'));
     if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
@@ -236,7 +249,7 @@ export default function EmployerLayout({ user }: Props) {
     // nezahrnuje — poctivý stav místo 403 uvnitř obrazovky.
     if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('overview')} />;
     switch (currentView) {
-      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} />;
+      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} smiPohled={smiPohled} />;
       case 'shifts':    return (
         <div>
           <ScheduleBuilder user={user as any} onNavigate={navigate} />
@@ -274,7 +287,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} />;
       case 'team-settings': return <TeamManagement user={user as any} />;
-      default:          return <EmployerDashboard user={user as any} onNavigate={navigate} />;
+      default:          return <EmployerDashboard user={user as any} onNavigate={navigate} smiPohled={smiPohled} />;
     }
   };
 
@@ -337,6 +350,7 @@ export default function EmployerLayout({ user }: Props) {
           user={user as any}
           onExit={() => switchMode('full')}
           onOpenView={(v, arg) => { switchMode('full'); navigate(v, arg); }}
+          smiPohled={smiPohled}
         />
       </ProfileLinkProvider>
     );
@@ -345,6 +359,7 @@ export default function EmployerLayout({ user }: Props) {
   return (
     <ProfileLinkProvider>
     <div className="flex h-[100dvh] overflow-hidden">
+      <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
       {/* Desktop sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-3.5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>

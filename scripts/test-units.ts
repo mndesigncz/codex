@@ -972,7 +972,6 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   eq('řazení: vlastní první, pak position, pak id', seradVlastniPrvni([{ id: 5, team_id: 9, position: 0 }, { id: 3, team_id: 2, position: 2 }, { id: 4, team_id: 2, position: 1 }, { id: 1, team_id: 9, position: 0 }], 2).map(r => r.id), [4, 3, 1, 5]);
 }
 
-// Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
 // ---- Role a oprávnění (kolo 67) ----
 {
   const ids = new Set(VSECHNA);
@@ -1003,13 +1002,24 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   ok('přiřazení: nejde sáhnout na člena s víc právy', !smiPriraditRoli(V, clen(['finance.mzdy']), { opravneni: barista }).ok);
   ok('přiřazení: vlastníkovi roli nezmění nikdo', !smiPriraditRoli({ jeVlastnik: true, opravneni: VSECHNA }, clen([], { jeVlastnik: true }), { opravneni: barista }).ok);
   ok('přiřazení: sám sobě roli nezmění', !smiPriraditRoli(V, clen(barista, { jeTo: true }), { opravneni: barista }).ok);
-  ok('přiřazení: Vedení dává jen vlastník', !smiPriraditRoli({ jeVlastnik: false, opravneni: VSECHNA }, clen(barista), { opravneni: VSECHNA, klic: 'vedeni' }).ok);
-  ok('přiřazení: dva vedoucí se navzájem nesesadí', !smiSpravovatClena({ jeVlastnik: false, opravneni: VSECHNA }, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  // Invariant: dnes smí každý vedoucí dát i vzít Vedení a spravovat jiného
+  // vedoucího. Chrání jen porovnání sad — na člověka s víc právy nesáhne.
+  const vedouci = { jeVlastnik: false, opravneni: VSECHNA };
+  ok('přiřazení: vedoucí (ne vlastník) dá roli Vedení', smiPriraditRoli(vedouci, clen(barista), { opravneni: VSECHNA, klic: 'vedeni' }).ok);
+  ok('přiřazení: vedoucí vezme jinému vedoucímu Vedení', smiPriraditRoli(vedouci, clen(VSECHNA, { soucasnaKlic: 'vedeni' }), { opravneni: barista, klic: 'barista' }).ok);
+  ok('přiřazení: vedoucí spravuje jiného vedoucího se stejnou sadou', smiSpravovatClena(vedouci, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  ok('přiřazení: provozní nedá Vedení (nemá celou sadu)', !smiPriraditRoli(V, clen(barista), { opravneni: VSECHNA, klic: 'vedeni' }).ok);
+  ok('přiřazení: provozní nesáhne na vedoucího (víc práv)', !smiSpravovatClena(V, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  ok('přiřazení: vedoucí bez jednoho klíče nesáhne na plné Vedení', !smiSpravovatClena({ jeVlastnik: false, opravneni: VSECHNA.filter(x => x !== 'finance.mzdy') }, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  // Tablet dnes zakládá konverzace — role Kiosk o to nesmí přijít.
+  ok('oprávnění: Kiosk smí zakládat konverzace (chat.prime)', SYSTEMOVE_ROLE.find(r => r.klic === 'kiosk')!.opravneni.includes('chat.prime') && KIOSK_BILA_LISTINA.has('chat.prime'));
+  ok('eskalace: vlastní role tabletu smí mít chat.prime', smiUpravitRoli({ jeVlastnik: true, opravneni: VSECHNA }, [], ['chat.pouzivat', 'chat.prime'], { typ: 'kiosk' }).ok);
   ok('výchozí role: Barista smí být výchozí', smiBytVychozi(barista).ok);
   ok('výchozí role: s tym.pozvat ne', !smiBytVychozi(['tym.zobrazit', 'tym.pozvat']).ok);
   ok('výchozí role: s citlivým oprávněním ne', !smiBytVychozi(['finance.mzdy']).ok);
 }
 
+// Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
 // souboru — všechno pod ní se sice vypsalo, ale do návratového kódu se
 // nepromítlo, takže `npm test` mohl skončit nulou s křížky na obrazovce.
 Promise.all(pending).then(() => {

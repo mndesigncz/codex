@@ -22,10 +22,36 @@ export async function GET() {
   // Aktivní podnik z databáze (pozaduj), stejně jako POST a DELETE.
   // token is included so the employer can copy a working join link and share
   // it directly (email delivery is best-effort and may be unconfigured).
-  // Token je klíč do podniku — vidí ho jen ten, kdo smí zvát (tym.pozvat).
-  const invitations = await sql`
-    SELECT id, email, job_title, status, token, created_at FROM invitations
-    WHERE team_id = ${c.teamId} ORDER BY created_at DESC`;
+  // Token je klíč do podniku: kdo ho má, pozvánku přijme sám, s heslem,
+  // které si zvolí, a dostane roli, kterou pozvánce dal ZVOUCÍ. Proto ho
+  // nevidí každý s tym.pozvat — jen ten, kdo pozvánku vytvořil, nebo kdo by
+  // stejnou roli smíl dát sám. Jinak by člověk s vlastní rolí „smí zvát"
+  // přečetl token vlastníkovy pozvánky do Vedení a přišel si pro ni.
+  let rows: any[];
+  try {
+    rows = await sql`
+      SELECT id, email, job_title, status, token, created_at, role, invited_by FROM invitations
+      WHERE team_id = ${c.teamId} ORDER BY created_at DESC` as any[];
+  } catch {
+    // Před sloupcem role: všechny pozvánky jsou do výchozí role.
+    rows = await sql`
+      SELECT id, email, job_title, status, token, created_at, invited_by FROM invitations
+      WHERE team_id = ${c.teamId} ORDER BY created_at DESC` as any[];
+  }
+  const V = { jeVlastnik: c.role.jeVlastnik, opravneni: c.role.opravneni };
+  const bezCile = { jeVlastnik: false, jeTo: false, soucasna: [], soucasnaKlic: null };
+  // Pozvánka „jako vedení" = přidělení role Vedení: stejná kontrola jako při
+  // jejím vytvoření v POST (tym.role_prirazovat + smiPriraditRoli). Pozvánku
+  // do výchozí role smí vytvořit každý s tym.pozvat (POST ji nijak dál
+  // neomezuje), takže její token mu nic navíc nedá.
+  const smiVedeni = c.role.opravneni.has('tym.role_prirazovat')
+    && smiPriraditRoli(V, bezCile, { opravneni: roleVedeni().opravneni, klic: 'vedeni' }).ok;
+  const invitations = rows.map(r => {
+    const jeho = r.invited_by != null && Number(r.invited_by) === c.meId;
+    const smi = jeho || (r.role === 'employer' ? smiVedeni : true);
+    const { invited_by: _zvouci, ...zbytek } = r;
+    return { ...zbytek, token: smi ? r.token : null };
+  });
   return NextResponse.json({ invitations });
 }
 

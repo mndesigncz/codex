@@ -23,10 +23,17 @@ export async function GET() {
   const muzuZalozit = activeTeamId != null ? await smiZalozitDalsiPodnik(meId, activeTeamId) : false;
   // Oprávnění v aktivním podniku (kolo 67) — klient podle nich skládá
   // navigaci a skrývá akce. Rozhoduje ale server: tohle je jen nápověda UI.
-  const r = activeTeamId != null ? await roleClena(meId, activeTeamId) : null;
+  // Když se roli nepodaří načíst (chyba DB), pošle se opravneni: null —
+  // klient pak nic neschová („ukázat vše, rozhodne server"). Prázdné pole
+  // by vedení na zbytek relace sebralo celou navigaci.
+  let r: Awaited<ReturnType<typeof roleClena>> = null;
+  let nevim = false;
+  if (activeTeamId != null) {
+    try { r = await roleClena(meId, activeTeamId); } catch { nevim = true; }
+  }
   return NextResponse.json({
     role: r ? { klic: r.klic, roleId: r.roleId, nazev: r.nazev, typ: r.typ, jeVlastnik: r.jeVlastnik } : null,
-    opravneni: r ? [...r.opravneni].sort() : [],
+    opravneni: nevim ? null : r ? [...r.opravneni].sort() : [],
     activeTeamId,
     teams,
     muzuZalozit,

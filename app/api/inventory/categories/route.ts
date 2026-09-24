@@ -12,7 +12,16 @@ const sql = neon(process.env.DATABASE_URL!);
 async function currentUser(klic: string) {
   const c = await pozaduj(klic);
   if (jeOdpoved(c)) return c;
-  return { meId: c.meId, teamId: c.teamId };
+  return { meId: c.meId, teamId: c.teamId, vidiCeny: c.role.opravneni.has('sklad.ceny') };
+}
+
+// Nákupní cena z předvyplnění kategorie je cena skladu — bez `sklad.ceny`
+// se neposílá (Barista a tablet ji v /api/inventory taky nevidí). Zbytek
+// předvyplnění (jednotka, balení, dodavatel) formulář potřebuje dál.
+function bezCeny(d: ReturnType<typeof normalizeDefaults>, vidiCeny: boolean) {
+  if (vidiCeny) return d;
+  const { unitCost: _c, ...rest } = d;
+  return rest;
 }
 
 // GET: list the team's custom categories ordered by position. Se sdílenými
@@ -78,7 +87,7 @@ export async function GET() {
     contentUnit: r.content_unit ?? null,
     defaultPackageSize: r.default_package_size != null ? Number(r.default_package_size) : null,
     thresholdUnit: r.threshold_unit === 'content' ? 'content' : 'package',
-    defaults: normalizeDefaults(r.defaults),
+    defaults: bezCeny(normalizeDefaults(r.defaults), me.vidiCeny),
     scale: r.scale ?? null,
     hideFromOverview: r.hide_from_overview === true,
   })));

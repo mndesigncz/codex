@@ -22,7 +22,13 @@ export async function GET(req: NextRequest) {
   const ctx = await pozaduj('rezervace.zobrazit');
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
-  const range = String(new URL(req.url).searchParams.get('range') ?? 'upcoming');
+  // Sdílený tablet za barem (systémová role Kiosk) má rezervace.zobrazit
+  // kvůli dnešnímu příjmu hostů. Dřív tuhle routu vůbec neviděl (hlídal ji
+  // employer()) a rezervace znal jen z dnešního inboxu — historie 100
+  // minulých a 60 dní dopředu s poznámkami hostů na zařízení, ke kterému
+  // má přístup každý u baru, nepatří. Proto jen dnešek a bez poznámky.
+  const tablet = ctx.role.typ === 'kiosk';
+  const range = tablet ? 'today' : String(new URL(req.url).searchParams.get('range') ?? 'upcoming');
   const today = pragueToday();
   const rows = range === 'today'
     ? await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date = ${today} ORDER BY r.time`
@@ -33,7 +39,12 @@ export async function GET(req: NextRequest) {
   // Kdo vidí rezervace, nemusí vidět kontakt na hosta — e-mail je osobní
   // údaj a patří jen tomu, kdo smí hostům psát (zakaznici.kontakty).
   const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
-  const reservations = kontakty ? rows : (rows as any[]).map(({ customer_email: _e, ...r }) => r);
+  const reservations = (rows as any[]).map(r => {
+    const out: Record<string, any> = { ...r };
+    if (!kontakty) delete out.customer_email;
+    if (tablet) delete out.note;
+    return out;
+  });
   return NextResponse.json({ reservations, tables, today });
 }
 

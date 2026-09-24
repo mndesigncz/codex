@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { normalizeSkipReasons, scoreRun } from '@/lib/procedureScoring';
 import { normalizePoints } from '@/lib/rewardLevels';
-import { resolveActingUser } from '@/lib/kioskActing';
+import { resolveActingUser, jeUcetTabletu } from '@/lib/kioskActing';
 import { pragueToday } from '@/lib/pragueTime';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
@@ -240,8 +240,11 @@ export async function PATCH(request: Request) {
     FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
     WHERE r.id = ${runId}`;
   // The kiosk updates runs it started on behalf of clocked-in staff, so its
-  // session may touch any run belonging to its own team.
-  const owns = run && (Number(run.user_id) === me.id || (me.role === 'kiosk' && Number(run.team_id) === me.teamId));
+  // session may touch any run belonging to its own team. Cizí běh smí jen
+  // skutečný účet tabletu (users.role = 'kiosk'), ne člověk, kterému někdo
+  // přidělil roli typu Tablet — ten by jinak měnil a rušil běhy všech.
+  const owns = run && (Number(run.user_id) === me.id
+    || (me.role === 'kiosk' && Number(run.team_id) === me.teamId && await jeUcetTabletu(me.id, me.teamId)));
   if (!owns) {
     return NextResponse.json({ error: 'Průběh nenalezen' }, { status: 404 });
   }

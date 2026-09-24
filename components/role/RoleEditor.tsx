@@ -14,15 +14,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Chip, EmptyState, ErrorState, Input, Label, Modal, SearchField, Segmented, Textarea } from '../ui';
+import { Button, Chip, DiscardGuard, EmptyState, ErrorState, Input, Label, Modal, SearchField, Segmented, Textarea } from '../ui';
 import { okJson, apiMessage, ApiError } from '@/lib/api';
-import { czCount } from '@/lib/czech';
+import { czCount, czForm, czVerb } from '@/lib/czech';
 import { obsahujeNekde } from '@/lib/hledani';
 import {
-  KATALOG, OBLASTI, KIOSK_BILA_LISTINA, sZavislostmi, bezZavislych, navic, opravneni as popisKlice,
+  KATALOG, OBLASTI, KIOSK_BILA_LISTINA, sZavislostmi, bezZavislych, navic, smiBytVychozi, opravneni as popisKlice,
   type TypRole, type Opravneni,
 } from '@/lib/opravneni';
 import { obnovOpravneni } from './useOpravneni';
+import { nastavRozepsanouRoli, CO_SE_ZAHODI_ROLE } from './rozepsano';
 
 interface SysRole { klic: string; nazev: string; popis: string; typ: TypRole; opravneni: string[]; pocet: number }
 interface VlRole { id: number; nazev: string; popis: string | null; typ: TypRole; opravneni: string[]; zdroj: string | null; pocet: number }
@@ -64,6 +65,10 @@ const nazvyKlicu = (ids: string[], max = 3) => {
 };
 
 /** Vyhodí z množiny klíče, jejichž závislosti v ní chybí (opak sZavislostmi, bez jednoho vypnutého). */
+// „Oprávnění" má ve všech třech tvarech stejnou podobu; přes czCount jde
+// kvůli jednotnosti a kvůli check-czech, které hlídá číslo před slovem.
+const OPRAVNENI = { one: 'oprávnění', few: 'oprávnění', many: 'oprávnění' };
+
 const beZDer = (sada: Iterable<string>) => bezZavislych(sada, '');
 
 export default function RoleEditor() {
@@ -113,6 +118,14 @@ export default function RoleEditor() {
       />
     );
   }
+
+  // „Nastavit jako výchozí" jen tam, kde to server přijme (vychozi/route.ts):
+  // typ zaměstnanec, nic citlivého ani správy týmu (smiBytVychozi) a nic,
+  // co volající sám nemá. Tlačítko, které vždycky skončí 400, je past —
+  // u Vedení, Provozní, Skladníka i Účetní by bylo přesně tohle.
+  const muzeBytVychozi = (r: { typ: TypRole; opravneni: string[] }) =>
+    r.typ === 'zamestnanec' && smiBytVychozi(r.opravneni).ok
+    && (ja.jeVlastnik || navic(r.opravneni, moje).length === 0);
 
   const jeVychozi = (r: { klic?: string; id?: number }) =>
     r.id != null ? data.vychozi.id === r.id : data.vychozi.id == null && data.vychozi.klic === r.klic;
@@ -192,7 +205,7 @@ export default function RoleEditor() {
                 vychozi={jeVychozi({ id: r.id })} mojeRole={ja.roleId === r.id}>
                 <Button size="sm" variant="secondary" icon={smiSpravovat ? 'pencil' : undefined}
                   onClick={() => setOtevreno({ druh: 'vlastni', role: r })}>{smiSpravovat ? 'Upravit' : 'Zobrazit'}</Button>
-                {smiSpravovat && r.typ !== 'kiosk' && !jeVychozi({ id: r.id }) && (
+                {smiSpravovat && muzeBytVychozi(r) && !jeVychozi({ id: r.id }) && (
                   <Button size="sm" variant="ghost" loading={nastavujiVychozi === `v${r.id}`}
                     onClick={() => nastavVychozi({ roleId: r.id }, r.nazev)}>Nastavit jako výchozí</Button>
                 )}
@@ -217,7 +230,7 @@ export default function RoleEditor() {
                 <Button size="sm" variant="secondary" icon="copy"
                   onClick={() => setOtevreno({ druh: 'nova', predloha: predlohaZ(r, ja) })}>Zkopírovat do vlastní</Button>
               )}
-              {smiSpravovat && r.typ !== 'kiosk' && !jeVychozi({ klic: r.klic }) && (
+              {smiSpravovat && muzeBytVychozi(r) && !jeVychozi({ klic: r.klic }) && (
                 <Button size="sm" variant="ghost" loading={nastavujiVychozi === `s${r.klic}`}
                   onClick={() => nastavVychozi({ klic: r.klic }, r.nazev)}>Nastavit jako výchozí</Button>
               )}
@@ -359,7 +372,9 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
       const v = zapnout(lze.map(o => o.id));
       if ('dalsi' in v) setSada(v.dalsi);
       const zbylo = klice.length - klice.filter(o => sada.has(o.id)).length - lze.length;
-      setInfo(zbylo > 0 ? `${czCount(zbylo, { one: 'oprávnění zůstalo', few: 'oprávnění zůstala', many: 'oprávnění zůstalo' })} vypnuté — je zamčené.` : '');
+      // Shoda podle čísla: „1 … zůstalo vypnuté — je zamčené", „3 … zůstala
+      // vypnutá — jsou zamčená", „5 … zůstalo vypnutých".
+      setInfo(zbylo > 0 ? `${czCount(zbylo, OPRAVNENI)} ${czForm(zbylo, { one: 'zůstalo vypnuté — je zamčené', few: 'zůstala vypnutá — jsou zamčená', many: 'zůstalo vypnutých — jsou zamčená' })}.` : '');
     } else {
       let s: Iterable<string> = sada;
       for (const o of klice) if (sada.has(o.id) && !zamek(o.id)) s = bezZavislych(s, o.id);
@@ -379,7 +394,7 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
     const zbyva = new Set(s);
     const vypnuto = sada.size - zbyva.size;
     setSada(zbyva);
-    setInfo(vypnuto ? `Tablet nesmí mít ${czCount(vypnuto, { one: 'oprávnění', few: 'oprávnění', many: 'oprávnění' })} z původního výběru — vypnula se.` : '');
+    setInfo(vypnuto ? `Tablet nesmí mít ${czCount(vypnuto, OPRAVNENI)} z původního výběru — ${czVerb(vypnuto, 'vypnulo', 'vypnula')} se.` : '');
   };
 
   const skupiny = useMemo(() => OBLASTI.map(oblast => ({
@@ -394,9 +409,32 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
   const zmeneno = nazev !== vychoziHodnoty.nazev || popis !== vychoziHodnoty.popis || typ !== vychoziHodnoty.typ
     || sada.size !== puvodni.size || [...sada].some(k => !puvodni.has(k));
 
+  // Neuložené změny hlásí editor ven: přepnutí záložky Nastavení nebo
+  // pohledu v navigaci se pak zeptá (components/role/rozepsano.ts), místo
+  // aby editor tiše odmontovalo. Po odmontování (uloženo, zahozeno, zpět)
+  // se hlášení vždy vrátí na „nic rozepsáno".
+  const rozepsano = !jenCist && zmeneno && !ukladam;
+  useEffect(() => {
+    nastavRozepsanouRoli(rozepsano);
+    if (!rozepsano) return;
+    // Obnovení nebo zavření stránky: prohlížeč se zeptá sám.
+    const pred = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', pred);
+    return () => window.removeEventListener('beforeunload', pred);
+  }, [rozepsano]);
+  useEffect(() => () => nastavRozepsanouRoli(false), []);
+
+  // Zpět i Zrušit se ptají stejnou vrstvou jako okna — ne nativním confirm.
+  const [ptamSe, setPtamSe] = useState(false);
   const zpet = () => {
-    if (!jenCist && zmeneno && !window.confirm('Zahodit neuložené změny role?')) return;
+    if (rozepsano) { setPtamSe(true); return; }
     onZpet();
+  };
+  const strazZpet = {
+    asking: ptamSe, dirty: rozepsano,
+    keep: () => setPtamSe(false),
+    discard: () => { setPtamSe(false); nastavRozepsanouRoli(false); onZpet(); },
+    attemptClose: zpet,
   };
 
   const uloz = async (e: React.FormEvent) => {
@@ -427,6 +465,7 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
 
   return (
     <form onSubmit={uloz} className="space-y-4 pb-24 md:pb-0" aria-labelledby="role-editor-nadpis">
+      <DiscardGuard guard={strazZpet} what={CO_SE_ZAHODI_ROLE} />
       <div className="glass-card p-5 sm:p-6 space-y-5">
         <div className="flex items-start gap-3">
           <Button variant="ghost" size="sm" icon="chevron" iconOnly aria-label="Zpět na seznam rolí" className="rotate-90 shrink-0 -ml-2" onClick={zpet} />
@@ -447,7 +486,7 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
         {!!predloha?.vynechano && (
           <p className="note text-sm flex items-start gap-2">
             <Icon name="info" size={15} className="shrink-0 mt-0.5" />
-            Z předlohy jsem vynechal {czCount(predloha.vynechano, { one: 'oprávnění', few: 'oprávnění', many: 'oprávnění' })}, která sám nemáš — do role je dát nemůžeš.
+            Z předlohy jsem vynechal {czCount(predloha.vynechano, OPRAVNENI)}, {czForm(predloha.vynechano, { one: 'které', few: 'která', many: 'která' })} sám nemáš — do role {predloha.vynechano === 1 ? 'ho' : 'je'} dát nemůžeš.
           </p>
         )}
 
@@ -494,10 +533,14 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
         <div className="space-y-2">
           {skupiny.map(({ oblast, vse, shoda }) => {
             if (hleda && shoda.length === 0) return null;
+            // Při hledání se hromadně přepíná jen to, co je vidět. Jinak by
+            // „Vše" u hledání „zobrazit" zapnulo i citlivé klíče oblasti,
+            // které filtr skrývá — a člověk by to poznal až z počítadla.
+            const viditelne = hleda ? shoda : vse;
             const zapnuto = vse.filter(o => sada.has(o.id)).length;
             const rozbaleno = hleda || otevrene.has(oblast);
             const idOblasti = `oblast-${OBLASTI.indexOf(oblast)}`;
-            const odemcene = vse.filter(o => !zamek(o.id));
+            const odemcene = viditelne.filter(o => !zamek(o.id));
             const vseZapnute = odemcene.length > 0 && odemcene.every(o => sada.has(o.id));
             return (
               <div key={oblast} className="rounded-2xl border border-black/[0.07] overflow-hidden">
@@ -512,11 +555,11 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
                   </button>
                   {!jenCist && odemcene.length > 0 && (
                     <Button size="sm" variant="ghost" className="shrink-0"
-                      aria-label={`${vseZapnute ? 'Vypnout' : 'Zapnout'} vše v oblasti ${oblast}`}
-                      onClick={() => prepniOblast(vse, !vseZapnute)}>
+                      aria-label={`${vseZapnute ? 'Vypnout' : 'Zapnout'} ${hleda ? 'nalezená oprávnění' : 'vše'} v oblasti ${oblast}`}
+                      onClick={() => prepniOblast(viditelne, !vseZapnute)}>
                       {/* Na telefonu by „Zapnout vše" ukouslo název oblasti. */}
-                      <span className="sm:hidden">{vseZapnute ? 'Vypnout' : 'Vše'}</span>
-                      <span className="hidden sm:inline">{vseZapnute ? 'Vypnout vše' : 'Zapnout vše'}</span>
+                      <span className="sm:hidden">{vseZapnute ? 'Vypnout' : hleda ? 'Nalezená' : 'Vše'}</span>
+                      <span className="hidden sm:inline">{vseZapnute ? (hleda ? 'Vypnout nalezená' : 'Vypnout vše') : (hleda ? 'Zapnout nalezená' : 'Zapnout vše')}</span>
                     </Button>
                   )}
                 </div>

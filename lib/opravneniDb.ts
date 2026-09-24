@@ -12,7 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { authOptions } from './auth';
 import {
   SYSTEMOVE_ROLE, VSECHNA, roleZTypu, systemovaRole, vycisti, sZavislostmi,
-  type TypRole,
+  type TypRole, type SystemovaRole,
 } from './opravneni';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -43,40 +43,67 @@ export function zneplatniOpravneni(userId?: number, teamId?: number): void {
 /**
  * Role a oprávnění člena v podniku, nebo null, když členem není.
  * Vlastník podniku má vždy celý katalog, ať má v členství cokoli.
+ * Při chybě databáze vyhodí (null znamená jen „opravdu není člen").
  */
 export async function roleClena(userId: number, teamId: number, opts: { cerstve?: boolean } = {}): Promise<RoleClena | null> {
   if (!Number.isFinite(userId) || !Number.isFinite(teamId)) return null;
   const k = `${userId}:${teamId}`;
   const c = cache.get(k);
   if (!opts.cerstve && c && Date.now() - c.at < TTL_MS) return c.v;
+  // Výjimka z nactiRoli projde dál a do cache se nic nezapíše: „nevím"
+  // se nesmí na 5 s proměnit v „není člen".
   const v = await nactiRoli(userId, teamId);
   cache.set(k, { at: Date.now(), v });
   return v;
 }
 
+/**
+ * Chyba „tabulka/sloupec neexistuje" (Postgres 42P01 / 42703) — databáze
+ * ještě neprošla migrací kola 67. Jen ta smí spadnout na starší dotaz;
+ * cokoli jiného (výpadek Neonu, timeout) je „nevím" a musí se propagovat,
+ * jinak by přechodná chyba z člověka udělala nečlena nebo mu dala roli
+ * podle typu účtu.
+ */
+const jePredMigraci = (e: unknown): boolean => {
+  const kod = (e as { code?: unknown } | null)?.code;
+  return kod === '42P01' || kod === '42703';
+};
+
+/**
+ * Načte roli z databáze. Při chybě DB (mimo stav před migrací) VYHODÍ —
+ * volající (roleClena) pak nic necachuje a brána vrátí 503, klient zůstane
+ * v režimu „ukázat vše, rozhodne server".
+ */
 async function nactiRoli(userId: number, teamId: number): Promise<RoleClena | null> {
   let m: any = null;
-  let t: any = null;
   try {
     [m] = await sql`
       SELECT m.role, m.role_id, m.role_klic, r.nazev AS r_nazev, r.typ AS r_typ, r.opravneni AS r_opravneni
       FROM team_members m LEFT JOIN roles r ON r.id = m.role_id AND r.team_id = m.team_id
       WHERE m.user_id = ${userId} AND m.team_id = ${teamId}`;
-  } catch {
+  } catch (e) {
+    if (!jePredMigraci(e)) throw e;
     // Před migrací kola 67 (roles, role_id ještě nejsou): role z typu účtu.
-    try { [m] = await sql`SELECT role FROM team_members WHERE user_id = ${userId} AND team_id = ${teamId}`; } catch { m = null; }
+    try { [m] = await sql`SELECT role FROM team_members WHERE user_id = ${userId} AND team_id = ${teamId}`; }
+    catch (e2) { if (!jePredMigraci(e2)) throw e2; m = null; }
+  }
+  // Zrcadlo users.role pro AKTIVNÍ podnik (users.team_id = teamId). Čte se,
+  // jen když je potřeba: bez členství (viz níž), nebo když členství nemá
+  // vybranou roli a typ se může rozcházet se zrcadlem.
+  const bezVybraneRole = m != null && m.role_id == null && !m.role_klic;
+  let u: any = null;
+  if (!m || (bezVybraneRole && m.role !== 'employer')) {
+    try { [u] = await sql`SELECT role FROM users WHERE id = ${userId} AND team_id = ${teamId}`; }
+    catch (e) { if (!jePredMigraci(e)) throw e; u = null; }
   }
   // Členství NEBO zrcadlo (stejná definice jako clenovePodniku v lib/tenant):
   // tablet nemá řádek v team_members (zakládá se jen v users) a starší účty,
   // které se od zavedení členství nepřihlásily, taky ne. Host (customer)
   // se zrcadlem projít nesmí.
-  if (!m) {
-    try {
-      const [u] = await sql`SELECT role FROM users WHERE id = ${userId} AND team_id = ${teamId}`;
-      if (u && (u.role === 'kiosk' || u.role === 'employer' || u.role === 'employee')) m = { role: u.role };
-    } catch { /* bez zrcadla není člen */ }
-  }
-  try { [t] = await sql`SELECT owner_id, show_team_schedule FROM teams WHERE id = ${teamId}`; } catch { t = null; }
+  if (!m && u && (u.role === 'kiosk' || u.role === 'employer' || u.role === 'employee')) m = { role: u.role };
+  let t: any = null;
+  try { [t] = await sql`SELECT owner_id, show_team_schedule FROM teams WHERE id = ${teamId}`; }
+  catch (e) { if (!jePredMigraci(e)) throw e; t = null; }
   const jeVlastnik = t != null && Number(t.owner_id) === userId;
   if (!m && !jeVlastnik) return null;
 
@@ -89,7 +116,21 @@ async function nactiRoli(userId: number, teamId: number): Promise<RoleClena | nu
     const typ: TypRole = m.r_typ === 'vedeni' || m.r_typ === 'kiosk' ? m.r_typ : 'zamestnanec';
     return { userId, teamId, jeVlastnik, klic: null, roleId: Number(m.role_id), nazev: String(m.r_nazev), typ, opravneni: new Set(sZavislostmi(vycisti(raw))) };
   }
-  const sys = systemovaRole(m.role_klic) ?? roleZTypu(m.role);
+  let sys: SystemovaRole;
+  if (m.role_id != null) {
+    // role_id ukazuje do prázdna (role smazaná souběžně s přiřazením, nebo
+    // patří jinému podniku). Typ účtu (employer u role typu vedeni) tady
+    // nerozhoduje — to by z omezené role udělalo plné Vedení. Bezpečné
+    // minimum je Barista, tedy to, co dostane každý nový člen.
+    sys = systemovaRole('barista')!;
+  } else if (bezVybraneRole && m.role !== 'employer' && u?.role === 'employer') {
+    // Nesoulad typu: v aktivním podniku člověk vystupuje jako vedení
+    // (users.role = employer), jen členství zůstalo na starším typu. Dnes
+    // má práva vedení, přechod na role mu je nesmí vzít (invariant).
+    sys = roleZTypu('employer');
+  } else {
+    sys = systemovaRole(m.role_klic) ?? roleZTypu(m.role);
+  }
   const opr = new Set(sys.opravneni);
   // Podnik, který zaměstnancům schoval rozvrh týmu (dřívější přepínač),
   // ho schovává dál — přepínač teď znamená „Barista bez náhledu rozvrhu".
@@ -116,7 +157,11 @@ export async function clenoveSOpravnenim(teamId: number, klic: string): Promise<
     if (t?.owner_id != null && !ids.includes(Number(t.owner_id))) ids.push(Number(t.owner_id));
   } catch { return []; }
   const out: number[] = [];
-  for (const id of ids) if (await maOpravneni(id, teamId, klic)) out.push(id);
+  for (const id of ids) {
+    // Upozornění jsou doplněk — když se u někoho nepodaří ověřit roli,
+    // nedostane ho (neposílá se naslepo), ale ostatní ano.
+    try { if (await maOpravneni(id, teamId, klic)) out.push(id); } catch { /* přeskočit */ }
+  }
   return out;
 }
 
@@ -131,13 +176,17 @@ export async function pozaduj(klic: string | string[] | null): Promise<Kontext |
   const s = await getServerSession(authOptions);
   if (!s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
   const meId = parseInt((s.user as any).id);
+  // Chyba databáze je 503 „zkus znovu", ne 403 — jinak by přechodný
+  // výpadek vypadal jako odebraná práva.
+  const nevim = () => NextResponse.json({ error: 'Oprávnění se teď nepodařilo ověřit. Zkus to za chvíli znovu.' }, { status: 503 });
   let teamId: number | null = null;
   try {
     const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
     teamId = u?.team_id != null ? Number(u.team_id) : null;
-  } catch { teamId = null; }
+  } catch { return nevim(); }
   if (teamId == null) return NextResponse.json({ error: 'Nejsi v žádném podniku.' }, { status: 403 });
-  const role = await roleClena(meId, teamId);
+  let role: RoleClena | null;
+  try { role = await roleClena(meId, teamId); } catch { return nevim(); }
   if (!role) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const klice = klic == null ? [] : Array.isArray(klic) ? klic : [klic];
   // Pole = stačí kterékoli z nich (např. uzávěrka: vlastní NEBO všechny).

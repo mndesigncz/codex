@@ -2003,12 +2003,13 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
  {
   "klic": "kiosk",
   "nazev": "Kiosk (tablet)",
-  "popis": "Systémová role pouze pro účty typu kiosk. Nejde přiřadit osobě a vlastní role nesmí kombinovat dochazka.tablet s finance.*. Vlastni.* má jen v rozsahu profil a notifikace. Odpovídá dnešnímu chování tabletu: píchání s PINem, uzávěrka za kohokoli, všechny úkoly týmu, postupy za osobu, sklad, inventura, výroba, příjem objednávek a rezervací, kartička hosta, vyprodáno, akce, žebříček.",
+  "popis": "Systémová role pouze pro účty typu kiosk. Nejde přiřadit osobě a vlastní role nesmí kombinovat dochazka.tablet s finance.*. Vlastni.* má jen v rozsahu profil a notifikace. Odpovídá dnešnímu chování tabletu: píchání s PINem, uzávěrka za kohokoli, všechny úkoly týmu, postupy za osobu, sklad, inventura, výroba, příjem objednávek a rezervací, kartička hosta, vyprodáno, akce, žebříček, týmový chat včetně zakládání konverzací.",
   "typ": "kiosk",
   "opravneni": [
    "akce.checklist",
    "akce.zobrazit",
    "chat.pouzivat",
+   "chat.prime",
    "dochazka.tablet",
    "inventura.pocitat",
    "kupony.uplatnit",
