@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
-import { vedeniPodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id, name FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null, name: u?.name as string };
-}
+// Vlastní žádosti má každý člen; volno týmu (i typ „nemoc", tedy zdravotní
+// údaj) jen s volno.zobrazit, rozhodování s volno.schvalovat.
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -26,13 +18,15 @@ const shape = (r: any) => ({
   employeeName: r.employee_name ?? null, employeeAvatar: r.employee_avatar ?? null,
 });
 
-// GET — employee: own requests; employer: whole team's.
+// GET — bez volno.zobrazit vlastní žádosti, s ním celý tým.
 export async function GET() {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ requests: [] });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  // Pole se dál jmenuje isEmployer kvůli klientům (TimeOffApprovals podle něj
+  // ukáže panel); znamená „odpověď nese žádosti týmu".
+  const isEmployer = c.role.opravneni.has('volno.zobrazit');
   try {
-    const rows = c.role === 'employer'
+    const rows = isEmployer
       ? await sql`
           SELECT t.*, u.name AS employee_name, u.avatar AS employee_avatar
           FROM time_off_requests t
@@ -44,18 +38,19 @@ export async function GET() {
           SELECT t.* FROM time_off_requests t
           WHERE t.employee_id = ${c.meId}
           ORDER BY t.from_date DESC LIMIT 50`;
-    return NextResponse.json({ requests: rows.map(shape), isEmployer: c.role === 'employer' });
+    return NextResponse.json({ requests: rows.map(shape), isEmployer });
   } catch {
-    return NextResponse.json({ requests: [], isEmployer: c.role === 'employer' });
+    return NextResponse.json({ requests: [], isEmployer });
   }
 }
 
-// POST — create a request (employee or employer for themselves).
+// POST — vlastní žádost o volno (kdokoli s osobním účtem, ne tablet).
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
-  if (c.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  if (c.role.typ === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  let jmeno = 'Kolega';
+  try { const [u] = await sql`SELECT name FROM users WHERE id = ${c.meId}`; if (u?.name) jmeno = String(u.name); } catch { /* jen do upozornění */ }
 
   const b = await req.json().catch(() => ({}));
   const from = String(b.fromDate ?? '');
@@ -69,12 +64,13 @@ export async function POST(req: NextRequest) {
     VALUES (${c.teamId}, ${c.meId}, ${from}, ${to}, ${type}, ${b.note || null})
     RETURNING *`;
 
-  // Vedení podle členství (kolo 62): vedoucí přepnutý jinam žádost jinak neuvidí.
+  // Kdo volno schvaluje (kolo 67), podle členství (kolo 62): vedoucí
+  // přepnutý jinam žádost jinak neuvidí.
   try {
-    const employers = await vedeniPodniku(c.teamId, { krome: c.meId });
+    const employers = (await clenoveSOpravnenim(c.teamId, 'volno.schvalovat')).filter(id => id !== c.meId);
     await notifyUsers(employers, {
       title: 'Žádost o volno',
-      body: `${c.name}: ${from === to ? from : `${from} až ${to}`}`,
+      body: `${jmeno}: ${from === to ? from : `${from} až ${to}`}`,
       type: 'info',
       category: 'shift',
       link: '/employer/overview?view=shifts',
@@ -84,11 +80,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, request: shape(row) });
 }
 
-// PATCH (employer) — approve / reject: { id, status: 'approved'|'rejected' }.
+// PATCH (volno.schvalovat) — approve / reject: { id, status: 'approved'|'rejected' }.
 export async function PATCH(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('volno.schvalovat');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
@@ -134,15 +129,15 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true, request: shape(row) });
 }
 
-// DELETE ?id= — the author cancels their own pending request; the employer
-// may cancel ANY request (approved holidays included), the person is told.
+// DELETE ?id= — the author cancels their own pending request; kdo volno
+// schvaluje, smí zrušit JAKOUKOLI žádost (i schválenou dovolenou), the person is told.
 export async function DELETE(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  if (c.role === 'employer') {
+  if (c.role.opravneni.has('volno.schvalovat')) {
     const [row] = await sql`
       DELETE FROM time_off_requests
       WHERE id = ${id} AND team_id = ${c.teamId}

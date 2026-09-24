@@ -6,7 +6,8 @@
 // Delivery API se ověří dotazem na neexistující objednávku, na který smí
 // pokladna odpovědět jedině „neznám".
 import { NextResponse } from 'next/server';
-import { sql, employer, ensureProfile } from '@/lib/client';
+import { sql, ensureProfile } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { getConnection, listDesks, tableOrderState, StoryousError } from '@/lib/storyous';
 import { czCount } from '@/lib/czech';
 
@@ -18,8 +19,9 @@ export const maxDuration = 60;
 interface Krok { krok: string; ok: boolean; detail: string; kde?: string }
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('pokladna.stav');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const p = await ensureProfile(u.team_id);
   const kroky: Krok[] = [];
 

@@ -1,30 +1,38 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeDefaults } from '@/lib/itemDefaults';
 import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id ?? null;
-  return { meId, role, teamId };
+/** Kolo 67: brána oprávněním místo role z tokenu; podnik vždy z databáze. */
+async function currentUser(klic: string) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, vidiCeny: c.role.opravneni.has('sklad.ceny') };
+}
+
+// Nákupní cena z předvyplnění kategorie je cena skladu — bez `sklad.ceny`
+// se neposílá (Barista a tablet ji v /api/inventory taky nevidí). Zbytek
+// předvyplnění (jednotka, balení, dodavatel) formulář potřebuje dál.
+function bezCeny(d: ReturnType<typeof normalizeDefaults>, vidiCeny: boolean) {
+  if (vidiCeny) return d;
+  const { unitCost: _c, ...rest } = d;
+  return rest;
 }
 
 // GET: list the team's custom categories ordered by position. Se sdílenými
 // číselníky (kolo 60) přibudou i kategorie zdrojového podniku organizace —
 // vlastní první, cizí označené `zOrganizace`, ať je na každé vidět, odkud je.
+//
+// `sklad.zobrazit` — mají ho všechny tři dnešní role; kategorie čte i tablet,
+// formulář zaměstnance a výběr surovin v Návodech.
 export async function GET() {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await currentUser('sklad.zobrazit');
+  if (jeOdpoved(me)) return me;
 
   // Které podniky čteme, rozhoduje jediné místo (lib/tenant.ts); tady se pole
   // jen dosadí do predikátu. Nikdy nepřijde z požadavku. Vedle predikátu
@@ -79,17 +87,16 @@ export async function GET() {
     contentUnit: r.content_unit ?? null,
     defaultPackageSize: r.default_package_size != null ? Number(r.default_package_size) : null,
     thresholdUnit: r.threshold_unit === 'content' ? 'content' : 'package',
-    defaults: normalizeDefaults(r.defaults),
+    defaults: bezCeny(normalizeDefaults(r.defaults), me.vidiCeny),
     scale: r.scale ?? null,
     hideFromOverview: r.hide_from_overview === true,
   })));
 }
 
-// POST (employer): create a new custom category.
+// POST (`sklad.kategorie`): create a new custom category.
 export async function POST(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await currentUser('sklad.kategorie');
+  if (jeOdpoved(me)) return me;
 
   const body = await request.json();
   const name = (body.name ?? '').trim();

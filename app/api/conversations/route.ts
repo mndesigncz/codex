@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { jeClenem } from '@/lib/tenant';
 
@@ -8,10 +7,12 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  return { id: parseInt((session.user as any).id) };
+// Chat je pro každého s chat.pouzivat (všechny přednastavené role včetně
+// tabletu); host s users.team_id, který není členem, dřív prošel taky.
+async function currentUser(klic: string = 'chat.pouzivat') {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, teamId: c.teamId };
 }
 
 // Ensure the user is a member of their team conversation (self-heal).
@@ -37,11 +38,8 @@ async function ensureTeamMembership(teamId: number, meId: number) {
 
 export async function GET() {
   const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const teamId = u?.team_id;
-  if (!teamId) return NextResponse.json({ conversations: [] });
+  if (jeOdpoved(me)) return me;
+  const teamId = me.teamId;
 
   await ensureTeamMembership(teamId, me.id);
 
@@ -115,9 +113,10 @@ export async function GET() {
 }
 
 // POST { otherUserId } → find-or-create a direct conversation (same team).
+// Přímé zprávy jsou samostatné oprávnění (chat.prime) — tablet je nemá.
 export async function POST(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await currentUser('chat.prime');
+  if (jeOdpoved(me)) return me;
 
   const { otherUserId } = await request.json();
   const otherId = parseInt(otherUserId);
@@ -125,9 +124,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Neplatný uživatel' }, { status: 400 });
   }
 
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const teamId = u?.team_id;
-  if (!teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const teamId = me.teamId;
 
   // Kolega je členem podniku (členství NEBO zrcadlo, kolo 62) — i když je
   // právě přepnutý jinam; konverzace zůstává v podniku volajícího.

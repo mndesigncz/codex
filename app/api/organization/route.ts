@@ -16,7 +16,7 @@ async function ctx() {
   if (!s?.user) return null;
   const meId = parseInt((s.user as any).id);
   const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role: String((s.user as any).role ?? ''), teamId: u?.team_id != null ? Number(u.team_id) : null };
+  return { meId, teamId: u?.team_id != null ? Number(u.team_id) : null };
 }
 
 export async function GET() {

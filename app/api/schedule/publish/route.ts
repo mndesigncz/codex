@@ -3,21 +3,19 @@
 // nobody was actually told anything.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const [me] = await sql`SELECT id, role, team_id FROM users WHERE id = ${meId}`;
-  if (!me || me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  // Dřív se tu četlo zrcadlo users.role; teď oprávnění z členství v aktivním podniku.
+  const c = await pozaduj('rozvrh.publikovat');
+  if (jeOdpoved(c)) return c;
+  const { meId, teamId } = c;
 
   const b = await req.json().catch(() => ({}));
   const month = String(b.month ?? ''); // "YYYY-MM"
@@ -27,7 +25,7 @@ export async function POST(req: NextRequest) {
     const rows = await sql`
       SELECT DISTINCT s.employee_id AS id
       FROM shifts s JOIN users u ON u.id = s.employee_id
-      WHERE s.team_id = ${me.team_id} AND s.date LIKE ${month + '-%'} AND s.employee_id <> ${meId}`;
+      WHERE s.team_id = ${teamId} AND s.date LIKE ${month + '-%'} AND s.employee_id <> ${meId}`;
     const ids = (rows as any[]).map(r => Number(r.id)).filter(Number.isFinite);
     const label = new Date(month + '-01T00:00:00').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
     if (ids.length) {

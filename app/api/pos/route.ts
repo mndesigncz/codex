@@ -1,33 +1,32 @@
-// POS connection management (Storyous). Employer only; the secret never
-// leaves the server — GET returns just a masked status.
+// Napojení pokladny (Storyous). Tajemství nikdy neopustí server — GET vrací
+// jen maskovaný stav. Kolo 67: čtení stavu a změna napojení jsou dvě
+// oprávnění, protože odpojení přeruší tržby i odpisy skladu a to nemá umět
+// každý, kdo stav jen vidí.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { seal } from '@/lib/secretBox';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, verifyConnection } from '@/lib/storyous';
 import { runFullSync, rememberStock } from '@/lib/posMirror';
 import { audit } from '@/lib/audit';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${id}`;
-  if (!u || u.role !== 'employer' || !u.team_id) return null;
-  return u;
+/** Kontext v dřívějším tvaru `u` (id, team_id), ať se tělo rout nemění. */
+async function clen(klic: string) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, team_id: c.teamId };
 }
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen('pokladna.stav');
+  if (jeOdpoved(u)) return u;
   const conn = await getConnection(u.team_id);
   if (!conn) return NextResponse.json({ connected: false });
   return NextResponse.json({
@@ -39,8 +38,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen('pokladna.nastavit');
+  if (jeOdpoved(u)) return u;
   if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
   const b = await req.json().catch(() => ({}));
   const clientId = String(b.clientId ?? '').trim();
@@ -74,8 +73,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen('pokladna.nastavit');
+  if (jeOdpoved(u)) return u;
   try { await sql`DELETE FROM pos_connections WHERE team_id = ${u.team_id}`; } catch {}
   audit(u.team_id, u.id, 'pos.disconnect', 'pos', null, 'Storyous');
   return NextResponse.json({ ok: true });

@@ -1,21 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function context() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
 
 /**
  * Řádek s tímhle id sice není můj, ale vidím ho ze zdrojového podniku
@@ -49,10 +39,8 @@ function mapRow(r: any) {
 // PATCH (employer) — { name?, startTime?, endTime?, color? }
 export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(ctx)) return ctx;
 
   const id = parseInt(params.id);
   if (!id) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
@@ -99,10 +87,8 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
 // DELETE (employer)
 export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const ctx = await context();
-  if (!ctx) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (ctx.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!ctx.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const ctx = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(ctx)) return ctx;
 
   const id = parseInt(params.id);
   if (!id) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });

@@ -1,30 +1,34 @@
 // Zdraví propojení s pokladnou — pro Nastavení → Pokladna. Vedení vidí, od
 // kdy jsou data, kolik účtenek je u nás, kdy proběhla poslední synchronizace
 // a jestli něco selhalo. Odtud jde i ruční synchronizace a načtení historie.
+//
+// Kolo 67: jedna routa, dvě úrovně. Stav a ruční synchronizace jsou provoz
+// (`pokladna.stav`, `pokladna.synchronizovat`); tajemství webhooku je
+// konfigurace (`pokladna.nastavit`) — kdo ho zná, může pokladně podstrčit
+// falešné volání, proto ho GET bez toho oprávnění nevrací.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { randomBytes } from 'crypto';
 import { health, runFullSync, backfill, rememberStock } from '@/lib/posMirror';
 import { getConnection } from '@/lib/storyous';
 import { audit } from '@/lib/audit';
 import { verejnaHlaska } from '@/lib/verejnaChyba';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${id}`;
-  if (!u || u.role !== 'employer' || !u.team_id) return null;
-  return u;
-}
+/** Které oprávnění potřebuje která akce POSTu. */
+const KLIC_AKCE: Record<string, string> = {
+  sync: 'pokladna.synchronizovat',
+  backfill: 'pokladna.synchronizovat',
+  stock: 'pokladna.synchronizovat',
+  'webhook-secret': 'pokladna.nastavit',
+  'webhook-off': 'pokladna.nastavit',
+};
 
 function webhookUrl(req: NextRequest, merchantId: string | null, placeId: string) {
   const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '') || new URL(req.url).origin;
@@ -32,21 +36,26 @@ function webhookUrl(req: NextRequest, merchantId: string | null, placeId: string
 }
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  const h = await health(u.team_id);
-  const conn = h.connected ? await getConnection(u.team_id) : null;
+  const c = await pozaduj('pokladna.stav');
+  if (jeOdpoved(c)) return c;
+  const h = await health(c.teamId);
+  const conn = h.connected ? await getConnection(c.teamId) : null;
   return NextResponse.json({
     ...h,
+    webhookSecret: c.role.opravneni.has('pokladna.nastavit') ? h.webhookSecret : null,
     webhookUrl: conn ? webhookUrl(req, conn.merchantId, conn.placeId) : null,
   });
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const b = await req.json().catch(() => ({}));
   const action = String(b.action ?? '');
+  const klic = KLIC_AKCE[action];
+  // Neznámou akci odmítne až po přihlášení — cizímu nemá prozradit, co existuje.
+  const c = await pozaduj(klic ?? 'pokladna.synchronizovat');
+  if (jeOdpoved(c)) return c;
+  if (!klic) return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
+  const u = { id: c.meId, team_id: c.teamId };
   try {
     if (action === 'sync') {
       const r = await runFullSync(u.team_id, u.id, { force: true });

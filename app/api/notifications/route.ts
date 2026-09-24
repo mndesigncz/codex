@@ -5,6 +5,9 @@ import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
 
+// Vlastní upozornění (user_id = já) — nevážou se na podnik ani roli, čtou je
+// i hosté. Brána oprávnění tu proto záměrně není.
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ notifications: [], unread: 0 });

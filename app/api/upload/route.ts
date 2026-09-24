@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { put } from '@vercel/blob';
 import { neon } from '@neondatabase/serverless';
 
@@ -40,11 +39,12 @@ const ZAKAZANE_PRIPONY = /\.(exe|msi|bat|cmd|com|scr|ps1|sh|js|mjs|jar|apk|dmg|h
 // file — blob or DB fallback — is addressed as /api/upload/<id> and served by
 // the authenticated route next door. Nothing gets a public URL.
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  }
-  const meId = parseInt((session.user as any).id);
+  // Nahrávat smí člen aktivního podniku (chat, účtenky, návody, značka).
+  // Soubor se zapíše k podniku z členství — dřív stačilo users.team_id, takže
+  // host s nastaveným podnikem ukládal soubory do cizího podniku (kolo 67).
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  const meId = c.meId;
 
   try {
     const form = await request.formData();
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     // jen očištěný: bez lomítek, bez „..", bez řídicích znaků.
     const filename = (f.name || 'soubor').replace(/[\u0000-\u001f\u007f/\\]+/g, '_').replace(/\.\.+/g, '.').slice(0, 200) || 'soubor';
     const type = mime.startsWith('image/') ? 'image' : 'file';
-    const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
+    const u = { team_id: c.teamId };
 
     let blobPath: string | null = null;
     if (process.env.BLOB_READ_WRITE_TOKEN) {

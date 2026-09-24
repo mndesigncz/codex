@@ -1,26 +1,40 @@
 // One event: edits, crew→shifts sync, checklist, packing with real stock
-// movements, publicity, money outcome. Employer only, except checklist ticks.
+// movements, publicity, money outcome.
+//
+// Kolo 67: místo „vedení všechno, ostatní jen checklist" se každá část hlídá
+// svým oprávněním (viz POZADAVKY níž). Některé části sahají mimo akce —
+// obsluha zakládá směny, výdej na akci hýbe skladem, rozeslání píše hostům —
+// takže chtějí i klíč té druhé oblasti; jinak by vlastní role se správou akcí
+// obešla rozvrh, sklad nebo zprávy hostům. Chybí-li oprávnění k jediné části,
+// neuloží se nic: půlka změny by vypadala jako úspěch.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { normalizeChecklist, normalizePacking, normalizeCrew, normalizeEventMenu, normalizePhotos } from '@/lib/events';
 import { clenovePodniku, idClenu } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id, name FROM users WHERE id = ${id}`;
-  return u ?? null;
-}
+/** Pole těla PATCH → oprávnění, která potřebuje (všechna najednou). */
+const POZADAVKY: [pole: string, klice: string[]][] = [
+  ['checklist', ['akce.checklist']],
+  ...['title', 'description', 'kind', 'date', 'startTime', 'endTime', 'location', 'offsite', 'capacity', 'notes', 'status',
+    'public', 'photos', 'menu', 'posPlaceId', 'packing', 'publishToTeam']
+    .map(p => [p, ['akce.upravit']] as [string, string[]]),
+  ['revenue', ['akce.finance']],
+  ['costs', ['akce.finance']],
+  // Obsluha zakládá a maže směny = zásah do rozvrhu.
+  ['crew', ['akce.upravit', 'rozvrh.upravit']],
+  // Výdej a návrat reálně hýbou skladem.
+  ['packAction', ['akce.upravit', 'sklad.zapsat_stav']],
+  // Rozeslání jde všem členům zákaznického klubu.
+  ['announceMembers', ['akce.upravit', 'zakaznici.zpravy']],
+];
 
 const TIME_RE = /^\d{2}:\d{2}$/;
 
@@ -39,19 +53,32 @@ const czDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-C
 
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj('akce.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
   const id = parseInt(params.id);
   const [ev] = await sql`SELECT * FROM events WHERE id = ${id} AND team_id = ${u.team_id}`;
   if (!ev) return NextResponse.json({ error: 'Akce nenalezena' }, { status: 404 });
   const b = await req.json().catch(() => ({}));
 
-  // Checklist ticks are for the whole crew; everything else is the employer's.
-  if (b.checklist !== undefined && u.role !== 'employer') {
-    await sql`UPDATE events SET checklist = ${JSON.stringify(normalizeChecklist(b.checklist))}::jsonb WHERE id = ${id}`;
-    return NextResponse.json({ ok: true });
+  // Oprávnění ke všem posílaným částem se ověří dřív, než se cokoli zapíše.
+  // `false` u přepínačů (announceMembers, publishToTeam) nic nedělá, takže
+  // se nepočítá; packAction jen se známou hodnotou.
+  const posila = (pole: string) => {
+    const v = (b ?? {})[pole];
+    if (pole === 'announceMembers' || pole === 'publishToTeam') return v === true;
+    if (pole === 'packAction') return v === 'checkout' || v === 'return';
+    return v !== undefined;
+  };
+  const chybi = [...new Set(POZADAVKY.filter(([pole]) => posila(pole)).flatMap(([, klice]) => klice))]
+    .filter(k => !c.role.opravneni.has(k));
+  if (chybi.length) {
+    return NextResponse.json({
+      error: chybi.includes('akce.upravit') ? 'Akce upravuje jen ten, kdo je smí spravovat.'
+        : chybi.includes('akce.checklist') ? 'Checklist akce ti odškrtávat nejde.'
+        : 'Na tuhle část akce nemáš oprávnění.',
+    }, { status: 403 });
   }
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Akce upravuje vedení.' }, { status: 403 });
 
   // ---- plain fields, one statement each ----
   if (b.title !== undefined) await sql`UPDATE events SET title = ${String(b.title).trim().slice(0, 160)} WHERE id = ${id}`;
@@ -246,13 +273,17 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   }
 
   const [fresh] = await sql`SELECT * FROM events WHERE id = ${id}`;
-  return NextResponse.json({ ok: true, event: fresh });
+  // Odškrtnutí checklistu vrací celý řádek akce — peníze v něm nechá jen tomu,
+  // kdo je smí vidět.
+  const event = fresh && !c.role.opravneni.has('akce.finance') ? { ...fresh, revenue: null, costs: null } : fresh;
+  return NextResponse.json({ ok: true, event });
 }
 
 export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const u = await me();
-  if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('akce.mazat');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
   const id = parseInt(params.id);
   const [ev] = await sql`SELECT title, date FROM events WHERE id = ${id} AND team_id = ${u.team_id}`;
   if (!ev) return NextResponse.json({ error: 'Akce nenalezena' }, { status: 404 });

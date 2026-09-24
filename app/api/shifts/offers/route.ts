@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
-import { idClenu, vedeniPodniku } from '@/lib/tenant';
+import { idClenu } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id, name FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null, name: u?.name as string };
+// Burza je vlastní věc člena (rozvrh.burza jde podniku vypnout), schvalování
+// výměn je věc vedení rozvrhu. Aktivní podnik z databáze (pozaduj).
+async function ctx(klic: string | string[] | null) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  let name: string | undefined;
+  try { [{ name }] = await sql`SELECT name FROM users WHERE id = ${c.meId}` as any[]; } catch { /* jméno jen do upozornění */ }
+  return { ...c, name };
 }
 
 const today = () => pragueToday();
@@ -24,9 +24,11 @@ const today = () => pragueToday();
 // GET — the team's shift-swap board: every open offer plus anything the current
 // user is involved in. Employers see claimed offers awaiting their approval.
 export async function GET() {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ offers: [], meId: c?.meId ?? null, isEmployer: false });
+  // Schvalovatel vidí burzu i bez toho, aby do ní sám směny dával.
+  const c = await ctx(['rozvrh.burza', 'rozvrh.vymeny_schvalovat']);
+  if (jeOdpoved(c)) return c;
+  // Pole se dál jmenuje isEmployer kvůli klientům; znamená „smí schvalovat".
+  const isEmployer = c.role.opravneni.has('rozvrh.vymeny_schvalovat');
   try {
     const rows = await sql`
       SELECT o.id, o.shift_id AS "shiftId", o.offered_by AS "offeredBy", o.claimed_by AS "claimedBy",
@@ -41,17 +43,16 @@ export async function GET() {
       WHERE o.team_id = ${c.teamId}
         AND (o.status IN ('open','claimed') OR o.offered_by = ${c.meId} OR o.claimed_by = ${c.meId})
       ORDER BY s.date ASC`;
-    return NextResponse.json({ offers: rows, meId: c.meId, isEmployer: c.role === 'employer' });
+    return NextResponse.json({ offers: rows, meId: c.meId, isEmployer });
   } catch {
-    return NextResponse.json({ offers: [], meId: c.meId, isEmployer: c.role === 'employer' });
+    return NextResponse.json({ offers: [], meId: c.meId, isEmployer });
   }
 }
 
 // POST — offer one of MY upcoming shifts to the team.
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejsi v žádném týmu.' }, { status: 400 });
+  const c = await ctx('rozvrh.burza');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const shiftId = parseInt(b.shiftId);
@@ -89,13 +90,16 @@ export async function POST(req: NextRequest) {
 
 // PATCH — claim / cancel / approve / reject one offer.
 export async function PATCH(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejsi v žádném týmu.' }, { status: 400 });
-
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   const action = String(b.action ?? '');
+  // Stažení vlastní nabídky stačí členství — kdo už nabídl, nesmí v burze
+  // uvíznout jen proto, že podnik mezitím burzu vypnul.
+  const klic = action === 'claim' ? 'rozvrh.burza'
+    : action === 'approve' || action === 'reject' ? 'rozvrh.vymeny_schvalovat'
+    : null;
+  const c = await ctx(klic);
+  if (jeOdpoved(c)) return c;
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID.' }, { status: 400 });
 
   const [o] = await sql`
@@ -114,8 +118,9 @@ export async function PATCH(req: NextRequest) {
         body: `${c.name ?? 'Kolega'} si chce vzít směnu ${o.date}. Čeká na schválení vedení.`,
         type: 'shift', category: 'shift', link: '/employee/shifts?view=availability',
       });
-      // Vedení podle členství (kolo 62), ať schválení nečeká na vedoucího přepnutého jinam.
-      const employers = await vedeniPodniku(c.teamId);
+      // Kdo smí výměny schvalovat (kolo 67) — podle členství, ať schválení
+      // nečeká na vedoucího přepnutého jinam.
+      const employers = await clenoveSOpravnenim(c.teamId, 'rozvrh.vymeny_schvalovat');
       await notifyUsers(employers, {
         title: '🔄 Výměna směny ke schválení',
         body: `${c.name ?? 'Kolega'} si bere směnu ${o.date} — schval ji ve Směnách.`,
@@ -138,7 +143,6 @@ export async function PATCH(req: NextRequest) {
 
   // Employer decisions on a claimed offer.
   if (action === 'approve' || action === 'reject') {
-    if (c.role !== 'employer') return NextResponse.json({ error: 'Jen vedení může schvalovat výměny.' }, { status: 403 });
     if (o.status !== 'claimed' || !o.claimed_by) return NextResponse.json({ error: 'Není co schvalovat.' }, { status: 400 });
 
     if (action === 'reject') {

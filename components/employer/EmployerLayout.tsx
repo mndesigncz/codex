@@ -25,6 +25,9 @@ import { useModal } from '@/lib/useModal';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
+import { useOpravneni } from '../role/useOpravneni';
+import BezOpravneni from '../role/BezOpravneni';
+import { useStrazRole, CO_SE_ZAHODI_ROLE } from '../role/rozepsano';
 
 // Pohledy se stahují až při otevření.
 //
@@ -97,13 +100,48 @@ const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
 
 const mobilePrimary = ['overview', 'shifts', 'inventory', 'chat'];
 
+// Která oprávnění otevírají který pohled (kolo 67). Stačí kterékoli z
+// pole — Rozvrh vidí plánovač i ten, kdo má jen náhled. `null` = pohled
+// patří každému členovi: přehled, vlastní směny, osobní nastavení
+// (účet, heslo, vzhled mají všichni; záložky podniku uvnitř Nastavení
+// hlídá Nastavení samo) a přehled organizace, který se řídí vlastnictvím.
+// Vedení má celý katalog, takže se mu nic neschová.
+const KLICE_POHLEDU: Record<string, readonly string[] | null> = {
+  overview: null, 'my-shifts': null, settings: null, org: null,
+  shifts: ['rozvrh.zobrazit', 'rozvrh.nahled'],
+  inventory: ['sklad.zobrazit'],
+  recipes: ['receptury.zobrazit'],
+  procedures: ['postupy.zobrazit'],
+  tasks: ['ukoly.zobrazit_tym', 'ukoly.zadavat'],
+  guides: ['navody.zobrazit'],
+  planning: ['planovani.zobrazit'],
+  reports: ['uzaverky.zobrazit_vse'],
+  finance: ['finance.zobrazit', 'finance.trzby'],
+  suggestions: ['napady.spravovat', 'napady.pridat'],
+  attendance: ['dochazka.zobrazit'],
+  rewards: ['odmeny.zebricek', 'odmeny.katalog'],
+  'team-settings': ['tym.zobrazit'],
+  chat: ['chat.pouzivat'],
+  menu: ['menu.zobrazit'],
+  events: ['akce.zobrazit'],
+};
+const KLIENT = ['klient.prehled'];
+const UCTENKY = ['finance.uctenky_zobrazit', 'finance.uctenky_pridat'];
+
 interface Props {
   user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string; superadmin?: boolean };
 }
 
 export default function EmployerLayout({ user }: Props) {
   const { plan } = usePlan();
-  const [currentView, setCurrentView] = useState('overview');
+  const { ma, role } = useOpravneni();
+  const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
+  const [currentView, setCurrentViewRaw] = useState('overview');
+  // Rozepsaná role v Nastavení (editor sedí na stránce, ne v okně): přechod
+  // na jiný pohled nebo do jiného režimu ji odmontuje, takže se nejdřív
+  // zeptá. Přechod na tentýž pohled nic neodmontuje, ten projde rovnou.
+  const straz = useStrazRole();
+  const setCurrentView = (v: string) => { if (v === currentView) setCurrentViewRaw(v); else straz.pokus(() => setCurrentViewRaw(v)); };
   // TO GO vs. full administration. Phones default to TO GO (the pocket view);
   // the choice is remembered and the switch is always one tap away.
   const [appMode, setAppMode] = useState<'togo' | 'full' | 'client' | null>(null);
@@ -135,8 +173,11 @@ export default function EmployerLayout({ user }: Props) {
     if (window.innerWidth < 1024) setSidebarOpen(false);
   }, []);
   const switchMode = (m: 'togo' | 'full' | 'client') => {
-    setAppMode(m);
-    try { localStorage.setItem('managero-app-mode', m); } catch { /* ignore */ }
+    const prepni = () => {
+      setAppMode(m);
+      try { localStorage.setItem('managero-app-mode', m); } catch { /* ignore */ }
+    };
+    if (m === appMode) prepni(); else straz.pokus(prepni);
   };
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
@@ -169,6 +210,10 @@ export default function EmployerLayout({ user }: Props) {
     } catch { return 'Nepodařilo se spojit se serverem.'; }
   };
   const navigate = (view: string, arg?: string) => {
+    if (view !== currentView) { straz.pokus(() => naviguj(view, arg)); return; }
+    naviguj(view, arg);
+  };
+  const naviguj = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
@@ -177,13 +222,13 @@ export default function EmployerLayout({ user }: Props) {
     // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
     // hledal dál sám.
     setSettingsTab(view === 'settings' ? arg : undefined);
-    setCurrentView(view);
+    setCurrentViewRaw(view);
   };
   // Deep links from notifications and old bookmarks: /employer/overview?view=X
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const v = p.get('view');
-    if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentView(v);
+    if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentViewRaw(v);
     const g = Number(p.get('guide'));
     if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
@@ -200,8 +245,11 @@ export default function EmployerLayout({ user }: Props) {
   const openTeam = () => { setCurrentView('team-settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
+    // Odkaz z oznámení nebo dlaždice může vést na pohled, který role
+    // nezahrnuje — poctivý stav místo 403 uvnitř obrazovky.
+    if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('overview')} />;
     switch (currentView) {
-      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} />;
+      case 'overview':  return <EmployerDashboard user={user as any} onNavigate={navigate} smiPohled={smiPohled} />;
       case 'shifts':    return (
         <div>
           <ScheduleBuilder user={user as any} onNavigate={navigate} />
@@ -239,19 +287,23 @@ export default function EmployerLayout({ user }: Props) {
       case 'suggestions': return <SuggestionsBoard />;
       case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} />;
       case 'team-settings': return <TeamManagement user={user as any} />;
-      default:          return <EmployerDashboard user={user as any} onNavigate={navigate} />;
+      default:          return <EmployerDashboard user={user as any} onNavigate={navigate} smiPohled={smiPohled} />;
     }
   };
 
   const active = navItems.find(n => n.id === currentView);
+  const mojeNav = navItems.filter(n => smiPohled(n.id));
+  const mojeById = Object.fromEntries(mojeNav.map(n => [n.id, n]));
+  const smiKlient = ma(KLIENT);
+  const smiTym = smiPohled('team-settings');
   const title = currentView === 'settings' ? 'Nastavení'
     : currentView === 'team-settings' ? 'Nastavení týmu'
     : currentView === 'org' ? 'Všechny podniky'
     : active?.label;
-  const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
+  const mobileSecondary = mojeNav.filter(n => !mobilePrimary.includes(n.id));
   // Same categories as the sidebar, minus whatever is already in the bottom dock.
   const mobileGroups = navSections
-    .map(sec => ({ title: sec.title, items: sec.ids.map(id => byId[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
+    .map(sec => ({ title: sec.title, items: sec.ids.map(id => mojeById[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
     .filter(g => g.items.length);
 
   const AccountMenu = () => (
@@ -259,19 +311,28 @@ export default function EmployerLayout({ user }: Props) {
       <button onClick={openSettings} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
         <Icon name="settings" size={18} /> Nastavení
       </button>
-      <button onClick={openTeam} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
-        <Icon name="users" size={18} /> Nastavení týmu
-      </button>
+      {smiTym && (
+        <button onClick={openTeam} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
+          <Icon name="users" size={18} /> Nastavení týmu
+        </button>
+      )}
       <div className="h-px bg-black/[0.06] my-1" />
-      <button onClick={() => { setAccountOpen(false); switchMode('client'); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.05] transition-colors">
-        <Icon name="gift" size={18} /> Managero client
-      </button>
+      {smiKlient && (
+        <button onClick={() => { setAccountOpen(false); switchMode('client'); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.05] transition-colors">
+          <Icon name="gift" size={18} /> Managero client
+        </button>
+      )}
       <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-bad-ink hover:bg-bad/[0.06] transition-colors">
         <Icon name="logout" size={18} /> Odhlásit se
       </button>
     </div>
   );
 
+  if (appMode === 'client' && !smiKlient) {
+    // Uložený režim z doby, kdy člověk měl jinou roli (nebo odkaz
+    // ?mode=client) — ne bílá obrazovka, ale vysvětlení a cesta zpět.
+    return <BezOpravneni co="Managero client (hosté, rezervace, věrnost)" onZpet={() => switchMode('full')} />;
+  }
   if (appMode === 'client') {
     return (
       <MaxGate feature="Managero client" benefit="Věrnost, rezervace a objednávky od stolu pro vaše hosty patří do plánu Max.">
@@ -289,6 +350,7 @@ export default function EmployerLayout({ user }: Props) {
           user={user as any}
           onExit={() => switchMode('full')}
           onOpenView={(v, arg) => { switchMode('full'); navigate(v, arg); }}
+          smiPohled={smiPohled}
         />
       </ProfileLinkProvider>
     );
@@ -297,6 +359,7 @@ export default function EmployerLayout({ user }: Props) {
   return (
     <ProfileLinkProvider>
     <div className="flex h-[100dvh] overflow-hidden">
+      <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
       {/* Desktop sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-3.5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
@@ -321,7 +384,7 @@ export default function EmployerLayout({ user }: Props) {
         <nav className="h-full py-1.5 space-y-px px-3 overflow-y-auto scrollbar-thin">
           {navSections.map((sec, si) => {
             // Chat lives in the Messenger dock on desktop, so drop it here.
-            const items = sec.ids.map(id => byId[id]).filter(n => n && n.id !== 'chat');
+            const items = sec.ids.map(id => mojeById[id]).filter(n => n && n.id !== 'chat');
             if (!items.length) return null;
             return (
               <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-1.5' : ''}>
@@ -359,7 +422,10 @@ export default function EmployerLayout({ user }: Props) {
               <>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-semibold truncate">{user.name}</p>
-                  <p className="text-[11px] text-black/45">Zaměstnavatel</p>
+                  {/* Vedení a vlastník vidí totéž co dřív; jiná role vedení
+                      (Provozní, Účetní…) ukáže svůj název — ať je jasné,
+                      proč v navigaci něco chybí. */}
+                  <p className="text-[11px] text-black/45 truncate">{role && !role.jeVlastnik && role.klic !== 'vedeni' ? role.nazev : 'Zaměstnavatel'}</p>
                 </div>
                 <Icon name="chevron" size={16} className={`text-black/40 transition-transform ${accountOpen ? 'rotate-180' : ''}`} />
               </>
@@ -392,14 +458,18 @@ export default function EmployerLayout({ user }: Props) {
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>
+          {ma(UCTENKY) && (
           <button onClick={() => setReceiptsOpen(true)} title="Účtenky" aria-label="Účtenky"
             className="tap-target-sm shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="receipt" size={20} />
           </button>
+          )}
+          {smiKlient && (
           <button onClick={() => switchMode('client')} title="Managero client: hosté, rezervace, věrnost" aria-label="Přepnout do Managero client"
             className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#16181A]/[0.06] border border-black/10 text-[#16181A] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#16181A]/[0.1] transition whitespace-nowrap">
             <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">Client</span>
           </button>
+          )}
           <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu" aria-label="Přepnout do TO GO režimu"
             className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
             <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">TO GO</span>
@@ -448,12 +518,12 @@ export default function EmployerLayout({ user }: Props) {
 
       {/* Na obrazovce Chatu plovoucí tlačítko nedává smysl — otevírá
           přesně to, co má člověk otevřené pod ním. */}
-      {currentView !== 'chat' && <MessengerDock user={user as any} />}
+      {currentView !== 'chat' && ma(KLICE_POHLEDU.chat!) && <MessengerDock user={user as any} />}
 
       {/* Mobile bottom dock */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
         <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
-          {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
+          {mojeNav.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
               className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
                 currentView === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
@@ -501,10 +571,10 @@ export default function EmployerLayout({ user }: Props) {
         onSelect={setCurrentView}
         actions={[
           { label: 'Nastavení', icon: 'settings', onClick: openSettings },
-          { label: 'Nastavení týmu', icon: 'users', onClick: openTeam },
+          ...(smiTym ? [{ label: 'Nastavení týmu', icon: 'users', onClick: openTeam }] : []),
           // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
           ...(user.superadmin ? [{ label: 'Správa platformy', icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
-          { label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } },
+          ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } }] : []),
           { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
         ]}
       />

@@ -8,14 +8,17 @@
 // Když se rozejdou, je to informace, ne chyba k zamlčení. Endpoint proto ke
 // každému rozdílu vrací i důvod: nesesynchronizované účtenky, položka bez
 // ceny v menu, refundace, účtenka po půlnoci.
+//
+// Kolo 67: tržby vidí `finance.trzby`; tržby po jednotlivých lidech (kdo
+// kolik namarkoval) jsou hodnocení konkrétních lidí a mají vlastní klíč
+// `finance.trzby_lide` — směnový vedoucí může vidět tržbu bez žebříčku.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, paymentLabel } from '@/lib/storyous';
 import { billsOfDays, productsFromMirror, mirrorCovers, soldLines, soldDays, type SoldLine } from '@/lib/posMirror';
 import { pragueToday, businessDayOf, dayPlus, pragueHourOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -41,14 +44,10 @@ interface DayRow {
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ connected: false });
-  const teamId = u.team_id as number;
+  const c = await pozaduj('finance.trzby');
+  if (jeOdpoved(c)) return c;
+  const teamId = c.teamId;
+  const poLidech = c.role.opravneni.has('finance.trzby_lide');
 
   const sp = new URL(req.url).searchParams;
   const today = pragueToday();
@@ -290,9 +289,11 @@ export async function GET(req: NextRequest) {
       };
     }),
     hours,
-    byPerson: Array.from(byPerson.entries())
-      .map(([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.total - a.total).slice(0, 10),
+    byPerson: poLidech
+      ? Array.from(byPerson.entries())
+        .map(([name, v]) => ({ name, ...v }))
+        .sort((a, b) => b.total - a.total).slice(0, 10)
+      : [],
     items: items.slice(0, 100),
     notes,
     note: `Účtenky vystavené do ${NIGHT_CUTOFF_HOUR}:00 patří k předchozímu dni.`,

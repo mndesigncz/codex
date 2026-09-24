@@ -3,10 +3,9 @@
 // the team. Team-wide defaults with per-person overrides.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,18 +50,13 @@ function cleanPersonHours(v: any): number | null {
   return Math.min(400, Math.max(8, n));
 }
 
-async function employer() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${meId}`;
-  if (!u || u.role !== 'employer' || !u.team_id) return null;
-  return u;
-}
+// Pravidla i osobní limity (úvazek) patří k nastavení rozvrhu. Dřív se
+// kontrolovalo zrcadlo users.role, teď oprávnění v aktivním podniku.
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
 
   let teamMax: number | null = null;
   let teamMaxHours: number | null = null;
@@ -105,8 +99,9 @@ export async function GET() {
 
 // PUT { teamMax?, teamMaxHours?, balanceShifts?, overrides?: [{ id, maxConsecutive?, maxHours? }] }
 export async function PUT(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('rozvrh.nastaveni');
+  if (jeOdpoved(c)) return c;
+  const u = { id: c.meId, team_id: c.teamId };
   const b = await req.json().catch(() => ({}));
 
   try {

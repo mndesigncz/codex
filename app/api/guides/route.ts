@@ -1,24 +1,14 @@
 import { NextResponse } from 'next/server';
 import { normalizeSteps } from '@/lib/guideSteps';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers, notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
-import { tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
+import { tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function ctx() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id ?? null };
-}
 
 /**
  * Je kategorie viditelná pro podnik? Vlastní, nebo ze zdrojového podniku
@@ -57,9 +47,9 @@ function checklistLength(raw: any): number {
 
 // GET — list team's guides (optionally ?categoryId=)
 export async function GET(request: Request) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ guides: [] });
+  const c = await pozaduj('navody.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const opr = c.role.opravneni;
 
   const { searchParams } = new URL(request.url);
   const categoryId = searchParams.get('categoryId');
@@ -96,8 +86,13 @@ export async function GET(request: Request) {
           WHERE team_id = ${c.teamId}
           ORDER BY updated_at DESC`;
   }
-  // Pending proposals: employer sees them (to approve), the author sees their own.
-  rows = rows.filter((g: any) => g.approved !== false || c.role === 'employer' || g.submitted_by === c.meId);
+  // Neschválené návrhy vidí ten, kdo je smí schválit, a autor svůj vlastní —
+  // ostatním by se v seznamu objevil text, který ještě nikdo nepotvrdil.
+  const schvaluje = opr.has('navody.schvalovat');
+  rows = rows.filter((g: any) => g.approved !== false || schvaluje || g.submitted_by === c.meId);
+  // Kolik lidí návod četlo, je přehled pro toho, kdo povinné čtení řídí;
+  // ostatní z něj nic nepotřebují (UI ho ukazuje jen vedení).
+  const vidiCtenare = opr.has('navody.povinne_cteni');
 
   const guides = rows.map((g: any) => ({
     id: g.id,
@@ -107,7 +102,7 @@ export async function GET(request: Request) {
     approved: g.approved !== false,
     submittedBy: g.submitted_by ?? null,
     requireRead: g.require_read === true,
-    readCount: Number(g.read_count) || 0,
+    readCount: vidiCtenare ? Number(g.read_count) || 0 : 0,
     myRead: g.my_read === true,
     excerpt: excerpt(g.content),
     hasChecklist: checklistLength(g.checklist) > 0,
@@ -119,14 +114,12 @@ export async function GET(request: Request) {
   return NextResponse.json({ guides });
 }
 
-// POST (employer) — create guide
+// POST — založit návod (navody.vytvorit), nebo jen navrhnout
+// (navody.navrhnout): návrh čeká na schválení a ostatním se neukáže.
 export async function POST(request: Request) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  // Employees may PROPOSE a guide — it waits for the employer's approval.
-  const isProposal = c.role !== 'employer';
-  if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const c = await pozaduj(['navody.vytvorit', 'navody.navrhnout']);
+  if (jeOdpoved(c)) return c;
+  const isProposal = !c.role.opravneni.has('navody.vytvorit');
 
   const body = await request.json();
   const { title, content, categoryId, checklist } = body;
@@ -188,8 +181,9 @@ export async function POST(request: Request) {
 
   if (isProposal) {
     try {
-      // Kolo 62: vedení podle členství — provozovatel přepnutý jinam návrh uvidí.
-      const employers = await vedeniPodniku(c.teamId);
+      // Kolo 62: podle členství — provozovatel přepnutý jinam návrh uvidí.
+      // Kolo 67: dostane ho ten, kdo návrhy smí schválit.
+      const employers = await clenoveSOpravnenim(c.teamId, 'navody.schvalovat');
       const [author] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
       await notifyUsers(employers, {
         title: '📖 Návrh návodu ke schválení',

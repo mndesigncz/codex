@@ -1,24 +1,14 @@
 import { NextResponse } from 'next/server';
 import { normalizeSteps } from '@/lib/guideSteps';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
 import { idClenu, tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function ctx() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id ?? null };
-}
 
 // Uložený checklist (JSONB dorazí jako pole i jako řetězec) na kroky návodu.
 // Krok může nést surovinu s množstvím; staré pole řetězců projde beze změny.
@@ -35,15 +25,15 @@ const normalizeChecklist = normalizeSteps;
 // GET — single guide full content (team members only)
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj('navody.zobrazit');
+  if (jeOdpoved(c)) return c;
 
   const id = parseInt(params.id);
   let g: any;
   try {
     [g] = await sql`
       SELECT g.id, g.title, g.content, g.checklist, g.category_id, g.updated_at, g.created_at,
-             g.product_id, g.product_name, g.item_id, i.name AS item_name,
+             g.approved, g.submitted_by, g.product_id, g.product_name, g.item_id, i.name AS item_name,
              i.made_in_house AS item_made, u.name AS author
       FROM guides g
       LEFT JOIN users u ON u.id = g.created_by
@@ -59,6 +49,11 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
   }
 
   if (!g) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
+  // Neschválený návrh smí číst jen ten, kdo ho může schválit, a jeho autor —
+  // stejně jako v seznamu. Dřív šel přes id přečíst komukoli z podniku.
+  if (g.approved === false && !c.role.opravneni.has('navody.schvalovat') && Number(g.submitted_by) !== c.meId) {
+    return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
+  }
 
   return NextResponse.json({
     guide: {
@@ -79,12 +74,15 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
   });
 }
 
-// PATCH (employer) — update title/content/category, bump updated_at
+// PATCH — úprava obsahu a přepínače návodu. Každá akce má svůj klíč
+// (povinné čtení, schválení, obsah), brána routy pustí toho, kdo má
+// aspoň jeden, a konkrétní akce se ověřuje níž.
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj(['navody.upravit', 'navody.povinne_cteni', 'navody.schvalovat']);
+  if (jeOdpoved(c)) return c;
+  const opr = c.role.opravneni;
+  const zakazano = () => NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
 
   const id = parseInt(params.id);
   const [existing] = await sql`SELECT id, category_id FROM guides WHERE id = ${id} AND team_id = ${c.teamId}`;
@@ -94,10 +92,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   // Mark/unmark as required reading for the whole team.
   if (body.requireRead !== undefined) {
+    if (!opr.has('navody.povinne_cteni')) return zakazano();
     try {
       await sql`UPDATE guides SET require_read = ${body.requireRead === true} WHERE id = ${id} AND team_id = ${c.teamId}`;
       if (body.requireRead === true) {
         // Kolo 62: zaměstnanci podle členství v tomhle podniku, ne zrcadla.
+        // Kolo 67: typ účtu tu neříká, co kdo smí, ale koho se povinné čtení
+        // týká — proto zůstává na team_members.role, ne na oprávnění.
         const members = await idClenu(c.teamId, { role: 'employee' });
         const [g2] = await sql`SELECT title FROM guides WHERE id = ${id}`;
         const { notifyUsers } = await import('@/lib/push');
@@ -116,6 +117,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   // Approving an employee proposal.
   if (body.approve === true) {
+    if (!opr.has('navody.schvalovat')) return zakazano();
     try {
       const [row] = await sql`
         UPDATE guides SET approved = TRUE
@@ -140,6 +142,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // Návod k uzávěrce: přepínač stejného druhu jako povinné čtení, jen se
   // u něj nikomu nic neposílá — je to označení místa, ne úkol.
   if (body.forClosing !== undefined) {
+    if (!opr.has('navody.upravit')) return zakazano();
     try {
       await sql`UPDATE guides SET for_closing = ${body.forClosing === true} WHERE id = ${id} AND team_id = ${c.teamId}`;
       // Na uzávěrce se ukazuje jeden návod. Kdyby jich bylo víc, obsluha by
@@ -153,6 +156,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
   }
 
+  if (!opr.has('navody.upravit')) return zakazano();
   const { title, content, categoryId, checklist } = body;
   const hasProduct = Object.prototype.hasOwnProperty.call(body, 'productId');
   const productId = body.productId ? String(body.productId).trim().slice(0, 120) : null;
@@ -213,12 +217,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   });
 }
 
-// DELETE (employer)
+// DELETE — navody.mazat
 export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('navody.mazat');
+  if (jeOdpoved(c)) return c;
 
   const id = parseInt(params.id);
   const [existing] = await sql`SELECT id FROM guides WHERE id = ${id} AND team_id = ${c.teamId}`;
@@ -231,9 +234,11 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
 // POST — the reader confirms they read a required guide: { markRead: true }.
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role === 'kiosk') return NextResponse.json({ error: 'Potvrzení čtení je osobní — přihlas se svým účtem.' }, { status: 403 });
+  // Potvrdit lze jen návod, který člověk smí číst. Tablet je sdílený účet —
+  // to je typ účtu, ne oprávnění, a potvrzení za „tablet" by nic neznamenalo.
+  const c = await pozaduj('navody.zobrazit');
+  if (jeOdpoved(c)) return c;
+  if (c.role.typ === 'kiosk') return NextResponse.json({ error: 'Potvrzení čtení je osobní — přihlas se svým účtem.' }, { status: 403 });
   const id = parseInt(params.id);
   const b = await request.json().catch(() => ({}));
   if (b.markRead !== true) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });

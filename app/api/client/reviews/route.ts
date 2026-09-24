@@ -2,9 +2,21 @@
 // objednávce. Jedno hodnocení na jednu návštěvu.
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer } from '@/lib/client';
-import { notifyTeamEmployers } from '@/lib/client';
+import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { notifyUsers } from '@/lib/push';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+/**
+ * Slabé hodnocení má vidět ten, kdo recenze čte a řeší (zakaznici.recenze).
+ * Upozornění je best-effort: host svou akci provedl, i když push neodejde.
+ */
+async function upozorni(teamId: number, payload: { title: string; body?: string; link?: string; type?: string }) {
+  try {
+    const ids = await clenoveSOpravnenim(teamId, 'zakaznici.recenze');
+    if (ids.length) await notifyUsers(ids, { ...payload, category: 'general' });
+  } catch { /* bez upozornění */ }
+}
 
 /** Co host ještě nehodnotil: hotové návštěvy za posledních 14 dní. */
 export async function GET() {
@@ -42,7 +54,7 @@ export async function POST(req: NextRequest) {
     await sql`INSERT INTO client_reviews (team_id, customer_id, ref, rating, note) VALUES (${row.team_id}, ${me.id}, ${ref}, ${rating}, ${note})`;
   } catch { return NextResponse.json({ error: 'Už jsi hodnotil.' }, { status: 409 }); }
   if (rating <= 2) {
-    await notifyTeamEmployers(Number(row.team_id), { title: `Hodnocení ${rating}/5 od hosta`, body: `${me.name}${note ? `: „${note}"` : ''}`, link: '/employer/overview?mode=client&tab=customers', type: 'info' });
+    await upozorni(Number(row.team_id), { title: `Hodnocení ${rating}/5 od hosta`, body: `${me.name}${note ? `: „${note}"` : ''}`, link: '/employer/overview?mode=client&tab=customers', type: 'info' });
   }
   return NextResponse.json({ ok: true });
 }

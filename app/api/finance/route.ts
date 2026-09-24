@@ -4,8 +4,7 @@
 // advice built from the numbers the app already collects.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference, normalizeMovements } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
@@ -17,15 +16,6 @@ const sql = neon(process.env.DATABASE_URL!);
 
 const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const WEEKDAYS = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
-
-async function employer() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${meId}`;
-  if (!u || u.role !== 'employer' || !u.team_id) return null;
-  return u;
-}
 
 async function monthClosings(teamId: number, month: string) {
   try {
@@ -43,8 +33,13 @@ async function monthClosings(teamId: number, month: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  // Kolo 67: finance podle oprávnění, podnik z databáze. Mzdy jsou zvlášť
+  // (finance.mzdy) — role může vidět tržby a výdaje, a přitom ne, kolik kdo
+  // bere. Vedení má obojí, jeho odpověď je stejná jako dřív.
+  const c = await pozaduj('finance.zobrazit');
+  if (jeOdpoved(c)) return c;
+  const u = { team_id: c.teamId };
+  const mzdy = c.role.opravneni.has('finance.mzdy');
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? pragueToday().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
@@ -200,7 +195,7 @@ export async function GET(req: NextRequest) {
 
   // ---- Wages from attendance × hourly rates (the payroll view of labour). ----
   let wagesWorked = 0;
-  try {
+  if (mzdy) try {
     // Sazba z členství v podniku ZÁZNAMU, ne ze zrcadla (kolo 62): člen
     // přepnutý jinam by měl mzdu z cizí sazby nebo 0. Stejný výraz jako
     // Přehled organizace, ať dají totéž číslo.
@@ -222,6 +217,10 @@ export async function GET(req: NextRequest) {
 
   const spent = (kind: string) => ledger.filter((r) => r.kind === kind).reduce((s, r) => s + r.amount, 0);
   const purchases = spent('receipt') + spent('order') + spent('expense');
+  // Bez finance.mzdy se mzdové řádky knihy (denní výplaty) nepošlou vůbec
+  // a součty mezd jsou nula — odečtem hrubého výsledku od tržeb by šly
+  // dopočítat. `mzdySkryte` říká rozhraní, že nula neznamená „nic".
+  if (!mzdy) for (let i = ledger.length - 1; i >= 0; i--) if (ledger[i].kind === 'wage') ledger.splice(i, 1);
   const wagesCash = spent('wage');
   const totalOut = purchases + wagesCash;
 
@@ -366,6 +365,7 @@ export async function GET(req: NextRequest) {
       closingsCount: real.length,
       diffSum, diffAbs,
       eventsRevenue,
+      mzdySkryte: !mzdy,
     },
     guest,
     ledger,

@@ -5,15 +5,14 @@
 // stránky (/client) a k podnikům se váže členstvím, ne týmem — jeden host může
 // být členem víc podniků. Vedení to spravuje v režimu Client vedle TO GO.
 //
-// Co tu je: kdo je kdo (customer / employer / člen týmu), profil podniku podle
+// Co tu je: kdo je host (tým hlídá lib/opravneniDb), profil podniku podle
 // veřejné adresy, členství, věrnostní účet (body, razítka, návštěvy) a kupony.
 
 import { neon } from '@neondatabase/serverless';
-import { vedeniPodniku } from './tenant';
 import { getServerSession } from 'next-auth';
 import { randomBytes } from 'crypto';
 import { authOptions } from './auth';
-import { notifyUser, notifyUsers } from './push';
+import { notifyUser } from './push';
 import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
 
@@ -35,26 +34,6 @@ export async function customer(): Promise<Customer | null> {
   if (!u?.id || u.role !== 'customer') return null;
   const [row] = await sql`SELECT id, name, email FROM users WHERE id = ${parseInt(String(u.id))} AND role = 'customer'`;
   return row ? { id: Number(row.id), name: String(row.name), email: String(row.email) } : null;
-}
-
-/** Vedení s týmem — spravuje Client svého podniku. */
-export async function employer(): Promise<{ id: number; team_id: number } | null> {
-  const session = await getServerSession(authOptions);
-  const u = session?.user as any;
-  if (!u?.id) return null;
-  const [row] = await sql`SELECT id, role, team_id FROM users WHERE id = ${parseInt(String(u.id))}`;
-  if (!row || row.role !== 'employer' || !row.team_id) return null;
-  return { id: Number(row.id), team_id: Number(row.team_id) };
-}
-
-/** Kdokoli z týmu (vedení, zaměstnanec, kiosk) — obsluha, která přijímá objednávky. */
-export async function teamMember(): Promise<{ id: number; role: string; team_id: number } | null> {
-  const session = await getServerSession(authOptions);
-  const u = session?.user as any;
-  if (!u?.id) return null;
-  const [row] = await sql`SELECT id, role, team_id FROM users WHERE id = ${parseInt(String(u.id))}`;
-  if (!row || !row.team_id || !['employer', 'employee', 'kiosk'].includes(String(row.role))) return null;
-  return { id: Number(row.id), role: String(row.role), team_id: Number(row.team_id) };
 }
 
 // ---- Profil podniku --------------------------------------------------------
@@ -322,17 +301,6 @@ export function couponCode(): string {
   let s = '';
   for (let i = 0; i < 6; i++) s += abc[b[i] % abc.length];
   return s.slice(0, 3) + '-' + s.slice(3);
-}
-
-// ---- Oznámení vedení -------------------------------------------------------
-
-export async function notifyTeamEmployers(teamId: number, payload: { title: string; body?: string; link?: string; type?: string }) {
-  try {
-    // Vedení podle členství (kolo 62): provozovatel přepnutý do jiného
-    // podniku dostane rezervaci a objednávku hostů pořád.
-    const ids = await vedeniPodniku(teamId);
-    if (ids.length) await notifyUsers(ids, { ...payload, category: 'general' });
-  } catch { /* oznámení je best-effort */ }
 }
 
 // ---- Rezervace: sloty (sdílené s prohlížečem) --------------------------------

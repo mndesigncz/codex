@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { souborUrl } from '@/lib/bezpecnaUrl';
@@ -9,10 +8,12 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  return { id: parseInt((session.user as any).id) };
+// Chat je pro každého s chat.pouzivat (všechny přednastavené role včetně
+// tabletu); host s users.team_id, který není členem, dřív prošel taky.
+async function currentUser(klic: string = 'chat.pouzivat') {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, teamId: c.teamId };
 }
 
 async function isMember(conversationId: number, userId: number) {
@@ -25,7 +26,7 @@ async function isMember(conversationId: number, userId: number) {
 export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(me)) return me;
   const conversationId = parseInt(params.id);
   if (!conversationId) return NextResponse.json({ error: 'Neplatná konverzace' }, { status: 400 });
 
@@ -69,7 +70,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(me)) return me;
   const conversationId = parseInt(params.id);
   if (!conversationId) return NextResponse.json({ error: 'Neplatná konverzace' }, { status: 400 });
 

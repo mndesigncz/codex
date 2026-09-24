@@ -5,6 +5,10 @@ import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
 
+// Odběr upozornění je osobní věc účtu, ne podniku — mají ho i hosté a lidé
+// bez aktivního podniku. Proto tu není brána oprávnění (pozaduj), jen
+// přihlášení a vazba na vlastní user_id.
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
@@ -24,8 +28,11 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const meId = parseInt((session.user as any).id);
   const { endpoint } = await request.json();
   const sql = neon(process.env.DATABASE_URL!);
-  if (endpoint) await sql`DELETE FROM push_subscriptions WHERE endpoint = ${endpoint}`;
+  // Jen vlastní odběr: dřív stačilo znát cizí endpoint a odhlásit tak
+  // komukoli upozornění (kolo 67).
+  if (endpoint) await sql`DELETE FROM push_subscriptions WHERE endpoint = ${endpoint} AND user_id = ${meId}`;
   return NextResponse.json({ ok: true });
 }

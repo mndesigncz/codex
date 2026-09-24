@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { parseSteps } from '@/lib/steps';
@@ -8,20 +6,19 @@ import { expectedCash, cashDifference } from '@/lib/closing';
 import { computeAutoPoints, normalizePoints, PointsConfig } from '@/lib/rewardLevels';
 import { shiftSpanFor, graceSpan, shiftsOverlap, type ShiftWindow } from '@/lib/shiftWindow';
 import { tymyCiselniku, clenovePodniku, clenPodniku, jeClenem } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const name = (s.user as any).name as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, name, teamId: u?.team_id as number | null };
-}
+// Peněžní pole uzávěrky v detailu směny. Hodnocení a peníze jsou dvě různá
+// oprávnění: role s hodnocením směn, ale bez tržeb (Provozní) vidí, že
+// uzávěrka je a kdo ji podal, ne kolik bylo v kase.
+const PENIZE_UZAVERKY = [
+  'openingCash', 'cashRevenue', 'cardRevenue', 'tips', 'expenses', 'cashRemoved',
+  'selfPayout', 'closingCash', 'tipsInDrawer', 'expected', 'difference',
+] as const;
 
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -328,10 +325,11 @@ async function buildSummary(teamId: number, emp: any, date: string, pt: PointsCo
 //     ?month=YYYY-MM                 → per-day roster + review status (review calendar)
 //     ?employeeId=&date=YYYY-MM-DD   → full drill-in of what the employee did + existing review
 export async function GET(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
-  if (c.role !== 'employer' && c.role !== 'kiosk') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
+  // Kolo 67: tablet sem dřív směl (soupiska dne i měsíce), ale nikde ji
+  // nepoužíval (KioskApp /api/shift-reviews nevolá) — hodnocení výkonu je
+  // osobní údaj, takže se zavírá spolu s ostatními úniky.
+  const c = await pozaduj('hodnoceni.zobrazit');
+  if (jeOdpoved(c)) return c;
 
   const { searchParams } = new URL(req.url);
   const employeeIdRaw = searchParams.get('employeeId');
@@ -455,9 +453,9 @@ export async function GET(req: NextRequest) {
   }
 
   // ---- Detail mode. ----
-  // The drill-in carries the closing's full financials — the shared tablet is
-  // deliberately blocked from financial history, so it stays on the roster modes.
-  if (c.role === 'kiosk') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
+  // The drill-in carries the closing's full financials — sdílený tablet sem
+  // nesmí nikdy, ani kdyby mu vlastní role hodnocení dala.
+  if (c.role.typ === 'kiosk') return NextResponse.json({ error: 'Jen pro vedení' }, { status: 403 });
   const employeeId = parseInt(employeeIdRaw);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Neplatný zaměstnanec' }, { status: 400 });
   // Členství, ne zrcadlo (kolo 62).
@@ -465,17 +463,21 @@ export async function GET(req: NextRequest) {
   if (!emp) return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 404 });
 
   const pt = await teamPoints(c.teamId);
-  return NextResponse.json(await buildSummary(c.teamId, emp, date, pt));
+  const souhrn = await buildSummary(c.teamId, emp, date, pt);
+  // Peníze z uzávěrky jen s finance.trzby; auto body se spočítaly z plných
+  // dat už v buildSummary, takže ořez je nezmění.
+  if (souhrn.closing && !c.role.opravneni.has('finance.trzby')) {
+    for (const k of PENIZE_UZAVERKY) souhrn.closing[k] = null;
+  }
+  return NextResponse.json(souhrn);
 }
 
 // POST { employeeId, date, rating, note, points, flagged, applyToShift?, employeeIds? }
 // → upsert the shift review; with applyToShift/employeeIds the same verdict is
 //   written for everyone on that shift (scope = 'shift').
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Hodnotit může jen vedení' }, { status: 403 });
+  const c = await pozaduj('hodnoceni.hodnotit');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const employeeId = parseInt(b.employeeId);
@@ -519,7 +521,7 @@ export async function POST(req: NextRequest) {
     // Automatic points are recomputed per person — the same shift can look
     // very different for two people (different tasks, runs, closing).
     let auto = 0;
-    try { auto = (await buildSummary(c.teamId!, t, date, pt)).autoPoints.total; } catch { auto = 0; }
+    try { auto = (await buildSummary(c.teamId, t, date, pt)).autoPoints.total; } catch { auto = 0; }
     try {
       await sql`
         INSERT INTO shift_reviews (team_id, employee_id, work_date, rating, note, points, auto_points, flagged, scope, reviewed_by, updated_at)
@@ -555,14 +557,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, scope, employeeIds: targets.map((t: any) => t.id), legacyOnly });
 }
 
-// PATCH — employer edits a single item on the shift: fix checklist / procedure
+// PATCH — hodnotitel edits a single item on the shift: fix checklist / procedure
 // steps and attach points, a note and a flag to it.
 // Body: { kind, id, employeeId?, date?, points?, note?, flagged?, checklist?, checkedItems?, skippedItems? }
 export async function PATCH(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Upravovat může jen vedení' }, { status: 403 });
+  const c = await pozaduj('hodnoceni.hodnotit');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const kind = String(b.kind ?? '');
@@ -586,7 +586,7 @@ export async function PATCH(req: NextRequest) {
   const saveItem = async () => {
     if (!wantsItem || !Number.isFinite(itemEmployeeId) || !isDate(itemDate)) return;
     // Členství, ne zrcadlo (kolo 62): body k položce se u člena přepnutého jinam tiše neukládaly.
-    if (!(await jeClenem(itemEmployeeId, c.teamId!))) return;
+    if (!(await jeClenem(itemEmployeeId, c.teamId))) return;
     let existing: any = null;
     try {
       const [r] = await sql`

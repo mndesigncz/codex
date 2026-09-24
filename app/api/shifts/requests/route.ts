@@ -5,42 +5,32 @@
 // requests — and a POST could be filed under somebody else's name.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { jeClenem } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function caller() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id ?? null };
-}
-
+// Vlastní žádosti má každý člen; cizí jsou žádosti o volno týmu
+// (volno.zobrazit, podle oponentury kola 67 — ne rozvrh.upravit).
 export async function GET(req: NextRequest) {
-  const me = await caller();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await pozaduj(null);
+  if (jeOdpoved(me)) return me;
 
   try {
     const { searchParams } = new URL(req.url);
     const asked = parseInt(searchParams.get('employeeId') ?? '');
 
     // An employee only ever sees their own requests, whatever they ask for.
-    if (me.role !== 'employer') {
+    if (!me.role.opravneni.has('volno.zobrazit')) {
       const rows = await sql`
         SELECT * FROM shift_requests WHERE employee_id = ${me.meId} AND team_id = ${me.teamId} ORDER BY created_at DESC`;
       return NextResponse.json(rows);
     }
 
-    if (!me.teamId) return NextResponse.json([]);
-
-    // An employer sees their own team, optionally narrowed to one person.
+    // Who may see the team's requests sees their own team, optionally narrowed to one person.
     const rows = Number.isFinite(asked)
       ? await sql`
           SELECT r.* FROM shift_requests r
@@ -57,8 +47,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const me = await caller();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await pozaduj(null);
+  if (jeOdpoved(me)) return me;
 
   try {
     const body = await req.json();
@@ -69,12 +59,12 @@ export async function POST(req: NextRequest) {
     }
     const note = body.note ? String(body.note).trim().slice(0, 500) || null : null;
 
-    // The request belongs to the person making it. An employer may file one for
-    // a member of their own team; nobody may file one for a stranger.
+    // The request belongs to the person making it. Kdo upravuje rozvrh, smí ji
+    // založit za člena svého podniku; za cizího člověka nikdo.
     let employeeId = me.meId;
     const asked = parseInt(body.employeeId);
     if (Number.isFinite(asked) && asked !== me.meId) {
-      if (me.role !== 'employer' || !me.teamId) {
+      if (!me.role.opravneni.has('rozvrh.upravit')) {
         return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
       }
       // Členství, ne zrcadlo (kolo 62): žádost za člena přepnutého jinam musí jít založit.

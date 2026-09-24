@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { tymyCiselniku, jeClenem } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null };
-}
 
 const LEGACY_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Odpolední', flexible: 'Vlastní' };
 
@@ -54,23 +44,26 @@ const shape = (r: any, resolve?: (r: any) => { label: string; color: string }) =
   };
 };
 
-// GET — employee: own shifts; employer: the whole team's shifts.
+// GET — vlastní směny má každý člen; celý tým jen s plánovačem rozvrhu.
 export async function GET(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  const opr = c.role.opravneni;
 
   const { searchParams } = new URL(req.url);
   const employeeIdParam = searchParams.get('employeeId');
 
   if (employeeIdParam) {
-    // Employees may only read their own; employers anyone in their team.
+    // Vlastní směny každý; cizí jen s plánovačem rozvrhu — nebo s hodnocením
+    // směn, jehož detail (ShiftReviewModal) si směny člověka načítá.
     const employeeId = parseInt(employeeIdParam);
-    if (c.role !== 'employer' && employeeId !== c.meId) {
+    const cizi = employeeId !== c.meId;
+    if (cizi && !opr.has('rozvrh.zobrazit') && !opr.has('hodnoceni.zobrazit')) {
       return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
     }
-    if (c.role === 'employer') {
+    if (cizi) {
       // Členství, ne zrcadlo (kolo 62): směny člena přepnutého jinam nesou team_id tohohle podniku.
-      if (!c.teamId || !(await jeClenem(employeeId, c.teamId))) return NextResponse.json([]);
+      if (!(await jeClenem(employeeId, c.teamId))) return NextResponse.json([]);
     }
     const resolve = await typeResolver(c.teamId);
     // Filtr týmu: člověk ve dvou podnicích má směny v obou a vedení A nemá
@@ -79,18 +72,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(rows.map((r: any) => shape(r, resolve)));
   }
 
-  // Náhled rozvrhu celého týmu. Zaměstnanec ho dostane jen když ho vedení
-  // nechá zapnutý — a jen jako jména a časy, bez sazeb a bez čehokoli, co
-  // do rozvrhu nepatří.
-  if (searchParams.get('team') === '1' && c.teamId) {
-    if (c.role !== 'employer') {
-      let allowed = true;
-      try {
-        const [t] = await sql`SELECT show_team_schedule FROM teams WHERE id = ${c.teamId}`;
-        allowed = t?.show_team_schedule !== false;
-      } catch { /* sloupec ještě není — výchozí je vidět */ }
-      if (!allowed) return NextResponse.json({ shifts: [], people: [], enabled: false });
-    }
+  // Náhled rozvrhu celého týmu — jen jména a časy, bez sazeb a bez čehokoli,
+  // co do rozvrhu nepatří. Dřívější přepínač show_team_schedule teď znamená
+  // roli bez rozvrh.nahled (řeší roleClena), takže stačí kontrolovat klíč.
+  // Bez něj tvar „vypnuto", ne 403 — obrazovka Rozvrh týmu na něj umí odpovědět.
+  if (searchParams.get('team') === '1') {
+    if (!opr.has('rozvrh.nahled')) return NextResponse.json({ shifts: [], people: [], enabled: false });
     const resolveTeam = await typeResolver(c.teamId);
     const month = searchParams.get('month');
     const rows = /^\d{4}-\d{2}$/.test(String(month))
@@ -117,7 +104,7 @@ export async function GET(req: NextRequest) {
   }
 
   const resolve = await typeResolver(c.teamId);
-  if (c.role === 'employer' && c.teamId) {
+  if (opr.has('rozvrh.zobrazit')) {
     const rows = await sql`
       SELECT s.* FROM shifts s
       JOIN users u ON u.id = s.employee_id
@@ -130,18 +117,17 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
 }
 
-// POST (employer) — create a shift for a team member.
+// POST — create a shift for a team member.
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('rozvrh.upravit');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const employeeId = parseInt(b.employeeId);
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Chybí zaměstnanec' }, { status: 400 });
 
   // Členství, ne zrcadlo (kolo 62); tablet směnu nedostane.
-  if (!c.teamId || !(await jeClenem(employeeId, c.teamId))) {
+  if (!(await jeClenem(employeeId, c.teamId))) {
     return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
   }
 

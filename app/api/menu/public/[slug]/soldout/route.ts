@@ -2,7 +2,9 @@
 //
 // Endpoint je veřejně dosažitelný (iPad s menu není přihlášený), takže si
 // žádost musí sáhnout pro jedno z dvojího:
-//   • přihlášená obsluha toho týmu, kterému menu patří, nebo
+//   • přihlášený člen toho týmu, kterému menu patří, s oprávněním
+//     `menu.vyprodano` (kolo 67 — dřív stačilo users.team_id, takže prošel
+//     i host se zrcadlem podniku), nebo
 //   • PIN toho konkrétního menu.
 // Bez toho se nedá změnit nic — host, který si menu otevřel v mobilu, tudy
 // nedosáhne. Měnit jde jenom příznak vyprodáno; ceny a názvy sem nepatří.
@@ -15,12 +17,17 @@ import bcrypt from 'bcryptjs';
 import { cleanSlug } from '@/lib/menu';
 import { podnikJePozastaveny } from '@/lib/blokaceDb';
 import { hit, clear } from '@/lib/rateLimit';
+import { maOpravneni } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-/** Je přihlášený uživatel členem týmu, kterému tohle menu patří? */
+/**
+ * Smí přihlášený uživatel v týmu, kterému menu patří, přepínat vyprodáno?
+ * Tým musí být jeho AKTIVNÍ podnik (z databáze) — stejně jako u všech
+ * ostatních oprávnění; členství samo nestačí, rozhoduje role.
+ */
 async function jeObsluha(teamId: number): Promise<boolean> {
   try {
     const session = await getServerSession(authOptions);
@@ -28,7 +35,8 @@ async function jeObsluha(teamId: number): Promise<boolean> {
     const meId = parseInt((session.user as any).id);
     if (!Number.isFinite(meId)) return false;
     const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-    return Number(u?.team_id) === teamId;
+    if (Number(u?.team_id) !== teamId) return false;
+    return await maOpravneni(meId, teamId, 'menu.vyprodano');
   } catch {
     return false;
   }

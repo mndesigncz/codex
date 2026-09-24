@@ -1,25 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { normalizeSkipReasons, scoreRun } from '@/lib/procedureScoring';
 import { normalizePoints } from '@/lib/rewardLevels';
-import { resolveActingUser } from '@/lib/kioskActing';
+import { resolveActingUser, jeUcetTabletu } from '@/lib/kioskActing';
 import { pragueToday } from '@/lib/pragueTime';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { typNaUcet } from '@/lib/opravneni';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function currentUser() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const id = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const name = (s.user as any).name as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${id}`;
-  return { id, role, name, teamId: u?.team_id as number | null };
+// Kontext z brány oprávnění. `role` je TYP ÚČTU (employer/employee/kiosk) —
+// podle něj tablet jedná za píchnutou osobu (resolveActingUser); co kdo smí,
+// se čte z c.role.opravneni.
+async function currentUser(klic: string | string[] | null) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  let name = '';
+  try { const [u] = await sql`SELECT name FROM users WHERE id = ${c.meId}`; name = String(u?.name ?? ''); } catch { /* jméno je jen do upozornění */ }
+  return { id: c.meId, role: typNaUcet(c.role.typ), name, teamId: c.teamId, opr: c.role.opravneni };
 }
 
 // Shape a "running" run so the client has everything to render the checklist.
@@ -41,15 +42,18 @@ function shapeActive(row: any) {
   };
 }
 
-// GET: ?active=1 → caller's running run; else employer=team feed, employee=own runs
+// GET: ?active=1 → caller's running run (postupy.spoustet);
+// ?today=team → dnešní běhy týmu pro uzávěrku (uzaverky.vytvorit | postupy.prubehy_tymu);
+// jinak průběhy týmu (postupy.prubehy_tymu), nebo jen vlastní.
 export async function GET(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!me.teamId) return NextResponse.json({ active: null, runs: [] });
+  const me = await currentUser(null);
+  if (jeOdpoved(me)) return me;
+  const zakazano = () => NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
 
   if (searchParams.get('active')) {
+    if (!me.opr.has('postupy.spoustet')) return zakazano();
     // On the shared tablet the "caller" is whoever is currently selected on it.
     const effectiveId = await resolveActingUser(me.id, me.role, me.teamId, searchParams.get('actingAs'), request);
     let row;
@@ -78,6 +82,9 @@ export async function GET(request: Request) {
   // Today's completed runs for the WHOLE team — the closing form needs to know
   // whether a required procedure was done by anyone on the shift, not just me.
   if (searchParams.get('today') === 'team') {
+    // Uzávěrka potřebuje vědět, jestli povinný postup udělal kdokoli ze
+    // směny — proto stačí smět uzávěrku vyplnit (Barista i tablet to smí).
+    if (!me.opr.has('uzaverky.vytvorit') && !me.opr.has('postupy.prubehy_tymu')) return zakazano();
     const today = pragueToday();
     let rows: any[] = [];
     try {
@@ -104,7 +111,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ runs: rows });
   }
 
-  if (me.role === 'employer') {
+  if (me.opr.has('postupy.prubehy_tymu')) {
     let runs;
     try {
       runs = await sql`
@@ -165,9 +172,8 @@ export async function GET(request: Request) {
 
 // POST: { procedureId } → start a run (closes any previous running run first)
 export async function POST(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!me.teamId) return NextResponse.json({ error: 'Nejste členem žádného týmu' }, { status: 400 });
+  const me = await currentUser('postupy.spoustet');
+  if (jeOdpoved(me)) return me;
 
   const body = await request.json().catch(() => ({}));
   const procedureId = parseInt(body.procedureId);
@@ -176,7 +182,7 @@ export async function POST(request: Request) {
   const [proc] = await sql`
     SELECT id, team_id, name, icon, color, items
     FROM procedures WHERE id = ${procedureId}`;
-  if (!proc || proc.team_id !== me.teamId) {
+  if (!proc || Number(proc.team_id) !== me.teamId) {
     return NextResponse.json({ error: 'Postup nenalezen' }, { status: 404 });
   }
   try {
@@ -221,8 +227,8 @@ function fmtDuration(sec: number) {
 
 // PATCH: { runId, checkedItems, complete? } → update progress / finish
 export async function PATCH(request: Request) {
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await currentUser('postupy.spoustet');
+  if (jeOdpoved(me)) return me;
 
   const body = await request.json().catch(() => ({}));
   const runId = parseInt(body.runId);
@@ -234,8 +240,11 @@ export async function PATCH(request: Request) {
     FROM procedure_runs r JOIN procedures p ON p.id = r.procedure_id
     WHERE r.id = ${runId}`;
   // The kiosk updates runs it started on behalf of clocked-in staff, so its
-  // session may touch any run belonging to its own team.
-  const owns = run && (run.user_id === me.id || (me.role === 'kiosk' && run.team_id === me.teamId));
+  // session may touch any run belonging to its own team. Cizí běh smí jen
+  // skutečný účet tabletu (users.role = 'kiosk'), ne člověk, kterému někdo
+  // přidělil roli typu Tablet — ten by jinak měnil a rušil běhy všech.
+  const owns = run && (Number(run.user_id) === me.id
+    || (me.role === 'kiosk' && Number(run.team_id) === me.teamId && await jeUcetTabletu(me.id, me.teamId)));
   if (!owns) {
     return NextResponse.json({ error: 'Průběh nenalezen' }, { status: 404 });
   }
@@ -285,28 +294,32 @@ export async function PATCH(request: Request) {
      }
     }
 
-    // Notify the team owner (employer) — flag any steps that weren't completed.
-    const [team] = await sql`SELECT owner_id FROM teams WHERE id = ${run.team_id}`;
-    if (team?.owner_id) {
+    // Upozornit ty, kdo sledují průběhy týmu (postupy.prubehy_tymu) — dřív
+    // jen vlastníka podniku, ostatní vedení se o dokončení nedozvědělo.
+    // Flag any steps that weren't completed.
+    const prijemci = await clenoveSOpravnenim(Number(run.team_id), 'postupy.prubehy_tymu');
+    if (prijemci.length) {
       const dur = fmtDuration(updated.duration_seconds ?? 0);
       const missing = Math.max(0, (run.total_items ?? 0) - checked.length);
       // Name the run's owner, not the session — on the tablet the session is
       // the anonymous kiosk account while the run belongs to a real person.
       let doneBy = me.name;
-      if (run.user_id !== me.id) {
+      if (Number(run.user_id) !== me.id) {
         try {
           const [owner] = await sql`SELECT name FROM users WHERE id = ${run.user_id}`;
           if (owner?.name) doneBy = owner.name;
         } catch { /* keep session name */ }
       }
-      notifyUser(team.owner_id, {
-        title: missing > 0 ? 'Postup dokončen s výhradami' : 'Postup dokončen',
-        body: missing > 0
-          ? `${doneBy} dokončil/a ${run.procedure_name} za ${dur} — ${missing} ${missing === 1 ? 'krok nedokončen' : missing <= 4 ? 'kroky nedokončeny' : 'kroků nedokončeno'}`
-          : `${doneBy} dokončil/a ${run.procedure_name} za ${dur}`,
-        type: 'shift',
-        link: '/employer/overview?view=procedures',
-      });
+      for (const kdo of prijemci) {
+        notifyUser(kdo, {
+          title: missing > 0 ? 'Postup dokončen s výhradami' : 'Postup dokončen',
+          body: missing > 0
+            ? `${doneBy} dokončil/a ${run.procedure_name} za ${dur} — ${missing} ${missing === 1 ? 'krok nedokončen' : missing <= 4 ? 'kroky nedokončeny' : 'kroků nedokončeno'}`
+            : `${doneBy} dokončil/a ${run.procedure_name} za ${dur}`,
+          type: 'shift',
+          link: '/employer/overview?view=procedures',
+        });
+      }
     }
 
     // ---- Automatic points: score the run from step weights and skip reasons,

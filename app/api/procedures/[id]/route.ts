@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { sanitizeSteps } from '@/lib/steps';
@@ -22,25 +21,18 @@ function parseRemindDays(v: any): number[] {
   ).sort((a, b) => a - b);
 }
 
-async function currentUser() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const id = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${id}`;
-  return { id, role, teamId: u?.team_id as number | null };
-}
-
-// PATCH (employer): update a procedure
+// PATCH: schválit návrh (postupy.schvalovat), nebo upravit postup
+// (postupy.upravit). Brána pustí kohokoli s jedním z nich, akce se ověří níž.
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj(['postupy.upravit', 'postupy.schvalovat']);
+  if (jeOdpoved(c)) return c;
+  const me = { id: c.meId, teamId: c.teamId };
+  const zakazano = () => NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
 
   const id = parseInt(params.id);
   const [existing] = await sql`SELECT id, team_id FROM procedures WHERE id = ${id}`;
-  if (!existing || existing.team_id !== me.teamId) {
+  if (!existing || Number(existing.team_id) !== me.teamId) {
     return NextResponse.json({ error: 'Postup nenalezen' }, { status: 404 });
   }
 
@@ -48,6 +40,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   // Approving an employee proposal is its own lightweight action.
   if (body.approve === true) {
+    if (!c.role.opravneni.has('postupy.schvalovat')) return zakazano();
     try {
       const [row] = await sql`
         UPDATE procedures SET approved = TRUE
@@ -69,6 +62,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Schválení není dostupné — spusť /api/init.' }, { status: 400 });
     }
   }
+  if (!c.role.opravneni.has('postupy.upravit')) return zakazano();
   const name = String(body.name ?? '').trim();
   const description = body.description ? String(body.description).trim() : null;
   const icon = body.icon ? String(body.icon) : 'check';
@@ -112,16 +106,16 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   return NextResponse.json({ procedure: updated });
 }
 
-// DELETE (employer): delete a procedure
+// DELETE: smazat postup (postupy.mazat)
 export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('postupy.mazat');
+  if (jeOdpoved(c)) return c;
+  const me = { id: c.meId, teamId: c.teamId };
 
   const id = parseInt(params.id);
   const [existing] = await sql`SELECT id, team_id FROM procedures WHERE id = ${id}`;
-  if (!existing || existing.team_id !== me.teamId) {
+  if (!existing || Number(existing.team_id) !== me.teamId) {
     return NextResponse.json({ error: 'Postup nenalezen' }, { status: 404 });
   }
 

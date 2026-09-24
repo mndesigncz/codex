@@ -1,24 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { normalizeScale, normalizeThresholdUnit } from '@/lib/packaging';
 import { wouldCycle } from '@/lib/categoryTree';
 import { normalizeDefaults } from '@/lib/itemDefaults';
 import { tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+/**
+ * Kolo 67: kategorie spravuje `sklad.kategorie` (dřív vedení). Podnik vždy
+ * z databáze, nikdy z požadavku.
+ */
 async function currentUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  const teamId = u?.team_id ?? null;
-  return { meId, role, teamId };
+  const c = await pozaduj('sklad.kategorie');
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, smiCenu: c.role.opravneni.has('sklad.ceny_upravit') };
 }
 
 /**
@@ -42,12 +41,11 @@ function cizi(kdo: string) {
   return NextResponse.json({ error: `Tohle spravuje podnik ${kdo} — upraví to jeho vedení.` }, { status: 403 });
 }
 
-// PATCH (employer): rename and/or reorder a category.
+// PATCH (`sklad.kategorie`): rename and/or reorder a category.
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (jeOdpoved(me)) return me;
 
   const id = parseInt(params.id);
   const [cat] = await sql`
@@ -134,6 +132,14 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // still take the rest of the edit.
   if (body.defaults !== undefined) {
     const defaults = normalizeDefaults(body.defaults);
+    // Nákupní cenu v předvyplnění mění jen `sklad.ceny_upravit`. Kdo ji
+    // nevidí (GET mu ji neposílá), by jinak uložením kategorie cenu smazal —
+    // proto se mu ponechá ta uložená. Vedení má klíč, pro něj beze změny.
+    if (!me.smiCenu) {
+      const puvodni = normalizeDefaults(cat.defaults);
+      if (puvodni.unitCost != null) defaults.unitCost = puvodni.unitCost;
+      else delete defaults.unitCost;
+    }
     try {
       await sql`
         UPDATE inventory_categories SET defaults = ${JSON.stringify(defaults)}::jsonb
@@ -187,12 +193,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   return NextResponse.json({ ok: true });
 }
 
-// DELETE (employer): remove the category option. Items keep their category string.
+// DELETE (`sklad.kategorie`): remove the category option. Items keep their category string.
 export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const me = await currentUser();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (jeOdpoved(me)) return me;
 
   const id = parseInt(params.id);
   // Vlastnictví se ověří dřív, než se čehokoli dotkneme: NULLování ukazatelů

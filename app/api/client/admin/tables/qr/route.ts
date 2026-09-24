@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { get } from '@vercel/blob';
-import { sql, employer, ensureProfile } from '@/lib/client';
+import { sql, ensureProfile } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizeQrDesign, QR_SHEETS, esc, type QrDesign } from '@/lib/qrDesign';
 
 export const dynamic = 'force-dynamic';
@@ -51,8 +52,9 @@ async function qrSvg(target: string, d: QrDesign, logo: string | null) {
 }
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.qr');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const url = new URL(req.url);
   const q = url.searchParams;
   const p = await ensureProfile(u.team_id);

@@ -5,28 +5,29 @@
 // team. Previously GET returned every business's recipes, and POST fell back to
 // `createdBy = 1` when there was no session, so an unauthenticated request could
 // insert rows attributed to a real user.
+//
+// Kolo 67: čtení `navody.zobrazit`, zápis `navody.vytvorit` (obsah se
+// přesunul do Návodů, tak i klíče). Zápis dřív hlídalo jen přihlášení, takže
+// recept založil i tablet nebo host s podnikem; žádné UI ho nevolá, takže
+// Barista ani Kiosk o nic nepřijdou.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function caller() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, teamId: (u?.team_id ?? null) as number | null };
+async function caller(klic: string) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId };
 }
 
 export async function GET() {
-  const me = await caller();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!me.teamId) return NextResponse.json([]);
+  const me = await caller('navody.zobrazit');
+  if (jeOdpoved(me)) return me;
 
   try {
     const rows = await sql`
@@ -40,8 +41,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const me = await caller();
-  if (!me) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const me = await caller('navody.vytvorit');
+  if (jeOdpoved(me)) return me;
 
   try {
     const body = await req.json();

@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { timingSafeEqual } from 'crypto';
 import { hit, clear } from '@/lib/rateLimit';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { pragueToday, pragueDaySafe, parseDbTime } from '@/lib/pragueTime';
 import { autoCloseEntry, isForgottenClockOut, pragueMoment, denSmeny } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
-import { jeClenem, vedeniPodniku } from '@/lib/tenant';
+import { jeClenem } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,23 +34,15 @@ async function ensureShift(teamId: number, employeeId: number, date: string, sta
   } catch { /* best-effort */ }
 }
 
-async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null };
-}
-
-// GET — kiosk/employer: today's roster with live status; employer also gets
-// recent entries; employee: their own entries.
+// GET — s dochazka.tablet nebo dochazka.zobrazit: dnešní roster s živým
+// stavem; s dochazka.zobrazit navíc záznamy; hodinové sazby jen s
+// finance.mzdy (Provozní docházku vidí, sazby ne). Ostatní: vlastní záznamy.
 export async function GET(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ roster: [], entries: [] });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  const opr = c.role.opravneni;
 
-  if (c.role === 'kiosk' || c.role === 'employer') {
+  if (opr.has('dochazka.tablet') || opr.has('dochazka.zobrazit')) {
     // Roster: every employee + their currently-open entry (if clocked in)
     // + today's planned shift so the kiosk can show plan vs reality.
     const today = pragueToday();
@@ -87,7 +78,7 @@ export async function GET(req: NextRequest) {
       ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
     let roster: any[];
     try {
-      roster = await rosterQuery(c.role === 'employer');
+      roster = await rosterQuery(opr.has('finance.mzdy'));
     } catch {
       // hourly_rate not migrated yet — retry without touching the column
       roster = await sql`
@@ -141,7 +132,7 @@ export async function GET(req: NextRequest) {
     } catch { /* watchdog is best-effort */ }
 
     let entries: any[] = [];
-    if (c.role === 'employer') {
+    if (opr.has('dochazka.zobrazit')) {
       const { searchParams } = new URL(req.url);
       const days = Math.min(180, Math.max(1, parseInt(searchParams.get('days') ?? '30')));
       entries = await sql`
@@ -174,20 +165,23 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ roster: [{ id: c.meId, openSince }], entries });
 }
 
-// POST — clock in / out. Caller must be the kiosk or the employee themselves.
+// POST — clock in / out. Sám za sebe kdokoli z podniku; za jiného jen
+// s dochazka.tablet (a jeho PINem); celý záznam zpětně s dochazka.upravit.
 export async function POST(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  const opr = c.role.opravneni;
 
   const b = await req.json().catch(() => ({}));
   const employeeId = parseInt(b.employeeId);
   const action = b.action === 'out' ? 'out' : 'in';
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Chybí zaměstnanec' }, { status: 400 });
 
-  // Manual complete entry: the employer backfills a forgotten punch for a
-  // member of their own team ({ employeeId, clockIn, clockOut } as ISO).
-  if (c.role === 'employer' && b.clockIn && b.clockOut) {
+  // Manual complete entry: kdo upravuje docházku, doplní zapomenutý záznam
+  // členovi svého podniku ({ employeeId, clockIn, clockOut } as ISO).
+  // Bez oprávnění se požadavek dál chová jako dřív u zaměstnance: jako
+  // píchnutí (a za jiného skončí na 403 níž).
+  if (opr.has('dochazka.upravit') && b.clockIn && b.clockOut) {
     // Kolo 62: členství nebo zrcadlo — člen přepnutý jinam tu dřív dostal
     // „není ve vašem týmu".
     if (!(await jeClenem(employeeId, c.teamId))) {
@@ -207,11 +201,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, entry });
   }
 
-  // Authorization: kiosk (same team) or the employee acting on themselves.
-  const isKiosk = c.role === 'kiosk';
-  if (!isKiosk && employeeId !== c.meId) {
+  // Authorization: za sebe každý; za jiného jen s dochazka.tablet. Vlastní
+  // píchnutí jde vždy jako 'self' bez PINu — i u Vedení, které tablet
+  // oprávnění má (jinak by si vedoucí s PINem musel PIN zadávat sám sobě).
+  // Účet tabletu jede vždy tabletovou cestou, jako dřív.
+  const zaJineho = employeeId !== c.meId;
+  if (zaJineho && !opr.has('dochazka.tablet')) {
     return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   }
+  const isKiosk = zaJineho || c.role.typ === 'kiosk';
   let empPinHash: string | null = null;
   // PIN je na osobě (users), ne na členství — čte se zvlášť; příslušnost
   // k podniku rozhoduje členství nebo zrcadlo (kolo 62).
@@ -309,7 +307,8 @@ export async function POST(req: NextRequest) {
         const lateMin = (nh * 60 + nm) - (ph * 60 + pm);
         if (lateMin > 10 && lateMin < 12 * 60) {
           const [emp2] = await sql`SELECT name FROM users WHERE id = ${employeeId}`;
-          const employers = await vedeniPodniku(c.teamId, { krome: employeeId });
+          // Kdo vidí docházku týmu (kolo 67), ne pevně „vedení".
+          const employers = (await clenoveSOpravnenim(c.teamId, 'dochazka.zobrazit')).filter(id => id !== employeeId);
           const { notifyUsers } = await import('@/lib/push');
           await notifyUsers(employers, {
             title: '⏰ Pozdní příchod',
@@ -355,11 +354,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, action: 'out', entry: row, closingDone });
 }
 
-// PATCH — employer fixes a forgotten clock-out: { id, clockOut?: ISO } (default now).
+// PATCH — oprava zapomenutého odchodu: { id, clockOut?: ISO } (default now).
 export async function PATCH(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('dochazka.upravit');
+  if (jeOdpoved(c)) return c;
 
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
@@ -416,11 +414,10 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true, entry: row });
 }
 
-// DELETE ?id= — employer removes an attendance entry (corrections).
+// DELETE ?id= — smazání záznamu docházky (hodiny = mzda, proto vlastní klíč).
 export async function DELETE(req: NextRequest) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('dochazka.mazat');
+  if (jeOdpoved(c)) return c;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
   await sql`DELETE FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;

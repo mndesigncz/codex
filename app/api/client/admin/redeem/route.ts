@@ -1,14 +1,16 @@
 // Host ukáže kód kuponu, obsluha ho tady uplatní. Jednou.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, teamMember } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { benefitLabel, conditionBadges, windowOk } from '@/lib/coupons';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function POST(req: NextRequest) {
-  const u = await teamMember();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('kupony.uplatnit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const code = String(b.code ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length < 6) return NextResponse.json({ error: 'Kód má šest znaků.' }, { status: 400 });

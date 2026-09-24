@@ -1,37 +1,45 @@
 // Receipts snapped on the go: a photo, who sold it, how much, and a note.
 // The employer captures them in TO GO mode standing in the shop doorway;
 // the details can be pushed into the stock later.
+//
+// Kolo 67: účtenku může nafotit i ten, kdo nakupuje, ale nevidí výdaje
+// podniku (`finance.uctenky_pridat`) — takový člověk dostane v seznamu jen
+// ty svoje, aby viděl, že se uložila. Všechny vidí `finance.uctenky_zobrazit`,
+// upravuje a maže `finance.uctenky_upravit`.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
 import { souborUrl } from '@/lib/bezpecnaUrl';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${meId}`;
-  if (!u || u.role !== 'employer' || !u.team_id) return null;
-  return u;
+async function clen(klic: string | string[]) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, team_id: c.teamId, vse: c.role.opravneni.has('finance.uctenky_zobrazit') };
 }
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen(['finance.uctenky_zobrazit', 'finance.uctenky_pridat']);
+  if (jeOdpoved(u)) return u;
   try {
-    const rows = await sql`
-      SELECT r.id, r.photo_url AS "photoUrl", r.supplier, r.amount, r.note, r.created_at AS "createdAt",
-             us.name AS "authorName"
-      FROM receipts r LEFT JOIN users us ON us.id = r.user_id
-      WHERE r.team_id = ${u.team_id}
-      ORDER BY r.created_at DESC LIMIT 100`;
+    const rows = u.vse
+      ? await sql`
+        SELECT r.id, r.photo_url AS "photoUrl", r.supplier, r.amount, r.note, r.created_at AS "createdAt",
+               us.name AS "authorName"
+        FROM receipts r LEFT JOIN users us ON us.id = r.user_id
+        WHERE r.team_id = ${u.team_id}
+        ORDER BY r.created_at DESC LIMIT 100`
+      : await sql`
+        SELECT r.id, r.photo_url AS "photoUrl", r.supplier, r.amount, r.note, r.created_at AS "createdAt",
+               us.name AS "authorName"
+        FROM receipts r LEFT JOIN users us ON us.id = r.user_id
+        WHERE r.team_id = ${u.team_id} AND r.user_id = ${u.id}
+        ORDER BY r.created_at DESC LIMIT 100`;
     return NextResponse.json({ receipts: rows });
   } catch {
     return NextResponse.json({ receipts: [], error: 'Účtenky nejsou dostupné — spusť /api/init.' });
@@ -39,8 +47,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen('finance.uctenky_pridat');
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   const photoUrl = souborUrl(b.photoUrl);
   const supplier = b.supplier ? String(b.supplier).trim().slice(0, 160) : null;
@@ -64,8 +72,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen('finance.uctenky_upravit');
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
@@ -81,8 +89,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await clen('finance.uctenky_upravit');
+  if (jeOdpoved(u)) return u;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
   await sql`DELETE FROM receipts WHERE id = ${id} AND team_id = ${u.team_id}`;

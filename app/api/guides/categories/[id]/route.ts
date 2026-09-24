@@ -1,21 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { tymyCiselniku } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-async function ctx() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id != null ? Number(u.team_id) : null };
-}
 
 /**
  * Kategorie s tímhle id není moje. Když ji ale vidím ze zdrojového podniku
@@ -38,13 +28,11 @@ async function odpovedCiziKategorie(teamId: number, id: number) {
   return NextResponse.json({ error: 'Kategorie nenalezena' }, { status: 404 });
 }
 
-// PATCH (employer) — rename / reorder
+// PATCH (navody.kategorie) — rename / reorder
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const c = await pozaduj('navody.kategorie');
+  if (jeOdpoved(c)) return c;
 
   const id = parseInt(params.id);
   const body = await request.json();
@@ -68,13 +56,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   return NextResponse.json({ category });
 }
 
-// DELETE (employer) — remove category, keep guides (null out category_id)
+// DELETE (navody.kategorie) — remove category, keep guides (null out category_id)
 export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const c = await pozaduj('navody.kategorie');
+  if (jeOdpoved(c)) return c;
 
   const id = parseInt(params.id);
   const [existing] = await sql`SELECT id FROM guide_categories WHERE id = ${id} AND team_id = ${c.teamId}`;

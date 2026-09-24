@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Kontext volajícího z brány oprávnění (aktivní podnik z databáze).
 async function ctx() {
-  const s = await getServerSession(authOptions);
-  if (!s?.user) return null;
-  const meId = parseInt((s.user as any).id);
-  const role = (s.user as any).role as string;
-  const [u] = await sql`SELECT team_id, name FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | null, name: u?.name as string };
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, opr: c.role.opravneni };
 }
 
 const STATUSES = ['new', 'planned', 'done', 'declined'] as const;
@@ -31,8 +28,8 @@ const STATUS_LABEL: Record<string, string> = {
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId || c.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (jeOdpoved(c)) return c;
+  if (!c.opr.has('napady.pridat')) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
@@ -55,7 +52,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
 
   // Edit the text — author only (typo in your own idea shouldn't be forever).
   if (typeof b.title === 'string' || typeof b.content === 'string') {
-    if (s.author_id !== c.meId) return NextResponse.json({ error: 'Upravit může jen autor.' }, { status: 403 });
+    if (Number(s.author_id) !== c.meId) return NextResponse.json({ error: 'Upravit může jen autor.' }, { status: 403 });
     const title = typeof b.title === 'string' ? b.title.trim().slice(0, 200) : null;
     const content = typeof b.content === 'string' ? b.content.trim().slice(0, 2000) : null;
     if (title !== null && title) await sql`UPDATE suggestions SET title = ${title} WHERE id = ${id}`;
@@ -63,10 +60,13 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     return NextResponse.json({ ok: true });
   }
 
-  // Send to the planning board — employer only. Creates a card and marks the
+  // Send to the planning board — napady.spravovat a zároveň planovani.upravit
+  // (vzniká karta v plánování, takže bez práva plánovat to nejde). Creates a card and marks the
   // suggestion as planned, so an accepted idea doesn't die in the list.
   if (b.toPlanning) {
-    if (c.role !== 'employer') return NextResponse.json({ error: 'Jen vedení může plánovat.' }, { status: 403 });
+    if (!c.opr.has('napady.spravovat') || !c.opr.has('planovani.upravit')) {
+      return NextResponse.json({ error: 'Do plánování může podnět poslat jen ten, kdo spravuje podněty a plánování.' }, { status: 403 });
+    }
     const [full] = await sql`SELECT title, content FROM suggestions WHERE id = ${id}`;
     if (!full) return NextResponse.json({ error: 'Podnět nenalezen' }, { status: 404 });
     await sql`
@@ -76,14 +76,15 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     return NextResponse.json({ ok: true });
   }
 
-  // Change status — employer only.
+  // Change status — napady.spravovat.
   const status = String(b.status ?? '');
   if (STATUSES.includes(status as any)) {
-    if (c.role !== 'employer') return NextResponse.json({ error: 'Jen vedení může měnit stav.' }, { status: 403 });
+    if (!c.opr.has('napady.spravovat')) return NextResponse.json({ error: 'Stav může měnit jen ten, kdo spravuje podněty.' }, { status: 403 });
     await sql`UPDATE suggestions SET status = ${status} WHERE id = ${id} AND team_id = ${c.teamId}`;
     // Let the author know their idea moved (unless they changed it themselves).
-    if (s.author_id && s.author_id !== c.meId && STATUS_LABEL[status]) {
+    if (s.author_id && Number(s.author_id) !== c.meId && STATUS_LABEL[status]) {
       try {
+        // Odkaz podle typu účtu autora — ten určuje, které rozhraní se mu otevře.
         const [author] = await sql`SELECT role FROM users WHERE id = ${s.author_id}`;
         await notifyUser(s.author_id, {
           title: 'Tvůj podnět má nový stav',
@@ -99,18 +100,17 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   return NextResponse.json({ error: 'Neplatná akce' }, { status: 400 });
 }
 
-// DELETE — the author can remove their own; an employer can remove any.
+// DELETE — autor smaže svůj podnět, s napady.spravovat jakýkoli.
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 400 });
+  if (jeOdpoved(c)) return c;
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
   const [s] = await sql`SELECT author_id FROM suggestions WHERE id = ${id} AND team_id = ${c.teamId}`;
   if (!s) return NextResponse.json({ ok: true });
-  if (c.role !== 'employer' && s.author_id !== c.meId) {
+  if (!c.opr.has('napady.spravovat') && Number(s.author_id) !== c.meId) {
     return NextResponse.json({ error: 'Můžeš smazat jen svůj podnět.' }, { status: 403 });
   }
   await sql`DELETE FROM suggestion_votes WHERE suggestion_id = ${id}`;

@@ -1,9 +1,8 @@
 // Managing public share links. The pages themselves are rendered by /s/[token]
-// and need no auth — these endpoints are the employer's side of it.
+// and need no auth — these endpoints are the managing side of it (sdileni.spravovat).
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, LIMITS, SHARE_LIMIT_MSG } from '@/lib/plan';
 import { makeToken, normalizeExcluded, normalizeTheme } from '@/lib/share';
@@ -12,14 +11,11 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function employer() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  if (role !== 'employer') return null;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return u?.team_id ? { meId, teamId: Number(u.team_id) } : null;
+// Veřejné sdílené odkazy spravuje ten, kdo má sdileni.spravovat.
+async function spravce() {
+  const c = await pozaduj('sdileni.spravovat');
+  if (jeOdpoved(c)) return c;
+  return { meId: c.meId, teamId: c.teamId, opr: c.role.opravneni };
 }
 
 const mapRow = (r: any) => ({
@@ -36,8 +32,8 @@ const mapRow = (r: any) => ({
 });
 
 export async function GET() {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await spravce();
+  if (jeOdpoved(me)) return me;
 
   let links: any[] = [];
   try {
@@ -58,8 +54,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await spravce();
+  if (jeOdpoved(me)) return me;
 
   const b = await request.json();
   const kind = b.kind === 'guides' ? 'guides' : 'inventory';
@@ -68,6 +64,12 @@ export async function POST(request: Request) {
   const excluded = normalizeExcluded(b.excluded);
   const title = b.title ? String(b.title).trim().slice(0, 120) || null : null;
   const note = b.note ? String(b.note).trim().slice(0, 500) || null : null;
+  // Zveřejnit jde jen to, co člověk sám smí vidět — jinak by si sdíleným
+  // odkazem otevřel sklad nebo návody, ke kterým v aplikaci nemá přístup.
+  const potreba = kind === 'guides' ? 'navody.zobrazit' : 'sklad.zobrazit';
+  if (!me.opr.has(potreba)) {
+    return NextResponse.json({ error: 'Sdílet můžeš jen to, co sám smíš vidět.' }, { status: 403 });
+  }
 
   try {
 
@@ -96,8 +98,8 @@ export async function POST(request: Request) {
 
 // PATCH here saves the team-wide look of every share page.
 export async function PATCH(request: Request) {
-  const me = await employer();
-  if (!me) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const me = await spravce();
+  if (jeOdpoved(me)) return me;
 
   const b = await request.json();
   const theme = normalizeTheme(b.theme);

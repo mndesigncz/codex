@@ -8,7 +8,7 @@ import AnnouncementsManager from './AnnouncementsManager';
 import ShiftReviewModal from './ShiftReviewModal';
 import { PersonLink } from './ProfileLinkProvider';
 import {
-  isWidgetOn, readLayout, type LayoutEntry,
+  isWidgetOn, readLayout, parseTarget, type LayoutEntry,
   EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS,
 } from '@/lib/dashboardWidgets';
 import { DashboardEditor, LinkTile } from '../DashboardEditor';
@@ -25,6 +25,16 @@ interface RosterEntry {
   points?: number; flagged?: boolean;
   shiftLabel?: string | null; startTime?: string | null; endTime?: string | null;
   closingFiled?: boolean; tasksDone?: number; tasksMissed?: number; stepsSkipped?: number;
+}
+
+// Na který pohled vede dlaždice-odkaz — stejný překlad jako LinkTile
+// v DashboardEditor (sklad:Kategorie, view:X, procedure:…, guide:…).
+function pohledOdkazu(target: string): string {
+  const { kind, arg } = parseTarget(target);
+  if (kind === 'view') return arg;
+  if (kind === 'procedure') return 'procedures';
+  if (kind === 'guide') return 'guides';
+  return kind;
 }
 
 const plural = (n: number, one: string, few: string, many: string) => czForm(n, { one, few, many });
@@ -50,6 +60,13 @@ function rosterMeta(r: RosterEntry): string {
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string };
   onNavigate: (view: string, arg?: string) => void;
+  /**
+   * Smí role otevřít pohled? (kolo 67, klíče v EmployerLayout → KLICE_POHLEDU)
+   * Dlaždice, karty a odkazy vedoucí na pohled, na který role nemá, se
+   * nekreslí — jinak by přehled Skladníka lákal na Rozvrh a Uzávěrky, které
+   * skončí na „nemáš oprávnění". Vedení má všechno, takže vidí totéž co dřív.
+   */
+  smiPohled?: (view: string) => boolean;
 }
 
 function nextMonthStr() {
@@ -72,7 +89,7 @@ function StatCard({ icon, label, value, onClick, alert = false }: { icon: string
   );
 }
 
-export default function EmployerDashboard({ user, onNavigate }: Props) {
+export default function EmployerDashboard({ user, onNavigate, smiPohled: smi = () => true }: Props) {
   const money = useMoney();
   const [members, setMembers] = useState<any[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
@@ -296,7 +313,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         </div>
       );
     })() : null,
-    nextEvent: nextEvent ? (
+    nextEvent: nextEvent && smi('events') ? (
       <button onClick={() => onNavigate('events')} className="w-full text-left rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5 hover:bg-[#0A84FF]/[0.12] transition">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
@@ -336,15 +353,16 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
       </a>
     ) : null,
     clock: user.id ? <ClockWidget userId={parseInt(String(user.id))} /> : null,
-    kpis: (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard icon="users" label="Zaměstnanci" value={members.length} onClick={() => onNavigate('team-settings')} />
-              <StatCard icon="calendar" label="Směny dnes" value={todayShifts.length} onClick={() => onNavigate('shifts')} />
-              <StatCard icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('tasks')} />
-              <StatCard icon="warning" label="Kriticky málo" value={critical.length} onClick={() => onNavigate('inventory')} alert={critical.length > 0} />
-            </div>
-    ),
-    onShift: onShift.length > 0 ? (
+    kpis: (() => {
+      const karty = [
+        smi('team-settings') && <StatCard key="tym" icon="users" label="Zaměstnanci" value={members.length} onClick={() => onNavigate('team-settings')} />,
+        smi('shifts') && <StatCard key="smeny" icon="calendar" label="Směny dnes" value={todayShifts.length} onClick={() => onNavigate('shifts')} />,
+        smi('tasks') && <StatCard key="ukoly" icon="check" label="Aktivní úkoly" value={activeTasks.length} onClick={() => onNavigate('tasks')} />,
+        smi('inventory') && <StatCard key="sklad" icon="warning" label="Kriticky málo" value={critical.length} onClick={() => onNavigate('inventory')} alert={critical.length > 0} />,
+      ].filter(Boolean);
+      return karty.length ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{karty}</div> : null;
+    })(),
+    onShift: onShift.length > 0 && smi('attendance') ? (
               <button onClick={() => onNavigate('attendance')} className="w-full text-left rounded-3xl bg-[#C8F542]/[0.12] border border-[#C8F542]/35 p-5 hover:bg-[#C8F542]/[0.18] transition">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 min-w-0">
@@ -379,7 +397,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                       <p className="text-xs text-black/45">Projdi, co kdo udělal, a dej hodnocení.</p>
                     </div>
                   </div>
-                  <button onClick={() => onNavigate('rewards')} className="text-sm text-[#5B7A08] hover:brightness-110 shrink-0">Kalendář hodnocení →</button>
+                  {smi('rewards') && <button onClick={() => onNavigate('rewards')} className="text-sm text-[#5B7A08] hover:brightness-110 shrink-0">Kalendář hodnocení →</button>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-1 rounded-full glass border border-black/[0.07] p-1 mb-3">
@@ -435,7 +453,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
               </div>
     ) : null,
     announcements: <AnnouncementsManager />,
-    availability: (
+    availability: smi('shifts') ? (
             <div className="glass-card p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:flex-wrap mb-4">
                 <div className="min-w-0">
@@ -459,8 +477,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                 <p className="text-sm text-black/45">Zatím žádní zaměstnanci. Pozvěte tým v sekci Nastavení.</p>
               )}
             </div>
-    ),
-    lowStock: (
+    ) : null,
+    lowStock: smi('inventory') ? (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="t-card">Nízké zásoby</h3>
@@ -482,8 +500,8 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   </div>
                 )}
               </div>
-    ),
-    todayShifts: (
+    ) : null,
+    todayShifts: smi('shifts') ? (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="t-card">Dnešní směny</h3>
@@ -505,7 +523,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
                   </div>
                 )}
               </div>
-    ),
+    ) : null,
   };
 
   return (
@@ -516,7 +534,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
           { done: shifts.length > 0, label: 'Naplánovat první směny', view: 'shifts' },
           { done: inventory.length > 0, label: 'Založit sklad (kategorie a položky)', view: 'inventory' },
           { done: closingsCount > 0, label: 'Vyplnit první uzávěrku', view: 'reports' },
-        ];
+        ].filter(st => smi(st.view));
         const remaining = steps.filter(st => !st.done);
         if (onboardingDismissed || remaining.length === 0) return null;
         return (
@@ -554,23 +572,23 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
         );
       })()}
 
-      {(pendingApprovals.timeoff > 0 || pendingApprovals.swaps > 0 || pendingApprovals.closings > 0) && (
+      {((smi('shifts') && (pendingApprovals.timeoff > 0 || pendingApprovals.swaps > 0)) || (smi('reports') && pendingApprovals.closings > 0)) && (
         <div className="card card-wait p-4 sm:p-5">
           <p className="t-card flex items-center gap-2 mb-2.5">
             <Icon name="warning" size={17} className="text-[var(--wait-ink)]" /> Čeká na tvoje rozhodnutí
           </p>
           <div className="flex flex-wrap gap-2">
-            {pendingApprovals.timeoff > 0 && (
+            {smi('shifts') && pendingApprovals.timeoff > 0 && (
               <button onClick={() => onNavigate('shifts')} className="btn btn-secondary">
                 <Icon name="calendar" size={15} className="text-black/45" /> {pendingApprovals.timeoff}× žádost o volno
               </button>
             )}
-            {pendingApprovals.swaps > 0 && (
+            {smi('shifts') && pendingApprovals.swaps > 0 && (
               <button onClick={() => onNavigate('shifts')} className="btn btn-secondary">
                 <Icon name="swap" size={15} className="text-black/45" /> {pendingApprovals.swaps}× výměna směny
               </button>
             )}
-            {pendingApprovals.closings > 0 && (
+            {smi('reports') && pendingApprovals.closings > 0 && (
               <button onClick={() => onNavigate('reports')} className="btn btn-secondary">
                 <Icon name="trend" size={15} className="text-black/45" /> {pendingApprovals.closings}× uzávěrka ke schválení
               </button>
@@ -613,7 +631,7 @@ export default function EmployerDashboard({ user, onNavigate }: Props) {
 
       {layout.map((e, i) =>
         e.type === 'link'
-          ? <LinkTile key={`l-${e.target}-${i}`} entry={e} onNavigate={onNavigate} />
+          ? smi(pohledOdkazu(e.target)) && <LinkTile key={`l-${e.target}-${i}`} entry={e} onNavigate={onNavigate} />
           : <Fragment key={`w-${e.id}-${i}`}>{blocks[e.id] ?? null}</Fragment>,
       )}
 

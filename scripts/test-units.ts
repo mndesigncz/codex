@@ -38,6 +38,7 @@ import { normalizePlan } from '../lib/floorplan.ts';
 import { verejnaHlaska } from '../lib/verejnaChyba.ts';
 import { planInfoOf } from '../lib/plan.ts';
 import { pragueMomentOf } from '../lib/pragueTime.ts';
+import { KATALOG, SYSTEMOVE_ROLE, VSECHNA, sZavislostmi, bezZavislych, navic, smiUpravitRoli, smiPriraditRoli, smiSpravovatClena, smiBytVychozi, roleZTypu, vycisti, KIOSK_BILA_LISTINA } from '../lib/opravneni.ts';
 import { premapujPodleNazvu, premapujKroky, premapujGuideId, volnySlug, nazvyNormovane } from '../lib/kopie.ts';
 
 let failed = 0;
@@ -969,6 +970,53 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   const mapa = new Map([[1, 101], [2, 102]]);
   eq('kopie: přemapování rodiče', [premapujRodice(null, mapa), premapujRodice(2, mapa), premapujRodice(7, mapa)], [null, 102, null]);
   eq('řazení: vlastní první, pak position, pak id', seradVlastniPrvni([{ id: 5, team_id: 9, position: 0 }, { id: 3, team_id: 2, position: 2 }, { id: 4, team_id: 2, position: 1 }, { id: 1, team_id: 9, position: 0 }], 2).map(r => r.id), [4, 3, 1, 5]);
+}
+
+// ---- Role a oprávnění (kolo 67) ----
+{
+  const ids = new Set(VSECHNA);
+  ok('oprávnění: klíče v katalogu jsou jedinečné', ids.size === KATALOG.length);
+  ok('oprávnění: každá závislost je známý klíč', KATALOG.every(o => o.vyzaduje.every(z => ids.has(z))));
+  ok('oprávnění: systémové role nesou jen známé klíče', SYSTEMOVE_ROLE.every(r => r.opravneni.every(x => ids.has(x))));
+  ok('oprávnění: systémové role jsou uzavřené na závislosti', SYSTEMOVE_ROLE.every(r => sZavislostmi(r.opravneni).length === new Set(r.opravneni).size));
+  ok('oprávnění: Vedení má celý katalog', SYSTEMOVE_ROLE.find(r => r.klic === 'vedeni')!.opravneni.length === KATALOG.length);
+  ok('oprávnění: role Kiosk je celá z bílé listiny tabletu', SYSTEMOVE_ROLE.find(r => r.klic === 'kiosk')!.opravneni.every(x => KIOSK_BILA_LISTINA.has(x)));
+  eq('oprávnění: dnešní role → systémové', [roleZTypu('employer').klic, roleZTypu('employee').klic, roleZTypu('kiosk').klic, roleZTypu(null).klic], ['vedeni', 'barista', 'kiosk', 'barista']);
+  eq('oprávnění: zapnutí doplní závislosti', sZavislostmi(['sklad.ceny_upravit']), ['sklad.ceny', 'sklad.ceny_upravit', 'sklad.zobrazit']);
+  eq('oprávnění: vypnutí vypne, co na tom stojí', bezZavislych(['sklad.zobrazit', 'sklad.ceny', 'sklad.ceny_upravit', 'sklad.hlasit'], 'sklad.zobrazit'), ['sklad.hlasit']);
+  eq('oprávnění: neznámé klíče z klienta zmizí', vycisti(['sklad.zobrazit', 'admin.vse', 42, 'sklad.zobrazit']), ['sklad.zobrazit']);
+  eq('oprávnění: navíc', navic(['a', 'b', 'c'], ['b']), ['a', 'c']);
+
+  const provozni = SYSTEMOVE_ROLE.find(r => r.klic === 'provozni')!.opravneni;
+  const barista = SYSTEMOVE_ROLE.find(r => r.klic === 'barista')!.opravneni;
+  const V = { jeVlastnik: false, opravneni: provozni };
+  ok('eskalace: vlastník smí vytvořit cokoli', smiUpravitRoli({ jeVlastnik: true, opravneni: [] }, [], VSECHNA).ok);
+  ok('eskalace: provozní vytvoří roli z vlastních oprávnění', smiUpravitRoli(V, [], barista.filter(x => provozni.includes(x))).ok);
+  ok('eskalace: do role nejde dát, co nemám (finance.mzdy)', !smiUpravitRoli(V, [], ['finance.mzdy']).ok);
+  ok('eskalace: roli s víc právy nejde osekat (sesazení nadřízeného)', !smiUpravitRoli(V, ['finance.mzdy', 'sklad.zobrazit'], ['sklad.zobrazit']).ok);
+  ok('eskalace: vlastní přiřazenou roli si nikdo neupraví', !smiUpravitRoli(V, provozni, provozni, { jeJehoRole: true }).ok);
+  ok('eskalace: tablet nedostane finance ani přes vlastníka', !smiUpravitRoli({ jeVlastnik: true, opravneni: VSECHNA }, [], ['finance.trzby'], { typ: 'kiosk' }).ok);
+  const clen = (soucasna: string[], extra = {}) => ({ jeVlastnik: false, jeTo: false, soucasna, soucasnaKlic: null, ...extra });
+  ok('přiřazení: provozní dá baristovi roli Barista', smiPriraditRoli(V, clen([]), { opravneni: barista, klic: 'barista' }).ok);
+  ok('přiřazení: nejde přidělit víc, než mám', !smiPriraditRoli(V, clen(barista), { opravneni: [...barista, 'finance.mzdy'] }).ok);
+  ok('přiřazení: nejde sáhnout na člena s víc právy', !smiPriraditRoli(V, clen(['finance.mzdy']), { opravneni: barista }).ok);
+  ok('přiřazení: vlastníkovi roli nezmění nikdo', !smiPriraditRoli({ jeVlastnik: true, opravneni: VSECHNA }, clen([], { jeVlastnik: true }), { opravneni: barista }).ok);
+  ok('přiřazení: sám sobě roli nezmění', !smiPriraditRoli(V, clen(barista, { jeTo: true }), { opravneni: barista }).ok);
+  // Invariant: dnes smí každý vedoucí dát i vzít Vedení a spravovat jiného
+  // vedoucího. Chrání jen porovnání sad — na člověka s víc právy nesáhne.
+  const vedouci = { jeVlastnik: false, opravneni: VSECHNA };
+  ok('přiřazení: vedoucí (ne vlastník) dá roli Vedení', smiPriraditRoli(vedouci, clen(barista), { opravneni: VSECHNA, klic: 'vedeni' }).ok);
+  ok('přiřazení: vedoucí vezme jinému vedoucímu Vedení', smiPriraditRoli(vedouci, clen(VSECHNA, { soucasnaKlic: 'vedeni' }), { opravneni: barista, klic: 'barista' }).ok);
+  ok('přiřazení: vedoucí spravuje jiného vedoucího se stejnou sadou', smiSpravovatClena(vedouci, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  ok('přiřazení: provozní nedá Vedení (nemá celou sadu)', !smiPriraditRoli(V, clen(barista), { opravneni: VSECHNA, klic: 'vedeni' }).ok);
+  ok('přiřazení: provozní nesáhne na vedoucího (víc práv)', !smiSpravovatClena(V, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  ok('přiřazení: vedoucí bez jednoho klíče nesáhne na plné Vedení', !smiSpravovatClena({ jeVlastnik: false, opravneni: VSECHNA.filter(x => x !== 'finance.mzdy') }, clen(VSECHNA, { soucasnaKlic: 'vedeni' })).ok);
+  // Tablet dnes zakládá konverzace — role Kiosk o to nesmí přijít.
+  ok('oprávnění: Kiosk smí zakládat konverzace (chat.prime)', SYSTEMOVE_ROLE.find(r => r.klic === 'kiosk')!.opravneni.includes('chat.prime') && KIOSK_BILA_LISTINA.has('chat.prime'));
+  ok('eskalace: vlastní role tabletu smí mít chat.prime', smiUpravitRoli({ jeVlastnik: true, opravneni: VSECHNA }, [], ['chat.pouzivat', 'chat.prime'], { typ: 'kiosk' }).ok);
+  ok('výchozí role: Barista smí být výchozí', smiBytVychozi(barista).ok);
+  ok('výchozí role: s tym.pozvat ne', !smiBytVychozi(['tym.zobrazit', 'tym.pozvat']).ok);
+  ok('výchozí role: s citlivým oprávněním ne', !smiBytVychozi(['finance.mzdy']).ok);
 }
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed

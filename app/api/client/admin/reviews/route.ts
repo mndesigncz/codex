@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { sql, employer } from '@/lib/client';
+import { sql } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 
 /** Pražský den hodnocení; prázdný, když čas z databáze nedává smysl. */
@@ -7,8 +8,9 @@ const dayOf = (v: any) => { const t = parseDbTime(v); return t ? pragueDayOf(t) 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('zakaznici.recenze');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const reviews = await sql`
     SELECT v.id, v.ref, v.rating, v.note, v.created_at, us.name AS customer_name
     FROM client_reviews v JOIN users us ON us.id = v.customer_id

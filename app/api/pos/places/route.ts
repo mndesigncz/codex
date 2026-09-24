@@ -1,24 +1,20 @@
 // Provozovny (places) merchanta ve Storyous. Jeden podnik jich může mít víc —
 // třeba stálou provozovnu a mobilní stánek. Výjezdová akce si pak přiřadí svoji
 // kasu a tržby dvou provozoven se nemíchají.
+//
+// Kolo 67: seznam potřebuje i ten, kdo jen spravuje akce (přiřazuje jim
+// kasu), ne jen ten, kdo vidí nastavení pokladny — proto stačí kterékoli.
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { neon } from '@neondatabase/serverless';
 import { getConnection, merchantInfo } from '@/lib/storyous';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
-const sql = neon(process.env.DATABASE_URL!);
-
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT role, team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Jen pro vedení.' }, { status: 403 });
-  const conn = await getConnection(u.team_id);
+  const c = await pozaduj(['pokladna.stav', 'akce.upravit']);
+  if (jeOdpoved(c)) return c;
+  const conn = await getConnection(c.teamId);
   if (!conn) return NextResponse.json({ places: [], current: null });
   try {
     const m = await merchantInfo(conn);

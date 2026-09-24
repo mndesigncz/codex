@@ -3,32 +3,36 @@
 // standings stay a single source of truth.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { pointsAvailableFor } from '@/lib/pointsBalance';
 import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueToday } from '@/lib/pragueTime';
-import { ciselnikPodniku, tymyCiselniku, vedeniPodniku } from '@/lib/tenant';
+import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Volající z brány oprávnění. Každý člen vidí aktivní katalog a své žádosti
+// a smí žádat o odměnu; správa katalogu je odmeny.katalog, vyřizování žádostí
+// odmeny.schvalovat. `kiosk` je typ účtu — sdílený tablet body nemá.
 async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id, name FROM users WHERE id = ${id}`;
-  return u ?? null;
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  let name = '';
+  try { const [u] = await sql`SELECT name FROM users WHERE id = ${c.meId}`; name = String(u?.name ?? ''); } catch { /* jméno je jen do upozornění */ }
+  return { id: c.meId, team_id: c.teamId, name, kiosk: c.role.typ === 'kiosk', opr: c.role.opravneni };
 }
 
 export async function GET() {
   const u = await me();
-  if (!u?.team_id) return NextResponse.json({ catalog: [], redemptions: [] });
-  const teamId = Number(u.team_id);
+  if (jeOdpoved(u)) return u;
+  const teamId = u.team_id;
+  const spravujeKatalog = u.opr.has('odmeny.katalog');
+  const schvaluje = u.opr.has('odmeny.schvalovat');
   try {
     // Sdílené číselníky (kolo 60): katalog může spravovat jiný podnik
     // organizace. Které podniky čteme, rozhoduje jediné místo (lib/tenant.ts);
@@ -39,7 +43,7 @@ export async function GET() {
     // vidí každý člen organizace i v seznamu podniků. Zaměstnanec katalog
     // jen čte, takže oba údaje dostane jen vedení.
     const { tymy, jsemZdroj, spravuje } = await ciselnikPodniku(teamId, 'odmeny');
-    const rows = u.role === 'employer'
+    const rows = spravujeKatalog
       ? await sql`
           SELECT id, team_id, title, icon, cost, active, created_at FROM rewards_catalog
           WHERE team_id = ANY(${tymy})
@@ -50,11 +54,11 @@ export async function GET() {
           ORDER BY (team_id = ${teamId}) DESC, cost ASC, id ASC`;
     const catalog = (rows as any[]).map(r => {
       const zOrganizace = Number(r.team_id) !== teamId;
-      return u.role === 'employer'
+      return spravujeKatalog
         ? { ...r, zOrganizace, sdileno: !zOrganizace && jsemZdroj, spravuje: zOrganizace ? spravuje : null }
         : { ...r, zOrganizace };
     });
-    const redemptions = u.role === 'employer'
+    const redemptions = schvaluje
       ? await sql`
           SELECT rr.*, us.name AS employee_name, us.avatar AS employee_avatar
           FROM reward_redemptions rr JOIN users us ON us.id = rr.employee_id
@@ -72,15 +76,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   if (!(await teamIsPro(u.team_id))) {
     return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
   }
 
-  // Employer manages the catalog.
+  // Správa katalogu — odmeny.katalog.
   if (b.manage === true) {
-    if (u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+    if (!u.opr.has('odmeny.katalog')) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
     const title = String(b.title ?? '').trim().slice(0, 120);
     const cost = Math.max(1, Math.round(Number(b.cost) || 0));
     if (!title) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
@@ -93,14 +97,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Employee redeems.
-  if (u.role === 'kiosk') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (u.kiosk) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
   const rewardId = parseInt(b.rewardId);
   if (!Number.isFinite(rewardId)) return NextResponse.json({ error: 'Chybí odměna' }, { status: 400 });
   // Vyměnit jde i odměnu ze zdrojového podniku organizace (kolo 60): cíl se
   // ověřuje proti viditelným podnikům, nikdy proti holému id. Žádost sama
   // zůstává řádkem TOHOTO podniku (team_id = u.team_id, title i cost
   // zkopírované), takže body se odečtou tam, kde člověk pracuje.
-  const tymy = await tymyCiselniku(Number(u.team_id), 'odmeny');
+  const tymy = await tymyCiselniku(u.team_id, 'odmeny');
   const [reward] = await sql`
     SELECT id, title, cost FROM rewards_catalog
     WHERE id = ${rewardId} AND team_id = ANY(${tymy}) AND active = TRUE`;
@@ -119,8 +123,9 @@ export async function POST(req: NextRequest) {
     VALUES (${u.team_id}, ${u.id}, ${rewardId}, ${reward.title}, ${reward.cost})
     RETURNING *`;
   try {
-    // Kolo 62: vedení podle členství, ne zrcadla.
-    const employers = await vedeniPodniku(u.team_id);
+    // Kolo 62: podle členství, ne zrcadla. Kolo 67: žádost dostane ten,
+    // kdo ji smí vyřídit (odmeny.schvalovat).
+    const employers = await clenoveSOpravnenim(u.team_id, 'odmeny.schvalovat');
     await notifyUsers(employers, {
       title: '🎁 Žádost o odměnu',
       body: `${u.name ?? 'Zaměstnanec'} chce vyměnit ${reward.cost} bodů za „${reward.title}".`,
@@ -133,12 +138,13 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
+  const zakazano = () => NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
 
-  // Catalog toggles/edits.
+  // Catalog toggles/edits — odmeny.katalog.
   if (b.manage === true) {
+    if (!u.opr.has('odmeny.katalog')) return zakazano();
     const id = parseInt(b.id);
     if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
     if (typeof b.active === 'boolean') {
@@ -147,6 +153,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Vyřízení žádosti — odmeny.schvalovat.
+  if (!u.opr.has('odmeny.schvalovat')) return zakazano();
   const id = parseInt(b.id);
   const action = b.action === 'approve' ? 'approve' : b.action === 'decline' ? 'decline' : null;
   if (!Number.isFinite(id) || !action) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
@@ -201,8 +209,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const u = await me();
-  if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj('odmeny.katalog');
+  if (jeOdpoved(c)) return c;
+  const u = { team_id: c.teamId };
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
   await sql`DELETE FROM rewards_catalog WHERE id = ${id} AND team_id = ${u.team_id}`;

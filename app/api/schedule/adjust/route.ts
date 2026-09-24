@@ -7,13 +7,12 @@
 
 import { NextResponse } from 'next/server';
 import { coverageGaps } from '@/lib/coverage';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { audit } from '@/lib/audit';
 import { prefAllowsSlot, dayPrefLabel, isRestrictingPref, type PrefType } from '@/lib/dayPrefs';
 import { tymyCiselniku, clenovePodniku, clenPodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,20 +36,10 @@ function shiftHours(start: string, end: string): number {
 }
 const dayNum = (d: string) => `${parseInt(d.split('-')[2])}.${parseInt(d.split('-')[1])}.`;
 
-async function ctx() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
-}
-
 export async function POST(req: Request) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (c.role !== 'employer') return NextResponse.json({ error: 'Pouze pro zaměstnavatele' }, { status: 403 });
-  if (!c.teamId) return NextResponse.json({ error: 'Bez týmu' }, { status: 400 });
+  // Přeřazení i zrušení kolidující směny je úprava rozvrhu — náhled i zápis.
+  const c = await pozaduj('rozvrh.upravit');
+  if (jeOdpoved(c)) return c;
 
   const body = await req.json().catch(() => ({}));
   const month: string = String(body.month ?? '');

@@ -4,14 +4,16 @@
 //
 // Čte prodeje z položek účtenek v našem zrcadle pokladny, ne živě —
 // měsíc účtenek by znamenal jeden požadavek na účet.
+//
+// Kolo 67: `finance.marze` — obsahuje nákupní ceny surovin, proto na něm
+// v katalogu visí i `sklad.ceny`.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
 import { productsFromMirror, soldLines, type SoldLine } from '@/lib/posMirror';
 import { pragueToday } from '@/lib/pragueTime';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -32,14 +34,9 @@ export interface ProductMargin {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || (session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ connected: false });
-  const teamId = u.team_id as number;
+  const c = await pozaduj('finance.marze');
+  if (jeOdpoved(c)) return c;
+  const teamId = c.teamId;
 
   const month = String(new URL(req.url).searchParams.get('month') ?? pragueToday().slice(0, 7));
   if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });

@@ -7,10 +7,11 @@
 // Hotová objednávka připíše body za útratu a razítko za návštěvu (nejvýš
 // jedno denně, ať tři čaje nejsou tři návštěvy).
 
-import { sql, award, stampVisit, notifyTeamEmployers, ensureProfile } from './client';
+import { sql, award, stampVisit, ensureProfile } from './client';
+import { clenoveSOpravnenim } from './opravneniDb';
 import { normName } from './menuPos';
 import { getConnection, createTableOrder, confirmTableOrder, tableOrderState, StoryousError } from './storyous';
-import { notifyUser } from './push';
+import { notifyUser, notifyUsers } from './push';
 import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
 import { createHmac } from 'crypto';
 
@@ -283,10 +284,17 @@ export async function applyPosState(teamId: number, order: any, st: string): Pro
 
 export async function notifyNewOrder(teamId: number, customerName: string, tableName: string | null, total: number, id: number, posNote?: string | null) {
   const kdo = `${customerName}${tableName ? ` · ${tableName}` : ''} · ${total} Kč`;
-  await notifyTeamEmployers(teamId, {
-    title: posNote ? 'Objednávka není v pokladně' : 'Nová objednávka od stolu',
-    body: posNote ? `${kdo} — ${posNote}` : kdo,
-    link: '/employer/overview?mode=client&tab=orders', type: posNote ? 'warning' : 'info',
-  });
+  // Příjemci = kdo vstoupí do Managero client (klient.prehled), protože
+  // odkaz vede tam. Ne objednavky.vyridit: to má i barista a tablet, kteří
+  // objednávku vidí v příjmu obsluhy a push na obrazovku vedení by jim
+  // k ničemu nebyl. Pro dnešní role je to totéž co dřív (jen Vedení).
+  try {
+    const ids = await clenoveSOpravnenim(teamId, 'klient.prehled');
+    if (ids.length) await notifyUsers(ids, {
+      title: posNote ? 'Objednávka není v pokladně' : 'Nová objednávka od stolu',
+      body: posNote ? `${kdo} — ${posNote}` : kdo,
+      link: '/employer/overview?mode=client&tab=orders', type: posNote ? 'warning' : 'info', category: 'general',
+    });
+  } catch { /* oznámení je best-effort */ }
   void id;
 }

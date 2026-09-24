@@ -2,7 +2,8 @@
 // Podklad se ukládá rovnou do plánku (očištěné SVG textem, rastr jako
 // data URI) — host totiž nemá tým, takže na chráněné /api/upload nedosáhne.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer, ensureProfile } from '@/lib/client';
+import { sql, ensureProfile } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizePlan, EMPTY_PLAN } from '@/lib/floorplan';
 import { sanitizeSvg } from '@/lib/svgSanitize';
 import { audit } from '@/lib/audit';
@@ -15,16 +16,18 @@ const MAX_IMG = 500 * 1024;
 const MAX_SVG = 400 * 1024;
 
 export async function GET() {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const p = await ensureProfile(u.team_id);
   const tables = await sql`SELECT id, name, seats, active, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${u.team_id} ORDER BY position, id`;
   return NextResponse.json({ plan: p.floorplan ? normalizePlan(p.floorplan) : EMPTY_PLAN, tables });
 }
 
 export async function PUT(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.upravit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   await ensureProfile(u.team_id);
   const b = await req.json().catch(() => ({}));
   const plan = normalizePlan(b.plan);
@@ -54,8 +57,9 @@ export async function PUT(req: NextRequest) {
 
 /** Nahrání podkladu: SVG se očistí, obrázek překlopí do data URI. */
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('stoly.upravit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const form = await req.formData().catch(() => null);
   const file = form?.get('file');
   if (!file || typeof file === 'string') return NextResponse.json({ error: 'Chybí soubor.' }, { status: 400 });

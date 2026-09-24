@@ -1,13 +1,15 @@
 // Ruční úprava bodů (omluva, bonus, oprava) a deník člena.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer, award, awardCredit, loyaltySummary } from '@/lib/client';
+import { sql, award, awardCredit, loyaltySummary } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj('vernost.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const q = new URL(req.url).searchParams;
   // Bez čísla hosta vrací souhrn celé věrnosti pro přehled záložky.
   const cid = parseInt(String(q.get('customerId')), 10);
@@ -42,9 +44,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const ctx = await pozaduj(['vernost.upravit_body', 'vernost.kredit_upravit']);
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
+  // Kredit jsou peníze hosta u podniku, body jen odměna — ruční zásah do
+  // kreditu je proto samostatné oprávnění.
+  const klic = b.what === 'credit' ? 'vernost.kredit_upravit' : 'vernost.upravit_body';
+  if (!ctx.role.opravneni.has(klic)) {
+    return NextResponse.json({ error: b.what === 'credit' ? 'Upravovat kredit hostů nemáš povoleno.' : 'Upravovat body hostů nemáš povoleno.' }, { status: 403 });
+  }
   const cid = parseInt(String(b.customerId), 10);
   const delta = Math.max(-100000, Math.min(100000, parseInt(String(b.delta), 10) || 0));
   if (!cid || !delta) return NextResponse.json({ error: 'Kolik bodů a komu?' }, { status: 400 });

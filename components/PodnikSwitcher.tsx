@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
-import { okJson } from '@/lib/api';
+import { nactiTeamsMine } from './role/useOpravneni';
 
 interface Podnik { teamId: number; teamName: string; role: 'employer' | 'employee' }
 interface Data { activeTeamId: number | null; teams: Podnik[]; organization: { name: string; isOwner: boolean } | null; muzuZalozit: boolean }
@@ -26,11 +26,9 @@ export function uklidKonceptu() {
 
 // Dva přepínače na stránce (boční pás + hlavička telefonu) sdílí jeden
 // požadavek na /api/teams/mine; druhý by jen zdvojil čtyři dotazy do databáze.
-let sdileneNacteni: Promise<any> | null = null;
-function nactiPodniky(znovu: boolean): Promise<any> {
-  if (znovu || !sdileneNacteni) sdileneNacteni = fetch('/api/teams/mine').then(okJson).catch(e => { sdileneNacteni = null; throw e; });
-  return sdileneNacteni;
-}
+// Od kola 67 ho sdílí i oprávnění (components/role/useOpravneni) — stejná
+// odpověď nese role a oprávnění v aktivním podniku.
+const nactiPodniky = (znovu: boolean): Promise<any> => nactiTeamsMine(znovu);
 
 /**
  * `jenPrepinani`: v hlavičce telefonu se kreslí jen tomu, kdo má víc podniků

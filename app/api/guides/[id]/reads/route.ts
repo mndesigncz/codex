@@ -4,11 +4,11 @@
 // zjistit, komu připomenout — a povinné čtení, u kterého nejde zjistit, kdo
 // chybí, je jen odznak. Odsud jdou obě skupiny jménem.
 //
-// Čte jen vedení: kdo co přečetl je informace o lidech, ne o návodu.
+// Čte jen ten, kdo řídí povinné čtení (navody.povinne_cteni): kdo co
+// přečetl je informace o lidech, ne o návodu.
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 
 export const dynamic = 'force-dynamic';
@@ -17,14 +17,9 @@ const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if ((session.user as any).role !== 'employer') {
-    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  }
-  const meId = parseInt((session.user as any).id);
-  const [me] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!me?.team_id) return NextResponse.json({ read: [], unread: [] });
+  const c = await pozaduj('navody.povinne_cteni');
+  if (jeOdpoved(c)) return c;
+  const me = { team_id: c.teamId };
 
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });

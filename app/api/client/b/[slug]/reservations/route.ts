@@ -2,11 +2,26 @@
 // „požadavek". Termín musí být v otevírací době a v dosahu, který podnik dovolí.
 
 import { NextResponse } from 'next/server';
-import { sql, customer, profileBySlug, join, slotsFor, notifyTeamEmployers } from '@/lib/client';
+import { sql, customer, profileBySlug, join, slotsFor } from '@/lib/client';
+import { clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { notifyUsers } from '@/lib/push';
+
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+/**
+ * Nová rezervace čeká na potvrzení — dozví se o ní ten, kdo ji smí potvrdit
+ * (rezervace.schvalovat), ne každý z vedení a ne celá obsluha.
+ * Upozornění je best-effort: host svou akci provedl, i když push neodejde.
+ */
+async function upozorni(teamId: number, payload: { title: string; body?: string; link?: string; type?: string }) {
+  try {
+    const ids = await clenoveSOpravnenim(teamId, 'rezervace.schvalovat');
+    if (ids.length) await notifyUsers(ids, { ...payload, category: 'general' });
+  } catch { /* bez upozornění */ }
+}
 
 export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
@@ -45,7 +60,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     }
     throw e;
   }
-  await notifyTeamEmployers(teamId, {
+  await upozorni(teamId, {
     title: 'Nová rezervace',
     body: `${me.name} · ${date.split('-').reverse().join('. ')} ${time} · ${party} ${party === 1 ? 'osoba' : party < 5 ? 'osoby' : 'osob'}`,
     link: '/employer/overview?mode=client&tab=reservations', type: 'info',

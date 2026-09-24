@@ -6,17 +6,17 @@ import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
 import { planInfoOf } from '@/lib/plan';
 import { clenovePodniku } from '@/lib/tenant';
+import { roleClena, pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { roleZTypu } from '@/lib/opravneni';
 
 export const dynamic = 'force-dynamic';
 
 async function currentUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return null;
-  return {
-    id: parseInt((session.user as any).id),
-    role: (session.user as any).role as string,
-    teamId: (session.user as any).teamId as number | null,
-  };
+  // Jen identita. Role ani podnik ze session se tu nečtou: podnik je
+  // z databáze a oprávnění z členství (roleClena níž).
+  return { id: parseInt((session.user as any).id) };
 }
 
 export async function GET() {
@@ -37,6 +37,17 @@ export async function GET() {
     // pending migration can NEVER make a team look like it disappeared.
     const [team] = await sql`SELECT id, name, owner_id, join_code, created_at FROM teams WHERE id = ${teamId}`;
     if (!team) return NextResponse.json({ team: null });
+
+    // Kolo 67: nastavení podniku (měna, uzávěrky, přehledy, tarif…) čte každý
+    // člen — stojí na nich jeho vlastní obrazovky i tablet. Citlivá pole jen
+    // s oprávněním: kód pro připojení (tym.pozvat), e-maily a telefony
+    // (tym.kontakty), sazby (finance.mzdy), podrobnosti předplatného
+    // (predplatne.zobrazit). Kdo v podniku není členem (host se zrcadlem
+    // team_id), neprojde vůbec — dřív tu dostal i join kód.
+    const r = await roleClena(me.id, Number(teamId));
+    if (!r) return NextResponse.json({ team: null });
+    const ma = (k: string) => r.opravneni.has(k);
+    if (!ma('tym.pozvat')) team.join_code = null;
 
     // Optional/newer columns fetched defensively; missing column ⇒ safe default.
     let payDailyCash = false;
@@ -112,7 +123,13 @@ export async function GET() {
       try { [planRow] = await sql`SELECT plan, trial_ends_at FROM teams WHERE id = ${teamId}`; }
       catch { /* columns not migrated yet ⇒ grandfathered pro */ }
     }
-    const planInfo = planInfoOf(planRow);
+    const planInfoPlne = planInfoOf(planRow);
+    // Tarif a zkušební doba zůstávají všem (podle nich UI zamyká funkce);
+    // stav plateb, období a nabídky jen tomu, kdo předplatné vidí.
+    const planInfo = ma('predplatne.zobrazit') ? planInfoPlne : {
+      ...planInfoPlne, pastDue: false, cancelAt: null, interval: null, subscriptionStatus: null,
+      maxOfferUntil: null, hadSubscription: false,
+    };
 
     // The link pinned to every dashboard (employer, employees, kiosk).
     let pinnedShare: { token: string; title: string | null; kind: string } | null = null;
@@ -124,15 +141,31 @@ export async function GET() {
     } catch { /* not migrated yet */ }
 
     // Členství NEBO zrcadlo (kolo 62): člen přepnutý do jiného podniku tu
-    // dřív zmizel. Role, pozice a sazba jsou z členství v TOMHLE podniku;
-    // sazbu vidí jen vedení. Klíče odpovědi zůstávají, přibylo aktivni_jinde.
-    const jeVedeni = me.role === 'employer';
-    const members = (await clenovePodniku(teamId, { sSazbou: jeVedeni })).map(c => ({
-      id: c.id, name: c.name, email: c.email, role: c.role, avatar: c.avatar, phone: c.phone,
-      job_title: c.jobTitle, shift_preference: c.shiftPreference,
-      hourly_rate: jeVedeni ? (c.hourlyRate ?? 0) : null,
-      aktivni_jinde: c.aktivniJinde,
-    }));
+    // dřív zmizel. Role, pozice a sazba jsou z členství v TOMHLE podniku.
+    // Klíče odpovědi zůstávají, přibylo aktivni_jinde. `role` je typ účtu
+    // (rozhraní, rozvrh, žebříček), ne role s oprávněními.
+    const sazby = ma('finance.mzdy');
+    const kontakty = ma('tym.kontakty');
+    // Role s oprávněními (role_klic / role_id / role_nazev) — bez nich
+    // Nastavení týmu ukazovalo jen typ účtu („Vedoucí") a vlastní role po
+    // obnovení stránky zmizela z výběru i ze štítku. Bere se z roleClena,
+    // aby seznam říkal totéž, co pak platí na serveru (včetně vlastníka
+    // a náhrady podle typu účtu, když role v členství chybí).
+    const clenove = await clenovePodniku(teamId, { sSazbou: sazby });
+    const role = await Promise.all(clenove.map(c => roleClena(c.id, Number(teamId)).catch(() => null)));
+    const members = clenove.map((c, i) => {
+      const rc = role[i];
+      const zTypu = roleZTypu(c.role);
+      return {
+        id: c.id, name: c.name, email: kontakty ? c.email : null, role: c.role, avatar: c.avatar, phone: kontakty ? c.phone : null,
+        job_title: c.jobTitle, shift_preference: c.shiftPreference,
+        hourly_rate: sazby ? (c.hourlyRate ?? 0) : null,
+        aktivni_jinde: c.aktivniJinde,
+        role_klic: rc ? rc.klic : zTypu.klic,
+        role_id: rc ? rc.roleId : null,
+        role_nazev: rc ? rc.nazev : zTypu.nazev,
+      };
+    });
 
     return NextResponse.json({
       planInfo,
@@ -147,23 +180,41 @@ export async function GET() {
   }
 }
 
-// PATCH: rename team or regenerate join code (employer only)
+// PATCH: nastavení podniku. Kolo 67: každé pole hlídá své oprávnění (viz
+// POLE). Když chybí oprávnění k jedinému poslanému poli, neuloží se nic —
+// půlka změny by vypadala jako úspěch (stejně jako teams/members).
+const POLE: Record<string, string> = {
+  name: 'podnik.nastaveni', currency: 'podnik.nastaveni', locale: 'podnik.nastaveni', weekStart: 'podnik.nastaveni',
+  businessType: 'podnik.nastaveni', dashboardConfig: 'podnik.nastaveni', showTeamSchedule: 'podnik.nastaveni',
+  regenerateCode: 'tym.pozvat',
+  payDailyCash: 'uzaverky.nastaveni', drawerFloat: 'uzaverky.nastaveni', closingRequiresShift: 'uzaverky.nastaveni',
+  payoutFromRegister: 'uzaverky.nastaveni', tipsInDrawer: 'uzaverky.nastaveni',
+  laborTargetPct: 'finance.nastaveni',
+  levelsConfig: 'odmeny.nastaveni', pointsConfig: 'odmeny.nastaveni',
+  lowStockDefault: 'sklad.kategorie', criticalStockDefault: 'sklad.kategorie',
+};
+
 export async function PATCH(request: Request) {
-  const me = await currentUser();
-  if (!me || me.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
   const sql = neon(process.env.DATABASE_URL!);
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, tipsInDrawer, dashboardConfig,
           showTeamSchedule,
           levelsConfig, pointsConfig,
-          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body;
+          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body ?? {};
 
-  // Any employer of the team may manage settings (multi-employer teams).
-  const [dbMe] = await sql`SELECT team_id FROM users WHERE id = ${me.id}`;
-  const [team] = dbMe?.team_id
-    ? await sql`SELECT id FROM teams WHERE id = ${dbMe.team_id}`
-    : await sql`SELECT id FROM teams WHERE owner_id = ${me.id}`;
+  const poslane = Object.keys(body ?? {}).filter(k => body[k] !== undefined && k in POLE);
+  const chybi = [...new Set(poslane.map(k => POLE[k]))].filter(k => !c.role.opravneni.has(k));
+  if (chybi.length) return NextResponse.json({ error: 'Na tuhle změnu nastavení nemáš oprávnění.' }, { status: 403 });
+  if (!poslane.length && !c.role.opravneni.has('podnik.nastaveni')) {
+    return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  }
+
+  // Aktivní podnik z databáze (pozaduj), nikdy z těla ani z tokenu.
+  const [team] = await sql`SELECT id FROM teams WHERE id = ${c.teamId}`;
   if (!team) return NextResponse.json({ error: 'Tým nenalezen' }, { status: 404 });
+  const me = { id: c.meId };
 
   audit(team.id, me.id, 'team.settings', 'team', team.id,
     Object.keys(body).filter(k => body[k] !== undefined).join(', ').slice(0, 200));
@@ -210,5 +261,7 @@ export async function PATCH(request: Request) {
   }
 
   const [updated] = await sql`SELECT id, name, join_code FROM teams WHERE id = ${team.id}`;
+  // Kód pro připojení je vstupenka do podniku — jen pro toho, kdo smí zvát.
+  if (updated && !c.role.opravneni.has('tym.pozvat')) updated.join_code = null;
   return NextResponse.json({ ok: true, team: updated });
 }

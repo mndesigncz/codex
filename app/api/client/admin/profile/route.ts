@@ -1,7 +1,8 @@
 // Profil podniku v Managero client — vedení ho zapíná, pojmenuje adresu,
 // nastaví, co host smí (rezervace, objednávky, věrnost) a pravidla věrnosti.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, employer, ensureProfile, slugify, publicProfile } from '@/lib/client';
+import { sql, ensureProfile, slugify, publicProfile } from '@/lib/client';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
@@ -9,11 +10,36 @@ import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+/**
+ * Profil drží tři různé věci: provoz stránky pro hosty, její vzhled a
+ * pravidla věrnosti. Každou smí měnit někdo jiný, proto se oprávnění
+ * kontroluje podle polí, která požadavek posílá (obrazovky posílají jen
+ * svoje pole — Nastavení, Vzhled, Věrnost).
+ */
+const POLE_OPRAVNENI: Record<string, string> = {
+  enabled: 'klient.nastaveni', slug: 'klient.nastaveni', reservations_on: 'klient.nastaveni', ordering_on: 'klient.nastaveni',
+  max_party: 'klient.nastaveni', lead_days: 'klient.nastaveni', slot_minutes: 'klient.nastaveni', menu_slug: 'klient.nastaveni',
+  order_qr_required: 'klient.nastaveni', order_geo: 'klient.nastaveni', lat: 'klient.nastaveni', lng: 'klient.nastaveni',
+  geo_radius_m: 'klient.nastaveni', order_auto_pos: 'klient.nastaveni',
+  // Texty a adresa se upravují na obrazovce Vzhled spolu s logem a galerií.
+  tagline: 'klient.vzhled', description: 'klient.vzhled', address: 'klient.vzhled', cover_url: 'klient.vzhled',
+  logo_url: 'klient.vzhled', gallery: 'klient.vzhled', accent: 'klient.vzhled', qr_design: 'klient.vzhled',
+  loyalty_on: 'vernost.pravidla', points_per_100: 'vernost.pravidla', stamp_target: 'vernost.pravidla', stamp_reward: 'vernost.pravidla',
+  birthday_points: 'vernost.pravidla', referral_points: 'vernost.pravidla', silver_at: 'vernost.pravidla', gold_at: 'vernost.pravidla',
+  platinum_at: 'vernost.pravidla', member_discount: 'vernost.pravidla', silver_discount: 'vernost.pravidla',
+  gold_discount: 'vernost.pravidla', platinum_discount: 'vernost.pravidla', cashback_pct: 'vernost.pravidla', cashback_mode: 'vernost.pravidla',
+};
+const NAZEV_SKUPINY: Record<string, string> = {
+  'klient.nastaveni': 'nastavení stránky pro hosty', 'klient.vzhled': 'vzhled stránky pro hosty', 'vernost.pravidla': 'pravidla věrnosti',
+};
+
 function origin(req: NextRequest) { return (process.env.NEXTAUTH_URL?.replace(/\/$/, '') || new URL(req.url).origin); }
 
 export async function GET(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  // Profil čte obrazovka Nastavení, Vzhled i Věrnost — stačí kterékoli z nich.
+  const ctx = await pozaduj(['klient.nastaveni', 'klient.vzhled', 'vernost.zobrazit']);
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const p = await ensureProfile(u.team_id);
   const boards = await sql`
     SELECT b.slug, b.name,
@@ -29,10 +55,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const u = await employer();
-  if (!u) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-  if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
+  const ctx = await pozaduj(['klient.nastaveni', 'klient.vzhled', 'vernost.pravidla']);
+  if (jeOdpoved(ctx)) return ctx;
+  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
+  // Chybí-li oprávnění k některému poslanému poli, neuloží se nic — půlka
+  // uložená a půlka ne by na obrazovce vypadala jako úspěch.
+  const chybi = new Set<string>();
+  for (const [pole, klic] of Object.entries(POLE_OPRAVNENI)) {
+    if (b?.[pole] !== undefined && !ctx.role.opravneni.has(klic)) chybi.add(klic);
+  }
+  if (chybi.size) {
+    return NextResponse.json({ error: `Na ${[...chybi].map(k => NAZEV_SKUPINY[k]).join(' ani ')} nemáš oprávnění.` }, { status: 403 });
+  }
+  // Tarif až po oprávnění — kdo na úpravu nemá právo, nemá co řešit tarif.
+  if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
   const cur = await ensureProfile(u.team_id);
   const slug = b.slug != null ? slugify(b.slug) : cur.slug;
   if (!slug) return NextResponse.json({ error: 'Adresa musí mít aspoň jedno písmeno nebo číslo.' }, { status: 400 });

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { roleClena } from '@/lib/opravneniDb';
 import { get } from '@vercel/blob';
 import { neon } from '@neondatabase/serverless';
 
@@ -19,7 +20,13 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
+  const [u0] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
+  // Soubory podniku čte jen jeho ČLEN (team_members / vlastník). Samotné
+  // users.team_id nestačí — host s nastaveným podnikem by jinak četl fotky
+  // účtenek a přílohy chatu (kolo 67). Brána pozaduj() tu není, protože soubor
+  // nahraný bez podniku se vydává autorovi i bez aktivního podniku (podmínka níž).
+  const clen = u0?.team_id != null ? await roleClena(meId, Number(u0.team_id)) : null;
+  const u = { team_id: clen ? Number(u0.team_id) : null };
   // Bez týmu se soubor nevydá nikomu jinému než jeho autorovi. Dřív tu bylo
   // „OR team_id IS NULL", takže co nahrál uživatel bez týmu, četl kdokoli.
   const [row] = await sql`

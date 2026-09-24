@@ -12,6 +12,8 @@ import EmployeeDashboard from './EmployeeDashboard';
 import MobileMoreSheet from '../MobileMoreSheet';
 import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
+import { useOpravneni } from '../role/useOpravneni';
+import BezOpravneni from '../role/BezOpravneni';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -62,12 +64,27 @@ const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
 
 const mobilePrimary = ['home', 'my-shifts', 'inventory', 'chat'];
 
+// Pohledy podle oprávnění (kolo 67). Barista má všechno níže, takže se mu
+// nic neschová; vlastní role typu Zaměstnanec (třeba Kuchař bez uzávěrky)
+// už nevidí obrazovku, která by skončila 403. Vlastní směny, dostupnost,
+// úkoly a odměny patří každému — jde o jeho vlastní data.
+const KLICE_POHLEDU: Record<string, readonly string[] | null> = {
+  inventory: ['sklad.zobrazit'],
+  closing: ['uzaverky.vytvorit', 'uzaverky.predavka'],
+  procedures: ['postupy.zobrazit'],
+  guides: ['navody.zobrazit'],
+  suggestions: ['napady.pridat', 'napady.spravovat'],
+  chat: ['chat.pouzivat'],
+};
+
 interface Props {
   user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string; jobTitle?: string };
 }
 
 export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
+  const { ma } = useOpravneni();
+  const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   // Deep links from notifications: /employee/shifts?view=X
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -97,6 +114,7 @@ export default function EmployeeLayout({ user }: Props) {
   const openSettings = () => { setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
+    if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('home')} />;
     switch (currentView) {
       case 'home':         return <EmployeeDashboard user={user as any} onNavigate={navigate} />;
       case 'my-shifts':    return (
@@ -127,9 +145,11 @@ export default function EmployeeLayout({ user }: Props) {
 
   const active = navItems.find(n => n.id === currentView);
   const title = currentView === 'settings' ? 'Nastavení' : active?.label;
-  const mobileSecondary = navItems.filter(n => !mobilePrimary.includes(n.id));
+  const mojeNav = navItems.filter(n => smiPohled(n.id));
+  const mojeById = Object.fromEntries(mojeNav.map(n => [n.id, n]));
+  const mobileSecondary = mojeNav.filter(n => !mobilePrimary.includes(n.id));
   const mobileGroups = navSections
-    .map(sec => ({ title: sec.title, items: sec.ids.map(id => byId[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
+    .map(sec => ({ title: sec.title, items: sec.ids.map(id => mojeById[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
     .filter(g => g.items.length);
 
   return (
@@ -150,7 +170,7 @@ export default function EmployeeLayout({ user }: Props) {
         </div>
         <nav className="flex-1 py-3 space-y-0.5 px-3 overflow-y-auto scrollbar-thin">
           {navSections.map((sec, si) => {
-            const items = sec.ids.map(id => byId[id]).filter(n => n && n.id !== 'chat');
+            const items = sec.ids.map(id => mojeById[id]).filter(n => n && n.id !== 'chat');
             if (!items.length) return null;
             return (
               <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
@@ -241,11 +261,11 @@ export default function EmployeeLayout({ user }: Props) {
 
       {/* Na obrazovce Chatu plovoucí tlačítko nedává smysl — otevírá
           přesně to, co má člověk otevřené pod ním. */}
-      {currentView !== 'chat' && <MessengerDock user={user as any} />}
+      {currentView !== 'chat' && smiPohled('chat') && <MessengerDock user={user as any} />}
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
         <nav className="glass-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
-          {navItems.filter(n => mobilePrimary.includes(n.id)).map(item => (
+          {mojeNav.filter(n => mobilePrimary.includes(n.id)).map(item => (
             <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
               className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
                 currentView === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>

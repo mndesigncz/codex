@@ -76,6 +76,7 @@ export const ZELENE = [
   'offline',
   'one',
   'prostor',
+  'role',
   'sanity',
   'skok',
   'stavy',

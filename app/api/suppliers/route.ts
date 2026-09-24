@@ -2,22 +2,23 @@
 // so an order can leave the app instead of living in a copy-pasted note.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
 import { ciselnikPodniku } from '@/lib/tenant';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function me() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const id = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT id, role, team_id FROM users WHERE id = ${id}`;
-  return u ?? null;
+/**
+ * Kolo 67: brána oprávněním v aktivním podniku (z databáze). Tvar `{ id,
+ * team_id }` drží dotazy níž beze změny.
+ */
+async function me(klic: string | string[]) {
+  const c = await pozaduj(klic);
+  if (jeOdpoved(c)) return c;
+  return { id: c.meId, team_id: c.teamId, kontakty: c.role.opravneni.has('dodavatele.zobrazit') };
 }
 
 // GET — dodavatelé podniku; se sdílenými číselníky (kolo 60) i dodavatelé
@@ -25,9 +26,14 @@ async function me() {
 // jen text (jméno), takže sjednocený seznam jmen stačí našeptávači i
 // nákupnímu seznamu beze změny. E-mail a telefon ze zdroje vidí každý člen —
 // stejný majitel, stejná organizace; hint v nastavení to říká.
+//
+// Kolo 67: kontakty (e-mail, telefon, poznámka — u OSVČ osobní údaje) jen
+// s `dodavatele.zobrazit`. Kdo má jen `sklad.zobrazit`, dostane jména pro
+// našeptávač; dřív dostal každý z podniku všechno, i když UI zaměstnance
+// ani tabletu dodavatele nečte.
 export async function GET() {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ suppliers: [] });
+  const u = await me(['dodavatele.zobrazit', 'sklad.zobrazit']);
+  if (jeOdpoved(u)) return u;
   const teamId = Number(u.team_id);
   try {
     // Zdroj vidí jen své řádky, ale má vědět, že úprava se propíše do celé
@@ -41,7 +47,8 @@ export async function GET() {
       suppliers: (rows as any[]).map(r => {
         const zOrganizace = Number(r.team_id) !== teamId;
         return {
-          id: r.id, name: r.name, email: r.email, phone: r.phone, note: r.note,
+          id: r.id, name: r.name,
+          email: u.kontakty ? r.email : null, phone: u.kontakty ? r.phone : null, note: u.kontakty ? r.note : null,
           zOrganizace, sdileno: !zOrganizace && jsemZdroj, spravuje: zOrganizace ? spravuje : null,
         };
       }),
@@ -49,10 +56,10 @@ export async function GET() {
   } catch { return NextResponse.json({ suppliers: [] }); }
 }
 
+// POST, PATCH, DELETE: `dodavatele.upravit` (dřív vedení).
 export async function POST(req: NextRequest) {
-  const u = await me();
-  if (!u?.team_id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await me('dodavatele.upravit');
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   const name = String(b.name ?? '').trim().slice(0, 120);
   if (!name) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
@@ -69,8 +76,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const u = await me();
-  if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await me('dodavatele.upravit');
+  if (jeOdpoved(u)) return u;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
@@ -86,8 +93,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const u = await me();
-  if (!u?.team_id || u.role !== 'employer') return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  const u = await me('dodavatele.upravit');
+  if (jeOdpoved(u)) return u;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
   try {

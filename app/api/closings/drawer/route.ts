@@ -4,8 +4,7 @@
 // (their own list only contains their own rows and misses alternating shifts).
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { cashLeft } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
@@ -16,11 +15,11 @@ export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  const meId = parseInt((session.user as any).id);
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  if (!u?.team_id) return NextResponse.json({ error: 'Nejsi v žádném týmu.' }, { status: 400 });
+  // Stav kasy potřebuje jen ten, kdo vyplňuje uzávěrku (kolo 67). Dřív
+  // stačilo mít users.team_id — i host.
+  const c = await pozaduj('uzaverky.vytvorit');
+  if (jeOdpoved(c)) return c;
+  const u = { team_id: c.teamId };
 
   let row: any = null;
   try {

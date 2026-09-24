@@ -15,18 +15,34 @@ import ReceiptsPanel from './ReceiptsPanel';
 import ProductionBoard from '../inventory/ProductionBoard';
 import { useConversations } from '../chat/useChat';
 import { okJson } from '@/lib/api';
+import { useOpravneni } from '../role/useOpravneni';
 
 function pragueToday(offset = 0): string {
   return new Date(Date.now() + offset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
 }
 const DAY_LETTERS = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
 
-export default function ToGoMode({ user, onExit, onOpenView }: {
+export default function ToGoMode({ user, onExit, onOpenView, smiPohled = () => true }: {
   user: { name?: string };
   onExit: () => void;
   /** Jump straight to a view in the full administration; `arg` upřesní cíl (id konverzace…). */
   onOpenView: (view: string, arg?: string) => void;
+  /** Smí role otevřít pohled? Klíče drží EmployerLayout (KLICE_POHLEDU), ať jsou na jednom místě. */
+  smiPohled?: (view: string) => boolean;
 }) {
+  // Oprávnění (kolo 67). TO GO je na telefonu výchozí režim, takže tu platí
+  // totéž co v navigaci: dlaždice a karty, na které role nemá, se nekreslí
+  // a jejich dotazy se neposílají. Jinak by Skladník viděl „Dnešní tržba
+  // 0 Kč" a prázdnou směnu (server mu vrátí 403 nebo jen jeho vlastní
+  // záznamy) a dlaždice by vedly do „nemáš oprávnění". Vedení má celý
+  // katalog — nic se mu neschová.
+  const { ma } = useOpravneni();
+  const smiTrzby = ma(['finance.trzby', 'uzaverky.zobrazit_vse']);
+  const smiUzaverky = smiPohled('reports');
+  const smiSmenu = ma(['dochazka.zobrazit', 'dochazka.tablet']);
+  const smiSklad = smiPohled('inventory');
+  const smiVyrobu = ma('vyroba.vyrabet');
+  const smiUctenky = ma(['finance.uctenky_zobrazit', 'finance.uctenky_pridat']);
   const money = useMoney();
   // TO GO je nakreslené natvrdo ve světlých barvách (bg-[#F1F4EC], text-[#16181A]).
   // Tmavý motiv ale přebarvuje text globálním pravidlem
@@ -43,24 +59,40 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
   const [lowItems, setLowItems] = useState<any[]>([]);
   const [pendingClosings, setPendingClosings] = useState(0);
 
+  // Do načtení oprávnění `ma()` vrací ANO (viz useOpravneni), takže se
+  // ptá hned — vedení se nezdrží. Když pak oprávnění některou kartu vezmou,
+  // efekt proběhne znovu, kartu vyprázdní a pozdě dorazivší odpověď z prvního
+  // průchodu zahodí. Vedení se nic nemění, takže se ani neptá dvakrát.
   useEffect(() => {
+    let zruseno = false;
     const today = pragueToday();
-    fetch(`/api/pos/summary?date=${today}`).then(okJson)
-      .then(d => setPos(d?.connected && d.bills != null ? d : null)).catch(() => {});
-    fetch('/api/closings').then(okJson).then(d => {
-      const list = Array.isArray(d.closings) ? d.closings : [];
-      setClosings(list);
-      setPendingClosings(list.filter((c: any) => c.approved === false).length);
-    }).catch(() => {});
-    fetch('/api/attendance?days=1').then(okJson).then(d => {
-      setRoster(Array.isArray(d.roster) ? d.roster : []);
-    }).catch(() => {});
-    fetch('/api/inventory').then(okJson).then(d => {
-      // Endpoint vrací holé pole; dřív se četlo d.items a dlaždice byla vždy prázdná.
-      const items = Array.isArray(d) ? d : Array.isArray(d?.items) ? d.items : [];
-      setLowItems(items.filter((i: any) => !i.madeInHouse && (i.status === 'low' || i.status === 'critical')));
-    }).catch(() => {});
-  }, []);
+    if (smiTrzby) {
+      fetch(`/api/pos/summary?date=${today}`).then(okJson)
+        .then(d => { if (!zruseno) setPos(d?.connected && d.bills != null ? d : null); }).catch(() => {});
+    } else setPos(null);
+    if (smiTrzby || smiUzaverky) {
+      fetch('/api/closings').then(okJson).then(d => {
+        if (zruseno) return;
+        const list = Array.isArray(d.closings) ? d.closings : [];
+        setClosings(list);
+        setPendingClosings(list.filter((c: any) => c.approved === false).length);
+      }).catch(() => {});
+    } else { setClosings([]); setPendingClosings(0); }
+    if (smiSmenu) {
+      fetch('/api/attendance?days=1').then(okJson).then(d => {
+        if (!zruseno) setRoster(Array.isArray(d.roster) ? d.roster : []);
+      }).catch(() => {});
+    } else setRoster([]);
+    if (smiSklad) {
+      fetch('/api/inventory').then(okJson).then(d => {
+        if (zruseno) return;
+        // Endpoint vrací holé pole; dřív se četlo d.items a dlaždice byla vždy prázdná.
+        const items = Array.isArray(d) ? d : Array.isArray(d?.items) ? d.items : [];
+        setLowItems(items.filter((i: any) => !i.madeInHouse && (i.status === 'low' || i.status === 'critical')));
+      }).catch(() => {});
+    } else setLowItems([]);
+    return () => { zruseno = true; };
+  }, [smiTrzby, smiUzaverky, smiSmenu, smiSklad]);
 
   // ---- Week of revenue: one bar per day, today included live from the POS. ----
   const week = useMemo(() => {
@@ -116,7 +148,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
     { view: 'procedures', icon: 'clipboard', label: 'Postupy', badge: null, badgeTone: '' },
     { view: 'rewards', icon: 'award', label: 'Hodnocení', badge: null, badgeTone: '' },
     { view: 'finance', icon: 'coins', label: 'Finance', badge: null, badgeTone: '' },
-  ];
+  ].filter(t => smiPohled(t.view));
 
   return (
     <div className="min-h-[100dvh] bg-[var(--bg)] pb-16"
@@ -145,6 +177,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       <div className="max-w-lg mx-auto px-4 pt-3 space-y-4">
 
         {/* Dark hero — today's number, big and calm */}
+        {smiTrzby && (
         <div className="relative overflow-hidden rounded-3xl bg-[#16181A] text-white p-5 shadow-[0_18px_50px_rgba(15,20,8,0.35)]">
           <div className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-[#C8F542]/25 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 -left-10 h-48 w-48 rounded-full bg-[#8FB811]/15 blur-3xl" />
@@ -195,8 +228,10 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             </div>
           </div>
         </div>
+        )}
 
         {/* Crew strip — who is here now / planned today */}
+        {smiSmenu && (
         <div className="glass-card rounded-3xl p-4">
           <div className="flex items-center justify-between mb-2.5">
             <p className="t-label text-black/45">Dnes v podniku</p>
@@ -233,6 +268,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
             </div>
           )}
         </div>
+        )}
 
         {/* Quick functions — frosted tiles with badges */}
         <div className="grid grid-cols-3 gap-2.5 stagger">
@@ -253,7 +289,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         {/* Poslední nepřečtená — dlaždice řekne „3", tohle řekne od koho a co.
             Na telefonu je to jediné místo, kde se člověk dozví obsah zprávy,
             aniž by musel chat otevřít a vlákno v něm hledat. */}
-        {newestUnread && (
+        {newestUnread && smiPohled('chat') && (
           <button onClick={() => onOpenView('chat', String(newestUnread.id))}
             className="w-full glass-card rounded-3xl p-4 text-left active:scale-[0.99] transition">
             <div className="flex items-center justify-between mb-2">
@@ -286,7 +322,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         )}
 
         {/* Low stock — the three most urgent, actionable */}
-        {lowItems.length > 0 && (
+        {smiSklad && lowItems.length > 0 && (
           <button onClick={() => onOpenView('inventory')}
             className="w-full glass-card rounded-3xl p-4 text-left active:scale-[0.99] transition">
             <div className="flex items-center justify-between mb-2">
@@ -308,10 +344,10 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
         )}
 
         {/* K výrobě — z docházejícího skladu rovnou úkol s recepturou. */}
-        <ProductionBoard compact onOpenTasks={() => onOpenView('tasks')} />
+        {smiVyrobu && <ProductionBoard compact onOpenTasks={() => onOpenView('tasks')} />}
 
         {/* Receipts — the TO GO superpower */}
-        <ReceiptsPanel compact />
+        {smiUctenky && <ReceiptsPanel compact />}
 
         <p className="text-center text-[11px] text-black/25 pb-2">Managero · TO GO režim</p>
       </div>

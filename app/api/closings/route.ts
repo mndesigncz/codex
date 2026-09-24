@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { pozaduj, jeOdpoved, maOpravneni, clenoveSOpravnenim, type Kontext } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
@@ -10,19 +9,57 @@ import { denSmeny, denUzaverkyPro, zavreneDnyTydne, smenaBezUzaverky } from '@/l
 import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
-import { clenovePodniku, clenPodniku, idClenu, vedeniPodniku } from '@/lib/tenant';
+import { clenovePodniku, clenPodniku, idClenu } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function ctx() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const meId = parseInt((session.user as any).id);
-  const role = (session.user as any).role as string;
-  const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
-  return { meId, role, teamId: u?.team_id as number | undefined };
+// Kolo 67: co kdo u uzávěrek smí, říkají oprávnění z role v AKTIVNÍM
+// podniku (z databáze). Typ účtu zůstává jen tam, kde jde o obrazovku:
+// tablet je sdílený, nemá vlastní historii a vždy vybírá, za koho zavírá.
+// Vedení má všechny klíče, Barista vytvorit + mazat_vlastni + předávku,
+// Kiosk vytvorit + za_jineho — proto se pro ně chování nemění.
+function prava(c: Kontext) {
+  const ma = (k: string) => c.role.opravneni.has(k);
+  const tablet = c.role.typ === 'kiosk';
+  return {
+    tablet,
+    vse: ma('uzaverky.zobrazit_vse'),
+    // „Za koho" + libovolné datum ve formuláři (dřív isEmployer). Tablet
+    // zavírá za jiné taky, ale přes výběr směny, ne přes seznam lidí.
+    zaJineho: ma('uzaverky.za_jineho') && !tablet,
+    bezSchvaleni: ma('uzaverky.bez_schvaleni'),
+    obejitPostupy: ma('uzaverky.obejit_postupy'),
+    mzdy: ma('finance.mzdy'),
+    mojeMzda: ma('finance.moje_mzda'),
+    trzby: ma('finance.trzby'),
+  };
+}
+
+// Mzdový snímek uzávěrky (sazba, výdělek, odpracovaný čas) je mzda: cizí
+// jen s finance.mzdy, vlastní s finance.moje_mzda. Zbytek řádku jsou čísla
+// kasy, která autor sám vyplnil nebo která vidí celé vedení uzávěrek.
+function bezMzdy<T extends Record<string, any>>(r: T, meId: number, p: { mzdy: boolean; mojeMzda: boolean }): T {
+  if (p.mzdy || (p.mojeMzda && Number(r.created_by) === meId)) return r;
+  const { wage_rate: _a, wage_earned: _b, worked_ms: _c, ...rest } = r;
+  return rest as T;
+}
+
+// Kolo 67 (oponentura): tržba z kasy patří k finance.trzby. Kdo má jen
+// uzaverky.zobrazit_vse (systémová role Provozní, vlastní role bez financí),
+// by jinak ze seznamu cizích uzávěrek sečetl denní i měsíční obrat, který mu
+// kalendář i detail záměrně skrývají. Vlastní uzávěrku autor vyplnil sám,
+// takže ji vidí celou. Vedení má finance.trzby, Barista a tablet cizí
+// uzávěrky nevidí vůbec — pro dnešní role se tedy nic nemění.
+const TRZBA_POLE = ['cash_revenue', 'card_revenue', 'tips', 'tips_card', 'closing_cash', 'expected', 'event_breakdown'] as const;
+function bezTrzby<T extends Record<string, any>>(r: T, meId: number, sTrzbou: boolean): T {
+  if (sTrzbou || Number(r.created_by) === meId) return r;
+  const rest: Record<string, any> = { ...r };
+  for (const k of TRZBA_POLE) delete rest[k];
+  // Klient pozná, že čísla chybí záměrně, ne že je autor nevyplnil.
+  rest.trzbaSkryta = true;
+  return rest as T;
 }
 
 const num = (v: any) => {
@@ -53,9 +90,10 @@ const idsOf = (v: any): number[] => {
 //   employer: every closing in the team, with full financial detail + author name.
 //   employee: only their OWN closings (they entered the values themselves).
 export async function GET() {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ closings: [], canSeeAll: false, payDailyCash: false });
+  // Seznam má každý člen — bez uzaverky.zobrazit_vse jen své (vlastní data).
+  const c = await pozaduj(null);
+  if (jeOdpoved(c)) return c;
+  const p = prava(c);
 
   // Defensive: a not-yet-migrated column must not break the whole view.
   let payDailyCash = false;
@@ -83,9 +121,9 @@ export async function GET() {
   } catch { /* column not migrated yet */ }
 
   // The shared kiosk never sees financial history — it only submits.
-  const rows = c.role === 'kiosk'
+  const rows = p.tablet
     ? []
-    : c.role === 'employer'
+    : p.vse
     ? await sql`
         SELECT cc.*, u.name AS author_name, u.avatar AS author_avatar, ev.title AS event_title
         FROM cash_closings cc
@@ -116,7 +154,7 @@ export async function GET() {
     } catch { /* fall back to ids only */ }
   }
   const closings = (rows as any[]).map(r => ({
-    ...r,
+    ...bezTrzby(bezMzdy(r, c.meId, p), c.meId, p.trzby),
     movements: normalizeMovements(r.movements),
     denominations: normalizeDenominations(r.denominations),
     shiftEmployees: idsOf(r.shift_employees)
@@ -134,7 +172,7 @@ export async function GET() {
   let eligibleShifts: any[] = [];
   const today = pragueToday();
   const zavrenoTyden = await zavreneDnyTydne(c.teamId);
-  if (c.role === 'kiosk') {
+  if (p.tablet) {
     const cutoff = pragueToday(-3);
     try {
       eligibleShifts = await sql`
@@ -166,7 +204,7 @@ export async function GET() {
           ORDER BY s.date DESC, s.start_time ASC`;
       } catch { /* shifts table issue — leave empty */ }
     }
-  } else if (c.role !== 'employer') {
+  } else if (!p.zaJineho) {
     const cutoff = pragueToday(-14);
     try {
       eligibleShifts = await sql`
@@ -207,12 +245,14 @@ export async function GET() {
   // where a closing is missing.
   let scheduledByDate: Record<string, any[]> = {};
   let missingClosings: { date: string; employees: any[] }[] = [];
-  if (c.role === 'employer') {
+  if (p.zaJineho) {
     try {
       // Kolo 62: „odeslat za" nabízí členy podniku (členství nebo zrcadlo).
       members = (await clenovePodniku(c.teamId)).map(m => ({ id: m.id, name: m.name, avatar: m.avatar, aktivniJinde: m.aktivniJinde }));
     } catch { /* ignore */ }
-
+  }
+  // Chybějící uzávěrky týmu patří k přehledu všech uzávěrek.
+  if (p.vse) {
     try {
       const cutoff = pragueToday(-30);
       const sched = await sql`
@@ -252,13 +292,15 @@ export async function GET() {
   return NextResponse.json({
     closings,
     suggestedDate,
-    canSeeAll: c.role === 'employer',
+    canSeeAll: p.vse,
     payDailyCash,
     payoutFromRegister,
     tipsInDrawer,
     requiresShift,
-    isEmployer: c.role === 'employer',
-    isKiosk: c.role === 'kiosk',
+    // Názvy polí zůstávají kvůli klientovi; znamenají „smí zavírat za jiné
+    // s volným datem" a „sdílený tablet".
+    isEmployer: p.zaJineho,
+    isKiosk: p.tablet,
     eligibleShifts,
     members,
     scheduledByDate,
@@ -271,9 +313,9 @@ export async function GET() {
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const c = await ctx();
-  if (!c) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if (!c.teamId) return NextResponse.json({ error: 'Nejsi v žádném týmu.' }, { status: 400 });
+  const c = await pozaduj('uzaverky.vytvorit');
+  if (jeOdpoved(c)) return c;
+  const p = prava(c);
 
   const b = await request.json();
   const today = pragueToday();
@@ -281,8 +323,9 @@ export async function POST(request: Request) {
   // odsud nikdy nepřijde — a po půlnoci v něm stojí zítřek jen proto, že
   // tak šly hodiny. Obchodní den se spočítá níž, až víme, za koho se zavírá.
   const zvoleno = typeof b.date === 'string' && b.date ? b.date : null;
-  const isEmployer = c.role === 'employer';
-  const isKiosk = c.role === 'kiosk';
+  const isKiosk = p.tablet;
+  // Za jiného zavírá tablet (výběrem směny) i člen s uzaverky.za_jineho.
+  const smiZaJineho = c.role.opravneni.has('uzaverky.za_jineho');
   let payDailyCash = false;
   try {
     const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
@@ -315,11 +358,18 @@ export async function POST(request: Request) {
   if (isKiosk && !Number.isFinite(wantEmployeeId)) {
     return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
   }
-  if ((isKiosk || isEmployer) && Number.isFinite(wantEmployeeId) && wantEmployeeId !== c.meId) {
+  if (smiZaJineho && Number.isFinite(wantEmployeeId) && wantEmployeeId !== c.meId) {
     // Kolo 62: členství nebo zrcadlo; tablet helper bez volby vyloučí sám.
     const emp = await clenPodniku(wantEmployeeId, c.teamId);
     if (!emp) {
       return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
+    }
+    // Tablet jedná za člověka, který se u něj vybral — uzávěrku za něj
+    // odešle jen tehdy, když ji ten člověk smí odeslat i sám (oponentura
+    // c4). Jinak by Kuchař bez uzaverky.vytvorit uzávěrku odeslal přes
+    // tablet. Každý dnešní zaměstnanec i vedení to oprávnění má.
+    if (isKiosk && !(await maOpravneni(wantEmployeeId, c.teamId, 'uzaverky.vytvorit'))) {
+      return NextResponse.json({ error: 'Tenhle člověk podle své role uzávěrku odesílat nesmí.' }, { status: 403 });
     }
     actorId = wantEmployeeId;
   }
@@ -400,9 +450,9 @@ export async function POST(request: Request) {
 
   const shiftLabel: string | null = b.shiftLabel || (shift ? `${shift.start_time}–${shift.end_time}` : null);
 
-  // An employer-submitted closing is always trusted. Otherwise it needs the
-  // employer's approval when the person wasn't on shift that day.
-  const approved = isEmployer || !!shift;
+  // A closing from someone with uzaverky.bez_schvaleni (vedení) is always
+  // trusted. Otherwise it needs approval when the person wasn't on shift.
+  const approved = p.bezSchvaleni || !!shift;
 
   // The closing covers the whole SHIFT, so record everyone who worked it. The
   // time window comes from an explicitly passed shift, otherwise the author's
@@ -441,13 +491,14 @@ export async function POST(request: Request) {
   } catch { /* shifts table issue — the author alone owns the closing */ }
 
   // Required procedures gate the closing server-side too — the client check
-  // alone would be decorative. Employers may override (they confirmed in UI).
+  // alone would be decorative. uzaverky.obejit_postupy may override (they
+  // confirmed in UI).
   // Not for an off-site event (the stall doesn't run the shop's opening
   // routine) and not for someone who wasn't on the shift at all — that closing
   // already goes to the employer for approval, so blocking it would just leave
   // the money unreported. The runs are matched against the SHIFT's day, so a
   // night shift filed after midnight still sees what was done before midnight.
-  if (!isEmployer && eventId == null && shift) {
+  if (!p.obejitPostupy && eventId == null && shift) {
     try {
       const req = await sql`
         SELECT p.id, p.name FROM procedures p
@@ -492,7 +543,7 @@ export async function POST(request: Request) {
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${actorId}, ${date}, ${shiftDate}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftDate}, ${shiftLabel}, ${shiftId}, ${approved}, ${p.bezSchvaleni ? c.meId : null}, ${payoutFromRegister},
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb, ${finalRemoval}, ${eventId},
@@ -509,7 +560,7 @@ export async function POST(request: Request) {
         opening_cash, cash_revenue, card_revenue, tips, expenses,
         cash_removed, self_payout, closing_cash, customers, notes
       ) VALUES (
-        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+        ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${p.bezSchvaleni ? c.meId : null}, ${payoutFromRegister},
         ${tipsInDrawer}, ${JSON.stringify(shiftEmployeeIds)}::jsonb,
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb,
@@ -525,7 +576,7 @@ export async function POST(request: Request) {
           opening_cash, cash_revenue, card_revenue, tips, expenses,
           cash_removed, self_payout, closing_cash, customers, notes
         ) VALUES (
-          ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister},
+          ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${p.bezSchvaleni ? c.meId : null}, ${payoutFromRegister},
           ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
           ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
         ) RETURNING *`;
@@ -622,9 +673,12 @@ export async function POST(request: Request) {
     if (handover) await sql`UPDATE cash_closings SET handover = ${JSON.stringify(handover)}::jsonb WHERE id = ${row.id}`;
   } catch { /* column not migrated yet */ }
 
-  // Notify team employers (except the author).
+  // Upozornění (kromě autora): na čekající uzávěrku ten, kdo smí schvalovat,
+  // na hotovou ten, kdo vidí všechny uzávěrky (kolo 67 — dřív vedení podle
+  // typu účtu; Vedení má obojí, takže dostane totéž co dřív).
   try {
-    const employers = await vedeniPodniku(c.teamId, { krome: actorId });
+    const employers = (await clenoveSOpravnenim(c.teamId, approved ? 'uzaverky.zobrazit_vse' : 'uzaverky.schvalovat'))
+      .filter(id => id !== actorId);
     if (employers.length) {
       const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
       const diff = cashDifference({ ...(row as any), tips_in_drawer: tipsInDrawer });
@@ -684,7 +738,7 @@ export async function POST(request: Request) {
         try {
           await sql`
             INSERT INTO cash_closings (team_id, created_by, date, shift_date, shift_label, shift_id, covered_by, approved, approved_by, payout_from_register, self_payout)
-            VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${shiftDate}, ${shiftLabel}, ${cwShift?.id ?? null}, ${row.id}, ${approved}, ${isEmployer ? c.meId : null}, ${payoutFromRegister}, ${cwPayout})`;
+            VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${shiftDate}, ${shiftLabel}, ${cwShift?.id ?? null}, ${row.id}, ${approved}, ${p.bezSchvaleni ? c.meId : null}, ${payoutFromRegister}, ${cwPayout})`;
         } catch {
           await sql`INSERT INTO cash_closings (team_id, created_by, date, shift_label, covered_by, self_payout) VALUES (${c.teamId}, ${cid}, ${shiftDate}, ${shiftLabel}, ${row.id}, ${cwPayout})`;
         }

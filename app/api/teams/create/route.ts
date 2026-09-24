@@ -1,4 +1,8 @@
-// Přidat další podnik — jen vedení, pod jeho organizací.
+// Přidat další podnik — jen vlastník, pod jeho organizací.
+// Kolo 67: rozhoduje vlastnictví podniku (a organizace), ne role ani typ
+// účtu v tokenu — organizace.zalozit_podnik nejde dát žádné roli. Dřívější
+// síto „role === employer" z tokenu tu nic nepřidávalo: vlastník ho má
+// vždy a nikoho jiného smiZalozitDalsiPodnik stejně nepustí.
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, zneplatniStav } from '@/lib/auth';
@@ -12,7 +16,7 @@ const sql = neon(process.env.DATABASE_URL!);
 export async function POST(req: Request) {
   const s = await getServerSession(authOptions);
   if (!s?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
-  if ((s.user as any).role !== 'employer') return NextResponse.json({ error: 'Podnik zakládá vedení.' }, { status: 403 });
+  if ((s.user as any).role === 'kiosk') return NextResponse.json({ error: 'Další podnik zakládá vlastník podniku.' }, { status: 403 });
   const meId = parseInt((s.user as any).id);
   const [u] = await sql`SELECT team_id FROM users WHERE id = ${meId}`;
   if (!u?.team_id) return NextResponse.json({ error: 'Nejsi v žádném podniku.' }, { status: 400 });
