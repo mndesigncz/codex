@@ -152,6 +152,29 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   chevron: <path d="m6 9 6 6 6-6" />,
+  // „Odkaz dál" a krok vpřed. Dřív se kreslil `chevron` otočený o −90°, jenže
+  // otočení nese každé místo zvlášť a `iconAfter` u tlačítka otočit nejde —
+  // proto zelené „Sklad →" s šipkou v textu.
+  chevronRight: <path d="m9 6 6 6-6 6" />,
+  // Odebrat widget: kolečko s mínusem. Koš by tvrdil, že se něco maže — nic se
+  // nemaže, widget jde vrátit.
+  minus: <path d="M5 12h14" />,
+  // Plocha s widgety (prázdná plocha, úpravy stránky).
+  grid: (
+    <>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+    </>
+  ),
+  // Vrátit poslední změnu.
+  undo: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+    </>
+  ),
   clipboard: (
     <>
       <rect x="6" y="4.5" width="12" height="17" rx="2.5" />

@@ -41,3 +41,5 @@ export const POLOZKA: CzNoun = { one: 'položka', few: 'položky', many: 'polož
 export const SMENA: CzNoun = { one: 'směna', few: 'směny', many: 'směn' };
 export const DEN: CzNoun = { one: 'den', few: 'dny', many: 'dní' };
 export const KATEGORIE: CzNoun = { one: 'kategorii', few: 'kategorie', many: 'kategorií' };
+/** Odznak chatu v doku vedení i zaměstnance: „1 nepřečtená zpráva", ne „1 nepřečtených zpráv". */
+export const NEPRECTENA_ZPRAVA: CzNoun = { one: 'nepřečtená zpráva', few: 'nepřečtené zprávy', many: 'nepřečtených zpráv' };

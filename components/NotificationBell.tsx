@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
+import { Badge } from './ui/Badge';
+import { czCount, type CzNoun } from '@/lib/czech';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { usePopover } from '@/lib/usePopover';
 import { okJson } from '@/lib/api';
@@ -21,6 +23,9 @@ const typeIcon: Record<string, string> = {
   chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
   warning: 'warning', success: 'check',
 };
+
+/** Věta pro odečítač u odznaku zvonku: „3 nové notifikace". */
+const NOVA_NOTIFIKACE: CzNoun = { one: 'nová notifikace', few: 'nové notifikace', many: 'nových notifikací' };
 
 export default function NotificationBell() {
   const { data: session } = useSession();
@@ -119,11 +124,11 @@ export default function NotificationBell() {
       >
         {/* The bell only moves when there is actually something new. */}
         <Icon name="bell" size={19} className="i-lead" motion={badge > 0 ? 'ring' : undefined} />
-        {badge > 0 && (
-          <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center rise-in ${flaggedFeedback > 0 ? 'bg-bad text-white' : 'bg-[#C8F542] text-black'}`}>
-            {badge > 9 ? '9+' : badge}
-          </span>
-        )}
+        {/* Stejný odznak jako v doku. Limetkový podklad tu dřív soupeřil
+            s hlavní akcí obrazovky o jedinou limetku; červený zůstává pro
+            vlajku (nízké hodnocení čeká na potvrzení). */}
+        <Badge count={badge} tone={flaggedFeedback > 0 ? 'bad' : 'ink'}
+          label={czCount(badge, NOVA_NOTIFIKACE)} className="absolute -top-0.5 -right-0.5" />
       </button>
 
       {open && (

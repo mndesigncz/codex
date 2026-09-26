@@ -152,6 +152,10 @@ jobs:
       # uzávěrek i varování v kiosku se prostě nekreslilo.
       - name: Krytí mimo škálu
         run: node scripts/check-opacity-steps.mjs
+      # `shadow-[var(--…)]` si Tailwind vyloží jako barvu stínu a box-shadow
+      # nevygeneruje: hromadná lišta, toast i našeptávač tak byly bez stínu.
+      - name: Stín z proměnné
+        run: node scripts/check-shadow-var.mjs
       # Správa platformy: žádná admin routa bez requireSuperadmin, middleware
       # s blokací existuje, lib/superadmin.ts je bez Node importů (edge).
       - name: Brána správy platformy

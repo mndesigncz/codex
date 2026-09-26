@@ -112,7 +112,7 @@ export function SearchField({ value, onChange, placeholder = 'Hledat…', sugges
         </button>
       )}
       {showPanel && (
-        <div role="listbox" className="absolute z-30 left-0 right-0 mt-1.5 card p-1.5 shadow-[var(--shadow-float)] pop-in origin-top max-h-64 overflow-y-auto scrollbar-thin">
+        <div role="listbox" className="absolute z-30 left-0 right-0 mt-1.5 card p-1.5 shadow-[shadow:var(--shadow-float)] pop-in origin-top max-h-64 overflow-y-auto scrollbar-thin">
           {items.map((it, i) => (
             <button key={`${it.kind}-${it.label}`} type="button" role="option" aria-selected={i === active}
               onMouseEnter={() => setActive(i)}

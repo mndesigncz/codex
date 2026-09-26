@@ -15,9 +15,10 @@ const problems = [];
 const ok = (m) => console.log('  ✓', m);
 const bad = (m) => { console.log('  ✗', m); problems.push(m); };
 
-async function open(url, w = 1280) {
+async function open(url, w = 1280, dark = false) {
   const ctx = await b.newContext({ viewport: { width: w, height: 900 }, locale: 'cs-CZ', isMobile: w <= 500, hasTouch: w <= 500 });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok('employer'), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
+  if (dark) await ctx.addInitScript(() => { try { localStorage.setItem('managero-theme', 'dark'); } catch {} });
   const sent = [];
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
@@ -38,12 +39,32 @@ async function open(url, w = 1280) {
   return { ctx, p, errs, sent };
 }
 
-async function queue(name, url, expectPending, shot, w = 1280) {
+// Pilulka lišty: stín a neprůhledná plocha. Obojí se už jednou potichu
+// ztratilo — utilita stínu s holou proměnnou nevygenerovala žádný box-shadow
+// a `bg-[#16181A]` je v tmavém režimu 14% bílá, takže přes lištu prosvítaly
+// řádky seznamu. Měří se spočítaný styl, ne třídy.
+const pilulka = (p) => p.evaluate(() => {
+  const reg = [...document.querySelectorAll('[role="region"]')].find(r => /^Vybráno/.test(r.getAttribute('aria-label') || ''));
+  const el = reg?.querySelector('.rounded-full');
+  if (!el) return null;
+  const cs = getComputedStyle(el);
+  const m = cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
+  const kanaly = m ? m[1].split(/[\s,/]+/).filter(Boolean).map(Number) : [];
+  return { stin: cs.boxShadow, alfa: kanaly.length > 3 ? kanaly[3] : kanaly.length === 3 ? 1 : 0, plocha: cs.backgroundColor };
+});
+
+// Na Rozvrhu jsou fronty dvě (Výměny směn nad Žádostmi o volno), proto se
+// „Vybrat víc" hledá podle nadpisu fronty, ne jako první na stránce — dřív
+// „Žádosti o volno" potichu klikaly na výměny a hlásily 3 místo 5.
+async function queue(name, url, expectPending, { shot = null, w = 1280, dark = false, sekce = null } = {}) {
   console.log(`${name}:`);
-  const { ctx, p, errs, sent } = await open(url, w);
+  const { ctx, p, errs, sent } = await open(url, w, dark);
   const more = p.locator('button', { hasText: /^Vybrat víc$/ });
-  if (await more.count() === 0) { bad(`${name}: tlačítko „Vybrat víc" není (fronta prázdná?)`); await ctx.close(); return; }
-  await more.first().click();
+  const poradi = sekce ? await p.evaluate((sekce) => [...document.querySelectorAll('button')]
+    .filter(x => /^Vybrat víc$/.test(x.innerText.trim()))
+    .findIndex(x => { let s = x; for (let i = 0; i < 8 && s; i++) { s = s.parentElement; const h = s?.querySelector('h1, h2, h3'); if (h) return h.innerText.trim().startsWith(sekce); } return false; }), sekce) : 0;
+  if (await more.count() === 0 || poradi < 0) { bad(`${name}: tlačítko „Vybrat víc" není (fronta prázdná?)`); await ctx.close(); return; }
+  await more.nth(poradi).click();
   await p.waitForTimeout(400);
   const boxes = await p.locator('[role="checkbox"]').count();
   boxes === expectPending ? ok(`zaškrtávátek: ${boxes}`) : bad(`${name}: čekáno ${expectPending} zaškrtávátek, je ${boxes}`);
@@ -51,6 +72,12 @@ async function queue(name, url, expectPending, shot, w = 1280) {
   await p.locator('[role="checkbox"]').first().click();
   await p.waitForTimeout(300);
   (await p.locator('text=/^1 vybráno$/').count()) ? ok('lišta hlásí „1 vybráno"') : bad(`${name}: lišta nehlásí výběr`);
+  const pil = await pilulka(p);
+  if (!pil) bad(`${name}: pilulka lišty nenalezena`);
+  else {
+    pil.stin && pil.stin !== 'none' ? ok('lišta má stín') : bad(`${name}: lišta je bez stínu (box-shadow: ${pil.stin})`);
+    pil.alfa === 1 ? ok(`lišta je neprůhledná (${pil.plocha})`) : bad(`${name}: přes lištu prosvítá obsah (${pil.plocha})`);
+  }
 
   const all = p.locator('button', { hasText: /^Vybrat vše \(/ });
   await all.first().click();
@@ -71,11 +98,14 @@ async function queue(name, url, expectPending, shot, w = 1280) {
   await ctx.close();
 }
 
-await queue('Žádosti o volno', '/employer/overview?view=shifts', 5, 'bulk-timeoff');
-await queue('Výměny směn', '/employer/overview?view=shifts', 3, null);
-await queue('Návrhy skladu', '/employer/overview?view=inventory', 3, 'bulk-inventory');
-await queue('Žádosti o odměny', '/employer/overview?view=rewards', 4, 'bulk-rewards');
-await queue('Volno na telefonu', '/employer/overview?view=shifts', 5, 'bulk-timeoff', 390);
+await queue('Žádosti o volno', '/employer/overview?view=shifts', 5, { shot: 'bulk-timeoff', sekce: 'Žádosti o volno' });
+await queue('Výměny směn', '/employer/overview?view=shifts', 3, { sekce: 'Výměny směn' });
+await queue('Návrhy skladu', '/employer/overview?view=inventory', 3, { shot: 'bulk-inventory' });
+await queue('Žádosti o odměny', '/employer/overview?view=rewards', 4, { shot: 'bulk-rewards' });
+await queue('Volno na telefonu', '/employer/overview?view=shifts', 5, { shot: 'bulk-timeoff', w: 390, sekce: 'Žádosti o volno' });
+await queue('Volno na telefonu, tmavý režim', '/employer/overview?view=shifts', 5, { shot: 'bulk-timeoff-tmavy', w: 390, dark: true, sekce: 'Žádosti o volno' });
 
 console.log(problems.length ? `\nPROBLÉMŮ: ${problems.length}` : '\nVšechno prošlo.');
 await b.close();
+// Bez nenulového kódu by spouštěč sondu hlásil jako zelenou, i když tu něco selhalo.
+process.exit(problems.length ? 1 : 0);

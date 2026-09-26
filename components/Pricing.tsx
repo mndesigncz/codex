@@ -99,11 +99,15 @@ export default function Pricing() {
                   </li>
                 ))}
               </ul>
-              <Link href={k.id === 'free' ? '/register?plan=free' : `/register?plan=${k.id}&interval=${interval}`} className="mt-auto pt-7 block">
-                <span className={`btn w-full ${pro ? 'btn-accent' : max ? 'btn-primary' : 'btn-secondary'}`}>
-                  Zvolit {PLAN_NAMES[k.id]}
-                </span>
-              </Link>
+              {/* Odsazení nese obal, ne odkaz: prstenec fokusu obkresluje odkaz,
+                  a tak má sedět těsně kolem pilulky, ne kolem prázdného místa nad ní. */}
+              <div className="mt-auto pt-7">
+                <Link href={k.id === 'free' ? '/register?plan=free' : `/register?plan=${k.id}&interval=${interval}`} className="flex rounded-full">
+                  <span className={`btn w-full ${pro ? 'btn-accent' : max ? 'btn-primary' : 'btn-secondary'}`}>
+                    Zvolit {PLAN_NAMES[k.id]}
+                  </span>
+                </Link>
+              </div>
             </div>
           );
         })}

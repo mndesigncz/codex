@@ -192,7 +192,7 @@ export default function PlanningBoard() {
                     draggable
                     onDragStart={() => setDragId(card.id)}
                     onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
-                    className={`relative card p-4 hover:shadow-[var(--shadow-float)] transition-shadow duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''} ${menuId === card.id ? 'z-30' : ''}`}
+                    className={`relative card p-4 hover:shadow-[shadow:var(--shadow-float)] transition-shadow duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''} ${menuId === card.id ? 'z-30' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">

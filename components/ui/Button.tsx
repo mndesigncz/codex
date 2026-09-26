@@ -62,7 +62,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       className={[
         'inline-flex items-center justify-center rounded-full font-semibold whitespace-nowrap select-none',
         'transition disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F1F3ED]',
+        // Mezera mezi tlačítkem a prstencem fokusu má barvu plochy, na které
+        // tlačítko stojí. Dřív to byl pevný starý odstín papíru #F1F3ED: na bílé
+        // kartě kreslil šedý proužek a v tmavém režimu světlý. `--surface` je
+        // bílá karta ve světlém a tmavá karta v tmavém režimu.
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]',
         VARIANT[variant],
         iconOnly ? ICON_ONLY[size] : SIZE[size],
         block ? 'w-full sm:w-auto' : '',
