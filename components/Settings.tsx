@@ -731,7 +731,11 @@ export default function Settings({ user, initialTab }: Props) {
                     title: 'Odpojit pokladnu?', text: 'Tržby se přestanou načítat. Účtenky, které už v aplikaci jsou, zůstanou.',
                     label: 'Odpojit pokladnu', danger: true,
                     akce: async () => {
-                      await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
+                      // Odpojeno je až to, co server potvrdí. Dřív se „Pokladna odpojena."
+                      // ukázalo i po 500/403 nebo bez wifi — a po obnovení stránky byla
+                      // pokladna zase připojená a tržby se dál načítaly (DP §3.17).
+                      const res = await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
+                      if (!res?.ok) { setPosMsg('Pokladnu se nepodařilo odpojit — zkus to znovu.', false); return; }
                       setPosStatus({ connected: false }); setPosHealth(null); setPosMsg('Pokladna odpojena.', true);
                     },
                   })}>

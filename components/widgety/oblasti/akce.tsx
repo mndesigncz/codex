@@ -23,7 +23,7 @@
 // `nacteno && ma('akce.zobrazit')` (spec §1.5); v náhledu se nic nenaviguje
 // ani nezapisuje.
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
@@ -55,6 +55,15 @@ function useBrana(klic: Klic): { ok: boolean; ceka: boolean } {
 
 /** „Ještě nevíme, jestli smí": kostra a žádný dotaz. */
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
+
+/**
+ * Plocha stránky Akce (EventsView) to widgetům řekne: odkaz „Akce ›" by tam
+ * vedl na stránku, na které člověk už je (stejně jako NaStranceOdmen u B7).
+ */
+export const NaStranceAkci = createContext(false);
+function useOdkazAkce(): { popisek: string; pohled: string } | undefined {
+  return useContext(NaStranceAkci) ? undefined : { popisek: 'Akce', pohled: 'events' };
+}
 
 // ---------------------------------------------------------------------------
 // Nejbližší akce
@@ -128,9 +137,10 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
     .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''))
     .slice(0, kolik);
   const jsem = (a: Akce) => meId != null && a.crew.includes(meId);
+  const odkaz = useOdkazAkce();
 
   return (
-    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Akce', pohled: 'events' }}
+    <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
       // Tři akce jsou seznam i ve střední velikosti — kostra má mít tvar toho, co přijde.
       kostra={kolik === 3 ? 'seznam' : undefined}
       prazdno={nadchazejici.length === 0 ? <p className="t-meta">Žádná akce v plánu.</p> : undefined}>
@@ -194,6 +204,7 @@ function PripravaAkce(_: WidgetProps) {
   useEffect(() => { setMistni(null); }, [data.data]);
   const body = akce ? akce.checklist.map((c, i) => ({ ...c, done: mistni?.id === akce.id ? mistni.body[i] ?? c.done : c.done })) : [];
   const zbyva = body.filter(c => !c.done).length;
+  const odkaz = useOdkazAkce();
 
   const prepni = async (i: number) => {
     if (!akce || !odskrta) return;
@@ -215,7 +226,7 @@ function PripravaAkce(_: WidgetProps) {
   };
 
   return (
-    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Akce', pohled: 'events' }}
+    <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
       doplnek={akce && zbyva > 0 ? <Chip tone="muted" size="sm">{zbyva}</Chip> : undefined}
       prazdno={data.data && !akce ? <p className="t-meta">Žádná nadcházející akce s přípravou.</p> : undefined}>
       {akce && (
@@ -246,8 +257,7 @@ function PripravaAkce(_: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 const ID_VYSLEDEK = 'akce.vysledek';
-/** Druhý pád po „z“: z 1 uzávěrky, ze 3 uzávěrek. */
-const Z_UZAVEREK: CzNoun = { one: 'uzávěrky', few: 'uzávěrek', many: 'uzávěrek' };
+const UZAVERKA: CzNoun = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' };
 
 function VysledekAkce({ velikost }: WidgetProps) {
   const money = useMoney();
@@ -260,23 +270,25 @@ function VysledekAkce({ velikost }: WidgetProps) {
   const prazdno = data.data && !a ? <p className="t-meta">Zatím žádná proběhlá akce s tržbou nebo náklady.</p> : undefined;
   const tonVysledku = vysledek == null ? undefined : vysledek >= 0 ? 'text-ok-ink' : 'text-bad-ink';
   const castka = vysledek == null ? '–' : `${vysledek > 0 ? '+' : ''}${money(vysledek)}`;
+  const odkaz = useOdkazAkce();
+  const naAkcich = !odkaz;
 
   if (velikost === 'S') {
     return (
       <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno}
-        otevrit={nav.smiPohled('events') ? () => nav.onNavigate('events') : undefined}>
+        otevrit={!naAkcich && nav.smiPohled('events') ? () => nav.onNavigate('events') : undefined}>
         {a && <Stat label="Výsledek" value={<span className={tonVysledku}>{castka}</span>} note={a.nazev} />}
       </Widget>
     );
   }
   return (
-    <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno} odkaz={{ popisek: 'Akce', pohled: 'events' }}>
+    <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno} odkaz={odkaz}>
       {a && (
         <div className="space-y-3">
           <p className="t-meta cz-sentence">{a.nazev} · {denAkce(a.datum, dnes)}</p>
           <StatRow>
             <Stat label="Tržba" value={a.trzba == null ? '–' : money(a.trzba)}
-              note={a.uzaverek > 0 ? `${a.uzaverek >= 2 && a.uzaverek <= 4 ? 'ze' : 'z'} ${czCount(a.uzaverek, Z_UZAVEREK)}` : 'zapsaná ručně'} />
+              note={a.uzaverek > 0 ? `${czCount(a.uzaverek, UZAVERKA)} za akci` : 'zapsaná ručně'} />
             <Stat label="Náklady" value={a.naklady == null ? '–' : money(a.naklady)} />
             <Stat label="Výsledek" value={<span className={tonVysledku}>{castka}</span>}
               note={vysledek == null ? undefined : <span className="inline-flex items-center gap-1"><Icon name="trend" size={13} className={vysledek < 0 ? 'rotate-180' : ''} />{vysledek >= 0 ? 'v plusu' : 've ztrátě'}</span>} />

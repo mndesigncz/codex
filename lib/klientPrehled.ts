@@ -8,6 +8,7 @@
 // Testy: scripts/testy/k69-b8.ts.
 
 import type { ChipTone } from '../components/ui/Chip';
+import { czCount, type CzNoun } from './czech.ts';
 
 const seznam = (x: unknown): any[] => (Array.isArray(x) ? x : []);
 const cislo = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -230,8 +231,8 @@ export interface KrokPropojeni {
   klic: string;
 }
 
-const CZ_STUL = (n: number) => (n === 1 ? 'stůl' : n >= 2 && n <= 4 ? 'stoly' : 'stolů');
-const CZ_SPAROVANY = (n: number) => (n === 1 ? 'spárovaný' : n >= 2 && n <= 4 ? 'spárované' : 'spárovaných');
+const STUL: CzNoun = { one: 'stůl', few: 'stoly', many: 'stolů' };
+const SPAROVANY: CzNoun = { one: 'spárovaný', few: 'spárované', many: 'spárovaných' };
 
 /** Kontrolní seznam „Propojení Clientu" ze `setup` v /api/client/admin/summary. */
 export function krokyPropojeni(setup: any, mena = 'Kč'): KrokPropojeni[] {
@@ -243,7 +244,7 @@ export function krokyPropojeni(setup: any, mena = 'Kč'): KrokPropojeni[] {
     { id: 'menu', hotovo: !!su.menu, popisek: su.menu ? 'Hosté vidí nabídku z Menu' : 'Vybrat menu pro hosty', zalozka: 'settings', klic: 'klient.nastaveni' },
     {
       id: 'stoly', hotovo: stolu > 0, zalozka: 'tables', klic: 'stoly.upravit',
-      popisek: stolu > 0 ? `${stolu} ${CZ_STUL(stolu)}${sparovano ? `, ${sparovano} ${CZ_SPAROVANY(sparovano)} s pokladnou` : ''}` : 'Přidat stoly pro rezervace a objednávky',
+      popisek: stolu > 0 ? `${czCount(stolu, STUL)}${sparovano ? `, ${czCount(sparovano, SPAROVANY)} s pokladnou` : ''}` : 'Přidat stoly pro rezervace a objednávky',
     },
     { id: 'pokladna', hotovo: !!su.pos, popisek: su.pos ? 'Pokladna napojená, objednávky jdou na stůl v kase' : 'Napojit pokladnu', zalozka: 'tables', klic: 'stoly.upravit' },
     { id: 'poloha', hotovo: !!su.location, popisek: su.location ? 'Poloha podniku nastavená' : 'Nastavit polohu podniku pro ochranu objednávek', zalozka: 'settings', klic: 'klient.nastaveni' },

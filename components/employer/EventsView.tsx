@@ -3,10 +3,21 @@
 // Events: the shop's concerts, lectures and offsite trips — crewed from the
 // team (creates real shifts), packed from the stock (real movements), shown
 // to customers when public, and settled with a simple revenue/costs outcome.
+//
+// Kolo 69 (balík B8): stránka je plocha s widgety (PlochaWidgetu, stránka
+// vedeni.akce) — v administraci i v Managero client stejná. Hlavička jde do
+// plochy, tahle komponenta kreslí nástroj: seznam akcí. Z auditu „Klient –
+// Akce": vlastní odsazení stránky pryč (sčítalo se s odsazením skořápky
+// a nadpis ujel o 24 px), prázdný stav je EmptyState (dřív karta s větou
+// a drobnou ikonou), akce jsou řádky jednoho seznamu v kartě (dřív
+// průhledné klikací karty `glass-card` s modrou ikonou, ručně barvenými
+// pilulkami stavu a emoji lidí v textu). „Nová akce" jen s akce.upravit.
+// Seznam čte /api/events přes sdílenou mezipaměť widgetů: odškrtnutí
+// v Přípravě akce se tak propíše sem a změna tady do widgetů.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
-import { PageHeader, Button } from '../ui';
+import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Skeleton, Switch, type ChipTone } from '../ui';
 import { useMoney } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
 import { pragueToday } from '@/lib/pragueTime';
@@ -16,45 +27,54 @@ import { DiscardGuard } from '../ui/DiscardGuard';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { czCount, type CzNoun } from '@/lib/czech';
+import { vysledekAkce } from '@/lib/klientPrehled';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useOpravneni } from '../role/useOpravneni';
+import { NaStranceAkci } from '../widgety/oblasti/akce';
 
 type Ev = any;
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition';
 
+const URL_AKCE = '/api/events';
+const TON_STAVU: Record<string, ChipTone> = { planned: 'info', confirmed: 'ok', done: 'muted', cancelled: 'muted' };
+const V_OBSLUZE: CzNoun = { one: 'člověk v obsluze', few: 'lidé v obsluze', many: 'lidí v obsluze' };
+
 export default function EventsView({ user }: { user: { id?: string } }) {
+  void user;
   const money = useMoney();
-  const [events, setEvents] = useState<Ev[]>([]);
+  // „Nová akce" podle `ma` (před načtením oprávnění ANO, rozhoduje server) — jako navigace layoutu.
+  const { ma } = useOpravneni();
+  const spravuje = ma('akce.upravit');
+  const akce = useDataWidgetu<any>(URL_AKCE, raw => raw);
+  const events: Ev[] = useMemo(() => (Array.isArray(akce.data?.events) ? akce.data.events : []), [akce.data]);
   const [members, setMembers] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<Ev | null>(null);
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState('');
   const [showPast, setShowPast] = useState(false);
 
   const [menuBoards, setMenuBoards] = useState<any[]>([]);
-  const load = async () => {
-    try {
-      const [ed, td, iv, mb] = await Promise.all([
-        fetch('/api/events').then(okJson).catch(() => ({})),
-        fetch('/api/teams').then(okJson).catch(() => ({})),
-        fetch('/api/inventory').then(okJson).catch(() => []),
-        fetch('/api/menu').then(okJson).catch(() => null),
-      ]);
-      setEvents(Array.isArray(ed.events) ? ed.events : []);
-      setMembers((td.members ?? []).filter((m: any) => m.role !== 'kiosk'));
-      setItems(Array.isArray(iv) ? iv.filter((i: any) => i.archived !== true && i.approved !== false) : []);
-      // Nabídka podniku po tabulích — menu akce si bere celé tabule i položky.
-      setMenuBoards(Array.isArray(mb?.boards)
-        ? mb.boards.map((bd: any) => ({ id: bd.id, name: bd.name, sections: (bd.sections ?? []).filter((sec: any) => (sec.items ?? []).length > 0) }))
-            .filter((bd: any) => bd.sections.length > 0)
-        : []);
-      if (ed.notMigrated) setErr('Akce budou dostupné po migraci (/api/init).');
-    } catch { setErr('Akce se nepodařilo načíst.'); }
-    setLoading(false);
+  const nactiCiselniky = async () => {
+    const [td, iv, mb] = await Promise.all([
+      fetch('/api/teams').then(okJson).catch(() => ({})),
+      fetch('/api/inventory').then(okJson).catch(() => []),
+      fetch('/api/menu').then(okJson).catch(() => null),
+    ]);
+    setMembers((td.members ?? []).filter((m: any) => m.role !== 'kiosk'));
+    setItems(Array.isArray(iv) ? iv.filter((i: any) => i.archived !== true && i.approved !== false) : []);
+    // Nabídka podniku po tabulích — menu akce si bere celé tabule i položky.
+    setMenuBoards(Array.isArray(mb?.boards)
+      ? mb.boards.map((bd: any) => ({ id: bd.id, name: bd.name, sections: (bd.sections ?? []).filter((sec: any) => (sec.items ?? []).length > 0) }))
+          .filter((bd: any) => bd.sections.length > 0)
+      : []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void nactiCiselniky(); }, []);
+  const load = async () => { obnovDataWidgetu(URL_AKCE); };
 
   const today = pragueToday();
   const upcoming = useMemo(() => events.filter(e => e.date >= today && e.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date)), [events, today]);
@@ -66,10 +86,10 @@ export default function EventsView({ user }: { user: { id?: string } }) {
       body: JSON.stringify(body),
     }).catch(() => null);
     if (res?.ok) {
-      await load();
-      const d = await fetch('/api/events').then(okJson).catch(() => ({}));
+      const d = await fetch(URL_AKCE).then(okJson).catch(() => ({}));
       const fresh = (d.events ?? []).find((e: Ev) => e.id === id);
       if (fresh) setDetail((cur: Ev) => (cur && cur.id === id ? fresh : cur));
+      obnovDataWidgetu(URL_AKCE);
       return true;
     }
     const d = res ? await res.json().catch(() => ({})) : {};
@@ -80,92 +100,68 @@ export default function EventsView({ user }: { user: { id?: string } }) {
   const fmtDate = (d: string) =>
     new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const EventCard = ({ e }: { e: Ev }) => {
+  const radek = (e: Ev) => {
     const k = kindSpec(e.kind);
-    // Stejná logika jako v detailu: tržbu akce s uzávěrkami nese uzávěrka.
+    // Stejná logika jako v detailu a ve widgetu Výsledek akce: tržbu akce s uzávěrkami nese uzávěrka.
     const rev = e.closingsCount > 0 ? e.closingsTotal : e.revenue;
-    const result = rev != null || e.costs != null ? (rev ?? 0) - (e.costs ?? 0) : null;
+    const result = vysledekAkce({ trzba: rev ?? null, naklady: e.costs ?? null });
+    const lidi = (e.crewPeople ?? []).length;
+    const meta = [
+      `${fmtDate(e.date).replace(/^./, c => c.toLocaleUpperCase('cs-CZ'))}${e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}`,
+      e.offsite || e.location ? `${e.location || 'mimo podnik'}${e.offsite ? ' · venkovní' : ''}` : null,
+      lidi ? czCount(lidi, V_OBSLUZE) : null,
+      e.public ? `veřejná${e.going > 0 ? ` · přijde ${e.going}` : ''}` : null,
+    ].filter(Boolean).join(' · ');
     return (
-      <button onClick={() => setDetail(e)}
-        className="w-full glass-card p-5 text-left hover:bg-black/[0.02] transition">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-bold tracking-tight text-[#16181A] line-clamp-2"><Icon name={k.icon} size={16} className="inline -mt-0.5 mr-1.5 text-[#0A5CC0]" />{e.title}</p>
-            <p className="text-sm text-black/50 mt-0.5 cz-sentence line-clamp-2">
-              {fmtDate(e.date)}{e.startTime ? ` · ${e.startTime}${e.endTime ? `–${e.endTime}` : ''}` : ''}
-            </p>
-            {(e.offsite || e.location) && (
-              <p className="text-xs text-black/40 mt-0.5 line-clamp-2"><Icon name="location" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {e.location || 'mimo podnik'}{e.offsite ? ' · venkovní' : ''}</p>
-            )}
-          </div>
-          <div className="shrink-0 flex flex-col items-end gap-1.5">
-            <span className={`tap-target-sm rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
-              e.status === 'confirmed' ? 'bg-[#C8F542]/20 text-[#5B7A08]'
-              : e.status === 'done' ? 'bg-black/[0.06] text-black/50'
-              : e.status === 'cancelled' ? 'bg-bad/10 text-bad-ink'
-              : 'bg-[#0A84FF]/10 text-[#0A5CC0]'
-            }`}>{statusLabel(e.status)}</span>
-            {e.public && <span className="text-[11px] text-[#5B7A08]">veřejná{e.going > 0 ? ` · přijde ${e.going}` : ''}</span>}
-            {result != null && (
-              <span className={`text-xs font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
-                {result >= 0 ? '+' : ''}{money(result)}
-              </span>
-            )}
-          </div>
-        </div>
-        {e.crewPeople?.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-3">
-            {e.crewPeople.map((p: any) => (
-              <span key={p.id} className="tap-target-sm rounded-full bg-white/60 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">
-                {p.avatar} {p.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </button>
+      <ListRow key={e.id} onClick={() => setDetail(e)}
+        lead={<Icon name={k.icon} size={18} className="text-black/40" />}
+        title={e.title} meta={meta}
+        value={result != null ? <span className={result >= 0 ? 'text-ok-ink' : 'text-bad-ink'}>{result >= 0 ? '+' : ''}{money(result)}</span> : undefined}
+        right={<Chip tone={TON_STAVU[e.status] ?? 'info'} size="sm">{statusLabel(e.status)}</Chip>} />
     );
   };
 
+  const nastroj = akce.error && !akce.data ? <ErrorState title="Akce se nenačetly" onRetry={akce.reload} detail={akce.error} />
+    : !akce.data ? <div className="space-y-3"><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
+    : (
+      <div className="space-y-4">
+        {akce.data.notMigrated && <p className="note note-wait">Akce budou dostupné po migraci (/api/init).</p>}
+        {err && <p className="note note-danger" role="alert">{err}</p>}
+        {upcoming.length === 0 ? (
+          <Card>
+            <EmptyState icon="calendarCheck" compact title="Žádná naplánovaná akce"
+              hint="Založ první — obsadíš ji lidmi, sbalíš sklad a dáš vědět zákazníkům." />
+          </Card>
+        ) : (
+          <Card pad="none" aria-label="Nadcházející akce"><ul className="list px-5">{upcoming.map(radek)}</ul></Card>
+        )}
+        {past.length > 0 && (
+          <div className="space-y-2">
+            <Button variant="ghost" size="sm" iconAfter="chevron" aria-expanded={showPast}
+              className={showPast ? '[&>svg:last-child]:rotate-180' : ''} onClick={() => setShowPast(o => !o)}>
+              Minulé a zrušené ({past.length})
+            </Button>
+            {showPast && <Card pad="none" aria-label="Minulé a zrušené akce"><ul className="list px-5">{past.map(radek)}</ul></Card>}
+          </div>
+        )}
+      </div>
+    );
+
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader hintId="eventsview" title="Akce" subtitle="Koncerty, přednášky i výjezdy mimo podnik — se směnami, balením a vyúčtováním."
-        primary={<Button variant="accent" icon="plus" onClick={() => setCreating(true)}>Nová akce</Button>} />
-
-      {err && <p className="text-sm text-bad-ink">{err}</p>}
-
-      {loading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="spinner" />
-        </div>
-      ) : (
-        <>
-          {upcoming.length === 0 ? (
-            <div className="glass-card p-10 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-2xl mb-3"><Icon name="calendarCheck" size={15} /></div>
-              <p className="text-black/55 text-sm">Žádná naplánovaná akce. Založ první — obsadíš ji lidmi, sbalíš sklad a dáš vědět zákazníkům.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {upcoming.map(e => <EventCard key={e.id} e={e} />)}
-            </div>
-          )}
-
-          {past.length > 0 && (
-            <div>
-              <button onClick={() => setShowPast(o => !o)} className="tap-target-sm text-sm text-black/45 hover:text-black transition flex items-center gap-1.5">
-                <Icon name="chevron" size={14} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
-                Minulé a zrušené ({past.length})
-              </button>
-              {showPast && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3 opacity-80">
-                  {past.map(e => <EventCard key={e.id} e={e} />)}
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
+    <>
+      {/* Widgety na téhle ploše nekreslí odkaz „Akce ›" — vedl by sem. */}
+      <NaStranceAkci.Provider value>
+      <PlochaWidgetu
+        stranka="vedeni.akce"
+        hlavicka={{
+          title: 'Akce',
+          hintId: 'eventsview',
+          subtitle: 'Koncerty, přednášky i výjezdy mimo podnik — se směnami, balením a vyúčtováním.',
+          primary: spravuje ? <Button variant="accent" icon="plus" onClick={() => setCreating(true)}>Nová akce</Button> : undefined,
+        }}
+        nastroj={nastroj}
+      />
+      </NaStranceAkci.Provider>
       {creating && (
         <EventEditor onClose={() => setCreating(false)} onSaved={async (ev) => { setCreating(false); await load(); setDetail(ev); }} />
       )}
@@ -174,7 +170,7 @@ export default function EventsView({ user }: { user: { id?: string } }) {
           onClose={() => setDetail(null)}
           onDeleted={async () => { setDetail(null); await load(); }} />
       )}
-    </div>
+    </>
   );
 }
 
@@ -276,7 +272,7 @@ function Sec({ title, children, action }: { title: string; children: React.React
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-black/45">{title}</p>
+        <p className="t-label">{title}</p>
         {action}
       </div>
       {children}
@@ -303,6 +299,9 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
   const [posErr, setPosErr] = useState('');
   const [uploading, setUploading] = useState(false);
   const [announcing, setAnnouncing] = useState(false);
+  // Potvrzení nevratných kroků a počet kusů do balení v okně — dřív confirm() a prompt().
+  const [potvrdit, setPotvrdit] = useState<{ title: string; text: string; akce: string; danger?: boolean; run: () => void } | null>(null);
+  const [baleni, setBaleni] = useState<{ item: any; qty: string } | null>(null);
   // Základ a peníze se editují v místě — ukládá se při opuštění pole.
   const [base, setBase] = useState({ date: e.date ?? '', start: e.startTime ?? '', end: e.endTime ?? '', location: e.location ?? '', capacity: e.capacity != null ? String(e.capacity) : '' });
   const [desc, setDesc] = useState(e.description ?? '');
@@ -355,6 +354,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
     : [];
 
   return (
+    <>
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={onClose}>
       <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin" onClick={ev2 => ev2.stopPropagation()}>
         <DiscardGuard guard={dm.guard} />
@@ -382,7 +382,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
             </button>
           ))}
           <span className="hidden sm:block flex-1" />
-          <button onClick={() => patch(e.id, { publishToTeam: true }).then(ok => ok && alert('Tým dostal notifikaci o akci. ✓'))}
+          <button onClick={() => patch(e.id, { publishToTeam: true }).then(ok => ok && alert('Tým dostal notifikaci o akci.'))}
             className="tap-target-sm w-full sm:w-auto rounded-full glass px-3 py-1.5 text-xs font-semibold text-black/50 hover:text-black transition">
             <Icon name="bell" size={13} className="inline -mt-0.5 mr-1.5" />Oznámit týmu
           </button>
@@ -416,8 +416,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
               merchant provozoven víc. */}
           {e.offsite && places && (places.places ?? []).length > 1 && (
             <div className="mt-2.5">
-              <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Kasa akce (provozovna Storyous)</label>
-              <select value={e.posPlaceId ?? ''} aria-label="Kasa akce"
+              <label htmlFor={`akce-kasa-${e.id}`} className="field-label">Kasa akce (provozovna Storyous)</label>
+              <select id={`akce-kasa-${e.id}`} value={e.posPlaceId ?? ''}
                 onChange={ev3 => patch(e.id, { posPlaceId: ev3.target.value || null })}
                 className={inputClass}>
                 <option value="">Bez vlastní kasy — na místě jen hotovost (uzávěrka za akci)</option>
@@ -489,21 +489,23 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
         <Sec title="Pro hosty">
           <div className="well border border-black/[0.06] p-4 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => patch(e.id, { public: !e.public })} aria-pressed={e.public}
-                className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-bold transition ${
-                  e.public ? 'bg-[#C8F542] on-accent' : 'bg-white/70 border border-black/10 text-black/55 hover:text-black'
-                }`}>
-                {e.public ? 'Veřejná — hosté ji vidí' : 'Zveřejnit hostům'}
-              </button>
+              {/* Zapnuto/vypnuto je přepínač, ne limetkové tlačítko (limetka se září je akce, ne stav). */}
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#16181A]">
+                <Switch checked={!!e.public} onChange={() => patch(e.id, { public: !e.public })} label="Veřejná akce" />
+                <span aria-hidden>{e.public ? 'Veřejná — hosté ji vidí' : 'Zveřejnit hostům'}</span>
+              </span>
               {e.public && (
                 <button disabled={announcing}
-                  onClick={async () => {
-                    if (!confirm('Rozeslat akci všem členům podniku? Přijde jim push a objeví se v novinkách na stránce podniku.')) return;
-                    setAnnouncing(true);
-                    const ok = await patch(e.id, { announceMembers: true });
-                    setAnnouncing(false);
-                    if (ok) alert('Členové dostali pozvánku. ✓');
-                  }}
+                  onClick={() => setPotvrdit({
+                    title: 'Rozeslat akci členům?', akce: 'Rozeslat',
+                    text: 'Všem členům podniku přijde push a akce se objeví v novinkách na stránce podniku.',
+                    run: async () => {
+                      setAnnouncing(true);
+                      const ok = await patch(e.id, { announceMembers: true });
+                      setAnnouncing(false);
+                      if (ok) alert('Členové dostali pozvánku.');
+                    },
+                  })}
                   className="tap-target-sm w-full sm:w-auto rounded-full bg-white/70 border border-black/10 px-3.5 py-2 text-xs font-semibold text-black/60 hover:text-black transition disabled:opacity-50">
                   <Icon name="send" size={13} className="inline -mt-0.5 mr-1.5" />{announcing ? 'Rozesílám…' : 'Rozeslat členům'}
                 </button>
@@ -517,8 +519,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
             )}
 
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-black/40 mb-1">Popis</p>
-              <textarea value={desc} rows={3} maxLength={2000} placeholder="Co hosty čeká — program, vstupné, na co se těšit…"
+              <label htmlFor={`akce-popis-${e.id}`} className="field-label">Popis</label>
+              <textarea id={`akce-popis-${e.id}`} value={desc} rows={3} maxLength={2000} placeholder="Co hosty čeká — program, vstupné, na co se těšit…"
                 onChange={ev3 => setDesc(ev3.target.value)}
                 onBlur={() => { if (desc !== (e.description ?? '')) patch(e.id, { description: desc }); }}
                 className={`${inputClass} resize-y`} />
@@ -526,7 +528,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
 
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-[11px] uppercase tracking-wider text-black/40">Fotky ({(e.photos ?? []).length}/8)</p>
+                <p className="t-label">Fotky ({(e.photos ?? []).length}/8)</p>
                 <label className={`tap-target-sm rounded-full bg-white/70 border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-black transition cursor-pointer ${uploading || (e.photos ?? []).length >= 8 ? 'opacity-50 pointer-events-none' : ''}`}>
                   <Icon name="camera" size={13} className="inline -mt-0.5 mr-1.5" />{uploading ? 'Nahrávám…' : 'Přidat'}
                   <input type="file" accept="image/*" className="sr-only" onChange={async ev3 => {
@@ -562,7 +564,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
 
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-[11px] uppercase tracking-wider text-black/40">Menu akce ({(e.menu ?? []).length}) — z nabídky podniku</p>
+                <p className="t-label">Menu akce ({(e.menu ?? []).length}) — z nabídky podniku</p>
                 <button type="button" onClick={() => setMenuPickOpen(o => !o)} aria-expanded={menuPickOpen}
                   className="tap-target-sm shrink-0 whitespace-nowrap rounded-full bg-white/70 border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-black transition">
                   <Icon name="leaf" size={13} className="inline -mt-0.5 mr-1.5" />{menuPickOpen ? 'Hotovo' : 'Vybrat z nabídky'}
@@ -594,25 +596,21 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                   ) : menuBoards.map((bd: any) => (
                     <div key={bd.id} className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-[#16181A]">{bd.name}</p>
+                        <p className="text-sm font-semibold">{bd.name}</p>
                         <button type="button" onClick={() => toggleBoard(bd.id)} aria-pressed={boardOn(bd.id)}
-                          className={`tap-target-sm rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
-                            boardOn(bd.id) ? 'bg-[#C8F542] on-accent' : 'bg-black/[0.05] text-black/55 hover:text-black'
-                          }`}>
-                          {boardOn(bd.id) ? 'Celá nabídka ✓' : 'Vzít celou nabídku'}
+                          className={`filter-pill tap-target-sm ${boardOn(bd.id) ? 'seg-on' : 'seg-off glass'}`}>
+                          {boardOn(bd.id) ? 'Celá nabídka vybraná' : 'Vzít celou nabídku'}
                         </button>
                       </div>
                       {!boardOn(bd.id) && bd.sections.map((sec: any) => (
                     <div key={sec.id}>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">{sec.title}</p>
+                      <p className="t-label mb-1">{sec.title}</p>
                       <div className="flex flex-wrap gap-2">
                         {(sec.items ?? []).map((mi: any) => {
                           const on = menuHas(mi.id);
                           return (
                             <button key={mi.id} type="button" onClick={() => toggleMenuItem(mi.id)} aria-pressed={on}
-                              className={`rounded-full px-3.5 py-2 text-xs transition ${
-                                on ? 'bg-[#C8F542]/25 text-[#3E5406] border border-[#C8F542]/45 font-semibold' : 'bg-black/[0.04] text-black/55 hover:text-black border border-transparent'
-                              }`}>
+                              className={`filter-pill tap-target-sm ${on ? 'seg-on' : 'seg-off glass'}`}>
                               {mi.name}{mi.price != null ? ` · ${mi.price}` : ''}{on ? <Icon name="check" size={11} className="inline ml-1 -mt-0.5" /> : null}
                             </button>
                           );
@@ -622,7 +620,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                       ))}
                     </div>
                   ))}
-                  <a href="/employer/overview?mode=client&tab=menu" className="tap-target-sm inline-block py-1 text-xs font-semibold text-[#0A5CC0] hover:underline">Chybí položka? Uprav nabídku v Menu →</a>
+                  <a href="/employer/overview?mode=client&tab=menu" className="tap-target-sm inline-flex items-center gap-1 py-1 text-[13px] font-semibold text-[#16181A] underline underline-offset-2 hover:no-underline">Chybí položka? Uprav nabídku v Menu<Icon name="chevronRight" size={13} /></a>
                 </div>
               )}
               {/* Výjezd mívá úplně vlastní menu — volný řádek s cenou, vždy po ruce. */}
@@ -675,19 +673,21 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
           {e.offsite && (
             <div className="mt-3 well border border-black/[0.06] p-4">
               <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45"><Icon name="tent" size={13} className="inline -mt-0.5 mr-1.5" />Balicí seznam (ze skladu)</p>
+                <p className="t-label flex items-center gap-1.5"><Icon name="tent" size={13} />Balicí seznam (ze skladu)</p>
                 <div className="flex gap-1.5">
                   {e.packing.some((p: any) => p.itemId && !p.packed) && (
-                    <button onClick={() => { if (confirm('Vyskladnit vše nesbalené? Množství se odečte ze skladu (s poznámkou u položek).')) patch(e.id, { packAction: 'checkout' }); }}
-                      className="tap-target-sm btn btn-primary btn-sm transition">
-                      <Icon name="box" size={13} className="inline -mt-0.5 mr-1.5 shrink-0" />Vyskladnit
-                    </button>
+                    <Button size="sm" variant="primary" icon="box" onClick={() => setPotvrdit({
+                      title: 'Vyskladnit vše nesbalené?', akce: 'Vyskladnit',
+                      text: 'Množství se odečte ze skladu (s poznámkou u položek).',
+                      run: () => { void patch(e.id, { packAction: 'checkout' }); },
+                    })}>Vyskladnit</Button>
                   )}
                   {e.packing.some((p: any) => p.itemId && p.packed && p.returned == null) && (
-                    <button onClick={() => { if (confirm('Vrátit sbalené položky zpět do skladu? (Vrací se plné množství — spotřebu pak uprav ve skladu.)')) patch(e.id, { packAction: 'return' }); }}
-                      className="tap-target-sm rounded-full bg-[#C8F542] on-accent px-3 py-1.5 text-xs font-bold hover:brightness-110 transition">
-                      <Icon name="swap" size={13} className="inline -mt-0.5 mr-1.5 shrink-0" />Vrátit do skladu
-                    </button>
+                    <Button size="sm" variant="secondary" icon="swap" onClick={() => setPotvrdit({
+                      title: 'Vrátit sbalené do skladu?', akce: 'Vrátit',
+                      text: 'Vrací se plné množství — spotřebu pak uprav ve skladu.',
+                      run: () => { void patch(e.id, { packAction: 'return' }); },
+                    })}>Vrátit do skladu</Button>
                   )}
                 </div>
               </div>
@@ -697,7 +697,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                     <span className="min-w-0 flex-1 truncate text-[#16181A]">{p2.name}</span>
                     <span className="shrink-0 text-xs text-black/45 tabular-nums">{p2.qty}×</span>
                     <span className="shrink-0 text-xs">
-                      {p2.returned != null ? <span className="text-[#5B7A08]">vráceno {p2.returned} ✓</span>
+                      {p2.returned != null ? <span className="text-ok-ink">vráceno {p2.returned}</span>
                        : p2.packed ? <span className="text-wait-ink">vyskladněno</span>
                        : <span className="text-black/35">čeká</span>}
                     </span>
@@ -714,12 +714,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
                   <div className="absolute inset-x-0 top-full mt-1 z-10 glass-strong rounded-2xl p-1.5 space-y-0.5 shadow-lg">
                     {packCandidates.map(i2 => (
                       <button key={i2.id}
-                        onClick={() => {
-                          const qty = parseInt(prompt(`Kolik kusů „${i2.name}" vzít? (skladem ${i2.quantity} ${i2.unit})`, '1') ?? '');
-                          if (!Number.isFinite(qty) || qty <= 0) return;
-                          patch(e.id, { packing: [...e.packing, { itemId: i2.id, name: i2.name, qty, packed: false, returned: null }] });
-                          setPackSearch('');
-                        }}
+                        onClick={() => setBaleni({ item: i2, qty: '1' })}
                         className="w-full text-left px-3 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] transition-colors flex justify-between gap-2">
                         <span className="min-w-0 truncate">{i2.name}</span>
                         <span className="shrink-0 text-xs text-black/40">{i2.quantity} {i2.unit}</span>
@@ -783,23 +778,23 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
               </div>
             ) : (
               <div>
-                <label htmlFor={`akce-trzba-${e.id}`} className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Tržba z akce</label>
+                <label htmlFor={`akce-trzba-${e.id}`} className="field-label">Tržba z akce</label>
                 <input id={`akce-trzba-${e.id}`} type="number" inputMode="numeric" value={revenue} onChange={ev3 => setRevenue(ev3.target.value)}
                   onBlur={() => patch(e.id, { revenue: revenue === '' ? null : Number(revenue) })} placeholder="0" className={inputClass} />
                 <p className="text-[11px] text-black/40 mt-1.5">
                   {e.offsite
-                    ? 'Nebo na místě udělejte Uzávěrku → „Za akci" — pozná, že ten den akce je, a tržba se sem propíše sama.'
+                    ? 'Nebo na místě udělejte uzávěrku „Za akci" — pozná, že ten den akce je, a tržba se sem propíše sama.'
                     : 'Když obsluha udělá uzávěrku „Za akci", tržba se sem propíše sama.'}
                 </p>
               </div>
             )}
             <div className="mt-2.5">
-              <label className="block text-[11px] uppercase tracking-wider text-black/40 mb-1">Náklady</label>
-              <input type="number" inputMode="numeric" value={costs} onChange={ev3 => setCosts(ev3.target.value)}
+              <label htmlFor={`akce-naklady-${e.id}`} className="field-label">Náklady</label>
+              <input id={`akce-naklady-${e.id}`} type="number" inputMode="numeric" value={costs} onChange={ev3 => setCosts(ev3.target.value)}
                 onBlur={() => patch(e.id, { costs: costs === '' ? null : Number(costs) })} placeholder="0" className={inputClass} />
             </div>
             {result != null && (
-              <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
+              <p className={`mt-2.5 text-sm font-bold tabular-nums ${result >= 0 ? 'text-ok-ink' : 'text-bad-ink'}`}>
                 Výsledek: {result >= 0 ? '+' : ''}{money(result)}
               </p>
             )}
@@ -807,16 +802,47 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, onClo
         </Sec>
 
         <div className="mt-6 flex justify-between gap-2">
-          <button onClick={async () => {
-            if (!confirm(`Smazat akci „${e.title}"? Odeberou se i směny z akce.`)) return;
-            const res = await fetch(`/api/events/${e.id}`, { method: 'DELETE' }).catch(() => null);
-            if (res?.ok) onDeleted();
-          }} className="rounded-full glass text-black/45 hover:text-bad-ink px-4 py-2.5 text-sm font-medium transition">
-            Smazat akci
-          </button>
-          <button onClick={onClose} className="rounded-full bg-[#16181A] text-white font-semibold px-6 py-2.5 text-sm hover:bg-black transition">Hotovo</button>
+          <Button variant="danger" onClick={() => setPotvrdit({
+            title: `Smazat akci „${e.title}"?`, akce: 'Smazat', danger: true,
+            text: 'Odeberou se i směny z akce. Smazanou akci nejde vrátit.',
+            run: async () => {
+              const res = await fetch(`/api/events/${e.id}`, { method: 'DELETE' }).catch(() => null);
+              if (res?.ok) onDeleted();
+            },
+          })}>Smazat akci</Button>
+          <Button variant="primary" onClick={onClose}>Hotovo</Button>
         </div>
       </div>
     </div>
+    {potvrdit && (
+      <Modal open onClose={() => setPotvrdit(null)} size="sm" title={potvrdit.title}
+        footer={<>
+          <Button variant="secondary" onClick={() => setPotvrdit(null)}>Zrušit</Button>
+          <Button variant={potvrdit.danger ? 'danger-solid' : 'primary'} onClick={() => { const p = potvrdit; setPotvrdit(null); p.run(); }}>{potvrdit.akce}</Button>
+        </>}>
+        <p className="text-sm text-black/70 text-pretty">{potvrdit.text}</p>
+      </Modal>
+    )}
+    {baleni && (
+      <Modal open onClose={() => setBaleni(null)} size="sm" title={`Kolik vzít: ${baleni.item.name}`}
+        footer={<>
+          <Button variant="secondary" onClick={() => setBaleni(null)}>Zrušit</Button>
+          <Button type="submit" form="akce-baleni" variant="primary" disabled={!(parseInt(baleni.qty, 10) > 0)}>Přidat do balení</Button>
+        </>}>
+        <form id="akce-baleni" onSubmit={ev4 => {
+          ev4.preventDefault();
+          const qty = parseInt(baleni.qty, 10);
+          if (!Number.isFinite(qty) || qty <= 0) return;
+          const i2 = baleni.item;
+          patch(e.id, { packing: [...e.packing, { itemId: i2.id, name: i2.name, qty, packed: false, returned: null }] });
+          setPackSearch(''); setBaleni(null);
+        }}>
+          <Field id="akce-baleni-kusy" label="Kusů" hint={`Skladem ${baleni.item.quantity} ${baleni.item.unit}.`}>
+            <Input id="akce-baleni-kusy" type="number" inputMode="numeric" min={1} autoFocus className="!w-28" value={baleni.qty} onChange={ev4 => setBaleni({ ...baleni, qty: ev4.target.value })} />
+          </Field>
+        </form>
+      </Modal>
+    )}
+    </>
   );
 }

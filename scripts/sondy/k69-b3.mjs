@@ -247,6 +247,22 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   const pridat = p.getByRole('button', { name: 'Přidat položku' });
   tvrdi('T1: „Přidat položku" je vidět a povolené', await pridat.isVisible() && await pridat.isEnabled());
   await p.screenshot({ path: OUT + 'k69-b3-sklad-tel.png', fullPage: true });
+  // Lišta nástroje (hledání, Seznam/Karty, kategorie) se po odjetí nahoru
+  // sbalí do jednoho řádku. Na ploše přijde nástroj až s rozložením a hlídač
+  // lepení se dřív nezapnul: celý průhledný panel s mřížkou kategorií zůstal
+  // přilepený přes seznam položek.
+  await widgetLi(p, 'nastroj').scrollIntoViewIfNeeded();
+  await p.evaluate(() => document.querySelector('main')?.scrollBy(0, 600));
+  await p.waitForTimeout(500);
+  const lista = await p.evaluate(() => {
+    const s = document.querySelector('[data-plocha] li[data-widget="nastroj"] .sticky');
+    if (!s) return null;
+    const r = s.getBoundingClientRect();
+    const cs = getComputedStyle(s);
+    return { h: Math.round(r.height), neprusvitna: cs.backdropFilter !== 'none' || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor), karetKategorii: s.querySelectorAll('.grid button, .grid a').length };
+  });
+  tvrdi('T1: přilepená lišta Skladu je po posunu sbalená (do 170 px), neprůsvitná a bez mřížky kategorií', !!lista && lista.h <= 170 && lista.neprusvitna && lista.karetKategorii === 0, JSON.stringify(lista));
+  await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
   // Menu „···" vedle hlavní akce: panel zarovnaný k pravé hraně tlačítka dřív
   // na telefonu utekl z levého okraje a půlka položek byla mimo obrazovku.
   await p.locator('[data-plocha]').getByRole('button', { name: 'Další akce' }).first().click();

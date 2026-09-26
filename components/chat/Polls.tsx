@@ -2,10 +2,10 @@
 
 // Active team polls: pinned above the chat. One tap = one vote (changeable).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import { Icon } from '../Icons';
-import { Button, Input, Modal, Well } from '../ui';
+import { Button, Field, Input, Modal, Well } from '../ui';
 import { okJson } from '@/lib/api';
 import { czCount } from '@/lib/czech';
 
@@ -18,6 +18,8 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
   const [question, setQuestion] = useState('');
   const [opts, setOpts] = useState(['', '']);
   const [err, setErr] = useState('');
+  // Anketa se kreslí v doku i v plném chatu zároveň — id polí musí být jedinečná.
+  const idPole = useId();
   // Uzavření ankety se ptá oknem, ne nativním confirm() (DP §3.10): na
   // tabletu v režimu kiosku prohlížeč systémové dialogy potlačuje.
   const [uzavrit, setUzavrit] = useState<{ id: number; question: string } | null>(null);
@@ -111,12 +113,22 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
           <form onSubmit={e => { e.preventDefault(); if (lzeZalozit) create(); }}
             className="well p-3.5 space-y-2">
             {err && <p role="alert" className="text-xs text-bad-ink">{err}</p>}
-            <Input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Otázka ankety…" maxLength={200}
-              aria-label="Otázka ankety" />
-            {opts.map((o, i) => (
-              <Input key={i} value={o} onChange={e => setOpts(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                placeholder={`Možnost ${i + 1}`} maxLength={80} aria-label={`Možnost ${i + 1}`} />
-            ))}
+            {/* Viditelné popisky, ne jen placeholder: ten zmizí, jakmile se začne
+                psát, a u třetího pole pak nikdo neví, co je otázka a co možnost
+                (DP §3.14, stejná oprava jako v KioskSettings v kole 33). */}
+            <Field id={`${idPole}-otazka`} label="Otázka">
+              <Input id={`${idPole}-otazka`} value={question} onChange={e => setQuestion(e.target.value)}
+                placeholder="Např. Kdy uděláme poradu?" maxLength={200} />
+            </Field>
+            <fieldset className="space-y-2 min-w-0">
+              <legend className="t-label mb-1.5">Možnosti</legend>
+              {opts.map((o, i) => (
+                <Field key={i} id={`${idPole}-moznost-${i}`} label={`Možnost ${i + 1}`}>
+                  <Input id={`${idPole}-moznost-${i}`} value={o} maxLength={80}
+                    onChange={e => setOpts(prev => prev.map((x, j) => j === i ? e.target.value : x))} />
+                </Field>
+              ))}
+            </fieldset>
             <div className="flex flex-wrap gap-2">
               {opts.length < 8 && (
                 <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpts(prev => [...prev, ''])}>Možnost</Button>

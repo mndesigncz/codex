@@ -1,0 +1,50 @@
+{
+ "reviews": [
+  {
+   "id": 1,
+   "ref": "ord:12",
+   "rating": 5,
+   "note": "Nejlepší matcha ve městě.",
+   "created_at": "2026-09-25 17:10:00",
+   "customer_name": "Jana Dvořáková",
+   "crew": [
+    {
+     "name": "Eva Testová",
+     "avatar": "👩"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "ref": "res:14",
+   "rating": 2,
+   "note": "Dlouho jsme čekali na stůl.",
+   "created_at": "2026-09-24 19:40:00",
+   "customer_name": "Petr Novák",
+   "crew": [
+    {
+     "name": "Jakub Horák",
+     "avatar": "👤"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "ref": "ord:9",
+   "rating": 4,
+   "note": null,
+   "created_at": "2026-09-20 12:00:00",
+   "customer_name": "Tereza Málková",
+   "crew": []
+  }
+ ],
+ "count": 61,
+ "avg": 4.62,
+ "dist": [
+  2,
+  3,
+  5,
+  18,
+  33
+ ]
+}

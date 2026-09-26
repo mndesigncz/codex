@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
@@ -120,6 +120,16 @@ function KioskShell({ user }: { user: KioskUser }) {
   // Dokud se neozve prohlížeč, držíme místo zástupným znakem — jinak by se
   // serverový a klientský čas rozešly a React by překreslil celou obrazovku.
   // Hodiny na kiosku ukazují pražský čas i na tabletu nastaveném jinam.
+  // Okna widgetů (NadPlochou v oblastech) a další portály míří do <body>,
+  // tedy mimo .kiosk-surface — a přišla by o tabletových 14 px písma a 44 px
+  // cílů. Třída na <body> po dobu tabletu platí i pro ně. Samotná
+  // .kiosk-surface nemá vlastní vzhled, jen pravidla pro potomky, takže
+  // dvojí výskyt (body i obal) nic nezdvojí.
+  useEffect(() => {
+    document.body.classList.add('kiosk-surface');
+    return () => { document.body.classList.remove('kiosk-surface'); };
+  }, []);
+
   const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
   const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
 
@@ -160,9 +170,15 @@ function KioskShell({ user }: { user: KioskUser }) {
           náznaku, že tam ještě něco je. U baru se nehledá posuvník. */}
       <nav className="mt-5 flex gap-1.5 flex-wrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-thin -mx-1 px-1">
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          // aria-current: odečítač musí říct, na které obrazovce obsluha je —
+          // třída seg-on je jen pro oko. V tmavém režimu je .seg-on inkoust na
+          // skoro stejně tmavém podkladu a vybraná záložka působila slabší než
+          // nevybrané se skleněnou výplní; světlá linka (ring, bez posunu
+          // rozměru) ji vrátí dopředu, dokud globals.css nemá tmavou .seg-on.
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            aria-current={tab === t.id ? 'page' : undefined}
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
-              tab === t.id ? 'seg-on' : 'seg-off glass'
+              tab === t.id ? 'seg-on dark:ring-1 dark:ring-white/30' : 'seg-off glass'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
@@ -183,17 +199,26 @@ function KioskShell({ user }: { user: KioskUser }) {
           plochy je „Kdo je na směně" — příchod, odchod a kdo u tabletu stojí. */}
       {tab === 'shift' && (
         <main className="flex-1 mt-6">
-          <PlochaWidgetu
-            stranka="kiosk.smena"
-            rezim="jen-cteni"
-            hlavicka={{ title: 'Směna', subtitle: 'Kdo je na směně a co dnes čeká.' }}
-            nastroj={<WhoIsWorkingOrLock />}
-          />
+          <ZapisPodJmenem>
+            {zamceno => (
+              <PlochaWidgetu
+                stranka="kiosk.smena"
+                rezim="jen-cteni"
+                hlavicka={{
+                  title: 'Směna',
+                  subtitle: zamceno
+                    ? 'Tablet je zamčený — widgety se odemknou, jakmile se někdo odpíchne.'
+                    : 'Kdo je na směně a co dnes čeká.',
+                }}
+                nastroj={<WhoIsWorkingOrLock />}
+              />
+            )}
+          </ZapisPodJmenem>
         </main>
       )}
 
       {/* Everything else unlocks once somebody is on shift and records under
-          the active person's account. */}
+          the active person's account. Widgety na Směně hlídá ZapisPodJmenem. */}
       {tab !== 'shift' && (
         <KioskShiftGate>
           {tab === 'tasks' && (
@@ -238,6 +263,104 @@ function KioskShell({ user }: { user: KioskUser }) {
       </Modal>
     </div>
     </NavigaceKontext.Provider>
+  );
+}
+
+/**
+ * Widgety na ploše Směna stojí mimo KioskShiftGate (plocha je vidět i na
+ * zamčeném tabletu), a přitom některé zapisují: „Vyrobeno", „Přijmout"
+ * objednávku od stolu, kartička hosta, „Zapsat novou věc", úkoly. Bez téhle
+ * pojistky by šel zápis pod anonymní účet tabletu, nebo pod toho, kdo zůstal
+ * v cookie — přesně to, co kolo 19 zakázalo („tablet nesmí hádat").
+ *
+ * - Nikdo na směně: widgety jsou `inert` (nejdou ťuknout ani zaostřit),
+ *   nástroj — zamykací obrazovka s příchodem — zůstává živý.
+ * - Na směně víc lidí a nikdo vybraný: první ťuknutí na ovládací prvek
+ *   widgetu se zadrží a tablet se zeptá, kdo u něj stojí (requireActive,
+ *   stejně jako WhoFirst). Po výběru se ťuknutí zopakuje, po zavření
+ *   výběru se nestane nic.
+ *
+ * Widgety samy o tabletu nevědí (patří všem rozhraním), proto se hlídá
+ * tady, na hranici plochy — jedno místo pro každý widget, i ten, který
+ * vedení přidá do rozložení později.
+ */
+const NASTROJ_PLOCHY = 'nastroj';
+const OVLADACI_PRVEK = 'button, a[href], input, select, textarea, summary, label, [role="button"], [role="menuitem"], [role="checkbox"], [role="switch"]';
+
+function ZapisPodJmenem({ children }: { children: (zamceno: boolean) => React.ReactNode }) {
+  const { active, onShift, requireActive, loading } = useKioskShift();
+  const obal = useRef<HTMLDivElement>(null);
+  const zamceno = onShift.length === 0;
+  const ptatSe = !active && onShift.length > 1;
+  /** Opakované ťuknutí po výběru osoby — to už pustit. */
+  const propustit = useRef(false);
+
+  // `inert` na buňky widgetů (ne na nástroj). Plocha si buňky překresluje
+  // sama (načtení rozložení, obnovení), proto hlídač změn ve stromu.
+  useLayoutEffect(() => {
+    const el = obal.current;
+    if (!el) return;
+    const nastav = () => {
+      el.querySelectorAll<HTMLElement>('li[data-widget]').forEach(li => {
+        const ma = zamceno && li.dataset.widget !== NASTROJ_PLOCHY;
+        if (li.hasAttribute('inert') !== ma) li.toggleAttribute('inert', ma);
+      });
+    };
+    nastav();
+    const hlidac = new MutationObserver(nastav);
+    hlidac.observe(el, { childList: true, subtree: true });
+    return () => {
+      hlidac.disconnect();
+      el.querySelectorAll<HTMLElement>('li[data-widget][inert]').forEach(li => li.removeAttribute('inert'));
+    };
+  }, [zamceno]);
+
+  const prvekWidgetu = (cil: EventTarget | null): HTMLElement | null => {
+    if (!(cil instanceof Element)) return null;
+    const li = cil.closest<HTMLElement>('li[data-widget]');
+    // Portál (okno widgetu) v DOM do buňky nepatří — to už prošlo branou při otevření.
+    if (!li || !obal.current?.contains(li) || li.dataset.widget === NASTROJ_PLOCHY) return null;
+    const prvek = cil.closest<HTMLElement>(OVLADACI_PRVEK);
+    return prvek && li.contains(prvek) ? prvek : null;
+  };
+
+  const zeptatSeANavazat = (prvek: HTMLElement, akce: () => void) => {
+    void requireActive().then(kdo => {
+      if (!kdo) return;
+      // Po výběru se musí překreslit a zapsat cookie s osobou (efekt
+      // v KioskShiftProvider) — až pak smí odejít zápis.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!prvek.isConnected) return;
+        propustit.current = true;
+        try { akce(); } finally { propustit.current = false; }
+      }));
+    });
+  };
+
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ptatSe || propustit.current) return;
+    const prvek = prvekWidgetu(e.target);
+    if (!prvek) return;
+    e.preventDefault();
+    e.stopPropagation();
+    zeptatSeANavazat(prvek, () => prvek.click());
+  };
+  // Pole ve widgetu (rychlý zápis) jde zaostřit i Tabem, bez kliknutí.
+  const onFocusCapture = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!ptatSe || propustit.current) return;
+    const cil = e.target as HTMLElement;
+    if (!cil.matches('input, select, textarea') || !prvekWidgetu(cil)) return;
+    cil.blur();
+    zeptatSeANavazat(cil, () => cil.focus());
+  };
+
+  return (
+    <div ref={obal} onClickCapture={onClickCapture} onFocusCapture={onFocusCapture}
+      data-kiosk-zapis={zamceno ? 'zamceno' : ptatSe ? 'kdo' : 'ok'}>
+      {/* Během prvního načtení rozpisu je plocha taky inert (nevíme, kdo je
+          na směně), ale „zamčeno" do podtitulku píšeme až podle odpovědi. */}
+      {children(zamceno && !loading)}
+    </div>
   );
 }
 

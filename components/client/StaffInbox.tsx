@@ -1,19 +1,33 @@
 'use client';
 
 // Příjem u obsluhy: nové objednávky od stolu a dnešní rezervace. Běží
-// v kiosku na baru i v mobilu zaměstnance. Objednávku je potřeba potvrdit
-// do pár minut, jinak host zbytečně čeká — proto se nová hlásí nahlas
-// (žlutý pruh, počet v záložce) a obnovuje se každých dvacet vteřin.
+// v kiosku na baru, v mobilu zaměstnance a jako nástroj stránky Objednávky
+// v Managero client. Objednávku je potřeba potvrdit do pár minut, jinak host
+// zbytečně čeká — proto se nová hlásí nahlas (pípnutí, počet v záložce)
+// a obnovuje se každých dvacet vteřin.
+//
+// Kolo 69 (B8), z auditu „Klient – Objednávky":
+//  - nové objednávky jsou karta se seznamem a počtem v Chipu (dřív jantarový
+//    panel a v něm bílé dlaždice — karta v kartě), nadpisy jednou podobou;
+//  - „Přijmout" je tmavé `primary` (dřív limetka u každé objednávky),
+//    odmítnutí v okně místo confirm(), přijímá a odmítá jen kdo má
+//    objednavky.vyridit;
+//  - stůl, stav, stav kasy a ověření QR a polohy jsou Chip (dřív čtyři
+//    ručně barvené pilulky a odznak stolu s rádiusem mimo škálu);
+//  - hlášení o kase je `.note note-wait`, potvrzení akcí jeden Toast dole
+//    (dřív limetkový proužek nahoře, druhá kopie té z ClientAdmin).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, EmptyState, Skeleton } from '../ui';
-import { Initials } from './ClientShell';
+import { Button, Card, Chip, EmptyState, ListRow, Menu, Modal, Skeleton, Toast, type ChipTone, type MenuItem } from '../ui';
 import CardScan from './CardScan';
 import { RES_STATUS } from '@/lib/clientSlots';
-import { czCount } from '@/lib/czech';
+import { TON_REZERVACE, type StavRezervace } from '@/lib/klientPrehled';
+import { czCount, type CzNoun } from '@/lib/czech';
+import { dbTimeHM, parseDbTime } from '@/lib/pragueTime';
 import { useMoney } from '../CurrencyProvider';
 import { okJson, apiMessage } from '@/lib/api';
+import { useOpravneni } from '../role/useOpravneni';
 
 const EVERY_MS = 20 * 1000;
 
@@ -32,35 +46,55 @@ export function useStaffInbox(enabled = true) {
   return { d, err, reload: load };
 }
 
-const ORDER_STATUS: Record<string, { label: string; tone: string }> = {
-  new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'done' }, declined: { label: 'Nepřijato', tone: 'off' },
+const ORDER_STATUS: Record<string, { label: string; tone: ChipTone }> = {
+  new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'muted' }, declined: { label: 'Nepřijato', tone: 'muted' },
 };
 const POS_STATE: Record<string, string> = { NEW: 'v kase čeká na přijetí', CONFIRMED: 'v kase, připravuje se', DISPATCHED: 'v kase vydáno', DECLINED: 'kasa odmítla', SCHEDULING_DELIVERY: 'v kase' };
-/** Jak víme, že host sedí u stolu: QR ze stolu a poloha telefonu. */
-function Verified({ o }: { o: any }) {
-  const parts: { txt: string; tone: 'ok' | 'wait' | 'off' }[] = [];
-  if (o.via_qr) parts.push({ txt: 'QR ze stolu', tone: 'ok' });
-  else if (o.via_qr === false) parts.push({ txt: 'bez QR', tone: 'wait' });
-  if (o.geo_status === 'ok') parts.push({ txt: `u podniku${o.geo_distance_m != null ? ` · ${o.geo_distance_m} m` : ''}`, tone: 'ok' });
-  else if (o.geo_status === 'far') parts.push({ txt: `daleko · ${o.geo_distance_m} m`, tone: 'off' });
-  else if (o.geo_status === 'none') parts.push({ txt: 'bez polohy', tone: 'wait' });
-  if (!parts.length) return null;
-  return <>{parts.map(p => <span key={p.txt} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${p.tone === 'ok' ? 'bg-[#C8F542]/20 text-[#3E5406]' : p.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-bad/10 text-bad-ink'}`}><Icon name={p.txt.startsWith('QR') || p.txt === 'bez QR' ? 'tag' : 'location'} size={11} />{p.txt}</span>)}</>;
-}
-const chip = (tone: string) => `inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : tone === 'wait' ? 'bg-wait/15 text-wait-ink' : tone === 'done' ? 'bg-black/[0.06] text-black/60' : 'bg-bad/10 text-bad-ink'}`;
+const PRIJATO_V_KASE = /^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i;
+const NOVA_OBJEDNAVKA: CzNoun = { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' };
+const OSOBA: CzNoun = { one: 'osoba', few: 'osoby', many: 'osob' };
 
-function ago(iso: string) {
-  const m = Math.max(0, Math.round((Date.now() - new Date(String(iso).replace(' ', 'T') + (String(iso).match(/[Zz]$|[+-]\d{2}:?\d{2}$/) ? '' : 'Z')).getTime()) / 60000));
-  return m < 1 ? 'právě teď' : m === 1 ? 'před minutou' : m < 5 ? `před ${m} minutami` : `před ${m} min`;
+/** Jak víme, že host sedí u stolu: QR ze stolu a poloha telefonu. */
+function Overeni({ o }: { o: any }) {
+  const casti: { text: string; tone: ChipTone; icon: string }[] = [];
+  if (o.via_qr) casti.push({ text: 'QR ze stolu', tone: 'ok', icon: 'tag' });
+  else if (o.via_qr === false) casti.push({ text: 'bez QR', tone: 'wait', icon: 'tag' });
+  if (o.geo_status === 'ok') casti.push({ text: `u podniku${o.geo_distance_m != null ? ` · ${o.geo_distance_m} m` : ''}`, tone: 'ok', icon: 'location' });
+  else if (o.geo_status === 'far') casti.push({ text: `daleko · ${o.geo_distance_m} m`, tone: 'bad', icon: 'location' });
+  else if (o.geo_status === 'none') casti.push({ text: 'bez polohy', tone: 'wait', icon: 'location' });
+  return <>{casti.map(c => <Chip key={c.text} tone={c.tone} size="sm" icon={c.icon}>{c.text}</Chip>)}</>;
+}
+
+/** Kde je objednávka v kase — jeden Chip místo čtyř ručně barvených pilulek s tečkou. */
+function StavKasy({ o }: { o: any }) {
+  const st = String(o.pos_state ?? '');
+  if (!o.storyous_order_id) return o.status !== 'declined' ? <Chip tone="wait" size="sm">Není v kase</Chip> : null;
+  if (st === 'DECLINED') return <Chip tone="bad" size="sm">Kasa odmítla</Chip>;
+  if (PRIJATO_V_KASE.test(st)) return <Chip tone="ok" size="sm" icon="check">Přijato v kase · tiskne se</Chip>;
+  return <Chip tone="wait" size="sm">V kase čeká na přijetí</Chip>;
+}
+
+/** „před 3 min", starší s časem. Čas z databáze přes parseDbTime — nese UTC bez zóny. */
+function kdy(iso: string): string {
+  const d = parseDbTime(iso);
+  if (!d) return '';
+  const m = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  if (m < 1) return 'právě teď';
+  if (m === 1) return 'před minutou';
+  if (m < 60) return `před ${m} min`;
+  return `v ${dbTimeHM(iso)}`;
 }
 
 export default function StaffInbox({ compact = false, onToast }: { compact?: boolean; onToast?: (m: string) => void }) {
   const { d, err, reload } = useStaffInbox(true);
+  // Tlačítka podle `ma` (před načtením oprávnění ANO, rozhoduje server).
+  const { ma } = useOpravneni();
+  const vyridi = ma('objednavky.vyridit');
   const [busy, setBusy] = useState<number | null>(null);
   const beeped = useRef<Set<number>>(new Set());
-  const [flash, setFlash] = useState('');
-  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4500); return () => clearTimeout(t); } }, [flash]);
-  const toast = (m: string) => { onToast ? onToast(m) : setFlash(m); };
+  const [hlaska, setHlaska] = useState<string | null>(null);
+  const [odmitam, setOdmitam] = useState<any | null>(null);
+  const toast = (m: string) => { if (onToast) onToast(m); else setHlaska(m); };
 
   // Nová objednávka, kterou jsme ještě neviděli → krátké pípnutí (kiosk na baru bývá bez očí).
   useEffect(() => {
@@ -88,7 +122,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Zkouška se nepovedla.');
       setTest(Array.isArray(x.kroky) ? x.kroky : []);
-    } catch (e: any) { toast(e.message); }
+    } catch (e) { toast(apiMessage(e, 'Zkouška se nepovedla.')); }
     setTestuji(false);
   };
 
@@ -114,13 +148,16 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       if (x.posNote) toast(x.posNote);
       else if (status === 'done' && x.loyalty?.stamp?.rewarded) toast('Hotovo. Host nasbíral všechna razítka a má odměnu.');
       else if (status === 'done') toast('Hotovo. Body připsány.');
+      else if (status === 'declined') toast('Objednávka odmítnuta — host dostane zprávu.');
+      else toast('Objednávka přijata.');
       await reload();
-    } catch (e: any) { toast(e.message); }
+    } catch (e) { toast(apiMessage(e, 'Nepovedlo se.')); }
     setBusy(null);
   };
 
-  if (err) return <p className="note note-danger text-sm px-4 py-3">{err}</p>;
-  if (!d) return <div className="space-y-3"><Skeleton className="h-16 rounded-2xl" /><Skeleton className="h-16 rounded-2xl" /></div>;
+  const toastEl = !onToast ? <Toast message={hlaska} onClose={() => setHlaska(null)} /> : null;
+  if (err) return <p className="note note-danger" role="alert">{err}</p>;
+  if (!d) return <div className="space-y-3"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>;
   const orders: any[] = d.orders ?? [];
   const news = orders.filter(o => o.status === 'new');
   const inProgress = orders.filter(o => o.status === 'confirmed');
@@ -134,141 +171,153 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
   const vady: string[] = [];
   if (pos.connected === false) vady.push('Pokladna Storyous není připojená (Nastavení → Pokladna).');
   else {
-    if (pos.autoPos === false) vady.push('Automatické odesílání do kasy je vypnuté (Klient → Nastavení).');
-    if (pos.tables > 0 && pos.tablesPaired === 0) vady.push(`Žádný z ${pos.tables} stolů není spárovaný s pokladnou (Klient → Stoly → Načíst z pokladny).`);
+    if (pos.autoPos === false) vady.push('Automatické odesílání do kasy je vypnuté (Client → Nastavení).');
+    if (pos.tables > 0 && pos.tablesPaired === 0) vady.push(`Žádný z ${pos.tables} stolů není spárovaný s pokladnou (Client → Stoly → Načíst z pokladny).`);
     else if (pos.tablesPaired < pos.tables) vady.push(`${pos.tables - pos.tablesPaired} z ${pos.tables} stolů není spárovaných s pokladnou.`);
-    if (pos.items > 0 && pos.itemsLinked < pos.items) vady.push(`${pos.items - pos.itemsLinked} z ${pos.items} položek menu nemá produkt v kase (Klient → Menu → Tisk na terminálu).`);
+    if (pos.items > 0 && pos.itemsLinked < pos.items) vady.push(`${pos.items - pos.itemsLinked} z ${pos.items} položek menu nemá produkt v kase (Client → Menu → Tisk na terminálu).`);
   }
+  const radek = (o: any) => (
+    <RadekObjednavky key={o.id} o={o} busy={busy === o.id} vyridi={vyridi}
+      onStav={s => { void act(o.id, s); }} onKasa={() => { void toPos(o.id); }} onOdmitnout={() => setOdmitam(o)} />
+  );
+  const vysledkyZkousky = test && (
+    <ul className="space-y-1.5">
+      {test.map((k, i) => (
+        <li key={i} className="flex gap-2 text-[13px]">
+          <Icon name={k.ok ? 'check' : 'close'} size={14} className={`shrink-0 mt-0.5 ${k.ok ? 'text-ok-ink' : 'text-bad-ink'}`} />
+          <span className="min-w-0">
+            <span className="font-semibold text-[#16181A]">{k.krok}:</span> <span className="text-black/70">{k.detail}</span>
+            {k.kde && <span className="block t-meta mt-0.5">Kde: {k.kde}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
-    <div className="space-y-5">
-      {!compact && (vady.length > 0 || test) && (
-        <section aria-labelledby="h-pos" className={`rounded-2xl border p-4 ${vady.length ? 'border-wait/35 bg-wait/[0.07]' : 'border-black/[0.08] bg-white/60'}`}>
-          <p id="h-pos" className={`text-sm font-bold flex items-center gap-2 ${vady.length ? 'text-wait-ink' : 'text-[#16181A]'}`}>
-            <Icon name={vady.length ? 'warning' : 'receipt'} size={16} className="shrink-0" />
-            {vady.length ? 'Objednávky se nevytisknou na terminálu' : 'Spojení s pokladnou'}
-          </p>
-          {vady.length > 0 && (
-            <ul className="mt-1.5 space-y-1 text-[13px] text-wait-ink/90">
-              {vady.map((v, i) => <li key={i} className="flex gap-2"><span aria-hidden>·</span><span>{v}</span></li>)}
-            </ul>
-          )}
-          {test && (
-            <ul className="mt-2.5 space-y-1.5">
-              {test.map((k, i) => (
-                <li key={i} className="flex gap-2 text-[13px]">
-                  <span className={`shrink-0 mt-0.5 ${k.ok ? 'text-[#5B7A08]' : 'text-bad-ink'}`} aria-hidden><Icon name={k.ok ? 'check' : 'close'} size={13} /></span>
-                  <span className="min-w-0">
-                    <span className="font-semibold text-[#16181A]">{k.krok}:</span> <span className="text-black/70">{k.detail}</span>
-                    {k.kde && <span className="block text-[11px] text-black/45 mt-0.5">→ {k.kde}</span>}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-2.5">
-            <Button size="sm" variant="secondary" icon="refresh" loading={testuji} onClick={zkouska}>
-              {test ? 'Zkusit znovu' : 'Vyzkoušet spojení s kasou'}
-            </Button>
-          </div>
-        </section>
+    <div className="space-y-4">
+      {!compact && vady.length > 0 && (
+        <div className="note note-wait space-y-2" role="status">
+          <p className="font-semibold flex items-center gap-2"><Icon name="warning" size={16} className="shrink-0" />Objednávky se nevytisknou na terminálu</p>
+          <ul className="space-y-1 list-disc pl-5">{vady.map((v, i) => <li key={i}>{v}</li>)}</ul>
+          {vysledkyZkousky}
+          <Button size="sm" variant="secondary" icon="refresh" loading={testuji} onClick={() => { void zkouska(); }}>{test ? 'Zkusit znovu' : 'Vyzkoušet spojení s kasou'}</Button>
+        </div>
       )}
-      {!compact && vady.length === 0 && !test && (
-        <p className="px-1">
-          <Button size="sm" variant="ghost" icon="refresh" loading={testuji} onClick={zkouska}>
-            {testuji ? 'Zkouším spojení s kasou…' : 'Vyzkoušet spojení s kasou'}
+      {!compact && vady.length === 0 && (
+        <div className="space-y-2">
+          <Button size="sm" variant="ghost" icon="refresh" loading={testuji} onClick={() => { void zkouska(); }}>
+            {testuji ? 'Zkouším spojení s kasou…' : test ? 'Zkusit spojení s kasou znovu' : 'Vyzkoušet spojení s kasou'}
           </Button>
-        </p>
+          {test && <Card pad="sm">{vysledkyZkousky}</Card>}
+        </div>
       )}
-      {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-2.5">{flash}</p>}
-      {/* Vyhledání kartičky je nástroj pro obsluhu u kasy, ne obsah
-          obrazovky. Dřív stálo jako velká karta nad objednávkami a bralo
-          jim první pohled; teď je to jeden řádek, který se rozbalí, když
-          někdo kartičku opravdu drží v ruce. */}
+      {/* Vyhledání kartičky je nástroj pro obsluhu u kasy, ne obsah obrazovky —
+          jeden řádek, který se rozbalí, když někdo kartičku opravdu drží v ruce. */}
       <details className="group">
-        <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none"><Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" /></summary>
+        <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
+          <Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+        </summary>
         <div className="mt-2"><CardScan onToast={toast} onChange={compact ? undefined : reload} /></div>
       </details>
       {news.length > 0 && (
-        <section className="rounded-3xl bg-wait/[0.10] border border-wait/40 p-4 space-y-3">
-          <h2 className="font-bold tracking-tight flex items-center gap-2"><Icon name="bell" size={18} className="text-wait-ink" />{news.length === 1 ? 'Nová objednávka od stolu' : `${czCount(news.length, { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' })} od stolu`}</h2>
-          <ul className="space-y-3">{news.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
-        </section>
+        // Bílá karta s počtem v Chipu: tónovaná plocha by na stránce s „Čeká na tebe" byla druhá (DP §6.3).
+        <Card pad="none" aria-labelledby="h-nove">
+          <h2 id="h-nove" className="t-card flex items-center gap-2 px-5 pt-4">
+            <Icon name="bell" size={17} className="text-wait-ink" />{news.length === 1 ? 'Nová objednávka od stolu' : `${czCount(news.length, NOVA_OBJEDNAVKA)} od stolu`}
+            <Chip tone="wait" size="sm">{news.length}</Chip>
+          </h2>
+          <ul className="list px-5">{news.map(radek)}</ul>
+        </Card>
       )}
       {inProgress.length > 0 && (
-        <section>
-          <h2 className="t-card mb-2">Připravuje se</h2>
-          <ul className="space-y-3">{inProgress.map(o => <OrderRow key={o.id} o={o} busy={busy === o.id} act={act} toPos={toPos} />)}</ul>
-        </section>
+        <Card pad="none" aria-labelledby="h-priprava">
+          <h2 id="h-priprava" className="t-card px-5 pt-4">Připravuje se</h2>
+          <ul className="list px-5">{inProgress.map(radek)}</ul>
+        </Card>
       )}
       {!compact && reservations.length > 0 && (
-        <section>
-          <h2 className="t-card mb-2">Dnešní rezervace</h2>
-          <ul className="divide-y divide-black/[0.06]">
+        <Card pad="none" aria-labelledby="h-rez">
+          <h2 id="h-rez" className="t-card px-5 pt-4">Dnešní rezervace</h2>
+          <ul className="list px-5">
             {reservations.map(r => (
-              <li key={r.id} className="py-2 flex items-center gap-3 flex-wrap">
-                <span className="font-semibold tabular-nums w-14 shrink-0">{r.time}</span>
-                <Initials name={r.customer_name} size={26} />
-                <span className="min-w-0 flex-1 basis-40 truncate">{r.customer_name} <span className="text-black/50">· {r.party} os.{r.table_name ? ` · ${r.table_name}` : ''}</span></span>
-                <span className={`${chip(RES_STATUS[r.status]?.tone ?? 'wait')} ml-auto`}>{RES_STATUS[r.status]?.label ?? r.status}</span>
-              </li>))}
+              <ListRow key={r.id} value={String(r.time ?? '').slice(0, 5)} title={r.customer_name}
+                meta={[czCount(Number(r.party) || 1, OSOBA), r.table_name].filter(Boolean).join(' · ')}
+                right={<Chip tone={TON_REZERVACE[r.status as StavRezervace] ?? 'wait'} size="sm">{RES_STATUS[r.status]?.label ?? r.status}</Chip>} />
+            ))}
           </ul>
-        </section>
+        </Card>
       )}
       {!compact && recent.length > 0 && (
-        <details>
-          <summary className="text-sm text-black/55 cursor-pointer hover:text-black">Vyřízené za poslední tři hodiny ({recent.length})</summary>
-          <ul className="space-y-2 mt-2">{recent.map(o => <OrderRow key={o.id} o={o} busy={false} act={act} />)}</ul>
+        <details className="group">
+          <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
+            Vyřízené za poslední tři hodiny ({recent.length})<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+          </summary>
+          <Card pad="none" className="mt-2"><ul className="list px-5">{recent.map(o => <RadekObjednavky key={o.id} o={o} busy={false} vyridi={false} />)}</ul></Card>
         </details>
       )}
       {!compact && orders.length === 0 && reservations.length === 0 && (
-        <EmptyState icon="inbox" title="Nic k vyřízení" hint="Objednávky od stolu a dnešní rezervace se objeví tady." compact />
+        <Card><EmptyState icon="inbox" title="Nic k vyřízení" hint="Objednávky od stolu a dnešní rezervace se objeví tady." compact /></Card>
       )}
+      {odmitam && (
+        <Modal open onClose={() => setOdmitam(null)} size="sm" title="Odmítnout objednávku?"
+          footer={<>
+            <Button variant="secondary" onClick={() => setOdmitam(null)}>Zrušit</Button>
+            <Button variant="danger-solid" onClick={() => { const o = odmitam; setOdmitam(null); void act(o.id, 'declined'); }}>Odmítnout</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty">{odmitam.table_name ? `Host u stolu ${odmitam.table_name}` : 'Host'} dostane zprávu, že objednávka nebyla přijata.</p>
+        </Modal>
+      )}
+      {toastEl}
     </div>
   );
 }
 
-function OrderRow({ o, busy, act, toPos }: { o: any; busy: boolean; act: (id: number, s: string) => void; toPos?: (id: number) => void }) {
+function RadekObjednavky({ o, busy, vyridi, onStav, onKasa, onOdmitnout }: {
+  o: any; busy: boolean; vyridi: boolean;
+  onStav?: (s: 'confirmed' | 'done') => void; onKasa?: () => void; onOdmitnout?: () => void;
+}) {
   const money = useMoney();
   const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new;
+  const kasa = !o.storyous_order_id && o.status !== 'declined' && !!onKasa;
+  const dalsi: MenuItem[] = vyridi ? [
+    ...(kasa ? [{ label: 'Poslat do kasy', icon: 'receipt', onClick: () => onKasa?.() }] : []),
+    ...(o.status === 'new' && onOdmitnout ? [{ label: 'Odmítnout…', icon: 'close', danger: true, onClick: onOdmitnout }] : []),
+  ] : [];
+  const stul = o.table_name ?? 'bez stolu';
   return (
-    <li className="rounded-2xl bg-white/70 border border-black/[0.06] p-3.5">
-      <div className="flex items-start gap-3 flex-wrap">
-        <div className="min-w-0 flex-1 basis-56">
-          <p className="font-bold leading-tight flex items-center gap-2 flex-wrap">
-            <span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm tabular-nums">{o.table_name ?? 'bez stolu'}</span>
-            <span className="truncate">{o.customer_name}</span>
-            <span className="text-xs font-medium text-black/45">{ago(o.created_at)}</span>
-          </p>
-          <ul className="mt-1.5 text-sm">
-            {(o.items ?? []).map((l: any, i: number) => <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{money(l.price * l.count)}</span></li>)}
-          </ul>
-          {o.note && <p className="text-xs text-black/60 mt-1">„{o.note}"</p>}
-          <p className="mt-1.5 flex items-center gap-2 flex-wrap"><span className="font-bold tabular-nums">{money(o.total)}</span><span className={chip(st.tone)}>{st.label}</span><Verified o={o} />{o.pos_state && <span className="text-[11px] text-black/45">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
-            {(() => {
-              const st = String(o.pos_state ?? '');
-              if (!o.storyous_order_id) {
-                return o.status !== 'declined'
-                  ? <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-2.5 py-1 text-[11px] font-semibold text-wait-ink"><span className="h-1.5 w-1.5 rounded-full bg-wait" />Není v kase</span>
-                  : null;
-              }
-              if (st === 'DECLINED') return <span className="inline-flex items-center gap-1.5 rounded-full bg-bad/15 px-2.5 py-1 text-[11px] font-semibold text-bad-ink"><span className="h-1.5 w-1.5 rounded-full bg-bad" />Kasa odmítla</span>;
-              if (/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(st)) return <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]"><span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />Přijato v kase · tiskne se</span>;
-              return <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-2.5 py-1 text-[11px] font-semibold text-wait-ink"><span className="h-1.5 w-1.5 rounded-full bg-wait" />V kase čeká na přijetí</span>;
-            })()}
-          </p>
-          {o.pos_note && o.status !== 'declined' && !/^(CONFIRMED|ACCEPTED|DISPATCHED|DELIVERED)$/i.test(String(o.pos_state ?? '')) && (
-            <p className="mt-1 text-[11px] text-wait-ink leading-snug">{o.pos_note}</p>
-          )}
+    <li className="list-row items-start flex-wrap sm:flex-nowrap">
+      <div className="min-w-0 flex-1 basis-56">
+        <p className="flex items-center gap-2 flex-wrap text-[15px] font-medium leading-snug text-[#16181A]">
+          <Chip tone="ink" size="sm">{stul}</Chip>
+          <span className="truncate">{o.customer_name}</span>
+          <span className="t-meta">{kdy(o.created_at)}</span>
+        </p>
+        <ul className="mt-1.5 text-sm">
+          {(o.items ?? []).map((l: any, i: number) => (
+            <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{money(l.price * l.count)}</span></li>
+          ))}
+        </ul>
+        {o.note && <p className="t-meta mt-1">„{o.note}"</p>}
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold tabular-nums mr-1">{money(o.total)}</span>
+          <Chip tone={st.tone} size="sm">{st.label}</Chip>
+          <Overeni o={o} />
+          <StavKasy o={o} />
+          {o.pos_state && !PRIJATO_V_KASE.test(String(o.pos_state)) && <span className="t-meta">{POS_STATE[o.pos_state] ?? `kasa: ${o.pos_state}`}</span>}
         </div>
-        <div className="flex gap-1.5 flex-wrap justify-end ml-auto">
-          {o.status === 'new' && <><Button size="sm" variant="accent" icon="check" loading={busy} onClick={() => act(o.id, 'confirmed')}>Přijmout</Button><Button size="sm" variant="ghost" loading={busy} onClick={() => { if (confirm('Objednávku odmítnout? Host dostane zprávu.')) act(o.id, 'declined'); }}>Odmítnout</Button></>}
-          {o.status === 'confirmed' && <Button size="sm" variant="primary" loading={busy} onClick={() => act(o.id, 'done')}>Hotovo</Button>}
-          {toPos && !o.storyous_order_id && o.status !== 'declined' && (
-            <Button size="sm" variant="secondary" icon="receipt" loading={busy} onClick={() => toPos(o.id)}>Poslat do kasy</Button>
-          )}
-        </div>
+        {o.pos_note && o.status !== 'declined' && !PRIJATO_V_KASE.test(String(o.pos_state ?? '')) && (
+          <p className="mt-1 text-[13px] text-wait-ink leading-snug">{o.pos_note}</p>
+        )}
       </div>
+      {vyridi && onStav && (o.status === 'new' || o.status === 'confirmed' || dalsi.length > 0) && (
+        <div className="flex gap-1.5 shrink-0 ml-auto">
+          {/* Stůl v přístupném názvu — tři „Přijmout" za sebou by odečítač nerozlišil. */}
+          {o.status === 'new' && <Button size="sm" variant="primary" icon="check" loading={busy} onClick={() => onStav('confirmed')} aria-label={`Přijmout: ${stul}, ${o.customer_name}`}>Přijmout</Button>}
+          {o.status === 'confirmed' && <Button size="sm" variant="primary" loading={busy} onClick={() => onStav('done')} aria-label={`Hotovo: ${stul}, ${o.customer_name}`}>Hotovo</Button>}
+          {dalsi.length > 0 && <Menu size="sm" label={`Další akce s objednávkou ${stul}`} items={dalsi} />}
+        </div>
+      )}
     </li>
   );
 }

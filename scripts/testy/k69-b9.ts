@@ -116,4 +116,24 @@ export default function ({ eq, ok }: Testy) {
 
   const sheet = bezKomentaru(precti('components/MobileMoreSheet.tsx'));
   ok('Další (telefon): štítek skupiny je t-label', sheet.includes('<p className="px-1 pb-1 t-label">'));
+
+  // ---- opravy po review kola 69 ----
+  const appR = bezKomentaru(precti('components/kiosk/KioskApp.tsx'));
+  ok('Tablet: plocha Směna je obalená pojistkou zápisu (ZapisPodJmenem)', /<ZapisPodJmenem>[\s\S]*stranka="kiosk.smena"/.test(appR));
+  ok('Tablet: zamčený tablet dá widgetům inert, nástroj ne', appR.includes("toggleAttribute('inert'") && appR.includes('li.dataset.widget !== NASTROJ_PLOCHY'));
+  ok('Tablet: bez vybrané osoby se zápis z widgetu ptá (requireActive)', /onClickCapture[\s\S]*requireActive\(\)/.test(appR));
+  ok('Tablet: záložky mají aria-current', appR.includes("aria-current={tab === t.id ? 'page' : undefined}"));
+  ok('Tablet: portály oken widgetů dědí .kiosk-surface (třída na <body>)', appR.includes("document.body.classList.add('kiosk-surface')") && appR.includes("document.body.classList.remove('kiosk-surface')"));
+
+  const brana = bezKomentaru(precti('components/kiosk/KioskShiftGate.tsx'));
+  ok('Tablet: hlášení přes sdílený Toast, ne ruční limetkový proužek', brana.includes('<Toast ') && !brana.includes('text-[#5B7A08]') && !brana.includes('border-[#C8F542]/40'));
+  ok('Tablet: přepínač osoby je MenuPanel s usePopover, aria-expanded a aria-checked', brana.includes('<MenuPanel') && brana.includes('usePopover(open, setOpen')
+    && brana.includes('aria-expanded={canSwitch ? open : undefined}') && brana.includes('aria-checked={vybrany}') && !brana.includes("? 'bg-[#C8F542]/20'"));
+  ok('Tablet: PIN bez znaku ⌫, smazání je ikona s aria-label', !brana.includes('⌫') && brana.includes('aria-label="Smazat číslici"'));
+  ok('Tablet: PunchDialog je <Modal>, ne ruční překryv', !brana.includes('modal-overlay') && /export function PunchDialog[\s\S]*<Modal open/.test(brana));
+
+  const pollsR = bezKomentaru(precti('components/chat/Polls.tsx'));
+  ok('Anketa: otázka a možnosti mají viditelný popisek (Field), ne jen placeholder', pollsR.includes('label="Otázka"') && pollsR.includes('label={`Možnost ${i + 1}`}') && !pollsR.includes('placeholder="Otázka ankety…"'));
+
+  ok('Nastavení: odpojení pokladny kontroluje res.ok', /method: 'DELETE' \}\)\.catch\(\(\) => null\);\s*if \(!res\?\.ok\)/.test(nast));
 }

@@ -3,25 +3,42 @@
 // Věrnostní program rozdělený jako v Kartičce: co dává body, jak se sbírají
 // razítka, co se dá za body pořídit, jaké slevy plynou z úrovně, a promo
 // kódy na letáky. Každá část zvlášť, ať se v tom vedení vyzná.
+//
+// Kolo 69 (balík B8): stránka Věrnost je plocha s widgety (PlochaWidgetu,
+// stránka vedeni.klient_vernost); přepínač částí je v `aside` hlavičky a tahle
+// komponenta kreslí nástroj. Z auditu „Klient – Věrnost":
+//  - „Body a úrovně" měly tři limetková „Uložit" pod sebou a první dvě ukládala
+//    totéž — teď jeden formulář a jedno „Uložit" v hlavičce;
+//  - třetí kopie StatCard (bílé dlaždice, v přehledu šedé) → StatRow v kartě,
+//    vlastní sloupky Spark → sdílený BarSpark, „Za posledních 30 dní" je widget;
+//  - nativní zaškrtávátka → Switch, lokální `Chip` (stejné jméno jako Chip z ui,
+//    vybraný stav tmavý s limetkovým textem) → filter-pill seg-on/seg-off,
+//    ruční pilulky Běží/Aktivní → Switch v řádku, „Smazat" → okno s potvrzením,
+//    „Zpět" jako tlačítko, hlavní akce vpravo, měna z CurrencyProvider;
+//  - razítková kartička v seznamu už nekreslí tři natvrdo vybarvená razítka,
+//    která vypadala jako skutečný průběh.
+// Oprávnění: pravidla a úrovně mění jen vernost.pravidla, kartičky
+// vernost.kampane, kupony kupony.spravovat, uplatnit kód kupony.uplatnit,
+// skupiny hostů zakaznici.skupiny.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  BarSpark, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, Segmented, Skeleton, Stat, StatRow, Switch, SwitchRow, Well,
+} from '../ui';
 import { Icon } from '../Icons';
-import { Button, Segmented, EmptyState, Skeleton, ErrorState, PageHeader } from '../ui';
-import { Initials } from './ClientShell';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czDay } from '@/lib/clientSlots';
+import { czCount, type CzNoun } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { useMoney, useSymbol } from '../CurrencyProvider';
-import { okJson } from '@/lib/api';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
-
-const input = 'field !py-2.5 text-sm';
-const label = 'field-label';
+import { apiMessage, okJson } from '@/lib/api';
+import { obsahuje } from '@/lib/hledani';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { useOpravneni } from '../role/useOpravneni';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
-// nad sebou. Přitom „Body" a „Slevy a úrovně" jsou jedna věc (co host
-// nasbírá a co za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
-// Spojené do jedné stránky po sekcích se hledají líp než ve dvou záložkách.
+// nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
+// za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
 export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
   { id: 'overview', label: 'Přehled' },
@@ -29,6 +46,16 @@ export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
   { id: 'stamps', label: 'Razítka' },
   { id: 'coupons', label: 'Kupony a kódy' },
 ];
+const KLIC_CASTI: Record<LoyaltySub, readonly string[]> = {
+  overview: ['vernost.zobrazit'],
+  points: ['vernost.zobrazit'],
+  stamps: ['vernost.zobrazit'],
+  coupons: ['kupony.spravovat', 'kupony.uplatnit'],
+};
+const FORM_BODY = 'vernost-body';
+
+const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
+const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
 
 async function j(url: string, init?: RequestInit) {
   const r = await fetch(url, init ? { headers: { 'Content-Type': 'application/json' }, ...init } : undefined);
@@ -41,8 +68,8 @@ async function j(url: string, init?: RequestInit) {
 function useProfile() {
   const [p, setP] = useState<any | null>(null);
   // Bez `error` tu mlčky selhalo načtení profilu a celá Věrnost zůstala
-  // viset na skeletonu — obrazovka, která se nikdy nedonačte, vypadá
-  // hůř než obrazovka, která přizná chybu.
+  // viset na kostře — obrazovka, která se nikdy nedonačte, vypadá hůř než
+  // obrazovka, která přizná chybu.
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
     setError(null);
@@ -55,184 +82,240 @@ function useProfile() {
   return { p, setP, reload: load, error };
 }
 
-function Tile({ icon, label: lb, value, unit, tone = 'ok' }: { icon: string; label: string; value: number | string; unit?: string; tone?: 'ok' | 'muted' | 'wait' }) {
-  const ring = tone === 'wait' ? 'bg-wait/15 border-wait/25 text-wait-ink' : tone === 'muted' ? 'bg-black/[0.05] border-black/[0.08] text-black/55' : 'bg-[#C8F542]/15 border-[#C8F542]/30 text-[#5B7A08]';
-  return (
-    <div className="glass-card p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-2">
-        <p className="t-label">{lb}</p>
-        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${ring}`}><Icon name={icon} size={16} /></span>
-      </div>
-      {/* Tisíce s mezerou jako všude jinde v aplikaci: „18 420", ne
-          „18420". Bez toho se velké číslo čte po slabikách. */}
-      <p className="text-3xl font-bold tracking-tight tabular-nums text-[#16181A] mt-3">
-        {typeof value === 'number' ? value.toLocaleString('cs-CZ') : value}
-        {unit && <span className="text-base font-medium text-black/45 ml-1">{unit}</span>}
-      </p>
-    </div>
-  );
-}
+function Kostra() { return <div className="space-y-4"><Skeleton className="h-28" /><Skeleton className="h-48" /></div>; }
 
-function Saver({ busy, onSave, children, title, hint }: { busy: boolean; onSave: () => void; children: React.ReactNode; title: string; hint?: string }) {
+/** Potvrzení smazání v okně (dřív confirm()). */
+function Smazat({ title, text, onPotvrdit, onZavrit }: { title: string; text: string; onPotvrdit: () => void; onZavrit: () => void }) {
   return (
-    <section className="glass-card p-5 space-y-4">
-      <div>
-        <h2 className="t-section">{title}</h2>
-        {hint && <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">{hint}</p>}
-      </div>
-      {children}
-      <Button variant="accent" loading={busy} onClick={onSave} block>Uložit</Button>
-    </section>
+    <Modal open onClose={onZavrit} size="sm" title={title}
+      footer={<>
+        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
+        <Button variant="danger-solid" onClick={() => { onZavrit(); onPotvrdit(); }}>Smazat</Button>
+      </>}>
+      <p className="text-sm text-black/70 text-pretty">{text}</p>
+    </Modal>
   );
 }
 
 // ---- Přehled --------------------------------------------------------------------
 
-/** Sloupky za 31 dní — rytmus týdne je vidět bez knihovny na grafy. */
-function Spark({ title, data, days }: { title: string; data: number[]; days: string[] }) {
-  const max = Math.max(1, ...data);
-  const total = data.reduce((a, b) => a + b, 0);
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs text-black/50">{title}</p>
-        <p className="text-sm font-bold tabular-nums">{total}</p>
-      </div>
-      <div className="flex items-end gap-[2px] h-10 mt-1" aria-hidden>
-        {data.map((v, i) => (
-          <span key={i} title={`${days[i]?.slice(8, 10)}. ${days[i]?.slice(5, 7)}.: ${v}`}
-            className="flex-1 rounded-t bg-[#C8F542]" style={{ height: `${Math.max(6, (v / max) * 100)}%`, opacity: v ? 1 : 0.25 }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Overview({ go }: { go: (s: LoyaltySub) => void }) {
+function Overview({ toast }: { toast: (m: string) => void }) {
+  const { ma: smi } = useOpravneni();
   const money = useMoney();
   const symbol = useSymbol();
   const [d, setD] = useState<any | null>(null);
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
-  useEffect(() => { fetch('/api/client/admin/loyalty').then(okJson).then(setD).catch(() => setD({ summary: null, recent: [] })); }, []);
-  const toggle = async () => {
+  useEffect(() => { fetch('/api/client/admin/loyalty').then(okJson).then(setD).catch(() => setD({ summary: null, recent: [], series: [] })); }, []);
+  const zapnout = async () => {
     setBusy(true);
-    try { const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: !p.loyalty_on }) }); setP(r.profile); } catch { /* tichá chyba, stav se nezmění */ }
+    try { const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: true }) }); setP(r.profile); toast('Věrnost je zapnutá. Hosté začnou sbírat body.'); }
+    catch (e) { toast(apiMessage(e, 'Věrnost se nepodařilo zapnout.')); }
     setBusy(false);
   };
   if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
-  if (!d || !p) return <Skeleton className="h-64 rounded-3xl" />;
+  if (!d || !p) return <Kostra />;
   const s = d.summary ?? {};
+  const rada: any[] = Array.isArray(d.series) ? d.series : [];
+  const sloupky = (klic: string) => rada.map(r => ({ value: Number(r[klic]) || 0, tip: `${String(r.day).slice(8, 10)}. ${String(r.day).slice(5, 7)}.: ${Number(r[klic]) || 0}` }));
+  const soucet = (klic: string) => rada.reduce((n, r) => n + (Number(r[klic]) || 0), 0);
+  const grafy = [
+    { klic: 'active', nazev: 'Členové u kasy' },
+    { klic: 'points_given', nazev: 'Rozdané body' },
+    { klic: 'new_members', nazev: 'Noví členové' },
+    { klic: 'redeemed', nazev: 'Uplatněné kupony' },
+  ];
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {!p.loyalty_on && (
-        <div className="card card-wait p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
-          <p className="font-semibold text-[#16181A] flex items-center gap-2"><Icon name="warning" size={17} className="text-wait-ink" />Věrnost je pro hosty vypnutá.</p>
-          <Button size="sm" variant="accent" loading={busy} onClick={toggle}>Zapnout</Button>
-        </div>
+        <Card tone="wait" className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-[15px] font-semibold text-[#16181A]">Věrnost je pro hosty vypnutá.</p>
+          {smi('vernost.pravidla') && <Button size="sm" variant="accent" loading={busy} onClick={zapnout}>Zapnout</Button>}
+        </Card>
       )}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile icon="users" label="Členů" value={s.members ?? 0} tone="muted" />
-        <Tile icon="coins" label="Bodů v oběhu" value={s.points ?? 0} />
-        <Tile icon="card" label="Kredit hostů" value={s.credit ?? 0} unit={symbol} />
-        <Tile icon="gift" label="Kupony k vyzvednutí" value={s.couponsOpen ?? 0} tone={(s.couponsOpen ?? 0) > 0 ? 'wait' : 'ok'} />
-      </div>
-      {(d.series ?? []).length > 0 && (() => {
-        const days = d.series.map((r: any) => String(r.day));
-        return (
-          <section className="glass-card p-4 sm:p-5">
-            <h2 className="t-section mb-3">Posledních 31 dní</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
-              <Spark title="Členové u kasy" data={d.series.map((r: any) => Number(r.active) || 0)} days={days} />
-              <Spark title="Rozdané body" data={d.series.map((r: any) => Number(r.points_given) || 0)} days={days} />
-              <Spark title="Noví členové" data={d.series.map((r: any) => Number(r.new_members) || 0)} days={days} />
-              <Spark title="Uplatněné kupony" data={d.series.map((r: any) => Number(r.redeemed) || 0)} days={days} />
-            </div>
-          </section>
-        );
-      })()}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5 items-start">
-        <section className="glass-card p-4 sm:p-5">
-          <h2 className="t-section mb-3">Poslední pohyby</h2>
-          {(d.recent ?? []).length === 0 ? <p className="text-sm text-black/55">Zatím se nic nedělo. První body přijdou s objednávkou nebo razítkem u kasy.</p> : (
-            <ul className="divide-y divide-black/[0.06]">
-              {d.recent.map((l: any) => (
-                <li key={l.id} className="py-2.5 flex items-center gap-3">
-                  <Initials name={l.customer_name} size={28} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate text-sm">{l.customer_name}</p>
-                    <p className="text-xs text-black/50 truncate">{l.note || l.kind}</p>
-                  </div>
-                  <span className={`shrink-0 font-semibold tabular-nums text-sm ${(l.delta || l.credit_delta) > 0 ? 'text-[#3E5406]' : 'text-bad-ink'}`}>
-                    {l.delta ? `${l.delta > 0 ? '+' : ''}${l.delta} b.` : `${l.credit_delta > 0 ? '+' : ''}${money(l.credit_delta)}`}
-                  </span>
-                  <span className="shrink-0 text-xs text-black/40 w-24 text-right hidden sm:block">{dbTimeDayHM(l.created_at)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <section className="glass-card p-4 sm:p-5 space-y-3">
-          <h2 className="t-section">Za posledních 30 dní</h2>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <div><dt className="text-black/50 text-xs">Rozdáno bodů</dt><dd className="text-xl font-bold tabular-nums">{s.pointsGiven30 ?? 0}</dd></div>
-            <div><dt className="text-black/50 text-xs">Utraceno bodů</dt><dd className="text-xl font-bold tabular-nums">{s.pointsSpent30 ?? 0}</dd></div>
-            <div><dt className="text-black/50 text-xs">Nových členů</dt><dd className="text-xl font-bold tabular-nums">{s.newMembers30 ?? 0}</dd></div>
-            <div><dt className="text-black/50 text-xs">Razítek celkem</dt><dd className="text-xl font-bold tabular-nums">{s.stamps ?? 0}</dd></div>
-          </dl>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button size="sm" variant="secondary" icon="coins" onClick={() => go('points')}>Pravidla bodů</Button>
-            <Button size="sm" variant="ghost" icon="gift" onClick={() => go('coupons')}>Kupony</Button>
+      <Card>
+        <StatRow>
+          <Stat label="Členů" value={(Number(s.members) || 0).toLocaleString('cs-CZ')} />
+          <Stat label="Bodů v oběhu" value={(Number(s.points) || 0).toLocaleString('cs-CZ')} />
+          <Stat label="Kredit hostů" value={(Number(s.credit) || 0).toLocaleString('cs-CZ')} unit={symbol} />
+          <Stat label="Kupony k vyzvednutí" value={(Number(s.couponsOpen) || 0).toLocaleString('cs-CZ')} note={`${(Number(s.couponsRedeemed) || 0).toLocaleString('cs-CZ')} uplatněno celkem`} />
+        </StatRow>
+      </Card>
+      {rada.length > 0 && (
+        <Card aria-labelledby="v-31">
+          <h2 id="v-31" className="t-card mb-4">Posledních {rada.length} dní</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
+            {grafy.map(g => (
+              <div key={g.klic}>
+                <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                  <p className="t-label truncate">{g.nazev}</p>
+                  <p className="text-sm font-bold tabular-nums">{soucet(g.klic).toLocaleString('cs-CZ')}</p>
+                </div>
+                <BarSpark height={40} label={`${g.nazev} po dnech`} data={sloupky(g.klic)} highlight={rada.length - 1} />
+              </div>
+            ))}
           </div>
-        </section>
-      </div>
+        </Card>
+      )}
+      <Card pad="none" aria-labelledby="v-pohyby">
+        <h2 id="v-pohyby" className="t-card px-5 pt-4">Poslední pohyby</h2>
+        {(d.recent ?? []).length === 0 ? (
+          <p className="t-meta px-5 pb-5 pt-2">Zatím se nic nedělo. První body přijdou s objednávkou nebo razítkem u kasy.</p>
+        ) : (
+          <ul className="list px-5">
+            {d.recent.map((l: any) => {
+              const plus = (Number(l.delta) || Number(l.credit_delta) || 0) > 0;
+              return (
+                <ListRow key={l.id} title={l.customer_name} meta={`${l.note || l.kind} · ${dbTimeDayHM(l.created_at)}`}
+                  value={<span className={plus ? 'text-ok-ink' : 'text-bad-ink'}>{l.delta ? `${l.delta > 0 ? '+' : ''}${l.delta} b.` : `${l.credit_delta > 0 ? '+' : ''}${money(l.credit_delta)}`}</span>} />
+              );
+            })}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }
 
-// ---- Body -----------------------------------------------------------------------
+// ---- Body a úrovně --------------------------------------------------------------
+//
+// Jeden formulář: body, cashback a úrovně se ukládají jedním PUT a jedním
+// „Uložit" v hlavičce stránky (tlačítko je mimo formulář, drží ho atribut `form`).
 
-function Points({ toast }: { toast: (m: string) => void }) {
+function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkladam: (v: boolean) => void }) {
+  const { ma } = useOpravneni();
+  const meni = ma('vernost.pravidla');
   const symbol = useSymbol();
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
-  const [busy, setBusy] = useState(false);
   if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
-  if (!p) return <Skeleton className="h-64 rounded-3xl" />;
-  const save = async () => {
-    setBusy(true);
+  if (!p) return <Kostra />;
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!meni) return;
+    setUkladam(true);
     try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points }) });
-      setP(r.profile); toast('Pravidla bodů uložena.');
-    } catch (e: any) { toast(e.message); }
-    setBusy(false);
+      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({
+        points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points,
+        silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
+        member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
+      }) });
+      setP(r.profile); toast('Pravidla bodů, úrovně a slevy uloženy.');
+    } catch (err) { toast(apiMessage(err, 'Uložení se nepovedlo.')); }
+    setUkladam(false);
   };
-  const row = (id: string, lb: string, hint: string, key: string, max: number, unit: string) => (
-    <div className="grid grid-cols-1 sm:grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 items-start">
-      <div><label htmlFor={id} className={label}>{lb}</label>
-        <div className="flex items-center gap-1.5">
-          <input id={id} type="number" min={0} max={max} value={p[key] ?? 0} onChange={e => setP({ ...p, [key]: e.target.value })} className={input} />
-        </div>
-      </div>
-      <p className="text-xs text-black/55 sm:pt-7">{unit} {hint}</p>
+  const cislo = (id: string, lb: string, hint: string, key: string, max: number, min = 0) => (
+    <Field id={id} label={lb} hint={hint}>
+      <Input id={id} type="number" min={min} max={max} disabled={!meni} className="!w-28" value={p[key] ?? 0} onChange={e => setP({ ...p, [key]: e.target.value })} />
+    </Field>
+  );
+  const urovne: { id: string; name: string; atKey?: string; discKey: string; tone: 'muted' | 'ink'; hint: string }[] = [
+    { id: 'bronze', name: 'Člen', discKey: 'member_discount', tone: 'muted', hint: 'Od první návštěvy.' },
+    { id: 'silver', name: 'Stříbrný host', atKey: 'silver_at', discKey: 'silver_discount', tone: 'muted', hint: 'Od kolika návštěv.' },
+    { id: 'gold', name: 'Zlatý host', atKey: 'gold_at', discKey: 'gold_discount', tone: 'ink', hint: 'Od kolika návštěv.' },
+    { id: 'platinum', name: 'Platinový host', atKey: 'platinum_at', discKey: 'platinum_discount', tone: 'ink', hint: '0 návštěv = Platina vypnutá.' },
+  ];
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <form id={FORM_BODY} onSubmit={save} className="space-y-4">
+        {!meni && <p className="note note-wait">Pravidla věrnosti tu jen vidíš — měnit je může, kdo má na starosti věrnostní program.</p>}
+        <Card className="space-y-4">
+          <div>
+            <h2 className="t-card">Za co host dostane body</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Body se sbírají samy: z objednávek od stolu, při načtení kartičky u kasy a při událostech níž. Utratí se za kupony.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {cislo('l-per100', `Bodů za 100 ${symbol}`, `Objednávka za 250 ${symbol} dá dvaapůlnásobek.`, 'points_per_100', 100)}
+            {cislo('l-bday', 'Bodů k narozeninám', 'Dárek v den narozenin. 0 = nedávat.', 'birthday_points', 1000)}
+            {cislo('l-ref', 'Bodů za pozvání', 'Pro oba, když kamarád poprvé přijde. 0 = vypnuto.', 'referral_points', 1000)}
+          </div>
+        </Card>
+        <Card className="space-y-4">
+          <div>
+            <h2 className="t-card">Cashback z útraty</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Část útraty se hostovi vrací: buď jako kredit (obsluha ho odečte u kasy), nebo jako body.</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            {cislo('l-cash', 'Vrátit (%)', '0 = nepoužívat.', 'cashback_pct', 50)}
+            <div>
+              <p className="field-label">V čem se vrací</p>
+              <Segmented options={[{ id: 'credit', label: `Kredit v ${symbol}` }, { id: 'points', label: 'Body' }]}
+                value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => { if (meni) setP({ ...p, cashback_mode: v }); }} size="sm" ariaLabel="Podoba cashbacku" />
+            </div>
+          </div>
+        </Card>
+        <Card className="space-y-4">
+          <div>
+            <h2 className="t-card">Úrovně hostů a jejich sleva</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Čím víc návštěv, tím lepší úroveň. Sleva je informace pro obsluhu: při načtení kartičky u kasy uvidí, kolik hostovi odečíst. Úroveň vidí i host na své stránce.</p>
+          </div>
+          <ul className="space-y-2">
+            {urovne.map(t => (
+              <Well as="li" key={t.id} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+                <div>
+                  <Chip tone={t.tone} size="sm">{t.name}</Chip>
+                  <p className="t-meta mt-1.5">{t.hint}</p>
+                </div>
+                {t.atKey ? (
+                  <Field id={`t-${t.id}`} label="Návštěv">
+                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={2000} disabled={!meni} className="!w-24" value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} />
+                  </Field>
+                ) : <span className="hidden sm:block" />}
+                <Field id={`d-${t.id}`} label="Sleva %">
+                  <Input id={`d-${t.id}`} type="number" min={0} max={90} disabled={!meni} className="!w-24" value={p[t.discKey] ?? 0} onChange={e => setP({ ...p, [t.discKey]: e.target.value })} />
+                </Field>
+              </Well>
+            ))}
+          </ul>
+          <p className="t-meta">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak. Uvítacích 10 bodů dostane každý nový člen automaticky; ruční úpravu bodů najdeš u hosta v Zákaznících.</p>
+        </Card>
+      </form>
+      {ma('zakaznici.zobrazit') && <Groups toast={toast} />}
     </div>
   );
+}
+
+// Ruční skupiny hostů („štamgasti", „firemní večery"). Členy do nich přidává
+// vedení v Zákaznících; kupony na ně jdou cílit v editoru kuponu.
+function Groups({ toast }: { toast: (m: string) => void }) {
+  const meni = useOpravneni().ma('zakaznici.skupiny');
+  const [list, setList] = useState<any[] | null>(null);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState('');
+  const [mazu, setMazu] = useState<any | null>(null);
+  const load = useCallback(() => fetch('/api/client/admin/groups').then(okJson).then(d => setList(d.groups ?? [])).catch(() => setList([])), []);
+  useEffect(() => { load(); }, [load]);
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!name.trim()) return; setBusy('add');
+    try { await j('/api/client/admin/groups', { method: 'POST', body: JSON.stringify({ name }) }); setName(''); load(); }
+    catch (err) { toast(apiMessage(err, 'Skupinu se nepodařilo založit.')); }
+    setBusy('');
+  };
+  const del = async (g: any) => {
+    try { await j(`/api/client/admin/groups?id=${g.id}`, { method: 'DELETE' }); load(); }
+    catch (err) { toast(apiMessage(err, 'Skupinu se nepodařilo smazat.')); }
+  };
   return (
-    <div className="space-y-5 max-w-3xl">
-      <Saver busy={busy} onSave={save} title="Za co host dostane body" hint="Body se sbírají samy: z objednávek od stolu, při načtení kartičky u kasy a při událostech níž. Utratí se za kupony.">
-        {row('l-per100', `Za 100 ${symbol}`, `útraty. Objednávka za 250 ${symbol} tedy dá dvojnásobek.`, 'points_per_100', 100, 'bodů')}
-        {row('l-bday', 'Narozeniny', 'jako dárek v den narozenin. 0 = nedávat.', 'birthday_points', 1000, 'bodů')}
-        {row('l-ref', 'Pozvání', 'pro oba, když pozvaný kamarád poprvé vstoupí do podniku. 0 = vypnuto.', 'referral_points', 1000, 'bodů')}
-      </Saver>
-      <Saver busy={busy} onSave={save} title="Cashback z útraty" hint="Jako v Kartičce: část útraty se hostovi vrací. Buď jako kredit v korunách (obsluha ho odečte u kasy), nebo jako body (přibudou k ostatním bodům).">
-        {row('l-cash', 'Vrátit', 'z útraty. 0 = nepoužívat. Načítá se při zaúčtování útraty u kasy.', 'cashback_pct', 50, '%')}
-        <div>
-          <p className={label}>V čem se vrací</p>
-          <Segmented options={[{ id: 'credit', label: `Kredit v ${symbol}` }, { id: 'points', label: 'Body' }]}
-            value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => setP({ ...p, cashback_mode: v })} size="sm" ariaLabel="Podoba cashbacku" />
-        </div>
-      </Saver>
-      <p className="text-xs text-black/50">Uvítacích 10 bodů dostane každý nový člen automaticky. Ruční úpravu bodů i kreditu najdeš u konkrétního hosta v Zákaznících.</p>
-    </div>
+    <Card className="space-y-3" aria-labelledby="v-skupiny">
+      <div>
+        <h2 id="v-skupiny" className="t-card">Skupiny hostů</h2>
+        <p className="t-meta mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Hosty do nich přidáš v Zákaznících; kupony na ně cílíš v jejich editoru.</p>
+      </div>
+      {list === null ? <Skeleton className="h-16" /> : list.length > 0 && (
+        <ul className="list">
+          {list.map((g: any) => (
+            <ListRow key={g.id} title={g.name} meta={czCount(Number(g.members) || 0, HOST)}
+              actions={meni ? <Button size="sm" variant="ghost" icon="trash" aria-label={`Smazat skupinu ${g.name}`} loading={busy === 'del:' + g.id} onClick={() => setMazu(g)}>Smazat</Button> : undefined} />
+          ))}
+        </ul>
+      )}
+      {meni && (
+        <form onSubmit={add} className="flex gap-2 flex-wrap">
+          <Input aria-label="Název nové skupiny" value={name} onChange={e => setName(e.target.value)} placeholder="Nová skupina…" className="flex-1 basis-48 !w-auto" maxLength={60} />
+          <Button type="submit" variant="secondary" icon="plus" loading={busy === 'add'} disabled={!name.trim()}>Přidat</Button>
+        </form>
+      )}
+      {mazu && <Smazat title={`Smazat skupinu „${mazu.name}"?`} text="Hosté v ní zůstanou, jen přijdou o štítek." onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }} />}
+    </Card>
   );
 }
 
@@ -293,53 +376,50 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
   const unpaired = items.length > 0 && value.some(v => items.find(i => i.id === v.itemId)?.paired === false);
   return (
     <div>
-      <label className="block text-xs font-semibold text-black/55 mb-1.5">{lb}</label>
+      <p className="field-label">{lb}</p>
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {value.map(v => (
-            <span key={v.itemId} className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 border border-[#C8F542]/40 pl-3 pr-1.5 py-1 text-xs font-semibold text-[#3E5406]">
-              {v.name}
-              <button type="button" aria-label={`Odebrat ${v.name}`} onClick={() => onChange(value.filter(x => x.itemId !== v.itemId))}
-                className="tap-target-sm grid place-items-center h-5 w-5 rounded-full hover:bg-black/[0.08] text-black/45"><Icon name="close" size={11} /></button>
-            </span>
+            <button key={v.itemId} type="button" aria-label={`Odebrat ${v.name}`} onClick={() => onChange(value.filter(x => x.itemId !== v.itemId))}
+              className="filter-pill tap-target-sm seg-on inline-flex items-center gap-1.5">
+              {v.name}<Icon name="close" size={12} className="opacity-60" />
+            </button>
           ))}
         </div>
       )}
-      <input ref={pickInput} onKeyDown={pickKeys.onInputKeyDown}
+      <Input ref={pickInput} onKeyDown={pickKeys.onInputKeyDown}
         value={q} onChange={e => setQ(e.target.value)} placeholder={items.length ? 'Hledej v nabídce…' : 'Nabídka je prázdná'} disabled={!items.length}
-        className={input} aria-label={lb} />
+        aria-label={lb} />
       {found.length > 0 && (
-        <ul ref={pickList} onKeyDown={pickKeys.onListKeyDown}
-          className="mt-1.5 rounded-2xl border border-black/[0.08] bg-white/85 divide-y divide-black/[0.05] overflow-hidden">
-          {found.map(i => (
-            <li key={i.id}>
-              <button type="button" onClick={() => { onChange([...value, { itemId: i.id, name: i.name }]); setQ(''); }}
-                className="w-full text-left px-3.5 py-2 hover:bg-[#C8F542]/15 transition flex items-center gap-2">
-                <span className="text-sm font-medium min-w-0 flex-1 truncate">{i.name}</span>
-                <span className="text-[11px] text-black/45 shrink-0">{i.board}</span>
-                {!i.paired && <span className="shrink-0 text-[11px] font-semibold rounded-full bg-wait/15 text-wait-ink px-2 py-0.5">bez pokladny</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <Well className="mt-1.5 !p-0 overflow-hidden">
+          <ul ref={pickList} onKeyDown={pickKeys.onListKeyDown} className="list px-3">
+            {found.map(i => (
+              <ListRow key={i.id} title={i.name} meta={i.board} onClick={() => { onChange([...value, { itemId: i.id, name: i.name }]); setQ(''); }}
+                right={!i.paired ? <Chip tone="wait" size="sm">bez pokladny</Chip> : undefined} chevron={false} />
+            ))}
+          </ul>
+        </Well>
       )}
-      {hint && <p className="text-xs text-black/50 mt-1.5">{hint}</p>}
-      {unpaired && <p className="text-xs text-wait-ink mt-1.5">Některé vybrané položky nejsou spárované s pokladnou — z účtenky se za ně razítko nepřipíše, jen ručně.</p>}
+      {hint && <p className="t-meta mt-1.5">{hint}</p>}
+      {unpaired && <p className="text-[13px] text-wait-ink mt-1.5">Některé vybrané položky nejsou spárované s pokladnou — z účtenky se za ně razítko nepřipíše, jen ručně.</p>}
     </div>
   );
 }
 
 function Stamps({ toast }: { toast: (m: string) => void }) {
+  const meni = useOpravneni().ma('vernost.kampane');
   const money = useMoney();
   const symbol = useSymbol();
   const [list, setList] = useState<any[] | null>(null);
   const [form, setForm] = useState<ReturnType<typeof blankCampaign> | null>(null);
   const [items, setItems] = useState<{ id: number; name: string; board: string; paired: boolean }[]>([]);
   const [busy, setBusy] = useState('');
+  const [mazu, setMazu] = useState<any | null>(null);
   const load = useCallback(() => fetch('/api/client/admin/stamps').then(okJson).then(d => setList(d.campaigns ?? [])).catch(() => setList([])), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    // Položky nabídky pro výběr „za položky" — přes všechny desky najednou.
+    if (!form) return;
+    // Položky nabídky pro výběr „za položky" — přes všechny desky najednou, až při úpravě.
     fetch('/api/menu').then(okJson).then(d => {
       const flat: any[] = [];
       for (const b of d.boards ?? []) for (const s of b.sections ?? []) for (const i of s.items ?? []) {
@@ -347,7 +427,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
       }
       setItems(flat);
     }).catch(() => {});
-  }, []);
+  }, [form == null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!form) return;
@@ -356,164 +436,140 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
       const body = JSON.stringify({ ...form, minValue: form.minValue === '' ? null : Number(form.minValue) });
       await j('/api/client/admin/stamps', { method: form.id ? 'PATCH' : 'POST', body });
       toast(form.id ? 'Kartička uložena.' : 'Kartička založena.'); setForm(null); load();
-    } catch (e: any) { toast(e.message); }
+    } catch (e) { toast(apiMessage(e, 'Kartičku se nepodařilo uložit.')); }
     setBusy('');
   };
   const toggle = async (c: any) => {
     setBusy('toggle:' + c.id);
     try { await j('/api/client/admin/stamps', { method: 'PATCH', body: JSON.stringify({ ...campaignToForm(c), active: !c.active }) }); load(); }
-    catch (e: any) { toast(e.message); }
+    catch (e) { toast(apiMessage(e, 'Změna se nepovedla.')); }
     setBusy('');
   };
   const del = async (c: any) => {
-    if (!confirm(`Smazat kartičku „${c.name}"? Rozsbíraná razítka ${c.collectors} hostů zmizí. Vydané kupony zůstanou.`)) return;
-    setBusy('del:' + c.id);
     try { await j(`/api/client/admin/stamps?id=${c.id}`, { method: 'DELETE' }); toast('Kartička smazána.'); setForm(null); load(); }
-    catch (e: any) { toast(e.message); }
-    setBusy('');
+    catch (e) { toast(apiMessage(e, 'Kartičku se nepodařilo smazat.')); }
   };
 
-  if (list === null) return <Skeleton className="h-64 rounded-3xl" />;
+  if (list === null) return <Kostra />;
 
   // --- editor ---
   if (form) {
-    const f = form; const set = (patch: any) => setForm({ ...f, ...patch });
+    const f = form; const set = (patch: Partial<typeof f>) => setForm({ ...f, ...patch });
     const num = (v: string, min: number, max: number) => Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
     return (
-      <div className="space-y-5 max-w-3xl">
-        <button type="button" onClick={() => setForm(null)} className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/55 hover:text-black transition">
-          <Icon name="chevron" size={15} className="rotate-90" />Zpět na kartičky
-        </button>
-        <section className="glass-card p-5 space-y-4">
+      <div className="space-y-4 max-w-3xl">
+        <Button variant="ghost" size="sm" icon="undo" onClick={() => setForm(null)}>Zpět na kartičky</Button>
+        <Card className="space-y-4">
           <div>
-            <h2 className="t-section">{f.id ? `Upravit „${f.name || '…'}"` : 'Nová kartička'}</h2>
-            <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">Za plnou kartu dostane host kupon s kódem — obsluha ho uplatní u kasy.</p>
+            <h2 className="t-card">{f.id ? `Upravit „${f.name || '…'}"` : 'Nová kartička'}</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Za plnou kartu dostane host kupon s kódem — obsluha ho uplatní u kasy.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label htmlFor="sc-name" className={label}>Název</label><input id="sc-name" value={f.name} onChange={e => set({ name: e.target.value })} placeholder="10 + 1 dýmka zdarma" className={input} maxLength={120} /></div>
-            <div><label htmlFor="sc-req" className={label}>Razítek do odměny</label><input id="sc-req" type="number" min={1} max={50} value={f.requiredStamps} onChange={e => set({ requiredStamps: num(e.target.value, 1, 50) })} className={input} /></div>
+            <Field id="sc-name" label="Název"><Input id="sc-name" value={f.name} onChange={e => set({ name: e.target.value })} placeholder="10 + 1 dýmka zdarma" maxLength={120} /></Field>
+            <Field id="sc-req" label="Razítek do odměny"><Input id="sc-req" type="number" min={1} max={50} value={f.requiredStamps} onChange={e => set({ requiredStamps: num(e.target.value, 1, 50) })} /></Field>
           </div>
-          <div><label htmlFor="sc-desc" className={label}>Popis pro hosta</label><input id="sc-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Každá desátá dýmka je na nás." className={input} maxLength={200} /></div>
+          <Field id="sc-desc" label="Popis pro hosta"><Input id="sc-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Každá desátá dýmka je na nás." maxLength={200} /></Field>
           <div>
-            <p className={label}>Za co se razítko připisuje</p>
+            <p className="field-label">Za co se razítko připisuje</p>
             <Segmented options={RULE_OPTS} value={f.ruleType} onChange={v => set({ ruleType: v })} size="sm" ariaLabel="Pravidlo razítka" />
-            {f.ruleType === 'visit' && <p className="text-xs text-black/50 mt-2">Jedno razítko za návštěvu — obsluha ho dá při načtení kartičky u kasy, nejvýš jedno denně.</p>}
+            {f.ruleType === 'visit' && <p className="t-meta mt-2">Jedno razítko za návštěvu — obsluha ho dá při načtení kartičky u kasy, nejvýš jedno denně.</p>}
             {f.ruleType === 'products' && (
               <div className="mt-3 space-y-3">
                 <ItemPicker items={items} value={f.stampItems} onChange={v => set({ stampItems: v })} label="Položky, které dávají razítko"
                   hint="Razítko za každý kus z účtenky. Obsluha u kasy zvolí účtenku hosta a razítka se připíší sama." />
-                <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={f.onePerOrder} onChange={e => set({ onePerOrder: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
-                  Nejvýš jedno razítko z jedné účtenky
-                </label>
+                <ul className="list">
+                  <SwitchRow title="Nejvýš jedno razítko z jedné účtenky" checked={f.onePerOrder} onChange={v => set({ onePerOrder: v })} />
+                </ul>
               </div>
             )}
             {f.ruleType === 'min_value' && (
               <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-[8rem_1fr] gap-3 items-end">
-                  <div><label htmlFor="sc-min" className={label}>Útrata od ({symbol})</label><input id="sc-min" type="number" min={1} max={100000} value={f.minValue} onChange={e => set({ minValue: e.target.value })} placeholder="300" className={input} /></div>
-                  <p className="text-xs text-black/55 pb-2.5">Razítko za účtenku aspoň na tuhle částku.</p>
-                </div>
-                <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={f.minValueMultiple} onChange={e => set({ minValueMultiple: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
-                  Razítko za každý násobek částky (600 {symbol} = 2 razítka)
-                </label>
+                <Field id="sc-min" label={`Útrata od (${symbol})`} hint="Razítko za účtenku aspoň na tuhle částku.">
+                  <Input id="sc-min" type="number" min={1} max={100000} className="!w-32" value={f.minValue} onChange={e => set({ minValue: e.target.value })} placeholder="300" />
+                </Field>
+                <ul className="list">
+                  <SwitchRow title={`Razítko za každý násobek částky (600 ${symbol} = 2 razítka)`} checked={f.minValueMultiple} onChange={v => set({ minValueMultiple: v })} />
+                </ul>
               </div>
             )}
           </div>
-          <div className="border-t border-black/[0.06] pt-4 space-y-3">
-            <div><label htmlFor="sc-rew" className={label}>Odměna za plnou kartu</label><input id="sc-rew" value={f.rewardTitle} onChange={e => set({ rewardTitle: e.target.value })} placeholder="Dýmka zdarma" className={input} maxLength={160} /></div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div><label htmlFor="sc-fin" className={label}>Dní na nasbírání</label><input id="sc-fin" type="number" min={0} max={365} value={f.daysToFinish} onChange={e => set({ daysToFinish: num(e.target.value, 0, 365) })} className={input} /></div>
-              <div><label htmlFor="sc-red" className={label}>Dní na uplatnění</label><input id="sc-red" type="number" min={0} max={365} value={f.daysToRedeem} onChange={e => set({ daysToRedeem: num(e.target.value, 0, 365) })} className={input} /></div>
+          <div className="border-t border-black/[0.06] pt-4 space-y-4">
+            <Field id="sc-rew" label="Odměna za plnou kartu"><Input id="sc-rew" value={f.rewardTitle} onChange={e => set({ rewardTitle: e.target.value })} placeholder="Dýmka zdarma" maxLength={160} /></Field>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <Field id="sc-fin" label="Dní na nasbírání"><Input id="sc-fin" type="number" min={0} max={365} value={f.daysToFinish} onChange={e => set({ daysToFinish: num(e.target.value, 0, 365) })} /></Field>
+              <Field id="sc-red" label="Dní na uplatnění"><Input id="sc-red" type="number" min={0} max={365} value={f.daysToRedeem} onChange={e => set({ daysToRedeem: num(e.target.value, 0, 365) })} /></Field>
             </div>
-            <p className="text-xs text-black/50">0 = bez omezení. Když host kartu nedosbírá včas, začíná znovu; kupon po lhůtě propadne.</p>
+            <p className="t-meta">0 = bez omezení. Když host kartu nedosbírá včas, začíná znovu; kupon po lhůtě propadne.</p>
             <div>
-              <p className={label}>Další karta po dokončení</p>
+              <p className="field-label">Další karta po dokončení</p>
               <Segmented options={REPEAT_OPTS} value={f.repeatMode} onChange={v => set({ repeatMode: v })} size="sm" ariaLabel="Opakování karty" />
             </div>
-            <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={f.stackCards} onChange={e => set({ stackCards: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
-              Přebytek razítek se přenáší do další karty
-            </label>
+            <ul className="list">
+              <SwitchRow title="Přebytek razítek se přenáší do další karty" checked={f.stackCards} onChange={v => set({ stackCards: v })} />
+            </ul>
           </div>
           <div className="border-t border-black/[0.06] pt-4">
-            <div className="grid grid-cols-2 gap-3 max-w-sm">
-              <div><label htmlFor="sc-since" className={label}>Platí od</label><input id="sc-since" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} className={input} /></div>
-              <div><label htmlFor="sc-till" className={label}>Platí do</label><input id="sc-till" type="date" value={f.validTill} onChange={e => set({ validTill: e.target.value })} className={input} /></div>
+            <div className="grid grid-cols-2 gap-4 max-w-sm">
+              <Field id="sc-since" label="Platí od"><Input id="sc-since" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} /></Field>
+              <Field id="sc-till" label="Platí do"><Input id="sc-till" type="date" value={f.validTill} onChange={e => set({ validTill: e.target.value })} /></Field>
             </div>
-            <p className="text-xs text-black/50 mt-1.5">Prázdné = běží pořád. Hodí se pro sezónní kartičky.</p>
+            <p className="t-meta mt-1.5">Prázdné = běží pořád. Hodí se pro sezónní kartičky.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button variant="accent" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit kartičku' : 'Založit kartičku'}</Button>
-            <Button variant="ghost" onClick={() => setForm(null)}>Zrušit</Button>
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setForm(null)}>Zrušit</Button>
+            <Button variant="primary" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit kartičku' : 'Založit kartičku'}</Button>
           </div>
-        </section>
+        </Card>
       </div>
     );
   }
 
   // --- seznam ---
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm text-black/55 max-w-[60ch]">Kartiček může běžet víc vedle sebe — třeba „10+1 dýmka" a „5+1 čaj". Razítka z účtenky připisuje obsluha u kasy jedním klepnutím.</p>
-        <Button variant="accent" icon="plus" onClick={() => setForm(blankCampaign())}>Nová kartička</Button>
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <p className="t-meta max-w-[60ch]">Kartiček může běžet víc vedle sebe — třeba „10+1 dýmka" a „5+1 čaj". Razítka z účtenky připisuje obsluha u kasy jedním klepnutím.</p>
+        {meni && <Button variant="secondary" icon="plus" onClick={() => setForm(blankCampaign())}>Nová kartička</Button>}
       </div>
       {list.length === 0 ? (
-        <EmptyState icon="check" title="Zatím žádná kartička" hint="Založ první — třeba „každá desátá dýmka zdarma“. Hosté ji uvidí na tvé stránce hned." compact />
+        <Card><EmptyState icon="check" title="Zatím žádná kartička" hint="Založ první — třeba „každá desátá dýmka zdarma“. Hosté ji uvidí na tvé stránce hned." compact /></Card>
       ) : (
-        <ul className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {list.map((c: any) => (
-            <li key={c.id} className={`glass-card p-4 sm:p-5 ${c.active ? '' : 'opacity-60'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-bold tracking-tight truncate">{c.name}</p>
-                  <p className="text-xs text-black/55 mt-0.5">
-                    {c.required_stamps} razítek {RULE_NAME[c.rule_type] ?? ''}
-                    {c.rule_type === 'products' && c.stampItems?.length > 0 && `: ${c.stampItems.map((x: any) => x.name).join(', ')}`}
-                    {c.rule_type === 'min_value' && c.min_value ? ` od ${money(c.min_value)}` : ''}
-                  </p>
-                </div>
-                <button onClick={() => toggle(c)} disabled={busy === 'toggle:' + c.id} aria-pressed={!!c.active}
-                  className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${c.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>
-                  {c.active ? 'Běží' : 'Vypnutá'}
-                </button>
-              </div>
-              <div className="flex gap-1 mt-3" aria-hidden>
-                {Array.from({ length: Math.min(Number(c.required_stamps) || 1, 12) }).map((_, i) => (
-                  <span key={i} className={`h-2 flex-1 rounded-full ${i < 3 ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />
-                ))}
-              </div>
-              <p className="text-xs text-black/55 mt-2">Odměna: <strong className="text-black/75">{c.reward_title || '—'}</strong></p>
-              <div className="flex items-center justify-between gap-3 mt-3 border-t border-black/[0.06] pt-3">
-                <p className="text-xs text-black/50 tabular-nums">{c.collectors} sbírá · {c.completions}× dokončeno</p>
-                <div className="flex gap-1.5">
-                  <Button size="sm" variant="secondary" onClick={() => setForm(campaignToForm(c))}>Upravit</Button>
-                  <Button size="sm" variant="ghost" loading={busy === 'del:' + c.id} onClick={() => del(c)}>Smazat</Button>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <Card pad="none">
+          <ul className="list px-5">
+            {list.map((c: any) => (
+              <ListRow key={c.id} className={c.active ? '' : 'opacity-60'} title={c.name}
+                meta={[
+                  `${czCount(Number(c.required_stamps) || 0, RAZITKO)} ${RULE_NAME[c.rule_type] ?? ''}${c.rule_type === 'products' && c.stampItems?.length ? `: ${c.stampItems.map((x: any) => x.name).join(', ')}` : ''}${c.rule_type === 'min_value' && c.min_value ? ` od ${money(c.min_value)}` : ''}`,
+                  `odměna ${c.reward_title || '—'}`,
+                  `${czCount(Number(c.collectors) || 0, HOST)} sbírá · ${c.completions}× dokončeno`,
+                ].join(' · ')}
+                actions={meni ? (
+                  <>
+                    <Switch checked={!!c.active} disabled={busy === 'toggle:' + c.id} onChange={() => { void toggle(c); }} label={`Běží: ${c.name}`} />
+                    <Menu size="sm" label={`Další akce s kartičkou ${c.name}`} items={[
+                      { label: 'Upravit…', icon: 'pencil', onClick: () => setForm(campaignToForm(c)) },
+                      { label: 'Smazat…', icon: 'trash', danger: true, onClick: () => setMazu(c) },
+                    ]} />
+                  </>
+                ) : <Chip tone={c.active ? 'ok' : 'muted'} size="sm">{c.active ? 'Běží' : 'Vypnutá'}</Chip>} />
+            ))}
+          </ul>
+        </Card>
       )}
-      <p className="text-xs text-black/50 max-w-[75ch]">Razítka připíše obsluha u kasy: buď „razítko za návštěvu", nebo výběrem účtenky hosta — z jejích položek se pravidla vyhodnotí sama. Za plnou kartu dostane host kupon s kódem.</p>
+      <p className="t-meta max-w-[75ch]">Razítka připíše obsluha u kasy: buď „razítko za návštěvu", nebo výběrem účtenky hosta — z jejích položek se pravidla vyhodnotí sama. Za plnou kartu dostane host kupon s kódem.</p>
+      {mazu && (
+        <Smazat title={`Smazat kartičku „${mazu.name}"?`} onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }}
+          text={`Rozsbíraná razítka (${czCount(Number(mazu.collectors) || 0, HOST)}) zmizí. Vydané kupony zůstanou.`} />
+      )}
     </div>
   );
 }
 
 // ---- Kupony ---------------------------------------------------------------------
-// Kupon v plné síle jako v Kartičce: výhoda (% / Kč / zdarma / X+Y), komu
+// Kupon v plné síle jako v Kartičce: výhoda (% / částka / zdarma / X+Y), komu
 // (úrovně, skupiny), kdy (dny, hodiny, od–do), jak často (limit, cooldown),
 // 18+ a uvítací kupon pro nové členy.
 
-const BENEFIT_OPTS = [
-  { id: 'percent', label: 'Sleva %' },
-  { id: 'amount', label: 'Sleva Kč' },
-  { id: 'free_item', label: 'Zdarma' },
-  { id: 'xy', label: 'X+Y' },
-  { id: 'text', label: 'Vlastní' },
-];
 const TIER_OPTS: { id: string; label: string }[] = [
   { id: 'bronze', label: 'Člen' }, { id: 'silver', label: 'Stříbrný' },
   { id: 'gold', label: 'Zlatý' }, { id: 'platinum', label: 'Platinový' },
@@ -546,22 +602,30 @@ function couponToForm(c: any) {
   };
 }
 
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+/** Přepínací filtr (vícenásobný výběr) — filter-pill jako všude, vybraný inkoustový s bílým textem. */
+function Volba({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={on}
-      className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition border ${on ? 'bg-[#16181A] text-[#C8F542] border-[#16181A]' : 'bg-white/60 text-black/60 border-black/[0.09] hover:bg-black/[0.05]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={on} className={`filter-pill tap-target-sm ${on ? 'seg-on' : 'seg-off glass'}`}>
       {children}
     </button>
   );
 }
 
 function Coupons({ toast }: { toast: (m: string) => void }) {
+  const spravuje = useOpravneni().ma('kupony.spravovat');
+  const uplatni = useOpravneni().ma('kupony.uplatnit');
+  const symbol = useSymbol();
   const [list, setList] = useState<any[] | null>(null);
   const [groups, setGroups] = useState<any[]>([]);
   const [form, setForm] = useState<ReturnType<typeof blankCoupon> | null>(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState('');
-  const load = useCallback(() => fetch('/api/client/admin/coupons').then(okJson).then(d => { setList(d.coupons ?? []); setGroups(d.groups ?? []); }).catch(() => setList([])), []);
+  const [mazu, setMazu] = useState<any | null>(null);
+  // Katalog kuponů čte jen správce (API chce kupony.spravovat); uplatnění kódu jde i bez něj.
+  const load = useCallback(() => {
+    if (!spravuje) { setList([]); return; }
+    fetch('/api/client/admin/coupons').then(okJson).then(d => { setList(d.coupons ?? []); setGroups(d.groups ?? []); }).catch(() => setList([]));
+  }, [spravuje]);
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
@@ -570,21 +634,18 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
     try {
       await j('/api/client/admin/coupons', { method: form.id ? 'PATCH' : 'POST', body: JSON.stringify(form) });
       toast(form.id ? 'Kupon uložen.' : 'Kupon založen.'); setForm(null); load();
-    } catch (e: any) { toast(e.message); }
+    } catch (e) { toast(apiMessage(e, 'Kupon se nepodařilo uložit.')); }
     setBusy('');
   };
   const toggle = async (c: any) => {
     setBusy('toggle:' + c.id);
     try { await j('/api/client/admin/coupons', { method: 'PATCH', body: JSON.stringify({ id: c.id, active: !c.active }) }); load(); }
-    catch (e: any) { toast(e.message); }
+    catch (e) { toast(apiMessage(e, 'Změna se nepovedla.')); }
     setBusy('');
   };
   const del = async (c: any) => {
-    if (!confirm(`Smazat kupon „${c.title}"?`)) return;
-    setBusy('del:' + c.id);
     try { await j(`/api/client/admin/coupons?id=${c.id}`, { method: 'DELETE' }); toast('Kupon smazán.'); setForm(null); load(); }
-    catch (e: any) { toast(e.message); }
-    setBusy('');
+    catch (e) { toast(apiMessage(e, 'Kupon se nepodařilo smazat.')); }
   };
   const redeem = async (e: React.FormEvent) => {
     e.preventDefault(); if (!code.trim()) return; setBusy('redeem');
@@ -592,258 +653,175 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
       const r = await j('/api/client/admin/redeem', { method: 'POST', body: JSON.stringify({ code }) });
       toast(`Uplatněno: ${r.title}${r.benefit ? ` (${r.benefit})` : ''} · ${r.customer}.${r.badges?.length ? ` Zkontroluj: ${r.badges.join(', ')}.` : ''}`);
       setCode(''); load();
-    } catch (e: any) { toast(e.message); }
+    } catch (err) { toast(apiMessage(err, 'Kupon se nepodařilo uplatnit.')); }
     setBusy('');
   };
 
-  if (list === null) return <Skeleton className="h-64 rounded-3xl" />;
+  if (list === null) return <Kostra />;
 
   // --- editor ---
   if (form) {
-    const f = form; const set = (patch: any) => setForm({ ...f, ...patch });
-    const flip = (arr: any[], v: any) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
+    const f = form; const set = (patch: Partial<typeof f>) => setForm({ ...f, ...patch });
+    const flip = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
     return (
-      <div className="space-y-5 max-w-3xl">
-        <button type="button" onClick={() => setForm(null)} className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/55 hover:text-black transition">
-          <Icon name="chevron" size={15} className="rotate-90" />Zpět na kupony
-        </button>
-        <section className="glass-card p-5 space-y-4">
+      <div className="space-y-4 max-w-3xl">
+        <Button variant="ghost" size="sm" icon="undo" onClick={() => setForm(null)}>Zpět na kupony</Button>
+        <Card className="space-y-4">
           <div>
-            <h2 className="t-section">{f.id ? `Upravit „${f.title || '…'}"` : 'Nový kupon'}</h2>
-            <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">Host si ho vezme za body na tvé stránce; dostane kód a obsluha ho uplatní u kasy.</p>
+            <h2 className="t-card">{f.id ? `Upravit „${f.title || '…'}"` : 'Nový kupon'}</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Host si ho vezme za body na tvé stránce; dostane kód a obsluha ho uplatní u kasy.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-4">
-            <div><label htmlFor="cp-title" className={label}>Název</label><input id="cp-title" value={f.title} onChange={e => set({ title: e.target.value })} placeholder="Dezert k čaji zdarma" className={input} maxLength={80} /></div>
-            <div><label htmlFor="cp-cost" className={label}>Cena v bodech</label><input id="cp-cost" type="number" min={0} max={100000} value={f.costPoints} onChange={e => set({ costPoints: parseInt(e.target.value || '0', 10) })} className={input} /></div>
+            <Field id="cp-title" label="Název"><Input id="cp-title" value={f.title} onChange={e => set({ title: e.target.value })} placeholder="Dezert k čaji zdarma" maxLength={80} /></Field>
+            <Field id="cp-cost" label="Cena v bodech"><Input id="cp-cost" type="number" min={0} max={100000} value={f.costPoints} onChange={e => set({ costPoints: parseInt(e.target.value || '0', 10) })} /></Field>
           </div>
-          <div><label htmlFor="cp-desc" className={label}>Popis</label><input id="cp-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Jeden dezert z vitríny podle výběru." className={input} maxLength={200} /></div>
+          <Field id="cp-desc" label="Popis"><Input id="cp-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Jeden dezert z vitríny podle výběru." maxLength={200} /></Field>
           <div>
-            <p className={label}>Co kupon dává</p>
-            <Segmented options={BENEFIT_OPTS} value={f.benefitKind} onChange={v => set({ benefitKind: v })} size="sm" ariaLabel="Výhoda kuponu" />
-            <div className="mt-3 grid grid-cols-1 sm:flex sm:flex-wrap items-end gap-3">
+            <p className="field-label">Co kupon dává</p>
+            <Segmented options={[
+              { id: 'percent', label: 'Sleva %' }, { id: 'amount', label: `Sleva ${symbol}` }, { id: 'free_item', label: 'Zdarma' },
+              { id: 'xy', label: 'X+Y' }, { id: 'text', label: 'Vlastní' },
+            ]} value={f.benefitKind} onChange={v => set({ benefitKind: v })} size="sm" ariaLabel="Výhoda kuponu" />
+            <div className="mt-3 flex flex-wrap items-end gap-4">
               {f.benefitKind === 'percent' && (
-                <div><label htmlFor="cp-pct" className={label}>Sleva %</label><input id="cp-pct" type="number" min={1} max={100} value={f.percentOff} onChange={e => set({ percentOff: e.target.value })} placeholder="15" className={`${input} !w-full sm:!w-24 text-center`} /></div>
+                <Field id="cp-pct" label="Sleva %"><Input id="cp-pct" type="number" min={1} max={100} className="!w-24 text-center" value={f.percentOff} onChange={e => set({ percentOff: e.target.value })} placeholder="15" /></Field>
               )}
               {f.benefitKind === 'amount' && (
-                <div><label htmlFor="cp-amt" className={label}>Sleva Kč</label><input id="cp-amt" type="number" min={1} max={100000} value={f.amountOff} onChange={e => set({ amountOff: e.target.value })} placeholder="50" className={`${input} !w-full sm:!w-24 text-center`} /></div>
+                <Field id="cp-amt" label={`Sleva ${symbol}`}><Input id="cp-amt" type="number" min={1} max={100000} className="!w-24 text-center" value={f.amountOff} onChange={e => set({ amountOff: e.target.value })} placeholder="50" /></Field>
               )}
               {f.benefitKind === 'xy' && (<>
-                <div><label htmlFor="cp-xb" className={label}>Koupí (X)</label><input id="cp-xb" type="number" min={1} max={50} value={f.xyBuy} onChange={e => set({ xyBuy: e.target.value })} placeholder="2" className={`${input} !w-full sm:!w-24 text-center`} /></div>
-                <div><label htmlFor="cp-xf" className={label}>Zdarma (Y)</label><input id="cp-xf" type="number" min={1} max={50} value={f.xyFree} onChange={e => set({ xyFree: e.target.value })} className={`${input} !w-full sm:!w-24 text-center`} /></div>
+                <Field id="cp-xb" label="Koupí (X)"><Input id="cp-xb" type="number" min={1} max={50} className="!w-24 text-center" value={f.xyBuy} onChange={e => set({ xyBuy: e.target.value })} placeholder="2" /></Field>
+                <Field id="cp-xf" label="Zdarma (Y)"><Input id="cp-xf" type="number" min={1} max={50} className="!w-24 text-center" value={f.xyFree} onChange={e => set({ xyFree: e.target.value })} /></Field>
               </>)}
-              {f.benefitKind === 'free_item' && <p className="text-xs text-black/55 pb-1">Položka zdarma — co přesně, řekni v názvu kuponu.</p>}
-              {f.benefitKind === 'text' && <p className="text-xs text-black/55 pb-1">Výhoda je v názvu a popisu — obsluha ji vyřídí podle nich.</p>}
-              <div><label htmlFor="cp-min" className={label}>Min. útrata (Kč)</label><input id="cp-min" type="number" min={0} max={100000} value={f.minOrderValue} onChange={e => set({ minOrderValue: e.target.value })} placeholder="—" className={`${input} !w-full sm:!w-28 text-center`} /></div>
+              {f.benefitKind === 'free_item' && <p className="t-meta pb-2">Položka zdarma — co přesně, řekni v názvu kuponu.</p>}
+              {f.benefitKind === 'text' && <p className="t-meta pb-2">Výhoda je v názvu a popisu — obsluha ji vyřídí podle nich.</p>}
+              <Field id="cp-min" label={`Min. útrata (${symbol})`}><Input id="cp-min" type="number" min={0} max={100000} className="!w-28 text-center" value={f.minOrderValue} onChange={e => set({ minOrderValue: e.target.value })} placeholder="—" /></Field>
             </div>
           </div>
           <div className="border-t border-black/[0.06] pt-4">
-            <p className={label}>Pro koho platí</p>
+            <p className="field-label">Pro koho platí</p>
             <div className="flex flex-wrap gap-1.5">
-              {TIER_OPTS.map(t => <Chip key={t.id} on={f.targetTiers.includes(t.id)} onClick={() => set({ targetTiers: flip(f.targetTiers, t.id) })}>{t.label}</Chip>)}
+              {TIER_OPTS.map(t => <Volba key={t.id} on={f.targetTiers.includes(t.id)} onClick={() => set({ targetTiers: flip(f.targetTiers, t.id) })}>{t.label}</Volba>)}
             </div>
             {groups.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {groups.map((g: any) => <Chip key={g.id} on={f.targetGroups.includes(g.id)} onClick={() => set({ targetGroups: flip(f.targetGroups, g.id) })}>{g.name} ({g.members})</Chip>)}
+                {groups.map((g: any) => <Volba key={g.id} on={f.targetGroups.includes(g.id)} onClick={() => set({ targetGroups: flip(f.targetGroups, g.id) })}>{g.name} ({g.members})</Volba>)}
               </div>
             )}
-            <p className="text-xs text-black/50 mt-1.5">Nic nevybráno = platí všem členům. Skupiny hostů se spravují ve Slevách a úrovních.</p>
+            <p className="t-meta mt-1.5">Nic nevybráno = platí všem členům. Skupiny hostů se spravují v Body a úrovně.</p>
           </div>
           <div className="border-t border-black/[0.06] pt-4 space-y-3">
-            <p className={label}>Kdy platí</p>
+            <p className="field-label">Kdy platí</p>
             <div className="flex flex-wrap gap-1.5">
-              {DOW.map(d => <Chip key={d.d} on={f.daysOfWeek.includes(d.d)} onClick={() => set({ daysOfWeek: flip(f.daysOfWeek, d.d) })}>{d.l}</Chip>)}
+              {DOW.map(d => <Volba key={d.d} on={f.daysOfWeek.includes(d.d)} onClick={() => set({ daysOfWeek: flip(f.daysOfWeek, d.d) })}>{d.l}</Volba>)}
             </div>
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
-              <div><label htmlFor="cp-hf" className={label}>Od hodiny</label><input id="cp-hf" type="time" value={f.hourFrom} onChange={e => set({ hourFrom: e.target.value })} className={`${input} !w-full sm:!w-28`} /></div>
-              <div><label htmlFor="cp-ht" className={label}>Do hodiny</label><input id="cp-ht" type="time" value={f.hourTill} onChange={e => set({ hourTill: e.target.value })} className={`${input} !w-full sm:!w-28`} /></div>
-              <div><label htmlFor="cp-vs" className={label}>Platí od</label><input id="cp-vs" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} className={`${input} !w-full sm:!w-36`} /></div>
-              <div><label htmlFor="cp-vu" className={label}>Platí do</label><input id="cp-vu" type="date" value={f.validUntil} onChange={e => set({ validUntil: e.target.value })} className={`${input} !w-full sm:!w-36`} /></div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-4">
+              <Field id="cp-hf" label="Od hodiny"><Input id="cp-hf" type="time" value={f.hourFrom} onChange={e => set({ hourFrom: e.target.value })} /></Field>
+              <Field id="cp-ht" label="Do hodiny"><Input id="cp-ht" type="time" value={f.hourTill} onChange={e => set({ hourTill: e.target.value })} /></Field>
+              <Field id="cp-vs" label="Platí od"><Input id="cp-vs" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} /></Field>
+              <Field id="cp-vu" label="Platí do"><Input id="cp-vu" type="date" value={f.validUntil} onChange={e => set({ validUntil: e.target.value })} /></Field>
             </div>
-            <p className="text-xs text-black/50">Žádný den nevybraný = platí každý den. Prázdné hodiny = celý den.</p>
+            <p className="t-meta">Žádný den nevybraný = platí každý den. Prázdné hodiny = celý den.</p>
           </div>
           <div className="border-t border-black/[0.06] pt-4 space-y-3">
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
-              <div><label htmlFor="cp-per" className={label}>Nejvýš na hosta</label><input id="cp-per" type="number" min={0} max={100} value={f.perCustomer} onChange={e => set({ perCustomer: parseInt(e.target.value || '0', 10) })} className={`${input} !w-full sm:!w-24 text-center`} /></div>
-              <div><label htmlFor="cp-cd" className={label}>Znovu až za (dní)</label><input id="cp-cd" type="number" min={0} max={365} value={f.cooldownDays} onChange={e => set({ cooldownDays: parseInt(e.target.value || '0', 10) })} className={`${input} !w-full sm:!w-24 text-center`} /></div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-4">
+              <Field id="cp-per" label="Nejvýš na hosta"><Input id="cp-per" type="number" min={0} max={100} className="sm:!w-24 text-center" value={f.perCustomer} onChange={e => set({ perCustomer: parseInt(e.target.value || '0', 10) })} /></Field>
+              <Field id="cp-cd" label="Znovu až za (dní)"><Input id="cp-cd" type="number" min={0} max={365} className="sm:!w-24 text-center" value={f.cooldownDays} onChange={e => set({ cooldownDays: parseInt(e.target.value || '0', 10) })} /></Field>
             </div>
-            <p className="text-xs text-black/50">0 = bez omezení. Limit počítá vyzvednutí, cooldown čas od posledního.</p>
-            <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={f.adultOnly} onChange={e => set({ adultOnly: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
-              Jen 18+ (podle data narození v profilu hosta)
-            </label>
-            <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-              <input type="checkbox" checked={f.welcome} onChange={e => set({ welcome: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
-              Uvítací kupon — nový člen ho dostane sám při vstupu do podniku
-            </label>
+            <p className="t-meta">0 = bez omezení. Limit počítá vyzvednutí, cooldown čas od posledního.</p>
+            <ul className="list">
+              <SwitchRow title="Jen 18+" hint="Podle data narození v profilu hosta." checked={f.adultOnly} onChange={v => set({ adultOnly: v })} />
+              <SwitchRow title="Uvítací kupon" hint="Nový člen ho dostane sám při vstupu do podniku." checked={f.welcome} onChange={v => set({ welcome: v })} />
+            </ul>
           </div>
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button variant="accent" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit kupon' : 'Založit kupon'}</Button>
-            <Button variant="ghost" onClick={() => setForm(null)}>Zrušit</Button>
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setForm(null)}>Zrušit</Button>
+            <Button variant="primary" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit kupon' : 'Založit kupon'}</Button>
           </div>
-        </section>
+        </Card>
       </div>
     );
   }
 
   // --- seznam + uplatnění ---
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-6 items-start">
-      <div className="space-y-5">
-        <form onSubmit={redeem} className="glass-card p-5 space-y-3">
-          <h2 className="t-section">Uplatnit kupon</h2>
-          <p className="text-xs text-black/50">Host ukáže kód ze své kartičky. Kupon jde uplatnit jednou; podmínky (útrata, 18+) připomene potvrzení.</p>
-          <div><label htmlFor="c-code" className={label}>Kód od hosta</label><input id="c-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" className={`${input} font-mono tracking-widest`} /></div>
-          <Button type="submit" variant="primary" icon="check" loading={busy === 'redeem'}>Uplatnit</Button>
-        </form>
-        <Button variant="accent" icon="plus" onClick={() => setForm(blankCoupon())}>Nový kupon</Button>
-      </div>
-      <section>
-        <h2 className="font-bold tracking-tight mb-2">Katalog kuponů</h2>
-        {list.length === 0
-          ? <EmptyState icon="gift" title="Zatím žádný kupon" hint="Založ první — třeba slevu 15 % pro Zlaté hosty nebo uvítací dezert zdarma." compact />
-          : <ul className="glass-card p-3 sm:p-4 divide-y divide-black/[0.06]">
-              {list.map((c: any) => (
-                <li key={c.id} className={`py-3 ${c.active ? '' : 'opacity-50'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">
-                        {c.title}
-                        {c.benefit && <span className="ml-2 rounded-full bg-[#C8F542]/25 text-[#3E5406] px-2 py-0.5 text-[11px] font-bold align-middle">{c.benefit}</span>}
-                        {c.welcome && <span className="ml-1.5 rounded-full bg-black/[0.07] text-black/60 px-2 py-0.5 text-[11px] font-semibold align-middle">uvítací</span>}
-                      </p>
-                      <p className="text-xs text-black/55 truncate">
-                        {c.costPoints > 0 ? `${c.costPoints} b.` : 'zdarma'}
-                        {c.badges?.length ? ` · ${c.badges.join(' · ')}` : ''}
-                        {c.validUntil ? ` · do ${czDay(c.validUntil)}` : ''} · vzato {c.claimed}×, uplatněno {c.redeemed}×
-                      </p>
-                    </div>
-                    <button onClick={() => toggle(c)} disabled={busy === 'toggle:' + c.id} aria-pressed={!!c.active}
-                      className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${c.active ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.06] text-black/55'}`}>{c.active ? 'Aktivní' : 'Vypnutý'}</button>
-                    <div className="shrink-0 flex gap-1.5">
-                      <Button size="sm" variant="secondary" onClick={() => setForm(couponToForm(c))}>Upravit</Button>
-                      <Button size="sm" variant="ghost" loading={busy === 'del:' + c.id} onClick={() => del(c)}>Smazat</Button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>}
-      </section>
-    </div>
-  );
-}
-
-// ---- Slevy a úrovně -------------------------------------------------------------
-
-function Tiers({ toast }: { toast: (m: string) => void }) {
-  const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
-  const [busy, setBusy] = useState(false);
-  if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
-  if (!p) return <Skeleton className="h-64 rounded-3xl" />;
-  const save = async () => {
-    setBusy(true);
-    try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at, member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount }) });
-      setP(r.profile); toast('Úrovně a slevy uloženy.');
-    } catch (e: any) { toast(e.message); }
-    setBusy(false);
-  };
-  const tiers: { id: string; name: string; at: string | null; atKey?: string; discKey: string; tone: string; hint?: string }[] = [
-    { id: 'bronze', name: 'Člen', at: 'od první návštěvy', discKey: 'member_discount', tone: 'bg-black/[0.05] text-black/60' },
-    { id: 'silver', name: 'Stříbrný host', at: null, atKey: 'silver_at', discKey: 'silver_discount', tone: 'bg-black/[0.07] text-black/70' },
-    { id: 'gold', name: 'Zlatý host', at: null, atKey: 'gold_at', discKey: 'gold_discount', tone: 'bg-[#C8F542]/30 text-[#3E5406]' },
-    { id: 'platinum', name: 'Platinový host', at: null, atKey: 'platinum_at', discKey: 'platinum_discount', tone: 'bg-[#16181A] text-[#C8F542]', hint: '0 návštěv = Platina vypnutá' },
-  ];
-  return (
-    <div className="space-y-5 max-w-3xl">
-      <Saver busy={busy} onSave={save} title="Úrovně hostů a jejich sleva"
-        hint="Čím víc návštěv, tím lepší úroveň. Sleva je informace pro obsluhu: při načtení kartičky u kasy uvidí, kolik hostovi odečíst. Úroveň vidí i host na své stránce.">
-        <ul className="space-y-3">
-          {tiers.map(t => (
-            <li key={t.id} className="well bg-white p-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
-              <div>
-                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${t.tone}`}>{t.name}</span>
-                <p className="text-xs text-black/50 mt-1.5">{t.hint ?? t.at ?? 'Od kolika návštěv'}</p>
-              </div>
-              {t.atKey ? (
-                <div><label htmlFor={`t-${t.id}`} className={label}>Návštěv</label><input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={2000} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} className={`${input} !w-full sm:!w-24`} /></div>
-              ) : <span className="hidden sm:block" />}
-              <div><label htmlFor={`d-${t.id}`} className={label}>Sleva %</label><input id={`d-${t.id}`} type="number" min={0} max={90} value={p[t.discKey] ?? 0} onChange={e => setP({ ...p, [t.discKey]: e.target.value })} className={`${input} !w-full sm:!w-24`} /></div>
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-black/50">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak.</p>
-      </Saver>
-      <Groups toast={toast} />
-    </div>
-  );
-}
-
-// Ruční skupiny hostů („štamgasti", „firemní večery"). Členy do nich přidává
-// vedení v Zákaznících; kupony na ně jdou cílit v editoru kuponu.
-function Groups({ toast }: { toast: (m: string) => void }) {
-  const [list, setList] = useState<any[] | null>(null);
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState('');
-  const load = useCallback(() => fetch('/api/client/admin/groups').then(okJson).then(d => setList(d.groups ?? [])).catch(() => setList([])), []);
-  useEffect(() => { load(); }, [load]);
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!name.trim()) return; setBusy('add');
-    try { await j('/api/client/admin/groups', { method: 'POST', body: JSON.stringify({ name }) }); setName(''); load(); }
-    catch (e: any) { toast(e.message); }
-    setBusy('');
-  };
-  const del = async (g: any) => {
-    if (!confirm(`Smazat skupinu „${g.name}"? Hosté v ní zůstanou, jen přijdou o štítek.`)) return;
-    setBusy('del:' + g.id);
-    try { await j(`/api/client/admin/groups?id=${g.id}`, { method: 'DELETE' }); load(); }
-    catch (e: any) { toast(e.message); }
-    setBusy('');
-  };
-  return (
-    <section className="glass-card p-5 space-y-4">
-      <div>
-        <h2 className="t-section">Skupiny hostů</h2>
-        <p className="text-xs text-black/50 mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Hosty do nich přidáš v Zákaznících; kupony na ně cílíš v jejich editoru.</p>
-      </div>
-      {list === null ? <Skeleton className="h-16 rounded-2xl" /> : list.length > 0 && (
-        <ul className="flex flex-wrap gap-2">
-          {list.map((g: any) => (
-            <li key={g.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/60 border border-black/[0.09] pl-3.5 pr-1.5 py-1.5 text-sm font-semibold">
-              {g.name} <span className="text-black/45 font-medium text-xs">({g.members})</span>
-              <button type="button" aria-label={`Smazat skupinu ${g.name}`} onClick={() => del(g)} disabled={busy === 'del:' + g.id}
-                className="tap-target-sm grid place-items-center h-6 w-6 rounded-full hover:bg-black/[0.08] text-black/45"><Icon name="close" size={12} /></button>
-            </li>
-          ))}
-        </ul>
+    <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
+      {uplatni && (
+        <Card as="form" className="space-y-3" onSubmit={redeem}>
+          <h2 className="t-card">Uplatnit kupon</h2>
+          <p className="t-meta">Host ukáže kód ze své kartičky. Kupon jde uplatnit jednou; podmínky (útrata, 18+) připomene potvrzení.</p>
+          <Field id="c-code" label="Kód od hosta"><Input id="c-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" className="font-mono tracking-widest" /></Field>
+          <Button type="submit" variant="primary" icon="check" loading={busy === 'redeem'} disabled={!code.trim()}>Uplatnit</Button>
+        </Card>
       )}
-      <form onSubmit={add} className="flex gap-2 flex-wrap">
-        <input aria-label="Název nové skupiny" value={name} onChange={e => setName(e.target.value)} placeholder="Nová skupina…" className={`${input} flex-1 basis-48`} maxLength={60} />
-        <Button type="submit" variant="secondary" icon="plus" loading={busy === 'add'}>Přidat</Button>
-      </form>
-    </section>
+      {spravuje && (
+        <Card pad="none" aria-labelledby="v-kupony" className={uplatni ? '' : 'lg:col-span-2'}>
+          <div className="flex items-center justify-between gap-3 px-5 pt-4">
+            <h2 id="v-kupony" className="t-card">Katalog kuponů</h2>
+            <Button size="sm" variant="secondary" icon="plus" onClick={() => setForm(blankCoupon())}>Nový kupon</Button>
+          </div>
+          {list.length === 0 ? (
+            <div className="px-5 pb-5"><EmptyState icon="gift" title="Zatím žádný kupon" hint="Založ první — třeba slevu 15 % pro Zlaté hosty nebo uvítací dezert zdarma." compact /></div>
+          ) : (
+            <ul className="list px-5">
+              {list.map((c: any) => (
+                <ListRow key={c.id} className={c.active ? '' : 'opacity-55'}
+                  title={<span className="flex items-center gap-1.5 min-w-0"><span className="truncate">{c.title}</span>{c.benefit && <Chip tone="muted" size="sm">{c.benefit}</Chip>}{c.welcome && <Chip tone="muted" size="sm">uvítací</Chip>}</span>}
+                  meta={[c.costPoints > 0 ? `${c.costPoints} b.` : 'zdarma', ...(c.badges ?? []), c.validUntil ? `do ${czDay(c.validUntil)}` : null, `vzato ${c.claimed}×, uplatněno ${c.redeemed}×`].filter(Boolean).join(' · ')}
+                  actions={<>
+                    <Switch checked={!!c.active} disabled={busy === 'toggle:' + c.id} onChange={() => { void toggle(c); }} label={`Aktivní: ${c.title}`} />
+                    <Menu size="sm" label={`Další akce s kuponem ${c.title}`} items={[
+                      { label: 'Upravit…', icon: 'pencil', onClick: () => setForm(couponToForm(c)) },
+                      { label: 'Smazat…', icon: 'trash', danger: true, onClick: () => setMazu(c) },
+                    ]} />
+                  </>} />
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {mazu && <Smazat title={`Smazat kupon „${mazu.title}"?`} text="Host, který si ho už vzal, ho uplatní i tak; nový už si ho nevezme." onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }} />}
+    </div>
   );
 }
 
-// ---- Rozcestník -----------------------------------------------------------------
+// ---- Rozcestník (plocha stránky Věrnost) ---------------------------------------
+
+const POPIS_CASTI: Record<LoyaltySub, string> = {
+  overview: 'Jak si věrnostní program vede a co se v něm poslední dobou dělo.',
+  points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
+  stamps: 'Razítkové kartičky — za návštěvy, za vybrané položky, nebo za útratu. Klidně víc najednou.',
+  coupons: 'Co host uplatní: kupony se slevou v % i v měně podniku, X+Y, cílením a limity — a promo kódy na leták nebo účtenku.',
+};
 
 export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => void; promos: React.ReactNode }) {
-  const [sub, setSub] = useState<LoyaltySub>('overview');
-  const HINTS: Record<LoyaltySub, string> = {
-    overview: 'Jak si věrnostní program vede a co se v něm poslední dobou dělo.',
-    points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
-    stamps: 'Razítkové kartičky — za návštěvy, za vybrané položky, nebo za útratu. Klidně víc najednou.',
-    coupons: 'Co host uplatní: kupony se slevou v % i Kč, X+Y, cílením a limity — a promo kódy na leták nebo účtenku.',
-  };
+  // Části jako záložky aplikace: podle `ma` (do načtení oprávnění všechny, pak jen povolené).
+  const { ma } = useOpravneni();
+  const casti = LOYALTY_SUBS.filter(c => ma(KLIC_CASTI[c.id]));
+  const [volba, setVolba] = useState<LoyaltySub>('overview');
+  const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
+  const [ukladam, setUkladam] = useState(false);
+  const nastroj = sub === 'overview' ? <Overview toast={toast} />
+    : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
+    : sub === 'stamps' ? <Stamps toast={toast} />
+    : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>
+    : null;
   return (
-    <div className="space-y-5">
-      {/* Ručně psaný nadpis nahradil PageHeader — stejná hlavička jako
-          všude jinde, a popis jde zavřít jako ostatní nápovědy. */}
-      <PageHeader hintId={`loyalty-${sub}`} title="Věrnost" subtitle={HINTS[sub]} />
-      <Segmented options={LOYALTY_SUBS} value={sub} onChange={setSub} size="sm" ariaLabel="Části věrnosti" />
-      {sub === 'overview' && <Overview go={setSub} />}
-      {sub === 'points' && <div className="space-y-5"><Points toast={toast} /><Tiers toast={toast} /></div>}
-      {sub === 'stamps' && <Stamps toast={toast} />}
-      {sub === 'coupons' && <div className="space-y-5"><Coupons toast={toast} />{promos}</div>}
-    </div>
+    <PlochaWidgetu
+      stranka="vedeni.klient_vernost"
+      hlavicka={{
+        title: 'Věrnost',
+        hintId: sub ? `loyalty-${sub}` : undefined,
+        subtitle: sub ? POPIS_CASTI[sub] : undefined,
+        // Jediné „Uložit" pro body, cashback i úrovně (dřív tři limetky pod sebou).
+        primary: sub === 'points' && ma('vernost.pravidla')
+          ? <Button type="submit" form={FORM_BODY} variant="accent" loading={ukladam}>Uložit</Button>
+          : undefined,
+        aside: casti.length > 1 && sub
+          ? <Segmented options={casti} value={sub} onChange={setVolba} size="sm" ariaLabel="Části věrnosti" />
+          : undefined,
+      }}
+      nastroj={nastroj}
+    />
   );
 }

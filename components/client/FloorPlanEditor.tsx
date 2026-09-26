@@ -7,10 +7,17 @@
 // Souřadnice jsou v procentech plátna, takže plánek drží na každé šířce.
 // Kreslí se tahem myší nebo prstem; mřížka přichytává po dvou procentech,
 // Alt ji vypne. Ukládá se ručně, aby se tažením nespouštěl zápis za zápisem.
+//
+// Kolo 69 (B8): karta s titulkem bez tónovaného kolečka a s rozbalením
+// tlačítkem (stejně jako Vzhled QR vedle), nástroje jako Segmented, mřížka
+// jako Switch, ostatní ovládání Button (dřív ručně psané pilulky 30 px
+// a destruktivní „Smazat" jako šedý text), „Uložit plánek" tmavě (limetkou je
+// „Přidat stůl"), kostra Skeleton, oba posuvníky v jedné barvě a popisek
+// i název plochy v okně místo prompt(). Upravuje jen kdo má stoly.upravit.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button } from '../ui';
+import { Button, Card, Field, Input, Modal, Segmented, Skeleton, Switch } from '../ui';
 import { PlanCanvasContent, TableShape } from './TableMap';
 import type { FloorPlan, MapTable, Shape } from '@/lib/floorplan';
 import { EMPTY_PLAN, tableBox } from '@/lib/floorplan';
@@ -32,7 +39,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const snap = (v: number, on: boolean) => on ? Math.round(v / 2) * 2 : Math.round(v * 10) / 10;
 const clamp = (v: number) => Math.max(0, Math.min(100, v));
 
-export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string) => void; onSaved?: () => void }) {
+export default function FloorPlanEditor({ toast, onSaved, smiUpravit = true }: { toast: (m: string) => void; onSaved?: () => void; smiUpravit?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [plan, setPlan] = useState<FloorPlan | null>(null);
@@ -45,6 +52,8 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const drag = useRef<{ mode: 'move' | 'resize' | 'draw'; ox: number; oy: number } | null>(null);
+  // Okno pro text: nový popisek na souřadnicích, nebo název plochy.
+  const [pojmenovat, setPojmenovat] = useState<{ druh: 'popisek'; x: number; y: number; text: string } | { druh: 'plocha'; id: string; text: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -78,8 +87,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
     if (tool === 'select') { setSel(null); return; }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     if (tool === 'label') {
-      const text = prompt('Co tam je? (například „Bar", „Vchod", „Zahrádka")')?.trim();
-      if (text) setPlan(x => x && ({ ...x, shapes: [...x.shapes, { id: uid(), type: 'label', x: p.x, y: p.y, text: text.slice(0, 40) }] }));
+      setPojmenovat({ druh: 'popisek', x: p.x, y: p.y, text: '' });
       setTool('select'); return;
     }
     const id = uid();
@@ -184,7 +192,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
     setBusy(false);
   };
 
-  if (!plan) return <div className="glass-card p-5"><div className="h-64 well animate-pulse" /></div>;
+  if (!plan) return <Card><Skeleton className="h-64" /></Card>;
 
   const selShape: any = sel?.kind === 'shape' ? plan.shapes.find(s => s.id === sel.id) : null;
   const selTable = sel?.kind === 'table' ? tables.find(t => t.id === sel.id) : null;
@@ -194,63 +202,53 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
   // čas — ne obsah, který má pod seznamem stolů viset pořád otevřený.
   // Sbalený vypadá stejně jako sousední „Vzhled QR na stůl".
   return (
-    <section className="glass-card p-4 sm:p-5 space-y-3">
+    <Card className="space-y-3" aria-labelledby="h-planek">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <h2 className="t-section flex items-center gap-2.5">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08]"><Icon name="location" size={15} /></span>
-            Plánek podniku
-          </h2>
-          {open && <p className="text-xs text-black/55 mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>}
+          <h2 id="h-planek" className="t-card flex items-center gap-2"><Icon name="location" size={17} className="shrink-0 text-black/40" />Plánek podniku</h2>
+          {open && <p className="t-meta mt-1 max-w-[60ch]">Nakresli zdi a plochy, nebo nahraj půdorys ze souboru. Pak rozmísti stoly tak, jak stojí v podniku — host je pozná i bez znalosti názvů.</p>}
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          {dirty && <span className="text-xs text-wait-ink">Neuloženo</span>}
-          {open && <Button size="sm" variant="accent" loading={busy} disabled={!dirty} onClick={save}>Uložit plánek</Button>}
-          <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
-            className="tap-target-sm text-xs font-semibold text-black/55 hover:text-black flex items-center gap-1">
-            {open ? 'Skrýt' : 'Upravit plánek'}<Icon name="chevron" size={14} className={open ? 'rotate-180 transition' : 'transition'} />
-          </button>
+          {dirty && <span className="t-meta text-wait-ink">Neuloženo</span>}
+          {open && smiUpravit && <Button size="sm" variant="primary" loading={busy} disabled={!dirty} onClick={save}>Uložit plánek</Button>}
+          {smiUpravit && (
+            <Button variant="ghost" size="sm" iconAfter="chevron" className={open ? '[&>svg:last-child]:rotate-180' : ''}
+              aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? 'Skrýt' : 'Upravit plánek'}</Button>
+          )}
         </div>
       </div>
       {!open ? null : (<>
 
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {TOOLS.map(t => (
-          <button key={t.id} type="button" onClick={() => { setTool(t.id); setSel(null); }} aria-pressed={tool === t.id}
-            className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${tool === t.id ? 'seg-on' : 'seg-off bg-black/[0.05]'}`}>
-            <Icon name={t.icon} size={13} />{t.label}
-          </button>
-        ))}
-        <span className="w-px h-5 bg-black/10 mx-1" />
-        <button type="button" onClick={() => setGrid(v => !v)} aria-pressed={grid}
-          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${grid ? 'bg-[#C8F542]/25 text-[#3E5406]' : 'bg-black/[0.05] text-black/55'}`}>Mřížka</button>
-        <button type="button" onClick={() => fileRef.current?.click()}
-          className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-3 py-1.5 text-xs font-semibold text-black/65 hover:bg-black/[0.09] transition"><Icon name="upload" size={13} />Podklad</button>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Segmented size="sm" ariaLabel="Nástroj plánku" value={tool} onChange={v => { setTool(v); setSel(null); }}
+          options={TOOLS.map(t => ({ id: t.id, label: t.label, icon: t.icon }))} />
+        <span className="inline-flex items-center gap-2 text-sm text-black/65">
+          <Switch checked={grid} onChange={setGrid} label="Mřížka" /><span aria-hidden>Mřížka</span>
+        </span>
+        <Button size="sm" variant="secondary" icon="upload" loading={busy} onClick={() => fileRef.current?.click()}>Podklad</Button>
         <input ref={fileRef} type="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
         {plan.bg && (
           <>
-            <label className="inline-flex items-center gap-1.5 text-xs text-black/55">Sytost
+            <label className="inline-flex items-center gap-1.5 text-[13px] text-black/55">Sytost
               <input type="range" min={5} max={100} value={Math.round(plan.bgOpacity * 100)} aria-label="Sytost podkladu"
-                onChange={e => setPlan(p => p && ({ ...p, bgOpacity: Number(e.target.value) / 100 }))} className="w-20 accent-[#16181A]" /></label>
-            <button type="button" onClick={() => setPlan(p => p && ({ ...p, bg: null }))}
-              className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-bad-ink hover:bg-bad/10 transition">Odebrat podklad</button>
+                onChange={e => setPlan(p => p && ({ ...p, bgOpacity: Number(e.target.value) / 100 }))} className="w-20 accent-[#8FB811]" /></label>
+            <Button size="sm" variant="danger" onClick={() => setPlan(p => p && ({ ...p, bg: null }))}>Odebrat podklad</Button>
           </>
         )}
       </div>
 
       {unplaced.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-black/50">Mimo plánek:</span>
+          <span className="t-meta">Mimo plánek:</span>
           {unplaced.map(t => (
-            <button key={t.id} type="button" onClick={() => { patchTable(t.id, x => ({ ...x, map_x: 50, map_y: 50 })); setSel({ kind: 'table', id: t.id }); setTool('select'); }}
-              className="tap-target-sm rounded-full bg-black/[0.05] hover:bg-black/[0.09] px-3 py-1.5 text-xs font-semibold transition">+ {t.name}</button>
+            <Button key={t.id} size="sm" variant="secondary" icon="plus" onClick={() => { patchTable(t.id, x => ({ ...x, map_x: 50, map_y: 50 })); setSel({ kind: 'table', id: t.id }); setTool('select'); }}>{t.name}</Button>
           ))}
         </div>
       )}
 
       <div ref={box} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        className={`relative w-full rounded-3xl border border-black/[0.08] bg-white/60 overflow-hidden select-none ${tool === 'select' ? 'touch-pan-y' : 'touch-none cursor-crosshair'}`}
+        className={`relative w-full rounded-2xl border border-black/[0.08] bg-white/60 overflow-hidden select-none ${tool === 'select' ? 'touch-pan-y' : 'touch-none cursor-crosshair'}`}
         style={{ aspectRatio: String(plan.ratio), backgroundImage: grid ? 'radial-gradient(rgba(22,24,26,0.07) 1px, transparent 1px)' : undefined, backgroundSize: '18px 18px' }}>
         <PlanCanvasContent plan={plan} />
 
@@ -283,7 +281,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
           if (s.type === 'room') return (
             <span key={s.id}>
               <button type="button" aria-label={`Plocha ${s.label ?? ''} — posunout`} onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'move')}
-                onDoubleClick={() => { const v = prompt('Název plochy', s.label ?? '')?.trim(); patchShape(s.id, x => ({ ...x, label: v ? v.slice(0, 40) : undefined })); }}
+                onDoubleClick={() => setPojmenovat({ druh: 'plocha', id: s.id, text: s.label ?? '' })}
                 className={`${on ? 'touch-none ring-2 ring-[#C8F542] bg-[#C8F542]/10' : 'hover:bg-black/[0.04]'} absolute transition`}
                 style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%` }} />
               {on && <button type="button" aria-label="Plocha — velikost" onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'resize')}
@@ -292,7 +290,7 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
           );
           return (
             <button key={s.id} type="button" aria-label={`Popisek ${s.text}`} onPointerDown={e => grab(e, { kind: 'shape', id: s.id }, 'move')}
-              className={`${on ? 'touch-none ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.05]'} tap-target-sm absolute h-7 -translate-x-1/2 -translate-y-1/2 rounded-lg px-2 transition`}
+              className={`${on ? 'touch-none ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.05]'} tap-target-sm absolute h-7 -translate-x-1/2 -translate-y-1/2 rounded-xl px-2 transition`}
               style={{ left: `${s.x}%`, top: `${s.y}%`, minWidth: '2rem' }} />
           );
         })}
@@ -324,32 +322,52 @@ export default function FloorPlanEditor({ toast, onSaved }: { toast: (m: string)
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-black/55">
+      <div className="flex items-center justify-between gap-3 flex-wrap text-[13px] text-black/55">
         <p>{hint} {grid && 'Alt vypne přichytávání.'}</p>
         {sel && (
           <div className="flex items-center gap-2">
             {selTable && (
               <>
                 <span className="font-semibold text-black/70">{selTable.name}</span>
-                <button type="button" onClick={() => patchTable(selTable.id, t => ({ ...t, map_shape: tableBox(t).shape === 'circle' ? 'rect' : 'circle' }))}
-                  className="tap-target-sm rounded-full bg-black/[0.05] px-3 py-1.5 font-semibold hover:bg-black/[0.09] transition">{tableBox(selTable).shape === 'circle' ? 'Na hranatý' : 'Na kulatý'}</button>
+                <Button size="sm" variant="secondary" onClick={() => patchTable(selTable.id, t => ({ ...t, map_shape: tableBox(t).shape === 'circle' ? 'rect' : 'circle' }))}>{tableBox(selTable).shape === 'circle' ? 'Na hranatý' : 'Na kulatý'}</Button>
               </>
             )}
             {selShape?.type === 'room' && (
-              <button type="button" onClick={() => { const v = prompt('Název plochy', selShape.label ?? '')?.trim(); patchShape(selShape.id, x => ({ ...x, label: v ? v.slice(0, 40) : undefined })); }}
-                className="tap-target-sm rounded-full bg-black/[0.05] px-3 py-1.5 font-semibold hover:bg-black/[0.09] transition">Pojmenovat</button>
+              <Button size="sm" variant="secondary" onClick={() => setPojmenovat({ druh: 'plocha', id: selShape.id, text: selShape.label ?? '' })}>Pojmenovat</Button>
             )}
             {selShape?.type === 'wall' && (
               <label className="inline-flex items-center gap-1.5">Tloušťka
                 <input type="range" min={3} max={40} value={Math.round(selShape.t * 10)} aria-label="Tloušťka zdi"
-                  onChange={e => patchShape(selShape.id, x => ({ ...x, t: Number(e.target.value) / 10 }))} className="w-20 accent-[#16181A]" /></label>
+                  onChange={e => patchShape(selShape.id, x => ({ ...x, t: Number(e.target.value) / 10 }))} className="w-20 accent-[#8FB811]" /></label>
             )}
-            <button type="button" onClick={removeSel}
-              className="tap-target-sm rounded-full px-3 py-1.5 font-semibold text-black/55 hover:text-bad-ink hover:bg-bad/10 transition">{sel.kind === 'table' ? 'Z plánku pryč' : 'Smazat'}</button>
+            <Button size="sm" variant={sel.kind === 'table' ? 'secondary' : 'danger'} onClick={removeSel}>{sel.kind === 'table' ? 'Z plánku pryč' : 'Smazat'}</Button>
           </div>
         )}
       </div>
     </>)}
-    </section>
+      {pojmenovat && (
+        <Modal open onClose={() => setPojmenovat(null)} size="sm" title={pojmenovat.druh === 'popisek' ? 'Nový popisek' : 'Název plochy'}
+          footer={<>
+            <Button variant="secondary" onClick={() => setPojmenovat(null)}>Zrušit</Button>
+            <Button type="submit" form="planek-text" variant="primary">{pojmenovat.druh === 'popisek' ? 'Přidat' : 'Uložit'}</Button>
+          </>}>
+          <form id="planek-text" onSubmit={e => {
+            e.preventDefault();
+            const text = pojmenovat.text.trim().slice(0, 40);
+            if (pojmenovat.druh === 'popisek') {
+              if (text) { const { x, y } = pojmenovat; setPlan(pl => pl && ({ ...pl, shapes: [...pl.shapes, { id: uid(), type: 'label', x, y, text }] })); }
+            } else {
+              const id = pojmenovat.id;
+              patchShape(id, sh => ({ ...sh, label: text || undefined }));
+            }
+            setPojmenovat(null);
+          }}>
+            <Field id="planek-text-pole" label={pojmenovat.druh === 'popisek' ? 'Co tam je' : 'Název'} hint={pojmenovat.druh === 'popisek' ? 'Například Bar, Vchod, Zahrádka.' : 'Prázdné = bez názvu.'}>
+              <Input id="planek-text-pole" autoFocus maxLength={40} value={pojmenovat.text} onChange={e => setPojmenovat({ ...pojmenovat, text: e.target.value })} />
+            </Field>
+          </form>
+        </Modal>
+      )}
+    </Card>
   );
 }

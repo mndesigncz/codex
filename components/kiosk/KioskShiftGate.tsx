@@ -2,11 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, Modal } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, Toast } from '../ui';
+import { usePopover } from '@/lib/usePopover';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
-import { useModal } from '@/lib/useModal';
 import { nextActiveId, IDLE_MS } from '@/lib/kioskIdentity';
-import { DiscardGuard } from '../ui/DiscardGuard';
 
 export interface RosterMember {
   id: number;
@@ -114,7 +113,9 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   const [hydrated, setHydrated] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [punching, setPunching] = useState<RosterMember | null>(null);
-  const [flash, setFlash] = useState('');
+  // Hlášení tabletu jde přes sdílený Toast (role=status, dole uprostřed).
+  // `id` odliší dvě stejná hlášení po sobě, jinak by druhé dostalo zbytek času prvního.
+  const [flash, setFlash] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
   const now = useNow();
   const [loadFailed, setLoadFailed] = useState(false);
   /** Kdy se naposled někdo tabletu dotkl — podle toho se pozná nečinnost. */
@@ -223,9 +224,8 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
     return new Promise<ActivePerson | null>(resolve => setAsking(() => resolve));
   }, []);
 
-  const showFlash = useCallback((msg: string) => {
-    setFlash(msg);
-    setTimeout(() => setFlash(''), 8000);
+  const showFlash = useCallback((text: string, tone: 'ok' | 'bad' = 'ok') => {
+    setFlash({ text, tone, id: Date.now() });
   }, []);
 
   useEffect(() => { activeRef.current = active; }, [active]);
@@ -259,11 +259,10 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
           />
         </Modal>
       )}
-      {flash && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-[92vw] px-5 py-3.5 rounded-2xl glass-strong border border-[#C8F542]/40 text-[#5B7A08] font-medium text-center shadow-lg">
-          {flash}
-        </div>
-      )}
+      {/* Dřív ručně psaný limetkový proužek nahoře bez role=status — odečítač
+          o zapomenuté uzávěrce ani o přepnuté identitě nic neřekl (DP §3.17).
+          Obě hlášení jsou varování, ne oslava, proto tón „bad" a 8 s na přečtení. */}
+      <Toast message={flash?.text ?? null} tone={flash?.tone} id={flash?.id} ms={8000} onClose={() => setFlash(null)} />
       {punching && (
         <PunchDialog
           member={punching}
@@ -279,8 +278,8 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
               : null;
             if (action === 'in') { setActiveId(member.id); touchedAt.current = Date.now(); }
             reload();
-            if (msg) showFlash(msg);
-            if (switchedFrom) showFlash(`Zapisuje se teď jako ${member.name}, ne ${switchedFrom}. Přepni nahoře u jména, jestli to není tak.`);
+            if (msg) showFlash(msg, 'bad');
+            if (switchedFrom) showFlash(`Zapisuje se teď jako ${member.name}, ne ${switchedFrom}. Přepni nahoře u jména, jestli to není tak.`, 'bad');
           }}
         />
       )}
@@ -419,7 +418,8 @@ export function WhoIsWorking() {
           <Icon name="clock" size={17} className="shrink-0 text-black/40" />
           <span className="truncate">Kdo teď pracuje</span>
         </h2>
-        <Button variant="secondary" size="sm" icon={adding ? 'close' : 'plus'} aria-expanded={adding} onClick={() => setAdding(v => !v)}>
+        {/* Na tabletu u baru cíle nejméně 44 px (DESIGN.md, Kiosk) — proto md, ne sm. */}
+        <Button variant="secondary" icon={adding ? 'close' : 'plus'} aria-expanded={adding} onClick={() => setAdding(v => !v)}>
           {adding ? 'Zavřít' : 'Další příchod'}
         </Button>
       </div>
@@ -435,9 +435,9 @@ export function WhoIsWorking() {
               meta={<span className="tabular-nums">Na směně {elapsed(m.openSince!, now)}</span>}
               right={isActive
                 ? <Chip tone="ok" icon="check">Zapisuje se</Chip>
-                : <Button variant="secondary" size="sm" onClick={() => selectPerson(m.id)} aria-label={`Zapisovat jako ${m.name}`}>Přepnout</Button>}
+                : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={`Zapisovat jako ${m.name}`}>Přepnout</Button>}
               actions={
-                <Button variant="ghost" size="sm" iconOnly icon="logout" title={`Odchod – ${m.name}`}
+                <Button variant="ghost" iconOnly icon="logout" title={`Odchod – ${m.name}`}
                   aria-label={`Odchod – ${m.name}`} onClick={() => punch(m)} />
               }
             />
@@ -482,11 +482,32 @@ export function ActivePersonChip() {
   }
   const canSwitch = onShift.length > 1;
 
+  return <PrepinacOsoby active={active} onShift={onShift} canSwitch={canSwitch} selectPerson={selectPerson} />;
+}
+
+/**
+ * Čip „Zapisuje se jako" s nabídkou lidí na směně. Dřív vlastní div s neviditelnou
+ * vrstvou přes obrazovku: Escape ho nezavřel, šipky nechodily a fokus se po
+ * zavření ztratil (DP §3.9). Teď sdílený MenuPanel s usePopover — stejné
+ * chování jako menu „···". Vybraný člověk nese fajfku a aria-checked, ne
+ * limetkový podklad (limetka na obrazovce patří jen hlavní akci).
+ */
+function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
+  active: ActivePerson; onShift: RosterMember[]; canSwitch: boolean; selectPerson: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
+
   return (
-    <div className="relative">
+    <div ref={pop.ref} className="relative">
       <button
+        type="button"
+        ref={pop.triggerRef}
         onClick={() => canSwitch && setOpen(v => !v)}
-        className={`flex items-center gap-2.5 rounded-full glass border border-[#C8F542]/45 bg-[#C8F542]/[0.14] pl-2.5 pr-4 py-2 transition ${
+        onKeyDown={canSwitch ? pop.onTriggerKeyDown : undefined}
+        aria-haspopup={canSwitch ? 'menu' : undefined}
+        aria-expanded={canSwitch ? open : undefined}
+        className={`flex items-center gap-2.5 rounded-full glass border border-[#C8F542]/45 bg-[#C8F542]/[0.14] pl-2.5 pr-4 py-2 min-h-[44px] transition ${
           canSwitch ? 'hover:bg-[#C8F542]/20' : 'cursor-default'
         }`}
       >
@@ -500,24 +521,26 @@ export function ActivePersonChip() {
       </button>
 
       {open && canSwitch && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-2xl glass-strong border border-black/10 p-1.5 shadow-xl">
-            {onShift.map(m => (
+        <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label="Zapisovat jako"
+          className="absolute right-0 top-full mt-2 w-64 origin-top-right">
+          {onShift.map(m => {
+            const vybrany = m.id === active.id;
+            return (
               <button
+                type="button"
                 key={m.id}
-                onClick={() => { selectPerson(m.id); setOpen(false); }}
-                className={`w-full flex items-center gap-3 rounded-xl px-3 py-3 min-h-[52px] text-left transition ${
-                  m.id === active.id ? 'bg-[#C8F542]/20' : 'hover:bg-black/[0.05]'
-                }`}
+                role="menuitemradio"
+                aria-checked={vybrany}
+                onClick={() => { selectPerson(m.id); pop.close(); }}
+                className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[52px] text-left transition-colors hover:bg-black/[0.05]"
               >
                 <Avatar emoji={m.avatar} size="md" ring={false} />
-                <span className="font-semibold text-[#16181A] truncate flex-1">{m.name}</span>
-                {m.id === active.id && <Icon name="check" size={16} className="text-[#5B7A08]" />}
+                <span className={`text-[#16181A] truncate flex-1 ${vybrany ? 'font-bold' : 'font-medium'}`}>{m.name}</span>
+                {vybrany && <Icon name="check" size={16} className="shrink-0 text-[#16181A]" />}
               </button>
-            ))}
-          </div>
-        </>
+            );
+          })}
+        </MenuPanel>
       )}
     </div>
   );
@@ -529,7 +552,6 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   onClose: () => void;
   onDone: (action: 'in' | 'out', member: RosterMember, flashMsg?: string) => void;
 }) {
-  const m = useModal(true, onClose, 'Příchod a odchod');
   const on = !!member.openSince;
   const needPin = member.hasPin && !on; // PIN only required to clock in
   const [pin, setPin] = useState('');
@@ -558,53 +580,56 @@ export function PunchDialog({ member, now, onClose, onDone }: {
     setBusy(false);
   };
 
+  // Sdílené okno místo ručně psaného překryvu (zákaz č. 23): Escape, past
+  // fokusu, vyjetí zdola na telefonu a DiscardGuard má Modal sám.
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={m.guard} />
+    <Modal open onClose={onClose} size="sm" title={member.name}
+      subtitle={on
+        ? `Na směně od ${timeOf(member.openSince!)} · ${elapsed(member.openSince!, now)}`
+        : 'Zaznamenej příchod na směnu'}
+      footer={<>
+        {/* Potvrzení v okně je `primary` (DP §3.1: limetka patří obrazovce,
+            ne modálu), odchod `danger-solid` — ukončuje směnu. */}
+        <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>Zpět</Button>
+        <Button variant={on ? 'danger-solid' : 'primary'} size="lg" className="flex-1" loading={busy}
+          disabled={needPin && pin.length < 4} onClick={submit}>
+          {on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
+        </Button>
+      </>}>
+      <div className="text-center">
         <Avatar emoji={member.avatar} size="xl" ring={false} />
-        <h2 className="t-section mt-2">{member.name}</h2>
-        <p className="text-sm text-black/50 mt-1">
-          {on
-            ? `Na směně od ${timeOf(member.openSince!)} · ${elapsed(member.openSince!, now)}`
-            : 'Zaznamenej příchod na směnu'}
-        </p>
         {!on && member.shiftStart && (
-          <p className="mt-1.5">
+          <p className="mt-2">
             <Chip tone="info" icon="calendar" className="tabular-nums">Dnes máš směnu {member.shiftStart}–{member.shiftEnd}</Chip>
           </p>
         )}
 
         {needPin && (
           <div className="mt-5">
-            <div className="flex justify-center gap-2 mb-3">
+            {/* Tečky nesou délku PINu i pro odečítač (role=img s popisem). */}
+            <div className="flex justify-center gap-2 mb-3" role="img" aria-label={`Zadáno číslic: ${pin.length}`}>
               {[0, 1, 2, 3].map(i => (
                 <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-[#C8F542] ring-1 ring-black/15' : 'bg-black/15'}`} />
               ))}
             </div>
+            {/* Klávesy jsou sdílená tlačítka (zákaz č. 1), číslice 18 px z řady (T13).
+                Smazání je ikona s popiskem, ne znak backspace, který odečítač přečte jako nesmysl. */}
             <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
-              {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((k, i) => k === '' ? <span key={i} /> : (
-                <button key={i} onClick={() => k === '⌫' ? setPin(p => p.slice(0, -1)) : setPin(p => (p.length < 6 ? p + k : p))}
-                  className="h-14 rounded-2xl glass border border-black/10 text-xl font-semibold text-[#16181A] hover:bg-black/[0.05] active:scale-95 transition">
-                  {k}
-                </button>
+              {['1','2','3','4','5','6','7','8','9'].map(k => (
+                <Button key={k} variant="secondary" size="lg" className="text-lg tabular-nums"
+                  onClick={() => setPin(p => (p.length < 6 ? p + k : p))}>{k}</Button>
               ))}
+              <span />
+              <Button variant="secondary" size="lg" className="text-lg tabular-nums"
+                onClick={() => setPin(p => (p.length < 6 ? p + '0' : p))}>0</Button>
+              <Button variant="secondary" size="lg" iconOnly icon="undo" aria-label="Smazat číslici" title="Smazat číslici"
+                className="w-full" disabled={pin.length === 0} onClick={() => setPin(p => p.slice(0, -1))} />
             </div>
           </div>
         )}
 
         {err && <p role="alert" className="text-sm text-bad-ink mt-4">{err}</p>}
-
-        {/* Potvrzení v okně je `primary` (DP §3.1: limetka patří obrazovce,
-            ne modálu), odchod `danger-solid` — ukončuje směnu. */}
-        <div className="mt-6 flex gap-2">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>Zpět</Button>
-          <Button variant={on ? 'danger-solid' : 'primary'} size="lg" className="flex-1" loading={busy}
-            disabled={needPin && pin.length < 4} onClick={submit}>
-            {on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
-          </Button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

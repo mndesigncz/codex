@@ -255,15 +255,19 @@ export default function Inventory({ initialCategory, onNavigate }: {
   // The toolbar sticks to the top while scrolling; once it does it collapses to
   // a single row so it stops eating the screen. A sentinel just above it tells
   // us when that happened without listening to every scroll event.
+  //
+  // Hlídač se zapíná ve chvíli, kdy značka vznikne (callback ref), ne jednou
+  // po prvním vykreslení: na ploše widgetů přijde nástroj až s rozložením,
+  // takže efekt s [] našel prázdný ref, lišta se nikdy nesbalila a celý
+  // průhledný panel s kategoriemi zůstal přilepený přes seznam (kolo 69).
   const [stuck, setStuck] = useState(false);
-  const sentinel = useRef<HTMLDivElement>(null);
+  const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = sentinel.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
+    if (!sentinelEl || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { threshold: 1 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    io.observe(sentinelEl);
+    return () => { io.disconnect(); setStuck(false); };
+  }, [sentinelEl]);
   // Potvrzení akce jako Toast (DP §3.17) místo ručně limetkového boxu na stránce.
   const [notice, setNotice] = useState<{ text: string; ton?: 'bad' } | null>(null);
   const showNotice = (text: string, ton?: 'bad') => setNotice({ text, ton });
@@ -763,7 +767,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
   const nastroj = (
     <div className="space-y-4">
       {/* Toolbar — v klidu leží na papíře; až se přilepí nahoru, stane se plovoucím chromem. */}
-      <div ref={sentinel} aria-hidden className="h-px -mb-px" />
+      <div ref={setSentinelEl} aria-hidden className="h-px -mb-px" />
       <div className={`sticky top-0 z-20 transition-[padding,box-shadow] ${
         stuck ? '-mx-4 px-4 sm:-mx-6 sm:px-6 py-2 space-y-2 glass-strong rounded-b-3xl shadow-[shadow:var(--shadow-float)]' : 'py-1 space-y-3'
       }`}>
