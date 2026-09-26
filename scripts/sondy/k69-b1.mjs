@@ -280,6 +280,16 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   // třetím (dřív 105 px na řádek). Prázdný ocas ListRow na telefonu přidá jen mezeru řádku.
   const vysky = await widgetLi(p, 'rozvrh.dostupnost_tymu').locator('.list-row').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
   tvrdi('T1: Dostupnost týmu na telefonu — řádek na dva řádky textu (výška ≤ 80 px, dřív 105)', vysky.length > 0 && Math.max(...vysky) <= 80, JSON.stringify(vysky));
+  // Záložky Rozvrhu (šest položek) jsou jeden posuvný pás, ne dva řádky textu.
+  const pas = await p.getByRole('tablist', { name: 'Část rozvrhu' }).evaluate(el => {
+    const tabs = [...el.querySelectorAll('[role="tab"]')].map(t => t.getBoundingClientRect().top);
+    return { radku: new Set(tabs.map(Math.round)).size, posuvny: el.scrollWidth > el.clientWidth, sirka: Math.round(el.getBoundingClientRect().right), vw: document.documentElement.clientWidth };
+  });
+  tvrdi('T1: záložky Rozvrhu na telefonu v jednom řádku, posuvné do strany a uvnitř obrazovky', pas.radku === 1 && pas.posuvny && pas.sirka <= pas.vw, JSON.stringify(pas));
+  await p.getByRole('tab', { name: 'Pravidla' }).click();
+  const vZaberu = await p.getByRole('tab', { name: 'Pravidla' }).evaluate(t => { const r = t.getBoundingClientRect(); const l = t.closest('[role="tablist"]').getBoundingClientRect(); return r.left >= l.left - 1 && r.right <= l.right + 1; });
+  tvrdi('T1: vybraná poslední záložka se posune do záběru', vZaberu);
+  await p.getByRole('tab', { name: 'Rozvrh' }).click();
   await p.screenshot({ path: OUT + 'k69-b1-rozvrh-tel.png', fullPage: true });
   await gen.click();
   tvrdi('T1: …a ukáže návrh v nástroji', await dokud(() => widgetLi(p, 'nastroj').getByText('Navržený rozvrh').isVisible(), 3000));

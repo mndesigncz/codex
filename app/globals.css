@@ -611,6 +611,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
 .panel-dark .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); }
+/* Posuvný pás bez posuvníku (přepínač Segmented): že je co posouvat, říká
+   vyblednutý okraj, ne šedá čárka pod pilulkami. */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
 
 /* ============================================================
    Dark theme — remaps the shared design vocabulary in one place

@@ -559,7 +559,7 @@ function Customers({ toast, initialQuery = '' }: { toast: (m: string) => void; i
   return (
     <div className="space-y-5">
       <PageHeader hintId="clientadmin-7" title="Zákazníci" subtitle={sub_title[sub]} />
-      <Segmented options={[{ id: 'members', label: 'Členové' }, { id: 'reviews', label: 'Hodnocení' }, { id: 'messages', label: 'Zprávy členům' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části zákazníků" wrap />
+      <Segmented options={[{ id: 'members', label: 'Členové' }, { id: 'reviews', label: 'Hodnocení' }, { id: 'messages', label: 'Zprávy členům' }]} value={sub} onChange={setSub} size="sm" ariaLabel="Části zákazníků" />
       {sub === 'members' && <Members toast={toast} initialQuery={initialQuery} />}
       {sub === 'reviews' && <Reviews />}
       {sub === 'messages' && <Broadcast toast={toast} />}

@@ -600,7 +600,7 @@ function ProcedureEditor({
         <div>
           <p className="field-label">Připomínka (nepovinné)</p>
           <p className="t-meta mb-2 text-pretty">Postup se v daný čas sám otevře a lidem na směně přijde upozornění.</p>
-          <Segmented ariaLabel="Kdy připomenout" value={remindAnchor} onChange={setRemindAnchor} wrap
+          <Segmented ariaLabel="Kdy připomenout" value={remindAnchor} onChange={setRemindAnchor}
             options={[{ id: 'time', label: 'V určený čas' }, { id: 'open', label: 'Při otevření' }, { id: 'close', label: 'Při zavření' }]} />
           <div className="mt-2.5">
             {remindAnchor === 'time' ? (

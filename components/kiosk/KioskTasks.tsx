@@ -153,7 +153,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   return (
     <div className="space-y-6">
       <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
-      <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Filtr úkolů">
+      <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1" role="group" aria-label="Filtr úkolů">
         {FILTERS.map(f => (
           <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
             className={`filter-pill tap-target ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>

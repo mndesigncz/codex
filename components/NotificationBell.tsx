@@ -7,6 +7,7 @@ import { Badge } from './ui/Badge';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { usePopover } from '@/lib/usePopover';
+import { useVejdiSe } from '@/lib/useVejdiSe';
 import { okJson } from '@/lib/api';
 
 interface Notif {
@@ -78,6 +79,8 @@ export default function NotificationBell() {
     arrowKeys: true,
     onDismiss: () => { if (unreadRef.current) markAllRead(); },
   });
+  // Panel se na telefonu vejde na obrazovku i do výšky (useVejdiSe).
+  const vejdiSe = useVejdiSe(pop.panelRef, { aktivni: open });
 
   // Odznak se nuluje až podle odpovědi. Dřív se vynuloval rovnou, takže
   // po nepovedeném zápisu tvrdil „přečteno" a server měl pořád nepřečteno;
@@ -132,7 +135,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="menu"
+        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="menu" style={vejdiSe}
           className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
           <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
             <span className="font-bold text-[#16181A] text-sm">Notifikace</span>

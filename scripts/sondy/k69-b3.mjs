@@ -247,6 +247,15 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   const pridat = p.getByRole('button', { name: 'Přidat položku' });
   tvrdi('T1: „Přidat položku" je vidět a povolené', await pridat.isVisible() && await pridat.isEnabled());
   await p.screenshot({ path: OUT + 'k69-b3-sklad-tel.png', fullPage: true });
+  // Menu „···" vedle hlavní akce: panel zarovnaný k pravé hraně tlačítka dřív
+  // na telefonu utekl z levého okraje a půlka položek byla mimo obrazovku.
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Další akce' }).first().click();
+  const panel = p.getByRole('menu').first();
+  await dokud(() => panel.isVisible(), 3000);
+  await p.waitForTimeout(250);
+  const r = await panel.evaluate(el => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), vw: document.documentElement.clientWidth, vh: window.innerHeight }; });
+  tvrdi('T1: menu „···" na telefonu celé na obrazovce s okrajem (16 px)', r.l >= 15 && r.r <= r.vw - 15 && r.t >= 0 && r.b <= r.vh, JSON.stringify(r));
+  await p.keyboard.press('Escape');
   await pridat.click();
   tvrdi('T1: …a otevře formulář Nová položka', await dokud(() => p.getByRole('dialog', { name: 'Nová položka' }).isVisible(), 3000));
   tvrdi('T1: formulář na telefonu nepřetéká', await bezPreteceni(p));

@@ -597,7 +597,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
           {/* Víc menu = přepínač nahoře. Stav zapnuto/vypnuto nese Stav menu nad editorem a adresa níž. */}
           {boards.length > 1 && (
-            <Segmented wrap ariaLabel="Menu k úpravě" value={String(aktivni ?? '')}
+            <Segmented ariaLabel="Menu k úpravě" value={String(aktivni ?? '')}
               options={boards.map(b => ({ id: String(b.id), label: b.name }))}
               onChange={id => {
                 if (neulozeno) {

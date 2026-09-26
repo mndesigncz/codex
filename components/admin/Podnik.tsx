@@ -74,7 +74,7 @@ export default function Podnik({ id }: { id: number }) {
       </StatRow>
 
       <Section title="Tarif" hint="Ruční tarif přebije Stripe i zkušební dobu. Uložený tarif ze Stripe se nemění, jen se překryje — kdykoli se dá vrátit.">
-        <Segmented options={TARIFY} value={tarif} ariaLabel="Ruční tarif" size="sm" wrap
+        <Segmented options={TARIFY} value={tarif} ariaLabel="Ruční tarif" size="sm"
           onChange={v => proved('plan', api('plan'), { plan: v === 'stripe' ? null : v })} />
       </Section>
 

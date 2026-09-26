@@ -660,7 +660,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const nastroj = (
     <div className="space-y-4">
       {sekce.length > 1 && (
-        <Segmented wrap ariaLabel="Sekce nastavení týmu" value={aktivni} onChange={setZvolena} options={sekce} />
+        <Segmented ariaLabel="Sekce nastavení týmu" value={aktivni} onChange={setZvolena} options={sekce} />
       )}
       {obsah}
     </div>

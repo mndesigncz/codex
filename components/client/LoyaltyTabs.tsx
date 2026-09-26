@@ -396,7 +396,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
           <div><label htmlFor="sc-desc" className={label}>Popis pro hosta</label><input id="sc-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Každá desátá dýmka je na nás." className={input} maxLength={200} /></div>
           <div>
             <p className={label}>Za co se razítko připisuje</p>
-            <Segmented options={RULE_OPTS} value={f.ruleType} onChange={v => set({ ruleType: v })} size="sm" ariaLabel="Pravidlo razítka" wrap />
+            <Segmented options={RULE_OPTS} value={f.ruleType} onChange={v => set({ ruleType: v })} size="sm" ariaLabel="Pravidlo razítka" />
             {f.ruleType === 'visit' && <p className="text-xs text-black/50 mt-2">Jedno razítko za návštěvu — obsluha ho dá při načtení kartičky u kasy, nejvýš jedno denně.</p>}
             {f.ruleType === 'products' && (
               <div className="mt-3 space-y-3">
@@ -430,7 +430,7 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
             <p className="text-xs text-black/50">0 = bez omezení. Když host kartu nedosbírá včas, začíná znovu; kupon po lhůtě propadne.</p>
             <div>
               <p className={label}>Další karta po dokončení</p>
-              <Segmented options={REPEAT_OPTS} value={f.repeatMode} onChange={v => set({ repeatMode: v })} size="sm" ariaLabel="Opakování karty" wrap />
+              <Segmented options={REPEAT_OPTS} value={f.repeatMode} onChange={v => set({ repeatMode: v })} size="sm" ariaLabel="Opakování karty" />
             </div>
             <label className="flex items-center gap-2.5 text-sm cursor-pointer">
               <input type="checkbox" checked={f.stackCards} onChange={e => set({ stackCards: e.target.checked })} className="h-4 w-4 rounded accent-[#8FB811]" />
@@ -619,7 +619,7 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
           <div><label htmlFor="cp-desc" className={label}>Popis</label><input id="cp-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Jeden dezert z vitríny podle výběru." className={input} maxLength={200} /></div>
           <div>
             <p className={label}>Co kupon dává</p>
-            <Segmented options={BENEFIT_OPTS} value={f.benefitKind} onChange={v => set({ benefitKind: v })} size="sm" ariaLabel="Výhoda kuponu" wrap />
+            <Segmented options={BENEFIT_OPTS} value={f.benefitKind} onChange={v => set({ benefitKind: v })} size="sm" ariaLabel="Výhoda kuponu" />
             <div className="mt-3 grid grid-cols-1 sm:flex sm:flex-wrap items-end gap-3">
               {f.benefitKind === 'percent' && (
                 <div><label htmlFor="cp-pct" className={label}>Sleva %</label><input id="cp-pct" type="number" min={1} max={100} value={f.percentOff} onChange={e => set({ percentOff: e.target.value })} placeholder="15" className={`${input} !w-full sm:!w-24 text-center`} /></div>
@@ -839,7 +839,7 @@ export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => v
       {/* Ručně psaný nadpis nahradil PageHeader — stejná hlavička jako
           všude jinde, a popis jde zavřít jako ostatní nápovědy. */}
       <PageHeader hintId={`loyalty-${sub}`} title="Věrnost" subtitle={HINTS[sub]} />
-      <Segmented options={LOYALTY_SUBS} value={sub} onChange={setSub} size="sm" ariaLabel="Části věrnosti" wrap />
+      <Segmented options={LOYALTY_SUBS} value={sub} onChange={setSub} size="sm" ariaLabel="Části věrnosti" />
       {sub === 'overview' && <Overview go={setSub} />}
       {sub === 'points' && <div className="space-y-5"><Points toast={toast} /><Tiers toast={toast} /></div>}
       {sub === 'stamps' && <Stamps toast={toast} />}

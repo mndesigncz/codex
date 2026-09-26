@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
+import { useVejdiSe } from '@/lib/useVejdiSe';
 import { nactiTeamsMine } from './role/useOpravneni';
 
 interface Podnik { teamId: number; teamName: string; role: 'employer' | 'employee' }
@@ -47,6 +48,9 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
   const [chybaSeznamu, setChybaSeznamu] = useState(false);
   const [pokus, setPokus] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  // Na telefonu se panel vejde na obrazovku (useVejdiSe).
+  const vejdiSe = useVejdiSe(panel, { aktivni: open });
 
   useEffect(() => {
     let alive = true;
@@ -132,7 +136,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
         )}
       </button>
       {open && (
-        <div role="menu" className="absolute left-0 right-0 top-full mt-1 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] min-w-[220px] pop-in origin-top">
+        <div ref={panel} role="menu" style={vejdiSe} className="absolute left-0 right-0 top-full mt-1 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] min-w-[220px] pop-in origin-top">
           {data.teams.map(t => (
             <button key={t.teamId} type="button" role="menuitem" disabled={busy} onClick={() => prepni(t.teamId)}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition ${

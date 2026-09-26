@@ -248,7 +248,7 @@ export default function SuggestionsBoard() {
                     {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). */}
                     {spravuje && (
                       <div className="mt-3">
-                        <Segmented size="sm" wrap ariaLabel={`Stav podnětu ${s.title}`} value={(STATUS_FLOW.some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
+                        <Segmented size="sm" ariaLabel={`Stav podnětu ${s.title}`} value={(STATUS_FLOW.some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
                           onChange={v => void setStatus(s, v)} options={STATUS_FLOW.map(x => ({ id: x.id, label: x.label }))} />
                       </div>
                     )}
