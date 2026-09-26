@@ -85,7 +85,9 @@ function kdy(iso: string): string {
   return `v ${dbTimeHM(iso)}`;
 }
 
-export default function StaffInbox({ compact = false, onToast }: { compact?: boolean; onToast?: (m: string) => void }) {
+// onZmena: po přijetí, hotovu, odmítnutí nebo odeslání do kasy — skořápka Clientu
+// podle toho obnoví odznaky „Objednávky N" (jinak by svítily staré až do Přehledu).
+export default function StaffInbox({ compact = false, onToast, onZmena }: { compact?: boolean; onToast?: (m: string) => void; onZmena?: () => void }) {
   const { d, err, reload } = useStaffInbox(true);
   // Tlačítka podle `ma` (před načtením oprávnění ANO, rozhoduje server).
   const { ma } = useOpravneni();
@@ -135,6 +137,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       const x = await r.json().catch(() => ({}));
       toast(x.posNote || x.error || (x.ok ? 'Objednávka je v pokladně.' : 'Do pokladny to nešlo.'));
       await reload();
+      onZmena?.();
     } catch { toast('Spojení se serverem selhalo.'); }
     setBusy(null);
   };
@@ -151,6 +154,7 @@ export default function StaffInbox({ compact = false, onToast }: { compact?: boo
       else if (status === 'declined') toast('Objednávka odmítnuta — host dostane zprávu.');
       else toast('Objednávka přijata.');
       await reload();
+      onZmena?.();
     } catch (e) { toast(apiMessage(e, 'Nepovedlo se.')); }
     setBusy(null);
   };

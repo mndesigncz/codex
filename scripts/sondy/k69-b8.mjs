@@ -71,6 +71,11 @@ const podvrh = (req, json, stav) => {
     (stav.rezervace ??= []).push(b);
     return json({ ok: true, status: b.status ?? 'confirmed' });
   }
+  // Skupiny u člena (Zákazníci): jen dotaz s customerId, seznam skupin ve Věrnosti jde dál na fixtury.
+  if (path === '/api/client/admin/groups' && (m === 'PATCH' || url.searchParams.has('customerId'))) {
+    if (m === 'PATCH') { (stav.skupiny ??= []).push(req.postDataJSON()); return json({ ok: true }); }
+    return json({ groups: [{ id: 5, name: 'Stálí hosté' }], customerGroupIds: [] });
+  }
   if (path === '/api/client/admin/loyalty' && m === 'POST') { (stav.body ??= []).push(req.postDataJSON()); return json({ points: 370 }); }
   if (path === '/api/events' && m === 'GET') return json(akce());
   if (/^\/api\/events\/\d+$/.test(path) && m === 'PATCH') { (stav.akce ??= []).push({ id: Number(path.split('/').pop()), ...req.postDataJSON() }); return json({ ok: true }); }
@@ -260,8 +265,15 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   await otevri(p, CLIENT('orders'), 'vedeni.klient_objednavky');
   tvrdi('O1: h1 „Objednávky" a nástroj s novou objednávkou', (await h1(p)).text === 'Objednávky' && await widgetLi(p, 'nastroj').getByText('Nová objednávka od stolu').isVisible());
   tvrdi('O1: „Přijmout" je tmavé, na ploše žádná limetka', await limetek(p) === 0);
+  const predPrijetim = Date.now();
   await widgetLi(p, 'nastroj').getByRole('button', { name: 'Přijmout: U okna, Jana Dvořáková' }).click();
   tvrdi('O-W: „Přijmout" pošle PATCH { id: 71, status: confirmed }', await dokud(() => (stav.prijem ?? []).some(b => b.id === 71 && b.status === 'confirmed'), 2000), JSON.stringify(stav.prijem));
+  // Odznaky „Objednávky N" v doku a „N k vyřízení" čtou souhrn — po vyřízení se musí načíst znovu.
+  const souhrnPo = (od) => dotazyNa(stav, ['/api/client/admin/summary'], od).filter(d => d.m === 'GET').length;
+  tvrdi('O-S: po přijetí objednávky se souhrn (odznaky) načte znovu', await dokud(() => souhrnPo(predPrijetim) > 0, 2000), `${souhrnPo(predPrijetim)}×`);
+  const predZalozkou = Date.now();
+  await zalozka(p, /Rezervace/).click();
+  tvrdi('O-S: přepnutí záložky souhrn obnoví (jako dřív useEffect na tab)', await dokud(() => souhrnPo(predZalozkou) > 0, 2000), `${souhrnPo(predZalozkou)}×`);
   await p.screenshot({ path: OUT + 'k69-b8-objednavky-desk.png', fullPage: true });
   tvrdi('O: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
@@ -298,6 +310,25 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   await dokud(async () => !(await vUpravach(p)), 1500);
   tvrdi('Z7: rozepsaný nadpis zprávy přežil úpravy', await nastroj.getByLabel('Nadpis').inputValue() === 'Degustace nových čajů');
   tvrdi('Z: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+{
+  // Z-S: role se zakaznici.skupiny bez vernost.zobrazit zařadí hosta do skupiny; deník bodů se nenačítá.
+  const SKUPINY = mine(['klient.prehled', 'zakaznici.zobrazit', 'zakaznici.skupiny'],
+    { klic: null, roleId: 9, nazev: 'Správa hostů', typ: 'vedeni', jeVlastnik: false });
+  const { ctx, p, stav } = await kontext({ fix: nacti('k69-b8-rozlozeni-zakaznici'), mineData: SKUPINY, dalsi: podvrh });
+  await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
+  const nastroj = widgetLi(p, 'nastroj');
+  const tlacitko = nastroj.getByRole('button', { name: 'Skupiny', exact: true }).first();
+  tvrdi('Z-S: bez vernost.zobrazit je u člena „Skupiny" (dřív „Deník" jen s věrností)', await dokud(() => tlacitko.isVisible(), 5000)
+    && await nastroj.getByRole('button', { name: 'Deník', exact: true }).count() === 0);
+  await tlacitko.click();
+  const stitek = nastroj.getByRole('button', { name: 'Stálí hosté' });
+  tvrdi('Z-S: …rozbalí štítky skupin', await dokud(() => stitek.isVisible(), 2000));
+  await stitek.click();
+  tvrdi('Z-S: …a klepnutí pošle PATCH /groups s přidáním hosta', await dokud(() => (stav.skupiny ?? []).some(b => b.id === 5 && Array.isArray(b.add) && b.add.length === 1), 2000), JSON.stringify(stav.skupiny));
+  tvrdi('Z-S: deník bodů (/api/client/admin/loyalty) se bez vernost.zobrazit nevolá', dotazyNa(stav, ['/api/client/admin/loyalty']).length === 0);
   await ctx.close();
 }
 
@@ -361,6 +392,34 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   await p.screenshot({ path: OUT + 'k69-b8-akce-desk.png', fullPage: true });
   await prip.getByRole('checkbox', { name: 'Prodlužovací kabel' }).click();
   tvrdi('A-W: odškrtnutí pošle PATCH /api/events/4 s bodem hotovým', await dokud(() => (stav.akce ?? []).some(b => b.id === 4 && b.checklist?.[1]?.done === true && b.checklist?.[0]?.done === true), 2000), JSON.stringify(stav.akce));
+
+  // A-K: detail akce je jedno okno; potvrzení je jeho druhý krok — Tab dojde na „Smazat",
+  // Escape vrátí jen do detailu. Hlášky přes Toast, žádný nativní dialog (alert/confirm).
+  let nativni = false;
+  p.on('dialog', d => { nativni = true; void d.dismiss(); });
+  const fokus = () => p.evaluate(() => ({ text: document.activeElement?.textContent?.trim() ?? '', vOkne: !!document.activeElement?.closest('[role="dialog"]') }));
+  await nastroj.getByRole('button', { name: /Výjezd na farmářský trh/ }).click();
+  const detail = p.getByRole('dialog', { name: 'Výjezd na farmářský trh' });
+  tvrdi('A-K: detail akce se otevře jako okno (Modal)', await dokud(() => detail.isVisible(), 2000));
+  tvrdi('A-K: v detailu je jedno okno (ne ruční překryv vedle <Modal>)', await p.locator('.modal-overlay').count() === 1);
+  await detail.getByRole('button', { name: 'Oznámit týmu' }).click();
+  tvrdi('A-K: „Oznámit týmu" pošle PATCH a ukáže Toast, ne alert()', await dokud(() => (stav.akce ?? []).some(b => b.id === 4 && b.publishToTeam === true), 2000)
+    && await dokud(() => p.getByText('Tým dostal notifikaci o akci.').isVisible(), 2000) && !nativni);
+  await detail.getByRole('button', { name: 'Smazat akci' }).click();
+  const potvrzeni = p.getByRole('dialog', { name: 'Smazat akci „Výjezd na farmářský trh"?' });
+  tvrdi('A-K: „Smazat akci" otevře potvrzení (bez confirm())', await dokud(() => potvrzeni.isVisible(), 2000) && !nativni && await p.locator('.modal-overlay').count() === 1);
+  tvrdi('A-K: fokus v potvrzení je na „Zrušit"', await dokud(async () => (await fokus()).text === 'Zrušit', 1500), JSON.stringify(await fokus()));
+  await p.keyboard.press('Tab');
+  tvrdi('A-K: Tab dojde na „Smazat"', (await fokus()).text === 'Smazat', JSON.stringify(await fokus()));
+  for (let i = 0; i < 4; i++) await p.keyboard.press('Tab');
+  tvrdi('A-K: Tab neuteče z okna', (await fokus()).vOkne, JSON.stringify(await fokus()));
+  await p.keyboard.press('Escape');
+  tvrdi('A-K: Escape zavře jen potvrzení, detail zůstane', await dokud(async () => !(await potvrzeni.isVisible()) && await detail.isVisible(), 1500));
+  tvrdi('A-K: …a fokus se vrátí na „Smazat akci"', await dokud(async () => (await fokus()).text === 'Smazat akci', 1500), JSON.stringify(await fokus()));
+  tvrdi('A-K: nic se nesmazalo', dotazyNa(stav, ['/api/events/4']).every(d => d.m !== 'DELETE'));
+  await p.keyboard.press('Escape');
+  tvrdi('A-K: druhý Escape zavře detail', await dokud(async () => !(await detail.isVisible()), 1500));
+
   await upravit(p).click();
   await dokud(() => vUpravach(p), 1500);
   await lista(p).getByRole('button', { name: 'Přidat widget' }).click();

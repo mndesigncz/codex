@@ -385,6 +385,8 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
     } finally {
       setPracuji(null);
       reload();
+      // Odznak „Objednávky N" v doku Clientu čte souhrn — bez obnovy by svítil dál.
+      obnovDataWidgetu('/api/client/admin/summary');
     }
   };
 

@@ -23,7 +23,7 @@
 //    layout by jinak jen přepsal výchozí záložku, kterou komponenta čte
 //    jednou při připojení, a proklik z widgetu by nikam nevedl.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import {
@@ -84,6 +84,8 @@ const NAV_SECTIONS: { title: string | null; ids: Tab[] }[] = [
 const DOCK: Tab[] = ['overview', 'reservations', 'orders'];
 
 const URL_SOUHRN = '/api/client/admin/summary';
+/** Jak často skořápka obnoví odznaky (stejný rytmus jako příjem objednávek ve StaffInbox). */
+const OBNOVA_SOUHRNU_MS = 20_000;
 const URL_REZERVACE_DNES = '/api/client/admin/reservations?range=today';
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
@@ -136,6 +138,20 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
 
   const souhrn = useDataWidgetu(URL_SOUHRN, vyberSouhrnSkorapky).data;
   const obnovSouhrn = useCallback(() => obnovDataWidgetu(URL_SOUHRN), []);
+  // Odznaky v doku a „N k vyřízení" musí žít i mimo Přehled: nová objednávka od
+  // stolu přijde, zatímco vedoucí stojí na Rezervacích nebo Stolech. Mezipaměť
+  // widgetů po připojení sama znovu nenačítá, proto obnova při každé změně
+  // záložky (jako dřív) a na viditelné kartě jednou za čas (jako příjem objednávek).
+  const minulaZalozka = useRef(tab);
+  useEffect(() => {
+    if (minulaZalozka.current === tab) return;
+    minulaZalozka.current = tab;
+    obnovSouhrn();
+  }, [tab, obnovSouhrn]);
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') obnovSouhrn(); }, OBNOVA_SOUHRNU_MS);
+    return () => clearInterval(t);
+  }, [obnovSouhrn]);
   const [hlaska, setHlaska] = useState<{ text: string; ton: 'ok' | 'bad' } | null>(null);
   const oznam: Hlaska = useCallback((text, ton = 'ok') => setHlaska({ text, ton }), []);
   // Jméno hosta z rezervace otevře Zákazníky s předvyplněným hledáním.
@@ -235,10 +251,10 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
               <ErrorBoundary resetKey={tab} title={`${aktivni.label}: tahle část se nenačetla`}>
                 {tab === 'overview' && <PrehledClientu zapnuto={souhrn?.zapnuto ?? null} slug={souhrn?.slug ?? null} prejdi={prejdi} />}
                 {tab === 'reservations' && <RezervaceStranka oznam={oznam} onZmena={obnovSouhrn} otevriHosta={moje.some(t => t.id === 'customers') ? otevriHosta : undefined} />}
-                {tab === 'orders' && <ObjednavkyStranka oznam={oznam} />}
+                {tab === 'orders' && <ObjednavkyStranka oznam={oznam} onZmena={obnovSouhrn} />}
                 {tab === 'tables' && <StolyStranka oznam={oznam} />}
                 {tab === 'menu' && <MenuEditor />}
-                {tab === 'events' && <EventsView user={(user ?? {}) as { id?: string }} />}
+                {tab === 'events' && <EventsView user={(user ?? {}) as { id?: string }} oznam={oznam} />}
                 {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} />}
                 {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<Promos oznam={oznam} />} />}
                 {tab === 'brand' && <div className="p-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
@@ -445,7 +461,7 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
 
 // ---- Objednávky -----------------------------------------------------------------
 
-function ObjednavkyStranka({ oznam }: { oznam: Hlaska }) {
+function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void }) {
   return (
     <PlochaWidgetu
       stranka="vedeni.klient_objednavky"
@@ -454,7 +470,7 @@ function ObjednavkyStranka({ oznam }: { oznam: Hlaska }) {
         hintId: 'clientadmin-1',
         subtitle: 'Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body.',
       }}
-      nastroj={<StaffInbox onToast={t => oznam(t)} />}
+      nastroj={<StaffInbox onToast={t => oznam(t)} onZmena={onZmena} />}
     />
   );
 }
@@ -638,6 +654,10 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
   const { ma: smi } = useOpravneni();
   const upravujeBody = smi('vernost.upravit_body');
   const vidiDenik = smi('vernost.zobrazit');
+  // Skupiny člena bydlí ve stejné jamce jako deník, ale nesmí na věrnosti záviset:
+  // role se zakaznici.skupiny bez vernost.zobrazit jinde hosta do skupiny nepřidá.
+  const meniSkupiny = smi('zakaznici.skupiny');
+  const rozbali = vidiDenik || meniSkupiny;
   const [q, setQ] = useState(hledat);
   useEffect(() => { setQ(hledat); }, [hledat]);
   // Hledání se ptá serveru (výsledky přes 500 členů) — s krátkou prodlevou, ať se neptá na každé písmeno.
@@ -689,13 +709,13 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
                       value={<>{c.points.toLocaleString('cs-CZ')} <span className="text-xs font-medium text-black/50">b.</span></>}
                       valueMeta={`${c.stamps} raz. · ${c.visits} návšt.`}
                       aside={<>{c.reservations} rez.{c.open_coupons ? ` · ${c.open_coupons} kup.` : ''}</>}
-                      actions={(upravujeBody || vidiDenik) ? (
+                      actions={(upravujeBody || rozbali) ? (
                         <>
                           {upravujeBody && <Button size="sm" variant="secondary" onClick={() => setUpravuji({ c, delta: '', poznamka: '' })} aria-label={`Upravit body: ${c.name}`}>Body ±</Button>}
-                          {vidiDenik && <Button size="sm" variant="ghost" aria-expanded={otevreny === c.id} onClick={() => setOtevreny(otevreny === c.id ? null : c.id)}>{otevreny === c.id ? 'Skrýt' : 'Deník'}</Button>}
+                          {rozbali && <Button size="sm" variant="ghost" aria-expanded={otevreny === c.id} onClick={() => setOtevreny(otevreny === c.id ? null : c.id)}>{otevreny === c.id ? 'Skrýt' : vidiDenik ? 'Deník' : 'Skupiny'}</Button>}
                         </>
                       ) : undefined} />
-                    {otevreny === c.id && <DenikClena key={verzeDeniku} customerId={c.id} oznam={oznam} />}
+                    {otevreny === c.id && <DenikClena key={verzeDeniku} customerId={c.id} oznam={oznam} vidiDenik={vidiDenik} />}
                   </li>
                 );
               })}
@@ -725,12 +745,14 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
 }
 
 /** Deník bodů a skupiny člena — jamka pod řádkem (dřív jamka s rámečkem navíc a ruční štítek verzálkami). */
-function DenikClena({ customerId, oznam }: { customerId: number; oznam: Hlaska }) {
-  const { data: denik } = useLoad<any[]>(`/api/client/admin/loyalty?customerId=${customerId}`, raw => (Array.isArray(raw?.ledger) ? raw.ledger : []));
+function DenikClena({ customerId, oznam, vidiDenik }: { customerId: number; oznam: Hlaska; vidiDenik: boolean }) {
+  // Deník bodů jen s vernost.zobrazit — bez něj by GET skončil 403 (widget bez oprávnění nevolá).
+  const { data: denik } = useLoad<any[]>(vidiDenik ? `/api/client/admin/loyalty?customerId=${customerId}` : null, raw => (Array.isArray(raw?.ledger) ? raw.ledger : []));
   return (
     <Well className="mb-3 space-y-3">
-      <SkupinyClena customerId={customerId} oznam={oznam} />
-      {denik === null ? <Skeleton className="h-10" />
+      <SkupinyClena customerId={customerId} oznam={oznam} prazdne={!vidiDenik} />
+      {!vidiDenik ? null
+        : denik === null ? <Skeleton className="h-10" />
         : denik.length === 0 ? <p className="t-meta">Deník je prázdný.</p>
         : (
           <ul className="list">
@@ -745,7 +767,7 @@ function DenikClena({ customerId, oznam }: { customerId: number; oznam: Hlaska }
 }
 
 /** Štítky skupin u člena: klepnutím se host do skupiny přidá / odebere. Jen se zakaznici.skupiny. */
-function SkupinyClena({ customerId, oznam }: { customerId: number; oznam: Hlaska }) {
+function SkupinyClena({ customerId, oznam, prazdne = false }: { customerId: number; oznam: Hlaska; prazdne?: boolean }) {
   const { ma: smi } = useOpravneni();
   const meni = smi('zakaznici.skupiny');
   const [skupiny, setSkupiny] = useState<{ id: number; name: string }[] | null>(null);
@@ -754,7 +776,9 @@ function SkupinyClena({ customerId, oznam }: { customerId: number; oznam: Hlaska
   const load = useCallback(() => fetch(`/api/client/admin/groups?customerId=${customerId}`).then(okJson)
     .then(d => { setSkupiny(d.groups ?? []); setMoje(d.customerGroupIds ?? []); }).catch(() => setSkupiny([])), [customerId]);
   useEffect(() => { load(); }, [load]);
-  if (skupiny === null || skupiny.length === 0) return null;
+  // Bez deníku je jamka jen pro skupiny — prázdná by jen zmizela, tak řekne proč.
+  if (skupiny === null) return prazdne ? <Skeleton className="h-8" /> : null;
+  if (skupiny.length === 0) return prazdne ? <p className="t-meta">Zatím žádné skupiny. Založíš je ve Věrnosti.</p> : null;
   const prepni = async (g: { id: number; name: string }) => {
     const je = moje.includes(g.id);
     setBusy(g.id);
