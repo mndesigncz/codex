@@ -15,6 +15,7 @@ import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
+import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -84,7 +85,7 @@ interface Props {
 
 export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
-  const { ma } = useOpravneni();
+  const { ma, opravneni, nacteno } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   // Deep links from notifications: /employee/shifts?view=X
   useEffect(() => {
@@ -153,7 +154,14 @@ export default function EmployeeLayout({ user }: Props) {
     .map(sec => ({ title: sec.title, items: sec.ids.map(id => mojeById[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
     .filter(g => g.items.length);
 
+  // Navigace pro widgety na ploše (kolo 68, spec §2.6): proklik z widgetu vede
+  // jen na pohled, který zaměstnanecký layout zná a kam divák smí — smiPohled
+  // pro neznámé id vrací ano (null = každý), proto ještě kontrola seznamu.
+  const smiPohledZWidgetu = (pohled: string) => (byId[pohled] != null || pohled === 'settings') && smiPohled(pohled);
+  const navigaceWidgetu = useHodnotaNavigace(navigate, smiPohledZWidgetu, mojeNav, [opravneni, nacteno]);
+
   return (
+    <NavigaceKontext.Provider value={navigaceWidgetu}>
     <div className="flex h-[100dvh] overflow-hidden">
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
@@ -176,7 +184,8 @@ export default function EmployeeLayout({ user }: Props) {
             return (
               <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
                 {sec.title && (sidebarOpen
-                  ? <p className="px-3.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>
+                  // Štítek skupiny jako všude jinde (t-label), ne ručně psaný (audit kola 68, rám).
+                  ? <p className="t-label px-3.5 pb-1.5">{sec.title}</p>
                   : <div className="mx-3 mb-1.5 h-px bg-black/[0.07]" />
                 )}
                 <div className="space-y-0.5">
@@ -300,5 +309,6 @@ export default function EmployeeLayout({ user }: Props) {
         ]}
       />
     </div>
+    </NavigaceKontext.Provider>
   );
 }

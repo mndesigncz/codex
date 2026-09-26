@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
 import { Icon } from './Icons';
-import { EmptyState, Button, Hint, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
+import { EmptyState, Button, Hint, Skeleton, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
@@ -18,8 +18,10 @@ import dynamic from 'next/dynamic';
 // Editor rolí nese celý katalog oprávnění (přes sto šedesát položek
 // s popisy) — stahuje se, až když ho někdo otevře, ne s každým Nastavením.
 const RoleEditor = dynamic(() => import('./role/RoleEditor'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
+// Výchozí rozložení stránek (kolo 68) nese plochu s editorem úprav — taky až na otevření.
+const VychoziRozlozeni = dynamic(() => import('./widgety/VychoziRozlozeni'), { loading: () => <Skeleton className="h-48 rounded-3xl" /> });
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles';
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles' | 'stranky';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -122,6 +124,8 @@ export default function Settings({ user, initialTab }: Props) {
     ...(isEmployer && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
     ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
     ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
+    // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
+    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: 'Stránky', icon: 'overview', desc: 'Výchozí plocha a zámky' }] : []),
     ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
   ];
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
@@ -825,6 +829,8 @@ export default function Settings({ user, initialTab }: Props) {
             </div>
           ) : section === 'roles' ? (
             <RoleEditor />
+          ) : section === 'stranky' ? (
+            <VychoziRozlozeni />
           ) : section === 'audit' ? (
             <div className="glass-card p-6">
               <h3 className={cardTitle}>Historie změn</h3>
