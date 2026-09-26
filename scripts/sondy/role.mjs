@@ -46,7 +46,9 @@ async function kontext(viewport, { mineData = VLASTNIK, roles = ROLE, postRoles,
 }
 async function otevriRole(p) {
   await p.goto('http://localhost:3000/employer/overview?view=settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
-  await p.getByRole('button', { name: /Role a oprávnění/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(900);
+  // Na telefonu jsou sekce Nastavení posuvný pás záložek (Segmented), na
+  // počítači seznam tlačítek — sonda bere obojí.
+  await p.getByRole('button', { name: /Role a oprávnění/ }).or(p.getByRole('tab', { name: /Role a oprávnění/ })).filter({ visible: true }).first().click(); await p.waitForTimeout(900);
 }
 const prepinac = (p, nazev) => p.getByRole('switch', { name: nazev, exact: true });
 
