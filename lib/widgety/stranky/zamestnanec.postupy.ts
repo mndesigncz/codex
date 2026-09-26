@@ -1,5 +1,6 @@
-// Stránka „Postupy" (zaměstnanec). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true)
-// a doporučené i výchozí rozložení upřesní balík B6b v kole 69.
+// Stránka „Postupy" (zaměstnanec). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B6b)
+// plochu zapnulo. Nástroj = seznam postupů ke spuštění (components/procedures/Procedures.tsx);
+// „Moje průběhy" pod ním jsou widget postupy.posledni_prubehy (bez postupy.prubehy_tymu jen vlastní).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -18,5 +19,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'postupy.posledni_prubehy', s: 'L' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

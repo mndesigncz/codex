@@ -1,21 +1,53 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, type JSX } from 'react';
+// Návody: jak se co dělá — s kroky, na baru po ruce.
+//
+// Kolo 69 (balík B6b): stránka je plocha s widgety. Hlavička jde do PlochaWidgetu,
+// pás návrhů je widget navody.navrhy, povinné čtení má souhrn ve widgetu
+// navody.povinne_cteni a „kdo četl" ve widgetu navody.kdo_necetl (oblasti/navody.tsx).
+// Tahle komponenta kreslí nástroj: kategorie, hledání, seznam, čtečku, editor
+// a správu kategorií. Data čte přes useDataWidgetu ze stejných adres jako
+// widgety — po schválení nebo potvrzení přečtení se obnoví obojí zároveň.
+//
+// Co se změnilo proti kolu 68 (audit final_sorted.json, obsah-kontrola.txt):
+//  - boční karta kategorií s vybranou položkou limetkově tónovanou a ručním štítkem
+//    verzálkami → filtrovací pás (filter-pill, vybráno inkoustem) nad seznamem;
+//  - mřížka karet, které při hoveru šedly a dostaly limetkový okraj → seznam v jedné kartě;
+//  - štítky kategorie v limetkovém (stavovém) tónu, ruční pilulky „povinné čtení",
+//    „checklist" a „Čeká na schválení" → Chip;
+//  - Upravit/Smazat pod myší s inline SVG → „···" vždy vidět; confirm() → Modal;
+//  - čtečka, editor a správa kategorií ručně psanými okny → Modal; akce čtečky
+//    (povinné čtení, připnutí k uzávěrce, kdo četl, upravit, smazat) do „···";
+//  - `<option className="bg-neutral-900">` (tmavé položky výběru ve světlém režimu) pryč;
+//  - kdo co smí, se čte z oprávnění (navody.vytvorit/upravit/mazat/schvalovat/
+//    povinne_cteni/kategorie), ne z typu účtu.
+//
+// Tablet (KioskApp) plochu nemá — kreslí nástroj s vlastní hlavičkou jako dřív.
+
+import { useState, useEffect, useMemo, useCallback, useId, useRef, type JSX } from 'react';
+import { usePathname } from 'next/navigation';
 import { Icon } from './Icons';
-import { EmptyState, Button, PageHeader , SearchField, ApproveAllBar, runBulk, ErrorState } from './ui';
+import {
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader, SearchField, Select,
+  Skeleton, SwitchRow, Textarea, type MenuItem,
+} from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import GuideItemLink from './guides/GuideItemLink';
-import { useModal } from '@/lib/useModal';
-import { clickable } from '@/lib/clickable';
 import { okJson, apiMessage } from '@/lib/api';
-import { czCount, KATEGORIE } from '@/lib/czech';
-import { DiscardGuard } from './ui/DiscardGuard';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { czCount, KATEGORIE, type CzNoun } from '@/lib/czech';
+import { obsahujeNekde } from '@/lib/hledani';
 import KopieZPodniku, { useJinePodniky } from './organizace/KopieZPodniku';
+import { PlochaWidgetu, type HlavickaPlochy } from './widgety/PlochaWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
+import { useSmi } from './widgety/NavigaceKontext';
+import { useOpravneni } from './role/useOpravneni';
+import {
+  URL_NAVODY, URL_CTENARI, UDALOST_OTEVRIT_NAVOD, vyberNavody, poctyKategorii, kdyUpraveno, type NavodApi,
+} from '@/lib/navodyPrehled';
 
 interface User {
   id: number;
@@ -36,23 +68,6 @@ interface Category {
   spravuje?: string | null;
 }
 
-interface GuideSummary {
-  id: number;
-  title: string;
-  categoryId: number | null;
-  updatedAt: string;
-  excerpt: string;
-  hasChecklist: boolean;
-  approved?: boolean;
-  submittedBy?: number | null;
-  requireRead?: boolean;
-  readCount?: number;
-  myRead?: boolean;
-  itemId?: number | null;
-  /** Ukazuje se u kroku „Kontrola kasy" v uzávěrce. */
-  forClosing?: boolean;
-}
-
 interface GuideFull {
   id: number;
   title: string;
@@ -62,7 +77,15 @@ interface GuideFull {
   updatedAt: string;
   createdAt?: string;
   author?: string;
+  productId?: string | null;
+  productName?: string | null;
+  itemId?: number | null;
+  itemName?: string | null;
+  itemMadeInHouse?: boolean;
 }
+
+const URL_KATEGORIE = '/api/guides/categories';
+const KROK: CzNoun = { one: 'krok', few: 'kroky', many: 'kroků' };
 
 // Replaces the removed Recipes feature — recipes now live as guides under "Recepty & Menu".
 const DEFAULT_CATEGORIES = [
@@ -72,12 +95,21 @@ const DEFAULT_CATEGORIES = [
   { name: 'Zákaznický servis', icon: 'chat' },
 ];
 
-const CATEGORY_ICONS = ['book', 'leaf', 'check', 'box', 'chat', 'users', 'clock', 'calendar', 'trend', 'warning'];
+const CATEGORY_ICONS: { id: string; nazev: string }[] = [
+  { id: 'book', nazev: 'Kniha' }, { id: 'leaf', nazev: 'List' }, { id: 'check', nazev: 'Fajfka' }, { id: 'box', nazev: 'Krabice' },
+  { id: 'chat', nazev: 'Bublina' }, { id: 'users', nazev: 'Lidé' }, { id: 'clock', nazev: 'Hodiny' }, { id: 'calendar', nazev: 'Kalendář' },
+  { id: 'trend', nazev: 'Graf' }, { id: 'warning', nazev: 'Výstraha' },
+];
 
 function formatDate(iso: string) {
   if (!iso) return '';
   const d = new Date(iso);
-  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+}
+
+function vyberKategorie(raw: any): Category[] {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.categories)) throw new Error('Kategorie přišly v nečekaném tvaru.');
+  return raw.categories;
 }
 
 // Lightweight markdown-ish renderer: **bold**, "- " bullets, preserved line breaks.
@@ -89,12 +121,9 @@ function renderContent(content: string) {
   const flushBullets = (key: string) => {
     if (bullets.length === 0) return;
     blocks.push(
-      <ul key={key} className="my-2 space-y-1.5">
+      <ul key={key} className="my-2 space-y-1.5 list-disc pl-5 marker:text-black/35">
         {bullets.map((b, i) => (
-          <li key={i} className="flex items-start gap-2 text-black/80">
-            <span className="text-[#5B7A08] mt-1.5 leading-none">•</span>
-            <span>{renderInline(b)}</span>
-          </li>
+          <li key={i} className="text-black/80">{renderInline(b)}</li>
         ))}
       </ul>
     );
@@ -139,64 +168,47 @@ function renderInline(text: string) {
 export default function Guides({ user, ticksFor, openGuideId }: {
   user: User;
   ticksFor?: number | null;
-  /** Otevřít rovnou tenhle návod — proklik z receptury, ze skladu nebo z úkolu. */
+  /** Otevřít rovnou tenhle návod — proklik z receptury, ze skladu, z úkolu nebo z widgetu. */
   openGuideId?: number | null;
 }) {
-  const isEmployer = user.role === 'employer';
-  const [approvingAll, setApprovingAll] = useState(false);
-  const [approveNote, setApproveNote] = useState('');
+  const pathname = usePathname() ?? '';
+  const { role } = useOpravneni();
+  // Tablet nemá plochu (kiosk.smena je jiná stránka, balík B9) — nástroj s vlastní hlavičkou.
+  const tablet = pathname.startsWith('/kiosk') || user.role === 'kiosk' || role?.typ === 'kiosk';
+  const stranka = pathname.startsWith('/employer') ? 'vedeni.navody' : 'zamestnanec.navody';
+  const smi = useSmi();
+  const smiVytvorit = smi('navody.vytvorit');
+  const smiNavrhnout = smi('navody.navrhnout');
+  const smiUpravit = smi('navody.upravit');
+  const smiMazat = smi('navody.mazat');
+  const smiSchvalovat = smi('navody.schvalovat');
+  const smiPovinne = smi('navody.povinne_cteni');
+  const smiKategorie = smi('navody.kategorie');
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [guides, setGuides] = useState<GuideSummary[]>([]);
-  const pendingGuides = guides.filter(g => g.approved === false);
-  const [loading, setLoading] = useState(true);
+  const navody = useDataWidgetu(URL_NAVODY, vyberNavody);
+  const kategorie = useDataWidgetu(URL_KATEGORIE, vyberKategorie);
+  const guides = navody.data ?? [];
+  const categories = kategorie.data ?? [];
+
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [chyba, setChyba] = useState('');
 
   // Reader / editor modals
   const [reader, setReader] = useState<GuideFull | null>(null);
-  const readerModal = useModal(!!reader, () => setReader(null), 'Návod');
   const [readerLoading, setReaderLoading] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<GuideFull | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const [creatingCat, setCreatingCat] = useState(false);
-  // Kopie z jiného podniku organizace — tlačítko jen vedení a jen když
-  // takový podnik existuje; jinak by vedlo do prázdna.
+  const [smazat, setSmazat] = useState<{ id: number; title: string } | null>(null);
+  const [mazu, setMazu] = useState(false);
+  // Kopie z jiného podniku organizace — jen s právem zakládat a jen když takový podnik existuje.
   const [kopieOpen, setKopieOpen] = useState(false);
-  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(isEmployer);
+  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(smiVytvorit);
 
-  const [loadErr, setLoadErr] = useState('');
-  const [reloadTick, setReloadTick] = useState(0);
-  // U kterého návodu má vedení rozbalený seznam „kdo četl".
-  const [ctenariFor, setCtenariFor] = useState<number | null>(null);
-
-  const loadCategories = useCallback(async () => {
-    const d = await fetch('/api/guides/categories').then(okJson);
-    if (Array.isArray(d.categories)) setCategories(d.categories);
-  }, []);
-
-  const approveGuide = async (id: number) => {
-    const res = await fetch(`/api/guides/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approve: true }),
-    });
-    if (!res.ok) throw new Error('nepovedlo se');
-  };
-
-  const loadGuides = useCallback(async () => {
-    const d = await fetch('/api/guides').then(okJson);
-    if (Array.isArray(d.guides)) setGuides(d.guides);
-  }, []);
-
-  useEffect(() => {
-    setLoadErr('');
-    Promise.all([loadCategories(), loadGuides()])
-      // Bez tohohle catch skončil výpadek sítě nezachyceným slibem a obrazovka
-      // pak tvrdila „Zatím žádné návody" — přesně opačně, než jak to bylo.
-      .catch(e => setLoadErr(apiMessage(e, 'Návody se nenačetly.')))
-      .finally(() => setLoading(false));
-  }, [loadCategories, loadGuides, reloadTick]);
+  const reloadGuides = useCallback(() => { obnovDataWidgetu(URL_NAVODY); obnovDataWidgetu(URL_CTENARI); }, []);
+  const reloadCategories = useCallback(() => { obnovDataWidgetu(URL_KATEGORIE); }, []);
 
   const catById = useMemo(() => {
     const m = new Map<number, Category>();
@@ -204,26 +216,13 @@ export default function Guides({ user, ticksFor, openGuideId }: {
     return m;
   }, [categories]);
 
-  const counts = useMemo(() => {
-    const m = new Map<number | 'all', number>();
-    m.set('all', guides.length);
-    guides.forEach((g) => {
-      const k = g.categoryId ?? -1;
-      m.set(k, (m.get(k) || 0) + 1);
-    });
-    return m;
-  }, [guides]);
+  const counts = useMemo(() => poctyKategorii(guides), [guides]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return guides.filter((g) => {
-      if (activeCat === 'all') {
-        // no-op
-      } else if (activeCat === -1) {
-        if (g.categoryId != null) return false;
-      } else if (g.categoryId !== activeCat) {
-        return false;
-      }
+      if (activeCat === -1) { if (g.categoryId != null) return false; }
+      else if (activeCat !== 'all' && g.categoryId !== activeCat) return false;
       if (!q) return true;
       return obsahujeNekde(q, g.title, g.excerpt);
     });
@@ -231,492 +230,375 @@ export default function Guides({ user, ticksFor, openGuideId }: {
 
   const hasUncategorized = useMemo(() => guides.some((g) => g.categoryId == null), [guides]);
 
-  const openReader = async (id: number) => {
+  const openReader = useCallback(async (id: number) => {
     setReaderLoading(true);
     setReader({ id, title: '', content: '', checklist: [], categoryId: null, updatedAt: '' });
     try {
       const d = await fetch(`/api/guides/${id}`).then(okJson);
       if (d.guide) setReader({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
       else setReader(null);
-    } catch {
+    } catch (e) {
       // A dead network must not leave the reader on an endless spinner.
       setReader(null);
+      setChyba(apiMessage(e, 'Návod se nepodařilo otevřít.'));
     } finally {
       setReaderLoading(false);
     }
-  };
+  }, []);
 
-  // Proklik na konkrétní návod otevře rovnou čtečku. Odkaz
-  // `?view=guides&guide=12` se z receptur generoval už dřív, ale nikdo ho
-  // nečetl — člověk skončil na seznamu a svůj návod hledal znovu ručně.
-  // Ref hlídá, aby se čtečka po zavření sama znovu neotevřela.
+  // Proklik na konkrétní návod otevře rovnou čtečku. Ref hlídá, aby se čtečka
+  // po zavření sama znovu neotevřela.
   const otevrenoZOdkazu = useRef<number | null>(null);
   useEffect(() => {
     if (!openGuideId || otevrenoZOdkazu.current === openGuideId) return;
     otevrenoZOdkazu.current = openGuideId;
-    openReader(openGuideId);
-    // openReader má při každém renderu jinou identitu; hlídá to ref výš.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openGuideId]);
+    void openReader(openGuideId);
+  }, [openGuideId, openReader]);
+
+  // Widgety (Povinné čtení, Nové, Kdo nečetl…) otevírají čtečku tady — bez přechodu jinam.
+  useEffect(() => {
+    const f = (e: Event) => {
+      const d = (e as CustomEvent<{ id: number; prijato: boolean }>).detail;
+      if (!d) return;
+      d.prijato = true;
+      void openReader(d.id);
+    };
+    window.addEventListener(UDALOST_OTEVRIT_NAVOD, f);
+    return () => window.removeEventListener(UDALOST_OTEVRIT_NAVOD, f);
+  }, [openReader]);
 
   const createDefaults = async () => {
-    setCreatingCat(true);
+    setCreatingCat(true); setChyba('');
     // Smyčka bez kontroly mlčky založila jen část kategorií; člověk pak
     // koukal na neúplný seznam a nevěděl, jestli to tak má být.
     let selhalo = 0;
     for (const c of DEFAULT_CATEGORIES) {
       try {
-        const res = await fetch('/api/guides/categories', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(c),
-        });
+        const res = await fetch(URL_KATEGORIE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) });
         if (!res.ok) selhalo += 1;
       } catch { selhalo += 1; }
     }
-    if (selhalo > 0) setLoadErr(`${czCount(selhalo, KATEGORIE)} se nepodařilo založit. Zkus to prosím znovu.`);
-    await loadCategories();
+    if (selhalo > 0) setChyba(`${czCount(selhalo, KATEGORIE)} se nepodařilo založit. Zkus to prosím znovu.`);
+    reloadCategories();
     setCreatingCat(false);
   };
 
-  const openEditor = (g?: GuideFull) => {
-    setEditing(g ?? null);
-    setEditorOpen(true);
-  };
-
-  const closeEditor = () => {
-    setEditorOpen(false);
-    setEditing(null);
-  };
-
-  const afterSave = async () => {
-    await loadGuides();
-    closeEditor();
-  };
-
-  const deleteGuide = async (id: number) => {
-    if (!confirm('Opravdu smazat tento návod?')) return;
-    // Bez téhle kontroly se po nepovedeném smazání jen zavřel čtenář
-    // a seznam se načetl znovu — návod tam pořád byl a nikdo nevěděl proč.
+  const openEditor = (g?: GuideFull) => { setEditing(g ?? null); setEditorOpen(true); };
+  const closeEditor = () => { setEditorOpen(false); setEditing(null); };
+  const editById = async (id: number) => {
+    setChyba('');
     try {
-      const res = await fetch(`/api/guides/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(String(res.status));
-      setReader(null);
-      await loadGuides();
-    } catch {
-      setLoadErr('Návod se nepodařilo smazat. Zkus to prosím znovu.');
+      const d = await fetch(`/api/guides/${id}`).then(okJson);
+      if (d.guide) openEditor({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
+    } catch (e) {
+      setChyba(apiMessage(e, 'Návod se nepodařilo otevřít k úpravě.'));
     }
   };
 
-  return (
-    <div className="p-4 md:p-6">
-      <div className="mb-6">
-      <PageHeader hintId="guides" title="Návody" subtitle="Jak se co dělá — s obrázky, na baru po ruce."
-        primary={user.role !== 'kiosk' && (
-          <>
-            {isEmployer && jinePodniky.length > 0 && (
-              <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
-            )}
-            <Button variant="accent" icon="plus" onClick={() => openEditor()} title={isEmployer ? undefined : 'Návrh schválí vedení'}>
-              {isEmployer ? 'Nový návod' : 'Navrhnout návod'}
-            </Button>
-          </>
-        )} />
-      </div>
+  const deleteGuide = async () => {
+    if (!smazat) return;
+    setMazu(true); setChyba('');
+    // Bez téhle kontroly se po nepovedeném smazání jen zavřel čtenář
+    // a seznam se načetl znovu — návod tam pořád byl a nikdo nevěděl proč.
+    try {
+      const res = await fetch(`/api/guides/${smazat.id}`, { method: 'DELETE' });
+      await okJson(res);
+      if (reader?.id === smazat.id) setReader(null);
+      reloadGuides();
+    } catch (e) {
+      setChyba(apiMessage(e, 'Návod se nepodařilo smazat. Zkus to prosím znovu.'));
+    }
+    setMazu(false);
+    setSmazat(null);
+  };
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar */}
-        <aside className="lg:w-64 flex-shrink-0">
-          <div className="glass-card p-3">
-            <div className="flex items-center justify-between px-2 py-1.5 mb-1">
-              <span className="text-xs uppercase tracking-wider text-black/45 font-medium">Kategorie</span>
-              {isEmployer && categories.length > 0 && (
-                <button
-                  onClick={() => setManageOpen(true)}
-                  className="text-black/45 hover:text-black text-xs transition-colors"
-                  title="Spravovat kategorie"
-                >
-                  Spravovat
-                </button>
-              )}
-            </div>
+  const patchGuide = async (id: number, body: Record<string, unknown>, chybaText: string) => {
+    setChyba('');
+    try {
+      const res = await fetch(`/api/guides/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await okJson(res);
+      reloadGuides();
+    } catch (e) {
+      setChyba(apiMessage(e, chybaText));
+    }
+  };
 
-            <nav className="flex lg:flex-col gap-1 overflow-x-auto scrollbar-thin">
-              <CatButton
-                label="Vše"
-                icon="book"
-                count={counts.get('all') || 0}
-                active={activeCat === 'all'}
-                onClick={() => setActiveCat('all')}
-              />
-              {categories.map((c) => (
-                <CatButton
-                  key={c.id}
-                  label={c.name}
-                  icon={c.icon}
-                  count={counts.get(c.id) || 0}
-                  active={activeCat === c.id}
-                  onClick={() => setActiveCat(c.id)}
-                />
-              ))}
-              {hasUncategorized && (
-                <CatButton
-                  label="Bez kategorie"
-                  icon="box"
-                  count={counts.get(-1) || 0}
-                  active={activeCat === -1}
-                  onClick={() => setActiveCat(-1)}
-                />
-              )}
-            </nav>
+  const smiZakladat = smiVytvorit || smiNavrhnout;
+  const hlavicka: HlavickaPlochy = {
+    title: 'Návody',
+    subtitle: 'Jak se co dělá — krok za krokem, na baru po ruce.',
+    hintId: 'guides',
+    primary: smiZakladat && !tablet ? (
+      <Button variant="accent" icon="plus" onClick={() => openEditor()} title={smiVytvorit ? undefined : 'Návrh schválí vedení'}>
+        {smiVytvorit ? 'Nový návod' : 'Navrhnout návod'}
+      </Button>
+    ) : undefined,
+    secondary: smiVytvorit && jinePodniky.length > 0
+      ? <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+      : undefined,
+    menu: [
+      ...(smiKategorie ? [{ label: 'Spravovat kategorie', icon: 'settings', onClick: () => setManageOpen(true) }] : []),
+      ...(smiVytvorit && jinePodniky.length > 0 ? [{ label: 'Kopírovat z jiného podniku', icon: 'copy', onClick: () => setKopieOpen(true) }] : []),
+    ],
+  };
 
-            {isEmployer && categories.length > 0 && (
-              <button
-                onClick={() => setManageOpen(true)}
-                className="mt-2 w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center gap-2 text-sm transition"
-              >
-                <Icon name="plus" size={16} strokeWidth={2} />
-                Kategorie
-              </button>
-            )}
+  const pilulka = (klic: number | 'all', label: string, n: number) => (
+    <button key={String(klic)} type="button" aria-pressed={activeCat === klic} onClick={() => setActiveCat(klic)}
+      className={`filter-pill tap-target whitespace-nowrap shrink-0 ${activeCat === klic ? 'seg-on' : 'seg-off glass'}`}>
+      {label} <span className="tabular-nums opacity-60">{n}</span>
+    </button>
+  );
 
-            {isEmployer && categories.length === 0 && (
-              <button
-                onClick={createDefaults}
-                disabled={creatingCat}
-                className="mt-2 w-full rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] px-3 py-2.5 text-sm font-medium hover:bg-[#C8F542]/20 transition disabled:opacity-50"
-              >
-                {creatingCat ? 'Vytvářím…' : 'Vytvořit výchozí kategorie'}
-              </button>
-            )}
-          </div>
-        </aside>
+  let seznam: React.ReactNode;
+  if (navody.loading) {
+    seznam = <Card pad="none" aria-busy><div className="p-5 space-y-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-12" />)}</div></Card>;
+  } else if (navody.error) {
+    seznam = <Card><ErrorState title="Návody se nenačetly" hint={navody.error} onRetry={navody.reload} /></Card>;
+  } else if (filtered.length === 0) {
+    seznam = (
+      <Card>
+        {search.trim() || activeCat !== 'all' ? (
+          <EmptyState icon="search" compact title={search.trim() ? `Nic pro „${search.trim()}“` : 'V téhle kategorii nic není'}
+            hint="Zkus jiné slovo nebo jinou kategorii." />
+        ) : (
+          <EmptyState illustration="postupy" title="Zatím žádné návody"
+            hint={smiVytvorit
+              ? 'Jak se připravuje váš podpisový nápoj, jak se čistí kávovar, co říct hostovi o nabídce — návody, které si tým otevře na baru.'
+              : 'Až je vedení sepíše, najdeš je tady — krok za krokem.'}
+            action={smiZakladat && !tablet
+              ? <Button variant="secondary" icon="plus" onClick={() => openEditor()}>{smiVytvorit ? 'Napsat první návod' : 'Navrhnout návod'}</Button>
+              : undefined} />
+        )}
+      </Card>
+    );
+  } else {
+    seznam = (
+      <Card pad="none">
+        <ul className="list px-5">
+          {filtered.map((g) => {
+            const cat = g.categoryId != null ? catById.get(g.categoryId) : undefined;
+            const polozky: MenuItem[] = [
+              ...(g.approved === false && smiSchvalovat ? [{ label: 'Schválit návrh', icon: 'check', onClick: () => { void patchGuide(g.id, { approve: true }, 'Návod se neschválil.'); } }] : []),
+              ...(smiUpravit ? [{ label: 'Upravit', icon: 'pencil', onClick: () => { void editById(g.id); } }] : []),
+              ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: () => setSmazat({ id: g.id, title: g.title }) }] : []),
+            ];
+            const meta = [cat?.name, g.excerpt].filter(Boolean).join(' · ') || undefined;
+            const stav = g.approved === false
+              ? <Chip tone="wait" size="sm">Čeká na schválení</Chip>
+              : g.requireRead
+                ? <Chip tone={g.myRead ? 'ok' : 'wait'} size="sm" icon={g.myRead ? 'check' : 'book'}>{g.myRead ? 'Přečteno' : 'Povinné čtení'}</Chip>
+                : undefined;
+            if (polozky.length === 0) {
+              return (
+                <ListRow key={g.id} title={g.title} meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                  onClick={() => { void openReader(g.id); }} />
+              );
+            }
+            return (
+              <ListRow key={g.id}
+                // Řádek má „···", takže celý klikací být nemůže (tlačítko v tlačítku) — čtečku otevře název.
+                title={<button type="button" onClick={() => { void openReader(g.id); }} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none focus-visible:underline">{g.title}</button>}
+                meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                actions={<Menu size="sm" label={`Další akce s návodem ${g.title}`} items={polozky} />} />
+            );
+          })}
+        </ul>
+      </Card>
+    );
+  }
 
-        {/* Main */}
-        <main className="flex-1 min-w-0">
-          <div className="relative mb-5">
-            <SearchField value={search} onChange={setSearch} placeholder="Hledat návody…" storageKey="guides"
-              suggestions={categories.map(c => ({ label: c.name, hint: 'kategorie' }))} />
-          </div>
-
-          {/* Návrhy od týmu přicházejí po vlnách — po zaškolení jich leží
-              pět naráz a každý se schvaloval zvlášť, s překreslením mřížky
-              po každém kliknutí (karty pod prstem odskakovaly). */}
-          {isEmployer && (
-            <div className="mb-5">
-              <ApproveAllBar count={pendingGuides.length} noun={{ one: 'návod', few: 'návody', many: 'návodů' }} busy={approvingAll} note={approveNote}
-                onApproveAll={async () => {
-                  if (!confirm(`Schválit všech ${pendingGuides.length} návrhů návodů?`)) return;
-                  setApprovingAll(true); setApproveNote('');
-                  const { failed } = await runBulk(pendingGuides.map(g => g.id), approveGuide);
-                  await loadGuides();
-                  setApprovingAll(false);
-                  if (failed.length) setApproveNote(`${failed.length} se neuložilo`);
-                }} />
-            </div>
+  const nastroj = (
+    <div className="space-y-3">
+      {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
+      {kategorie.error && <p className="note note-wait" role="status">Kategorie se nenačetly — návody ukazuji bez nich. {kategorie.error}</p>}
+      <SearchField value={search} onChange={setSearch} placeholder="Hledat návody…" storageKey="guides" ariaLabel="Hledat návody"
+        suggestions={categories.map(c => ({ label: c.name, hint: 'kategorie' }))} />
+      {(categories.length > 0 || hasUncategorized || (smiKategorie && !kategorie.loading)) && (
+        <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 items-center" role="group" aria-label="Kategorie návodů">
+          {pilulka('all', 'Vše', counts.get('vse') ?? 0)}
+          {categories.map(c => pilulka(c.id, c.name, counts.get(c.id) ?? 0))}
+          {hasUncategorized && pilulka(-1, 'Bez kategorie', counts.get(-1) ?? 0)}
+          {smiKategorie && categories.length === 0 && !kategorie.loading && !kategorie.error && (
+            <Button variant="secondary" size="sm" icon="plus" onClick={createDefaults} loading={creatingCat} className="shrink-0">Vytvořit výchozí kategorie</Button>
           )}
-
-          {loading ? (
-            <div className="flex items-center justify-center h-48">
-              <div className="spinner" />
-            </div>
-          ) : loadErr ? (
-            <div className="glass-card">
-              <ErrorState title="Návody se nenačetly" hint={loadErr}
-                onRetry={() => { setLoading(true); setReloadTick(t => t + 1); }} />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="glass-card">
-              {search.trim() ? (
-                <EmptyState icon="search" title={`Nic pro „${search}“`} hint="Zkus jiné slovo nebo zruš hledání." compact />
-              ) : (
-                <EmptyState illustration="postupy" title="Zatím žádné návody"
-                  hint={isEmployer
-                    ? 'Jak se připravuje váš podpis nápoj, jak se čistí kávovar, co říct hostovi o nabídce — návody s obrázky, které si tým otevře na baru.'
-                    : 'Až je vedení sepíše, najdeš je tady — s obrázky a krok za krokem.'}
-                  action={isEmployer ? <Button variant="accent" icon="plus" onClick={() => openEditor()}>Nový návod</Button> : undefined} />
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
-              {filtered.map((g) => {
-                const cat = g.categoryId != null ? catById.get(g.categoryId) : undefined;
-                return (
-                  <div
-                    key={g.id}
-                    {...clickable(() => openReader(g.id), { label: `Otevřít návod ${g.title}` })}
-                    className="glass-card p-5 cursor-pointer hover:bg-black/[0.05] hover:border-[#C8F542]/30 transition duration-300 flex flex-col group"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="t-card min-w-0 flex-1 break-words">
-                        {g.title}
-                        {g.approved === false && (
-                          <span className="ml-2 align-middle inline-flex items-center gap-1.5">
-                            <span className="rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">Čeká na schválení</span>
-                            {isEmployer && (
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  try { await approveGuide(g.id); await loadGuides(); } catch { /* ignore */ }
-                                }}
-                                className="btn btn-primary btn-sm transition whitespace-nowrap">
-                                Schválit
-                              </button>
-                            )}
-                          </span>
-                        )}
-                      </h3>
-                      {isEmployer && (
-                        // gap-2, ne gap-1: tlačítka jsou 28px, ale `tap-target-sm`
-                        // jim dotykovou plochu roztáhne na 36 — při mezeře 4px se
-                        // plochy překrývaly a dotyk u pravého okraje tužky trefil
-                        // koš vedle ní. Osm pixelů je přesně tolik, aby se plochy
-                        // dotkly a nepřekryly.
-                        <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const r = await fetch(`/api/guides/${g.id}`);
-                              const d = await r.json();
-                              if (d.guide) openEditor({ ...d.guide, checklist: normalizeSteps(d.guide.checklist) });
-                            }}
-                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition text-xs"
-                            title="Upravit"
-                          >
-                            <Icon name="pencil" size={13} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteGuide(g.id);
-                            }}
-                            className="tap-target-sm w-7 h-7 rounded-full glass flex items-center justify-center text-black/55 hover:text-bad-ink transition"
-                            title="Smazat"
-                          >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {g.excerpt && <p className="text-sm text-black/55 leading-relaxed line-clamp-3 flex-1">{g.excerpt}</p>}
-                    <div className="flex items-center gap-2 mt-4 flex-wrap">
-                      {cat && (
-                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08]">
-                          <Icon name={cat.icon} size={12} strokeWidth={2} />
-                          {cat.name}
-                        </span>
-                      )}
-                      {g.requireRead && (
-                        <span className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          g.myRead ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-bad/10 text-bad-ink'
-                        }`}>
-                          <Icon name="book" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {g.myRead ? 'přečteno' : 'povinné čtení'}
-                          {isEmployer && <span className="font-normal opacity-70">· {g.readCount ?? 0}×</span>}
-                        </span>
-                      )}
-                      {g.hasChecklist && (
-                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-black/[0.05] text-black/60">
-                          <Icon name="check" size={12} strokeWidth={2.2} />
-                          checklist
-                        </span>
-                      )}
-                      <span className="text-xs text-black/30 flex items-center gap-1 ml-auto">
-                        <Icon name="clock" size={12} />
-                        {formatDate(g.updatedAt)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* Reader modal */}
-      {reader && (
-        <div
-          className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4"
-          onClick={() => setReader(null)}
-        >
-          <div
-            ref={readerModal.ref} {...readerModal.dialogProps}
-            className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <DiscardGuard guard={readerModal.guard} />
-            <div className="flex items-start justify-between gap-3 sm:gap-4 mb-4">
-              <div className="min-w-0 flex-1">
-                {(() => {
-                  const cat = reader.categoryId != null ? catById.get(reader.categoryId) : undefined;
-                  return cat ? (
-                    <span className="tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-[#C8F542]/10 text-[#5B7A08] mb-3">
-                      <Icon name={cat.icon} size={12} strokeWidth={2} />
-                      {cat.name}
-                    </span>
-                  ) : null;
-                })()}
-                <h2 className="text-2xl font-bold tracking-tight text-[#16181A] break-words">{reader.title || '…'}</h2>
-                {(reader.author || reader.updatedAt) && (
-                  <p className="text-xs text-black/45 mt-1.5">
-                    {reader.author ? `${reader.author} · ` : ''}
-                    Aktualizováno {formatDate(reader.updatedAt)}
-                  </p>
-                )}
-                {/* Že podle návodu vzniká konkrétní věc ve skladu, je při čtení
-                    důležité: obsluha pak ví, že odškrtání kroků má dopad
-                    na zásobu, a ne že si jen něco přečetla. */}
-                {(reader as any).itemName && (
-                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#0A84FF]/[0.09] border border-[#0A84FF]/20 px-3 py-1 text-xs text-[#0A5CC0]">
-                    <Icon name="leaf" size={12} />
-                    {(reader as any).itemMadeInHouse
-                      ? `Vyrábíme podle něj: ${(reader as any).itemName}`
-                      : `Položka ${(reader as any).itemName} už není vlastní výroba`}
-                  </p>
-                )}
-                {(() => {
-                  const summary = guides.find(g => g.id === reader.id);
-                  if (!summary) return null;
-                  return (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {summary.requireRead && !summary.myRead && user.role !== 'kiosk' && (
-                        <button
-                          onClick={async () => {
-                            const res = await fetch(`/api/guides/${reader.id}`, {
-                              method: 'POST', headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ markRead: true }),
-                            }).catch(() => null);
-                            if (res?.ok) await loadGuides();
-                          }}
-                          className="btn btn-primary btn-sm transition">
-                          <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Potvrzuji přečtení
-                        </button>
-                      )}
-                      {summary.requireRead && summary.myRead && (
-                        <span className="tap-target-sm rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-3 py-1.5 text-xs font-semibold">Přečteno</span>
-                      )}
-                      {/* Ze samotného čísla „3×" se nedá zjistit, komu
-                          připomenout. Povinné čtení, u kterého nejde zjistit,
-                          kdo chybí, je jen odznak. */}
-                      {isEmployer && summary.requireRead && (
-                        <button onClick={() => setCtenariFor(c => (c === reader.id ? null : reader.id))}
-                          className="tap-target-sm rounded-full bg-black/[0.05] text-black/60 hover:text-black px-3 py-1.5 text-xs font-semibold transition">
-                          {ctenariFor === reader.id ? 'Skrýt, kdo četl' : `Kdo četl (${summary.readCount ?? 0})`}
-                        </button>
-                      )}
-                      {isEmployer && (
-                        <button
-                          onClick={async () => {
-                            const res = await fetch(`/api/guides/${reader.id}`, {
-                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ requireRead: !(summary.requireRead === true) }),
-                            }).catch(() => null);
-                            if (res?.ok) await loadGuides();
-                          }}
-                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                            summary.requireRead ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
-                          }`}>
-                          {summary.requireRead ? 'Zrušit povinné čtení' : 'Označit jako povinné čtení'}
-                        </button>
-                      )}
-                      {/* Krok „Kontrola kasy" je jediné místo, kde vzniká
-                          manko. Návod „co dělat, když to nesedí" tam patří,
-                          ale z rozdělané uzávěrky se do Návodů nikdo nejde
-                          podívat — proto se tenhle jeden připne přímo tam. */}
-                      {isEmployer && (
-                        <button
-                          onClick={async () => {
-                            const res = await fetch(`/api/guides/${reader.id}`, {
-                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ forClosing: !(summary.forClosing === true) }),
-                            }).catch(() => null);
-                            if (res?.ok) await loadGuides();
-                          }}
-                          title={'Ukáže se u kroku „Kontrola kasy" v uzávěrce'}
-                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                            summary.forClosing ? 'bg-black/[0.06] text-black/55 hover:text-black' : 'glass text-[#5B7A08] hover:brightness-105'
-                          }`}>
-                          {summary.forClosing ? 'Odepnout od uzávěrky' : 'Připnout k uzávěrce'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-                {isEmployer && ctenariFor === reader.id && <CtenariNavodu guideId={reader.id} />}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {isEmployer && !readerLoading && (
-                  <>
-                    <button
-                      onClick={() => {
-                        openEditor(reader);
-                        setReader(null);
-                      }}
-                      className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-3 py-1.5 text-sm transition whitespace-nowrap"
-                    >
-                      Upravit
-                    </button>
-                    <button
-                      onClick={() => deleteGuide(reader.id)}
-                      className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-bad-ink hover:bg-bad/[0.06] transition"
-                      title="Smazat"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => setReader(null)}
-                  title="Zavřít"
-                  className="w-9 h-9 rounded-full glass flex items-center justify-center text-black/55 hover:text-black transition"
-                >
-                  <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-                </button>
-              </div>
-            </div>
-
-            {readerLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="spinner" />
-              </div>
-            ) : (
-              <>
-                <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
-                {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} guideId={reader.id} ticksFor={ticksFor ?? user.id} />}
-              </>
-            )}
-          </div>
         </div>
       )}
+      {seznam}
+    </div>
+  );
 
-      {/* Editor modal */}
+  const summary = reader ? guides.find(g => g.id === reader.id) ?? null : null;
+  const okna = (
+    <>
+      {reader && (
+        <GuideReader
+          reader={reader}
+          loading={readerLoading}
+          summary={summary}
+          kategorie={reader.categoryId != null ? catById.get(reader.categoryId) ?? null : null}
+          tablet={tablet}
+          ticksFor={ticksFor ?? user.id}
+          smiUpravit={smiUpravit}
+          smiMazat={smiMazat}
+          smiPovinne={smiPovinne}
+          smiSchvalit={smiSchvalovat}
+          onClose={() => setReader(null)}
+          onEdit={() => { const r = reader; setReader(null); openEditor(r); }}
+          onDelete={() => setSmazat({ id: reader.id, title: reader.title })}
+          onPatch={(body, text) => patchGuide(reader.id, body, text)}
+          onMarkRead={async () => {
+            setChyba('');
+            try {
+              const res = await fetch(`/api/guides/${reader.id}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markRead: true }),
+              });
+              await okJson(res);
+              reloadGuides();
+            } catch (e) {
+              setChyba(apiMessage(e, 'Přečtení se nepodařilo potvrdit.'));
+            }
+          }}
+        />
+      )}
+
+      <Modal open={!!smazat} onClose={() => { if (!mazu) setSmazat(null); }} size="sm" title="Smazat návod?"
+        subtitle={smazat ? `„${smazat.title}"` : undefined}
+        footer={<>
+          <Button variant="secondary" onClick={() => setSmazat(null)} disabled={mazu}>Zrušit</Button>
+          <Button variant="danger-solid" icon="trash" onClick={deleteGuide} loading={mazu}>Smazat</Button>
+        </>}>
+        <p className="text-sm text-black/55 text-pretty">Návod zmizí z knihovny i z kroků postupů a úkolů, které na něj odkazují.</p>
+      </Modal>
+
       {editorOpen && (
         <GuideEditor
           editing={editing}
           categories={categories}
+          navrh={!smiVytvorit && !editing}
           defaultCategory={typeof activeCat === 'number' && activeCat > 0 ? activeCat : null}
           onClose={closeEditor}
-          onSaved={afterSave}
+          onSaved={() => { reloadGuides(); closeEditor(); }}
         />
       )}
 
-      {kopieOpen && isEmployer && (
+      {kopieOpen && smiVytvorit && (
         <KopieZPodniku entita="navody" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)}
-          onHotovo={() => setReloadTick(t => t + 1)} />
+          onHotovo={() => { reloadGuides(); reloadCategories(); }} />
       )}
 
-      {/* Manage categories modal */}
-      {manageOpen && isEmployer && (
+      {manageOpen && smiKategorie && (
         <ManageCategories
           categories={categories}
           onClose={() => setManageOpen(false)}
-          onChanged={async () => {
-            await Promise.all([loadCategories(), loadGuides()]);
-          }}
+          onChanged={() => { reloadCategories(); reloadGuides(); }}
         />
       )}
-    </div>
+    </>
+  );
+
+  if (tablet) {
+    return (
+      <div className="p-4 sm:p-6 space-y-5">
+        <PageHeader title={hlavicka.title} subtitle={hlavicka.subtitle} hintId={hlavicka.hintId} />
+        {nastroj}
+        {okna}
+      </div>
+    );
+  }
+  return (
+    <>
+      <PlochaWidgetu stranka={stranka} hlavicka={hlavicka} nastroj={nastroj} />
+      {okna}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Čtečka
+// ---------------------------------------------------------------------------
+
+function GuideReader({
+  reader, loading, summary, kategorie, tablet, ticksFor, smiUpravit, smiMazat, smiPovinne, smiSchvalit,
+  onClose, onEdit, onDelete, onPatch, onMarkRead,
+}: {
+  reader: GuideFull;
+  loading: boolean;
+  summary: NavodApi | null;
+  kategorie: Category | null;
+  tablet: boolean;
+  ticksFor: number | null;
+  smiUpravit: boolean;
+  smiMazat: boolean;
+  smiPovinne: boolean;
+  smiSchvalit: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onPatch: (body: Record<string, unknown>, chyba: string) => Promise<void>;
+  onMarkRead: () => Promise<void>;
+}) {
+  // U kterého návodu má vedení rozbalený seznam „kdo četl".
+  const [ctenari, setCtenari] = useState(false);
+  const [potvrzuji, setPotvrzuji] = useState(false);
+  const povinne = summary?.requireRead === true;
+  const polozky: MenuItem[] = loading ? [] : [
+    ...(summary?.approved === false && smiSchvalit ? [{ label: 'Schválit návrh', icon: 'check', onClick: () => { void onPatch({ approve: true }, 'Návod se neschválil.'); } }] : []),
+    ...(smiUpravit ? [{ label: 'Upravit', icon: 'pencil', onClick: onEdit }] : []),
+    ...(smiPovinne && summary ? [{
+      label: povinne ? 'Zrušit povinné čtení' : 'Označit jako povinné čtení', icon: 'book',
+      onClick: () => { void onPatch({ requireRead: !povinne }, 'Povinné čtení se nepodařilo změnit.'); },
+    }] : []),
+    ...(smiPovinne && povinne ? [{ label: ctenari ? 'Skrýt, kdo četl' : 'Kdo četl', icon: 'users', onClick: () => setCtenari(v => !v) }] : []),
+    // Krok „Kontrola kasy" je jediné místo, kde vzniká manko. Návod „co dělat,
+    // když to nesedí" tam patří — proto se tenhle jeden připne přímo tam.
+    ...(smiUpravit && summary ? [{
+      label: summary.forClosing ? 'Odepnout od uzávěrky' : 'Připnout k uzávěrce', icon: 'pin',
+      hint: 'Ukáže se u kroku „Kontrola kasy" v uzávěrce',
+      onClick: () => { void onPatch({ forClosing: !summary.forClosing }, 'Připnutí k uzávěrce se nepodařilo změnit.'); },
+    }] : []),
+    ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: onDelete }] : []),
+  ];
+  const potvrdit = povinne && summary?.myRead !== true && !tablet;
+
+  return (
+    <Modal open onClose={onClose} size="lg" title={reader.title || 'Návod'}
+      subtitle={loading ? undefined : [kategorie?.name, reader.author, reader.updatedAt ? `aktualizováno ${formatDate(reader.updatedAt)}` : null].filter(Boolean).join(' · ') || undefined}
+      footer={potvrdit ? (
+        <Button variant="primary" icon="check" loading={potvrzuji}
+          onClick={async () => { setPotvrzuji(true); await onMarkRead(); setPotvrzuji(false); }}>
+          Potvrzuji přečtení
+        </Button>
+      ) : undefined}>
+      {loading ? (
+        <div className="space-y-2" aria-busy>
+          <Skeleton className="h-4 w-4/5 rounded-full" />
+          <Skeleton className="h-4 w-3/5 rounded-full" />
+          <Skeleton className="h-24" />
+        </div>
+      ) : (
+        <>
+          {(polozky.length > 0 || povinne || summary?.forClosing || summary?.approved === false) && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {summary?.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
+              {povinne && <Chip tone={summary?.myRead ? 'ok' : 'wait'} size="sm" icon={summary?.myRead ? 'check' : 'book'}>{summary?.myRead ? 'Přečteno' : 'Povinné čtení'}</Chip>}
+              {summary?.forClosing && <Chip tone="muted" size="sm" icon="pin">U uzávěrky</Chip>}
+              {polozky.length > 0 && <Menu size="sm" label="Akce s návodem" items={polozky} className="ml-auto" />}
+            </div>
+          )}
+          {/* Že podle návodu vzniká konkrétní věc ve skladu, je při čtení
+              důležité: obsluha pak ví, že odškrtání kroků má dopad na zásobu. */}
+          {reader.itemName && (
+            <p className="note mb-4 text-sm inline-flex items-center gap-1.5">
+              <Icon name="leaf" size={14} className="shrink-0 text-black/45" />
+              {reader.itemMadeInHouse ? `Vyrábíme podle něj: ${reader.itemName}` : `Položka ${reader.itemName} už není vlastní výroba`}
+            </p>
+          )}
+          {smiPovinne && povinne && ctenari && <CtenariNavodu guideId={reader.id} />}
+          <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
+          {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} guideId={reader.id} ticksFor={ticksFor} />}
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -759,24 +641,17 @@ function ReaderChecklist({ steps, guideId, ticksFor }: { steps: GuideStep[]; gui
   return (
     <div className="mt-6 pt-6 border-t border-black/[0.08]">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-black/45">Postup</h3>
-        <span className={`text-xs font-medium ${allDone ? 'text-[#5B7A08]' : 'text-black/45'}`}>
-          {doneCount}/{total}
-        </span>
+        <h3 className="t-label">Postup</h3>
+        <span className="t-meta tabular-nums">{doneCount}/{total}</span>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1.5 w-full rounded-full bg-black/[0.06] overflow-hidden mb-4">
-        <div
-          className="h-full rounded-full bg-[#C8F542] transition duration-300"
-          style={{ width: `${pct}%` }}
-        />
+      <div className="h-1.5 w-full rounded-full bg-black/[0.06] overflow-hidden mb-4" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Hotové kroky">
+        <div className="h-full rounded-full bg-[#16181A] transition-[width] duration-300" style={{ width: `${pct}%` }} />
       </div>
 
       <StepTimeline
         steps={parseSteps(steps.map(st => (
-          // Gramáž patří ke kroku, ne do zvláštního seznamu — barista čte
-          // jeden řádek, ne dva.
+          // Gramáž patří ke kroku, ne do zvláštního seznamu — barista čte jeden řádek, ne dva.
           st.itemId != null && st.amount != null
             ? `${st.text} — ${String(st.amount).replace('.', ',')} ${st.unit ?? ''}`.trim()
             : st.text
@@ -787,78 +662,43 @@ function ReaderChecklist({ steps, guideId, ticksFor }: { steps: GuideStep[]; gui
       />
 
       {allDone && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 px-4 py-3">
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#5B7A08] min-w-0">
-            <Icon name="check" size={16} strokeWidth={2.5} />
-            Hotovo! Všechny kroky splněny.
+        <div className="note note-ok mt-4 flex flex-wrap items-center justify-between gap-2" role="status">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold min-w-0">
+            <Icon name="check" size={16} strokeWidth={2.2} />
+            Všechny kroky jsou hotové.
           </span>
-          <button
-            onClick={reset}
-            className="text-xs text-[#5B7A08]/80 hover:text-[#5B7A08] transition-colors underline underline-offset-2 whitespace-nowrap flex-shrink-0"
-          >
-            Znovu
-          </button>
+          <Button variant="ghost" size="sm" icon="undo" onClick={reset}>Znovu</Button>
         </div>
       )}
     </div>
   );
 }
 
-function CatButton({
-  label,
-  icon,
-  count,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`tap-target-sm flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm transition flex-shrink-0 whitespace-nowrap lg:w-full ${
-        active ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'text-black/60 hover:bg-black/[0.04] hover:text-black'
-      }`}
-    >
-      <Icon name={icon} size={17} strokeWidth={active ? 2 : 1.7} />
-      <span className="flex-1 text-left truncate">{label}</span>
-      <span className={`text-xs ${active ? 'text-[#5B7A08]/70' : 'text-black/30'}`}>{count}</span>
-    </button>
-  );
-}
+// ---------------------------------------------------------------------------
+// Editor
+// ---------------------------------------------------------------------------
 
 function GuideEditor({
-  editing,
-  categories,
-  defaultCategory,
-  onClose,
-  onSaved,
+  editing, categories, navrh, defaultCategory, onClose, onSaved,
 }: {
   editing: GuideFull | null;
   categories: Category[];
+  /** Ukládá se jako návrh ke schválení (navody.navrhnout bez navody.vytvorit). */
+  navrh: boolean;
   defaultCategory: number | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const em = useModal(true, onClose, 'Návod — úpravy');
+  const uid = useId();
   const [title, setTitle] = useState(editing?.title || '');
   const [content, setContent] = useState(editing?.content || '');
-  const [categoryId, setCategoryId] = useState<number | null>(
-    editing ? editing.categoryId : defaultCategory
-  );
-  const [steps, setSteps] = useState<GuideStep[]>(
-    editing?.checklist?.length ? normalizeSteps(editing.checklist) : [],
-  );
+  const [categoryId, setCategoryId] = useState<number | null>(editing ? editing.categoryId : defaultCategory);
+  const [steps, setSteps] = useState<GuideStep[]>(editing?.checklist?.length ? normalizeSteps(editing.checklist) : []);
   // Návod patří k položce v kase; z jeho surovin se pak dá složit receptura.
-  const [productId, setProductId] = useState<string | null>((editing as any)?.productId ?? null);
-  const [productName, setProductName] = useState<string | null>((editing as any)?.productName ?? null);
-  // A druhým směrem: podle kterého návodu se položka vyrábí. Postup výroby
-  // se do téhle chvíle psal jako holý text u skladové položky.
-  const [itemId, setItemId] = useState<number | null>((editing as any)?.itemId ?? null);
+  const [productId, setProductId] = useState<string | null>(editing?.productId ?? null);
+  const [productName, setProductName] = useState<string | null>(editing?.productName ?? null);
+  // A druhým směrem: podle kterého návodu se položka vyrábí.
+  const [itemId, setItemId] = useState<number | null>(editing?.itemId ?? null);
   const [alsoRecipe, setAlsoRecipe] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
@@ -874,8 +714,6 @@ function GuideEditor({
   const [error, setError] = useState('');
 
   const addStep = () => setSteps((prev) => [...prev, { text: '' }]);
-  const updateStep = (i: number, v: string) =>
-    setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, text: v } : s)));
   const patchStep = (i: number, patch: Partial<GuideStep>) =>
     setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const removeStep = (i: number) => setSteps((prev) => prev.filter((_, idx) => idx !== i));
@@ -889,26 +727,18 @@ function GuideEditor({
     });
 
   const save = async () => {
-    if (!title.trim()) {
-      setError('Zadejte název návodu.');
-      return;
-    }
+    if (!title.trim()) { setError('Zadej název návodu.'); return; }
     setSaving(true);
     setError('');
     const checklist = normalizeSteps(steps);
     const payload = { title: title.trim(), content, categoryId, checklist, productId, productName, itemId };
-    const res = editing
-      ? await fetch(`/api/guides/${editing.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-      : await fetch('/api/guides', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-    if (res.ok) {
+    try {
+      const res = await fetch(editing ? `/api/guides/${editing.id}` : '/api/guides', {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      await okJson(res);
       // Suroviny z návodu jsou receptura — psát ji podruhé ručně je přesně to
       // místo, kde se obě verze rozejdou.
       const ing = checklist
@@ -922,248 +752,140 @@ function GuideEditor({
           });
         } catch { /* receptura je bonus, návod je uložený */ }
       }
-      setSaving(false);
       onSaved();
-    } else {
+    } catch (e) {
+      setError(apiMessage(e, 'Uložení se nezdařilo.'));
+    } finally {
       setSaving(false);
-      const d = await res.json().catch(() => ({}));
-      setError(d.error || 'Uložení se nezdařilo.');
     }
   };
 
+  const surovina = (s: GuideStep) => s.itemId != null || s.unit != null;
+
   return (
-    <div className="fixed inset-0 modal-overlay z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div
-        ref={em.ref} {...em.dialogProps}
-        className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <DiscardGuard guard={em.guard} />
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="t-section min-w-0 truncate">{editing ? 'Upravit návod' : 'Nový návod'}</h2>
-          <button onClick={em.guard.attemptClose} className="btn-icon" aria-label="Zavřít">
-            <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-          </button>
-        </div>
+    <Modal open onClose={onClose} size="lg"
+      title={editing ? 'Upravit návod' : navrh ? 'Navrhnout návod' : 'Nový návod'}
+      subtitle={navrh ? 'Návrh schválí vedení, pak ho uvidí celý tým.' : undefined}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
+        <Button variant="primary" onClick={save} loading={saving}>{editing ? 'Uložit změny' : navrh ? 'Odeslat návrh' : 'Vytvořit návod'}</Button>
+      </>}>
+      <div className="space-y-4">
+        <Field id={`${uid}-nazev`} label="Název">
+          <Input id={`${uid}-nazev`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Např. Jak připravit naši podpisovou kávu" />
+        </Field>
 
-        <div className="space-y-4">
-          <div>
-            <label className="field-label">Název</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Např. Jak připravit naši signature kávu"
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition"
-            />
+        <Field id={`${uid}-kat`} label="Kategorie">
+          <Select id={`${uid}-kat`} value={categoryId ?? ''} onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}>
+            <option value="">Bez kategorie</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </Field>
+
+        <Field id={`${uid}-obsah`} label="Obsah" hint="Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.">
+          <Textarea id={`${uid}-obsah`} value={content} onChange={(e) => setContent(e.target.value)} rows={12}
+            placeholder={'Sem napiš návod…\n\nTip: řádky **tučně** a odrážky pomocí „- “.'} className="leading-relaxed !resize-y" />
+        </Field>
+
+        {/* Vazba na položku v kase — z ní plyne, že se suroviny z návodu dají uložit rovnou jako receptura. */}
+        <GuideProductLink productId={productId} productName={productName}
+          onPick={(id, name) => { setProductId(id); setProductName(name); }} />
+
+        {/* Opačný směr: co se podle návodu vyrábí. */}
+        <GuideItemLink itemId={itemId} items={items} onPick={setItemId} />
+
+        {/* Checklist builder */}
+        <div role="group" aria-labelledby={`${uid}-kroky`}>
+          <div className="flex items-center justify-between mb-2">
+            <p id={`${uid}-kroky`} className="field-label !mb-0">Checklist (nepovinný)</p>
+            <span className="t-meta">{czCount(steps.length, KROK)}</span>
           </div>
-
-          <div>
-            <label className="field-label">Kategorie</label>
-            <select
-              aria-label="Kategorie"
-              value={categoryId ?? ''}
-              onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition appearance-none"
-            >
-              <option value="" className="bg-neutral-900">
-                Bez kategorie
-              </option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id} className="bg-neutral-900">
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="field-label">Obsah</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={12}
-              placeholder={'Sem napište návod…\n\nTip: řádky **tučně** a odrážky pomocí „- “.'}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition leading-relaxed resize-y"
-            />
-            <p className="text-xs text-black/30 mt-2">Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.</p>
-          </div>
-
-          {/* Vazba na položku v kase — z ní plyne, že se suroviny z návodu
-              dají uložit rovnou jako receptura. */}
-          <GuideProductLink
-            productId={productId} productName={productName}
-            onPick={(id, name) => { setProductId(id); setProductName(name); }}
-          />
-
-          {/* Opačný směr: co se podle návodu vyrábí. Odsud si úkol „Vyrobit X“
-              vezme kroky místo odstavce textu u skladové položky. */}
-          <GuideItemLink itemId={itemId} items={items} onPick={setItemId} />
-
-          {/* Checklist builder */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs uppercase tracking-wider text-black/45">Checklist (volitelný)</label>
-              <span className="text-xs text-black/30">{steps.length} kroků</span>
-            </div>
-            {steps.length === 0 ? (
-              <p className="text-xs text-black/40 mb-3">Přidejte kroky, které si personál může odškrtávat při čtení návodu.</p>
-            ) : (
-              <div className="space-y-2 mb-3">
-                {steps.map((s, i) => (
-                  <div key={i} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => moveStep(i, -1)}
-                        disabled={i === 0}
-                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition rotate-180"
-                        title="Nahoru"
-                      >
-                        <Icon name="chevron" size={14} strokeWidth={2.5} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveStep(i, 1)}
-                        disabled={i === steps.length - 1}
-                        className="w-6 h-4 flex items-center justify-center text-black/40 hover:text-black disabled:opacity-25 disabled:hover:text-black/40 transition"
-                        title="Dolů"
-                      >
-                        <Icon name="chevron" size={14} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                    <span className="text-xs text-black/30 w-5 text-right flex-shrink-0">{i + 1}.</span>
-                    <input
-                      value={s.text}
-                      onChange={(e) => updateStep(i, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (i === steps.length - 1) addStep();
-                        }
-                      }}
-                      placeholder={`Krok ${i + 1}`}
-                      className="flex-1 field border border-black/[0.08] px-4 py-2.5 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm min-w-0"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => patchStep(i, s.itemId != null || s.unit != null
-                        ? { itemId: null, amount: null, unit: null }
-                        : { itemId: null, amount: null, unit: '' })}
-                      title={s.itemId != null || s.unit != null ? 'Zrušit surovinu' : 'Označit jako surovinu'}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition flex-shrink-0 ${
-                        s.itemId != null || s.unit != null
-                          ? 'bg-[#C8F542] on-accent'
-                          : 'glass text-black/45 hover:text-[#5B7A08]'
-                      }`}
-                    >
+          {steps.length === 0 ? (
+            <p className="t-meta mb-3">Přidej kroky, které si tým může odškrtávat při čtení návodu.</p>
+          ) : (
+            <ol className="space-y-2 mb-3">
+              {steps.map((s, i) => (
+                <li key={i} className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="t-meta w-5 text-right shrink-0 tabular-nums">{i + 1}.</span>
+                    <Input value={s.text} onChange={(e) => patchStep(i, { text: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (i === steps.length - 1) addStep(); } }}
+                      placeholder={`Krok ${i + 1}`} aria-label={`Krok ${i + 1}`} className="flex-1 min-w-0" />
+                    <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={`Posunout krok ${i + 1} výš`}
+                      onClick={() => moveStep(i, -1)} disabled={i === 0} />
+                    <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={`Posunout krok ${i + 1} níž`}
+                      onClick={() => moveStep(i, 1)} disabled={i === steps.length - 1} />
+                    <button type="button" aria-pressed={surovina(s)}
+                      onClick={() => patchStep(i, surovina(s) ? { itemId: null, amount: null, unit: null } : { itemId: null, amount: null, unit: '' })}
+                      aria-label={surovina(s) ? `Krok ${i + 1}: zrušit surovinu` : `Krok ${i + 1}: označit jako surovinu`}
+                      title={surovina(s) ? 'Zrušit surovinu' : 'Označit jako surovinu'}
+                      className={`filter-pill tap-target grid h-9 w-9 place-items-center !px-0 shrink-0 ${surovina(s) ? 'seg-on' : 'seg-off glass'}`}>
                       <Icon name="box" size={14} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => removeStep(i)}
-                      className="w-8 h-8 rounded-full glass flex items-center justify-center text-black/45 hover:text-bad-ink transition flex-shrink-0"
-                      title="Odebrat krok"
-                    >
-                      <Icon name="close" size={14} />
-                    </button>
+                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat krok ${i + 1}`} onClick={() => removeStep(i)} />
                   </div>
-                  {(s.itemId != null || s.unit != null) && (
-                    <div className="pl-12">
-                      <GuideStepIngredient
-                        step={s} items={items} categories={stockCategories}
+                  {surovina(s) && (
+                    <div className="pl-7">
+                      <GuideStepIngredient step={s} items={items} categories={stockCategories}
                         onChange={patch => patchStep(i, patch)}
-                        onItemCreated={created => setItems(list => [...list, created])}
-                      />
+                        onItemCreated={created => setItems(list => [...list, created])} />
                     </div>
                   )}
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={addStep}
-              className="w-full rounded-2xl glass border border-black/10 text-black/70 hover:bg-black/[0.06] hover:text-black px-3 py-2.5 flex items-center justify-center gap-2 text-sm transition"
-            >
-              <Icon name="plus" size={16} strokeWidth={2} />
-              Přidat krok
-            </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          <Button variant="secondary" size="sm" icon="plus" onClick={addStep}>Přidat krok</Button>
 
-            {productId && steps.some(st => st.itemId != null && (st.amount ?? 0) > 0) && (
-              <label className="mt-3 flex items-start gap-3 rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3 cursor-pointer">
-                <input type="checkbox" checked={alsoRecipe} onChange={e => setAlsoRecipe(e.target.checked)}
-                  className="mt-0.5 h-5 w-5 accent-[#8FB811]" />
-                <span className="text-sm text-[#16181A]">
-                  Uložit suroviny i jako recepturu
-                  <span className="block text-[11px] text-black/50 mt-0.5">
-                    Prodej „{productName}" pak sklad odepíše sám. Přepíše stávající recepturu téhle položky.
-                  </span>
-                </span>
-              </label>
-            )}
-          </div>
-
-          {error && <p className="text-sm text-bad-ink">{error}</p>}
+          {productId && steps.some(st => st.itemId != null && (st.amount ?? 0) > 0) && (
+            <ul className="list mt-3">
+              <SwitchRow title="Uložit suroviny i jako recepturu"
+                hint={`Prodej „${productName ?? ''}" pak sklad odepíše sám. Přepíše stávající recepturu téhle položky.`}
+                checked={alsoRecipe} onChange={setAlsoRecipe} />
+            </ul>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.06] px-5 py-2.5 transition whitespace-nowrap"
-          >
-            Zrušit
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-50 whitespace-nowrap"
-          >
-            {saving ? 'Ukládám…' : editing ? 'Uložit změny' : 'Vytvořit návod'}
-          </button>
-        </div>
+        {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Správa kategorií
+// ---------------------------------------------------------------------------
+
 function ManageCategories({
-  categories,
-  onClose,
-  onChanged,
+  categories, onClose, onChanged,
 }: {
   categories: Category[];
   onClose: () => void;
-  onChanged: () => Promise<void>;
+  onChanged: () => void;
 }) {
-  const cm = useModal(true, onClose, 'Správa kategorií');
-  const [items, setItems] = useState<Category[]>(categories);
+  const uid = useId();
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('book');
   const [busy, setBusy] = useState(false);
   /** Proč se poslední úprava kategorií neuložila. */
   const [chyba, setChyba] = useState('');
-
-  useEffect(() => {
-    setItems(categories);
-  }, [categories]);
+  const [smazat, setSmazat] = useState<Category | null>(null);
 
   const add = async () => {
     if (!newName.trim()) return;
     setBusy(true); setChyba('');
     try {
-      const res = await fetch('/api/guides/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(URL_KATEGORIE, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim(), icon: newIcon }),
       });
-      if (!res.ok) throw new Error(String(res.status));
+      await okJson(res);
       setNewName('');
       setNewIcon('book');
-      await onChanged();
-    } catch {
+      onChanged();
+    } catch (e) {
       // Jméno zůstává v poli, ať se nemusí psát znovu.
-      setChyba('Kategorii se nepodařilo založit. Zkus to prosím znovu.');
+      setChyba(apiMessage(e, 'Kategorii se nepodařilo založit. Zkus to prosím znovu.'));
     } finally {
       setBusy(false);
     }
@@ -1172,127 +894,100 @@ function ManageCategories({
   const rename = async (id: number, name: string) => {
     setChyba('');
     try {
-      const res = await fetch(`/api/guides/categories/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      await onChanged();
-    } catch {
-      setChyba('Přejmenování se neuložilo. Zkus to prosím znovu.');
-      await onChanged();
+      const res = await fetch(`${URL_KATEGORIE}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+      await okJson(res);
+    } catch (e) {
+      setChyba(apiMessage(e, 'Přejmenování se neuložilo. Zkus to prosím znovu.'));
     }
+    onChanged();
   };
 
-  const remove = async (id: number) => {
-    if (!confirm('Smazat kategorii? Návody v ní zůstanou (bez kategorie).')) return;
+  const remove = async () => {
+    if (!smazat) return;
     setChyba('');
     try {
-      const res = await fetch(`/api/guides/categories/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(String(res.status));
-      await onChanged();
-    } catch {
-      setChyba('Kategorii se nepodařilo smazat. Zkus to prosím znovu.');
+      const res = await fetch(`${URL_KATEGORIE}/${smazat.id}`, { method: 'DELETE' });
+      await okJson(res);
+      onChanged();
+    } catch (e) {
+      setChyba(apiMessage(e, 'Kategorii se nepodařilo smazat. Zkus to prosím znovu.'));
     }
+    setSmazat(null);
   };
 
   return (
-    <div className="fixed inset-0 modal-overlay z-[60] flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div
-        ref={cm.ref} {...cm.dialogProps}
-        className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 md:p-8 scrollbar-thin"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <DiscardGuard guard={cm.guard} />
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <h2 className="t-section min-w-0 truncate">Kategorie</h2>
-          <button onClick={cm.guard.attemptClose} className="btn-icon" aria-label="Zavřít">
-            <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-          </button>
-        </div>
+    <>
+      <Modal open onClose={onClose} size="md" title="Kategorie návodů">
         {chyba && <p role="alert" className="note note-danger mb-4">{chyba}</p>}
 
-        <div className="space-y-2 mb-6">
-          {items.length === 0 && <EmptyState icon="book" compact title="Zatím žádné kategorie"
-            hint="Kategorie třídí návody podle toho, čeho se týkají — příprava, úklid, provoz." />}
-          {items.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 well border border-black/[0.08] px-3 py-2">
-              <span className="text-black/55">
-                <Icon name={c.icon} size={18} />
-              </span>
-              {/* Kategorii ze zdrojového podniku organizace upraví jen jeho vedení —
-                  pole i koš by tu jen vracely 403, tak se ukáže jen jméno a odkud je. */}
-              {c.zOrganizace ? (
-                <div className="flex-1 min-w-0">
-                  <p className="text-[#16181A] text-sm truncate">
-                    {c.name}
-                    <span className="ml-2 chip chip-sm chip-muted align-middle">z organizace</span>
-                  </p>
-                  {c.spravuje && <p className="text-xs text-black/45 truncate">Spravuje: {c.spravuje}</p>}
-                </div>
-              ) : (
-                <>
-                  <input
-                    defaultValue={c.name}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v && v !== c.name) rename(c.id, v);
-                    }}
-                    className="flex-1 bg-transparent text-[#16181A] text-sm focus:outline-none min-w-0"
-                  />
-                  {c.sdileno && <span className="chip chip-sm chip-info flex-shrink-0">sdíleno</span>}
-                  <button
-                    onClick={() => remove(c.id)}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-black/45 hover:text-bad-ink transition text-xs flex-shrink-0"
-                    title="Smazat"
-                  >
-                    <Icon name="close" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="border-t border-black/[0.08] pt-5">
-          <label className="field-label">Nová kategorie</label>
-          <div className="flex gap-2 mb-3 flex-wrap">
-            {CATEGORY_ICONS.map((ic) => (
-              <button
-                key={ic}
-                onClick={() => setNewIcon(ic)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition ${
-                  newIcon === ic ? 'bg-[#C8F542]/15 text-[#5B7A08] border border-[#C8F542]/30' : 'glass text-black/55 hover:text-black'
-                }`}
-              >
-                <Icon name={ic} size={17} />
-              </button>
+        {categories.length === 0 ? (
+          <EmptyState icon="book" compact title="Zatím žádné kategorie"
+            hint="Kategorie třídí návody podle toho, čeho se týkají — příprava, úklid, provoz." />
+        ) : (
+          <ul className="list mb-5">
+            {categories.map((c) => (
+              <li key={c.id} className="list-row gap-3">
+                <Icon name={c.icon || 'book'} size={18} className="shrink-0 text-black/45" />
+                {/* Kategorii ze zdrojového podniku organizace upraví jen jeho vedení —
+                    pole i koš by tu jen vracely 403, tak se ukáže jen jméno a odkud je. */}
+                {c.zOrganizace ? (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#16181A] truncate">{c.name} <Chip tone="muted" size="sm" className="ml-1 align-middle">z organizace</Chip></p>
+                    {c.spravuje && <p className="t-meta truncate">Spravuje: {c.spravuje}</p>}
+                  </div>
+                ) : (
+                  <>
+                    <Input defaultValue={c.name} aria-label={`Název kategorie ${c.name}`}
+                      onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== c.name) void rename(c.id, v); }}
+                      className="flex-1 min-w-0" />
+                    {c.sdileno && <Chip tone="info" size="sm" className="shrink-0">sdíleno</Chip>}
+                    <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat kategorii ${c.name}`} onClick={() => setSmazat(c)} />
+                  </>
+                )}
+              </li>
             ))}
+          </ul>
+        )}
+
+        <div className="border-t border-black/[0.08] pt-5 space-y-3">
+          <div role="group" aria-labelledby={`${uid}-ikona`}>
+            <p id={`${uid}-ikona`} className="field-label">Ikona nové kategorie</p>
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORY_ICONS.map((ic) => (
+                <button key={ic.id} type="button" onClick={() => setNewIcon(ic.id)} aria-pressed={newIcon === ic.id} aria-label={`Ikona ${ic.nazev}`}
+                  className={`filter-pill tap-target grid h-10 w-10 place-items-center !px-0 ${newIcon === ic.id ? 'seg-on' : 'seg-off glass'}`}>
+                  <Icon name={ic.id} size={17} />
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-2">
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && add()}
-              placeholder="Název kategorie"
-              className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm"
-            />
-            <button
-              onClick={add}
-              disabled={busy || !newName.trim()}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-50 flex-shrink-0 whitespace-nowrap"
-            >
-              Přidat
-            </button>
-          </div>
+          <Field id={`${uid}-nova`} label="Nová kategorie">
+            <div className="flex gap-2">
+              <Input id={`${uid}-nova`} value={newName} onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void add(); }} placeholder="Např. Úklid" className="flex-1 min-w-0" />
+              <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!newName.trim()} className="shrink-0">Přidat</Button>
+            </div>
+          </Field>
         </div>
-      </div>
-    </div>
+      </Modal>
+
+      <Modal open={!!smazat} onClose={() => setSmazat(null)} size="sm" title="Smazat kategorii?"
+        subtitle={smazat ? `„${smazat.name}"` : undefined}
+        footer={<>
+          <Button variant="secondary" onClick={() => setSmazat(null)}>Zrušit</Button>
+          <Button variant="danger-solid" icon="trash" onClick={remove}>Smazat</Button>
+        </>}>
+        <p className="text-sm text-black/55 text-pretty">Návody v ní zůstanou, jen bez kategorie.</p>
+      </Modal>
+    </>
   );
 }
 
-/** Kdo návod četl a kdo ne — jmény, ne číslem. Vidí jen vedení. */
+// ---------------------------------------------------------------------------
+// Kdo četl
+// ---------------------------------------------------------------------------
+
+/** Kdo návod četl a kdo ne — jmény, ne číslem. Vidí jen navody.povinne_cteni. */
 function CtenariNavodu({ guideId }: { guideId: number }) {
   const [data, setData] = useState<{
     read: { id: number; name: string; avatar: string; jobTitle: string | null; readAt: string }[];
@@ -1311,39 +1006,26 @@ function CtenariNavodu({ guideId }: { guideId: number }) {
     return () => { alive = false; };
   }, [guideId]);
 
-  if (err) return <p className="mt-3 text-xs text-bad-ink">{err}</p>;
-  if (!data) return <p className="mt-3 text-xs text-black/40">Načítám…</p>;
+  if (err) return <p className="note note-danger text-sm mb-4" role="alert">{err}</p>;
+  if (!data) return <Skeleton className="h-16 mb-4" />;
 
-  const radek = (
-    p: { id: number; name: string; avatar: string; jobTitle: string | null },
-    kdy?: string,
-  ) => (
-    <li key={p.id} className="flex items-center gap-2 py-1">
-      <span className="shrink-0 text-base leading-none">{p.avatar || '👤'}</span>
-      <span className="min-w-0 flex-1 truncate text-xs text-[#16181A]">
-        {p.name}
-        {p.jobTitle && <span className="ml-1.5 text-black/40">{p.jobTitle}</span>}
-      </span>
-      {kdy && <span className="shrink-0 text-[11px] text-black/40">{formatDate(kdy)}</span>}
-    </li>
+  const radek = (p: { id: number; name: string; avatar: string; jobTitle: string | null }, kdy?: string) => (
+    <ListRow key={p.id} lead={<Avatar emoji={p.avatar} size="xs" />} title={p.name} meta={p.jobTitle ?? undefined}
+      aside={kdy ? formatDate(kdy) : undefined} />
   );
 
   return (
-    <div className="mt-3 well border border-black/[0.07] p-3 space-y-2.5">
+    <div className="well p-3 mb-4 space-y-3">
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-bad-ink">
-          Nepřečetli ({data.unread.length})
-        </p>
+        <p className="t-label">Nepřečetli ({data.unread.length})</p>
         {data.unread.length === 0
-          ? <p className="text-xs text-black/45 mt-1">Přečetli to všichni.</p>
-          : <ul className="mt-1">{data.unread.map(p => radek(p))}</ul>}
+          ? <p className="t-meta mt-1">Přečetli to všichni.</p>
+          : <ul className="list mt-1">{data.unread.map(p => radek(p))}</ul>}
       </div>
       {data.read.length > 0 && (
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[#5B7A08]">
-            Přečetli ({data.read.length})
-          </p>
-          <ul className="mt-1">{data.read.map(p => radek(p, p.readAt))}</ul>
+          <p className="t-label">Přečetli ({data.read.length})</p>
+          <ul className="list mt-1">{data.read.map(p => radek(p, p.readAt))}</ul>
         </div>
       )}
     </div>

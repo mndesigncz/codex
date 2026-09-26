@@ -1,8 +1,8 @@
 // Widgety oblasti „Úkoly" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/ukoly.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B6a v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B6a; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/ukoly.tsx, výpočty v lib/ukolyPrehled.ts.
+// Soubor patří balíku B6a. Kolo 69: všech pět widgetů hotových. Ikony se liší, ať jde widgety
+// v galerii i na ploše rozeznat podle ikony, ne jen podle titulku (dřív všech pět „check").
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -42,14 +42,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'ukoly',
     nazev: 'Úkoly po termínu',
     popis: 'Nedokončené úkoly po termínu — kolik a čí.',
-    ikona: 'check',
+    ikona: 'clock',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
     stranky: ['vedeni.prehled', 'zamestnanec.domu', 'vedeni.ukoly', 'zamestnanec.ukoly'],
     opravneni: { vse: [], nektere: [], pole: { cely_tym: 'ukoly.zobrazit_tym' } },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/tasks; GET /api/teams → members
   {
@@ -57,14 +57,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'ukoly',
     nazev: 'Úkoly podle lidí',
     popis: 'Kolik má kdo aktivních a po termínu úkolů — proklik filtruje seznam.',
-    ikona: 'check',
+    ikona: 'users',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.ukoly'],
     opravneni: { vse: ['ukoly.zobrazit_tym'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/tasks; GET /api/teams → team.week_start
   // Pozor: vlastní každý
@@ -73,34 +73,33 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'ukoly',
     nazev: 'Úkoly na týden',
     popis: 'Týdenní tabule úkolů po dnech (přetažením se přesouvají).',
-    ikona: 'check',
+    ikona: 'calendar',
     velikosti: ['L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni', 'zamestnanec'],
-    stranky: [],
+    stranky: ['vedeni.ukoly', 'zamestnanec.ukoly'],
     opravneni: {
       vse: [],
       nektere: [],
       pole: { cely_tym: 'ukoly.zobrazit_tym', 'akce:presunout_cizi': 'ukoly.upravit' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/tasks → [status=done, completedByName]
-  // Backend: triviální: přidat completed_at do shape() v app/api/tasks/route.ts (sloupec existuje, API ho
-  // nevrací)
+  // Backend (kolo 69): completedAt v shape() app/api/tasks/route.ts — sloupec se plnil, API ho nevracelo.
   {
     id: 'ukoly.splneno_dnes',
     oblast: 'ukoly',
     nazev: 'Splněno dnes',
     popis: 'Co dnes kdo dokončil.',
-    ikona: 'check',
+    ikona: 'calendarCheck',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.ukoly'],
     opravneni: { vse: ['ukoly.zobrazit_tym'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

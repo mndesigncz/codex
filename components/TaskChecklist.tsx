@@ -1,5 +1,8 @@
 'use client';
 
+import { Icon } from './Icons';
+import { Button } from './ui';
+
 export type ChecklistItem = { text: string; done: boolean };
 
 export const RECURRENCE_OPTIONS = [
@@ -40,12 +43,12 @@ export function TaskChecklist({ items, onToggle, onToggleAll }: {
         <div className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden">
           <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${pct}%` }} />
         </div>
-        <span className="text-[11px] font-medium tabular-nums text-black/45 shrink-0">{done}/{items.length}</span>
+        <span className="text-xs font-medium tabular-nums text-black/55 shrink-0">{done}/{items.length}</span>
+        {/* Kolo 69: dřív ruční pilulka 11 px; tichá akce v řádku je ghost Button. */}
         {onToggleAll && items.length > 2 && (
-          <button type="button" onClick={() => onToggleAll(!allDone)}
-            className="tap-target-sm shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-black/45 hover:text-[#16181A] hover:bg-black/[0.05] transition">
+          <Button variant="ghost" size="sm" className="shrink-0 -my-1" onClick={() => onToggleAll(!allDone)}>
             {allDone ? 'Zrušit vše' : 'Odškrtnout vše'}
-          </button>
+          </Button>
         )}
       </div>
       <div className="space-y-0.5">
@@ -55,14 +58,17 @@ export function TaskChecklist({ items, onToggle, onToggleAll }: {
             type="button"
             onClick={onToggle ? () => onToggle(i) : undefined}
             disabled={!onToggle}
-            className={`tap-target-sm flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left text-sm transition ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
+            role="checkbox"
+            aria-checked={it.done}
+            // Rádiusy ze systému (řádek i zaškrtávátko 10 px) a fajfka z Icons.tsx místo vlastního SVG (kolo 69).
+            className={`tap-target-sm flex w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left text-sm transition-colors ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
           >
-            <span className={`grid place-items-center h-4 w-4 shrink-0 rounded-[5px] border transition ${
-              it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/25 text-transparent'
+            <span aria-hidden className={`grid place-items-center h-[18px] w-[18px] shrink-0 rounded-xl border transition-colors ${
+              it.done ? 'bg-[#C8F542] border-[#C8F542] on-accent' : 'border-black/25 text-transparent'
             }`}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+              <Icon name="check" size={12} strokeWidth={2.6} />
             </span>
-            <span className={`min-w-0 truncate ${it.done ? 'line-through text-black/35' : 'text-black/70'}`}>{it.text}</span>
+            <span className={`min-w-0 truncate ${it.done ? 'line-through text-black/45' : 'text-black/70'}`}>{it.text}</span>
           </button>
         ))}
       </div>

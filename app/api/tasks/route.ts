@@ -33,6 +33,9 @@ const shape = (r: any) => ({
   assigneeName: r.assignee_name ?? null, assigneeAvatar: r.assignee_avatar ?? null,
   completedBy: r.completed_by ?? null,
   completedByName: r.completed_by_name ?? null, completedByAvatar: r.completed_by_avatar ?? null,
+  // Kolo 69 (widget Splněno dnes): sloupec se plnil od kola s body, jen ho API
+  // nevracelo — „co se dnes splnilo" nešlo odlišit od včerejška.
+  completedAt: r.completed_at ?? null,
   source: r.source ?? null,
   sourceRef: r.source_ref ?? null,
   sourceMeta: r.source_meta ?? null,

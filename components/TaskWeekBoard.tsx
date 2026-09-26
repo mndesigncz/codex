@@ -1,8 +1,20 @@
 'use client';
 
+// Týdenní tabule úkolů: sloupce jsou dny, karta je úkol. Přetažením karty na
+// jiný den se změní termín (jen vedení, přes onMove).
+//
+// Kolo 69 (balík B6a): tabule se kreslí v nástroji Úkolů i ve widgetu Úkoly na
+// týden, a proto mluví jazykem zbytku aplikace. Dřív byly sloupce sklo jako
+// karta, úkoly šedé dlaždice, dnešek limetkový prstenec, počty ruční pilulky
+// a opakování znak „↻" (audit obsah-kontrola). Teď: sloupec = jamka (Well),
+// úkol = bílá karta, dnešek a počet přes Chip, opakování ikonou, šipky týdne
+// jako Button. Dnešek se bere z pražského dne, ne z hodin prohlížeče.
+
 import { useMemo, useState } from 'react';
 import { Icon } from './Icons';
+import { Button, Chip } from './ui';
 import { recurrenceLabel } from './TaskChecklist';
+import { pragueToday } from '@/lib/pragueTime';
 
 export type BoardTask = {
   id: number;
@@ -18,12 +30,10 @@ export type BoardTask = {
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const WD = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
-const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-black/20';
+const PRIORITA: Record<string, string> = { high: 'vysoká', medium: 'střední', low: 'nízká' };
 
-// A weekly kanban styled exactly like the Planning board — glass columns and
-// draggable cards — but the columns are the days of the week. Dragging a card
-// onto another day changes its due date (employer only, via onMove).
-export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, onOpen, onMove, onAddForDay }: {
+export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, onOpen, onMove, onAddForDay, canComplete, canMove }: {
   tasks: BoardTask[];
   weekStart: number;
   onComplete: (t: BoardTask, done: boolean) => void;
@@ -31,19 +41,23 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
   onOpen?: (t: BoardTask) => void;
   onMove?: (t: BoardTask, date: string) => void;
   onAddForDay?: (date: string) => void;
+  /** Smí divák úkol odškrtnout (cizí úkol bez ukoly.plnit ne) — bez toho platí „každý". */
+  canComplete?: (t: BoardTask) => boolean;
+  /** Smí divák kartu přetáhnout na jiný den (cizí úkol bez ukoly.upravit ne) — bez toho každou. */
+  canMove?: (t: BoardTask) => boolean;
 }) {
   const [offset, setOffset] = useState(0);
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const today = ymd(new Date());
+  const today = pragueToday();
 
   const days = useMemo(() => {
-    const base = new Date(); base.setHours(0, 0, 0, 0);
+    const base = new Date(`${today}T12:00:00`);
     const toStart = (base.getDay() - weekStart + 7) % 7;
     const start = new Date(base);
     start.setDate(base.getDate() - toStart + offset * 7);
     return Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
-  }, [weekStart, offset]);
+  }, [weekStart, offset, today]);
 
   const byDay = useMemo(() => {
     const m = new Map<string, BoardTask[]>();
@@ -62,30 +76,32 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
   const card = (t: BoardTask) => {
     const done = t.status === 'done';
     const label = labelFor?.(t);
+    const muze = canComplete ? canComplete(t) : true;
+    const tah = !!onMove && (canMove ? canMove(t) : true);
+    const opakovani = recurrenceLabel(t.recurrence);
     return (
       <div
         key={t.id}
-        draggable={!!onMove}
-        onDragStart={() => setDragId(t.id)}
+        draggable={tah}
+        onDragStart={tah ? () => setDragId(t.id) : undefined}
         onDragEnd={() => { setDragId(null); setDragOver(null); }}
-        className={`relative bg-black/[0.04] border border-black/[0.07] rounded-2xl p-3 transition ${onMove ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === t.id ? 'opacity-40' : 'hover:bg-black/[0.06]'} ${done ? 'opacity-60' : ''}`}
+        className={`card p-3 transition-shadow ${tah ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === t.id ? 'opacity-40' : 'hover:shadow-[var(--shadow-float)]'}`}
       >
         <div className="flex items-start gap-2">
-          <button onClick={() => onComplete(t, !done)} title={done ? 'Zrušit hotové' : 'Hotovo'}
-            className={`mt-0.5 w-5 h-5 shrink-0 rounded-full border flex items-center justify-center transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/25 hover:border-[#C8F542]/70 bg-white/60'}`}>
-            {done && <span className="text-[11px] font-bold leading-none"><Icon name="check" size={15} /></span>}
+          <button type="button" role="checkbox" aria-checked={done} aria-label={t.title}
+            disabled={!muze} onClick={() => onComplete(t, !done)}
+            // fokus-kontrast: obrys fokusu musí být vidět i kolem limetkového (splněného) kolečka.
+            className={`tap-target fokus-kontrast mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              done ? 'bg-[#C8F542] on-accent' : 'border-2 border-black/15 hover:bg-black/[0.05]'}`}>
+            {done && <Icon name="check" size={12} strokeWidth={2.6} />}
           </button>
-          <button onClick={() => onOpen?.(t)} className="min-w-0 flex-1 text-left">
-            <p className={`font-semibold text-sm break-words ${done ? 'line-through text-black/40' : 'text-[#16181A]'}`}>{t.title}</p>
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} />
-              {label && <span className="text-[11px] text-black/50 truncate max-w-[9rem]">{label}</span>}
-              {recurrenceLabel(t.recurrence) && (
-                <span className="inline-flex items-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-1.5 py-0.5 text-[11px] font-semibold">↻</span>
-              )}
-            </div>
-            {done && t.completedByName && <p className="text-[11px] text-black/35 mt-1">splnil {t.completedByName}</p>}
-          </button>
+          {onOpen ? (
+            <button type="button" onClick={() => onOpen(t)} className="min-w-0 flex-1 text-left">
+              <Obsah t={t} done={done} label={label} opakovani={opakovani} />
+            </button>
+          ) : (
+            <div className="min-w-0 flex-1"><Obsah t={t} done={done} label={label} opakovani={opakovani} /></div>
+          )}
         </div>
       </div>
     );
@@ -93,59 +109,70 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
 
   return (
     <div className="space-y-4">
-      {/* Week navigation */}
       <div className="flex items-center justify-between gap-2">
-        <button onClick={() => setOffset(o => o - 1)} aria-label="Předchozí týden" className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
-          <Icon name="chevron" size={16} className="rotate-90" />
-        </button>
-        <p className="text-sm font-semibold text-[#16181A] text-center">
+        <Button variant="secondary" size="sm" iconOnly icon="chevron" className="[&_svg]:rotate-90" aria-label="Předchozí týden" onClick={() => setOffset(o => o - 1)} />
+        <p className="text-sm font-semibold text-[#16181A] text-center tabular-nums">
           {days[0].toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })} – {days[6].toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
-          {offset === 0 && <span className="text-black/40 font-normal"> · tento týden</span>}
+          {offset === 0 && <span className="text-black/45 font-normal"> · tento týden</span>}
         </p>
-        <button onClick={() => setOffset(o => o + 1)} aria-label="Další týden" className="tap-target rounded-full glass w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.05]">
-          <Icon name="chevron" size={16} className="-rotate-90" />
-        </button>
+        <Button variant="secondary" size="sm" iconOnly icon="chevronRight" aria-label="Další týden" onClick={() => setOffset(o => o + 1)} />
       </div>
 
-      {/* Day columns — a horizontally scrolling kanban */}
-      <div className="flex gap-4 overflow-x-auto scrollbar-thin pb-2 -mx-1 px-1 snap-x">
+      {/* Sloupce dnů — vodorovně posuvná tabule (na telefonu po jednom dni se scroll-snap). */}
+      <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2 -mx-1 px-1 snap-x">
         {days.map(d => {
           const key = ymd(d);
           const list = (byDay.get(key) ?? []).slice().sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done'));
           const isToday = key === today;
           return (
-            <div
+            <section
               key={key}
+              aria-label={d.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })}
               onDragOver={onMove ? (e => { e.preventDefault(); setDragOver(key); }) : undefined}
               onDragLeave={onMove ? (() => setDragOver(c => (c === key ? null : c))) : undefined}
               onDrop={onMove ? (() => drop(key)) : undefined}
-              className={`shrink-0 w-[15rem] snap-start glass rounded-3xl p-3.5 flex flex-col gap-3 transition ${dragOver === key ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.05]' : ''} ${isToday ? 'ring-1 ring-[#C8F542]/40' : ''}`}
+              className={`well shrink-0 w-[15rem] snap-start p-3 flex flex-col gap-3 transition-shadow ${dragOver === key ? 'ring-2 ring-black/15' : ''}`}
             >
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isToday ? 'bg-[#C8F542]' : 'bg-black/20'}`} />
-                  <span className="font-semibold text-sm text-[#16181A] tracking-tight truncate">
-                    {WD[d.getDay()]} <span className="text-black/45 font-normal">{d.getDate()}.{d.getMonth() + 1}.</span>
-                  </span>
-                </div>
-                {list.length > 0 && <span className="rounded-full bg-black/[0.06] text-black/55 px-2 py-0.5 text-xs font-medium shrink-0">{list.length}</span>}
+              <div className="flex items-center justify-between gap-2 px-1">
+                <h3 className="t-card truncate">
+                  {WD[d.getDay()]} <span className="text-black/45 font-normal tabular-nums">{d.getDate()}.&nbsp;{d.getMonth() + 1}.</span>
+                </h3>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  {isToday && <Chip tone="ink" size="sm">dnes</Chip>}
+                  {list.length > 0 && <Chip tone="muted" size="sm">{list.length}</Chip>}
+                </span>
               </div>
 
-              <div className="space-y-2.5 min-h-[3rem]">
+              <div className="space-y-2 min-h-[3rem]">
                 {list.map(card)}
-                {list.length === 0 && <p className="text-[11px] text-black/25 text-center py-4">Žádný úkol</p>}
+                {list.length === 0 && <p className="t-meta text-center py-4">Žádný úkol</p>}
               </div>
 
               {onAddForDay && (
-                <button onClick={() => onAddForDay(key)}
-                  className="w-full py-2 border border-dashed border-black/10 rounded-2xl text-xs text-black/35 hover:border-[#C8F542]/40 hover:text-[#5B7A08] transition">
-                  + Přidat úkol
+                <button type="button" onClick={() => onAddForDay(key)}
+                  className="tap-target-sm w-full py-2 rounded-2xl border border-dashed border-black/15 text-sm text-black/45 inline-flex items-center justify-center gap-1.5 hover:text-[#16181A] hover:bg-black/[0.03] transition-colors">
+                  <Icon name="plus" size={15} /> Přidat úkol
                 </button>
               )}
-            </div>
+            </section>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function Obsah({ t, done, label, opakovani }: { t: BoardTask; done: boolean; label?: string; opakovani: string | null }) {
+  return (
+    <>
+      <p className={`font-medium text-sm break-words ${done ? 'text-black/45' : 'text-[#16181A]'}`}>{t.title}</p>
+      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} aria-hidden />
+        <span className="sr-only">Priorita {PRIORITA[t.priority] ?? 'střední'}.</span>
+        {label && <span className="text-xs text-black/55 truncate max-w-[9rem]">{label}</span>}
+        {opakovani && <><Icon name="refresh" size={13} className="shrink-0 text-black/45" title={`Opakuje se: ${opakovani}`} /><span className="sr-only">Opakuje se: {opakovani}.</span></>}
+      </div>
+      {done && t.completedByName && <p className="text-xs text-black/45 mt-1">splnil {t.completedByName}</p>}
+    </>
   );
 }

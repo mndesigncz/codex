@@ -1,6 +1,8 @@
 'use client';
 
 import { Step, fmtMinutes } from '@/lib/steps';
+import { Icon } from '../Icons';
+import { Button, Chip } from '../ui';
 import { clickable } from '@/lib/clickable';
 
 type Status = 'pending' | 'done' | 'skipped';
@@ -25,25 +27,10 @@ interface Props {
   guideHref?: (guideId: number) => string;
 }
 
-const clockGlyph = (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-);
-const checkGlyph = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
-);
-// Skip glyph: a forward "skip" chevron pair.
-const skipGlyph = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 5l7 7-7 7M13 5l7 7-7 7" /></svg>
-);
-const infoGlyph = (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
-);
-const bookGlyph = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-);
-
-// One consistent on-brand tile (lime + lime-text) for every step.
-const TILE = 'bg-[#C8F542]/30 text-[#5B7A08]';
+// Kolo 69 (B6b): vlastní SVG glyfy (hodiny, fajfka, přeskočit, info, kniha) nahradila sada
+// z Icons.tsx; limetková dlaždice u každého kroku, limetkový/oranžový tón karty a limetková
+// ZÁŘE tečky hotového kroku pryč (audit: limetka je akce, ne stav). Hotové = inkoustová
+// tečka s fajfkou a přeškrtnutý text, přeskočené = tečka ve stavovém tónu „čeká".
 
 export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, interactive = false, compact = false, onOpenGuide, guideHref }: Props) {
   return (
@@ -56,7 +43,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
         const first = i === 0;
         const last = i === steps.length - 1;
 
-        const segColor = (st: Status) => (st === 'done' ? 'bg-[#C8F542]' : st === 'skipped' ? 'bg-wait/70' : 'bg-black/[0.12]');
+        const segColor = (st: Status) => (st === 'done' ? 'bg-black/45' : st === 'skipped' ? 'bg-wait/70' : 'bg-black/[0.12]');
 
         return (
           <li key={i} className="relative flex items-stretch gap-3">
@@ -81,16 +68,12 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                     e.preventDefault(); onSkip(i);
                   }
                 }}
-                className={`rounded-3xl px-3.5 ${compact ? 'py-2.5' : 'py-3'} border transition ${
-                  done
-                    ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/30'
-                    : skipped
-                    ? 'bg-wait/[0.07] border-wait/25'
-                    : 'bg-white border-black/[0.05] shadow-[0_2px_10px_rgba(20,30,10,0.05)]'
+                className={`rounded-3xl px-3.5 ${compact ? 'py-2.5' : 'py-3'} border bg-white transition-[transform,border-color] ${
+                  skipped ? 'border-wait/30' : 'border-black/[0.07]'
                 } ${interactive ? 'cursor-pointer active:scale-[0.99]' : ''}`}
               >
                 <div className="flex items-center gap-3">
-                  <span className={`flex ${compact ? 'h-8 w-8 text-base' : 'h-10 w-10 text-xl'} flex-shrink-0 items-center justify-center rounded-2xl ${TILE}`}>
+                  <span className={`well flex ${compact ? 'h-8 w-8 text-base' : 'h-10 w-10 text-xl'} flex-shrink-0 items-center justify-center text-black/60`}>
                     {s.emoji || <span className="text-sm font-bold">{i + 1}</span>}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -98,12 +81,12 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       {s.text}
                     </p>
                     {skipped ? (
-                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-wait-ink">
-                        {skipGlyph} Přeskočeno
+                      <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-wait-ink">
+                        <Icon name="chevronRight" size={13} /> Přeskočeno
                       </p>
                     ) : s.note && !compact && (
                       <p className="mt-1 flex items-start gap-1.5 text-xs text-black/45">
-                        <span className="mt-0.5 flex-shrink-0 text-black/30">{infoGlyph}</span>
+                        <Icon name="info" size={12} className="mt-0.5 flex-shrink-0 text-black/30" />
                         <span className="leading-snug">{s.note}</span>
                       </p>
                     )}
@@ -112,39 +95,31 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                         návodu zároveň prohlásilo krok za hotový. */}
                     {s.guideId != null && !skipped && (onOpenGuide || guideHref) && (
                       onOpenGuide ? (
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); onOpenGuide(s.guideId as number); }}
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1 text-[11px] font-semibold transition">
-                          {bookGlyph} Otevřít návod
-                        </button>
+                        <Button variant="secondary" size="sm" icon="book" className="mt-1.5"
+                          onClick={(e) => { e.stopPropagation(); onOpenGuide(s.guideId as number); }}>
+                          Otevřít návod
+                        </Button>
                       ) : (
                         <a href={guideHref!(s.guideId as number)}
                           onClick={(e) => e.stopPropagation()}
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1 text-[11px] font-semibold transition">
-                          {bookGlyph} Otevřít návod
+                          className="btn btn-secondary btn-sm mt-1.5 inline-flex items-center gap-1.5">
+                          <Icon name="book" size={14} /> Otevřít návod
                         </a>
                       )
                     )}
                   </div>
                   {s.minutes != null && !skipped && (
-                    <span className="flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-black/55 tabular-nums">
-                      {clockGlyph}{fmtMinutes(s.minutes)}
-                    </span>
+                    <Chip tone="muted" size="sm" icon="clock" className="flex-shrink-0 tabular-nums">{fmtMinutes(s.minutes)}</Chip>
                   )}
                   {/* Skip / undo-skip control */}
                   {interactive && onSkip && !done && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onSkip(i); }}
+                    <Button variant="ghost" size="sm" icon={skipped ? 'undo' : 'chevronRight'} className="flex-shrink-0"
+                      iconOnly={compact && !skipped}
+                      aria-label={skipped ? `Vrátit mezi kroky: ${s.text}` : `Přeskočit krok: ${s.text}`}
                       title={skipped ? 'Vrátit mezi kroky' : 'Přeskočit tento krok'}
-                      className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                        skipped
-                          ? 'bg-wait/15 text-wait-ink hover:bg-wait/25'
-                          : 'bg-black/[0.05] text-black/45 hover:bg-wait/15 hover:text-wait-ink'
-                      }`}
-                    >
-                      {skipped ? 'Vrátit' : <>{skipGlyph}<span className={compact ? 'sr-only' : ''}>Přeskočit</span></>}
-                    </button>
+                      onClick={(e) => { e.stopPropagation(); onSkip(i); }}>
+                      {compact && !skipped ? undefined : skipped ? 'Vrátit' : 'Přeskočit'}
+                    </Button>
                   )}
                 </div>
               </div>
@@ -163,15 +138,16 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                 onClick={() => onToggle?.(i)}
                 onContextMenu={(e) => { if (interactive && onSkip) { e.preventDefault(); onSkip(i); } }}
                 title={interactive ? (done ? 'Zrušit označení' : 'Označit jako splněné') : undefined}
-                className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full transition ${
+                aria-label={interactive ? `${done ? 'Zrušit splnění' : 'Označit jako hotové'} — ${s.text}` : undefined}
+                className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
                   done
-                    ? 'bg-[#C8F542] text-black shadow-[0_2px_8px_rgba(200,245,66,0.5)]'
+                    ? 'bg-[#16181A] text-white'
                     : skipped
-                    ? 'bg-wait text-white shadow-[0_2px_8px_rgba(251,191,36,0.4)]'
-                    : `bg-white border-2 border-black/15 shadow-sm ${interactive ? 'hover:border-[#C8F542] cursor-pointer' : ''}`
+                    ? 'bg-wait text-white'
+                    : `bg-white border-2 border-black/15 ${interactive ? 'hover:border-black/40 cursor-pointer' : ''}`
                 }`}
               >
-                {done ? checkGlyph : skipped ? skipGlyph : null}
+                {done ? <Icon name="check" size={15} strokeWidth={2.4} /> : skipped ? <Icon name="chevronRight" size={13} strokeWidth={2.4} /> : null}
               </button>
             </div>
           </li>

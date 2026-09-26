@@ -1,64 +1,86 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+// Úkoly (vedení): co se má udělat, kdo to udělá a do kdy.
+//
+// Kolo 69 (balík B6a): stránka je plocha s widgety. Hlavička jde do PlochaWidgetu,
+// tahle komponenta kreslí nástroj — filtr podle lidí, formulář úkolu a seznam po
+// dnech nebo týdenní tabuli. Data čte přes useDataWidgetu z téže adresy jako widgety
+// (Po termínu, Podle lidí, Splněno dnes…), takže stránka se ptá jednou a odškrtnutí
+// dole i nahoře se srovná samo.
+//
+// Z auditu (obsah-kontrola, final_sorted): confirm() u mazání a u splnění mimo den
+// termínu je teď okno, formulář je z polí `Field` (priorita přes Segmented, žádné
+// ruční pilulky ani limetkový box), akce řádku jsou Button s ikonou z Icons.tsx
+// a aria-label, štítky úkolu Chip, odkaz na návod ghost tlačítko a „Zobrazit další
+// úkoly" bez šipky v textu. Tlačítka Upravit a Smazat se ukážou, jen když je server
+// pustí (autor, ukoly.upravit, ukoly.mazat) — dřív klik skončil tichým návratem.
+
+import { useState, useEffect, useMemo, useCallback, useId } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, Segmented, EmptyState } from '../ui';
+import {
+  Button, Card, Chip, EmptyState, ErrorState, Field, Input, Modal, Segmented, Select, Skeleton, Textarea, Toast,
+} from '../ui';
 import { useCurrency } from '../CurrencyProvider';
 import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { PersonLink } from './ProfileLinkProvider';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { URL_UKOLY, UDALOST_FILTR_UKOLU, KLIC_FILTRU_UKOLU, UKOL, Zaskrtnuti } from '../widgety/oblasti/ukoly';
 import { pragueToday } from '@/lib/pragueTime';
-import { okJson } from '@/lib/api';
+import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
+import { czCount } from '@/lib/czech';
+import { vyberUkoly, rozdelPoDnech, jeCiziUkol, type Ukol } from '@/lib/ukolyPrehled';
 
-interface Task {
-  id: number;
-  title: string;
-  description?: string | null;
-  assignedTo: number | null;
-  teamTask?: boolean;
-  createdBy: number;
-  priority: string;
-  status: string;
-  dueDate?: string | null;
-  recurrence?: string | null;
-  seriesId?: string | null;
-  checklist?: ChecklistItem[];
-  completedBy?: number | null;
-  completedByName?: string | null;
-  completedByAvatar?: string | null;
-  source?: string | null;
-  sourceMeta?: { guideId?: number | null; guideTitle?: string | null } | null;
-}
-interface Member { id: number; name: string; role: string; avatar?: string }
-
-const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
+interface Member { id: number; name: string; role: string }
 
 const PRIORITIES = [
-  { value: 'low', label: 'Nízká', dot: 'bg-[#C8F542]' },
-  { value: 'medium', label: 'Střední', dot: 'bg-wait' },
-  { value: 'high', label: 'Vysoká', dot: 'bg-bad' },
-];
-const statusLabel = (s: string) => s === 'done' ? 'Hotovo' : s === 'in_progress' ? 'Probíhá' : 'Čeká';
-const statusChip = (s: string) => s === 'done' ? 'bg-[#C8F542]/15 text-[#5B7A08]' : s === 'in_progress' ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-black/[0.05] text-black/55';
+  { id: 'low', label: 'Nízká' },
+  { id: 'medium', label: 'Střední' },
+  { id: 'high', label: 'Vysoká' },
+] as const;
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-black/20';
+const PRIORITA: Record<string, string> = { high: 'vysoká', medium: 'střední', low: 'nízká' };
 
 const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[] });
+type Form = ReturnType<typeof emptyForm>;
+
+const vyberCleny = (raw: any): Member[] =>
+  (Array.isArray(raw?.members) ? raw.members : []).filter((m: Member) => m.role === 'employee' || m.role === 'employer');
+
+const denDlouze = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 export default function TaskManager({ user }: { user: { id?: string | number } }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
+  const ja = Number(user.id) || null;
+  const smi = useSmi();
+  const data = useDataWidgetu<Ukol[]>(URL_UKOLY, vyberUkoly);
+  const clenoveData = useDataWidgetu<Member[]>('/api/teams', vyberCleny);
+  const tasks = useMemo(() => data.data ?? [], [data.data]);
+  const members = clenoveData.data ?? [];
+  const zadava = smi('ukoly.zadavat');
+
   // Padesát úkolů napříč osmi lidmi a jediné, co šlo, bylo číst je podle
   // data. „Co má dneska Eva" nešlo zjistit jinak než očima přes celý seznam.
-  const [who, setWho] = useState<number | 'all'>('all');
-  const [loading, setLoading] = useState(true);
+  // 'volne' = úkoly pro kohokoli (widget Úkoly podle lidí na ně umí kliknout).
+  const [who, setWho] = useState<number | 'all' | 'volne'>('all');
+  const [view, setView] = useState<'list' | 'week'>('list');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<Form>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingSeries, setEditingSeries] = useState(false);
+  const [akceChyba, setAkceChyba] = useState<string | null>(null);
+  const [zprava, setZprava] = useState<string | null>(null);
+  // Okna místo confirm(): mazání a splnění úkolu, který není na dnešek.
+  const [mazani, setMazani] = useState<Ukol | null>(null);
+  const [mazu, setMazu] = useState(false);
+  const [mimoDen, setMimoDen] = useState<Ukol | null>(null);
   // Záložky v aplikaci jsou `?view=`, takže odchod na Rozvrh formulář
   // odmontuje. Do kola 37 to znamenalo psát úkol znovu.
   const koncept = useDraft('ukoly', form, setForm, {
@@ -68,35 +90,45 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   // totéž co ztracený — uživatel by ho nehledal a psal znovu.
   useEffect(() => { if (koncept.cekaKoncept) setShowForm(true); }, [koncept.cekaKoncept]);
 
-  const [view, setView] = useState<'list' | 'week'>('list');
+  // Filtr z widgetu Úkoly podle lidí: na téže stránce událostí, odjinud přes sessionStorage.
+  useEffect(() => {
+    const nastav = (kdo: unknown) => setWho(kdo == null || kdo === 'volne' ? 'volne' : Number(kdo) || 'all');
+    try {
+      const ulozeno = sessionStorage.getItem(KLIC_FILTRU_UKOLU);
+      if (ulozeno) { sessionStorage.removeItem(KLIC_FILTRU_UKOLU); nastav(ulozeno); }
+    } catch { /* soukromé okno */ }
+    const naUdalost = (e: Event) => {
+      const d = (e as CustomEvent<{ kdo: number | null; prijato: boolean }>).detail;
+      d.prijato = true;
+      setView('list');
+      nastav(d.kdo);
+    };
+    window.addEventListener(UDALOST_FILTR_UKOLU, naUdalost);
+    return () => window.removeEventListener(UDALOST_FILTR_UKOLU, naUdalost);
+  }, []);
+
   const [showLater, setShowLater] = useState(false);
   const { weekStart } = useCurrency();
   const today = pragueToday();
   const weekAhead = pragueToday(7);
 
-  const load = async () => {
-    try {
-      const [tk, tm] = await Promise.all([
-        fetch('/api/tasks').then(okJson).catch(() => []),
-        fetch('/api/teams').then(okJson).catch(() => ({})),
-      ]);
-      setTasks(Array.isArray(tk) ? tk : []);
-      setMembers((tm?.members ?? []).filter((m: Member) => m.role === 'employee' || m.role === 'employer'));
-    } catch { /* ignore */ }
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, []);
-
-  const memberById = useMemo(() => {
-    const m = new Map<number, Member>();
-    members.forEach(x => m.set(x.id, x));
-    return m;
-  }, [members]);
+  const memberById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
 
   const closeForm = () => { setShowForm(false); setEditingId(null); setEditingSeries(false); setForm(emptyForm()); setError(''); };
+  const openNew = (dueDate = '') => {
+    setEditingId(null); setEditingSeries(false);
+    setForm({ ...emptyForm(), dueDate, assignedTo: zadava ? '' : String(ja ?? '') });
+    setShowForm(true); setError('');
+  };
+
+  /** Úpravy pustí server autorovi a s ukoly.upravit; mazání autorovi a s ukoly.mazat. */
+  const smiUpravit = (t: Ukol) => t.createdBy === ja || smi('ukoly.upravit');
+  const smiSmazat = (t: Ukol) => t.createdBy === ja || smi('ukoly.mazat');
+  const smiSplnit = (t: Ukol) => !jeCiziUkol(t, ja) || smi('ukoly.plnit');
 
   // Open the form pre-filled to edit an existing task.
-  const openEdit = (t: Task) => {
+  const openEdit = (t: Ukol) => {
+    if (!smiUpravit(t)) return;
     setEditingId(t.id);
     setEditingSeries(!!t.seriesId);
     setForm({
@@ -111,114 +143,89 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!form.title.trim()) { setError('Zadejte název úkolu.'); return; }
-    if (form.assignedTo === '' && !form.dueDate) { setError('U úkolu pro kohokoliv vyber den (termín).'); return; }
+    if (!form.title.trim()) { setError('Zadej název úkolu.'); return; }
+    if (form.assignedTo === '' && !form.dueDate) { setError('U úkolu pro kohokoli vyber den (termín).'); return; }
     setSaving(true);
+    const spolecne = {
+      title: form.title.trim(), description: form.description.trim() || null, priority: form.priority,
+      assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
+      dueDate: form.dueDate || null,
+      recurrence: form.recurrence || null,
+    };
     try {
-      if (editingId) {
-        // Edit — everything is editable, just like creating. For a recurring
-        // task the server rewrites all future occurrences when the schedule,
-        // assignee or checklist changes.
-        const res = await fetch('/api/tasks', {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: editingId, edit: true,
-            title: form.title.trim(), description: form.description.trim() || null, priority: form.priority,
-            assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
-            dueDate: form.dueDate || null,
-            recurrence: form.recurrence || null,
-            checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: !!i.done })),
-          }),
-        });
-        const d = await res.json();
-        if (res.ok) { koncept.hotovo(); closeForm(); load(); }
-        else setError(d.error || 'Úkol se nepodařilo upravit.');
-      } else {
-        const res = await fetch('/api/tasks', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: form.title.trim(), description: form.description.trim() || null,
-            assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
-            priority: form.priority, dueDate: form.dueDate || null,
-            recurrence: form.recurrence || null,
-            checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: false })),
-          }),
-        });
-        const d = await res.json();
-        if (res.ok) { koncept.hotovo(); closeForm(); load(); } // reload to include generated upcoming occurrences
-        else setError(d.error || 'Úkol se nepodařilo vytvořit.');
-      }
-    } catch { setError('Chyba serveru.'); }
+      // Úprava: všechno jde změnit jako při založení. U opakovaného úkolu server
+      // přepíše budoucí výskyty, když se změní termín, přiřazení nebo kroky.
+      await fetch(URL_UKOLY, {
+        method: editingId ? 'PATCH' : 'POST', headers: JSON_HLAVICKA,
+        body: JSON.stringify(editingId
+          ? { id: editingId, edit: true, ...spolecne, checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: !!i.done })) }
+          : { ...spolecne, checklist: form.checklist.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), done: false })) }),
+      }).then(okJson);
+      const novy = !editingId;
+      koncept.hotovo(); closeForm();
+      // Znovu načíst: opakovaný úkol si na serveru vygeneruje nejbližší výskyty.
+      data.reload();
+      setZprava(novy ? 'Úkol je zadaný.' : 'Změny úkolu jsou uložené.');
+    } catch (err) {
+      setError(apiMessage(err, editingId ? 'Úkol se nepodařilo upravit.' : 'Úkol se nepodařilo vytvořit.'));
+    }
     setSaving(false);
   };
 
-  // Drag a card to another day → change that occurrence's due date.
-  const moveTask = async (t: Task, date: string) => {
-    const prev = tasks;
-    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, dueDate: date } : x));
+  /** Zápis s optimistickou změnou a vrácením při chybě (seznam, tabule i widgety nad /api/tasks). */
+  const zapis = useCallback(async (zmena: (ts: Ukol[]) => Ukol[], telo: Record<string, unknown>, chyba: string) => {
+    setAkceChyba(null);
+    const puvodni = data.data;
+    data.set(prev => zmena(prev ?? []));
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, move: true, dueDate: date }),
-      });
-      if (!res.ok) throw new Error();
-    } catch { setTasks(prev); }
-  };
-
-  const openCreateForDay = (date: string) => {
-    setEditingId(null); setEditingSeries(false);
-    setForm({ ...emptyForm(), dueDate: date });
-    setShowForm(true); setError('');
-  };
-
-  // Toggle done, warning first if it isn't the task's day.
-  const completeTask = async (t: Task, done: boolean) => {
-    if (done && t.dueDate && t.dueDate !== today) {
-      const d = new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
-      if (!confirm(`Tohle není dnešní úkol (termín: ${d}). Opravdu ho označit jako hotový?`)) return;
+      await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify(telo) }).then(okJson);
+      data.reload();
+    } catch (e) {
+      data.set(() => puvodni ?? []);
+      setAkceChyba(apiMessage(e, chyba));
     }
+  }, [data]);
+
+  // Drag a card to another day → change that occurrence's due date.
+  const moveTask = (t: Ukol, date: string) =>
+    zapis(ts => ts.map(x => (x.id === t.id ? { ...x, dueDate: date } : x)), { id: t.id, move: true, dueDate: date }, 'Úkol se nepodařilo přesunout.');
+
+  const setStatus = (t: Ukol, done: boolean) => {
     const status = done ? 'done' : 'pending';
-    const prev = tasks;
-    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, status } : x));
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, status }),
-      });
-      if (!res.ok) throw new Error();
-    } catch { setTasks(prev); }
+    return zapis(ts => ts.map(x => (x.id === t.id ? { ...x, status } : x)), { id: t.id, status }, 'Změnu stavu se nepodařilo uložit.');
   };
 
-  const remove = async (t: Task) => {
-    const isSeries = !!t.seriesId;
-    if (!confirm(isSeries ? `Smazat celý opakovaný úkol „${t.title}" (i nadcházející)?` : `Smazat úkol „${t.title}"?`)) return;
-    const prev = tasks;
-    // A series delete removes every occurrence of it.
-    setTasks(ts => ts.filter(x => isSeries ? x.seriesId !== t.seriesId : x.id !== t.id));
-    try {
-      const res = await fetch(`/api/tasks?id=${t.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-    } catch { setTasks(prev); }
+  // Toggle done — úkol, který není na dnešek, se napřed zeptá oknem (dřív confirm()).
+  const completeTask = (t: Ukol, done: boolean) => {
+    if (!smiSplnit(t)) return;
+    if (done && t.dueDate && t.dueDate !== today) { setMimoDen(t); return; }
+    void setStatus(t, done);
   };
 
-  const saveChecklist = async (t: Task, next: { text: string; done: boolean }[]) => {
-    const prev = tasks;
-    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, checklist: next } : x));
+  const remove = async () => {
+    const t = mazani;
+    if (!t) return;
+    setMazu(true);
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, checklist: next }),
-      });
-      if (!res.ok) throw new Error();
-    } catch { setTasks(prev); }
+      await fetch(`${URL_UKOLY}?id=${t.id}`, { method: 'DELETE' }).then(okJson);
+      // Smazání opakovaného úkolu zruší celou sérii — i nadcházející výskyty.
+      data.set(prev => (prev ?? []).filter(x => (t.seriesId ? x.seriesId !== t.seriesId : x.id !== t.id)));
+      data.reload();
+      setZprava(t.seriesId ? 'Opakovaný úkol je smazaný i s nadcházejícími.' : 'Úkol je smazaný.');
+      setMazani(null);
+    } catch (e) {
+      setAkceChyba(apiMessage(e, 'Úkol se nepodařilo smazat.'));
+      setMazani(null);
+    }
+    setMazu(false);
   };
 
-  const toggleChecklistItem = (t: Task, index: number) =>
-    saveChecklist(t, (t.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it));
-
+  const saveChecklist = (t: Ukol, next: ChecklistItem[]) =>
+    zapis(ts => ts.map(x => (x.id === t.id ? { ...x, checklist: next } : x)), { id: t.id, checklist: next }, 'Kontrolní seznam se nepodařilo uložit.');
+  const toggleChecklistItem = (t: Ukol, index: number) =>
+    saveChecklist(t, t.checklist.map((it, i) => (i === index ? { ...it, done: !it.done } : it)));
   /** Odškrtnout nebo odškrtnutí zrušit u celého seznamu jedním požadavkem. */
-  const toggleChecklistAll = (t: Task, done: boolean) =>
-    saveChecklist(t, (t.checklist ?? []).map(it => ({ ...it, done })));
+  const toggleChecklistAll = (t: Ukol, done: boolean) => saveChecklist(t, t.checklist.map(it => ({ ...it, done })));
 
   // Create-form checklist editing helpers.
   const addChecklistLine = () => setForm(f => ({ ...f, checklist: [...f.checklist, { text: '', done: false }] }));
@@ -226,119 +233,87 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const setChecklistLine = (i: number, text: string) => setForm(f => ({ ...f, checklist: f.checklist.map((it, idx) => idx === i ? { ...it, text } : it) }));
   const removeChecklistLine = (i: number) => setForm(f => ({ ...f, checklist: f.checklist.filter((_, idx) => idx !== i) }));
 
-  // Day-based grouping for the list view.
-  const byDate = (a: Task, b: Task) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
-  const forWho = who === 'all' ? tasks : tasks.filter(t => t.assignedTo === who);
-  const undone = forWho.filter(t => t.status !== 'done');
-  const overdue = undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate);
-  const todayTasks = undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate);
-  const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
-  // Week ahead up front (greyed as inactive); anything further out sits behind a toggle.
-  const upcomingSoon = upcoming.filter(t => t.dueDate! <= weekAhead);
-  const upcomingLater = upcoming.filter(t => t.dueDate! > weekAhead);
-  const doneTasks = forWho.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 30);
+  const forWho = who === 'all' ? tasks : who === 'volne' ? tasks.filter(t => t.assignedTo == null) : tasks.filter(t => t.assignedTo === who);
+  const skupiny = rozdelPoDnech(forWho, today, weekAhead);
+  const labelFor = (t: Ukol) => t.teamTask ? 'Kdokoli' : (t.assignedTo != null ? (memberById.get(t.assignedTo)?.name ?? t.assigneeName ?? '') : '');
 
-  const labelFor = (t: Task) => t.teamTask ? 'Kdokoliv' : (t.assignedTo != null ? (memberById.get(t.assignedTo)?.name ?? '') : '');
-
-  const renderCard = (t: Task, compact = false) => {
-    const m = t.assignedTo != null ? memberById.get(t.assignedTo) : undefined;
-    const who = t.teamTask ? 'Kdokoliv' : (m ? `${m.avatar ?? '👤'} ${m.name}` : 'Neznámý');
-    const prio = PRIORITIES.find(p => p.value === t.priority) ?? PRIORITIES[1];
+  const renderRow = (t: Ukol) => {
+    const kdo = t.teamTask ? 'Kdokoli' : (t.assigneeName ?? memberById.get(t.assignedTo!)?.name ?? 'Neznámý');
     const done = t.status === 'done';
-    // Future occurrences aren't active yet → show them greyed until their day comes.
+    // Budoucí výskyty ještě neplatí → tlumeně, dokud nepřijde jejich den.
     const inactive = !done && !!t.dueDate && t.dueDate > today;
+    const opakovani = recurrenceLabel(t.recurrence);
     return (
-      <div key={t.id} className={`${compact ? 'card p-3' : 'list-row items-start'} ${inactive ? 'opacity-60' : ''}`}>
-        <div className="flex items-start gap-2.5 w-full min-w-0">
-          <button onClick={() => completeTask(t, !done)} title={done ? 'Označit jako nehotové' : 'Označit jako hotové'}
-            className={`tap-target mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]/60'}`}>
-            {done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
-          </button>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-1.5">
-              <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${prio.dot}`} title={`Priorita: ${prio.label}`} />
-              <p className={`font-semibold text-sm text-[#16181A] ${compact ? '' : 'line-clamp-2 sm:truncate'} ${done ? 'line-through text-black/40' : ''}`}>{t.title}</p>
-            </div>
-            <p className={`text-xs text-black/45 mt-0.5 flex items-center gap-1.5 flex-wrap`}>
-              <span className={compact ? '' : 'min-w-0 line-clamp-2'}>
-                {t.assignedTo != null ? <PersonLink id={t.assignedTo}>{who}</PersonLink> : who}
-                {!compact && t.dueDate ? ` · ${new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}` : ''}
-                {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
-              </span>
-              {t.source === 'production' && (
-                <span className="chip chip-sm chip-info shrink-0" title="Vzniká sám, když dochází vlastní výroba">Výroba</span>
-              )}
-              {/* Vedení odsud vidí, podle čeho obsluha vyrábí — a jedním
-                  ťuknutím je v tom návodu. */}
-              {t.sourceMeta?.guideId && (
-                <a href={`/employer/overview?view=guides&guide=${t.sourceMeta.guideId}`}
-                  className="chip chip-sm bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 transition shrink-0"
-                  title={t.sourceMeta.guideTitle ?? 'Otevřít návod'}>
-                  {t.sourceMeta.guideTitle ?? 'Návod'}
-                </a>
-              )}
-              {recurrenceLabel(t.recurrence) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold shrink-0">↻ {recurrenceLabel(t.recurrence)}</span>
-              )}
-            </p>
-            {!compact && t.checklist && t.checklist.length > 0 && (
-              <TaskChecklist items={t.checklist} onToggle={i => toggleChecklistItem(t, i)}
-                onToggleAll={d => toggleChecklistAll(t, d)} />
+      <li key={t.id} className="list-row items-start">
+        <span className="shrink-0 pt-0.5">
+          <Zaskrtnuti hotovo={done} nazev={t.title} zamceno={!smiSplnit(t)} ceka={false} onClick={() => completeTask(t, !done)} />
+        </span>
+        <div className={`min-w-0 flex-1 ${inactive ? 'opacity-60' : ''}`}>
+          <p className="flex items-start gap-1.5">
+            <span className={`mt-[7px] w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} aria-hidden />
+            <span className="sr-only">Priorita {PRIORITA[t.priority] ?? 'střední'}.</span>
+            <span className={`font-medium text-[15px] leading-snug line-clamp-2 ${done ? 'text-black/45' : 'text-[#16181A]'}`}>{t.title}</span>
+          </p>
+          <div className="text-[13px] text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <span className="min-w-0">
+              {t.assignedTo != null ? <PersonLink id={t.assignedTo}>{kdo}</PersonLink> : kdo}
+              {t.dueDate ? ` · ${denKratce(t.dueDate)}` : ''}
+              {done && t.completedByName ? <> · splnil <PersonLink id={t.completedBy}>{t.completedByName}</PersonLink></> : ''}
+            </span>
+            {t.source === 'production' && <Chip tone="info" size="sm" icon="leaf">Výroba</Chip>}
+            {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
+            {/* Vedení odsud vidí, podle čeho obsluha vyrábí — a jedním ťuknutím je v tom návodu. */}
+            {t.sourceMeta?.guideId && (
+              <a href={`/employer/overview?view=guides&guide=${t.sourceMeta.guideId}`} className="btn btn-ghost btn-sm -my-1">
+                <Icon name="book" size={15} className="shrink-0" />
+                <span className="truncate max-w-[12rem]">{t.sourceMeta.guideTitle ?? 'Návod'}</span>
+              </a>
             )}
           </div>
-          {!compact && (
-            <div className="flex items-center gap-1 shrink-0">
-              <button onClick={() => openEdit(t)} title="Upravit" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-[#16181A]">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-              </button>
-              <button onClick={() => remove(t)} title="Smazat" className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/45 hover:text-bad-ink">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-              </button>
-            </div>
+          {t.checklist.length > 0 && (
+            <TaskChecklist items={t.checklist} onToggle={i => toggleChecklistItem(t, i)} onToggleAll={d => toggleChecklistAll(t, d)} />
           )}
         </div>
-      </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {smiUpravit(t) && <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit úkol ${t.title}`} onClick={() => openEdit(t)} />}
+          {smiSmazat(t) && <Button variant="ghost" size="sm" iconOnly icon="trash" className="hover:!text-[var(--bad-ink)]" aria-label={`Smazat úkol ${t.title}`} onClick={() => setMazani(t)} />}
+        </div>
+      </li>
     );
   };
 
-  const section = (title: string, list: Task[], tone = 'text-black/45') =>
+  const section = (title: string, list: Ukol[], tone = '') =>
     list.length > 0 && (
-      <div className="space-y-2">
-        <h3 className={`t-label ${tone}`}>{title} ({list.length})</h3>
-        <div className="card"><div className="list">{list.map(t => renderCard(t))}</div></div>
-      </div>
+      <section className="space-y-2" aria-label={title}>
+        <h2 className={`t-label ${tone}`}>{title} ({list.length.toLocaleString('cs-CZ')})</h2>
+        <Card pad="none" className="px-5"><ul className="list">{list.map(renderRow)}</ul></Card>
+      </section>
     );
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto w-full">
-      <PageHeader hintId="taskmanager"
-        title="Úkoly"
-        subtitle="Úkoly na den nebo pro konkrétní lidi — a jejich plnění."
-        secondary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
-          options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />}
-        primary={
-          <Button variant="accent" icon="plus"
-            onClick={() => { if (showForm) closeForm(); else { setForm(emptyForm()); setEditingId(null); setShowForm(true); setError(''); } }}>
-            Nový úkol
-          </Button>
-        }
-        aside={<div className="md:hidden"><Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
-          options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} /></div>}
-      />
+  const idForm = useId();
+  const fid = (k: string) => `${idForm}-${k}`;
 
+  const nastroj = (
+    <div className="space-y-6">
       {/* Filtr podle člověka. Ukáže se, až když je koho filtrovat. */}
       {members.length > 1 && tasks.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
-          <button type="button" onClick={() => setWho('all')}
-            className={`filter-pill ${who === 'all' ? 'seg-on' : 'seg-off glass'}`}>
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5" role="group" aria-label="Filtr podle člověka">
+          <button type="button" aria-pressed={who === 'all'} onClick={() => setWho('all')}
+            className={`filter-pill tap-target-sm ${who === 'all' ? 'seg-on' : 'seg-off glass'}`}>
             Všichni · {tasks.length}
           </button>
+          {tasks.some(t => t.assignedTo == null) && (
+            <button type="button" aria-pressed={who === 'volne'} onClick={() => setWho(w => (w === 'volne' ? 'all' : 'volne'))}
+              className={`filter-pill tap-target-sm ${who === 'volne' ? 'seg-on' : 'seg-off glass'}`}>
+              Kdokoli · {tasks.filter(t => t.assignedTo == null).length}
+            </button>
+          )}
           {members.map(m => {
             const n = tasks.filter(t => t.assignedTo === m.id).length;
             if (n === 0) return null;
             return (
-              <button key={m.id} type="button" onClick={() => setWho(w => (w === m.id ? 'all' : m.id))}
-                className={`filter-pill ${who === m.id ? 'seg-on' : 'seg-off glass'}`}>
+              <button key={m.id} type="button" aria-pressed={who === m.id} onClick={() => setWho(w => (w === m.id ? 'all' : m.id))}
+                className={`filter-pill tap-target-sm ${who === m.id ? 'seg-on' : 'seg-off glass'}`}>
                 {m.name.split(' ')[0]} · {n}
               </button>
             );
@@ -347,144 +322,151 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       )}
 
       {showForm && (
-        <form onSubmit={save} className="glass-card p-5 sm:p-6 space-y-4">
-          <h3 className="t-card">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h3>
+        <Card as="form" pad="lg" onSubmit={save} className="space-y-4" aria-labelledby={fid('nadpis')}>
+          <h2 id={fid('nadpis')} className="t-section">{editingId ? 'Upravit úkol' : 'Nový úkol'}</h2>
           <DraftNote koncept={koncept} co="rozepsaný úkol" />
-          <div>
-            <label className="field-label">Název úkolu</label>
-            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Např. Umýt okna" className={inputClass} autoFocus />
-          </div>
-          <div>
-            <label className="field-label">Popis (nepovinné)</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className={`${inputClass} resize-none`} />
-          </div>
+          <Field id={fid('nazev')} label="Název úkolu">
+            <Input id={fid('nazev')} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Např. Umýt okna" autoFocus maxLength={200} />
+          </Field>
+          <Field id={fid('popis')} label="Popis" hint="Nepovinné.">
+            <Textarea id={fid('popis')} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+          </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="field-label">Kdo úkol udělá</label>
-              <select value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} className={inputClass}>
-                <option value="">Kdokoliv (podle dne)</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.avatar} {m.name}</option>)}
-              </select>
-              <p className="text-[11px] text-black/40 mt-1.5">
-                {form.assignedTo === ''
-                  ? 'Úkol na daný den — splní ho kdokoliv z týmu.'
-                  : 'Úkol pro konkrétního člověka.'}
-              </p>
-            </div>
-            <div>
-              <label className="field-label">
-                {editingSeries ? 'Termín (od kdy)' : `Termín ${form.assignedTo === '' ? '(povinné)' : '(nepovinné)'}`}
-              </label>
-              <input type="date" aria-label="Termín úkolu" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }} />
-            </div>
+            <Field id={fid('kdo')} label="Kdo úkol udělá"
+              hint={form.assignedTo === '' ? 'Úkol na daný den — splní ho kdokoli z týmu.' : 'Úkol pro konkrétního člověka.'}>
+              <Select id={fid('kdo')} value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
+                {/* Úkol pro kohokoli nebo pro kolegu zadá jen ten, kdo smí úkoly zadávat (jako POST /api/tasks). */}
+                {zadava && <option value="">Kdokoli (podle dne)</option>}
+                {zadava ? members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)
+                  : <option value={String(ja ?? '')}>Já</option>}
+              </Select>
+            </Field>
+            <Field id={fid('termin')} label={editingSeries ? 'Termín (od kdy)' : 'Termín'}
+              hint={editingSeries ? undefined : form.assignedTo === '' ? 'Povinné u úkolu pro kohokoli.' : 'Nepovinné.'}>
+              <Input id={fid('termin')} type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+            </Field>
           </div>
           {editingSeries && (
-            <p className="text-xs text-black/50 bg-[#C8F542]/[0.12] border border-[#C8F542]/25 rounded-xl px-3 py-2.5">
-              Jde o opakovaný úkol. Úpravy názvu, popisu a priority se projeví u všech výskytů. Změna termínu, opakování, přiřazení nebo kroků <strong>přepíše všechny budoucí výskyty</strong> (hotové a minulé zůstanou beze změny).
+            <p className="note note-info text-sm">
+              Jde o opakovaný úkol. Název, popis a priorita se změní u všech výskytů. Změna termínu, opakování, přiřazení nebo kroků <strong>přepíše všechny budoucí výskyty</strong> — hotové a minulé zůstanou beze změny.
             </p>
           )}
-          <div>
-            <label className="field-label">Priorita</label>
-            <div className="flex flex-wrap gap-2">
-              {PRIORITIES.map(p => (
-                <button key={p.value} type="button" onClick={() => setForm(f => ({ ...f, priority: p.value }))}
-                  className={`rounded-full px-4 py-2 text-sm font-medium border transition inline-flex items-center gap-2 whitespace-nowrap ${form.priority === p.value ? 'bg-[#16181A] text-white border-[#16181A]' : 'bg-black/[0.04] border-black/[0.08] text-black/60 hover:text-black'}`}>
-                  <span className={`w-2 h-2 rounded-full ${p.dot}`} /> {p.label}
-                </button>
-              ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="min-w-0">
+              <p className="field-label" id={fid('prio')}>Priorita</p>
+              <Segmented size="sm" ariaLabel="Priorita" value={form.priority as typeof PRIORITIES[number]['id']}
+                onChange={v => setForm(f => ({ ...f, priority: v }))} options={PRIORITIES.map(p => ({ id: p.id, label: p.label }))} />
             </div>
+            <Field id={fid('opak')} label="Opakování"
+              hint={form.recurrence ? 'Dopředu se připraví nejbližší výskyty; po splnění se neobnoví hned.' : undefined}>
+              <Select id={fid('opak')} value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}>
+                {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+            </Field>
           </div>
-          {/* Recurrence + checklist definition — editable when creating or editing. */}
-          <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="field-label">Opakování</label>
-                  <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
-                    className={`${inputClass} appearance-none`} style={{ WebkitAppearance: 'none' }}>
-                    {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                  {form.recurrence && <p className="text-[11px] text-black/40 mt-1.5">Dopředu se připraví nejbližší výskyty; po splnění se neobnoví hned.</p>}
-                </div>
-              </div>
 
-              <div>
-                <label className="field-label">Kontrolní seznam (nepovinné)</label>
-                <div className="space-y-2">
-                  {form.checklist.map((it, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input value={it.text} onChange={e => setChecklistLine(i, e.target.value)}
-                          placeholder={`Bod ${i + 1}`} className={`${inputClass} !py-2.5`} />
-                        <button type="button" onClick={() => removeChecklistLine(i)}
-                          className="rounded-full glass w-9 h-9 flex items-center justify-center text-black/45 hover:text-bad-ink shrink-0">
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
-                        </button>
-                      </div>
-                      {i < form.checklist.length - 1 && (
-                        <div className="flex justify-center">
-                          <button type="button" onClick={() => insertChecklistLine(i)} title="Přidat bod sem"
-                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-black/10 text-black/40 hover:text-[#5B7A08] hover:border-[#C8F542]/60 shadow-sm transition">
-                            <Icon name="plus" size={13} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <button type="button" onClick={addChecklistLine}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] text-black/60 px-4 py-2 text-sm font-medium hover:bg-black/[0.07] transition">
-                    <Icon name="plus" size={15} /> Přidat bod
-                  </button>
+          <fieldset className="min-w-0">
+            <legend className="field-label">Kontrolní seznam <span className="text-black/45 font-normal">— nepovinné</span></legend>
+            <div className="space-y-2">
+              {form.checklist.map((it, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Input value={it.text} onChange={e => setChecklistLine(i, e.target.value)} aria-label={`Bod ${i + 1}`} placeholder={`Bod ${i + 1}`} maxLength={300} />
+                  <Button variant="ghost" size="sm" iconOnly icon="plus" aria-label={`Vložit bod za bod ${i + 1}`} onClick={() => insertChecklistLine(i)} />
+                  <Button variant="ghost" size="sm" iconOnly icon="minus" aria-label={`Odebrat bod ${i + 1}`} onClick={() => removeChecklistLine(i)} />
                 </div>
-              </div>
-            </>
+              ))}
+              <Button variant="secondary" size="sm" icon="plus" onClick={addChecklistLine}>Přidat bod</Button>
+            </div>
+          </fieldset>
 
-          {error && <p className="text-sm text-bad-ink">{error}</p>}
+          {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={saving} className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
-              {saving ? 'Ukládám…' : editingId ? 'Uložit změny' : 'Vytvořit úkol'}
-            </button>
-            <button type="button" onClick={closeForm} className="rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition whitespace-nowrap">
-              Zrušit
-            </button>
+            <Button type="submit" variant="primary" loading={saving}>{editingId ? 'Uložit změny' : 'Vytvořit úkol'}</Button>
+            <Button variant="secondary" onClick={closeForm}>Zrušit</Button>
           </div>
-        </form>
+        </Card>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
+      {akceChyba && <p className="note note-danger text-sm" role="alert">{akceChyba}</p>}
+
+      {data.error && !data.data ? (
+        <Card><ErrorState title="Úkoly se nenačetly" onRetry={data.reload} detail={data.error} /></Card>
+      ) : data.loading ? (
+        <Card aria-busy className="space-y-2">
+          <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 w-2/3" />
+        </Card>
       ) : view === 'week' ? (
-        <TaskWeekBoard tasks={tasks} weekStart={weekStart}
-          onComplete={(t, done) => completeTask(t as Task, done)}
-          labelFor={(t) => labelFor(t as Task)}
-          onOpen={(t) => openEdit(t as Task)}
-          onMove={(t, date) => moveTask(t as Task, date)}
-          onAddForDay={openCreateForDay} />
+        <TaskWeekBoard tasks={forWho} weekStart={weekStart}
+          onComplete={(t, done) => { const u = tasks.find(x => x.id === t.id); if (u) completeTask(u, done); }}
+          canComplete={t => { const u = tasks.find(x => x.id === t.id); return !!u && smiSplnit(u); }}
+          labelFor={t => { const u = tasks.find(x => x.id === t.id); return u ? labelFor(u) : ''; }}
+          onOpen={t => { const u = tasks.find(x => x.id === t.id); if (u) openEdit(u); }}
+          onMove={(t, date) => { const u = tasks.find(x => x.id === t.id); if (u) void moveTask(u, date); }}
+          canMove={t => { const u = tasks.find(x => x.id === t.id); return !!u && smiUpravit(u); }}
+          onAddForDay={d => openNew(d)} />
       ) : tasks.length === 0 ? (
-        <div className="glass-card">
+        <Card>
           <EmptyState illustration="ukoly" title="Zatím žádné úkoly"
-            hint="Zadej, co se má udělat a kdy — jednorázově nebo každý den. Tým to uvidí v přehledu i na kiosku."
-            action={<Button variant="accent" icon="plus" onClick={() => { setForm(emptyForm()); setEditingId(null); setShowForm(true); setError(''); }}>Nový úkol</Button>} />
-        </div>
+            hint="Zadej, co se má udělat a kdy — jednorázově nebo každý den. Tým to uvidí v přehledu i na tabletu."
+            action={<Button variant="secondary" icon="plus" onClick={() => openNew()}>Nový úkol</Button>} />
+        </Card>
+      ) : forWho.length === 0 ? (
+        <Card><EmptyState compact icon="check" title="Tady nic není" hint="Zruš filtr a uvidíš úkoly všech."
+          action={<Button variant="secondary" size="sm" onClick={() => setWho('all')}>Zobrazit všechny</Button>} /></Card>
       ) : (
         <div className="space-y-6">
-          {section('Po termínu', overdue, 'text-bad-ink')}
-          {section('Dnes', todayTasks, 'text-[#5B7A08]')}
-          {section('Tento týden', upcomingSoon)}
-          {upcomingLater.length > 0 && (
-            showLater ? (
-              section('Později', upcomingLater)
-            ) : (
-              <button
-                onClick={() => setShowLater(true)}
-                className="w-full rounded-2xl border border-dashed border-black/15 py-2.5 text-xs font-semibold text-black/45 hover:text-[#5B7A08] hover:border-[#C8F542]/60 transition"
-              >
-                Zobrazit další úkoly ({upcomingLater.length}) →
-              </button>
+          {section('Po termínu', skupiny.poTerminu, 'text-bad-ink')}
+          {section('Dnes', skupiny.dnes)}
+          {section('Tento týden', skupiny.tentoTyden)}
+          {skupiny.pozdeji.length > 0 && (
+            showLater ? section('Později', skupiny.pozdeji) : (
+              <Button variant="ghost" size="sm" iconAfter="chevron" onClick={() => setShowLater(true)}>
+                Zobrazit další úkoly ({skupiny.pozdeji.length.toLocaleString('cs-CZ')})
+              </Button>
             )
           )}
-          {section('Hotové', doneTasks)}
+          {section('Hotové', skupiny.hotove)}
         </div>
       )}
     </div>
+  );
+
+  const nehotovych = tasks.filter(t => t.status !== 'done' && (!t.dueDate || t.dueDate <= today)).length;
+  return (
+    <>
+      <PlochaWidgetu
+        stranka="vedeni.ukoly"
+        hlavicka={{
+          title: 'Úkoly',
+          subtitle: data.data && nehotovych > 0 ? `Na dnešek a po termínu: ${czCount(nehotovych, UKOL)}.` : 'Úkoly na den nebo pro konkrétní lidi — a jejich plnění.',
+          hintId: 'taskmanager',
+          primary: <Button variant="accent" icon="plus" onClick={() => (showForm && !editingId ? closeForm() : openNew())}>Nový úkol</Button>,
+          aside: <Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
+            options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />,
+        }}
+        nastroj={nastroj}
+      />
+      {mazani && (
+        <Modal open onClose={() => setMazani(null)} size="sm" title={mazani.seriesId ? 'Smazat opakovaný úkol?' : 'Smazat úkol?'}
+          footer={<>
+            <Button variant="secondary" onClick={() => setMazani(null)}>Zrušit</Button>
+            <Button variant="danger-solid" loading={mazu} onClick={remove}>Smazat</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty">
+            {mazani.seriesId ? <>„{mazani.title}" se smaže i se všemi nadcházejícími výskyty.</> : <>„{mazani.title}" zmizí ze seznamu i z přehledu týmu.</>}
+          </p>
+        </Modal>
+      )}
+      {mimoDen && (
+        <Modal open onClose={() => setMimoDen(null)} size="sm" title="Tohle není dnešní úkol"
+          footer={<>
+            <Button variant="secondary" onClick={() => setMimoDen(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" onClick={() => { const t = mimoDen; setMimoDen(null); void setStatus(t, true); }}>Označit jako hotové</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">„{mimoDen.title}" má termín {denDlouze(mimoDen.dueDate!)}.</span> Opravdu ho označit jako hotový už teď?</p>
+        </Modal>
+      )}
+      <Toast message={zprava} onClose={() => setZprava(null)} />
+    </>
   );
 }

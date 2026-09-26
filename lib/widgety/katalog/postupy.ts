@@ -1,8 +1,10 @@
 // Widgety oblasti „Postupy" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/postupy.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B6b v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B6b; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/postupy.tsx, výpočty v lib/postupyPrehled.ts.
+// Soubor patří balíku B6b; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2),
+// v kole 69 hotové všechny. Ikony: dřív měly všechny „clipboard" jako nástroj stránky, takže
+// by se ve výchozím rozložení opakovaly (AK-19) — každý teď nese svou (zámek = bez něj
+// nepůjde uzávěrka, zvonek = připomínka, play = spustit…).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -13,7 +15,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'postupy',
     nazev: 'Povinné postupy dnes',
     popis: 'Postupy povinné před uzávěrkou: hotovo / čeká. Bez nich nepůjde odeslat uzávěrka.',
-    ikona: 'clipboard',
+    ikona: 'lock',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
@@ -34,7 +36,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:spustit': 'postupy.spoustet' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/procedures/runs →
   // runs[{procedure_name,user_name,status,completed_at,duration_seconds,checked_items,total_items}]
@@ -44,7 +46,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'postupy',
     nazev: 'Poslední průběhy',
     popis: 'Kdo, kdy a jak rychle prošel postup; nedokončené kroky oranžově.',
-    ikona: 'clipboard',
+    ikona: 'clock',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
@@ -60,7 +62,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '5',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/procedures/runs → runs[{skipped_items,skip_reasons,procedure_name,user_name}]
   // Pozor: API vrací posledních 50 průběhů — období je nanejvýš tolik.
@@ -69,7 +71,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'postupy',
     nazev: 'Přeskočené kroky',
     popis: 'Které kroky se přeskakují a s jakým důvodem — kandidáti na úpravu postupu nebo na rozhovor.',
-    ikona: 'clipboard',
+    ikona: 'warning',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -85,7 +87,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '7_dni',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/procedures → procedures[{id,name,icon,color}]; GET /api/procedures/runs (poslední dokončení)
   {
@@ -93,7 +95,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'postupy',
     nazev: 'Spustit postup',
     popis: 'Dlaždice jednoho postupu (otevírání, zavírání…) — ťuk a běží, včetně „naposledy dokončeno".',
-    ikona: 'clipboard',
+    ikona: 'play',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
@@ -101,7 +103,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['postupy.spoustet'], nektere: [] },
     tarif: 'zdarma',
     nastaveni: [{ klic: 'postup', nazev: 'Postup', typ: 'zdroj', zdroj: 'postupy', vychozi: null }],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/procedures → procedures[approved=false] (API je vrací jen schvalovateli)
   {
@@ -109,14 +111,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'postupy',
     nazev: 'Návrhy postupů',
     popis: 'Postupy navržené týmem ke schválení — Schválit vše.',
-    ikona: 'clipboard',
+    ikona: 'inbox',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.postupy'],
     opravneni: { vse: ['postupy.schvalovat'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/procedures → procedures[{remindAt,remindDays,remindAnchor}], openingToday, hasShiftToday
   {
@@ -124,13 +126,13 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'postupy',
     nazev: 'Připomínky dnes',
     popis: 'Které postupy mají dnes připomínku a kdy (i vůči otevírací době).',
-    ikona: 'clipboard',
+    ikona: 'bell',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
     stranky: ['vedeni.postupy', 'zamestnanec.postupy'],
     opravneni: { vse: ['postupy.zobrazit'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

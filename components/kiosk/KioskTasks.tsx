@@ -1,98 +1,84 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Icon } from '../Icons';
+// Úkoly na tabletu za barem (záložka Úkoly v KioskApp).
+//
+// Kolo 69 (balík B6a): stejný slovník jako Úkoly v aplikaci. Dřív tu byl každý
+// úkol vlastní kartou v mřížce (na monitoru jeden úkol a vedle prázdno), vlastní
+// checklist se čtverečky mimo rádiusy, plná limetka „Návod: …" u každého úkolu
+// (víc limetek na obrazovce), ručně psané pilulky filtru a nadpisy verzálkami,
+// „Žádné úkoly. 🎉" s emoji a náhradní 👤 místo avataru (audit zaměstnanec-kiosk).
+// Teď: skupina = jedna karta s `.list`, checklist sdílený TaskChecklist, návod
+// `secondary` tlačítko, filtr `filter-pill`, prázdno EmptyState, kostra místo
+// kolečka. Povrch `.kiosk-surface` sám zvedne písmo na 14 px a cíle na 44 px.
+//
+// Data přes useDataWidgetu (/api/tasks): widget Úkoly na dnes na ploše tabletu
+// čte tutéž adresu, takže odškrtnutí tady srovná i jeho.
+
+import { useMemo, useState } from 'react';
 import { useKioskShift } from './KioskShiftGate';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson, apiMessage } from '@/lib/api';
-import { ErrorState } from '../ui/ErrorState';
-import { Toast } from '../ui/Toast';
-
-interface ChecklistItem { text: string; done: boolean }
-interface Task {
-  id: number;
-  title: string;
-  description?: string | null;
-  priority: string;
-  status: string;
-  dueDate?: string | null;
-  assignedTo?: number | null;
-  teamTask?: boolean;
-  checklist?: ChecklistItem[];
-  assigneeName?: string | null;
-  assigneeAvatar?: string | null;
-  completedByName?: string | null;
-  source?: string | null;
-  sourceMeta?: { guideId?: number | null; guideTitle?: string | null } | null;
-}
+import { czCount, type CzNoun } from '@/lib/czech';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Skeleton, Toast } from '../ui';
+import { Icon } from '../Icons';
+import { TaskChecklist } from '../TaskChecklist';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { vyberUkoly, rozdelPoDnech, type Ukol } from '@/lib/ukolyPrehled';
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
-const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
-const todayStr = () => pragueToday();
+const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-black/20';
+const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number) => void }) {
   const { active, requireActive } = useKioskShift();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Když se úkoly nenačtou, nesmí to vypadat jako „žádné úkoly 🎉“ —
+  // Když se úkoly nenačtou, nesmí to vypadat jako „žádné úkoly" —
   // na tabletu je tahle obrazovka jediné místo, kde se úkol dá vidět.
-  const [loadErr, setLoadErr] = useState('');
+  const data = useDataWidgetu<Ukol[]>('/api/tasks', vyberUkoly);
+  const tasks = useMemo(() => data.data ?? [], [data.data]);
   const [filter, setFilter] = useState<Filter>('open');
-
-  const load = () => {
-    setLoadErr('');
-    fetch('/api/tasks').then(okJson)
-      .then(d => {
-        if (!Array.isArray(d)) throw new Error('Server poslal něco jiného než seznam úkolů.');
-        setTasks(d); setLoading(false);
-      })
-      .catch(e => { setLoadErr(apiMessage(e, 'Úkoly se nenačetly.')); setLoading(false); });
-  };
-  useEffect(load, []);
+  const [bodyToast, setBodyToast] = useState<string | null>(null);
+  const [chyba, setChyba] = useState<string | null>(null);
 
   // Kdo splnil úkol, je záznam o práci. Když tablet neví, koho zapsat,
   // musí se zeptat dřív, než se cokoli pošle — `actingAs: undefined` dřív
   // znamenalo, že si úkol připsal tablet sám.
-  const [bodyToast, setBodyToast] = useState<string | null>(null);
-  const setStatus = async (t: Task, status: string) => {
+  const setStatus = async (t: Ukol, status: string) => {
     const who = await requireActive();
     if (!who) return;
-    const prev = tasks;
-    setTasks(list => list.map(x => x.id === t.id ? { ...x, status } : x));
+    setChyba(null);
+    data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status } : x)));
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, status, actingAs: who.id }),
-      });
-      if (!res.ok) throw new Error();
+      const d = await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, status, actingAs: who.id }) }).then(okJson);
       // Body patří tomu, kdo u tabletu stojí — a má je vidět hned, jinak
       // odškrtnutí „vyrob limonádu" nic neznamená.
-      const d = await res.json().catch(() => null);
       const pts = Number(d?.pointsEarned);
-      if (status === 'done' && Number.isFinite(pts) && pts > 0) {
-        setBodyToast(`${who.name}: +${pts} ${pts === 1 ? 'bod' : pts < 5 ? 'body' : 'bodů'} za splněný úkol`);
-      }
-    } catch { setTasks(prev); }
+      if (status === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`${who.name}: +${czCount(pts, BOD)} za splněný úkol`);
+      data.reload();
+    } catch (e) {
+      data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status } : x)));
+      setChyba(apiMessage(e, 'Úkol se nepodařilo uložit.'));
+    }
   };
 
-  const toggleChecklistItem = async (t: Task, index: number) => {
+  const toggleChecklistItem = async (t: Ukol, index: number) => {
     const who = await requireActive();
     if (!who) return;
-    const next = (t.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it);
-    const prev = tasks;
-    setTasks(list => list.map(x => x.id === t.id ? { ...x, checklist: next } : x));
+    setChyba(null);
+    const next = t.checklist.map((it, i) => (i === index ? { ...it, done: !it.done } : it));
+    data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, checklist: next } : x)));
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, checklist: next, actingAs: who.id }),
-      });
-      if (!res.ok) throw new Error();
-    } catch { setTasks(prev); }
+      await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, checklist: next, actingAs: who.id }) }).then(okJson);
+    } catch (e) {
+      data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, checklist: t.checklist } : x)));
+      setChyba(apiMessage(e, 'Krok se nepodařilo uložit.'));
+    }
   };
 
-  const today = todayStr();
-  const weekAhead = useMemo(() => pragueToday(7), [today]);
+  const today = pragueToday();
+  const weekAhead = pragueToday(7);
 
   const filtered = useMemo(() => tasks.filter(t => {
     if (filter === 'mine') return active != null && (t.assignedTo === active.id || t.assignedTo == null);
@@ -100,14 +86,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
     if (filter === 'done') return t.status === 'done';
     return true;
   }), [tasks, filter, active]);
-
-  const byDate = (a: Task, b: Task) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
-  const undone = filtered.filter(t => t.status !== 'done');
-  const overdue = undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate);
-  const todayTasks = undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate);
-  const thisWeek = undone.filter(t => t.dueDate && t.dueDate > today && t.dueDate <= weekAhead).sort(byDate);
-  const later = undone.filter(t => t.dueDate && t.dueDate > weekAhead).sort(byDate);
-  const done = filtered.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 30);
+  const sk = rozdelPoDnech(filtered, today, weekAhead, 30);
 
   const FILTERS: { id: Filter; label: string }[] = [
     { id: 'open', label: 'Nesplněné' },
@@ -116,109 +95,93 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
     { id: 'done', label: 'Hotové' },
   ];
 
-  const card = (t: Task) => {
+  const row = (t: Ukol) => {
     const isDone = t.status === 'done';
-    const overdueTask = !isDone && t.dueDate && t.dueDate < today;
+    const overdueTask = !isDone && !!t.dueDate && t.dueDate < today;
     return (
-      <div key={t.id} className={`glass-card p-4 flex flex-col ${isDone ? 'opacity-60' : ''}`}>
-        <div className="flex items-start gap-3 flex-1">
-          <button
-            onClick={() => setStatus(t, isDone ? 'pending' : 'done')}
-            title={isDone ? 'Vrátit mezi nesplněné' : 'Označit jako hotové'}
-            className={`tap-target mt-0.5 w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition active:scale-90 ${
-              isDone ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 hover:border-[#C8F542]'
-            }`}
-          >
-            {isDone && <span className="text-sm font-bold"><Icon name="check" size={15} /></span>}
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className={`font-semibold text-[#16181A] leading-snug ${isDone ? 'line-through text-black/45' : ''}`}>
-              <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${prioDot(t.priority)}`} />
-              {t.title}
-            </p>
-            {t.source === 'production' && !isDone && <span className="chip chip-sm chip-info mt-1">Výroba · odškrtnutí naskladní dávku</span>}
-            {/* Postup je v návodu, ne v popisu úkolu. U baru je rozdíl mezi
-                „přepni na Návody a najdi si to" a jedním ťuknutím zásadní. */}
-            {!isDone && t.sourceMeta?.guideId && onOpenGuide && (
-              <button type="button" onClick={() => onOpenGuide(Number(t.sourceMeta!.guideId))}
-                className="mt-1.5 inline-flex items-center gap-2 rounded-full bg-[#C8F542] on-accent font-semibold px-4 min-h-[44px] text-sm active:scale-[0.97] transition">
-                <Icon name="book" size={16} />
-                {t.sourceMeta.guideTitle ? `Návod: ${t.sourceMeta.guideTitle}` : 'Otevřít návod'}
-              </button>
+      <li key={t.id} className="list-row items-start">
+        <button type="button" role="checkbox" aria-checked={isDone} aria-label={t.title}
+          onClick={() => setStatus(t, isDone ? 'pending' : 'done')}
+          // fokus-kontrast: obrys fokusu musí být vidět i kolem limetkového (splněného) kolečka.
+          className={`tap-target fokus-kontrast mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors ${
+            isDone ? 'bg-[#C8F542] on-accent' : 'border-2 border-black/15 hover:bg-black/[0.05]'}`}>
+          {isDone && <Icon name="check" size={16} strokeWidth={2.6} />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-start gap-2">
+            <span className={`mt-2 w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} aria-hidden />
+            <span className={`font-medium leading-snug ${isDone ? 'text-black/45' : 'text-[#16181A]'}`}>{t.title}</span>
+          </p>
+          {t.source === 'production' && !isDone && <Chip tone="info" size="sm" icon="leaf" className="mt-1">Výroba · odškrtnutí naskladní dávku</Chip>}
+          {t.description && !isDone && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{t.description}</p>}
+          <p className="text-sm text-black/55 mt-1.5 flex items-center gap-1.5 min-w-0">
+            {t.assignedTo == null ? <span>Kdokoli</span> : (
+              <><Avatar emoji={t.assigneeAvatar} size="xs" ring={false} /><span className="truncate">{t.assigneeName ?? ''}</span></>
             )}
-            {t.description && !isDone && <p className="text-sm text-black/50 mt-1 whitespace-pre-wrap">{t.description}</p>}
-            <p className="text-xs text-black/40 mt-1.5 truncate">
-              {t.teamTask || t.assignedTo == null ? 'Kdokoliv' : `${t.assigneeAvatar ?? '👤'} ${t.assigneeName ?? ''}`}
-              {t.dueDate && (
-                <span className={overdueTask ? 'text-bad-ink font-medium' : ''}>
-                  {' · '}{new Date(t.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
-                  {overdueTask && ' · po termínu'}
-                </span>
-              )}
-              {isDone && t.completedByName && ` · splnil ${t.completedByName}`}
-            </p>
-            {!isDone && t.checklist && t.checklist.length > 0 && (
-              <div className="mt-2.5 space-y-1">
-                {t.checklist.map((it, i) => (
-                  <button key={i} onClick={() => toggleChecklistItem(t, i)}
-                    className="w-full flex items-center gap-2.5 text-left min-h-[44px] rounded-xl px-2 -mx-2 hover:bg-black/[0.03] active:scale-[0.99] transition">
-                    <span className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
-                      it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20'
-                    }`}>
-                      {it.done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
-                    </span>
-                    <span className={`text-sm ${it.done ? 'text-black/40 line-through' : 'text-[#16181A]'}`}>{it.text}</span>
-                  </button>
-                ))}
-              </div>
+            {t.dueDate && (
+              <span className={`whitespace-nowrap ${overdueTask ? 'text-bad-ink font-medium' : ''}`}>
+                {' · '}{denKratce(t.dueDate)}{overdueTask && ' · po termínu'}
+              </span>
             )}
-          </div>
+            {isDone && t.completedByName && <span className="truncate"> · splnil {t.completedByName}</span>}
+          </p>
+          {/* Postup je v návodu, ne v popisu úkolu. U baru je rozdíl mezi
+              „přepni na Návody a najdi si to" a jedním ťuknutím zásadní.
+              Vedlejší akce, ne limetka — ta by svítila u každého úkolu. */}
+          {!isDone && t.sourceMeta?.guideId && onOpenGuide && (
+            <Button variant="secondary" size="lg" icon="book" className="mt-2" onClick={() => onOpenGuide(Number(t.sourceMeta!.guideId))}>
+              {t.sourceMeta.guideTitle ? `Návod: ${t.sourceMeta.guideTitle}` : 'Otevřít návod'}
+            </Button>
+          )}
+          {!isDone && t.checklist.length > 0 && (
+            <TaskChecklist items={t.checklist} onToggle={i => void toggleChecklistItem(t, i)} />
+          )}
         </div>
-      </div>
+      </li>
     );
   };
 
-  const section = (title: string, list: Task[], tone = 'text-black/45') =>
+  const section = (title: string, list: Ukol[], tone = '') =>
     list.length > 0 && (
-      <section>
-        <h3 className={`text-xs font-bold uppercase tracking-[0.13em] ${tone} mb-2.5`}>{title} ({list.length})</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">{list.map(card)}</div>
+      <section className="space-y-2" aria-label={title}>
+        <h2 className={`t-label ${tone}`}>{title} ({list.length.toLocaleString('cs-CZ')})</h2>
+        <Card pad="none" className="px-5"><ul className="list">{list.map(row)}</ul></Card>
       </section>
     );
 
+  const nesplnenych = sk.poTerminu.length + sk.dnes.length + sk.tentoTyden.length + sk.pozdeji.length;
   return (
     <div className="space-y-6">
       <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
-      {/* Filter chips */}
-      <div className="flex gap-1.5 flex-wrap">
+      <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Filtr úkolů">
         {FILTERS.map(f => (
-          <button key={f.id} onClick={() => setFilter(f.id)}
-            className={`rounded-full px-4 py-2.5 text-sm font-semibold min-h-[44px] transition active:scale-[0.97] ${
-              filter === f.id ? 'seg-on' : 'seg-off glass'
-            }`}>
+          <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
+            className={`filter-pill tap-target ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
             {f.label}
           </button>
         ))}
       </div>
+      {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
 
-      {loading ? (
-        <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
-      ) : loadErr ? (
-        <ErrorState title="Úkoly se nenačetly" hint={loadErr} onRetry={() => { setLoading(true); load(); }} />
+      {data.error && !data.data ? (
+        <Card><ErrorState title="Úkoly se nenačetly" hint={data.error} onRetry={data.reload} /></Card>
+      ) : data.loading ? (
+        <Card aria-busy className="space-y-2"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14 w-2/3" /></Card>
       ) : filtered.length === 0 ? (
-        <div className="glass-card p-8 text-center text-black/45">
-          {filter === 'done' ? 'Zatím nic hotového.' : 'Žádné úkoly. 🎉'}
-        </div>
+        <Card>
+          <EmptyState compact illustration="ukoly" title={filter === 'done' ? 'Zatím nic hotového' : 'Žádné úkoly'}
+            hint={filter === 'done' ? 'Splněné úkoly se objeví tady.' : 'Až vedení něco zadá, objeví se to tady.'} />
+        </Card>
       ) : (
         <>
-          {filter !== 'done' && overdue.length + todayTasks.length + thisWeek.length + later.length === 0 && (
-            <div className="glass-card p-6 text-center text-[#5B7A08] font-medium">Všechny úkoly splněné! 🎉</div>
+          {filter !== 'done' && nesplnenych === 0 && (
+            <Card><EmptyState compact illustration="ukoly" title="Na dnešek je hotovo" hint="Všechny úkoly jsou splněné." /></Card>
           )}
-          {section('Po termínu', overdue, 'text-bad-ink')}
-          {section('Dnes', todayTasks, 'text-[#5B7A08]')}
-          {section('Tento týden', thisWeek)}
-          {section('Později', later)}
-          {(filter === 'done' || filter === 'all') && section('Hotové — posledních 30', done)}
+          {section('Po termínu', sk.poTerminu, 'text-bad-ink')}
+          {section('Dnes', sk.dnes)}
+          {section('Tento týden', sk.tentoTyden)}
+          {section('Později', sk.pozdeji)}
+          {(filter === 'done' || filter === 'all') && section('Hotové — posledních 30', sk.hotove)}
         </>
       )}
     </div>

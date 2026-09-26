@@ -1,5 +1,6 @@
-// Stránka „Návody" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B6b v kole 69.
+// Stránka „Návody" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B6b)
+// plochu zapnulo. Nástroj = knihovna návodů s kategoriemi, čtečkou a editorem (components/Guides.tsx).
+// Pás návrhů je widget navody.navrhy a „Kdo četl" ve čtečce má souhrn ve widgetu navody.kdo_necetl.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -18,5 +19,5 @@ export const STRANKA: DefiniceStranky = {
     'odkaz',
   ],
   vychozi: { 'typ:vedeni': [{ w: 'navody.navrhy', s: 'M' }, { w: 'navody.kdo_necetl', s: 'M' }, { w: 'nastroj' }] },
-  aktivni: false,
+  aktivni: true,
 };

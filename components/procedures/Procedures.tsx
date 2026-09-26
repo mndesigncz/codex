@@ -1,57 +1,68 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+// Postupy: otevírání, zavírání a další rutiny krok za krokem.
+//
+// Kolo 69 (balík B6b): stránka je plocha s widgety. Hlavička jde do PlochaWidgetu,
+// pás „N návrhů ke schválení" je widget postupy.navrhy a „Poslední průběhy" pod
+// mřížkou widget postupy.posledni_prubehy (oblasti/postupy.tsx). Tahle komponenta
+// kreslí nástroj: seznam postupů se spuštěním, detail, editor a smazání. Data čte
+// přes useDataWidgetu ze stejných adres jako widgety — po uložení nebo schválení
+// se obnoví seznam i widgety zároveň.
+//
+// Co se změnilo proti kolu 68 (audit final_sorted.json, obsah-kontrola.txt):
+//  - mřížka velkých karet s limetkovým čtvercem a plným inkoustovým „Spustit" v každé
+//    (pět tmavých ploch) → seznam v jedné kartě (archetyp A), „Spustit" secondary v řádku;
+//  - Upravit/Smazat jen pod myší (na dotyku neviditelné) → „···" vždy vidět;
+//  - confirm() a ručně psaná okna (smazání, detail, editor) → Modal;
+//  - checkbox „Vyžadovat před uzávěrkou" → SwitchRow, kotva připomínky → Segmented,
+//    vybraný den a ikona inkoustem (seg-on), ne limetkou;
+//  - co kdo smí, se čte z oprávnění (postupy.vytvorit/upravit/mazat/schvalovat/spoustet),
+//    ne z typu účtu — Provozní bez postupy.upravit dřív viděl tužku, která končila 403.
+//
+// Tablet (KioskApp) plochu nemá — kreslí nástroj s vlastní hlavičkou jako dřív.
+
+import { useCallback, useEffect, useId, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Icon } from '../Icons';
-import { EmptyState, Button, PageHeader, ApproveAllBar, runBulk, ErrorState } from '../ui';
-import { isExcused, skipReasonLabel } from '@/lib/procedureScoring';
-import { PersonLink } from '../employer/ProfileLinkProvider';
-import { useProcedures, type ProcedureLite } from './ProcedureProvider';
+import {
+  Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader, Segmented, Skeleton, SwitchRow,
+  type MenuItem,
+} from '../ui';
+import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
-import { parseSteps, totalMinutes, fmtMinutes, timeRange, STEP_WEIGHTS, weightSpec, stepPenalty, stepPlus, type Step } from '@/lib/steps';
-import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
-import { useModal } from '@/lib/useModal';
-import { clickable } from '@/lib/clickable';
-import { czForm } from '@/lib/czech';
+import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
+import { czCount, type CzNoun } from '@/lib/czech';
 import { okJson, apiMessage } from '@/lib/api';
-import { DiscardGuard } from '../ui/DiscardGuard';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
+import { PlochaWidgetu, type HlavickaPlochy } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { useOpravneni } from '../role/useOpravneni';
+import {
+  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni, popisPripominky,
+  type PostupApi,
+} from '@/lib/postupyPrehled';
+import { kdyPrubehu, useObnovaPoPrubehu } from '../widgety/oblasti/postupy';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
 }
 
-interface Procedure extends ProcedureLite {
-  approved?: boolean;
-  submittedBy?: number | null;
-  description?: string | null;
+interface Procedure extends PostupApi {
+  items: any[];
   icon: string;
-  color: string;
-  remindAt?: string | null;
-  requireBeforeClosing?: boolean;
-  remindDays?: number[] | null;
+  color?: string;
 }
 
 const WEEKDAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
-
-interface RunRow {
-  id: number;
-  procedure_name: string;
-  procedure_icon: string;
-  user_id?: number;
-  user_name: string;
-  user_avatar: string;
-  status: string;
-  total_items: number;
-  checked_items: number[];
-  skipped_items?: number[];
-  started_at: string;
-  completed_at: string | null;
-  duration_seconds: number | null;
-}
-
-const ICON_CHOICES = ['check', 'clock', 'box', 'book', 'leaf', 'users', 'calendar', 'chat', 'trend', 'warning', 'settings', 'search'];
+const KROK: CzNoun = { one: 'krok', few: 'kroky', many: 'kroků' };
+const ICON_CHOICES: { id: string; nazev: string }[] = [
+  { id: 'check', nazev: 'Fajfka' }, { id: 'clock', nazev: 'Hodiny' }, { id: 'box', nazev: 'Krabice' }, { id: 'book', nazev: 'Kniha' },
+  { id: 'leaf', nazev: 'List' }, { id: 'users', nazev: 'Lidé' }, { id: 'calendar', nazev: 'Kalendář' }, { id: 'chat', nazev: 'Bublina' },
+  { id: 'trend', nazev: 'Graf' }, { id: 'warning', nazev: 'Výstraha' }, { id: 'settings', nazev: 'Ozubené kolo' }, { id: 'search', nazev: 'Lupa' },
+];
 
 const SEEDS = [
   {
@@ -82,362 +93,224 @@ const SEEDS = [
   },
 ];
 
-function fmtDuration(sec: number | null) {
-  if (sec == null) return '';
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+/** Ikona v jamce jako `lead` řádku (DP §3.6) — místo limetkového čtverce 48 px. */
+function Jamka({ ikona }: { ikona: string }) {
+  return (
+    <span aria-hidden className="well grid h-9 w-9 shrink-0 place-items-center">
+      <Icon name={ikona || 'check'} size={16} className="text-black/55" />
+    </span>
+  );
 }
-
-function fmtWhen(iso: string) {
-  if (!iso) return '';
-  const d = parseDbTime(iso);
-  if (!d) return '';
-  const time = dbTimeHM(d);
-  // Porovnává se pražský den, ne den prohlížeče — jinak by se po půlnoci
-  // „dnes" rozešlo s obchodním dnem.
-  const day = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
-  if (day(d) === day(new Date())) return `dnes ${time}`;
-  return `${d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'short' })} ${time}`;
-}
-
-const stepsWord = (n: number) => czForm(n, { one: 'krok', few: 'kroky', many: 'kroků' });
-
-const playGlyph = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-);
 
 export default function Procedures({ user }: Props) {
-  const isEmployer = user.role === 'employer';
+  const pathname = usePathname() ?? '';
+  const { role } = useOpravneni();
+  // Tablet nemá plochu (kiosk.smena je jiná stránka, balík B9) — nástroj s vlastní hlavičkou.
+  const tablet = pathname.startsWith('/kiosk') || role?.typ === 'kiosk';
+  const stranka = pathname.startsWith('/employer') ? 'vedeni.postupy' : 'zamestnanec.postupy';
+  const smi = useSmi();
+  const smiVytvorit = smi('postupy.vytvorit');
+  const smiNavrhnout = smi('postupy.navrhnout');
+  const smiUpravit = smi('postupy.upravit');
+  const smiMazat = smi('postupy.mazat');
+  const smiSchvalovat = smi('postupy.schvalovat');
+  const smiSpoustet = smi('postupy.spoustet');
   const { active, startRun, starting } = useProcedures();
+  useObnovaPoPrubehu();
 
-  const [procedures, setProcedures] = useState<Procedure[]>([]);
-  const pendingProcedures = procedures.filter(p => p.approved === false);
-  const [approvingAll, setApprovingAll] = useState(false);
-  const [approveNote, setApproveNote] = useState('');
-  const [runs, setRuns] = useState<RunRow[]>([]);
-  // Clicking a finished run opens the exact ✓/✗/skip breakdown.
-  const [runDetail, setRunDetail] = useState<any | null>(null);
-  const runModal = useModal(!!runDetail, () => setRunDetail(null), 'Detail běhu postupu');
-  const [loading, setLoading] = useState(true);
+  const data = useDataWidgetu(URL_POSTUPY, vyberPostupy);
+  // Poslední dokončení do řádku — sdílené s widgetem Poslední průběhy (jeden dotaz).
+  const behy = useDataWidgetu(URL_PRUBEHY, vyberPrubehy);
+  const procedures = (data.data?.postupy ?? []) as Procedure[];
+
   const [seeding, setSeeding] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Procedure | null>(null);
-  const [detail, setDetail] = useState<Procedure | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const detail = detailId != null ? procedures.find(p => p.id === detailId) ?? null : null;
   const [confirmDel, setConfirmDel] = useState<Procedure | null>(null);
-  const delModal = useModal(!!confirmDel, () => setConfirmDel(null), 'Smazat postup');
   const [deleting, setDeleting] = useState(false);
-  // Kopie z jiného podniku organizace — jen vedení a jen když takový
-  // podnik existuje. Ukazuje se i bez postupů: kopie je rychlejší start než
-  // ukázkové postupy.
+  const [chyba, setChyba] = useState('');
+  // Kopie z jiného podniku organizace — jen s právem zakládat a jen když takový podnik existuje.
   const [kopieOpen, setKopieOpen] = useState(false);
-  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(isEmployer);
+  const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(smiVytvorit);
 
-  const approveProcedure = async (id: number) => {
-    const res = await fetch(`/api/procedures/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approve: true }),
-    });
-    if (!res.ok) throw new Error('nepovedlo se');
-  };
+  const reload = useCallback(() => { obnovDataWidgetu(URL_POSTUPY); }, []);
 
-  const [loadErr, setLoadErr] = useState('');
-
-  const load = useCallback(async () => {
-    setLoadErr('');
-    try {
-      const [pData, rData] = await Promise.all([
-        fetch('/api/procedures').then(okJson),
-        fetch('/api/procedures/runs').then(okJson),
-      ]);
-      setProcedures(pData.procedures ?? []);
-      setRuns(rData.runs ?? []);
-    } catch (e) {
-      // Povinné zavírací postupy nesmí po výpadku vypadat jako „žádné nejsou" —
-      // podle téhle obrazovky se zavírá podnik.
-      setLoadErr(apiMessage(e, 'Postupy se nenačetly.'));
-    } finally {
-      setLoading(false);
-    }
+  // Widget (Návrhy postupů) otevírá detail postupu tady — bez přechodu jinam.
+  useEffect(() => {
+    const f = (e: Event) => {
+      const d = (e as CustomEvent<{ id: number; prijato: boolean }>).detail;
+      if (!d) return;
+      d.prijato = true;
+      setDetailId(d.id);
+    };
+    window.addEventListener(UDALOST_OTEVRIT_POSTUP, f);
+    return () => window.removeEventListener(UDALOST_OTEVRIT_POSTUP, f);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  // Refresh the runs feed when a run finishes (active clears).
-  const activeId = active?.id ?? null;
-  useEffect(() => {
-    if (activeId === null) {
-      const t = setTimeout(() => { load(); }, 500);
-      return () => clearTimeout(t);
-    }
-  }, [activeId, load]);
-
-  const seedExamples = async () => {
-    setSeeding(true);
+  const approveProcedure = async (id: number) => {
+    setChyba('');
     try {
-      for (const s of SEEDS) {
-        await fetch('/api/procedures', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(s),
-        });
-      }
-      await load();
-    } finally {
-      setSeeding(false);
+      const res = await fetch(`/api/procedures/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approve: true }),
+      });
+      await okJson(res);
+      reload();
+    } catch (e) {
+      setChyba(apiMessage(e, 'Postup se neschválil.'));
     }
   };
 
-  const removeProcedure = async (id: number) => {
-    setProcedures(prev => prev.filter(p => p.id !== id));
-    await fetch(`/api/procedures/${id}`, { method: 'DELETE' }).catch(() => {});
+  const seedExamples = async () => {
+    setSeeding(true); setChyba('');
+    let selhalo = 0;
+    for (const s of SEEDS) {
+      try {
+        const res = await fetch('/api/procedures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
+        if (!res.ok) selhalo += 1;
+      } catch { selhalo += 1; }
+    }
+    if (selhalo) setChyba('Některé ukázkové postupy se nepodařilo založit. Zkus to znovu.');
+    reload();
+    setSeeding(false);
   };
 
   const doConfirmDelete = async () => {
     if (!confirmDel) return;
-    setDeleting(true);
+    setDeleting(true); setChyba('');
     try {
-      await removeProcedure(confirmDel.id);
+      const res = await fetch(`/api/procedures/${confirmDel.id}`, { method: 'DELETE' });
+      await okJson(res);
+      data.set(prev => (prev ? { ...prev, postupy: prev.postupy.filter(p => p.id !== confirmDel.id) } : prev as any));
+      reload();
+      setConfirmDel(null);
+    } catch (e) {
+      // Dřív se postup z obrazovky odebral hned a chyba smazání se zahodila — po obnovení byl zpátky.
+      setChyba(apiMessage(e, 'Postup se nepodařilo smazat.'));
+      setConfirmDel(null);
     } finally {
       setDeleting(false);
-      setConfirmDel(null);
     }
   };
 
   const openNew = () => { setEditing(null); setEditorOpen(true); };
   const openEdit = (p: Procedure) => { setEditing(p); setEditorOpen(true); };
+  const spust = (p: Procedure) => { if (!starting) void startRun(p as any); };
 
-  return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full">
-      {/* Header */}
-      <PageHeader hintId="procedures" className="pb-5" title="Postupy" subtitle="Krok za krokem — otevírání, zavírání a další rutiny."
-        primary={isEmployer && (procedures.length > 0 || jinePodniky.length > 0) && (
-          <>
-            {jinePodniky.length > 0 && (
-              <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
-            )}
-            {procedures.length > 0 && <Button variant="accent" icon="plus" onClick={openNew}>Nový postup</Button>}
-          </>
-        )} />
+  const smiZakladat = smiVytvorit || smiNavrhnout;
+  const hlavicka: HlavickaPlochy = {
+    title: 'Postupy',
+    subtitle: 'Krok za krokem — otevírání, zavírání a další rutiny.',
+    hintId: 'procedures',
+    // Jediná limetka stránky. Bez postupů ji nese prázdný stav (ukázkové postupy), ne hlavička.
+    primary: smiZakladat && procedures.length > 0 ? (
+      <Button variant="accent" icon="plus" onClick={openNew} title={smiVytvorit ? undefined : 'Návrh schválí vedení'}>
+        {smiVytvorit ? 'Nový postup' : 'Navrhnout postup'}
+      </Button>
+    ) : undefined,
+    secondary: smiVytvorit && jinePodniky.length > 0
+      ? <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+      : undefined,
+    menu: smiVytvorit && jinePodniky.length > 0
+      ? [{ label: 'Kopírovat z jiného podniku', icon: 'copy', onClick: () => setKopieOpen(true) }]
+      : undefined,
+  };
 
-      {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map(i => (
-            <div key={i} className="glass-card rounded-3xl h-40 animate-pulse" />
-          ))}
-        </div>
-      ) : loadErr ? (
-        <div className="glass-card">
-          <ErrorState title="Postupy se nenačetly" hint={loadErr}
-            onRetry={() => { setLoading(true); load(); }} />
-        </div>
-      ) : procedures.length === 0 ? (
-        <ProceduresEmpty isEmployer={isEmployer} seeding={seeding} onSeed={seedExamples} onNew={openNew} />
-      ) : (
-        <>
-        {isEmployer && (
-          <div className="mb-4">
-            <ApproveAllBar count={pendingProcedures.length} noun={{ one: 'postup', few: 'postupy', many: 'postupů' }} busy={approvingAll} note={approveNote}
-              onApproveAll={async () => {
-                if (!confirm(`Schválit všech ${pendingProcedures.length} návrhů postupů?`)) return;
-                setApprovingAll(true); setApproveNote('');
-                const { failed } = await runBulk(pendingProcedures.map(p => p.id), approveProcedure);
-                await load();
-                setApprovingAll(false);
-                if (failed.length) setApproveNote(`${failed.length} se neuložilo`);
-              }} />
-          </div>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  let nastroj: React.ReactNode;
+  if (data.loading) {
+    nastroj = (
+      <Card pad="none" aria-busy>
+        <div className="p-5 space-y-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-12" />)}</div>
+      </Card>
+    );
+  } else if (data.error) {
+    nastroj = <Card><ErrorState title="Postupy se nenačetly" hint={data.error} onRetry={data.reload} /></Card>;
+  } else if (procedures.length === 0) {
+    nastroj = (
+      <Card>
+        <EmptyState illustration="postupy" title="Zatím žádné postupy"
+          hint={smiVytvorit
+            ? 'Otevírání, zavírání, příjem zboží — krok za krokem, s časy a tím, co je klíčové. Tým je pak odklikne na baru.'
+            : 'Až je vedení sepíše, najdeš je tady a projdeš krok po kroku.'}
+          action={smiVytvorit ? (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+              <Button variant="accent" icon="leaf" onClick={seedExamples} loading={seeding}>Vytvořit ukázkové postupy</Button>
+              <Button variant="secondary" icon="plus" onClick={openNew}>Vlastní postup</Button>
+            </div>
+          ) : smiNavrhnout ? <Button variant="secondary" icon="plus" onClick={openNew}>Navrhnout postup</Button> : undefined} />
+      </Card>
+    );
+  } else {
+    nastroj = (
+      <Card pad="none">
+        <ul className="list px-5">
           {procedures.map(p => {
             const running = active?.procedureId === p.id;
-            const mins = totalMinutes(parseSteps(p.items));
-            const lastRun = runs.find(r => r.status === 'completed' && r.procedure_name === p.name);
+            const steps = parseSteps(p.items);
+            const mins = totalMinutes(steps);
+            const last = posledniDokonceni(behy.data ?? [], p.id);
+            const navrh = p.approved === false;
+            const meta = [
+              czCount(steps.length, KROK),
+              mins > 0 ? fmtMinutes(mins) : null,
+              popisPripominky(p),
+              last ? `naposledy ${kdyPrubehu(last.completed_at || last.started_at)}` : null,
+            ].filter(Boolean).join(' · ');
+            const polozky: MenuItem[] = [
+              { label: 'Zobrazit kroky', icon: 'clipboard', onClick: () => setDetailId(p.id) },
+              ...(navrh && smiSchvalovat ? [{ label: 'Schválit návrh', icon: 'check', onClick: () => { void approveProcedure(p.id); } }] : []),
+              ...(smiUpravit ? [{ label: 'Upravit', icon: 'pencil', onClick: () => openEdit(p) }] : []),
+              ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: () => setConfirmDel(p) }] : []),
+            ];
             return (
-              <div
-                key={p.id}
-                {...clickable(() => setDetail(p), { label: `Otevřít postup ${p.name}` })}
-                className="glass-card rounded-3xl p-5 flex flex-col group cursor-pointer hover:border-black/15 transition"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">
-                    <Icon name={p.icon || 'check'} size={24} />
-                  </div>
-                  {isEmployer && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button onClick={(e) => { e.stopPropagation(); openEdit(p); }} title="Upravit" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-black/[0.06] hover:text-black transition">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }} title="Smazat" className="flex h-8 w-8 items-center justify-center rounded-full text-black/40 hover:bg-bad/10 hover:text-bad-ink transition">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-                      </button>
-                    </div>
+              <ListRow key={p.id}
+                lead={<Jamka ikona={p.icon} />}
+                // Řádek má vlastní tlačítka (Spustit, „···"), takže celý klikací být nemůže
+                // (tlačítko v tlačítku) — detail otevře název.
+                title={<button type="button" onClick={() => setDetailId(p.id)} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none focus-visible:underline">{p.name}</button>}
+                meta={meta}
+                right={navrh ? <Chip tone="wait" size="sm">Čeká na schválení</Chip> : running ? <Chip tone="info" size="sm">Probíhá</Chip> : undefined}
+                actions={<>
+                  {smiSpoustet && !navrh && !running && (
+                    <Button variant="secondary" size="sm" icon="play" disabled={starting} onClick={() => spust(p)}>Spustit</Button>
                   )}
-                </div>
-                <h3 className="mt-4 text-lg font-bold tracking-tight text-[#16181A]">{p.name}</h3>
-                {p.approved === false && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <span className="tap-target-sm rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-xs font-semibold">Čeká na schválení</span>
-                    {isEmployer && (
-                      <button
-                        type="button"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try { await approveProcedure(p.id); await load(); } catch { /* ignore */ }
-                        }}
-                        className="tap-target-sm btn btn-primary btn-sm transition">
-                        Schválit
-                      </button>
-                    )}
-                  </div>
-                )}
-                {p.description && <p className="mt-1 text-sm text-black/50 line-clamp-2">{p.description}</p>}
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-black/45">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Icon name="check" size={14} /> {p.items.length} {stepsWord(p.items.length)}
-                  </span>
-                  {mins > 0 && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Icon name="clock" size={13} /> {fmtMinutes(mins)}
-                    </span>
-                  )}
-                  {(p.remindAt || p.remindAnchor === 'open' || p.remindAnchor === 'close') && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2 py-0.5 font-medium text-[#5B7A08]">
-                      <Icon name="clock" size={12} /> {p.remindAnchor === 'open' ? 'Při otevření' : p.remindAnchor === 'close' ? 'Při zavření' : p.remindAt}
-                    </span>
-                  )}
-                </div>
-                {lastRun && (
-                  <p className="mt-2 text-[11px] text-black/40 truncate">
-                    Naposledy {fmtWhen(lastRun.completed_at || lastRun.started_at)}
-                    {lastRun.duration_seconds != null && ` · ${fmtDuration(lastRun.duration_seconds)}`}
-                    {lastRun.user_name && ` · ${lastRun.user_name}`}
-                  </p>
-                )}
-                <div className="mt-4 pt-1 flex-1 flex items-end">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (p.approved === false) { setDetail(p); return; } running ? setDetail(p) : startRun(p); }}
-                    disabled={starting || p.approved === false}
-                    className={`w-full rounded-full px-5 py-2.5 font-semibold transition inline-flex items-center justify-center gap-2 ${
-                      running
-                        ? 'bg-[#C8F542]/25 text-[#5B7A08]'
-                        : 'bg-[#16181A] text-white hover:brightness-110'
-                    }`}
-                  >
-                    {running ? 'Probíhá…' : <>{playGlyph} Spustit</>}
-                  </button>
-                </div>
-              </div>
+                  <Menu size="sm" label={`Další akce s postupem ${p.name}`} items={polozky} />
+                </>} />
             );
           })}
+        </ul>
+      </Card>
+    );
+  }
 
-          {user.role !== 'kiosk' && !isEmployer && (
-            <button
-              onClick={openNew}
-              className="glass rounded-3xl p-5 min-h-[176px] flex flex-col items-center justify-center gap-2 border border-dashed border-black/15 text-black/45 hover:text-black hover:border-black/30 transition"
-            >
-              <div className="flex h-12 w-12 items-center justify-center well">
-                <Icon name="plus" size={24} />
-              </div>
-              <span className="text-sm font-medium">{isEmployer ? 'Nový postup' : 'Navrhnout postup'}</span>
-              {!isEmployer && <span className="text-[11px] text-black/35">schválí vedení</span>}
-            </button>
-          )}
-        </div>
-        </>
-      )}
+  const okna = (
+    <>
+      <Modal open={!!confirmDel} onClose={() => { if (!deleting) setConfirmDel(null); }} size="sm" title="Smazat postup?"
+        subtitle={confirmDel ? `„${confirmDel.name}"` : undefined}
+        footer={<>
+          <Button variant="secondary" onClick={() => setConfirmDel(null)} disabled={deleting}>Zrušit</Button>
+          <Button variant="danger-solid" icon="trash" onClick={doConfirmDelete} loading={deleting}>Smazat</Button>
+        </>}>
+        <p className="text-sm text-black/55 text-pretty">Postup se odstraní i s nastavenou připomínkou. Proběhlé průběhy v historii zůstanou.</p>
+      </Modal>
 
-      {/* Recent runs */}
-      {(isEmployer || runs.length > 0) && !loading && (
-        <div className="mt-10">
-          <h2 className="t-section">
-            {isEmployer ? 'Poslední průběhy' : 'Moje průběhy'}
-          </h2>
-          {runs.length === 0 ? (
-            <p className="mt-3 text-sm text-black/45">Zatím žádné dokončené průběhy.</p>
-          ) : (
-            <div className="mt-3 glass-card rounded-3xl divide-y divide-black/[0.06] overflow-hidden">
-              {runs.map(r => {
-                const done = r.status === 'completed';
-                const checkedCount = Array.isArray(r.checked_items) ? r.checked_items.length : 0;
-                const missing = Math.max(0, (r.total_items ?? 0) - checkedCount);
-                return (
-                  <div key={r.id}
-                    {...clickable(() => setRunDetail(r), { disabled: !done, label: 'Otevřít proběhlý postup' })}
-                    className={`flex items-center gap-3 px-4 py-3 ${done ? 'cursor-pointer hover:bg-black/[0.03] transition-colors' : ''}`}>
-                    <PersonLink id={r.user_id} className="text-xl flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{r.user_avatar || '👤'}</PersonLink>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-[#16181A] truncate">
-                        {r.procedure_name}
-                      </p>
-                      <p className="text-xs text-black/50 truncate">
-                        <PersonLink id={r.user_id}>{r.user_name}</PersonLink> · {done ? fmtWhen(r.completed_at || r.started_at) : 'probíhá'}
-                      </p>
-                    </div>
-                    {done ? (
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {missing > 0 && (
-                          <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-wait/15 px-2.5 py-1 text-xs font-medium text-wait-ink tabular-nums">
-                            <Icon name="warning" size={12} /> {missing} nedokončeno
-                          </span>
-                        )}
-                        <span className="tap-target-sm inline-flex items-center gap-1 rounded-full bg-[#C8F542]/25 px-2.5 py-1 text-xs font-medium text-[#5B7A08] tabular-nums">
-                          <Icon name="clock" size={13} /> {fmtDuration(r.duration_seconds)}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-medium text-black/55 flex-shrink-0">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#C8F542] motion-safe:animate-pulse" />
-                        {Array.isArray(r.checked_items) ? r.checked_items.length : 0}/{r.total_items}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {confirmDel && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => !deleting && setConfirmDel(null)}>
-          <div ref={delModal.ref} {...delModal.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <DiscardGuard guard={delModal.guard} />
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-bad/15 text-bad-ink">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-              </div>
-              <div className="min-w-0">
-                <h3 className="t-card">Smazat postup?</h3>
-                <p className="text-sm text-black/55 truncate">„{confirmDel.name}"</p>
-              </div>
-            </div>
-            <p className="text-sm text-black/55">Tento postup se odstraní. Akci nelze vzít zpět.</p>
-            <div className="flex gap-2">
-              <button onClick={() => setConfirmDel(null)} disabled={deleting} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition disabled:opacity-50">
-                Zrušit
-              </button>
-              <button onClick={doConfirmDelete} disabled={deleting} className="flex-1 rounded-full bg-bad text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition disabled:opacity-50">
-                {deleting ? 'Mažu…' : 'Smazat'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {kopieOpen && isEmployer && (
-        <KopieZPodniku entita="postupy" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={() => { load(); }} />
+      {kopieOpen && smiVytvorit && (
+        <KopieZPodniku entita="postupy" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={reload} />
       )}
 
       {detail && (
         <ProcedureDetail
           procedure={detail}
-          isEmployer={isEmployer}
+          smiUpravit={smiUpravit}
+          smiSpustit={smiSpoustet}
+          smiSchvalit={smiSchvalovat}
           running={active?.procedureId === detail.id}
           starting={starting}
-          onRun={() => { startRun(detail); setDetail(null); }}
-          onEdit={() => { const p = detail; setDetail(null); openEdit(p); }}
-          onClose={() => setDetail(null)}
+          onRun={() => { spust(detail); setDetailId(null); }}
+          onApprove={() => { void approveProcedure(detail.id); }}
+          onEdit={() => { const p = detail; setDetailId(null); openEdit(p); }}
+          onClose={() => setDetailId(null)}
         />
       )}
 
@@ -445,181 +318,97 @@ export default function Procedures({ user }: Props) {
         <ProcedureEditor
           key={editing?.id ?? 'new'}
           initial={editing}
+          smiPovinny={smiVytvorit || smiUpravit}
+          navrh={!smiVytvorit && !editing}
           onClose={() => setEditorOpen(false)}
           onSaved={(saved) => {
-            setProcedures(prev => {
-              const exists = prev.some(p => p.id === saved.id);
-              return exists ? prev.map(p => (p.id === saved.id ? saved : p)) : [...prev, saved];
+            data.set(prev => {
+              if (!prev) return prev as any;
+              const exists = prev.postupy.some(p => p.id === saved.id);
+              return { ...prev, postupy: exists ? prev.postupy.map(p => (p.id === saved.id ? saved : p)) : [...prev.postupy, saved] };
             });
+            reload();
             setEditorOpen(false);
           }}
         />
       )}
-      {runDetail && (() => {
-        const steps = parseSteps(
-          procedures.find(p => p.id === runDetail.procedure_id)?.items ?? []
-        );
-        const checked: number[] = Array.isArray(runDetail.checked_items) ? runDetail.checked_items : [];
-        const skipped: number[] = Array.isArray(runDetail.skipped_items) ? runDetail.skipped_items : [];
-        const reasons = runDetail.skip_reasons && typeof runDetail.skip_reasons === 'object' ? runDetail.skip_reasons : {};
-        return (
-          <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setRunDetail(null)}>
-            <div ref={runModal.ref} {...runModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-              <DiscardGuard guard={runModal.guard} />
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <h3 className="text-lg font-bold tracking-tight text-[#16181A] min-w-0">{runDetail.procedure_name}</h3>
-                <button aria-label="Zavřít" onClick={() => setRunDetail(null)} className="shrink-0 btn-icon"><Icon name="close" size={15} /></button>
-              </div>
-              <p className="text-sm text-black/50 mb-4">
-                {runDetail.user_avatar ?? '👤'} {runDetail.user_name} · {fmtWhen(runDetail.completed_at || runDetail.started_at)} · {fmtDuration(runDetail.duration_seconds)}
-              </p>
-              {steps.length === 0 ? (
-                <p className="text-sm text-black/45">Kroky tohoto postupu už nejsou k dispozici (postup byl změněn nebo smazán).</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {steps.map((st, i) => {
-                    const isDone = checked.includes(i);
-                    const isSkip = skipped.includes(i);
-                    const reason = reasons[String(i)];
-                    const excused = reason && isExcused(reason.reason);
-                    return (
-                      <div key={i} className={`rounded-2xl border px-3.5 py-2.5 ${
-                        isDone ? 'border-[#C8F542]/30 bg-[#C8F542]/[0.07]'
-                        : isSkip && excused ? 'border-black/[0.08] bg-black/[0.02]'
-                        : 'border-bad/25 bg-bad/[0.05]'
-                      }`}>
-                        <div className="flex items-start gap-2.5">
-                          <span className="shrink-0 mt-0.5 text-sm">{isDone ? '✅' : isSkip ? '⏭️' : '❌'}</span>
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-sm ${isDone ? 'text-[#16181A]' : 'text-black/70'}`}>
-                              {st.emoji ? `${st.emoji} ` : ''}{st.text}
-                              {st.weight === 'key' && <span className="ml-1.5 rounded-full bg-[#16181A] text-white px-1.5 py-0.5 text-[11px] font-bold align-middle">KLÍČOVÝ</span>}
-                            </p>
-                            {isSkip && (
-                              <p className={`text-xs mt-0.5 ${excused ? 'text-black/45' : 'text-bad-ink'}`}>
-                                {skipReasonLabel(reason?.reason)}{reason?.note ? ` — „${reason.note}"` : ''}
-                                {excused ? ' · omluveno, bez bodové ztráty' : ` · −${stepPenalty(st)} b.`}
-                              </p>
-                            )}
-                            {!isDone && !isSkip && (
-                              <p className="text-xs text-bad-ink mt-0.5">Nedokončeno · −{stepPenalty(st)} b.</p>
-                            )}
-                          </div>
-                          {isDone && stepPlus(st) > 0 && (
-                            <span className="shrink-0 text-xs font-semibold text-[#5B7A08] tabular-nums">+{stepPlus(st)}</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+    </>
+  );
+
+  const telo = (
+    <div className="space-y-3">
+      {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
+      {nastroj}
     </div>
+  );
+
+  if (tablet) {
+    return (
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-5">
+        <PageHeader title={hlavicka.title} subtitle={hlavicka.subtitle} hintId={hlavicka.hintId} primary={hlavicka.primary} />
+        {telo}
+        {okna}
+      </div>
+    );
+  }
+  return (
+    <>
+      <PlochaWidgetu stranka={stranka} hlavicka={hlavicka} nastroj={telo} />
+      {okna}
+    </>
   );
 }
 
 function ProcedureDetail({
-  procedure, isEmployer, running, starting, onRun, onEdit, onClose,
+  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, onRun, onApprove, onEdit, onClose,
 }: {
   procedure: Procedure;
-  isEmployer: boolean;
+  smiUpravit: boolean;
+  smiSpustit: boolean;
+  smiSchvalit: boolean;
   running: boolean;
   starting: boolean;
   onRun: () => void;
+  onApprove: () => void;
   onEdit: () => void;
   onClose: () => void;
 }) {
-  const dm = useModal(true, onClose, 'Detail postupu');
   const steps = parseSteps(procedure.items);
   const mins = totalMinutes(steps);
   const navodOdkaz = useOtevreniNavodu();
+  const navrh = procedure.approved === false;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={dm.guard} />
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">
-                <Icon name={procedure.icon || 'check'} size={24} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="t-section truncate">{procedure.name}</h2>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-black/50">
-                  <span>{steps.length} {stepsWord(steps.length)}</span>
-                  {mins > 0 && <><span className="text-black/25">•</span><span className="inline-flex items-center gap-1"><Icon name="clock" size={12} /> {fmtMinutes(mins)}</span></>}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {isEmployer && (
-                <button onClick={onEdit} title="Upravit" className="btn-icon">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2V20Z" /><path d="M13.5 6.5l4 4" /></svg>
-                </button>
-              )}
-              <button onClick={dm.guard.attemptClose} aria-label="Zavřít" className="btn-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-              </button>
-            </div>
-          </div>
-          {procedure.description && <p className="mt-3 text-sm leading-relaxed text-black/60">{procedure.description}</p>}
-        </div>
-
-        {/* Timeline preview */}
-        <div className="overflow-y-auto scrollbar-thin px-5 pb-2">
-          <StepTimeline steps={steps} {...navodOdkaz} />
-        </div>
-
-        {/* Play */}
-        <div className="px-5 py-4 border-t border-black/[0.07]">
-          <button
-            onClick={onRun}
-            disabled={starting}
-            className={`w-full rounded-full px-5 py-3 font-semibold transition inline-flex items-center justify-center gap-2 ${
-              running ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-[#16181A] text-white hover:brightness-110'
-            } disabled:opacity-60`}
-          >
-            {playGlyph} {running ? 'Pokračovat v průběhu' : 'Spustit postup'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProceduresEmpty({ isEmployer, seeding, onSeed, onNew }: { isEmployer: boolean; seeding: boolean; onSeed: () => void; onNew: () => void }) {
-  return (
-    <div className="glass-card">
-      <EmptyState illustration="postupy" title="Zatím žádné postupy"
-        hint={isEmployer
-          ? 'Otevírání, zavírání, příjem zboží — krok za krokem, s časy a tím, co je klíčové. Zaměstnanci je pak odklikají na baru.'
-          : 'Až je vedení sepíše, najdeš je tady a projdeš krok po kroku.'}
-        action={isEmployer ? (
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
-            <Button variant="accent" icon="leaf" onClick={onSeed} loading={seeding}>Vytvořit ukázkové postupy</Button>
-            <Button variant="secondary" icon="plus" onClick={onNew}>Vlastní postup</Button>
-          </div>
-        ) : undefined} />
-    </div>
+    <Modal open onClose={onClose} size="md" title={procedure.name}
+      subtitle={[czCount(steps.length, KROK), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure)].filter(Boolean).join(' · ')}
+      footer={<>
+        {smiUpravit && <Button variant="secondary" icon="pencil" onClick={onEdit}>Upravit</Button>}
+        {navrh && smiSchvalit && <Button variant="primary" icon="check" onClick={onApprove}>Schválit</Button>}
+        {!navrh && smiSpustit && (
+          <Button variant="primary" icon="play" onClick={onRun} loading={starting} disabled={running}>
+            {running ? 'Právě probíhá' : 'Spustit postup'}
+          </Button>
+        )}
+      </>}>
+      {navrh && <p className="note note-wait text-sm mb-3">Návrh čeká na schválení — spustit půjde až potom.</p>}
+      {procedure.description && <p className="text-sm leading-relaxed text-black/60 mb-3 text-pretty">{procedure.description}</p>}
+      <StepTimeline steps={steps} {...navodOdkaz} />
+    </Modal>
   );
 }
 
 function ProcedureEditor({
-  initial,
-  onClose,
-  onSaved,
+  initial, smiPovinny, navrh, onClose, onSaved,
 }: {
   initial: Procedure | null;
+  /** Povinnost před uzávěrkou nastaví jen ten, kdo zakládá nebo upravuje (návrh ji API zahodí). */
+  smiPovinny: boolean;
+  /** Ukládá se jako návrh ke schválení (postupy.navrhnout bez postupy.vytvorit). */
+  navrh: boolean;
   onClose: () => void;
   onSaved: (p: Procedure) => void;
 }) {
-  const em = useModal(true, onClose, 'Postup — úpravy');
+  const uid = useId();
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [icon, setIcon] = useState(initial?.icon ?? 'check');
@@ -627,7 +416,7 @@ function ProcedureEditor({
   const [remindAnchor, setRemindAnchor] = useState<'time' | 'open' | 'close'>(
     (initial?.remindAnchor as 'time' | 'open' | 'close') ?? 'time'
   );
-  const [requireBeforeClosing, setRequireBeforeClosing] = useState<boolean>((initial as any)?.requireBeforeClosing === true);
+  const [requireBeforeClosing, setRequireBeforeClosing] = useState<boolean>(initial?.requireBeforeClosing === true);
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
@@ -678,14 +467,14 @@ function ProcedureEditor({
         guideId: s.guideId ?? null,
       }))
       .filter(s => s.text.length > 0);
-    if (!cleanName) { setError('Zadejte název postupu.'); return; }
-    if (items.length === 0) { setError('Přidejte alespoň jeden krok.'); return; }
+    if (!cleanName) { setError('Zadej název postupu.'); return; }
+    if (items.length === 0) { setError('Přidej aspoň jeden krok.'); return; }
     setSaving(true);
     try {
       const reminderOn = remindAnchor !== 'time' || !!remindAt;
       const payload = {
         name: cleanName,
-        description: description.trim(),
+        description: (description ?? '').trim(),
         icon,
         items,
         remindAnchor,
@@ -698,258 +487,141 @@ function ProcedureEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Uložení se nezdařilo.'); return; }
-      onSaved(data.procedure as Procedure);
-    } catch {
-      setError('Uložení se nezdařilo.');
+      const d = await okJson(res);
+      onSaved(d.procedure as Procedure);
+    } catch (e) {
+      setError(apiMessage(e, 'Uložení se nezdařilo.'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div
-        ref={em.ref} {...em.dialogProps}
-        className="modal-sheet w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        <DiscardGuard guard={em.guard} />
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <h2 className="t-section">{initial ? 'Upravit postup' : 'Nový postup'}</h2>
-          <button onClick={em.guard.attemptClose} aria-label="Zavřít" className="btn-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
+    <Modal open onClose={onClose} size="lg"
+      title={initial ? 'Upravit postup' : navrh ? 'Navrhnout postup' : 'Nový postup'}
+      subtitle={navrh ? 'Návrh schválí vedení, pak ho uvidí celý tým.' : undefined}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
+        <Button variant="primary" onClick={save} loading={saving}>{initial ? 'Uložit změny' : navrh ? 'Odeslat návrh' : 'Vytvořit postup'}</Button>
+      </>}>
+      <div className="space-y-4">
+        <Field id={`${uid}-nazev`} label="Název">
+          <Input id={`${uid}-nazev`} value={name} onChange={e => setName(e.target.value)} placeholder="Např. Otevírání" />
+        </Field>
+        <Field id={`${uid}-popis`} label="Popis (nepovinné)">
+          <Input id={`${uid}-popis`} value={description ?? ''} onChange={e => setDescription(e.target.value)} placeholder="Krátký popis postupu" />
+        </Field>
+
+        <div role="group" aria-labelledby={`${uid}-ikona`}>
+          <p id={`${uid}-ikona`} className="field-label">Ikona</p>
+          <div className="flex flex-wrap gap-2">
+            {ICON_CHOICES.map(ic => (
+              <button key={ic.id} type="button" onClick={() => setIcon(ic.id)} aria-label={`Ikona ${ic.nazev}`} aria-pressed={icon === ic.id}
+                className={`filter-pill tap-target grid h-11 w-11 place-items-center !px-0 ${icon === ic.id ? 'seg-on' : 'seg-off glass'}`}>
+                <Icon name={ic.id} size={20} />
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="overflow-y-auto scrollbar-thin px-5 pb-2 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-black/50 mb-1.5">Název</label>
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Např. Otevírání"
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-black/50 mb-1.5">Popis (nepovinné)</label>
-            <input
-              value={description ?? ''}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Krátký popis postupu"
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-black/50 mb-1.5">Ikona</label>
-            <div className="flex flex-wrap gap-2">
-              {ICON_CHOICES.map(name => (
-                <button
-                  key={name}
-                  onClick={() => setIcon(name)}
-                  aria-label={`Ikona ${name}`}
-                  aria-pressed={icon === name}
-                  className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
-                    icon === name
-                      ? 'bg-[#C8F542] border-[#C8F542] text-black'
-                      : 'bg-black/[0.04] border-black/[0.08] text-black/50 hover:text-black hover:bg-black/[0.06]'
-                  }`}
-                >
-                  <Icon name={name} size={20} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-black/50 mb-1.5">Kroky</label>
-            <p className="mb-2 text-xs text-black/40">Emoji a čas jsou nepovinné. Důležitost kroku řídí automatické body: hotový krok přičítá, vynechaný odečítá (Klíčový +2/−3, Běžný +1/−1, Drobný 0). Vlastní minus body mají přednost.</p>
-            <div className="space-y-2.5">
-              {steps.map((s, i) => (
-                <div key={i} className="space-y-2.5">
-                <div className="well border border-black/[0.07] p-2.5 space-y-2">
+        <div>
+          <p className="field-label">Kroky</p>
+          <p className="t-meta mb-2 text-pretty">Emoji a čas jsou nepovinné. Důležitost kroku řídí body: hotový krok přičítá, vynechaný odečítá (klíčový +2/−3, běžný +1/−1, drobný 0). Vlastní minus body mají přednost.</p>
+          <ol className="space-y-2.5">
+            {steps.map((s, i) => (
+              <li key={i} className="space-y-2">
+                <div className="well p-2.5 space-y-2">
                   <div className="flex items-center gap-2">
-                    <input
-                      value={s.emoji ?? ''}
-                      onChange={e => patchStep(i, { emoji: e.target.value })}
-                      placeholder="🙂"
-                      maxLength={4}
-                      className="w-11 flex-shrink-0 text-center rounded-xl bg-white/70 border border-black/[0.08] px-1 py-2.5 text-lg focus:border-[#C8F542]/50 focus:outline-none"
-                    />
-                    <input
-                      value={s.text}
-                      onChange={e => patchStep(i, { text: e.target.value })}
-                      placeholder={`Krok ${i + 1}`}
-                      className="flex-1 min-w-0 rounded-xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-                    />
-                    <div className="relative flex-shrink-0">
-                      <input
-                        type="number" min={0} inputMode="numeric"
-                        value={s.minutes ?? ''}
-                        onChange={e => patchStep(i, { minutes: e.target.value ? Math.max(0, parseInt(e.target.value)) : null })}
-                        placeholder="min"
-                        className="w-[68px] rounded-xl bg-white/70 border border-black/[0.08] pl-3 pr-7 py-2.5 text-sm tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
-                      />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-black/35">m</span>
-                    </div>
+                    <Input value={s.emoji ?? ''} onChange={e => patchStep(i, { emoji: e.target.value })} placeholder="🙂" maxLength={4}
+                      aria-label={`Emoji kroku ${i + 1} (nepovinné)`} className="!w-12 shrink-0 text-center !px-1" />
+                    <Input value={s.text} onChange={e => patchStep(i, { text: e.target.value })} placeholder={`Krok ${i + 1}`}
+                      aria-label={`Krok ${i + 1}`} className="flex-1 min-w-0" />
+                    <Input type="number" min={0} inputMode="numeric" value={s.minutes ?? ''}
+                      onChange={e => patchStep(i, { minutes: e.target.value ? Math.max(0, parseInt(e.target.value)) : null })}
+                      placeholder="min" aria-label={`Minuty kroku ${i + 1} (nepovinné)`} className="!w-20 shrink-0 tabular-nums" />
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Importance drives automatic points: done = +, missed = − */}
-                    <div className="flex gap-1 rounded-full bg-white/60 border border-black/[0.07] p-0.5">
-                      {STEP_WEIGHTS.map(w => (
-                        <button key={w.id} type="button" title={`${w.hint} (+${w.plus} / −${s.penalty ?? w.minus})`}
-                          onClick={() => patchStep(i, { weight: w.id })}
-                          className={`tap-target-sm rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                            (s.weight ?? 'normal') === w.id ? 'seg-on' : 'seg-off'
-                          }`}>
-                          {w.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="relative flex-shrink-0" title="Vlastní minus body, když se krok neudělá">
-                      <input type="number" min={0} inputMode="numeric"
-                        value={s.penalty ?? ''}
-                        onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
-                        placeholder={String(weightSpec(s.weight ?? 'normal').minus)}
-                        className="tap-target-sm w-[64px] rounded-xl bg-white/60 border border-black/[0.07] pl-6 pr-2 py-1.5 text-xs tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-bad-ink/70">−</span>
-                    </div>
-                    <input
-                      value={s.note ?? ''}
-                      onChange={e => patchStep(i, { note: e.target.value })}
-                      aria-label={`Poznámka ke kroku ${i + 1} (nepovinné)`}
-                      placeholder="Poznámka (nepovinné)"
-                      className="flex-1 min-w-0 rounded-xl bg-white/50 border border-black/[0.06] px-3.5 py-2 text-xs text-black/70 placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
-                    />
+                    {/* Důležitost řídí automatické body: hotovo = +, vynecháno = − */}
+                    <Segmented size="sm" ariaLabel={`Důležitost kroku ${i + 1}`} value={s.weight ?? 'normal'}
+                      onChange={w => patchStep(i, { weight: w })}
+                      options={STEP_WEIGHTS.map(w => ({ id: w.id, label: w.label }))} />
+                    <Input type="number" min={0} inputMode="numeric" value={s.penalty ?? ''}
+                      onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
+                      placeholder={`−${weightSpec(s.weight ?? 'normal').minus}`}
+                      aria-label={`Vlastní minus body kroku ${i + 1}, když se neudělá`} className="!w-20 shrink-0 tabular-nums" />
+                    <Input value={s.note ?? ''} onChange={e => patchStep(i, { note: e.target.value })}
+                      aria-label={`Poznámka ke kroku ${i + 1} (nepovinné)`} placeholder="Poznámka (nepovinné)" className="flex-1 min-w-[10rem]" />
                     {/* Poznámka je na jednu větu. „Vyčistit kávovar" chce celý
                         postup — a ten v Návodech nejspíš už je. */}
-                    <StepGuidePicker
-                      guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
-                      onChange={g => patchStep(i, { guideId: g })}
-                    />
-                    <div className="flex flex-shrink-0 items-center">
-                      <button onClick={() => move(i, -1)} disabled={i === 0} title="Nahoru" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>
-                      </button>
-                      <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} title="Dolů" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-black hover:bg-black/[0.06] disabled:opacity-25 transition">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-                      </button>
-                      <button onClick={() => removeStep(i)} title="Odebrat" className="flex h-8 w-7 items-center justify-center rounded-lg text-black/35 hover:text-bad-ink hover:bg-bad/10 transition">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                      </button>
+                    <StepGuidePicker guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
+                      onChange={g => patchStep(i, { guideId: g })} />
+                    <div className="flex shrink-0 items-center">
+                      <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={`Posunout krok ${i + 1} výš`}
+                        onClick={() => move(i, -1)} disabled={i === 0} />
+                      <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={`Posunout krok ${i + 1} níž`}
+                        onClick={() => move(i, 1)} disabled={i === steps.length - 1} />
+                      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat krok ${i + 1}`} onClick={() => removeStep(i)} />
                     </div>
                   </div>
                 </div>
                 {i < steps.length - 1 && (
                   <div className="flex justify-center">
-                    <button type="button" onClick={() => insertStep(i)} title="Přidat krok sem"
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-black/10 text-black/40 hover:text-[#5B7A08] hover:border-[#C8F542]/60 shadow-sm transition">
-                      <Icon name="plus" size={13} />
-                    </button>
+                    <Button variant="ghost" size="sm" icon="plus" onClick={() => insertStep(i)} aria-label={`Vložit krok za krok ${i + 1}`}>Vložit</Button>
                   </div>
                 )}
-                </div>
-              ))}
-            </div>
-            <button onClick={addStep} className="mt-2.5 inline-flex items-center gap-1.5 btn btn-secondary btn-sm text-[#16181A] hover:bg-black/[0.05] transition">
-              <Icon name="plus" size={16} /> Přidat krok
-            </button>
-          </div>
+              </li>
+            ))}
+          </ol>
+          <Button variant="secondary" size="sm" icon="plus" className="mt-2.5" onClick={addStep}>Přidat krok</Button>
+        </div>
 
-          <label className="flex items-start justify-between gap-4 well border border-black/[0.07] p-4 cursor-pointer">
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-[#16181A]">Vyžadovat před uzávěrkou</span>
-              <span className="block text-xs text-black/45 mt-0.5">Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne.</span>
-            </span>
-            <input type="checkbox" checked={requireBeforeClosing} onChange={e => setRequireBeforeClosing(e.target.checked)}
-              className="mt-1 h-5 w-5 rounded accent-[#8FB811] shrink-0" />
-          </label>
+        {smiPovinny && !navrh && (
+          <ul className="list">
+            <SwitchRow title="Vyžadovat před uzávěrkou" hint="Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne."
+              checked={requireBeforeClosing} onChange={setRequireBeforeClosing} />
+          </ul>
+        )}
 
-          <div>
-            <label className="block text-xs font-medium text-black/50 mb-1.5">Připomínka (nepovinné)</label>
-            <p className="mb-2 text-xs text-black/40">Postup se v daný čas sám otevře a lidem na směně přijde upozornění.</p>
-            <div className="flex flex-wrap gap-1.5 mb-2.5">
-              {([['time', 'V určený čas'], ['open', 'Při otevření'], ['close', 'Při zavření']] as const).map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setRemindAnchor(val)}
-                  className={`rounded-full px-3.5 py-2 text-sm font-medium border transition ${
-                    remindAnchor === val ? 'bg-[#16181A] text-white border-transparent' : 'bg-black/[0.04] border-black/[0.08] text-black/60 hover:text-black'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+        <div>
+          <p className="field-label">Připomínka (nepovinné)</p>
+          <p className="t-meta mb-2 text-pretty">Postup se v daný čas sám otevře a lidem na směně přijde upozornění.</p>
+          <Segmented ariaLabel="Kdy připomenout" value={remindAnchor} onChange={setRemindAnchor} wrap
+            options={[{ id: 'time', label: 'V určený čas' }, { id: 'open', label: 'Při otevření' }, { id: 'close', label: 'Při zavření' }]} />
+          <div className="mt-2.5">
             {remindAnchor === 'time' ? (
               <div className="flex items-center gap-2">
-                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center well border border-black/[0.08] text-[#5B7A08]">
-                  <Icon name="clock" size={20} />
-                </span>
-                <input
-                  type="time"
-                  aria-label="Čas připomenutí"
-                  value={remindAt ?? ''}
-                  onChange={e => setRemindAt(e.target.value)}
-                  className="flex-1 min-w-0 field border border-black/[0.08] px-4 py-3 text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-                />
+                <Input type="time" aria-label="Čas připomenutí" value={remindAt ?? ''} onChange={e => setRemindAt(e.target.value)}
+                  className="flex-1 min-w-0 tabular-nums" />
                 {remindAt && (
-                  <button
-                    onClick={() => { setRemindAt(''); setRemindDays([]); }}
-                    title="Zrušit připomínku"
-                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-black/40 hover:bg-black/[0.06] hover:text-black transition"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                  </button>
+                  <Button variant="ghost" iconOnly icon="close" aria-label="Zrušit připomínku" onClick={() => { setRemindAt(''); setRemindDays([]); }} />
                 )}
               </div>
             ) : (
-              <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/20 rounded-xl px-3 py-2.5">
-                Připomene se podle otevírací doby daného dne{remindAnchor === 'open' ? ' (při otevření)' : ' (při zavření)'} — pokud je zavřeno, ten den se nepřipomene.
+              <p className="t-meta text-pretty">
+                Připomene se podle otevírací doby daného dne{remindAnchor === 'open' ? ' (při otevření)' : ' (při zavření)'} — když je zavřeno, ten den se nepřipomene.
               </p>
             )}
-            {(remindAnchor !== 'time' || remindAt) && (
-              <div className="mt-2.5">
-                <p className="mb-1.5 text-xs text-black/40">Ve dnech (nevybráno = každý den)</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {WEEKDAYS.map((label, d) => {
-                    const on = remindDays.includes(d);
-                    return (
-                      <button
-                        key={d}
-                        onClick={() => toggleDay(d)}
-                        className={`h-9 min-w-[2.5rem] px-1 rounded-full text-sm font-medium border transition ${
-                          on
-                            ? 'bg-[#C8F542] border-[#C8F542] text-black'
-                            : 'bg-black/[0.04] border-black/[0.08] text-black/50 hover:text-black hover:bg-black/[0.06]'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
-
-          {error && <p className="text-sm text-bad-ink">{error}</p>}
+          {(remindAnchor !== 'time' || remindAt) && (
+            <div className="mt-2.5" role="group" aria-labelledby={`${uid}-dny`}>
+              <p id={`${uid}-dny`} className="t-meta mb-1.5">Ve dnech (nevybráno = každý den)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {WEEKDAYS.map((label, d) => {
+                  const on = remindDays.includes(d);
+                  return (
+                    <button key={d} type="button" onClick={() => toggleDay(d)} aria-pressed={on}
+                      className={`filter-pill tap-target min-w-[2.75rem] justify-center ${on ? 'seg-on' : 'seg-off glass'}`}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 px-5 py-4 border-t border-black/[0.07]">
-          <button onClick={onClose} className="rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 font-medium hover:bg-black/[0.05] transition">
-            Zrušit
-          </button>
-          <button onClick={save} disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-60">
-            {saving ? 'Ukládám…' : initial ? 'Uložit změny' : 'Vytvořit postup'}
-          </button>
-        </div>
+        {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

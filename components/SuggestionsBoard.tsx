@@ -1,41 +1,52 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Icon } from './Icons';
+// Nápady: podněty týmu na vylepšení, hlasování a posun od „Nový" po „Hotovo".
+//
+// Kolo 69 (balík B6a): stránka je plocha s widgety — u vedení (vedeni.napady)
+// i u zaměstnance (zamestnanec.napady); tatáž komponenta pozná stránku podle
+// adresy. Hlavička jde do PlochaWidgetu, tahle komponenta kreslí nástroj:
+// filtr, řazení a seznam. Data čte přes useDataWidgetu z téže adresy jako
+// widgety Nové podněty a Nejžádanější nápady, takže hlas daný nahoře se hned
+// ukáže i v seznamu a stránka se ptá jednou.
+//
+// Z auditu (final_sorted, obsah-kontrola): Nový podnět byl ručně psané okno vedle
+// <Modal> o pár řádků níž → obě okna jsou Modal s popisky polí; stav ručně míchaným
+// štítkem s hex barvami → Chip; posun podnětu ručními pilulkami → Segmented; akce
+// holým textem „→ Do plánování" → Menu s ikonami; mazání přes confirm() → okno;
+// náhradní emoji 👤 → Avatar; na telefonu se pás filtrů ořízl vedle řazení → řazení
+// je samostatné Menu vedle pásu, pás se posouvá sám.
 
-import { EmptyState, PageHeader, Button, Modal } from './ui';
-import { useModal } from '@/lib/useModal';
-import { okJson } from '@/lib/api';
-import { DiscardGuard } from './ui/DiscardGuard';
-type Suggestion = {
-  id: number;
-  title: string;
-  content: string | null;
-  status: string;
-  authorId: number;
-  authorName: string | null;
-  authorAvatar: string | null;
-  createdAt: string;
-  votes: number;
-  hasVoted: boolean;
+import { useId, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import {
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type ChipTone, type MenuItem,
+} from './ui';
+import { PlochaWidgetu } from './widgety/PlochaWidgetu';
+import { useDataWidgetu, obnovDataWidgetu } from './widgety/useDataWidgetu';
+import { useSmi } from './widgety/NavigaceKontext';
+import { URL_NAPADY, Hlas } from './widgety/oblasti/napady';
+import { apiMessage, okJson } from '@/lib/api';
+import { czCount, type CzNoun } from '@/lib/czech';
+import { vyberPodnety, prepniHlas, type DataPodnetu, type Podnet } from '@/lib/ukolyPrehled';
+
+const PODNET: CzNoun = { one: 'podnět', few: 'podněty', many: 'podnětů' };
+const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
+
+// Stavy v pořadí, jak vedení podnět posouvá. Tón je stav (DP §2.1): nový čeká,
+// naplánovaný je informace, hotový v pořádku, zamítnutý tlumený.
+const STATUS_META: Record<string, { label: string; tone: ChipTone }> = {
+  new: { label: 'Nový', tone: 'wait' },
+  planned: { label: 'Naplánováno', tone: 'info' },
+  done: { label: 'Hotovo', tone: 'ok' },
+  declined: { label: 'Zamítnuto', tone: 'muted' },
 };
-
-const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
-
-// Pipeline stages, in the order the employer moves an idea through.
-const STATUS_META: Record<string, { label: string; chip: string }> = {
-  new:      { label: 'Nový',        chip: 'bg-wait/15 text-wait-ink' },
-  planned:  { label: 'Naplánováno', chip: 'bg-[#0A84FF]/15 text-[#0A5CC0]' },
-  done:     { label: 'Hotovo',      chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
-  declined: { label: 'Zamítnuto',   chip: 'bg-black/[0.06] text-black/45' },
-};
-const STATUS_FLOW: { id: string; label: string }[] = [
+const STATUS_FLOW = [
   { id: 'new', label: 'Nový' },
   { id: 'planned', label: 'Naplánovat' },
   { id: 'done', label: 'Hotovo' },
   { id: 'declined', label: 'Zamítnout' },
-];
+] as const;
+type IdStavu = typeof STATUS_FLOW[number]['id'];
 
 const FILTERS: { id: string; label: string }[] = [
   { id: 'all', label: 'Vše' },
@@ -59,284 +70,232 @@ const relDate = (iso: string) => {
 };
 
 export default function SuggestionsBoard() {
-  const [items, setItems] = useState<Suggestion[]>([]);
-  const [isEmployer, setIsEmployer] = useState(false);
-  const [meId, setMeId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const zamestnanec = (usePathname() ?? '').startsWith('/employee');
+  const smi = useSmi();
+  const data = useDataWidgetu<DataPodnetu>(URL_NAPADY, vyberPodnety);
+  const items = data.data?.podnety ?? [];
+  const spravuje = !!data.data?.spravuje;
+  const meId = data.data?.meId ?? null;
+  const pridava = smi('napady.pridat');
+  const doPlanovani = spravuje && smi('planovani.upravit');
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState<'new' | 'votes'>('new');
   const [composing, setComposing] = useState(false);
-  const composeModal = useModal(composing, () => setComposing(false), 'Nový podnět');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState('');
+  const [akceChyba, setAkceChyba] = useState<string | null>(null);
+  const [zprava, setZprava] = useState<string | null>(null);
+  // Autor upravuje svůj podnět; mazání přes okno (dřív confirm()).
+  const [editing, setEditing] = useState<Podnet | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [mazani, setMazani] = useState<Podnet | null>(null);
+  const [mazu, setMazu] = useState(false);
+  const id = useId();
 
-  const load = async () => {
-    try {
-      const d = await fetch('/api/suggestions').then(okJson);
-      setItems(Array.isArray(d.suggestions) ? d.suggestions : []);
-      setIsEmployer(!!d.isEmployer);
-      setMeId(typeof d.meId === 'number' ? d.meId : null);
-    } catch { /* ignore */ }
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, []);
+  const zmen = (f: (list: Podnet[]) => Podnet[]) => data.set(prev => (prev ? { ...prev, podnety: f(prev.podnety) } : prev!));
 
   const submit = async () => {
     setErr('');
     if (!title.trim()) { setErr('Napiš krátký název podnětu.'); return; }
     setSubmitting(true);
     try {
-      const res = await fetch('/api/suggestions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), content: content.trim() }),
-      });
-      if (res.ok) {
-        setTitle(''); setContent(''); setComposing(false);
-        await load();
-      } else {
-        const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Nepodařilo se odeslat.');
-      }
-    } catch { setErr('Chyba serveru.'); }
+      await fetch(URL_NAPADY, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ title: title.trim(), content: content.trim() }) }).then(okJson);
+      setTitle(''); setContent(''); setComposing(false);
+      data.reload();
+      setZprava(zamestnanec ? 'Podnět je odeslaný — vedení ho uvidí.' : 'Podnět je přidaný.');
+    } catch (e) { setErr(apiMessage(e, 'Podnět se nepodařilo odeslat.')); }
     setSubmitting(false);
   };
 
-  const toggleVote = async (s: Suggestion) => {
-    // Optimistic flip.
-    setItems(list => list.map(x => x.id === s.id
-      ? { ...x, hasVoted: !x.hasVoted, votes: x.votes + (x.hasVoted ? -1 : 1) }
-      : x));
+  const toggleVote = async (s: Podnet) => {
+    setAkceChyba(null);
+    zmen(list => prepniHlas(list, s.id));
     try {
-      const res = await fetch(`/api/suggestions/${s.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toggleVote: true }),
-      });
-      if (!res.ok) throw new Error();
-      const d = await res.json();
-      setItems(list => list.map(x => x.id === s.id ? { ...x, votes: d.votes, hasVoted: d.hasVoted } : x));
-    } catch { load(); }
+      await fetch(`${URL_NAPADY}/${s.id}`, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ toggleVote: true }) }).then(okJson);
+      data.reload();
+    } catch (e) {
+      zmen(list => prepniHlas(list, s.id));
+      setAkceChyba(apiMessage(e, 'Hlas se nepodařilo uložit.'));
+    }
   };
 
-  const setStatus = async (s: Suggestion, status: string) => {
-    const prev = items;
-    setItems(list => list.map(x => x.id === s.id ? { ...x, status } : x));
+  const setStatus = async (s: Podnet, status: string) => {
+    if (s.status === status) return;
+    setAkceChyba(null);
+    zmen(list => list.map(x => (x.id === s.id ? { ...x, status } : x)));
     try {
-      const res = await fetch(`/api/suggestions/${s.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error();
-    } catch { setItems(prev); }
+      await fetch(`${URL_NAPADY}/${s.id}`, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ status }) }).then(okJson);
+      data.reload();
+    } catch (e) {
+      zmen(list => list.map(x => (x.id === s.id ? { ...x, status: s.status } : x)));
+      setAkceChyba(apiMessage(e, 'Stav se nepodařilo změnit.'));
+    }
   };
 
-  // Author edits their own idea in place.
-  const [editing, setEditing] = useState<Suggestion | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
-  const [savingEdit, setSavingEdit] = useState(false);
+  const sendToPlanning = async (s: Podnet) => {
+    setAkceChyba(null);
+    try {
+      await fetch(`${URL_NAPADY}/${s.id}`, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ toPlanning: true }) }).then(okJson);
+      data.reload();
+      obnovDataWidgetu('/api/planning');
+      setZprava(`„${s.title}" je na tabuli v Plánování.`);
+    } catch (e) { setAkceChyba(apiMessage(e, 'Do plánování se to nepodařilo přesunout.')); }
+  };
+
   const saveEdit = async () => {
     if (!editing || !editTitle.trim()) return;
     setSavingEdit(true);
-    const res = await fetch(`/api/suggestions/${editing.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: editTitle.trim(), content: editContent.trim() }),
-    }).catch(() => null);
+    try {
+      await fetch(`${URL_NAPADY}/${editing.id}`, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ title: editTitle.trim(), content: editContent.trim() }) }).then(okJson);
+      setEditing(null);
+      data.reload();
+    } catch (e) { setAkceChyba(apiMessage(e, 'Úpravu se nepodařilo uložit.')); setEditing(null); }
     setSavingEdit(false);
-    if (res?.ok) { setEditing(null); await load(); }
-    else setErr('Úpravu se nepodařilo uložit.');
   };
 
-  const remove = async (s: Suggestion) => {
-    if (!confirm('Smazat tento podnět?')) return;
-    const prev = items;
-    setItems(list => list.filter(x => x.id !== s.id));
+  const remove = async () => {
+    const s = mazani;
+    if (!s) return;
+    setMazu(true);
     try {
-      const res = await fetch(`/api/suggestions/${s.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-    } catch { setItems(prev); }
+      await fetch(`${URL_NAPADY}/${s.id}`, { method: 'DELETE' }).then(okJson);
+      zmen(list => list.filter(x => x.id !== s.id));
+      data.reload();
+      setZprava('Podnět je smazaný.');
+    } catch (e) { setAkceChyba(apiMessage(e, 'Podnět se nepodařilo smazat.')); }
+    setMazani(null);
+    setMazu(false);
   };
 
   const counts = items.reduce((a, s) => { a[s.status] = (a[s.status] ?? 0) + 1; return a; }, {} as Record<string, number>);
-  const shown = (() => {
-    const base = filter === 'all' ? items : items.filter(s => s.status === filter);
-    // Hlasy jsou na kartě to největší číslo a hlavní obsah celé nástěnky —
-    // a přesto se podle nich nedalo řadit. Pořadí ze serveru je podle data,
-    // takže nejpodporovanější nápad mohl být úplně dole.
-    if (sort === 'votes') return [...base].sort((a, b) => b.votes - a.votes);
-    return base;
-  })();
+  const base = filter === 'all' ? items : items.filter(s => s.status === filter);
+  // Hlasy jsou na kartě to největší číslo a hlavní obsah celé nástěnky —
+  // a přesto se podle nich dřív nedalo řadit. Pořadí ze serveru je podle stavu a data.
+  const shown = sort === 'votes' ? [...base].sort((a, b) => b.votes - a.votes) : base;
 
-  return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-6">
-      {/* Hlavička jako u ostatních obrazovek. Dřív tu byla uvítací karta s
-          h3 a pod ní tmavé tlačítko: obrazovka neměla hlavní nadpis a hlavní
-          akce se barvou lišila od zbytku aplikace. */}
-      <PageHeader hintId="suggestionsboard"
-        title="Nápady"
-        subtitle={isEmployer
-          ? 'Podněty od týmu — co by lidem usnadnilo práci. Přidej se hlasem nebo posuň nápad dál.'
-          : 'Máš nápad, co by šlo zlepšit? Přidej podnět a vedení ho uvidí. Palcem podpoříš nápady ostatních.'}
-        primary={<Button onClick={() => { setComposing(true); setErr(''); }} variant="accent" icon="plus">Přidat podnět</Button>}
-      />
+  const akce = (s: Podnet): MenuItem[] => {
+    const mine = meId != null && s.authorId === meId;
+    return [
+      ...(doPlanovani && s.status !== 'planned' && s.status !== 'done'
+        ? [{ label: 'Do plánování', icon: 'kanban', hint: 'Založí kartu na tabuli a označí podnět jako naplánovaný.', onClick: () => void sendToPlanning(s) }] : []),
+      ...(mine ? [{ label: 'Upravit', icon: 'pencil', onClick: () => { setEditing(s); setEditTitle(s.title); setEditContent(s.content ?? ''); } }] : []),
+      ...(spravuje || mine ? [{ label: 'Smazat podnět…', icon: 'trash', danger: true, onClick: () => setMazani(s) }] : []),
+    ];
+  };
 
-      {/* Filters */}
+  const nastroj = (
+    <div className="space-y-4">
       {items.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1 min-w-0 flex-1">
-          {FILTERS.map(f => {
-            const cnt = f.id === 'all' ? items.length : (counts[f.id] ?? 0);
-            return (
-              <button key={f.id} onClick={() => setFilter(f.id)}
-                className={`filter-pill ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
-                {f.label} {cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/35'}>· {cnt}</span>}
-              </button>
-            );
-          })}
-        </div>
-        {items.length > 2 && (
-          <button type="button" onClick={() => setSort(v => (v === 'votes' ? 'new' : 'votes'))}
-            aria-pressed={sort === 'votes'}
-            className={`filter-pill ${sort === 'votes' ? 'seg-on' : 'seg-off glass'}`}>
-            <Icon name="trend" size={14} />{sort === 'votes' ? 'Nejvíc hlasů' : 'Od nejnovějších'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 min-w-0 flex-1" role="group" aria-label="Filtr podle stavu">
+            {FILTERS.map(f => {
+              const cnt = f.id === 'all' ? items.length : (counts[f.id] ?? 0);
+              return (
+                <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
+                  className={`filter-pill tap-target-sm shrink-0 ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
+                  {f.label}{cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/45'}> · {cnt}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {items.length > 2 && (
+            <Menu size="sm" icon="swap" label={`Řazení: ${sort === 'votes' ? 'nejvíc hlasů' : 'od nejnovějších'}`} className="shrink-0" items={[
+              { label: 'Od nejnovějších', icon: sort === 'new' ? 'check' : 'clock', onClick: () => setSort('new') },
+              { label: 'Nejvíc hlasů', icon: sort === 'votes' ? 'check' : 'trend', onClick: () => setSort('votes') },
+            ]} />
+          )}
         </div>
       )}
 
-      {/* List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="spinner" />
-        </div>
-      ) : shown.length === 0 ? (
-        <div className="glass-card">
-          {items.length === 0
-            ? <EmptyState illustration="napady" title="Zatím žádný nápad" hint="Cokoli, co by v podniku šlo líp — nová položka do nabídky, jiný postup, oprava. Kdo napíše první, začíná." />
-            : <EmptyState icon="bulb" title="V této kategorii nic není" compact />}
-        </div>
-      ) : (
-        <div className="card divide-y divide-black/[0.06]">
-          {shown.map(s => {
-            const meta = STATUS_META[s.status] ?? STATUS_META.new;
-            const mine = meId != null && s.authorId === meId;
-            return (
-              <div key={s.id} className="p-5">
-                <div className="flex items-start gap-3">
-                  {/* Vote pill */}
-                  <button onClick={() => toggleVote(s)}
-                    className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-12 rounded-2xl border py-2 transition ${
-                      s.hasVoted ? 'bg-[#C8F542]/20 border-[#C8F542]/50 text-[#5B7A08]' : 'bg-white border-black/[0.08] text-black/45 hover:border-black/20'
-                    }`} title={s.hasVoted ? 'Zrušit podporu' : 'Podpořit'}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 15 6-6 6 6" /></svg>
-                    <span className="text-sm font-bold tabular-nums">{s.votes}</span>
-                  </button>
+      {akceChyba && <p className="note note-danger text-sm" role="alert">{akceChyba}</p>}
 
+      {data.error && !data.data ? (
+        <Card><ErrorState title="Nápady se nenačetly" onRetry={data.reload} detail={data.error} /></Card>
+      ) : data.loading ? (
+        <Card aria-busy className="space-y-2"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14 w-2/3" /></Card>
+      ) : shown.length === 0 ? (
+        <Card>
+          {items.length === 0
+            ? <EmptyState illustration="napady" title="Zatím žádný nápad" hint="Cokoli, co by v podniku šlo líp — nová položka do nabídky, jiný postup, oprava. Kdo napíše první, začíná."
+              action={pridava ? <Button variant="secondary" icon="plus" onClick={() => { setComposing(true); setErr(''); }}>Přidat podnět</Button> : undefined} />
+            : <EmptyState compact icon="bulb" title="V této kategorii nic není" />}
+        </Card>
+      ) : (
+        <Card pad="none" className="px-5">
+          <ul className="list">
+            {shown.map(s => {
+              const meta = STATUS_META[s.status] ?? STATUS_META.new;
+              const mine = meId != null && s.authorId === meId;
+              const polozky = akce(s);
+              return (
+                <li key={s.id} className="list-row items-start">
+                  <Hlas podnet={s} onClick={() => void toggleVote(s)} zamceno={!pridava} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold tracking-tight text-[#16181A] leading-snug min-w-0">{s.title}</h4>
-                      <span className={`tap-target-sm shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap ${meta.chip}`}>{meta.label}</span>
+                      <h3 className="t-card min-w-0 break-words">{s.title}</h3>
+                      <Chip tone={meta.tone} size="sm" className="shrink-0">{meta.label}</Chip>
                     </div>
-                    {s.content && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-wrap break-words">{s.content}</p>}
-                    <div className="flex items-center gap-x-2 gap-y-1 flex-wrap mt-2.5 text-xs text-black/45">
-                      <span className="text-base leading-none">{s.authorAvatar ?? '👤'}</span>
-                      <span className="font-medium text-black/55 truncate min-w-0 basis-full min-[380px]:basis-24 min-[380px]:flex-1">{s.authorName ?? 'Neznámý'}{mine ? ' (ty)' : ''}</span>
-                      <span className="text-black/25">·</span>
-                      <span className="whitespace-nowrap">{relDate(s.createdAt)}</span>
-                    </div>
-
-                    {/* Employer pipeline controls */}
-                    {isEmployer && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-black/[0.06]">
-                        {STATUS_FLOW.map(st => (
-                          <button key={st.id} onClick={() => setStatus(s, st.id)} disabled={s.status === st.id}
-                            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                              s.status === st.id
-                                ? 'bg-[#16181A] text-white cursor-default'
-                                : 'bg-black/[0.04] text-black/55 hover:bg-black/[0.08]'
-                            }`}>
-                            {st.label}
-                          </button>
-                        ))}
+                    {s.content && <p className="text-sm text-black/60 mt-1 whitespace-pre-wrap break-words text-pretty">{s.content}</p>}
+                    <p className="flex items-center gap-1.5 mt-2 text-[13px] text-black/55 min-w-0">
+                      <Avatar emoji={s.authorAvatar} size="xs" ring={false} />
+                      <span className="truncate min-w-0">{s.authorName ?? 'Neznámý'}{mine ? ' (ty)' : ''}</span>
+                      {relDate(s.createdAt) && <><span aria-hidden className="text-black/40">·</span><span className="whitespace-nowrap">{relDate(s.createdAt)}</span></>}
+                    </p>
+                    {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). */}
+                    {spravuje && (
+                      <div className="mt-3">
+                        <Segmented size="sm" wrap ariaLabel={`Stav podnětu ${s.title}`} value={(STATUS_FLOW.some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
+                          onChange={v => void setStatus(s, v)} options={STATUS_FLOW.map(x => ({ id: x.id, label: x.label }))} />
                       </div>
                     )}
                   </div>
-                </div>
-
-                {(isEmployer || mine) && (
-                  <div className="flex justify-start sm:justify-end gap-1 mt-1">
-                    {isEmployer && s.status !== 'planned' && s.status !== 'done' && (
-                      <button
-                        onClick={async () => {
-                          const res = await fetch(`/api/suggestions/${s.id}`, {
-                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ toPlanning: true }),
-                          }).catch(() => null);
-                          if (res?.ok) await load();
-                          else setErr('Do plánování se to nepodařilo přesunout.');
-                        }}
-                        className="tap-target-sm text-xs text-[#5B7A08] hover:underline rounded-full px-2 py-1 transition"
-                        title="Vytvoří kartu na plánovací tabuli a označí podnět jako naplánovaný">
-                        → Do plánování
-                      </button>
-                    )}
-                    {mine && (
-                      <button onClick={() => { setEditing(s); setEditTitle(s.title); setEditContent(s.content ?? ''); }}
-                        className="tap-target-sm text-xs text-black/35 hover:text-black rounded-full px-2 py-1 transition">
-                        Upravit
-                      </button>
-                    )}
-                    <button onClick={() => remove(s)}
-                      className="tap-target-sm text-xs text-black/35 hover:text-bad-ink rounded-full px-2 py-1 transition">
-                      Smazat
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {polozky.length > 0 && <Menu size="sm" label={`Další akce: ${s.title}`} items={polozky} className="shrink-0 -my-1" />}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
+    </div>
+  );
 
-      {/* Compose modal */}
+  const novych = counts.new ?? 0;
+  return (
+    <>
+      <PlochaWidgetu
+        stranka={zamestnanec ? 'zamestnanec.napady' : 'vedeni.napady'}
+        hlavicka={{
+          title: 'Nápady',
+          subtitle: spravuje
+            ? (novych > 0 ? `Na posouzení čeká ${czCount(novych, PODNET)}. Přidej se hlasem nebo posuň nápad dál.` : 'Podněty od týmu — co by lidem usnadnilo práci. Přidej se hlasem nebo posuň nápad dál.')
+            : 'Máš nápad, co by šlo zlepšit? Přidej podnět a vedení ho uvidí. Hlasem podpoříš nápady ostatních.',
+          hintId: 'suggestionsboard',
+          primary: pridava ? <Button onClick={() => { setComposing(true); setErr(''); }} variant="accent" icon="plus">Přidat podnět</Button> : undefined,
+        }}
+        nastroj={nastroj}
+      />
+
       {composing && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-4" onClick={() => setComposing(false)}>
-          <div ref={composeModal.ref} {...composeModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <DiscardGuard guard={composeModal.guard} />
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="grid place-items-center h-10 w-10 rounded-2xl bg-[#C8F542]/20 text-[#5B7A08]"><Icon name="bulb" size={20} /></div>
-              <h3 className="t-card">Nový podnět</h3>
-            </div>
-            {err && (
-              <div className="p-3 note note-danger text-sm flex items-center gap-2 mb-3">
-                <Icon name="warning" size={16} /> {err}
-              </div>
-            )}
-            <div className="space-y-3">
-              <div>
-                <label className="field-label">Co navrhuješ?</label>
-                <input value={title} onChange={e => setTitle(e.target.value)} maxLength={160} autoFocus
-                  placeholder="Např. Přidat druhý mlýnek na kávu" className={inputClass} />
-              </div>
-              <div>
-                <label className="field-label">Vysvětli to blíž (nepovinné)</label>
-                <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} maxLength={2000}
-                  placeholder="Proč to pomůže, jak by to mělo fungovat…" className={`${inputClass} resize-none`} />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setComposing(false)}
-                className="btn btn-secondary flex-1">
-                Zrušit
-              </button>
-              <button onClick={submit} disabled={submitting}
-                className="btn btn-primary flex-1 disabled:opacity-50 inline-flex items-center justify-center gap-2">
-                {submitting ? 'Odesílám…' : <>Odeslat podnět <Icon name="send" size={16} /></>}
-              </button>
-            </div>
+        <Modal open onClose={() => setComposing(false)} size="md" title="Nový podnět"
+          subtitle={zamestnanec ? 'Uvidí ho vedení a kolegové můžou hlasovat.' : undefined}
+          footer={<>
+            <Button variant="secondary" onClick={() => setComposing(false)}>Zrušit</Button>
+            <Button variant="primary" iconAfter="send" loading={submitting} onClick={submit}>Odeslat podnět</Button>
+          </>}>
+          <div className="space-y-3">
+            {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
+            <Field id={`${id}-nazev`} label="Co navrhuješ?">
+              <Input id={`${id}-nazev`} value={title} onChange={e => setTitle(e.target.value)} maxLength={160} autoFocus placeholder="Např. Přidat druhý mlýnek na kávu" />
+            </Field>
+            <Field id={`${id}-popis`} label="Vysvětli to blíž" hint="Nepovinné — proč to pomůže, jak by to mělo fungovat.">
+              <Textarea id={`${id}-popis`} value={content} onChange={e => setContent(e.target.value)} rows={4} maxLength={2000} />
+            </Field>
           </div>
-        </div>
+        </Modal>
       )}
       {editing && (
         <Modal open onClose={() => setEditing(null)} title="Upravit podnět" size="sm"
@@ -345,12 +304,25 @@ export default function SuggestionsBoard() {
             <Button variant="primary" icon="check" loading={savingEdit} disabled={!editTitle.trim()} onClick={saveEdit}>Uložit</Button>
           </>}>
           <div className="space-y-3">
-            <input value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200} autoFocus className="field" />
-            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000} className="field resize-none" />
+            <Field id={`${id}-e-nazev`} label="Název">
+              <Input id={`${id}-e-nazev`} value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200} autoFocus />
+            </Field>
+            <Field id={`${id}-e-popis`} label="Popis" hint="Nepovinné.">
+              <Textarea id={`${id}-e-popis`} value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} maxLength={2000} />
+            </Field>
           </div>
         </Modal>
       )}
-
-    </div>
+      {mazani && (
+        <Modal open onClose={() => setMazani(null)} title="Smazat podnět?" size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setMazani(null)}>Zrušit</Button>
+            <Button variant="danger-solid" loading={mazu} onClick={remove}>Smazat</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty">„{mazani.title}" zmizí i s hlasy. Vrátit to nepůjde.</p>
+        </Modal>
+      )}
+      <Toast message={zprava} onClose={() => setZprava(null)} />
+    </>
   );
 }

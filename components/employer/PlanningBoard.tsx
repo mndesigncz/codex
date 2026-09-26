@@ -1,18 +1,32 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Icon } from '../Icons';
+// Plánování: tabule, na které karta putuje zleva doprava — Nápady → Rozpracováno
+// → Ke schválení → Hotovo.
+//
+// Kolo 69 (balík B6a): stránka je plocha s widgety. Hlavička jde do PlochaWidgetu
+// (a konečně má hlavní akci „Nová karta" — dřív šla karta přidat jen tichým „+"
+// v každém sloupci), tahle komponenta kreslí nástroj: tabuli. Karty čte přes
+// useDataWidgetu z téže adresy jako widgety Plánovací nástěnka a Karty ke schválení,
+// takže karta schválená ve widgetu se hned přesune i tady.
+//
+// Z auditu (pruzkum68 Plánování): menu karty bylo ručně psané „···" bez klávesnice
+// a Escape → Menu z ui; výpadek načtení vypadal jako prázdná tabule → ErrorState;
+// neúspěšné přidání nic neřeklo → hláška; publikace do Noisium ruční limetková jamka
+// s „✓" → Toast; formulář nové karty s ruční limetkou v každém otevřeném sloupci →
+// Input/Textarea a Button; na telefonu čtyři sloupce pod sebou, i prázdné → vodorovný
+// pás sloupců se scroll-snap. Přidat, přesunout, upravit a smazat jde jen
+// s planovani.upravit — role jen se zobrazením dřív viděla ovládání, které skončilo 403.
 
-import { EmptyState, Button, PageHeader, Modal } from '../ui';
-import { useModal } from '@/lib/useModal';
-import { okJson } from '@/lib/api';
-interface PlanningCard {
-  id: number;
-  title: string;
-  description?: string;
-  column: string;
-  position: number;
-}
+import { useEffect, useId, useState } from 'react';
+import { Icon } from '../Icons';
+import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Skeleton, Textarea, Toast, type MenuItem } from '../ui';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { URL_PLANOVANI, KARTA } from '../widgety/oblasti/planovani';
+import { apiMessage, okJson } from '@/lib/api';
+import { czCount, czForm } from '@/lib/czech';
+import { vyberKarty, kartySloupce, sloupecKarty, type KartaPlanu } from '@/lib/ukolyPrehled';
 
 // Sloupce tabule jsou kategorie, ne stavy — každý potřebuje vlastní
 // rozlišitelnou barvu, a stavové tóny na to nestačí. Proto kategoriální
@@ -20,119 +34,112 @@ interface PlanningCard {
 // „Rozpracováno" oranžové, vypadalo to jako dva odstíny téhož; po
 // sjednocení oranžové na amber z nich byla dokonce jedna barva.)
 const COLUMNS = [
-  { id: 'ideas', label: 'Nápady', dot: 'cat-dot-2', chip: 'cat-2' },
-  { id: 'in_progress', label: 'Rozpracováno', dot: 'cat-dot-4', chip: 'cat-4' },
-  { id: 'review', label: 'Ke schválení', dot: 'cat-dot-5', chip: 'cat-5' },
-  { id: 'done', label: 'Hotovo', dot: 'cat-dot-1', chip: 'cat-1' },
-];
+  { id: 'ideas', label: 'Nápady', dot: 'cat-dot-2' },
+  { id: 'in_progress', label: 'Rozpracováno', dot: 'cat-dot-4' },
+  { id: 'review', label: 'Ke schválení', dot: 'cat-dot-5' },
+  { id: 'done', label: 'Hotovo', dot: 'cat-dot-1' },
+] as const;
+
+const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 export default function PlanningBoard() {
-  const [cards, setCards] = useState<PlanningCard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const smi = useSmi();
+  const upravuje = smi('planovani.upravit');
+  const data = useDataWidgetu<KartaPlanu[]>(URL_PLANOVANI, vyberKarty);
+  const cards = data.data ?? [];
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
-  // Inline edit of an existing card — a typo shouldn't mean delete + retype.
+  // Úprava existující karty — překlep nemá znamenat smazat a napsat znovu.
   const [editCard, setEditCard] = useState<{ id: number; title: string; description: string } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
-  const saveEdit = async () => {
-    if (!editCard || !editCard.title.trim()) return;
-    setSavingEdit(true);
-    const res = await fetch(`/api/planning/${editCard.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: editCard.title.trim(), description: editCard.description.trim() }),
-    }).catch(() => null);
-    setSavingEdit(false);
-    if (res?.ok) {
-      setCards(prev => prev.map(c => c.id === editCard.id ? { ...c, title: editCard.title.trim(), description: editCard.description.trim() } : c));
-      setEditCard(null);
-    } else setFlash('Kartu se nepodařilo uložit.');
-  };
   const [adding, setAdding] = useState(false);
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
-  const [menuId, setMenuId] = useState<number | null>(null);
   const [noisium, setNoisium] = useState(false);
   const [publishing, setPublishing] = useState<number | null>(null);
-  const [flash, setFlash] = useState('');
+  const [mazani, setMazani] = useState<KartaPlanu | null>(null);
+  const [mazu, setMazu] = useState(false);
+  const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
+  const [chybaFormulare, setChybaFormulare] = useState<string | null>(null);
+  const idForm = useId();
 
   useEffect(() => {
-    fetch('/api/noisium').then(okJson).then(d => setNoisium(!!d.connected)).catch(() => {});
-  }, []);
+    if (!upravuje) return;
+    fetch('/api/noisium').then(okJson).then(d => setNoisium(!!d.connected)).catch(() => { /* bez Noisium se jen nenabídne publikace */ });
+  }, [upravuje]);
 
-  const publishToNoisium = async (card: PlanningCard) => {
-    setPublishing(card.id); setMenuId(null);
+  const getColumnCards = (colId: string) =>
+    colId === 'ideas' ? cards.filter(c => sloupecKarty(c) === 'ideas').sort((a, b) => a.position - b.position) : kartySloupce(cards, colId);
+
+  const publishToNoisium = async (card: KartaPlanu) => {
+    setPublishing(card.id);
     try {
-      const res = await fetch('/api/noisium/publish', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardId: card.id }),
-      });
-      const d = await res.json();
-      setFlash(res.ok ? `„${card.title}" publikováno do Noisium ✓` : (d.error || 'Publikování selhalo.'));
-    } catch { setFlash('Chyba při publikování.'); }
+      await fetch('/api/noisium/publish', { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ cardId: card.id }) }).then(okJson);
+      setZprava({ text: `„${card.title}" je publikované do Noisium.` });
+    } catch (e) { setZprava({ text: apiMessage(e, 'Publikování se nepodařilo.'), ton: 'bad' }); }
     setPublishing(null);
-    setTimeout(() => setFlash(''), 4000);
   };
 
-  useEffect(() => {
-    fetch('/api/planning')
-      .then(okJson)
-      .then(data => { if (Array.isArray(data)) setCards(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
-
-  const getColumnCards = (colId: string) => cards.filter(c => c.column === colId).sort((a, b) => a.position - b.position);
-
   const handleAddCard = async () => {
-    if (!newCard || !newCard.title.trim()) return;
+    if (!newCard || !newCard.title.trim() || adding) return;
     setAdding(true);
+    setChybaFormulare(null);
     try {
-      const res = await fetch('/api/planning', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newCard, position: getColumnCards(newCard.column).length }),
-      });
-      if (res.ok) {
-        const card = await res.json();
-        setCards(prev => [...prev, card]);
-        setNewCard(null);
-      }
+      const card = await fetch(URL_PLANOVANI, {
+        method: 'POST', headers: JSON_HLAVICKA,
+        body: JSON.stringify({ ...newCard, title: newCard.title.trim(), description: newCard.description.trim() || null, position: getColumnCards(newCard.column).length }),
+      }).then(okJson);
+      data.set(prev => [...(prev ?? []), ...vyberKarty([card])]);
+      data.reload();
+      setNewCard(null);
     } catch (e) {
-      console.error(e);
+      // Dřív jen console.error — karta nevznikla a nikdo se to nedozvěděl.
+      setChybaFormulare(apiMessage(e, 'Kartu se nepodařilo přidat.'));
     } finally {
       setAdding(false);
     }
   };
 
-  const moveCard = async (card: PlanningCard, targetCol: string) => {
-    if (card.column === targetCol) return;
+  const moveCard = async (card: KartaPlanu, targetCol: string) => {
+    if (sloupecKarty(card) === targetCol || !upravuje) return;
     const newPosition = getColumnCards(targetCol).length;
-    // Optimistic
-    const prev = cards;
-    setCards(cs => cs.map(c => c.id === card.id ? { ...c, column: targetCol, position: newPosition } : c));
-    setMenuId(null);
+    data.set(prev => (prev ?? []).map(c => (c.id === card.id ? { ...c, column: targetCol, position: newPosition } : c)));
     try {
-      const res = await fetch(`/api/planning/${card.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ column: targetCol, position: newPosition }),
-      });
-      if (!res.ok) throw new Error('patch failed');
+      await fetch(`${URL_PLANOVANI}/${card.id}`, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ column: targetCol, position: newPosition }) }).then(okJson);
+      data.reload();
     } catch (e) {
-      console.error(e);
-      setCards(prev); // rollback
+      data.set(prev => (prev ?? []).map(c => (c.id === card.id ? card : c)));
+      setZprava({ text: apiMessage(e, 'Kartu se nepodařilo přesunout.'), ton: 'bad' });
     }
   };
 
-  const deleteCard = async (card: PlanningCard) => {
-    if (!confirm(`Smazat kartu „${card.title}"?`)) return;
-    const prev = cards;
-    setCards(cs => cs.filter(c => c.id !== card.id));
-    setMenuId(null);
+  const saveEdit = async () => {
+    if (!editCard || !editCard.title.trim()) return;
+    setSavingEdit(true);
     try {
-      const res = await fetch(`/api/planning/${card.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('delete failed');
-    } catch (e) {
-      console.error(e);
-      setCards(prev); // rollback
-    }
+      await fetch(`${URL_PLANOVANI}/${editCard.id}`, {
+        method: 'PATCH', headers: JSON_HLAVICKA,
+        body: JSON.stringify({ title: editCard.title.trim(), description: editCard.description.trim() }),
+      }).then(okJson);
+      data.set(prev => (prev ?? []).map(c => (c.id === editCard.id ? { ...c, title: editCard.title.trim(), description: editCard.description.trim() || null } : c)));
+      data.reload();
+      setEditCard(null);
+    } catch (e) { setZprava({ text: apiMessage(e, 'Kartu se nepodařilo uložit.'), ton: 'bad' }); }
+    setSavingEdit(false);
+  };
+
+  // Mazání přes okno (dřív confirm()).
+  const deleteCard = async () => {
+    const card = mazani;
+    if (!card) return;
+    setMazu(true);
+    try {
+      await fetch(`${URL_PLANOVANI}/${card.id}`, { method: 'DELETE' }).then(okJson);
+      data.set(prev => (prev ?? []).filter(c => c.id !== card.id));
+      data.reload();
+      setZprava({ text: 'Karta je smazaná.' });
+    } catch (e) { setZprava({ text: apiMessage(e, 'Kartu se nepodařilo smazat.'), ton: 'bad' }); }
+    setMazani(null);
+    setMazu(false);
   };
 
   const handleDrop = (colId: string) => {
@@ -140,160 +147,117 @@ export default function PlanningBoard() {
     if (dragId === null) return;
     const card = cards.find(c => c.id === dragId);
     setDragId(null);
-    if (card) moveCard(card, colId);
+    if (card) void moveCard(card, colId);
   };
 
-  return (
-    <div className="p-6 space-y-5">
-      {/* Nadpis obrazovky: bez něj tabule začínala rovnou sloupci a nedalo se
-          poznat, kde je člověk — horní lišta je malá a při rolování zmizí. */}
-      <PageHeader hintId="planningboard" title="Plánování" subtitle="Nápady a úkoly, které čekají na svůj čas." />
-      {flash && (
-        <div className="mb-4 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-3 text-[#5B7A08] text-sm">{flash}</div>
+  const polozkyMenu = (card: KartaPlanu): MenuItem[] => [
+    ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: `Přesunout do: ${c.label}`, icon: 'swap', onClick: () => void moveCard(card, c.id) })),
+    ...(noisium ? [{ label: publishing === card.id ? 'Publikuji…' : 'Publikovat do Noisium', icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
+    { label: 'Upravit kartu', icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
+    { label: 'Smazat kartu…', icon: 'trash', danger: true, onClick: () => setMazani(card) },
+  ];
+
+  const otevriNovou = (column: string = COLUMNS[0].id) => { setChybaFormulare(null); setNewCard({ column, title: '', description: '' }); };
+
+  const nastroj = data.error && !data.data ? (
+    <Card><ErrorState title="Plánování se nenačetlo" onRetry={data.reload} detail={data.error} /></Card>
+  ) : data.loading ? (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-busy>
+      {COLUMNS.map(c => <div key={c.id} className="well p-3 space-y-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-16" /></div>)}
+    </div>
+  ) : (
+    <div className="space-y-4">
+      {cards.length === 0 && !newCard && (
+        /* Prázdná tabule sama o sobě neřekne, k čemu je. Než čtyři prázdné
+           sloupce ve výšce obrazovky, radši jedna věta a první karta. */
+        <Card>
+          <EmptyState illustration="postupy" title="Tabule je zatím prázdná"
+            hint="Sem patří všechno, co chcete v podniku posunout — nová položka do nabídky, oprava kávovaru, nápad od někoho z týmu. Karta putuje zleva doprava, jak se na ní pracuje."
+            action={upravuje ? <Button variant="secondary" icon="plus" onClick={() => otevriNovou()}>Přidat první kartu</Button> : undefined} />
+        </Card>
       )}
-      {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <div className="spinner" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-        {cards.length === 0 && (
-          /* Prázdná tabule sama o sobě neřekne, k čemu je. Než čtyři prázdné
-             sloupce ve výšce obrazovky, radši jedna věta a první karta. */
-          <div className="glass-card max-w-xl mx-auto rise-in">
-            <EmptyState illustration="postupy" title="Tabule je zatím prázdná"
-              hint="Sem patří všechno, co chcete v podniku posunout — nová položka do nabídky, oprava kávovaru, nápad od někoho z týmu. Karta putuje zleva doprava, jak se na ní pracuje."
-              action={<Button variant="accent" icon="plus" onClick={() => setNewCard({ column: COLUMNS[0].id, title: '', description: '' })}>Přidat první kartu</Button>} />
-          </div>
-        )}
-        {/* Dokud není ani jedna karta, čtyři prázdné sloupce jen zabírají
-            obrazovku — stačí ta jedna věta nad nimi. */}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${cards.length === 0 && !newCard ? 'hidden' : ''}`}>
-          {COLUMNS.map(col => (
-            <div
+      {/* Na telefonu vodorovný pás sloupců (jeden a kousek dalšího na šířku), od sm mřížka. */}
+      <div className={`flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-thin -mx-1 px-1 pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 sm:overflow-visible sm:mx-0 sm:px-0 ${cards.length === 0 && !newCard ? 'hidden' : ''}`}>
+        {COLUMNS.map(col => {
+          const karty = getColumnCards(col.id);
+          return (
+            <section
               key={col.id}
-              onDragOver={e => { e.preventDefault(); setDragOverCol(col.id); }}
-              onDragLeave={() => setDragOverCol(c => (c === col.id ? null : c))}
-              onDrop={() => handleDrop(col.id)}
-              className={`well rounded-3xl p-3 flex flex-col gap-3 transition ${dragOverCol === col.id ? 'ring-2 ring-[#C8F542]/60 bg-[#C8F542]/[0.06]' : ''}`}
+              aria-labelledby={`${idForm}-${col.id}`}
+              onDragOver={upravuje ? (e => { e.preventDefault(); setDragOverCol(col.id); }) : undefined}
+              onDragLeave={upravuje ? (() => setDragOverCol(c => (c === col.id ? null : c))) : undefined}
+              onDrop={upravuje ? (() => handleDrop(col.id)) : undefined}
+              className={`well shrink-0 w-[84%] snap-start sm:w-auto p-3 flex flex-col gap-3 transition-shadow ${dragOverCol === col.id ? 'ring-2 ring-black/15' : ''}`}
             >
-              <div className="flex items-center justify-between px-1 py-1">
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${col.dot}`} />
-                  <span className="font-semibold text-sm text-[#16181A] tracking-tight">{col.label}</span>
-                </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${col.chip}`}>{getColumnCards(col.id).length}</span>
+              <div className="flex items-center justify-between gap-2 px-1">
+                <h3 id={`${idForm}-${col.id}`} className="t-card flex items-center gap-2 min-w-0">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} aria-hidden />
+                  <span className="truncate">{col.label}</span>
+                </h3>
+                <Chip tone="muted" size="sm">{karty.length.toLocaleString('cs-CZ')}<span className="sr-only"> {czForm(karty.length, KARTA)}</span></Chip>
               </div>
 
-              <div className="space-y-3 min-h-24">
-                {getColumnCards(col.id).map(card => (
-                  <div
+              <ul className="space-y-2 min-h-[3rem]">
+                {karty.map(card => (
+                  <li
                     key={card.id}
-                    draggable
-                    onDragStart={() => setDragId(card.id)}
+                    draggable={upravuje}
+                    onDragStart={upravuje ? () => setDragId(card.id) : undefined}
                     onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
-                    className={`relative card p-4 hover:shadow-[shadow:var(--shadow-float)] transition-shadow duration-300 cursor-grab active:cursor-grabbing ${dragId === card.id ? 'opacity-40' : ''} ${menuId === card.id ? 'z-30' : ''}`}
+                    className={`card p-4 transition-shadow hover:shadow-[var(--shadow-float)] ${upravuje ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === card.id ? 'opacity-40' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-[#16181A] text-sm break-words">{card.title}</p>
-                        {card.description && <p className="text-xs text-black/45 mt-1.5 break-words">{card.description}</p>}
+                        <p className="font-medium text-[15px] leading-snug text-[#16181A] break-words">{card.title}</p>
+                        {card.description && <p className="text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</p>}
                       </div>
-                      <button
-                        onClick={() => setMenuId(m => (m === card.id ? null : card.id))}
-                        className="tap-target-sm rounded-full glass w-7 h-7 flex items-center justify-center text-black/50 hover:text-black shrink-0 leading-none"
-                        title="Možnosti"
-                      >
-                        ···
-                      </button>
+                      {upravuje && <Menu size="sm" label={`Možnosti karty ${card.title}`} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
                     </div>
-
-                    {menuId === card.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
-                        <div className="absolute right-3 top-11 z-20 glass-strong rounded-2xl p-2 w-48 max-w-[calc(100vw-5rem)] shadow-lg space-y-0.5">
-                          <p className="text-[11px] uppercase tracking-wider text-black/40 px-2 py-1">Přesunout do →</p>
-                          {COLUMNS.filter(c => c.id !== card.column).map(c => (
-                            <button
-                              key={c.id}
-                              onClick={() => moveCard(card, c.id)}
-                              className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] flex items-center gap-2 transition-colors"
-                            >
-                              <span className={`w-2 h-2 rounded-full ${c.dot}`} />
-                              {c.label}
-                            </button>
-                          ))}
-                          {noisium && (
-                            <>
-                              <div className="h-px bg-black/[0.08] my-1" />
-                              <button
-                                onClick={() => publishToNoisium(card)}
-                                disabled={publishing === card.id}
-                                className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#5B7A08] hover:bg-[#C8F542]/10 flex items-center gap-2 transition-colors disabled:opacity-50"
-                              >
-                                <Icon name="kanban" size={15} /> {publishing === card.id ? 'Publikuji…' : 'Publikovat do Noisium'}
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => { setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }); setMenuId(null); }}
-                            className="w-full text-left px-2 py-2 rounded-xl text-sm text-[#16181A] hover:bg-black/[0.06] flex items-center gap-2 transition-colors"
-                          >
-                            <Icon name="pencil" size={15} /> Upravit kartu
-                          </button>
-                          <div className="h-px bg-black/[0.08] my-1" />
-                          <button
-                            onClick={() => deleteCard(card)}
-                            className="w-full text-left px-2 py-2 rounded-xl text-sm text-bad-ink hover:bg-bad/10 transition-colors"
-                          >
-                            Smazat kartu
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  </li>
                 ))}
-              </div>
+                {karty.length === 0 && newCard?.column !== col.id && <li className="t-meta text-center py-3">Žádná karta</li>}
+              </ul>
 
-              {newCard?.column === col.id ? (
-                <form onSubmit={e => { e.preventDefault(); if (!adding && newCard.title.trim()) handleAddCard(); }}
-                  className="bg-black/[0.04] border border-[#C8F542]/30 rounded-2xl p-3 space-y-2">
-                  <input
-                    autoFocus
-                    value={newCard.title}
-                    onChange={e => setNewCard(prev => prev ? { ...prev, title: e.target.value } : null)}
-                    placeholder="Název karty..."
-                    className="w-full text-sm field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition"
-                  />
-                  <textarea
-                    value={newCard.description}
-                    onChange={e => setNewCard(prev => prev ? { ...prev, description: e.target.value } : null)}
-                    placeholder="Popis (volitelné)"
-                    rows={2}
-                    className="w-full text-xs field rounded-xl border border-black/[0.08] px-3 py-2 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none transition resize-none"
-                  />
+              {upravuje && (newCard?.column === col.id ? (
+                <form onSubmit={e => { e.preventDefault(); void handleAddCard(); }} className="card p-3 space-y-2" aria-label={`Nová karta do sloupce ${col.label}`}>
+                  <Input autoFocus value={newCard.title} aria-label="Název karty" placeholder="Název karty" maxLength={200}
+                    onChange={e => setNewCard(prev => (prev ? { ...prev, title: e.target.value } : null))} />
+                  <Textarea value={newCard.description} aria-label="Popis karty" placeholder="Popis (nepovinný)" rows={2} maxLength={2000}
+                    onChange={e => setNewCard(prev => (prev ? { ...prev, description: e.target.value } : null))} />
+                  {chybaFormulare && <p className="note note-danger text-sm" role="alert">{chybaFormulare}</p>}
                   <div className="flex gap-2">
-                    <button type="submit" disabled={adding} className="tap-target-sm flex-1 py-1.5 rounded-full bg-[#C8F542] text-black text-xs font-semibold hover:brightness-110 disabled:opacity-50 transition">
-                      {adding ? 'Přidávám…' : 'Přidat'}
-                    </button>
-                    <button type="button" onClick={() => setNewCard(null)} className="tap-target-sm flex-1 py-1.5 rounded-full glass border border-black/10 text-black/60 text-xs hover:bg-black/[0.06] transition">
-                      Zrušit
-                    </button>
+                    <Button type="submit" variant="primary" size="sm" loading={adding} disabled={!newCard.title.trim()}>Přidat</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setNewCard(null)}>Zrušit</Button>
                   </div>
                 </form>
               ) : (
-                <button
-                  onClick={() => setNewCard({ column: col.id, title: '', description: '' })}
-                  className="w-full py-2.5 border border-dashed border-black/10 rounded-2xl text-xs text-black/30 hover:border-[#C8F542]/40 hover:text-[#5B7A08] transition duration-300"
-                >
-                  + Přidat kartu
+                <button type="button" onClick={() => otevriNovou(col.id)}
+                  className="tap-target-sm w-full py-2 rounded-2xl border border-dashed border-black/15 text-sm text-black/45 inline-flex items-center justify-center gap-1.5 hover:text-[#16181A] hover:bg-black/[0.03] transition-colors">
+                  <Icon name="plus" size={15} /> Přidat kartu
                 </button>
-              )}
-            </div>
-          ))}
-        </div>
-        </div>
-      )}
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const vPraci = cards.filter(c => c.column === 'in_progress' || c.column === 'review').length;
+  return (
+    <>
+      <PlochaWidgetu
+        stranka="vedeni.planovani"
+        hlavicka={{
+          title: 'Plánování',
+          subtitle: data.data && cards.length > 0
+            ? `${czCount(cards.length, KARTA)} na tabuli, v práci ${vPraci.toLocaleString('cs-CZ')}.`
+            : 'Nápady a úkoly, které čekají na svůj čas.',
+          hintId: 'planningboard',
+          primary: upravuje ? <Button variant="accent" icon="plus" onClick={() => otevriNovou()}>Nová karta</Button> : undefined,
+        }}
+        nastroj={nastroj}
+      />
       {editCard && (
         <Modal open onClose={() => setEditCard(null)} title="Upravit kartu" size="sm"
           footer={<>
@@ -301,14 +265,25 @@ export default function PlanningBoard() {
             <Button variant="primary" icon="check" loading={savingEdit} disabled={!editCard.title.trim()} onClick={saveEdit}>Uložit</Button>
           </>}>
           <div className="space-y-3">
-            <input value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })}
-              placeholder="Název" maxLength={200} className="field" />
-            <textarea value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })}
-              placeholder="Popis (nepovinný)" rows={3} className="field resize-none" />
+            <Field id={`${idForm}-e-nazev`} label="Název">
+              <Input id={`${idForm}-e-nazev`} value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })} maxLength={200} />
+            </Field>
+            <Field id={`${idForm}-e-popis`} label="Popis" hint="Nepovinné.">
+              <Textarea id={`${idForm}-e-popis`} value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })} rows={3} maxLength={2000} />
+            </Field>
           </div>
         </Modal>
       )}
-
-    </div>
+      {mazani && (
+        <Modal open onClose={() => setMazani(null)} title="Smazat kartu?" size="sm"
+          footer={<>
+            <Button variant="secondary" onClick={() => setMazani(null)}>Zrušit</Button>
+            <Button variant="danger-solid" loading={mazu} onClick={deleteCard}>Smazat</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty">„{mazani.title}" zmizí z tabule. Vrátit to nepůjde.</p>
+        </Modal>
+      )}
+      <Toast message={zprava?.text ?? null} tone={zprava?.ton} onClose={() => setZprava(null)} />
+    </>
   );
 }
