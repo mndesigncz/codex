@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
-import { EmptyState } from './ui';
+import { Avatar, Button, Chip, EmptyState, Field, ListRow } from './ui';
 import { okJson } from '@/lib/api';
 
 const inputClass =
@@ -66,13 +66,13 @@ export default function KioskSettings() {
   };
 
   return (
-    <div className="glass-card p-6 space-y-4">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-start justify-between gap-3 text-left">
+    <div className="card p-6 space-y-4">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-start justify-between gap-3 text-left">
         <div className="min-w-0">
           <h3 className="t-card flex items-center gap-2">
-            <span className="text-lg"><Icon name="clipboard" size={15} /></span> Tabletový účet (píchačky)
+            <Icon name="clipboard" size={17} className="shrink-0 text-black/40" /> Tabletový účet (píchačky)
           </h3>
-          <p className="text-black/45 text-sm mt-1">
+          <p className="t-meta mt-1">
             {kiosk ? `Připojeno — ${kiosk.email}` : 'Sdílené zařízení na provozovně, kde se zaměstnanci odpíchávají na směnu.'}
           </p>
         </div>
@@ -81,44 +81,57 @@ export default function KioskSettings() {
 
       {open && (
         <div className="space-y-5 pt-1">
-          {msg && <div className="p-3 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 text-[#5B7A08] text-sm">{msg}</div>}
-          {err && <div className="p-3 note note-danger text-sm">{err}</div>}
+          {msg && <div role="status" className="p-3 note note-ok text-sm">{msg}</div>}
+          {err && <div role="alert" className="p-3 note note-danger text-sm">{err}</div>}
 
           <form onSubmit={saveAccount} className="space-y-3">
             <p className="t-label">Přihlášení tabletu</p>
-            <p className="text-xs text-black/45 -mt-1">Na tabletu se přihlásíš tímto e-mailem a heslem. Otevře se režim píchaček.</p>
+            <p className="t-meta -mt-1">Na tabletu se přihlásíš tímto e-mailem a heslem. Otevře se režim píchaček.</p>
+            {/* Pole s viditelným popiskem, ne jen placeholderem — ten zmizí,
+                jakmile se začne psát (kolo 33). */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tablet@mojekavarna.cz" required className={inputClass} />
-              <input type="text" value={password} onChange={e => setPassword(e.target.value)} placeholder={kiosk ? 'Nové heslo…' : 'Heslo (min. 4 znaky)'} className={inputClass} />
+              <Field id="kiosk-email" label="E-mail tabletu">
+                <input id="kiosk-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tablet@mojekavarna.cz" required className={inputClass} />
+              </Field>
+              <Field id="kiosk-heslo" label={kiosk ? 'Nové heslo' : 'Heslo'} hint={kiosk ? 'Prázdné = heslo se nemění.' : 'Nejméně 4 znaky.'}>
+                <input id="kiosk-heslo" type="text" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+              </Field>
             </div>
-            <button type="submit" disabled={busy} className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black disabled:opacity-50 transition whitespace-nowrap">
-              {busy ? 'Ukládám…' : kiosk ? 'Uložit změny' : 'Vytvořit tabletový účet'}
-            </button>
+            <Button type="submit" variant="primary" loading={busy}>
+              {kiosk ? 'Uložit změny' : 'Vytvořit tabletový účet'}
+            </Button>
           </form>
 
           <div className="h-px bg-black/[0.06]" />
 
           <div className="space-y-2.5">
             <p className="t-label">PIN pro odpíchnutí (nepovinné)</p>
-            <p className="text-xs text-black/45 -mt-1">Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu — nikdo se nepodepíše za něj.</p>
+            <p className="t-meta -mt-1">Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu — nikdo se nepodepíše za něj.</p>
             {members.length === 0 ? (
               <EmptyState icon="users" compact title="Zatím nikdo v týmu"
                 hint="Na tabletu se odpíchnou lidé, které pozveš v Nastavení týmu." />
-            ) : members.map(m => (
-              <div key={m.id} className="flex items-center gap-2 flex-wrap">
-                <span className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-lg shrink-0">{m.avatar ?? '👤'}</span>
-                  <span className="text-sm text-[#16181A] truncate">{m.name}</span>
-                  {m.hasPin && <span className="text-[11px] rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 font-medium shrink-0">PIN</span>}
-                </span>
-                <input
-                  value={pins[m.id] ?? ''} onChange={e => setPins(p => ({ ...p, [m.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-                  inputMode="numeric" placeholder={m.hasPin ? '••••' : 'PIN'} className="w-24 field rounded-xl border border-black/[0.08] px-3 py-2 text-sm tabular-nums text-center focus:border-[#C8F542]/50 focus:outline-none shrink-0" />
-                <button onClick={() => savePin(m.id)} className="rounded-full glass border border-black/10 text-[#16181A] px-3 py-2 text-xs font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
-                  {(pins[m.id] ?? '') ? 'Uložit' : m.hasPin ? 'Zrušit' : 'Uložit'}
-                </button>
-              </div>
-            ))}
+            ) : (
+              // Lidé v .list (DP §3.9), avatar přes Avatar místo emoji 👤 v textu,
+              // „PIN nastaven" jako stavový chip.
+              <ul className="list">
+                {members.map(m => (
+                  <ListRow key={m.id}
+                    lead={<Avatar emoji={m.avatar} size="sm" ring={false} />}
+                    title={m.name}
+                    right={m.hasPin ? <Chip tone="ok" size="sm" icon="lock">PIN</Chip> : undefined}
+                    actions={<>
+                      <input
+                        value={pins[m.id] ?? ''} onChange={e => setPins(p => ({ ...p, [m.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                        inputMode="numeric" aria-label={`PIN pro ${m.name}`} placeholder={m.hasPin ? '••••' : 'PIN'}
+                        className="w-24 field rounded-xl border border-black/[0.08] px-3 py-2 text-sm tabular-nums text-center focus:border-[#C8F542]/50 focus:outline-none shrink-0" />
+                      <Button variant="secondary" size="sm" onClick={() => savePin(m.id)}>
+                        {(pins[m.id] ?? '') ? 'Uložit' : m.hasPin ? 'Zrušit PIN' : 'Uložit'}
+                      </Button>
+                    </>}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       )}

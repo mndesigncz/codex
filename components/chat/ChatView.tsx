@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/Icons';
-import { EmptyState, SearchField, Button } from '../ui';
+import { EmptyState, SearchField, Button, Badge, Skeleton } from '../ui';
 import PollsStrip from './Polls';
 import NewConversation from './NewConversation';
 import {
@@ -82,7 +82,9 @@ export default function ChatView({ user, openConversationId = null }: Props) {
   }, [conversations, q, onlyUnread]);
 
   return (
-    <div className="h-full w-full flex overflow-hidden rounded-3xl glass-card">
+    // Jediná karta obrazovky (DP §3.9). Dřív `glass-card` ve skleněném rámu
+    // layoutu — na snímku dvojitý okraj a stín.
+    <div className="card h-full w-full flex overflow-hidden">
       {/* Nadpis obrazovky. Vizuálně je zbytečný — celá plocha je zjevně
           chat —, ale kdo se po aplikaci pohybuje podle nadpisů, měl tu
           jedinou obrazovku bez záchytného bodu. */}
@@ -95,7 +97,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
       >
         <div className="px-4 py-3.5 border-b border-black/[0.06] space-y-3">
           <div className="flex items-center gap-2">
-            <Icon name="chat" size={22} className="text-[#5B7A08]" />
+            <Icon name="chat" size={17} className="shrink-0 text-black/40" />
             <h2 className="t-section flex-1">Zprávy</h2>
             <Button size="sm" variant="secondary" icon="plus" onClick={() => setNewOpen(true)}>
               Nová
@@ -115,7 +117,9 @@ export default function ChatView({ user, openConversationId = null }: Props) {
               type="button"
               onClick={() => setOnlyUnread((v) => !v)}
               aria-pressed={onlyUnread}
-              className={`chip tap-target-sm ${onlyUnread ? 'seg-on' : 'seg-off glass'}`}
+              // .chip má odsazení v :where() a preflight tlačítka ho vynuloval —
+              // text narážel na rámeček. filter-pill je v @layer components.
+              className={`filter-pill tap-target-sm ${onlyUnread ? 'seg-on' : 'seg-off glass'}`}
             >
               Nepřečtené · {totalUnread}
             </button>
@@ -123,7 +127,9 @@ export default function ChatView({ user, openConversationId = null }: Props) {
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
           {loading && (
-            <div className="p-6 text-center text-black/45 text-sm">Načítání…</div>
+            <div className="p-4 space-y-3" aria-busy="true" aria-label="Načítám konverzace">
+              {[0, 1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
           )}
           {!loading && conversations.length === 0 && (
             <EmptyState
@@ -135,9 +141,9 @@ export default function ChatView({ user, openConversationId = null }: Props) {
             />
           )}
           {!loading && conversations.length > 0 && shown.length === 0 && (
-            <div className="p-6 text-center text-black/45 text-sm">
+            <p className="p-6 text-center t-meta">
               {onlyUnread ? 'Všechno přečtené.' : 'Nic neodpovídá hledání.'}
-            </div>
+            </p>
           )}
           {shown.map((c) => (
             <ConversationRow
@@ -197,7 +203,7 @@ function ConversationRow({
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-        active ? 'bg-black/[0.04]' : 'hover:bg-white/[0.03]'
+        active ? 'bg-black/[0.04]' : 'hover:bg-black/[0.03]'
       }`}
     >
       <Avatar conv={conv} />
@@ -219,11 +225,9 @@ function ConversationRow({
               ? <span className="inline-flex items-center gap-1"><Icon name="clipboard" size={13} className="shrink-0 opacity-70" />Příloha</span>
               : (conv.lastMessage ?? 'Zatím žádné zprávy')}
           </span>
-          {conv.unreadCount > 0 && (
-            <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-[#C8F542] text-black text-[11px] font-semibold flex items-center justify-center">
-              {conv.unreadCount}
-            </span>
-          )}
+          {/* Jeden odznak pro celou aplikaci (DP §3.20), ne ruční limetka. */}
+          <Badge count={conv.unreadCount} max={99} ring={false} className="shrink-0 mt-0.5"
+            label={`Nepřečtené: ${conv.unreadCount}`} />
         </div>
       </div>
     </button>
@@ -234,10 +238,10 @@ function Avatar({ conv, size = 44 }: { conv: Conversation; size?: number }) {
   if (conv.type === 'team') {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] flex-shrink-0"
+        className="inline-flex items-center justify-center rounded-full bg-black/[0.04] border border-black/[0.08] text-black/55 flex-shrink-0"
         style={{ width: size, height: size }}
       >
-        <Icon name="users" size={Math.round(size * 0.5)} />
+        <Icon name="users" size={Math.round(size * 0.45)} />
       </span>
     );
   }
@@ -385,19 +389,13 @@ function Thread({
   return (
     <>
       <header className="px-4 py-3 border-b border-black/[0.06] flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="tap-target-sm md:hidden text-black/60 hover:text-black p-1 -ml-1"
-          aria-label="Zpět"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </button>
+        <Button variant="ghost" size="sm" iconOnly aria-label="Zpět" onClick={onBack} className="md:hidden -ml-1">
+          <Icon name="chevronRight" size={18} className="rotate-180" />
+        </Button>
         <Avatar conv={conv} size={38} />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[#16181A] truncate">{conv.name}</div>
-          <div className="text-[11px] text-black/45">
+          <div className="t-meta">
             {conv.type === 'team' ? 'Týmový kanál — vidí celý tým' : 'Jen vy dva'}
           </div>
         </div>
@@ -410,7 +408,10 @@ function Thread({
       >
         {conv.type === 'team' && <PollsStrip meId={meId} />}
         {loading && (
-          <div className="text-center text-black/45 text-sm py-6">Načítání…</div>
+          <div className="space-y-2 py-2" aria-busy="true" aria-label="Načítám zprávy">
+            <Skeleton className="h-10 w-2/3" />
+            <Skeleton className="h-10 w-1/2 ml-auto" />
+          </div>
         )}
         {!loading && messages.length === 0 && (
           <EmptyState illustration="chat" title="Zatím žádné zprávy" hint="Napiš první — tým to uvidí v aplikaci i na kiosku." compact />
@@ -487,8 +488,10 @@ function Thread({
           className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-black/60 hover:text-black hover:bg-black/[0.04] transition-colors disabled:opacity-40"
           aria-label="Připojit soubor"
         >
+          {/* Bílé kolečko na bílé liště nebylo vidět — při nahrávání to
+              vypadalo, že se nic neděje. */}
           {uploading ? (
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+            <span className="spinner spinner-sm" aria-hidden />
           ) : (
             <PaperclipIcon />
           )}
@@ -508,14 +511,9 @@ function Thread({
           aria-label="Text zprávy"
           className="flex-1 min-w-0 resize-none field border border-black/[0.08] px-4 py-2.5 leading-snug text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
-        <button
-          type="submit"
-          disabled={!text.trim() || sending}
-          className="flex-shrink-0 w-10 h-10 rounded-full bg-[#C8F542] text-black flex items-center justify-center disabled:opacity-40 transition-opacity"
-          aria-label="Odeslat"
-        >
-          <Icon name="send" size={20} />
-        </button>
+        {/* Odeslat je hlavní akce vlákna → jediná limetka obrazovky. */}
+        <Button type="submit" variant="accent" iconOnly icon="send" aria-label="Odeslat"
+          disabled={!text.trim() || sending} className="shrink-0" />
       </form>
     </>
   );
@@ -540,13 +538,16 @@ export function MessageBubble({
   return (
     <div className={`flex flex-col ${own ? 'items-end' : 'items-start'}`}>
       {showSender && (
-        <span className="text-[11px] text-black/45 ml-3 mb-0.5">{msg.senderName}</span>
+        <span className="text-xs text-black/55 ml-3 mb-0.5">{msg.senderName}</span>
       )}
       <div
         className={`max-w-[78%] px-4 py-2.5 ${
           own
-            ? 'bg-[#C8F542] text-black rounded-3xl rounded-br-lg'
-            : 'glass text-[#16181A] rounded-3xl rounded-bl-lg'
+            // Vlastní bublina jemným tónem, ne plnou limetkou: ve vlákně by
+            // limetka převládla a splynula s tlačítkem Odeslat (DP T3).
+            // Roh xl místo lg — 8 px je mimo škálu rádiusů.
+            ? 'bg-[var(--ok-bg)] text-[#16181A] rounded-3xl rounded-br-xl'
+            : 'bg-[var(--well)] border border-[var(--well-line)] text-[#16181A] rounded-3xl rounded-bl-xl'
         }`}
       >
         {msg.attachmentUrl && msg.attachmentType === 'image' && (
@@ -580,7 +581,7 @@ export function MessageBubble({
           </p>
         )}
         <div
-          className={`text-[11px] mt-1 ${own ? 'on-accent-muted' : 'text-black/45'} text-right`}
+          className="text-[11px] mt-1 text-black/55 text-right tabular-nums"
         >
           {formatTime(msg.createdAt)}
         </div>

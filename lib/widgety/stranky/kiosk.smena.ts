@@ -1,5 +1,15 @@
-// Stránka „Směna" (tablet). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B9 v kole 69.
+// Stránka „Směna" (tablet). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B9) plochu
+// zapnulo. Nástroj = WhoIsWorking / zamykací obrazovka z components/kiosk/KioskShiftGate.tsx:
+// příchod a odchod s PINem a výběr, kdo u tabletu stojí.
+//
+// Tablet si rozložení neupravuje (sdílené zařízení, PlochaWidgetu rezim="jen-cteni") —
+// skládá ho vedení s kiosk.spravovat nebo podnik.nastaveni v Nastavení → Stránky.
+// Výchozí rozložení je přesně to, co Směna ukazovala do kola 68 (nástěnka, předávka,
+// dnešní směny, povinné postupy, nejbližší akce, zápis do skladu, připnutá nabídka),
+// doplněné o to, co tablet u baru potřebuje vidět hned: objednávky od stolu, výrobu
+// a docházející zásoby. Nástěnka je nad nástrojem, protože dřív stál AnnouncementBanner
+// nad „Kdo teď pracuje" a vedení na ni psalo právě pro ranní příchod.
+// Widgety, na které tablet nemá klíč, server z rozložení vyřadí sám (jeViditelny).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -45,5 +55,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'sdileni.pripnuta_nabidka', s: 'L' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

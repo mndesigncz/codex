@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@/components/Icons';
-import { EmptyState, Button } from '../ui';
+import { EmptyState, Button, Badge } from '../ui';
 import { MessageBubble } from './ChatView';
 import NewConversation from './NewConversation';
 import {
@@ -59,7 +59,6 @@ export default function MessengerDock({ user }: Props) {
     // Na telefonu je chat v dolním doku; bublina nad ním byla podruhé totéž
     // a zakrývala tlačítka v rohu. Na monitoru, kde dok není, má smysl.
     <div className="hidden md:block fixed md:bottom-4 md:right-4 z-40 max-w-[calc(100vw-1.5rem)]">
-      <style>{`@keyframes chatDockIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
       <div className="flex flex-col md:flex-row items-end gap-3">
         {/* Open chat windows (mobile shows only the most recent one) */}
         {openConvs.map((conv, i) => (
@@ -84,17 +83,18 @@ export default function MessengerDock({ user }: Props) {
               onClose={() => setListOpen(false)}
             />
           )}
+          {/* Plovoucí chrom je inkoustový (DP §2.10): limetkové kolečko na
+              každé obrazovce soupeřilo s hlavní akcí stránky o jedinou limetku.
+              Počet nese stejný Badge jako dok a zvonek. */}
           <button
+            type="button"
             onClick={() => setListOpen((v) => !v)}
-            className="fab-chat relative w-14 h-14 rounded-full bg-[#C8F542] text-black flex items-center justify-center shadow-[0_10px_30px_rgba(25,35,15,0.28)] hover:scale-105 active:scale-95 transition-transform"
-            aria-label="Chat"
+            className="fab-chat chrom-inkoust relative w-14 h-14 rounded-full grid place-items-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2"
+            aria-label={totalUnread > 0 ? `Chat, nepřečtené: ${totalUnread}` : 'Chat'}
+            aria-expanded={listOpen}
           >
-            <Icon name="chat" size={26} />
-            {totalUnread > 0 && (
-              <span className="fab-chat-odznak absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-[#16181A] text-white text-[11px] font-semibold flex items-center justify-center ring-2 ring-[#F6F7F2] dark:ring-[#0C0D0F]">
-                {totalUnread}
-              </span>
-            )}
+            <Icon name="chat" size={24} />
+            <Badge count={totalUnread} max={99} className="fab-chat-odznak absolute -top-1 -right-1" />
           </button>
         </div>
       </div>
@@ -114,10 +114,10 @@ function ConvAvatar({ conv, size = 40 }: { conv: Conversation; size?: number }) 
   if (conv.type === 'team') {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/25 text-[#5B7A08] flex-shrink-0"
+        className="inline-flex items-center justify-center rounded-full bg-black/[0.04] border border-black/[0.08] text-black/55 flex-shrink-0"
         style={{ width: size, height: size }}
       >
-        <Icon name="users" size={Math.round(size * 0.5)} />
+        <Icon name="users" size={Math.round(size * 0.45)} />
       </span>
     );
   }
@@ -143,7 +143,8 @@ function ConversationPopover({
   onClose: () => void;
 }) {
   return (
-    <div className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(70vh,calc(100dvh-200px))] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]">
+    // Stín a vstup jako ostatní plovoucí panely (--shadow-float, pop-in), ne vlastní animace a 50% černá.
+    <div className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(70vh,calc(100dvh-200px))] rounded-3xl glass-strong shadow-[shadow:var(--shadow-float)] overflow-hidden flex flex-col pop-in">
       <div className="px-4 py-3 flex items-center justify-between border-b border-black/[0.06]">
         <span className="font-semibold text-[#16181A]">Zprávy</span>
         <div className="flex items-center gap-1">
@@ -155,13 +156,7 @@ function ConversationPopover({
           >
             <Icon name="plus" size={16} />
           </button>
-          <button
-            onClick={onClose}
-            className="text-black/55 hover:text-black p-1"
-            aria-label="Zavřít"
-          >
-            <CloseIcon />
-          </button>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" onClick={onClose} />
         </div>
       </div>
       <div className="overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
@@ -190,11 +185,7 @@ function ConversationPopover({
               : (c.lastMessage ?? 'Zatím žádné zprávy')}
               </span>
             </div>
-            {c.unreadCount > 0 && (
-              <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-[#C8F542] text-black text-[11px] font-semibold flex items-center justify-center">
-                {c.unreadCount}
-              </span>
-            )}
+            <Badge count={c.unreadCount} max={99} ring={false} className="shrink-0" label={`Nepřečtené: ${c.unreadCount}`} />
           </button>
         ))}
       </div>
@@ -282,7 +273,7 @@ function ChatWindow({
 
   return (
     <div
-      className="w-80 max-w-[calc(100vw-1.5rem)] h-[440px] max-h-[calc(100dvh-200px)] rounded-3xl glass-strong shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-[chatDockIn_.18s_cubic-bezier(0.16,1,0.3,1)]"
+      className="w-80 max-w-[calc(100vw-1.5rem)] h-[440px] max-h-[calc(100dvh-200px)] rounded-3xl glass-strong shadow-[shadow:var(--shadow-float)] overflow-hidden flex flex-col pop-in"
       style={{ zIndex: 40 - offset }}
     >
       <header className="px-3 py-2.5 flex items-center gap-2 border-b border-black/[0.06]">
@@ -293,18 +284,12 @@ function ChatWindow({
             <div className="text-[11px] text-black/45 leading-none">Týmový kanál</div>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="text-black/55 hover:text-black p-1"
-          aria-label="Zavřít"
-        >
-          <CloseIcon />
-        </button>
+        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" onClick={onClose} />
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-1.5">
         {messages.length === 0 && (
-          <div className="text-center text-black/45 text-xs py-6">Zatím žádné zprávy.</div>
+          <p className="text-center t-meta py-6">Zatím žádné zprávy.</p>
         )}
         {messages.map((m, i) => (
           <MessageBubble
@@ -336,7 +321,7 @@ function ChatWindow({
           aria-label="Připojit soubor"
         >
           {uploading ? (
-            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+            <span className="spinner spinner-sm" aria-hidden />
           ) : (
             <PaperclipIcon />
           )}
@@ -347,24 +332,12 @@ function ChatWindow({
           placeholder="Zpráva…"
           className="flex-1 min-w-0 field border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
-        <button
-          type="submit"
-          disabled={!text.trim() || sending}
-          className="flex-shrink-0 w-8 h-8 rounded-full bg-[#C8F542] text-black flex items-center justify-center disabled:opacity-40"
-          aria-label="Odeslat"
-        >
-          <Icon name="send" size={16} />
-        </button>
+        {/* Okno doku visí nad cizí obrazovkou, která má svou limetku —
+            odeslání je tu tmavé (primary), ne druhá limetka. */}
+        <Button type="submit" variant="primary" size="sm" iconOnly icon="send" aria-label="Odeslat"
+          disabled={!text.trim() || sending} className="shrink-0" />
       </form>
     </div>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
   );
 }
 

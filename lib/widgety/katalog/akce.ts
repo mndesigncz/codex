@@ -1,8 +1,8 @@
 // Widgety oblasti „Akce" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/akce.tsx. Widget se stavem 'planovany' komponentu ještě
-// nemá: nekreslí se ani nenabízí, dokud ho balík B8 v kole 69 nenapíše a nepřepne na 'hotovo'. Soubor
-// patří balíku B8; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/akce.tsx, výpočty v lib/klientPrehled.ts. Soubor patří
+// balíku B8; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2). Kolo 69: všechny tři hotové;
+// Příprava a Výsledek mají vlastní ikonu, ať se na stránce Akce neopakuje kalendář (AK-19).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -37,14 +37,15 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'akce',
     nazev: 'Příprava akce',
     popis: 'Checklist nejbližší akce k odškrtání.',
-    ikona: 'calendarCheck',
+    ikona: 'check',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
     stranky: ['vedeni.akce'],
     opravneni: { vse: ['akce.zobrazit'], nektere: [], pole: { 'akce:odskrtnout': 'akce.checklist' } },
     tarif: 'zdarma',
-    stav: 'planovany',
+    kostra: { M: 'seznam' },
+    stav: 'hotovo',
   },
   // Data: GET /api/events → events[{revenue,costs,closingsTotal,closingsCount}] (null bez akce.finance)
   {
@@ -52,13 +53,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'akce',
     nazev: 'Výsledek akce',
     popis: 'Tržby, náklady a výsledek poslední proběhlé akce.',
-    ikona: 'calendarCheck',
+    ikona: 'trend',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.klient', 'vedeni.akce'],
     opravneni: { vse: ['akce.zobrazit', 'akce.finance'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'cislo' },
+    stav: 'hotovo',
   },
 ];

@@ -39,12 +39,17 @@ import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { apiMessage } from '@/lib/api';
 import { czCount, czForm, type CzNoun } from '@/lib/czech';
-import { dbTimeHM, parseDbTime } from '@/lib/pragueTime';
-import { useMoney } from '../../CurrencyProvider';
-import { Button, Chip, EmptyState, ListRow, Menu, Modal, Stat, StatRow, type MenuItem } from '../../ui';
+import { dbTimeDayHM, dbTimeHM, parseDbTime } from '@/lib/pragueTime';
+import { useCurrency, useMoney } from '../../CurrencyProvider';
+import { BarSpark, Button, Checklist, Chip, EmptyState, ListRow, Menu, Modal, Stat, StatRow, type MenuItem } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
-import { useDataWidgetu } from '../useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
+import {
+  RAZENI_CLENU, TON_REZERVACE, hlavniKrok, klicPrechodu, krokyPropojeni, muzeDo, nejvernejsi, prumerCesky, seradDnes, souhrnDne,
+  vyberCleny, vyberHodnoceni, vyberRezervace, vyberVernost, type RazeniClenu, type Rezervace, type StavRezervace,
+} from '@/lib/klientPrehled';
+import { RES_STATUS, czDay } from '@/lib/clientSlots';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { Icon } from '../../Icons';
 import CardScan from '../../client/CardScan';
@@ -451,7 +456,327 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Dnešní rezervace
+// ---------------------------------------------------------------------------
+//
+// Dřív blok Přehledu Clientu: ruční seznam `divide-y` s iniciálami 28 px,
+// stav jako ručně barvená pilulka a prázdno jako holá věta. Teď `.list`
+// + ListRow (čas v pevném sloupci čísel), stav Chipem a akce jen ve velké
+// velikosti: Potvrdit (rezervace.schvalovat) a Usadit / Hotovo
+// (rezervace.usadit) tmavě `primary` — limetka je na ploše jen „Hotovo"
+// v úpravách. Odmítnutí přes okno, ne confirm().
+
+const ID_REZERVACE = 'klient.dnesni_rezervace';
+const URL_REZERVACE_DNES = '/api/client/admin/reservations?range=today';
+const OSOBA: CzNoun = { one: 'osoba', few: 'osoby', many: 'osob' };
+
+/** Meta řádek rezervace: počet osob, stůl, e-mail (jen když ho API poslalo — zakaznici.kontakty). */
+function metaRezervace(r: Rezervace): string {
+  return [czCount(r.osob, OSOBA), r.stul ?? 'bez stolu', r.email].filter(Boolean).join(' · ');
+}
+
+function DnesniRezervace({ velikost }: WidgetProps) {
+  const smi = useSmi();
+  const nav = useNavigace();
+  const { nahled } = useWidget();
+  const { ok, ceka } = useBrana(widget(ID_REZERVACE)?.opravneni.vse ?? ['rezervace.zobrazit']);
+  const data = useDataWidgetu(ok ? URL_REZERVACE_DNES : null, vyberRezervace);
+  const { reload } = data;
+  const [pracuji, setPracuji] = useState<number | null>(null);
+  const [hlaska, setHlaska] = useState<Hlaska | null>(null);
+  const [odmitam, setOdmitam] = useState<Rezervace | null>(null);
+  // Akce z katalogu (pole akce:*) — jeden zdroj pravdy se serverem.
+  const smiKrok = (klic: string) => {
+    const k = klicCasti(ID_REZERVACE, klic === 'rezervace.schvalovat' ? 'akce:potvrdit_odmitnout' : 'akce:usadit');
+    return !!k && smi(k);
+  };
+
+  useEffect(() => {
+    if (!hlaska) return;
+    const t = setTimeout(() => setHlaska(null), 4500);
+    return () => clearTimeout(t);
+  }, [hlaska]);
+
+  const zmenit = async (r: Rezervace, na: StavRezervace) => {
+    if (nahled || pracuji != null) return;
+    setPracuji(r.id);
+    setHlaska(null);
+    try {
+      const res = await fetch('/api/client/admin/reservations', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id, status: na }),
+      });
+      const x = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof x?.error === 'string' ? x.error : 'Rezervaci se nepodařilo změnit.');
+      setHlaska({
+        text: typeof x?.posNote === 'string' && x.posNote ? x.posNote
+          : x?.loyalty?.rewarded ? 'Hotovo. Host nasbíral všechna razítka a má odměnu.'
+          : `${r.host}: ${(RES_STATUS[x?.status ?? na]?.label ?? na).toLocaleLowerCase('cs-CZ')}.`,
+        ton: 'ok',
+      });
+    } catch (e) {
+      setHlaska({ text: apiMessage(e, 'Spojení se serverem selhalo.'), ton: 'bad' });
+    } finally {
+      setPracuji(null);
+      reload();
+      // Čísla v „Hosté a věrnost", „Čeká na tebe" a odznaku Clientu stojí na souhrnu.
+      obnovDataWidgetu('/api/client/admin/summary');
+    }
+  };
+
+  const vse = seradDnes(data.data?.rezervace ?? []);
+  const souhrn = souhrnDne(vse);
+  const naRezervace = nav.smiPohled('klient:reservations');
+
+  if (velikost === 'S') {
+    return (
+      <Widget nacteni={ceka ? CEKA : data} otevrit={naRezervace ? () => nav.onNavigate('klient:reservations') : undefined}>
+        <Stat label="Dnes" value={cislo(souhrn.dnes)}
+          note={souhrn.ceka > 0 ? <span className="text-wait-ink">{czCount(souhrn.ceka, CEKAJICI_REZERVACE)}</span> : `${czCount(souhrn.osob, OSOBA)}`} />
+      </Widget>
+    );
+  }
+
+  const L = velikost === 'L';
+  const videt = L ? vse : vse.slice(0, 5);
+  return (
+    <>
+      <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Rezervace', pohled: 'klient:reservations' }}
+        doplnek={souhrn.ceka > 0 ? <Chip tone="wait" size="sm">{cislo(souhrn.ceka)}</Chip> : undefined}
+        prazdno={vse.length === 0 && !hlaska ? <p className="t-meta">Dnes nikdo rezervovaný. Klid, nebo prostor pro hosty bez rezervace.</p> : undefined}>
+        <div className="space-y-3">
+          {hlaska && (
+            <p className={`note ${hlaska.ton === 'ok' ? 'note-ok' : 'note-danger'}`} role={hlaska.ton === 'ok' ? 'status' : 'alert'}>{hlaska.text}</p>
+          )}
+          <ul className="list">
+            {videt.map(r => {
+              const krok = L && !nahled ? hlavniKrok(r.stav, smiKrok) : null;
+              const dalsi: MenuItem[] = L && !nahled ? [
+                ...(krok?.na === 'seated' && muzeDo(r.stav, 'done') && smiKrok(klicPrechodu('done'))
+                  ? [{ label: 'Rovnou hotovo', icon: 'check', onClick: () => { void zmenit(r, 'done'); } }] : []),
+                ...(muzeDo(r.stav, 'declined') && smiKrok(klicPrechodu('declined'))
+                  ? [{ label: 'Odmítnout rezervaci…', icon: 'close', danger: true, onClick: () => setOdmitam(r) }] : []),
+              ] : [];
+              const stav = <Chip tone={TON_REZERVACE[r.stav]} size="sm">{RES_STATUS[r.stav]?.label ?? r.stav}</Chip>;
+              return (
+                <ListRow key={r.id} title={r.host} meta={metaRezervace(r)} value={r.cas}
+                  // Stav zůstává vidět i na telefonu (aside by se pod `lg` schoval).
+                  right={stav}
+                  actions={krok || dalsi.length ? (
+                    <>
+                      {krok && (
+                        <Button variant="primary" size="sm" loading={pracuji === r.id} onClick={() => { void zmenit(r, krok.na); }}
+                          aria-label={`${krok.popisek}: ${r.host}, ${r.cas}`}>{krok.popisek}</Button>
+                      )}
+                      {dalsi.length > 0 && <Menu size="sm" label={`Další akce s rezervací ${r.host}`} items={dalsi} />}
+                    </>
+                  ) : undefined} />
+              );
+            })}
+          </ul>
+          {!L && vse.length > 5 && <p className="t-meta">{aDalsich(vse.length - 5)}</p>}
+        </div>
+      </Widget>
+      {odmitam && !nahled && (
+        <NadPlochou>
+          <Modal open onClose={() => setOdmitam(null)} size="sm" title="Odmítnout rezervaci?"
+            footer={<>
+              <Button variant="secondary" onClick={() => setOdmitam(null)}>Zrušit</Button>
+              <Button variant="danger-solid" onClick={() => { const r = odmitam; setOdmitam(null); void zmenit(r, 'declined'); }}>Odmítnout</Button>
+            </>}>
+            <p className="text-sm text-black/70 text-pretty">{odmitam.host} ({odmitam.cas}, {czCount(odmitam.osob, OSOBA)}) dostane zprávu, že se rezervace nepovedla.</p>
+          </Modal>
+        </NadPlochou>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hodnocení od hostů
+// ---------------------------------------------------------------------------
+//
+// Dřív Zákazníci → Hodnocení: průměr 36 px (mimo škálu), hvězdy jako znaky
+// „★" a rozložení v ručně kreslených pruzích. Teď Stat s „/ 5" a desetinnou
+// čárkou, rozložení BarSpark (jedna podoba sloupků v celé aplikaci), hvězdy
+// ikonou a tři poslední komentáře v `.list`.
+
+const ID_HODNOCENI = 'klient.hodnoceni';
+const HODNOCENI: CzNoun = { one: 'hodnocení', few: 'hodnocení', many: 'hodnocení' };
+const TYDEN_MS = 7 * 24 * 3600 * 1000;
+
+function Hodnoceni({ velikost }: WidgetProps) {
+  const nav = useNavigace();
+  const { ok, ceka } = useBrana(widget(ID_HODNOCENI)?.opravneni.vse ?? ['zakaznici.recenze']);
+  const data = useDataWidgetu(ok ? '/api/client/admin/reviews' : null, vyberHodnoceni);
+  const h = data.data;
+  const slabych = (h?.posledni ?? []).filter(v => v.hvezdy <= 2 && Date.now() - (parseDbTime(v.kdy)?.getTime() ?? 0) < TYDEN_MS).length;
+  const prazdno = h && h.pocet === 0 ? <p className="t-meta">Zatím žádné hodnocení. Host dostane výzvu po hotové návštěvě.</p> : undefined;
+
+  if (velikost === 'S') {
+    return (
+      <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno}
+        otevrit={nav.smiPohled('klient:customers') ? () => nav.onNavigate('klient:customers') : undefined}>
+        <Stat label="Průměr" value={prumerCesky(h?.prumer ?? null)} unit="/ 5"
+          note={slabych > 0 ? <span className="text-wait-ink">{czCount(slabych, NIZKE)} za týden</span> : czCount(h?.pocet ?? 0, HODNOCENI)} />
+      </Widget>
+    );
+  }
+
+  return (
+    <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno} odkaz={{ popisek: 'Zákazníci', pohled: 'klient:customers' }}
+      doplnek={slabych > 0 ? <Chip tone="wait" size="sm">{czCount(slabych, NIZKE)}</Chip> : undefined}>
+      {h && (
+        <div className="space-y-4">
+          <div className="flex items-end gap-5">
+            <Stat label="Průměr" value={prumerCesky(h.prumer)} unit="/ 5" note={czCount(h.pocet, HODNOCENI)} className="shrink-0" />
+            <BarSpark className="flex-1 min-w-0 max-w-[12rem]" height={40} showLabels label="Rozložení hodnocení od jedné do pěti hvězd"
+              data={h.rozlozeni.map((n, i) => ({ value: n, label: String(i + 1), tip: `${i + 1} z 5: ${czCount(n, HODNOCENI)}` }))} />
+          </div>
+          {h.posledni.length > 0 && (
+            <ul className="list">
+              {h.posledni.slice(0, 3).map(v => (
+                <ListRow key={v.id} title={v.poznamka ? `„${v.poznamka}"` : 'Bez komentáře'}
+                  meta={`${v.host} · ${dbTimeDayHM(v.kdy)}`}
+                  value={<span className="inline-flex items-center gap-1" aria-label={`${v.hvezdy} z 5`}>{v.hvezdy}<Icon name="star" size={14} className={v.hvezdy <= 2 ? 'text-wait-ink' : 'text-black/40'} /></span>} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Členové klubu
+// ---------------------------------------------------------------------------
+//
+// Počet členů a noví za 30 dní jsou souhrn (klient.prehled), jména až od M
+// a jen se zakaznici.zobrazit — kdo smí do Clientu, nemusí znát hosty jménem.
+
+const ID_CLENOVE = 'klient.clenove';
+const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+
+function ClenoveKlubu({ velikost, nastaveni }: WidgetProps<{ razeni?: unknown }>) {
+  const smi = useSmi();
+  const nav = useNavigace();
+  const { ok, ceka } = useBrana(widget(ID_CLENOVE)?.opravneni.vse ?? ['klient.prehled']);
+  const souhrn = useDataWidgetu(ok ? '/api/client/admin/summary' : null, vyberSouhrn);
+  const klicJmen = klicCasti(ID_CLENOVE, 'jmena');
+  const jmena = velikost !== 'S' && !!klicJmen && smi(klicJmen);
+  const razeni: RazeniClenu = RAZENI_CLENU.includes(nastaveni.razeni as RazeniClenu) ? nastaveni.razeni as RazeniClenu : 'navstevy';
+  const lide = useDataWidgetu(ok && jmena ? `/api/client/admin/customers?sort=${razeni}&limit=5` : null, vyberCleny);
+  const s = souhrn.data;
+  const cisla = s ? <Stat label="Členů" value={cislo(s.clenu)} note={`+${cislo(s.novychClenu30)} za 30 dní`} /> : null;
+
+  if (!jmena) {
+    return (
+      <Widget nacteni={ceka ? CEKA : souhrn}
+        otevrit={velikost === 'S' && nav.smiPohled('klient:customers') ? () => nav.onNavigate('klient:customers') : undefined}
+        odkaz={velikost === 'S' ? undefined : { popisek: 'Zákazníci', pohled: 'klient:customers' }}>
+        {cisla}
+      </Widget>
+    );
+  }
+  const top = nejvernejsi(lide.data?.clenove ?? [], razeni);
+  return (
+    <Widget nacteni={ceka ? CEKA : [souhrn, lide]} odkaz={{ popisek: 'Zákazníci', pohled: 'klient:customers' }}>
+      <div className="space-y-4">
+        {cisla}
+        {top.length === 0
+          ? <p className="t-meta">Zatím žádní členové. Přidají se sami na stránce pro hosty.</p>
+          : (
+            <ul className="list">
+              {top.map(c => (
+                <ListRow key={c.id} title={c.jmeno}
+                  meta={razeni === 'nejnovejsi' && c.clenOd ? `člen od ${czDay(c.clenOd)}` : czCount(c.navstev, NAVSTEVA)}
+                  value={<>{cislo(c.body)} <span className="text-xs font-medium text-black/50">b.</span></>} />
+              ))}
+            </ul>
+          )}
+      </div>
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Věrnost za 30 dní
+// ---------------------------------------------------------------------------
+//
+// Dřív jen ve Věrnosti jako „Za posledních 30 dní" (dl s čísly 20 px) a vlastní
+// sloupky Spark. Teď StatRow (tři čísla ve střední, čtyři ve velké) a BarSpark.
+
+const ID_VERNOST = 'klient.vernost_30dni';
+const KUPON: CzNoun = { one: 'kupon', few: 'kupony', many: 'kuponů' };
+
+function Vernost30({ velikost }: WidgetProps) {
+  const { ok, ceka } = useBrana(widget(ID_VERNOST)?.opravneni.vse ?? ['vernost.zobrazit']);
+  const data = useDataWidgetu(ok ? '/api/client/admin/loyalty' : null, vyberVernost);
+  const v = data.data;
+  const L = velikost === 'L';
+  const aktivnich = (v?.poDnech ?? []).some(d => d.aktivnich > 0);
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Věrnost', pohled: 'klient:loyalty' }}>
+      {v && (
+        <div className="space-y-4">
+          <StatRow>
+            <Stat label="Rozdáno" value={cislo(v.rozdano)} unit="b." />
+            <Stat label="Utraceno" value={cislo(v.utraceno)} unit="b." />
+            <Stat label="Noví členové" value={cislo(v.noviClenove)} />
+            {L && <Stat label="Kupony" value={cislo(v.kuponu)} note="uplatněné" />}
+          </StatRow>
+          {!L && <p className="t-meta">Uplatněno {czCount(v.kuponu, KUPON)} za 30 dní.</p>}
+          {L && aktivnich && (
+            <div>
+              <p className="t-label mb-2">Aktivní hosté po dnech</p>
+              <BarSpark height={56} label="Aktivní hosté po dnech za posledních 30 dní" highlight={v.poDnech.length - 1}
+                data={v.poDnech.map(d => ({ value: d.aktivnich, tip: `${d.den}: ${cislo(d.aktivnich)}` }))} />
+            </div>
+          )}
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Propojení Clientu
+// ---------------------------------------------------------------------------
+//
+// Dřív ručně opsaný checklist (druhá kopie „Prvních kroků" s limetkovými
+// jamkami). Teď sdílený Checklist; krok vede do záložky, kde se nastaví,
+// jen tomu, kdo ho smí nastavit (pole akce:nastavit), a nikdy v náhledu.
+
+const ID_PROPOJENI = 'klient.propojeni';
+
+function Propojeni(_: WidgetProps) {
+  const smi = useSmi();
+  const nav = useNavigace();
+  const { nahled } = useWidget();
+  const mena = useCurrency().symbol;
+  const { ok, ceka } = useBrana(widget(ID_PROPOJENI)?.opravneni.vse ?? ['klient.prehled']);
+  const data = useDataWidgetu(ok ? '/api/client/admin/summary' : null, (raw: any) => krokyPropojeni(raw?.setup, mena));
+  const kroky = data.data ?? [];
+  const hotovo = kroky.filter(k => k.hotovo).length;
+  return (
+    <Widget nacteni={ceka ? CEKA : data}
+      doplnek={kroky.length ? <Chip tone={hotovo === kroky.length ? 'ok' : 'muted'} size="sm">{hotovo}/{kroky.length}</Chip> : undefined}>
+      <Checklist label="Co je v Managero client nastavené" items={kroky.map(k => {
+        const pohled = `klient:${k.zalozka}`;
+        const vede = !nahled && smi(k.klic) && nav.smiPohled(pohled);
+        return { id: k.id, label: k.popisek, done: k.hotovo, onClick: vede ? () => nav.onNavigate(pohled) : undefined };
+      })} />
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'klient.hoste_vernost': HosteAVernost,
   'klient.objednavky_od_stolu': ObjednavkyOdStolu,
+  'klient.dnesni_rezervace': DnesniRezervace,
+  'klient.hodnoceni': Hodnoceni,
+  'klient.clenove': ClenoveKlubu,
+  'klient.vernost_30dni': Vernost30,
+  'klient.propojeni': Propojeni,
 };

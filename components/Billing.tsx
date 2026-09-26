@@ -6,13 +6,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icons';
-import { Button, Segmented } from './ui';
+import { Button, Chip, Segmented } from './ui';
 import CheckoutModal from './CheckoutModal';
 import {
   PLAN_FEATURES, PLAN_NAMES, PRICES, MAX_EXTRAS, MAX_OFFER_PCT, TRIAL_DAYS, REFERRALS_PER_MONTH,
   planLabel, czDays, type PlanInfo, type Interval,
 } from '@/lib/plan';
 import { okJson, apiMessage } from '@/lib/api';
+import { czCount } from '@/lib/czech';
+
+const MESIC = { one: 'měsíc', few: 'měsíce', many: 'měsíců' };
 
 type Status = {
   configured: boolean;
@@ -76,21 +79,29 @@ export default function Billing() {
     try { await navigator.clipboard.writeText(st.referral.link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
   };
 
+  // Nabídka Max po koupi Pro má vlastní (tónovanou) kartu i limetkové tlačítko.
+  const nabidkaMax = plan?.effective === 'pro' && active && offerLeft > 0;
+
   const priceCard = (p: 'pro' | 'max') => {
     const pr = PRICES[p];
     const isCurrent = plan?.effective === p && active;
+    // Tónovaná je nejvýš jedna karta — doporučený tarif pro toho, kdo ještě
+    // neplatí (DP §3.9). Dřív byly obě tónované (limetková a modrá) a vedle
+    // sebe soupeřily.
+    const doporuceny = !active && p === 'pro';
     return (
-      <div key={p} className={`card p-6 flex flex-col ${p === 'pro' ? 'card-accent' : 'card-info'}`}>
+      <div key={p} className={`card p-6 flex flex-col ${doporuceny ? 'card-accent' : ''}`}>
         <div className="flex items-center justify-between gap-2">
           <h3 className="t-card">{PLAN_NAMES[p]}</h3>
-          {isCurrent && <span className="chip chip-sm chip-ok">váš plán</span>}
+          {isCurrent && <Chip size="sm" tone="ok">váš plán</Chip>}
+          {doporuceny && <Chip size="sm">Doporučujeme</Chip>}
         </div>
         {interval === 'year' ? (
-          <p className="mt-2"><span className="text-3xl font-bold tracking-tight text-[#16181A]">{czk(pr.year)}</span> <span className="text-sm text-black/45">ročně</span>
-            <span className="block text-[13px] text-black/45"><s>{czk(pr.yearCompare)}</s> · ušetříte {czk(pr.yearCompare - pr.year)}</span></p>
+          <p className="mt-2"><span className="text-[1.75rem] font-bold tracking-tight tabular-nums text-[#16181A]">{czk(pr.year)}</span> <span className="text-sm text-black/55">ročně</span>
+            <span className="block text-[13px] text-black/55"><s>{czk(pr.yearCompare)}</s> · ušetříte {czk(pr.yearCompare - pr.year)}</span></p>
         ) : (
-          <p className="mt-2"><span className="text-3xl font-bold tracking-tight text-[#16181A]">{czk(pr.month)}</span> <span className="text-sm text-black/45">měsíčně</span>
-            <span className="block text-[13px] text-black/45">za podnik, kdykoli zrušit</span></p>
+          <p className="mt-2"><span className="text-[1.75rem] font-bold tracking-tight tabular-nums text-[#16181A]">{czk(pr.month)}</span> <span className="text-sm text-black/55">měsíčně</span>
+            <span className="block text-[13px] text-black/55">za podnik, kdykoli zrušit</span></p>
         )}
         <p className="mt-3 text-sm text-black/60">
           {p === 'pro' ? 'Neomezený tým, kiosk, odměny, exporty, měsíční přehled a sdílené menu ve vašich barvách.'
@@ -100,7 +111,7 @@ export default function Billing() {
           {isCurrent ? (
             <Button variant="secondary" onClick={() => go('/api/billing/portal')} loading={busy === '/api/billing/portal'}>Spravovat předplatné</Button>
           ) : active ? (
-            <Button variant={p === 'max' ? 'accent' : 'secondary'} onClick={() => p === 'max' ? go('/api/billing/upgrade') : go('/api/billing/portal')} loading={busy.endsWith(p === 'max' ? '/upgrade' : '/portal')}>
+            <Button variant={p === 'max' && !nabidkaMax ? 'accent' : 'secondary'} onClick={() => p === 'max' ? go('/api/billing/upgrade') : go('/api/billing/portal')} loading={busy.endsWith(p === 'max' ? '/upgrade' : '/portal')}>
               {p === 'max' ? (offerLeft ? `Přejít na Max se slevou ${MAX_OFFER_PCT} %` : 'Přejít na Max') : 'Změnit na Pro'}
             </Button>
           ) : (
@@ -108,7 +119,7 @@ export default function Billing() {
               {canTrial ? `Vyzkoušet ${TRIAL_DAYS} dní zdarma` : `Předplatit ${PLAN_NAMES[p]}`}
             </Button>
           )}
-          {!active && canTrial && <p className="mt-2 text-[11px] text-black/45">Karta se zadá hned, první platba až po {TRIAL_DAYS} dnech. Zrušit jde kdykoli.</p>}
+          {!active && canTrial && <p className="mt-2 t-meta">Karta se zadá hned, první platba až po {TRIAL_DAYS} dnech. Zrušit jde kdykoli.</p>}
         </div>
       </div>
     );
@@ -133,7 +144,8 @@ export default function Billing() {
             <p className="t-meta mt-1">Co váš podnik v Managero aktuálně má.</p>
           </div>
           {plan && (
-            <span className={`chip ${plan.effective === 'free' ? 'chip-muted' : plan.effective === 'max' ? 'chip-info' : 'chip-ok'}`}>{planLabel(plan)}</span>
+            // Tarif je stav (platí / zdarma), ne informace — info modrá patří odkazům a radám.
+            <Chip tone={plan.effective === 'free' ? 'muted' : 'ok'}>{planLabel(plan)}</Chip>
           )}
         </div>
         {plan?.pastDue && (
@@ -156,7 +168,7 @@ export default function Billing() {
         {active && (
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="secondary" icon="card" onClick={() => go('/api/billing/portal')} loading={busy === '/api/billing/portal'}>Spravovat předplatné</Button>
-            <span className="self-center text-[11px] text-black/45">karta, faktury, změna tarifu, zrušení</span>
+            <span className="self-center t-meta">karta, faktury, změna tarifu, zrušení</span>
           </div>
         )}
         {plan?.effective === 'free' && !plan.trialing && (
@@ -167,14 +179,15 @@ export default function Billing() {
       </div>
 
       {/* Nabídka Max po koupi Pro */}
-      {plan?.effective === 'pro' && active && offerLeft > 0 && (
+      {nabidkaMax && (
         <div className="card card-info p-6">
+          {/* Štítek nad nadpisem ne (DP §3.3) — doba nabídky jde do chipu vedle. */}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="t-label text-[#0A5CC0]">Nabídka na {czDays(offerLeft)}</p>
-              <h3 className="t-section mt-1">Max se slevou {MAX_OFFER_PCT} % na první platbu</h3>
+              <h3 className="t-section">Max se slevou {MAX_OFFER_PCT} % na první platbu</h3>
+              <p className="t-meta mt-1">Nabídka platí ještě {czDays(offerLeft)}.</p>
             </div>
-            <span className="chip chip-info">{interval === 'year' ? czk(Math.round(PRICES.max.year * (1 - MAX_OFFER_PCT / 100))) : czk(Math.round(PRICES.max.month * (1 - MAX_OFFER_PCT / 100)))} místo {interval === 'year' ? czk(PRICES.max.year) : czk(PRICES.max.month)}</span>
+            <span className="chip chip-info tabular-nums">{interval === 'year' ? czk(Math.round(PRICES.max.year * (1 - MAX_OFFER_PCT / 100))) : czk(Math.round(PRICES.max.month * (1 - MAX_OFFER_PCT / 100)))} místo {interval === 'year' ? czk(PRICES.max.year) : czk(PRICES.max.month)}</span>
           </div>
           <ul className="mt-3 space-y-1.5">
             {MAX_EXTRAS.map(x => <li key={x} className="text-sm text-[#16181A] flex items-center gap-2"><Icon name="check" size={15} className="text-[#0A5CC0] shrink-0" />{x}</li>)}
@@ -207,10 +220,10 @@ export default function Billing() {
             <input readOnly value={st.referral.link} className="field font-mono text-sm" onFocus={e => e.currentTarget.select()} />
             <Button variant="primary" icon="copy" onClick={copy}>{copied ? 'Zkopírováno' : 'Kopírovat odkaz'}</Button>
           </div>
-        ) : <p className="mt-3 text-sm text-black/45">Odkaz se připravuje…</p>}
+        ) : <p className="mt-3 t-meta">Odkaz se připravuje…</p>}
         {st && (
           <p className="mt-3 text-[13px] text-black/55">
-            Tento měsíc {st.referral.thisMonth} / {st.referral.limit} · celkem {st.referral.total} {st.referral.total === 1 ? 'měsíc' : st.referral.total < 5 ? 'měsíce' : 'měsíců'} zdarma · přes váš odkaz se zaregistrovalo {st.referral.referredCount}
+            Tento měsíc {st.referral.thisMonth} / {st.referral.limit} · celkem {czCount(st.referral.total, MESIC)} zdarma · přes váš odkaz se zaregistrovalo {st.referral.referredCount}
           </p>
         )}
       </div>
@@ -224,8 +237,8 @@ export default function Billing() {
               <tr className="text-left t-label">
                 <th className="py-2 pr-3">Funkce</th>
                 <th className="py-2 px-3 w-24">Zdarma</th>
-                <th className="py-2 px-3 w-36 text-[#5B7A08]">Pro</th>
-                <th className="py-2 pl-3 w-36 text-[#0A5CC0]">Max</th>
+                <th className="py-2 px-3 w-36">Pro</th>
+                <th className="py-2 pl-3 w-36">Max</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.06]">
@@ -240,7 +253,7 @@ export default function Billing() {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-[11px] text-black/40">Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.</p>
+        <p className="mt-3 t-meta">Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.</p>
       </div>
     </div>
   );
