@@ -1,9 +1,29 @@
 // Widgety oblasti „Finance" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/finance.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B5b v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B5b; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/finance.tsx. Soubor patří balíku B5b; převedeno
+// z katalogu widgetů jednorázovým skriptem (spec §2.2), v kole 69 jsou hotové všechny widgety oblasti.
+//
+// Ikony (kolo 69): katalog dal celé oblasti `coins`; na Financích je ve výchozím rozložení sedm
+// finančních widgetů a ikona se nesmí opakovat (AK-19). `coins` si nechal Souhrn měsíce, ostatní
+// mají ikonu podle obsahu a nástroj Financí (kniha výdajů) má `book`.
 import type { DefiniceWidgetu } from '../typy.ts';
+
+/**
+ * Měsíc widgetu z volby „Měsíc" (Tento / Minulý) a měsíce stránky.
+ *
+ * Proč relativně ke stránce: Finance i Všechny podniky mají v hlavičce přepínač měsíce
+ * a katalog chce, aby ho widgety následovaly („Měsíc v hlavičce řídí všechny widgety").
+ * Kdyby „Tento" znamenalo vždycky dnešní měsíc, souhrn nahoře by po přepnutí na srpen
+ * ukazoval září a kniha výdajů pod ním srpen — dvě čísla za dva měsíce na jedné obrazovce.
+ * Na stránce bez přepínače (Přehled, TO GO) je měsícem stránky dnešní pražský měsíc.
+ *
+ * `zaklad` je „RRRR-MM"; neznámá volba = „tento" (uložené nastavení z budoucí verze nesmí shodit widget).
+ */
+export function mesicZVolby(volba: unknown, zaklad: string): string {
+  if (volba !== 'minuly') return zaklad;
+  const [y, m] = zaklad.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
 
 export const WIDGETY: DefiniceWidgetu[] = [
   // Data: GET /api/finance?month →
@@ -20,6 +40,9 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.prehled', 'vedeni.finance'],
     opravneni: { vse: ['finance.zobrazit'], nektere: [], pole: { mzdy_a_vysledek_po_mzdach: 'finance.mzdy' } },
     tarif: 'zdarma',
+    kostra: { S: 'cislo', M: 'cislo', L: 'cislo' },
+    // Hlavní číslo peněz Financí: na stránce s `inkoust` nese jedinou inkoustovou plochu (DP §2.10).
+    muzeInkoust: true,
     nastaveni: [
       {
         klic: 'mesic',
@@ -41,16 +64,16 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'trzby',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
-  // Data: GET /api/finance?month → summary.revenue, summary.wagesWorked, summary.wagesCash, summary.prevRevenue;
-  // GET /api/teams → team.labor_target_pct
+  // Data: GET /api/finance?month → summary.revenue, summary.wagesWorked, summary.wagesCash, summary.prevRevenue,
+  // summary.laborTargetPct (kolo 69: cíl podniku posílá /api/finance, dřív ho widget musel brát z /api/teams)
   {
     id: 'finance.trzby_vs_mzdy',
     oblast: 'finance',
     nazev: 'Tržby vs. mzdy',
     popis: 'Podíl mezd na tržbách proti cíli podniku (zelená pod cílem, červená nad).',
-    ikona: 'coins',
+    ikona: 'users',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
@@ -66,15 +89,16 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
-  // Data: GET /api/finance?month → ledger[{kind,amount}], summary{wagesCash,wagesWorked,stockValue}
+  // Data: GET /api/finance?month → ledger[{kind,amount}], summary{wagesCash,wagesWorked,stockValue,stockTop}
+  // (N8: hodnota zásob jen odsud — jedním výpočtem pro Finance i sklad)
   {
     id: 'finance.kam_sly_penize',
     oblast: 'finance',
     nazev: 'Kam šly peníze',
     popis: 'Pruhy: nákupy a účtenky, výdaje z kasy, mzdy; pod tím hodnota zboží ve skladu.',
-    ikona: 'coins',
+    ikona: 'cart',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -90,7 +114,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/pos/margins?month → totals{marginPct,margin,cogs,revenueKnown,noRecipe,noRecipeShare},
   // items[], insights[]
@@ -100,7 +124,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'finance',
     nazev: 'Marže',
     popis: 'Marže na položkách s recepturou, co vydělává nejvíc a nejmíň, rady (drahé suroviny, položky bez receptury).',
-    ikona: 'coins',
+    ikona: 'tag',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -123,7 +147,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'trzba',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/finance?month → guest{orders,total,offPos,offPosTotal,members,newMembers,couponsRedeemed}
   {
@@ -131,7 +155,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'finance',
     nazev: 'Hosté ve financích',
     popis: 'Objednávky od stolu (a kolik jich nedoteklo do pokladny), členové věrnosti, uplatněné kupony.',
-    ikona: 'coins',
+    ikona: 'gift',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -147,7 +171,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/finance/advice?month → advice[], blind[], counts{}
   {
@@ -155,7 +179,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'finance',
     nazev: 'Doporučení',
     popis: 'Co s čísly udělat: rady ke tržbám, produktům a lidem, včetně přiznaných slepých míst.',
-    ikona: 'coins',
+    ikona: 'bulb',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
@@ -171,7 +195,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/finance?month → insights[{icon,title,text,tone}]
   // Pozor: Překrývá se s Doporučeními; nabídnout oba, výchozí jen Doporučení.
@@ -180,7 +204,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'finance',
     nazev: 'Postřehy měsíce',
     popis: 'Krátké postřehy z čísel měsíce: tržby proti minulému měsíci, podíl mezd proti cíli, nejslabší den, rozdíly v kase, závislost na dodavateli, podíl karet, sklad proti tržbám.',
-    ikona: 'coins',
+    ikona: 'sparkle',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -196,7 +220,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/inventory/shrinkage[?id] → ready, stocktake{completedAt,counted},
   // totals{lostValue,surplusValue,netValue,missing,surplus}, rows[], insights[]
@@ -205,14 +229,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'finance',
     nazev: 'Ztráty a manka',
     popis: 'Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného.',
-    ikona: 'coins',
+    ikona: 'warning',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.sklad', 'vedeni.finance'],
     opravneni: { vse: ['finance.ztraty'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/receipts → receipts[{photoUrl,supplier,amount,note,createdAt}] (bez finance.uctenky_zobrazit
   // jen vlastní)
@@ -221,7 +245,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'finance',
     nazev: 'Účtenky z nákupů',
     popis: 'Nafotit účtenku jedním ťuknutím; poslední účtenky a součet za měsíc.',
-    ikona: 'coins',
+    ikona: 'camera',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
@@ -232,6 +256,6 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:nafotit': 'finance.uctenky_pridat', 'akce:upravit_smazat': 'finance.uctenky_upravit' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

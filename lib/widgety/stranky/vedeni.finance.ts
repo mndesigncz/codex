@@ -1,5 +1,12 @@
-// Stránka „Finance" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B5b v kole 69.
+// Stránka „Finance" (vedení). Plocha je aktivní od kola 69 (balík B5b).
+//
+// Bloky, které si FinanceView kreslil sám (čtyři souhrnné karty, Kam šly peníze, Hosté a věrnost,
+// Doporučení, Živě z pokladny, Ztráty, Co vydělává), jsou teď widgety; nástrojem stránky zůstává
+// kniha výdajů s hledáním, filtrem a detailem účtenky. Přepínač měsíce v hlavičce řídí i widgety
+// s volbou „Měsíc" (Tento = měsíc stránky, mesicZVolby v katalogu finance).
+//
+// Výchozí rozložení je z katalogu. Nástroj má ikonu `book` — `coins` patří Souhrnu měsíce a na jedné
+// stránce se ikona ve výchozím rozložení opakovat nesmí (AK-19).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -8,7 +15,7 @@ export const STRANKA: DefiniceStranky = {
   nazev: 'Finance',
   pohled: 'finance',
   pristup: ['finance.zobrazit', 'finance.trzby'],
-  nastroj: { nazev: 'Finance', ikona: 'coins', popis: 'Kniha výdajů měsíce s účtenkami, objednávkami a výplatami.' },
+  nastroj: { nazev: 'Kniha výdajů', ikona: 'book', popis: 'Výdaje měsíce s účtenkami, objednávkami a výplatami — hledání, filtr a detail účtenky.' },
   inkoust: true,
   doporucene: [
     'finance.souhrn_mesice',
@@ -23,6 +30,8 @@ export const STRANKA: DefiniceStranky = {
     'trzby.platby',
     'trzby.po_obsluze',
     'trzby.hodiny',
+    'trzby.prumerna_uctenka',
+    'pokladna.stav',
     'finance.ztraty',
     'finance.marze',
     'finance.uctenky',
@@ -53,5 +62,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

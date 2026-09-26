@@ -1,299 +1,245 @@
 'use client';
 
-// Kolik se dnes protočilo — živě z pokladny.
+// Živě z pokladny — části, ze kterých se skládá widget „Živě z pokladny"
+// (pokladna.zive) a menší widgety tržeb (kolo 69, balík B5b).
 //
-// Nejdůležitější čísla podniku nemají čekat na uzávěrku ani na měsíční
-// přehled. Tenhle panel se ptá pokladny na vybrané období a hned pod součty
-// říká, jestli si data sedí — a když ne, čím to je. Číslo bez vysvětlení je
-// horší než žádné, protože se podle něj rozhoduje.
+// Dřív to byl samostatný panel na Financích s vlastním fetch, vlastními
+// předvolbami období (ruční pilulky), poli data s přepsaným .field, kolečkem
+// při načítání a sedmi ručně psanými štítky. Na ploše si data načítá widget
+// přes useDataWidgetu (sdílená mezipaměť: Živě z pokladny, Platby a Top
+// produkty za stejné období pošlou jeden dotaz) a období vybírá v nastavení
+// widgetu. Tady zůstalo jen kreslení — každá část je jedna věc (čísla,
+// poznámky, hodiny, produkty, obsluha, dny) a widget si vybere, kolik jich
+// se do jeho velikosti vejde.
+//
+// Číslo bez vysvětlení je horší než žádné, protože se podle něj rozhoduje:
+// proto poznámky (chybějící ceny, refundace, nesesynchronizované účtenky)
+// zůstávají u čísel i ve střední velikosti.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
-import { dbTimeHM } from '@/lib/pragueTime';
+import { BarSpark, Chip, ListRow } from '../ui';
+import { czCount, type CzNoun } from '@/lib/czech';
+import { pragueToday } from '@/lib/pragueTime';
 
-type Note = { tone: 'good' | 'warn' | 'info'; title: string; text: string };
-type Day = {
+export type TonPoznamky = 'good' | 'warn' | 'info';
+export interface PoznamkaPokladny { tone: TonPoznamky; title: string; text: string }
+export interface DenPokladny {
   day: string; bills: number; cash: number; card: number; other: number; total: number;
-  tips: number; tipsCash: number; tipsCard: number; refundCount: number; refundTotal: number;
+  tips: number; refundCount: number; refundTotal: number;
   closings: number; declared: number | null; diff: number | null;
-};
-type Item = { productId: string; name: string; category: string | null; qty: number; price: number | null; revenue: number | null };
-type Data = {
-  connected: boolean; error?: string;
-  from: string; to: string; today: string; placeName?: string | null; lastSyncAt?: string | null;
-  totals: { bills: number; total: number; cash: number; card: number; other: number; tips: number;
-    tipsCash: number; tipsCard: number; discounts: number; refundCount: number; refundTotal: number;
-    avgBill: number; soldQty: number; productRevenue: number;
-    methods?: { id: string; label: string; amount: number }[] };
-  days: Day[]; hours: number[]; byPerson: { name: string; total: number; bills: number }[];
-  items: Item[]; notes: Note[]; note: string;
-};
+}
+export interface PolozkaPokladny { productId: string; name: string; category: string | null; qty: number; revenue: number | null }
+export interface OsobaPokladny { name: string; total: number; bills: number }
+export interface SouctyPokladny {
+  bills: number; total: number; cash: number; card: number; other: number; tips: number;
+  tipsCash: number; tipsCard: number; refundCount: number; refundTotal: number;
+  avgBill: number; soldQty: number; productRevenue: number;
+  methods: { id: string; label: string; amount: number }[];
+}
 
-const toneCls: Record<Note['tone'], string> = {
-  good: 'bg-[#C8F542]/10 border-[#C8F542]/30 text-[#5B7A08]',
-  warn: 'bg-wait/10 border-wait/25 text-wait-ink',
-  info: 'bg-black/[0.03] border-black/[0.07] text-black/60',
-};
-const toneIcon: Record<Note['tone'], string> = { good: 'check', warn: 'warning', info: 'bulb' };
+/** Odpověď /api/pos/daily vybraná pro widgety. Obal (nikdy null), aby „nepropojeno" nebylo „načítám". */
+export interface DenniPokladna {
+  propojeno: boolean;
+  from: string; to: string;
+  misto: string | null;
+  posledniSynchronizace: string | null;
+  soucty: SouctyPokladny;
+  dny: DenPokladny[];
+  hodiny: number[];
+  obsluha: OsobaPokladny[];
+  polozky: PolozkaPokladny[];
+  poznamky: PoznamkaPokladny[];
+  poznamka: string;
+}
 
-const iso = (d: Date) => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit',
-}).format(d);
-const shift = (days: number) => iso(new Date(Date.now() + days * 86400000));
-const csDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const text = (v: unknown) => (typeof v === 'string' ? v : '');
 
-export default function LiveRevenue() {
-  const money = useMoney();
-  const [from, setFrom] = useState(shift(0));
-  const [to, setTo] = useState(shift(0));
-  const [d, setD] = useState<Data | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState('');
-  const [openDays, setOpenDays] = useState(false);
+/** Vybere z /api/pos/daily jen to, co widgety kreslí; nečekaný tvar je chyba widgetu, ne prázdno. */
+export function vyberDenniPokladnu(raw: any): DenniPokladna {
+  if (!raw || typeof raw !== 'object') throw new Error('Pokladna odpověděla v nečekaném tvaru.');
+  const t = raw.totals ?? {};
+  return {
+    propojeno: raw.connected === true && !!raw.totals,
+    from: text(raw.from), to: text(raw.to),
+    misto: text(raw.placeName).trim() || null,
+    posledniSynchronizace: typeof raw.lastSyncAt === 'string' ? raw.lastSyncAt : null,
+    soucty: {
+      bills: n(t.bills), total: n(t.total), cash: n(t.cash), card: n(t.card), other: n(t.other), tips: n(t.tips),
+      tipsCash: n(t.tipsCash), tipsCard: n(t.tipsCard), refundCount: n(t.refundCount), refundTotal: n(t.refundTotal),
+      avgBill: n(t.avgBill), soldQty: n(t.soldQty), productRevenue: n(t.productRevenue),
+      methods: Array.isArray(t.methods) ? t.methods.map((m: any) => ({ id: text(m?.id), label: text(m?.label) || text(m?.id), amount: n(m?.amount) })) : [],
+    },
+    dny: Array.isArray(raw.days) ? raw.days.map((d: any) => ({
+      day: text(d?.day), bills: n(d?.bills), cash: n(d?.cash), card: n(d?.card), other: n(d?.other), total: n(d?.total),
+      tips: n(d?.tips), refundCount: n(d?.refundCount), refundTotal: n(d?.refundTotal),
+      closings: n(d?.closings), declared: d?.declared == null ? null : n(d.declared), diff: d?.diff == null ? null : n(d.diff),
+    })) : [],
+    hodiny: Array.isArray(raw.hours) ? raw.hours.map(n) : [],
+    obsluha: Array.isArray(raw.byPerson) ? raw.byPerson.map((p: any) => ({ name: text(p?.name) || 'Bez jména', total: n(p?.total), bills: n(p?.bills) })) : [],
+    polozky: Array.isArray(raw.items) ? raw.items.map((i: any) => ({
+      productId: text(i?.productId) || text(i?.name), name: text(i?.name) || 'Bez názvu', category: text(i?.category) || null,
+      qty: n(i?.qty), revenue: i?.revenue == null ? null : n(i.revenue),
+    })) : [],
+    poznamky: Array.isArray(raw.notes) ? raw.notes
+      .filter((x: any) => x && (x.tone === 'good' || x.tone === 'warn' || x.tone === 'info'))
+      .map((x: any) => ({ tone: x.tone, title: text(x.title), text: text(x.text) })) : [],
+    poznamka: text(raw.note),
+  };
+}
 
-  const load = useCallback(async () => {
-    setLoading(true); setErr('');
-    try {
-      const r = await fetch(`/api/pos/daily?from=${from}&to=${to}`).then(x => x.json());
-      if (r?.error) setErr(r.error);
-      setD(r?.connected ? r : null);
-    } catch { setErr('Data se nepodařilo načíst.'); }
-    setLoading(false);
-  }, [from, to]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // Dnešek se mění pod rukama — když je vybraný, ať se čísla obnovují sama.
-  useEffect(() => {
-    if (!(from === to && from === shift(0))) return;
-    const t = setInterval(load, 120000);
-    return () => clearInterval(t);
-  }, [from, to, load]);
-
-  const preset = (a: string, b: string) => { setFrom(a); setTo(b); };
-  const isPreset = (a: string, b: string) => from === a && to === b;
-
-  const presets: [string, string, string][] = [
-    ['Dnes', shift(0), shift(0)],
-    ['Včera', shift(-1), shift(-1)],
-    ['7 dní', shift(-6), shift(0)],
-    ['30 dní', shift(-29), shift(0)],
-  ];
-
-  if (!loading && !d && !err) {
-    return (
-      <div className="glass-card p-6 text-center text-black/45 text-sm">
-        Pokladna není připojená — živý přehled se zapne po propojení se Storyous.
-      </div>
-    );
+/** Období widgetu tržeb → dny od–do v pražském čase. `mesic` = od prvního dne měsíce do dneška. */
+export function obdobiPokladny(id: unknown): { from: string; to: string; popis: string } {
+  const dnes = pragueToday();
+  switch (id) {
+    case 'vcera': return { from: pragueToday(-1), to: pragueToday(-1), popis: 'Včera' };
+    case '7_dni': return { from: pragueToday(-6), to: dnes, popis: 'Posledních 7 dní' };
+    case '14_dni': return { from: pragueToday(-13), to: dnes, popis: 'Posledních 14 dní' };
+    case '30_dni': return { from: pragueToday(-29), to: dnes, popis: 'Posledních 30 dní' };
+    case 'mesic':
+    case 'tento_mesic': return { from: `${dnes.slice(0, 7)}-01`, to: dnes, popis: 'Tento měsíc' };
+    default: return { from: dnes, to: dnes, popis: 'Dnes' };
   }
+}
 
-  const t = d?.totals;
-  const maxHour = d ? Math.max(...(d.hours ?? []), 0) : 0;
+export const UCTENKA: CzNoun = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
+export const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' };
 
+const PISMENA_DNU = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
+/** „Po" z „2026-09-21" — poledne UTC, ať se den nepřehoupne podle pásma zařízení. */
+export const pismenoDne = (d: string) => PISMENA_DNU[new Date(`${d}T12:00:00Z`).getUTCDay()] ?? '';
+/** „21. 9." */
+export const kratkeDatum = (d: string) => {
+  const [, m, dd] = d.split('-').map(Number);
+  return m && dd ? `${dd}. ${m}.` : d;
+};
+
+const TON_IKONA: Record<TonPoznamky, { ikona: string; barva: string }> = {
+  good: { ikona: 'check', barva: 'text-ok-ink' },
+  warn: { ikona: 'warning', barva: 'text-wait-ink' },
+  info: { ikona: 'info', barva: 'text-info-ink' },
+};
+
+/**
+ * Poctivé poznámky k číslům (a rady jiných widgetů financí) jako řádky
+ * seznamu s tónovanou ikonou v jamce. Dřív každá poznámka byla vlastní
+ * tónovaný box (třetí kopie téže mapy tónů) — na ploše s osmi widgety by
+ * tónovaná plocha přerostla limit DP T4.
+ */
+export function RadyJakoSeznam({ rady, limit = Infinity }: {
+  rady: { tone: TonPoznamky; title: string; text?: string; ikona?: string; doplnek?: ReactNode }[];
+  limit?: number;
+}) {
+  const vidim = rady.slice(0, limit);
   return (
-    <div className="glass-card p-5 sm:p-6 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="t-card">
-            Živě z pokladny{d?.placeName ? ` · ${d.placeName}` : ''}
-          </h3>
-          <p className="text-[11px] text-black/40">
-            {from === to ? csDate(from) : `${csDate(from)} – ${csDate(to)}`}
-            {d?.lastSyncAt && <span> · naposledy synchronizováno {dbTimeHM(d.lastSyncAt)}</span>}
-          </p>
-        </div>
-        <button onClick={load} disabled={loading}
-          className="w-full sm:w-auto shrink-0 rounded-full glass px-3.5 py-2 text-xs font-bold text-black/60 hover:text-black disabled:opacity-50 transition inline-flex items-center justify-center gap-1.5">
-          <Icon name="swap" size={14} /> {loading ? 'Načítám…' : 'Obnovit'}
-        </button>
-      </div>
-
-      {/* Období */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {presets.map(([label, a, b]) => (
-            <button key={label} onClick={() => preset(a, b)}
-              className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-bold transition active:scale-95 ${
-                isPreset(a, b) ? 'seg-on' : 'seg-off glass'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="date" aria-label="Od data" value={from} max={to} onChange={e => setFrom(e.target.value)}
-            className="tap-target-sm flex-1 sm:flex-none min-w-0 field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
-          <span className="text-xs text-black/35 shrink-0">–</span>
-          <input type="date" aria-label="Do data" value={to} min={from} max={d?.today} onChange={e => setTo(e.target.value)}
-            className="tap-target-sm flex-1 sm:flex-none min-w-0 field border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
-        </div>
-      </div>
-
-      {err && <p className="text-sm text-wait-ink bg-wait/10 border border-wait/25 rounded-2xl px-4 py-3">{err}</p>}
-
-      {loading && !d ? (
-        <div className="flex items-center justify-center h-28">
-          <div className="spinner" />
-        </div>
-      ) : t ? (
-        <>
-          {/* Peníze */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="t-label">Tržba</p>
-              <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.total)}</p>
-              <p className="text-[11px] text-black/40">{t.bills} účtenek · ⌀ {money(t.avgBill)}</p>
-            </div>
-            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="t-label">Hotově</p>
-              <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.cash)}</p>
-              <p className="text-[11px] text-black/40">
-                {t.total > 0 ? Math.round((t.cash / t.total) * 100) : 0} % tržby
-                {t.tipsCash > 0 ? ` · sprop. ${money(t.tipsCash)}` : ''}
-              </p>
-            </div>
-            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="t-label">Kartou</p>
-              <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.card)}</p>
-              <p className="text-[11px] text-black/40">
-                {t.total > 0 ? Math.round((t.card / t.total) * 100) : 0} % tržby
-                {t.tipsCard > 0 ? ` · sprop. ${money(t.tipsCard)}` : ''}
-              </p>
-            </div>
-            <div className="well border border-black/[0.06] px-4 py-3 min-w-0">
-              <p className="t-label">Spropitné</p>
-              <p className="text-xl sm:text-2xl font-bold tabular-nums text-[#16181A] whitespace-nowrap">{money(t.tips)}</p>
-              <p className="text-[11px] text-black/40">
-                {t.refundCount > 0 ? `${t.refundCount}× refundace ${money(t.refundTotal)}` : t.other > 0 ? `jinak ${money(t.other)}` : 'bez refundací'}
-              </p>
-            </div>
-          </div>
-
-          {/* Co není hotově ani kartou: stravenky, kredit, faktura… Dřív se to
-              schovalo do „jinak" a uzávěrka proti kase nesedela. */}
-          {(t.methods?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] uppercase tracking-wider text-black/55 mr-1">Jinak zaplaceno</span>
-              {t.methods!.map(m => (
-                <span key={m.id} className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] border border-black/[0.06] px-3 py-1 text-xs text-[#16181A]">
-                  <span className="cz-sentence">{m.label}</span>
-                  <span className="font-semibold tabular-nums">{money(m.amount)}</span>
+    <>
+      <ul className="list">
+        {vidim.map((r, i) => {
+          const t = TON_IKONA[r.tone];
+          return (
+            <ListRow key={`${i}-${r.title}`}
+              lead={(
+                <span aria-hidden className="well grid h-9 w-9 shrink-0 place-items-center">
+                  <Icon name={r.ikona ?? t.ikona} size={16} className={t.barva} />
                 </span>
-              ))}
-            </div>
-          )}
-
-          {/* Sedí to? */}
-          {(d.notes?.length ?? 0) > 0 && (
-            <div className="space-y-2">
-              {(d.notes ?? []).map((n, i) => (
-                <div key={i} className={`rounded-2xl border px-4 py-2.5 ${toneCls[n.tone]}`}>
-                  <p className="text-sm font-semibold flex items-center gap-1.5">
-                    <Icon name={toneIcon[n.tone]} size={14} /> {n.title}
-                  </p>
-                  <p className="text-xs mt-0.5 opacity-80 leading-relaxed">{n.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Špičky dne */}
-          {maxHour > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Kdy se protáčelo</p>
-              <div className="flex items-end gap-[3px] h-16">
-                {(d.hours ?? []).map((v, h) => (
-                  <div key={h} className="flex-1 min-w-[8px] flex flex-col items-center gap-1" title={`${h}:00 — ${money(v)}`}>
-                    <div className={`w-full rounded-t ${v === maxHour ? 'bg-[#8FB811]' : 'bg-[#C8F542]/70'}`}
-                      style={{ height: `${maxHour ? Math.max(v > 0 ? 4 : 0, (v / maxHour) * 48) : 0}px` }} />
-                    <span className="text-[11px] text-black/30 tabular-nums">{h % 3 === 0 ? h : ''}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Co se prodalo */}
-          {(d.items?.length ?? 0) > 0 && (
-            <div>
-              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45">Co se prodalo</p>
-                <p className="text-[11px] text-black/40 tabular-nums">
-                  {d.totals.soldQty.toLocaleString('cs-CZ')} kusů · {money(d.totals.productRevenue)} podle ceníku
-                </p>
-              </div>
-              <div className="rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-80 overflow-y-auto scrollbar-thin">
-                {(d.items ?? []).map(i => (
-                  <div key={i.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
-                    <span className="w-full sm:w-auto sm:flex-1 min-w-0 truncate text-[#16181A]">{i.name}</span>
-                    <span className="sm:hidden flex-1" />
-                    <span className="shrink-0 text-xs text-black/45 tabular-nums">{i.qty.toLocaleString('cs-CZ')}×</span>
-                    <span className="w-24 shrink-0 text-right text-xs font-bold tabular-nums text-[#16181A]">
-                      {i.revenue != null ? money(i.revenue) : <span className="text-black/25">bez ceny</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Kdo markoval */}
-          {(d.byPerson?.length ?? 0) > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Kdo markoval</p>
-              <div className="space-y-1.5">
-                {(d.byPerson ?? []).map(p => {
-                  const pct = t.total ? Math.round((p.total / t.total) * 100) : 0;
-                  return (
-                    <div key={p.name} className="relative overflow-hidden rounded-xl border border-black/[0.06] bg-white/50 px-3.5 py-2">
-                      <span className="absolute inset-y-0 left-0 bg-[#C8F542]/25" style={{ width: `${pct}%` }} />
-                      <span className="relative flex items-center justify-between gap-x-2 gap-y-0.5 flex-wrap text-sm">
-                        <span className="min-w-0 truncate text-[#16181A]">{p.name}</span>
-                        <span className="shrink-0 text-black/55 tabular-nums">{money(p.total)} · {p.bills} úč.</span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Den po dni */}
-          {(d.days?.length ?? 0) > 1 && (
-            <div>
-              <button type="button" onClick={() => setOpenDays(o => !o)}
-                className="w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-2.5 text-sm font-semibold text-[#16181A]">
-                <span>Den po dni ({d.days?.length ?? 0})</span>
-                <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${openDays ? 'rotate-180' : ''}`} />
-              </button>
-              {openDays && (
-                <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden max-h-72 overflow-y-auto scrollbar-thin">
-                  {(d.days ?? []).map(day => (
-                    <div key={day.day} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                      <span className="w-14 shrink-0 text-black/45 tabular-nums">{csDate(day.day)}</span>
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-black/40">
-                        {day.bills} úč. · hotově {money(day.cash)} · kartou {money(day.card)}
-                      </span>
-                      <span className="shrink-0 font-semibold tabular-nums text-[#16181A]">{money(day.total)}</span>
-                      {day.diff != null && (
-                        <span className={`w-16 shrink-0 text-right text-xs font-bold tabular-nums ${
-                          Math.abs(day.diff) <= 50 ? 'text-[#5B7A08]' : 'text-wait-ink'
-                        }`} title="Rozdíl proti uzávěrce">
-                          {day.diff === 0 ? '✓' : `${day.diff > 0 ? '+' : ''}${money(day.diff)}`}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
               )}
-            </div>
-          )}
+              title={<span className="block whitespace-normal text-pretty">{r.title}</span>}
+              meta={r.text ? <span className="block whitespace-normal text-pretty">{r.text}</span> : undefined}
+              right={r.doplnek}
+            />
+          );
+        })}
+      </ul>
+      {rady.length > vidim.length && <p className="t-meta mt-2">…a dalších {(rady.length - vidim.length).toLocaleString('cs-CZ')}</p>}
+    </>
+  );
+}
 
-          <p className="text-[11px] text-black/35">{d.note}</p>
-        </>
-      ) : null}
+/** Tržba po hodinách: sloupky 0–23, nejsilnější hodina zvýrazněná, popisek každé tři hodiny. */
+export function HodinyPokladny({ hodiny, vyska = 56 }: { hodiny: number[]; vyska?: number }) {
+  const money = useMoney();
+  const max = hodiny.reduce((m, v) => Math.max(m, v), 0);
+  const spicka = max > 0 ? hodiny.indexOf(max) : undefined;
+  return (
+    <BarSpark height={vyska} showLabels highlight={spicka} label="Tržba po hodinách"
+      data={hodiny.map((v, h) => ({ value: v, label: h % 3 === 0 ? String(h) : '', tip: `${h}:00 — ${money(v)}` }))} />
+  );
+}
+
+/** Co se prodalo: řádek na produkt, kusy vlevo pod názvem, tržba v pravém sloupci. */
+export function ProdanoPokladny({ polozky, limit, razeni = 'kusy' }: { polozky: PolozkaPokladny[]; limit: number; razeni?: 'kusy' | 'trzba' }) {
+  const money = useMoney();
+  const serazene = [...polozky].sort((a, b) => (razeni === 'trzba' ? (b.revenue ?? 0) - (a.revenue ?? 0) : b.qty - a.qty));
+  const vidim = serazene.slice(0, limit);
+  return (
+    <>
+      <ul className="list">
+        {vidim.map(i => (
+          <ListRow key={i.productId} title={i.name}
+            meta={`${czCount(Math.round(i.qty), KUS)}${i.category ? ` · ${i.category}` : ''}`}
+            value={<span className="tabular-nums">{i.revenue != null ? money(i.revenue) : '—'}</span>}
+            valueMeta={i.revenue == null ? 'bez ceny' : undefined} />
+        ))}
+      </ul>
+      {serazene.length > vidim.length && <p className="t-meta mt-2">…a dalších {(serazene.length - vidim.length).toLocaleString('cs-CZ')}</p>}
+    </>
+  );
+}
+
+/** Kdo kolik namarkoval: tržba a podíl v pravém sloupci, počet účtenek v meta řádku. */
+export function ObsluhaPokladny({ obsluha, celkem, limit }: { obsluha: OsobaPokladny[]; celkem: number; limit: number }) {
+  const money = useMoney();
+  const vidim = obsluha.slice(0, limit);
+  return (
+    <>
+      <ul className="list">
+        {vidim.map(p => (
+          <ListRow key={p.name} title={p.name} meta={czCount(p.bills, UCTENKA)}
+            value={<span className="tabular-nums">{money(p.total)}</span>}
+            valueMeta={celkem > 0 ? `${Math.round((p.total / celkem) * 100)} %` : undefined} />
+        ))}
+      </ul>
+      {obsluha.length > vidim.length && <p className="t-meta mt-2">…a dalších {(obsluha.length - vidim.length).toLocaleString('cs-CZ')}</p>}
+    </>
+  );
+}
+
+/**
+ * Den po dni proti uzávěrkám — rozbalovací, protože u třiceti dnů by jinak
+ * přebil zbytek widgetu. Rozdíl nad práh je chip „wait", sedící den „ok".
+ */
+export function DnyPokladny({ dny, prah = 50 }: { dny: DenPokladny[]; prah?: number }) {
+  const money = useMoney();
+  const [otevreno, setOtevreno] = useState(false);
+  return (
+    <div>
+      <button type="button" onClick={() => setOtevreno(o => !o)} aria-expanded={otevreno}
+        className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-[#16181A] hover:text-black">
+        Den po dni ({dny.length.toLocaleString('cs-CZ')})
+        <Icon name="chevron" size={15} className={`text-black/40 transition-transform ${otevreno ? 'rotate-180' : ''}`} />
+      </button>
+      {otevreno && (
+        <ul className="list mt-2">
+          {dny.map(d => (
+            <ListRow key={d.day}
+              title={<span className="tabular-nums">{pismenoDne(d.day)} {kratkeDatum(d.day)}</span>}
+              meta={`${czCount(d.bills, UCTENKA)} · hotově ${money(d.cash)} · kartou ${money(d.card)}`}
+              value={<span className="tabular-nums">{money(d.total)}</span>}
+              right={d.diff == null ? undefined
+                : Math.abs(d.diff) <= prah
+                  ? <Chip tone="ok" size="sm" icon="check">sedí</Chip>
+                  : <Chip tone="wait" size="sm">{d.diff > 0 ? '+' : '−'}{money(Math.abs(d.diff))}</Chip>} />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
+
+/** Popisek součtu účtenek: „128 účtenek · ⌀ 164 Kč". */
+export function popisUctenek(bills: number, prumer: number, money: (n: number) => string): string {
+  return `${czCount(bills, UCTENKA)}${bills > 0 ? ` · průměr ${money(prumer)}` : ''}`;
+}
+

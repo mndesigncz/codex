@@ -1,5 +1,9 @@
-// Stránka „Uzávěrka" (zaměstnanec). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true)
-// a doporučené i výchozí rozložení upřesní balík B5a v kole 69.
+// Stránka „Uzávěrka" (zaměstnanec). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B5a)
+// plochu zapnulo. Nástroj = formulář uzávěrky (components/employee/CashClosing.tsx); historie pod
+// ním a výzva „Chybí ti uzávěrka" nad ním jsou teď widgety.
+//
+// Předávka je ve výchozím na konci kvůli roli, která má jen uzaverky.predavka (kuchař): formulář
+// se jí nevykreslí a bez předávky by stránka zůstala prázdná (poznámka katalogu).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -23,7 +27,8 @@ export const STRANKA: DefiniceStranky = {
       { w: 'navody.k_uzaverce', s: 'S' },
       { w: 'nastroj' },
       { w: 'uzaverky.moje_historie', s: 'L' },
+      { w: 'uzaverky.predavka', s: 'L' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

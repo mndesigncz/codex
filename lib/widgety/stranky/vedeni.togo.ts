@@ -1,5 +1,12 @@
-// Stránka „TO GO" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B5b v kole 69.
+// Stránka „TO GO" (vedení) — kapesní režim na telefonu. Plocha je aktivní od kola 69 (balík B5b).
+//
+// Dřív byly dlaždice a karty TO GO natvrdo v kódu (tmavý hero, devět šedých dlaždic, karty zpráv
+// a zásob) a nedalo se nic přeskládat ani skrýt — přitom zrovna na telefonu chce majitel domovskou
+// obrazovku „jako iOS" nejvíc. Teď jede ze stejného registru jako Přehled: hero je Pokladna dnes
+// (jediná inkoustová plocha), týden je Tržba po dnech, zprávy, sklad a účtenky jsou malé widgety.
+// Zkratky na záložky si člověk přidá widgetem Odkaz; ve výchozím rozložení nejsou, protože by se
+// jejich ikona `chevronRight` opakovala (AK-19) a „Administrace" vede na celou navigaci.
+// Nástroj stránka nemá.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -31,5 +38,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'finance.uctenky', s: 'S' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

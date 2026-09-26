@@ -1,8 +1,11 @@
 // Widgety oblasti „Organizace" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/organizace.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B5b v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B5b; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/organizace.tsx. Soubor patří balíku B5b; převedeno
+// z katalogu widgetů jednorázovým skriptem (spec §2.2), hotové v kole 69.
+//
+// Na stránce Všechny podniky nese widget součty (M), seznam podniků je nástroj stránky. Měsíc
+// „Tento" znamená měsíc stránky — na Všech podnicích ten z přepínače v hlavičce, jinde dnešní
+// (mesicZVolby v ./finance.ts).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -17,7 +20,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
-    stranky: ['vedeni.prehled'],
+    stranky: ['vedeni.prehled', 'vedeni.vsechny_podniky'],
     opravneni: { vse: ['organizace.prehled'], nektere: [], pole: { trzby: 'finance.trzby', mzdy: 'finance.mzdy' } },
     tarif: 'zdarma',
     nastaveni: [
@@ -29,6 +32,6 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

@@ -1,5 +1,10 @@
-// Stránka „Uzávěrky" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B5a v kole 69.
+// Stránka „Uzávěrky" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B5a) plochu
+// zapnulo. Nástroj = seznam uzávěrek s filtrem měsíce, detailem a novou uzávěrkou
+// (components/employer/ClosingsOverview.tsx); bloky nad ním jsou widgety oblasti uzávěrek a tržeb.
+//
+// Výchozí rozložení je z katalogu: fronty nahoře (co čeká na člověka), čísla, graf a kalendář,
+// seznam dole. Provozní (bez finance.trzby) dostane jen fronty a kalendář — souhrn, trend
+// i rozdíl kasy by bez tržeb neměly co ukázat (N3).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -47,5 +52,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };
