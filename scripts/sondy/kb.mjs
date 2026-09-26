@@ -106,9 +106,11 @@ const bad = (msg) => { console.log('  ✗', msg); problems.push(msg); };
     form > 0 ? ok('dialog je opravdový formulář') : bad('dialog stále není <form>');
     let submitted = false;
     p.on('request', r => { if (r.method() === 'POST' && r.url().includes('/api/events')) submitted = true; });
-    await p.locator('input[placeholder="Název akce"]').fill('Svatba Novákovi');
+    // Formulář má od kola 69 popisek u pole (Field), ne jen placeholder.
+    const nazev = p.getByLabel('Název akce');
+    await nazev.fill('Svatba Novákovi');
     await p.locator('input[type="date"]').first().fill('2026-10-01');
-    await p.locator('input[placeholder="Název akce"]').press('Enter');
+    await nazev.press('Enter');
     await p.waitForTimeout(900);
     submitted ? ok('Enter akci založil') : bad('Enter akci nezaložil');
   }
