@@ -1,0 +1,25 @@
+{
+ "usage": {
+  "3": [
+   {
+    "productId": "p1",
+    "productName": "Mango lemonade",
+    "amount": 0.03
+   }
+  ],
+  "1": [
+   {
+    "productId": "p2",
+    "productName": "Latte",
+    "amount": 0.2
+   }
+  ],
+  "4": [
+   {
+    "productId": "p3",
+    "productName": "Limonáda",
+    "amount": 0.02
+   }
+  ]
+ }
+}

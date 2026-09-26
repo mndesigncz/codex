@@ -25,6 +25,22 @@ const mk = async (b, role) => {
       if (u.includes('/api/tasks')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 91, status: 'done', pointsEarned: 5 }) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     }
+    // Kolo 69: plocha připojí nástroj i widgety až po načtení oprávnění; teams_mine.json
+    // je ze starší verze API bez nich (stránka by zůstala na kostrách). Zaměstnanec dostane
+    // systémovou roli baristy (typ zamestnanec) — s oprávněními vlastníka by uzávěrka šla
+    // větví „za kohokoli“ a sonda by přestala ověřovat skutečný tok zaměstnance.
+    if (new URL(u).pathname === '/api/teams/mine') {
+      const role = JSON.parse(readFileSync(DIR + 'roles.json', 'utf8'));
+      const r = role === 'employee' ? role.system.find(x => x.klic === 'barista') : role.ja;
+      const mine = { ...JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8')), opravneni: r.opravneni, role: role === 'employee'
+        ? { klic: 'barista', roleId: null, nazev: r.nazev, typ: 'zamestnanec', jeVlastnik: false }
+        : { klic: r.klic, roleId: r.roleId, nazev: r.nazev, typ: 'vedeni', jeVlastnik: r.jeVlastnik } };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mine) });
+    }
+    // Kolo 69: záložka Uzávěrka je plocha s widgety a formulář je její nástroj — bez
+    // rozložení (holé [] z podvrhu) by plocha byla prázdná a formulář by chyběl.
+    if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'zamestnanec.uzaverka')
+      return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b5a-rozlozeni-uzaverka.json', 'utf8') });
     const k = keyFor(u);
     if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });

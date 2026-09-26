@@ -16,6 +16,8 @@ await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
   if (route.request().method() !== 'GET') { posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() }); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, organization: { id: 9, name: 'Moje kavárny', settings: JSON.parse(readFileSync(DIR + 'organization.json', 'utf8')).organization.settings }, kopie: [] }) }); }
+  // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
+  if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -51,7 +53,7 @@ tvrdi('nastavení: zrušené potvrzení nic neuloží', posty.filter(x => x.url 
 
 // 2) Sklad → Kategorie a balení
 await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
-await p.locator('button[title="Další"]').first().click(); await p.waitForTimeout(400);
+await p.locator('[data-plocha] button[aria-label="Další akce"]:visible').first().click(); // kolo 69: „···" hlavičky plochy await p.waitForTimeout(400);
 await p.getByRole('menu').getByText('Kategorie a balení', { exact: false }).first().click(); await p.waitForTimeout(700);
 m = norm(await p.locator('body').innerText());
 tvrdi('sklad: správce kategorií má blok „Z organizace"', m.includes('z organizace') && m.includes('sirupy z organizace'), m.slice(0, 120));

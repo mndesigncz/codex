@@ -1,9 +1,8 @@
 'use client';
-import { SearchField } from '../ui';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState } from '../ui';
+import { Button, Card, EmptyState, ErrorState, ListRow, SearchField } from '../ui';
 import KioskPackagedStock from './KioskPackagedStock';
 import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
@@ -136,55 +135,57 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
 
       {!stockFocused && (
         <div className="space-y-4">
+          {/* Kolo 69 (DP §6.1, §6.2, §6.6, §6.8): tlačítka z ui místo ručně
+              psaných, kontejnery Card a `.list` místo glass-card na položku,
+              znaky „−"/„+" jako ikony. Limetka je na obrazovce jediná — na
+              „Probíhá inventura", když běží; jinak žádná. Dřív svítila na „+"
+              u každého řádku, na tečce „v pořádku" i na „Máme zpátky". Cíle
+              44 px si tlačítkům na kiosku zvedá .kiosk-surface. */}
           {/* New arrivals get written in right here — the tablet is where the
               crew stands when the delivery is unpacked. */}
           {adding ? (
-            <div className="glass-card p-5 space-y-4">
-              <p className="font-bold text-lg text-[#16181A] flex items-center gap-2">
-                <Icon name="box" size={20} className="text-[#5B7A08]" /> Nová věc do skladu
-                {active && <span className="text-sm font-medium text-black/40">· zapisuje {active.name}</span>}
-              </p>
+            <Card className="space-y-4" aria-labelledby="kiosk-sklad-nova">
+              <h2 id="kiosk-sklad-nova" className="t-card flex flex-wrap items-center gap-2">
+                <Icon name="box" size={20} /> Nová věc do skladu
+                {active && <span className="t-meta">· zapisuje {active.name}</span>}
+              </h2>
               <NewStockEntry
                 variant="kiosk"
                 actingAs={activeId}
                 onSaved={() => { setAdding(false); setJustAdded(true); setTimeout(() => setJustAdded(false), 4000); reload(); }}
                 onCancel={() => setAdding(false)}
               />
-            </div>
+            </Card>
           ) : (
-            <button onClick={() => setAdding(true)}
-              className="w-full rounded-2xl bg-[#16181A] text-white px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
-              <Icon name="plus" size={20} strokeWidth={2.2} /> Zapsat novou věc do skladu
-            </button>
+            <Button variant="primary" size="lg" icon="plus" block className="w-full" onClick={() => setAdding(true)}>
+              Zapsat novou věc do skladu
+            </Button>
           )}
           {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo stojí u regálu —
               tedy zpravidla někdo s tímhle tabletem v ruce. */}
           {stocktakeOpen && (
-            <button onClick={() => setCounting(true)}
-              className="w-full rounded-2xl bg-[#C8F542] on-accent px-5 py-4 text-base font-bold min-h-[56px] flex items-center justify-center gap-2 active:scale-[0.99] transition">
-              <Icon name="clipboard" size={20} strokeWidth={2.2} /> Probíhá inventura — spočítat sklad
-            </button>
+            <Button variant="accent" size="lg" icon="clipboard" block className="w-full" onClick={() => setCounting(true)}>
+              Probíhá inventura — spočítat sklad
+            </Button>
           )}
           {justAdded && (
-            <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] px-5 py-3.5 text-base font-semibold">
-              Zapsáno do skladu ✓ Vedení to potvrdí.
-            </div>
+            // Stavové hlášení `.note` (DP §3.15) — dřív ručně limetkový box a znak ✓.
+            <p className="note note-ok text-base font-semibold" role="status">
+              Zapsáno do skladu. Vedení to potvrdí.
+            </p>
           )}
           <SearchField value={search} onChange={setSearch} placeholder="Hledat položku…" storageKey="inventory-kiosk"
             suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))}
             inputClassName="!py-3.5 text-base" />
           {(parkedCount > 0 || showParked) && (
-            <button onClick={() => setShowParked(v => !v)}
-              className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
-                showParked ? 'seg-on' : 'seg-off glass'
-              }`}>
+            <Button variant="secondary" size="lg" block className="w-full" aria-pressed={showParked} onClick={() => setShowParked(v => !v)}>
               {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
-            </button>
+            </Button>
           )}
           <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
             {cats.map(c => (
-              <button key={c} onClick={() => setCat(c)}
-                className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap shrink-0 transition ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
+              <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
+                className={`filter-pill whitespace-nowrap shrink-0 ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
                 {c}
               </button>
             ))}
@@ -198,74 +199,58 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
           {loading ? (
             <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
           ) : loadErr ? (
-            <div className="glass-card p-8 text-center space-y-3">
-              <p className="text-base font-semibold text-bad-ink">Sklad se nepodařilo načíst.</p>
-              <p className="text-sm text-black/50">Nejspíš vypadlo připojení. Data můžou být neúplná — nespoléhej na tenhle seznam, dokud se nenačte.</p>
-              <button onClick={() => { setLoading(true); reload(); }} className="rounded-2xl bg-[#16181A] text-white px-5 py-3 text-sm font-bold min-h-[48px] active:scale-[0.99] transition">Zkusit znovu</button>
-            </div>
+            <Card pad="none">
+              <ErrorState compact title="Sklad se nepodařilo načíst."
+                hint="Nejspíš vypadlo připojení. Data můžou být neúplná — nespoléhej na tenhle seznam, dokud se nenačte."
+                onRetry={() => { setLoading(true); reload(); }} />
+            </Card>
           ) : filtered.length === 0 ? (
-            <div className="glass-card p-4"><EmptyState icon="box" compact title="Žádné položky"
-              hint="V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu." /></div>
+            <Card pad="sm"><EmptyState icon="box" compact title="Žádné položky"
+              hint="V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu." /></Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {filtered.map(i => {
-                const st = statusOf(i);
-                const dot = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
-                return (
-                  // Ovládání zabere 226 px (čtyři tlačítka 48 px a počítadlo).
-                  // Na telefonu tak na název zbylo 56 px z potřebných 176 —
-                  // z „Sirup Monin Levandule" bylo vidět „Siru…". Název si
-                  // proto bere celý řádek a tlačítka se zalomí pod něj.
-                  <div key={i.id} className={`glass-card p-3 min-[360px]:p-4 flex items-center gap-x-2 min-[360px]:gap-x-3 gap-y-3 flex-wrap ${st === 'critical' ? 'border-bad/25' : ''}`}>
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
-                    {/* Zlom podle šířky okna tady klame: od 520 px se karty
-                        srovnají do dvou sloupců, takže karta je zase úzká a na
-                        název zbylo 52 px. Na jeden řádek se to vrací až od
-                        1024 px, kde je karta doopravdy široká. */}
-                    <div className="min-w-0 flex-1 basis-[calc(100%-1.5rem)] lg:basis-0">
-                      <p className="font-semibold text-[#16181A] line-clamp-2">
-                        {i.name}
-                        {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
-                        {(i as any).approved === false && (
-                          <span className="ml-1.5 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
-                            čeká na potvrzení
+            // Jedna karta s linkami (DP §3.6), ne karta na položku. Na telefonu
+            // ListRow zalomí ovládání pod název, takže „Sirup Monin Levandule"
+            // zůstane čitelný celý.
+            <Card pad="none" className="px-5">
+              <ul className="list">
+                {filtered.map(i => {
+                  const st = statusOf(i);
+                  const ceka = (i as any).approved === false;
+                  return (
+                    <li key={i.id}>
+                      <ListRow as="div"
+                        lead={<span className={`w-2.5 h-2.5 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok'}`} aria-hidden />}
+                        title={<>{i.name}{i.brand && <span className="ml-1.5 font-normal text-black/55">{i.brand}</span>}</>}
+                        meta={<>
+                          {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? 'kriticky · ' : 'dochází · '}</span>}
+                          {ceka && <span className="font-medium text-wait-ink">čeká na potvrzení · </span>}
+                          {i.category}
+                        </>}
+                        actions={i.archived ? (
+                          <Button variant="secondary" onClick={() => setParked(i, false)}>Máme zpátky</Button>
+                        ) : <>
+                          <Button variant="ghost" iconOnly icon="archive" aria-label={`Momentálně nevedeme — ${i.name}`} title="Momentálně nevedeme"
+                            onClick={() => setParked(i, true)} />
+                          <span className="flex items-center gap-1.5">
+                            <Button variant="secondary" iconOnly icon="minus" aria-label={`Ubrat — ${i.name}`} onClick={() => step(i, -1)} />
+                            <span className="w-14 text-center font-bold text-[#16181A] tabular-nums text-lg" aria-live="polite">
+                              {i.quantity}<span className="block text-[11px] font-medium text-black/55 leading-none">{i.unit}</span>
+                            </span>
+                            <Button variant="secondary" iconOnly icon="plus" aria-label={`Přidat — ${i.name}`} onClick={() => step(i, 1)} />
                           </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-black/40 truncate">{i.category}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                      {i.archived ? (
-                        <button onClick={() => setParked(i, false)}
-                          className="rounded-2xl bg-[#C8F542] text-black px-4 h-12 text-sm font-bold active:scale-95 transition">
-                          Máme zpátky
-                        </button>
-                      ) : (
-                      <>
-                      <button onClick={() => setParked(i, true)} title="Momentálně nevedeme"
-                        className="rounded-2xl glass border border-black/10 w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 flex items-center justify-center text-black/40 active:scale-95 transition">
-                        <Icon name="warning" size={18} />
-                      </button>
-                      <button onClick={() => step(i, -1)}
-                        className="rounded-2xl glass border border-black/10 w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 flex items-center justify-center text-xl min-[360px]:text-2xl leading-none text-black/70 active:scale-95 transition">−</button>
-                      <span className="w-12 min-[360px]:w-16 text-center font-bold text-[#16181A] tabular-nums text-base min-[360px]:text-lg">
-                        {i.quantity}<span className="block text-[11px] font-medium text-black/40 leading-none">{i.unit}</span>
-                      </span>
-                      <button onClick={() => step(i, 1)}
-                        className="rounded-2xl bg-[#C8F542] w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 flex items-center justify-center text-xl min-[360px]:text-2xl leading-none text-black active:scale-95 transition">+</button>
-                      </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                        </>}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
           )}
         </div>
       )}
 
       {counting && (
-        <StocktakeModal isEmployer={false} onClose={() => setCounting(false)} onApplied={reload} />
+        <StocktakeModal smiZahajit={false} smiDokoncit={false} smiZtraty={false} onClose={() => setCounting(false)} onApplied={reload} />
       )}
     </div>
   );

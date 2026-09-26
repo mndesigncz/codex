@@ -245,6 +245,7 @@ export async function GET() {
   // where a closing is missing.
   let scheduledByDate: Record<string, any[]> = {};
   let missingClosings: { date: string; employees: any[] }[] = [];
+  let missingToday: { date: string; employees: any[] } | null = null;
   if (p.zaJineho) {
     try {
       // Kolo 62: „odeslat za" nabízí členy podniku (členství nebo zrcadlo).
@@ -271,10 +272,15 @@ export async function GET() {
       // Dates that had at least one shift but not a single closing row —
       // podle obchodního dne, ne podle dne odeslání formuláře.
       const closedDates = new Set(closings.map(r => String(r.shift_date ?? r.date)));
+      // Kolo 69 (N9): „chybí" až do včerejška, stejně jako kalendář. Dřív tu
+      // bylo `<= dnes`, takže dnešní běžící směna svítila jako chybějící
+      // uzávěrka od chvíle, kdy začala. Dnešek bez uzávěrky jde zvlášť
+      // (`missingToday`) — widget ho ukáže jen tomu, kdo si ho zapne.
       missingClosings = Object.keys(scheduledByDate)
-        .filter(d => !closedDates.has(d))
+        .filter(d => !closedDates.has(d) && d < today)
         .sort().reverse()
         .map(date => ({ date, employees: scheduledByDate[date] }));
+      if (scheduledByDate[today] && !closedDates.has(today)) missingToday = { date: today, employees: scheduledByDate[today] };
     } catch { /* shifts table issue — leave empty */ }
   }
 
@@ -305,6 +311,7 @@ export async function GET() {
     members,
     scheduledByDate,
     missingClosings,
+    missingToday,
     meId: c.meId,
   });
 }

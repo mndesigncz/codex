@@ -1,0 +1,104 @@
+{
+ "month": "2026-09",
+ "prevMonth": "2026-08",
+ "summary": {
+  "revenue": 184320,
+  "cash": 72400,
+  "card": 111920,
+  "tips": 4260,
+  "purchases": 61840,
+  "wagesCash": 0,
+  "wagesWorked": 48200,
+  "totalOut": 110040,
+  "gross": 74280,
+  "stockValue": 23610,
+  "prevRevenue": 171450,
+  "closingsCount": 21,
+  "diffSum": -180,
+  "diffAbs": 940,
+  "eventsRevenue": 12400,
+  "stockTop": [
+   {
+    "name": "Káva Brazílie 1 kg",
+    "value": 6400
+   },
+   {
+    "name": "Sirup Monin vanilka",
+    "value": 2100
+   },
+   {
+    "name": "Mléko plnotučné",
+    "value": 1800
+   }
+  ],
+  "laborTargetPct": 28,
+  "mzdySkryte": false
+ },
+ "guest": {
+  "orders": 142,
+  "total": 38900,
+  "offPos": 6,
+  "offPosTotal": 1480,
+  "members": 148,
+  "newMembers": 23,
+  "couponsRedeemed": 31
+ },
+ "ledger": [
+  {
+   "date": "2026-09-16",
+   "kind": "receipt",
+   "label": "Velkoobchod Bílkovi",
+   "amount": 8420,
+   "receiptId": 31,
+   "photoUrl": null,
+   "note": "Mléko, káva, kelímky"
+  },
+  {
+   "date": "2026-09-15",
+   "kind": "expense",
+   "label": "Výdaje z kasy",
+   "amount": 640
+  },
+  {
+   "date": "2026-09-14",
+   "kind": "wage",
+   "label": "Denní výplata",
+   "amount": 1800
+  },
+  {
+   "date": "2026-09-13",
+   "kind": "removal",
+   "label": "Odloženo ven",
+   "amount": 9000
+  },
+  {
+   "date": "2026-09-12",
+   "kind": "receipt",
+   "label": "Pekárna Na rohu",
+   "amount": 3150,
+   "receiptId": 30,
+   "photoUrl": null,
+   "note": null
+  }
+ ],
+ "insights": [
+  {
+   "icon": "trend",
+   "title": "Tržba roste",
+   "text": "Proti srpnu o 7,5 % — hlavně díky víkendům.",
+   "tone": "good"
+  },
+  {
+   "icon": "warning",
+   "title": "Nákupy nad plánem",
+   "text": "Nákupy jsou 33,6 % tržby. Loni touhle dobou 29 %.",
+   "tone": "warn"
+  },
+  {
+   "icon": "coins",
+   "title": "Kasa sedí",
+   "text": "Za měsíc rozdíl −180 Kč celkem, absolutně 940 Kč.",
+   "tone": "info"
+  }
+ ]
+}

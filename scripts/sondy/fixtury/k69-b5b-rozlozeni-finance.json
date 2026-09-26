@@ -1,0 +1,84 @@
+{
+ "stranka": "vedeni.finance",
+ "polozky": [
+  {
+   "id": "souhrn",
+   "widget": "finance.souhrn_mesice",
+   "velikost": "L"
+  },
+  {
+   "id": "podil-mezd",
+   "widget": "finance.trzby_vs_mzdy",
+   "velikost": "S"
+  },
+  {
+   "id": "uctenky",
+   "widget": "finance.uctenky",
+   "velikost": "S"
+  },
+  {
+   "id": "kam-sly",
+   "widget": "finance.kam_sly_penize",
+   "velikost": "M"
+  },
+  {
+   "id": "marze",
+   "widget": "finance.marze",
+   "velikost": "M"
+  },
+  {
+   "id": "doporuceni",
+   "widget": "finance.doporuceni",
+   "velikost": "M"
+  },
+  {
+   "id": "zive",
+   "widget": "pokladna.zive",
+   "velikost": "L"
+  },
+  {
+   "id": "ztraty",
+   "widget": "finance.ztraty",
+   "velikost": "M"
+  },
+  {
+   "id": "platby",
+   "widget": "trzby.platby",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "finance.souhrn_mesice",
+  "finance.trzby_vs_mzdy",
+  "finance.kam_sly_penize",
+  "finance.hoste_vernost",
+  "finance.doporuceni",
+  "finance.postrehy",
+  "pokladna.zive",
+  "trzby.po_dnech",
+  "trzby.top_produkty",
+  "trzby.platby",
+  "trzby.po_obsluze",
+  "trzby.hodiny",
+  "trzby.prumerna_uctenka",
+  "pokladna.stav",
+  "finance.ztraty",
+  "finance.marze",
+  "finance.uctenky",
+  "odkaz",
+  "pokladna.dnes",
+  "chat.neprectene"
+ ],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

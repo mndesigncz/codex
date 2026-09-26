@@ -38,7 +38,9 @@ export async function GET() {
       LIMIT 50`;
     return NextResponse.json({ reports: rows });
   } catch {
-    return NextResponse.json({ reports: [] });
+    // Kolo 69: dřív prázdný seznam — výpadek databáze pak na widgetu
+    // „Hlášení ze skladu" vypadal jako „tým nic nehlásí". Chyba je chyba.
+    return NextResponse.json({ error: 'Hlášení se nepodařilo načíst' }, { status: 500 });
   }
 }
 

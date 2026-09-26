@@ -24,7 +24,15 @@ await ctx.route('**/api/**', async route => {
     if (u.includes('/api/teams/switch')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, teamId: 2, role: 'employer', teamName: 'Kavárna Karlín' }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   }
+  // Kolo 69 (B5b): Všechny podniky jsou plocha s widgety — rozložení (součty jako widget
+  // a seznam podniků jako nástroj) z fixtury balíku, oprávnění vlastníka pro widget součtů.
+  if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.vsechny_podniky') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b5b-rozlozeni-podniky.json', 'utf8') });
   const k = keyFor(u);
+  if (k === 'teams_mine') {
+    const d = JSON.parse(readFileSync(DIR + k + '.json', 'utf8'));
+    d.opravneni = JSON.parse(readFileSync(DIR + 'roles.json', 'utf8')).ja.opravneni;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
+  }
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
 });
@@ -47,7 +55,8 @@ if (await prepinac.count() > 0) {
   await menu.getByRole('menuitem', { name: /Všechny podniky/ }).click();
   await p.waitForTimeout(1500);
   const m = norm(await p.locator('main').innerText());
-  tvrdi('otevřel se přehled s názvem organizace', m.includes('všechny podniky · moje kavárny'), m.slice(0, 200));
+  // Kolo 69: nadpis je jen „Všechny podniky", organizace je v podtitulku (dřív se nadpis na telefonu lámal).
+  tvrdi('otevřel se přehled s názvem organizace', m.includes('všechny podniky') && m.includes('moje kavárny ·'), m.slice(0, 200));
   tvrdi('tržby celkem jsou součet (200 000)', m.includes('tržby celkem') && /200 000/.test(m), m.match(/tržby celkem[\s\S]{0,40}/)?.[0]);
   tvrdi('mzdy celkem 56 000 a podíl 28 %', /56 000/.test(m) && /28 %/.test(m), m.match(/mzdy celkem[\s\S]{0,60}/)?.[0]);
   tvrdi('chybí uzávěrka: 2, 1 ke schválení', /chybí uzávěrka\s*\n?\s*2/.test(m) && m.includes('1 ke schválení'), m.match(/chybí uzávěrka[\s\S]{0,60}/)?.[0]);
@@ -61,7 +70,7 @@ if (await prepinac.count() > 0) {
   tvrdi('krok o měsíc zpět změní nadpis měsíce', m2 !== m || /srpen|august/.test(m2), 'měsíc se nezměnil');
   // Otevřít → přepnutí přes server
   const nav = p.waitForNavigation({ waitUntil: 'commit', timeout: 6000 }).catch(() => null);
-  const karta = p.locator('h3', { hasText: 'Kavárna Karlín' }).locator('xpath=ancestor::div[contains(@class,"glass-card")][1]');
+  const karta = p.locator('article', { has: p.locator('h3', { hasText: 'Kavárna Karlín' }) });
   await karta.getByRole('button', { name: 'Otevřít' }).click();
   await nav;
   const sw = posty.find(x => x.url.includes('/api/teams/switch'));

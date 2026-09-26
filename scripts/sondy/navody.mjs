@@ -27,6 +27,8 @@ await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
   if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+  // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
+  if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -44,11 +46,9 @@ await p.waitForTimeout(700);
 // Otevřít detail položky „Domácí limonáda".
 // Název položky v seznamu — nad ním je souhrn „dochází", který jméno
 // obsahuje taky, ale nic neotevře.
-// Karta položky v mřížce skladu; editor otevírá její tlačítko „Upravit".
-const karta = p.locator('p.font-semibold', { hasText: 'Domácí limonáda' }).first()
-  .locator('xpath=ancestor::*[.//button[@aria-label="Upravit"]][1]');
-await karta.hover();
-await karta.getByRole('button', { name: 'Upravit' }).first().click({ force: true });
+// Kolo 69 (B3): sklad je seznam v jedné kartě, úprava položky je v nabídce „···" řádku.
+await p.getByRole('button', { name: 'Další akce: Domácí limonáda' }).first().click();
+await p.getByRole('menuitem', { name: 'Upravit položku' }).first().click();
 await p.waitForTimeout(900);
 const editor = await p.locator('body').innerText();
 tvrdi('editor výroby ukáže připnutý návod',

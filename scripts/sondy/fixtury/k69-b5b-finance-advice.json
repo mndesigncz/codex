@@ -1,0 +1,47 @@
+{
+ "month": "2026-09",
+ "prevMonth": "2026-08",
+ "advice": [
+  {
+   "group": "revenue",
+   "tone": "warn",
+   "icon": "calendar",
+   "title": "Čtvrtky jsou nejslabší",
+   "text": "Průměr 5 200 Kč proti 9 800 Kč v pátek.",
+   "action": "Zkus čtvrteční akci.",
+   "impact": 12400
+  },
+  {
+   "group": "products",
+   "tone": "info",
+   "icon": "box",
+   "title": "Matcha latte roste",
+   "text": "+40 % proti srpnu."
+  },
+  {
+   "group": "people",
+   "tone": "good",
+   "icon": "users",
+   "title": "Mzdy jsou pod cílem",
+   "text": "26 % tržeb."
+  },
+  {
+   "group": "stock",
+   "tone": "info",
+   "icon": "clipboard",
+   "title": "Monin drží polovinu nákupů",
+   "text": "Vyjednej slevu.",
+   "evidence": "52 % nákupů"
+  }
+ ],
+ "blind": [
+  "Marže bez receptur se nedá spočítat."
+ ],
+ "counts": {
+  "revenue": 1,
+  "products": 1,
+  "people": 1,
+  "stock": 1,
+  "guests": 0
+ }
+}

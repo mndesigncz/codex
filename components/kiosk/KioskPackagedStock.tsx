@@ -144,7 +144,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
   return (
     <section className="space-y-2.5">
-      <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">Zápis zbytků</p>
+      <p className="t-label">Zápis zbytků</p>
       <CategoryNav
         categories={navCats}
         current={null}
@@ -202,7 +202,7 @@ function ItemRow({ item, packaging, onChanged }: {
   if (item.archived) {
     return (
       <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap opacity-80">
-        <p className="font-bold text-[#16181A] min-w-0 truncate">
+        <p className="t-card !text-base min-w-0 truncate">
           {item.name}
           {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
         </p>
@@ -218,7 +218,7 @@ function ItemRow({ item, packaging, onChanged }: {
     return (
       <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <p className="font-bold text-[#16181A] truncate">{item.name}</p>
+          <p className="t-card !text-base truncate">{item.name}</p>
           <p className="text-sm text-wait-ink mt-1">Chybí velikost balení — doplní ji vedení ve skladu.</p>
         </div>
         <button onClick={() => apply({ archived: true })} disabled={busy}
@@ -237,7 +237,7 @@ function ItemRow({ item, packaging, onChanged }: {
     <div className="glass-card p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <p className="font-bold text-[#16181A] text-lg leading-snug truncate">
+          <p className="t-card !text-lg leading-snug truncate">
             {item.name}
             {item.brand && <span className="ml-1.5 text-base font-normal text-black/40">{item.brand}</span>}
           </p>
@@ -247,7 +247,7 @@ function ItemRow({ item, packaging, onChanged }: {
             <span className="text-black/25"> · balení {fmtAmount(size)} {unit}</span>
           </p>
         </div>
-        {saved && <span className="text-sm font-bold text-[#5B7A08] shrink-0">Uloženo ✓</span>}
+        {saved && <span className="text-sm font-semibold text-ok-ink shrink-0 flex items-center gap-1" role="status"><Icon name="check" size={15} /> Uloženo</span>}
         {failed && (
           <span className="text-sm font-bold text-bad-ink shrink-0 flex items-center gap-1">
             <Icon name="warning" size={15} /> Neuloženo
@@ -331,7 +331,8 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
   if (idx >= items.length) {
     return (
       <section className="glass-card p-8 text-center space-y-4">
-        <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#C8F542] text-black mx-auto">
+        {/* Stav „hotovo", ne akce: tlumené kolečko místo limetkové plochy (jedna limetka na obrazovce). */}
+        <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-ok/15 text-ok-ink mx-auto">
           <Icon name="check" size={30} />
         </span>
         <div>

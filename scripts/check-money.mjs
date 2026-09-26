@@ -20,7 +20,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOTS = ['app', 'components', 'lib'];
-const BASELINE = 61;
+const BASELINE = 59; // kolo 69 (B5b): účtenky přes useMoney/useSymbol místo „Kč"
 
 // Kde je koruna v pořádku: vlastní formátovač a ceník předplatného.
 const ALLOW = [

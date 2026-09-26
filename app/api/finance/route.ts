@@ -244,7 +244,10 @@ export async function GET(req: NextRequest) {
       .filter((i) => i.value > 0)
       .sort((a, b) => b.value - a.value);
     stockValue = valued.reduce((s, i) => s + i.value, 0);
-    stockTop = valued.slice(0, 3);
+    // N8 (kolo 69): pět nejdražších položek jde i do odpovědi. Dřív se počítaly jen pro
+    // postřeh níž a zahazovaly se, takže widget Hodnota zásob by si je musel spočítat
+    // znovu jinak (Sklad bere i archivované a bez načatých balení) — dvě čísla za totéž.
+    stockTop = valued.slice(0, 5);
   } catch { /* ignore */ }
 
   // ---- Advice, computed from the month's own numbers. ----
@@ -260,13 +263,15 @@ export async function GET(req: NextRequest) {
     });
   }
   const laborBase = Math.max(wagesWorked, wagesCash);
+  // Cíl podílu mezd podniku (kolo 69): posílá se i v souhrnu, aby widget Tržby vs. mzdy
+  // nemusel kvůli jednomu číslu na /api/teams (to patří správě týmu a jiným oprávněním).
+  let target: number | null = null;
+  try {
+    const [t] = await sql`SELECT labor_target_pct FROM teams WHERE id = ${u.team_id}`;
+    target = t?.labor_target_pct != null && Number.isFinite(Number(t.labor_target_pct)) ? Number(t.labor_target_pct) : null;
+  } catch { /* ignore */ }
   if (revenue > 0 && laborBase > 0) {
     const share = Math.round((laborBase / revenue) * 100);
-    let target: number | null = null;
-    try {
-      const [t] = await sql`SELECT labor_target_pct FROM teams WHERE id = ${u.team_id}`;
-      target = t?.labor_target_pct ?? null;
-    } catch { /* ignore */ }
     const goal = target ?? 30;
     insights.push({
       icon: 'users', tone: share <= goal ? 'good' : 'warn',
@@ -321,7 +326,7 @@ export async function GET(req: NextRequest) {
     insights.push({
       icon: 'box', tone: 'warn',
       title: `Ve skladu leží ${stockValue.toLocaleString('cs-CZ')} Kč`,
-      text: `Nejvíc drží ${stockTop.map((i) => `${i.name} (${i.value.toLocaleString('cs-CZ')} Kč)`).join(', ')}. Zvaž menší objednávky častěji — peníze ve skladu nevydělávají.`,
+      text: `Nejvíc drží ${stockTop.slice(0, 3).map((i) => `${i.name} (${i.value.toLocaleString('cs-CZ')} Kč)`).join(', ')}. Zvaž menší objednávky častěji — peníze ve skladu nevydělávají.`,
     });
   }
   if (tips > 0) {
@@ -361,6 +366,8 @@ export async function GET(req: NextRequest) {
       purchases, wagesCash, wagesWorked, totalOut,
       gross: revenue + eventsRevenueNoClosing - purchases - Math.max(wagesCash, wagesWorked),
       stockValue,
+      stockTop,
+      laborTargetPct: target,
       prevRevenue,
       closingsCount: real.length,
       diffSum, diffAbs,

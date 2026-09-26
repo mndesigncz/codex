@@ -1,8 +1,11 @@
-// Widgety oblasti „Uzávěrky" — metadata bez Reactu (kolo 68).
+// Widgety oblasti „Uzávěrky" — metadata bez Reactu (kolo 68, doplněno v kole 69).
 //
-// Komponenty jsou v components/widgety/oblasti/uzaverky.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B5a v kole 69 nenapíše a nepřepne na 'hotovo'.
+// Komponenty jsou v components/widgety/oblasti/uzaverky.tsx, výpočty v lib/uzaverkyPrehled.ts.
 // Soubor patří balíku B5a; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Kolo 69: všech deset widgetů má komponentu (stav 'hotovo'). Ikony už nejsou všude
+// „trend" — v galerii se jinak nedaly od sebe rozeznat. Vybrané tak, aby se na žádné stránce,
+// kde widget stojí ve výchozím rozložení, neopakovaly (AK-19): proto „bell" a „send" místo
+// obvyklejších „warning" a „inbox", které už mají Ztráty a Čeká na tebe.
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -15,7 +18,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Chybějící uzávěrky',
     popis: 'Dny, kdy někdo pracoval, ale uzávěrka chybí — s lidmi na směně a tlačítkem Vyplnit.',
-    ikona: 'trend',
+    ikona: 'bell',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
@@ -27,7 +30,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'zdarma',
     nastaveni: [{ klic: 'dnes', nazev: 'Počítat i dnešek', typ: 'prepinac', vychozi: false }],
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[approved=false && !covered_by]{author_name,date,…}; rozdíl: lib/closing
   // cashDifference(c)
@@ -36,7 +40,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Uzávěrky ke schválení',
     popis: 'Uzávěrky odeslané bez směny, které čekají na schválení — autor, den, rozdíl kasy, Schválit.',
-    ikona: 'trend',
+    ikona: 'send',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -47,7 +51,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { rozdil_kasy: 'finance.trzby', 'akce:schvalit': 'uzaverky.schvalovat', 'akce:smazat': 'uzaverky.mazat' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'seznam' },
+    stav: 'hotovo',
   },
   // Data: GET /api/closings →
   // closings[]{cash_revenue,card_revenue,tips,self_payout,cash_removed,final_removal,closing_cash,…},
@@ -58,7 +63,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Souhrn uzávěrek',
     popis: 'Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy — za zvolené období.',
-    ikona: 'trend',
+    ikona: 'coins',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
@@ -91,7 +96,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'trzba',
       },
     ],
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'cislo', L: 'cislo' },
+    stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[] → lib/closing cashDifference() po uzávěrce (ne covered_by); měsíc
   // alternativně: GET /api/finance?month → summary.diffSum, summary.diffAbs
@@ -100,7 +106,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Rozdíl pokladny',
     popis: 'Manko / přebytek za týden nebo měsíc: součet, součet absolutních rozdílů a dny, kde kasa nesedí nad práh.',
-    ikona: 'trend',
+    ikona: 'swap',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
@@ -130,7 +136,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
         napoveda: 'Částka v měně podniku.',
       },
     ],
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'cislo' },
+    stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[] (součet cash_revenue+card_revenue po dnech)
   {
@@ -138,14 +145,15 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Trendy tržeb',
     popis: 'Tento týden proti stejným dnům minulého týdne, nejsilnější den v týdnu, rekordní den.',
-    ikona: 'trend',
+    ikona: 'chart',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.uzaverky'],
     opravneni: { vse: ['uzaverky.zobrazit_vse', 'finance.trzby'], nektere: [] },
     tarif: 'pro',
-    stav: 'planovany',
+    kostra: { M: 'cislo', L: 'cislo' },
+    stav: 'hotovo',
   },
   // Data: doporučený zdroj: GET /api/finance?month → summary{revenue,purchases,wagesWorked,wagesCash,gross};
   // dnešní zdroj: GET /api/closings + GET /api/attendance?days=180 (entries × roster.hourlyRate, lib/wages) +
@@ -173,7 +181,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
-    stav: 'planovany',
+    kostra: { M: 'cislo', L: 'cislo' },
+    stav: 'hotovo',
   },
   // Data: GET /api/closings/calendar?month[&scope=me] →
   // days{datum:{onShift[],closedBy[],hasClosing,missing,revenue?}}, selfOnly
@@ -183,7 +192,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Kalendář uzávěrek',
     popis: 'Měsíc: kdo pracoval, kdo zavřel, kde chybí a co čeká; s přístupem k tržbám i tržba dne.',
-    ikona: 'trend',
+    ikona: 'calendarCheck',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni', 'zamestnanec'],
@@ -206,7 +215,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tym',
       },
     ],
-    stav: 'planovany',
+    kostra: { M: 'graf', L: 'graf' },
+    stav: 'hotovo',
   },
   // Data: GET /api/closings/handover → handover{todo,runningOut,message}, date, authorName
   {
@@ -229,7 +239,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Moje uzávěrka',
     popis: 'Připomene uzávěrku z tvé směny a vede rovnou k vyplnění.',
-    ikona: 'trend',
+    ikona: 'coins',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
@@ -245,7 +255,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Moje uzávěrky',
     popis: 'Poslední vlastní uzávěrky: tržba hotově/kartou, odloženo, výplata, rozdíl.',
-    ikona: 'trend',
+    ikona: 'clock',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['zamestnanec'],
@@ -261,6 +271,6 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '3',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

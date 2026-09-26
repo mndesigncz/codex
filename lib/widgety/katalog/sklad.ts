@@ -1,8 +1,11 @@
 // Widgety oblasti „Sklad a výroba" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/sklad.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B3 v kole 69 nenapíše a nepřepne na 'hotovo'.
+// Komponenty jsou v components/widgety/oblasti/sklad.tsx, výpočty v lib/skladPrehled.ts.
 // Soubor patří balíku B3; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Kolo 69: všech třináct widgetů má komponentu (stav 'hotovo'). Ikony už nejsou všude „box" —
+// v galerii se jinak nedaly od sebe rozeznat a na Skladu i na Přehledu Skladníka stálo ve výchozím
+// rozložení šest stejných ikon (AK-19). „box" zůstal Docházejícím zásobám (jsou na Přehledu
+// od kola 68), ostatní nesou, co dělají: košík nákupu, kamera zápisu, schránka návrhů…
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -52,7 +55,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Nákupní seznam',
     popis: 'Co objednat: pod limitem (kritické první) a suroviny chybějící na výrobu; návrh množství do maxima, seskupeno podle dodavatele; Objednat.',
-    ikona: 'box',
+    ikona: 'cart',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -78,7 +81,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
       { klic: 'jen_kriticke', nazev: 'Jen kriticky málo', typ: 'prepinac', vychozi: false },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/finance?month → summary.stockValue (finance.zobrazit); nebo GET /api/inventory → Σ quantity ×
   // unitCost (sklad.ceny)
@@ -90,14 +93,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Hodnota zásob',
     popis: 'Kolik peněz leží na regálech (i poměrem z načatých balení) a u větší velikosti tři nejdražší položky.',
-    ikona: 'box',
+    ikona: 'chart',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.sklad', 'vedeni.finance'],
     opravneni: { vse: [], nektere: ['sklad.ceny', 'finance.zobrazit'] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/inventory →
   // [approved=false]{name,category,quantity,unit,submittedByName,description,photoUrl}
@@ -106,7 +109,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Nové věci od týmu',
     popis: 'Položky zapsané týmem jako návrh (s fotkou, kdo a kolik) — Schválit / Zamítnout, i hromadně.',
-    ikona: 'box',
+    ikona: 'inbox',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -117,7 +120,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:schvalit': 'sklad.schvalovat', 'akce:zamitnout': 'sklad.schvalovat' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/inventory/reports → reports[{items,note,status,author_name,created_at}]
   {
@@ -125,22 +128,22 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Hlášení ze skladu',
     popis: 'Co tým nahlásil jako docházející / chybějící — Vyřízeno, nebo rovnou do nákupního seznamu.',
-    ikona: 'box',
+    ikona: 'mail',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.sklad'],
     opravneni: { vse: ['sklad.hlaseni_vyridit'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/orders → orders[{supplier,items[],status,createdAt,receivedAt,totalCost}]
   {
     id: 'sklad.objednavky',
     oblast: 'sklad',
     nazev: 'Objednávky u dodavatelů',
-    popis: 'Objednávky čekající na příjem (kdy, u koho, položky) — Přijmout naskladní.',
-    ikona: 'box',
+    popis: 'Objednávky čekající na příjem (kdy, u koho, položky) — Přijmout naskladní a zapíše cenu; velký i historie a útrata za měsíc.',
+    ikona: 'download',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -148,10 +151,12 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: {
       vse: ['nakup.zobrazit'],
       nektere: [],
-      pole: { totalcost: 'sklad.ceny', 'akce:prijmout_zrusit': 'nakup.prijmout' },
+      // Cenu při příjmu zapisuje jen `sklad.ceny_upravit` (server jinak 403);
+      // mazání z historie hlídá server stejným klíčem jako příjem.
+      pole: { totalcost: 'sklad.ceny', 'pole:cena_prijmu': 'sklad.ceny_upravit', 'akce:prijmout_zrusit': 'nakup.prijmout', 'akce:smazat_historii': 'nakup.prijmout' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/production → toMake[]; POST /api/inventory/{id}/produce
   {
@@ -186,7 +191,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Suroviny bez ceny nebo balení',
     popis: 'Suroviny, které kasa používá v recepturách, ale chybí jim cena nebo velikost balení — bez nich se nespočítá marže ani odpis z načatého balení.',
-    ikona: 'box',
+    ikona: 'info',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -197,7 +202,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:doplnit': ['sklad.upravit', 'sklad.ceny_upravit'] },
     },
     tarif: 'max',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/inventory/log → [{itemName,oldQuantity,newQuantity,oldOpen,newOpen,note,userName,createdAt}]
   {
@@ -205,7 +210,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Poslední pohyby skladu',
     popis: 'Kdo kdy co odepsal, naskladnil nebo opravil (posledních 20 pohybů).',
-    ikona: 'box',
+    ikona: 'swap',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -225,7 +230,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'vse',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/stocktake → open{data[],createdAt}, history[{completedAt}]
   {
@@ -233,7 +238,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Inventura',
     popis: 'Běží inventura? Kolik položek je spočítaných — Pokračovat v počítání. Jinak kdy byla poslední.',
-    ikona: 'box',
+    ikona: 'clipboard',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
@@ -244,7 +249,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:zahajit_zrusit': 'inventura.spravovat', 'akce:dokoncit': 'inventura.dokoncit' },
     },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: POST /api/inventory (NewStockEntry)
   {
@@ -252,14 +257,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Zapsat novou věc',
     popis: 'Rychlá akce: přišlo zboží — vyfotit a napsat kolik; bez práva přidávat jde jako návrh ke schválení.',
-    ikona: 'box',
+    ikona: 'camera',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
     stranky: ['zamestnanec.sklad', 'kiosk.smena'],
     opravneni: { vse: [], nektere: ['sklad.pridat', 'sklad.navrhnout'] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/inventory; POST /api/inventory/reports
   {
@@ -267,14 +272,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Nahlásit chybějící',
     popis: 'Vyber, co dochází nebo chybí, a pošli hlášení vedení.',
-    ikona: 'box',
+    ikona: 'send',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
     stranky: ['zamestnanec.sklad'],
     opravneni: { vse: ['sklad.hlasit'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/inventory → [{categoryId,status}]; GET /api/inventory/categories → [{id,name,parentId}]
   {
@@ -282,7 +287,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'sklad',
     nazev: 'Stav kategorie',
     popis: 'Jedna kategorie skladu jako widget: kolik položek, kolik dochází, proklik rovnou do ní (jako dlaždice, ale živá).',
-    ikona: 'box',
+    ikona: 'grid',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     vicekrat: true,
@@ -301,6 +306,6 @@ export const WIDGETY: DefiniceWidgetu[] = [
         napoveda: 'Bez vybrané kategorie widget nic neukáže.',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

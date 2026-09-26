@@ -1,0 +1,46 @@
+{
+ "orders": [
+  {
+   "id": 31,
+   "supplier": "Makro",
+   "items": [
+    {
+     "name": "Ovesné mléko",
+     "qty": 12,
+     "unit": "l",
+     "itemId": 2
+    },
+    {
+     "name": "Kelímky 0,4 l",
+     "qty": 500,
+     "unit": "ks",
+     "itemId": 5
+    }
+   ],
+   "totalCost": 1860,
+   "status": "ordered",
+   "note": null,
+   "createdAt": "2026-09-24T08:00:00Z",
+   "receivedAt": null,
+   "createdByName": "Martin Nemeškal"
+  },
+  {
+   "id": 30,
+   "supplier": "Bidfood",
+   "items": [
+    {
+     "name": "Sirup Mango",
+     "qty": 6,
+     "unit": "ks",
+     "itemId": 3
+    }
+   ],
+   "totalCost": null,
+   "status": "received",
+   "note": null,
+   "createdAt": "2026-09-10T08:00:00Z",
+   "receivedAt": "2026-09-12T08:00:00Z",
+   "createdByName": "Martin Nemeškal"
+  }
+ ]
+}

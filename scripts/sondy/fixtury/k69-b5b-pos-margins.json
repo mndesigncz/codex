@@ -1,0 +1,62 @@
+{
+ "connected": true,
+ "ready": true,
+ "month": "2026-09",
+ "menuError": null,
+ "totals": {
+  "revenue": 180000,
+  "revenueKnown": 150000,
+  "cogs": 45000,
+  "margin": 105000,
+  "marginPct": 70,
+  "products": 4,
+  "noRecipe": 1,
+  "noRecipeShare": 8
+ },
+ "items": [
+  {
+   "productId": "p1",
+   "name": "Flat white",
+   "category": "Káva",
+   "qty": 640,
+   "revenue": 54400,
+   "cost": 14,
+   "marginPct": 84
+  },
+  {
+   "productId": "p2",
+   "name": "Croissant",
+   "category": "Pečivo",
+   "qty": 410,
+   "revenue": 22550,
+   "cost": 30,
+   "marginPct": 45
+  },
+  {
+   "productId": "p4",
+   "name": "Cheesecake",
+   "category": "Dezerty",
+   "qty": 120,
+   "revenue": 10800,
+   "cost": 52,
+   "marginPct": 42
+  },
+  {
+   "productId": "p3",
+   "name": "Matcha latte",
+   "category": "Čaj",
+   "qty": 220,
+   "revenue": 19800,
+   "cost": null,
+   "marginPct": null
+  }
+ ],
+ "insights": [
+  {
+   "icon": "warning",
+   "tone": "warn",
+   "title": "Cheesecake vydělává nejmíň",
+   "text": "Suroviny zdražily — zvaž cenu."
+  }
+ ]
+}

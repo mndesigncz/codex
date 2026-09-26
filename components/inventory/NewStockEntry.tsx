@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Icon } from '../Icons';
+import { Button } from '../ui';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
 import { okJson } from '@/lib/api';
@@ -164,7 +165,8 @@ export default function NewStockEntry({
     // Naskladnění se vyplňuje jednou rukou u regálu; Enter po posledním poli
     // musí položku zapsat, ne čekat, až se trefíš do tlačítka.
     <form onSubmit={e => { e.preventDefault(); if (!saving && !uploading && name.trim()) save(false); }}
-      className={`space-y-${big ? '5' : '4'}`}>
+      // Celé třídy, ne `space-y-${…}` — Tailwind skládanou třídu nenajde a nevygeneruje.
+      className={big ? 'space-y-5' : 'space-y-4'}>
       {/* What it is — photo first, because a picture beats a description of a
           bottle nobody at the office has seen. */}
       <div className="flex items-start gap-3">
@@ -181,8 +183,8 @@ export default function NewStockEntry({
             ) : <Icon name="camera" size={big ? 34 : 26} strokeWidth={1.7} />}
         </button>
         <div className="min-w-0 flex-1">
-          <label className={label}>Co to je?</label>
-          <input ref={nameRef} value={name} onChange={e => setName(e.target.value)} autoFocus
+          <label htmlFor="nova-vec-nazev" className={label}>Co to je?</label>
+          <input id="nova-vec-nazev" ref={nameRef} value={name} onChange={e => setName(e.target.value)} autoFocus
             placeholder="Např. Sirup Mango 0,7 l" className={field} />
         </div>
       </div>
@@ -190,15 +192,12 @@ export default function NewStockEntry({
       {/* Where it belongs */}
       {flat.length > 0 && (
         <div>
-          <label className={label}>Kam to patří</label>
-          <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+          <p id="nova-vec-kategorie" className={label}>Kam to patří</p>
+          <div role="group" aria-labelledby="nova-vec-kategorie" className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
             {flat.map(({ cat, depth }: any) => (
-              <button key={cat.id} type="button" onClick={() => pickCategory(cat.id)}
-                className={`tap-target-sm rounded-full font-semibold transition active:scale-95 max-w-full truncate ${
-                  big ? 'px-2.5 py-2 text-xs min-[360px]:px-3 min-[360px]:text-sm sm:px-4 sm:py-2.5 sm:text-base' : 'px-3 py-1.5 text-xs'
-                } ${categoryId === cat.id
-                  ? 'seg-on'
-                  : 'glass text-black/60 hover:text-[#16181A]'}`}>
+              <button key={cat.id} type="button" onClick={() => pickCategory(cat.id)} aria-pressed={categoryId === cat.id}
+                className={`filter-pill tap-target-sm max-w-full truncate ${big ? '!text-sm sm:!text-base sm:!px-4 sm:!py-2.5' : ''} ${
+                  categoryId === cat.id ? 'seg-on' : 'seg-off glass'}`}>
                 {depth > 0 && <span className="opacity-40">{'· '.repeat(depth)}</span>}{cat.name}
                 {/* Kategorie zdrojového podniku organizace — ať jde poznat od stejnojmenné vlastní. */}
                 {cat.zOrganizace && <span className="opacity-40"> · z organizace</span>}
@@ -210,28 +209,23 @@ export default function NewStockEntry({
 
       {/* How much came in */}
       <div>
-        <label className={label}>Kolik toho je</label>
+        <label htmlFor="nova-vec-mnozstvi" className={label}>Kolik toho je</label>
         {/* Na úzkém displeji se „− 140px + ks balení l kg g ml" do jednoho
             řádku nevejde: kiosk má velká tlačítka (2×56 px) a pevně široké
             pole, takže řádek roztáhl celou stránku a zapnul vodorovný scroll.
             Počítadlo drží řádek, jednotky se zalomí pod něj. */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button type="button" onClick={() => bump(-1)}
-            className={`shrink-0 rounded-2xl glass font-bold text-[#16181A] active:scale-95 transition ${
-              big ? 'h-11 w-11 min-[360px]:h-12 min-[360px]:w-12 sm:h-14 sm:w-14 text-lg min-[360px]:text-xl sm:text-2xl' : 'h-10 w-10 min-[360px]:h-11 min-[360px]:w-11 text-base min-[360px]:text-lg'}`}>−</button>
-          <input inputMode="decimal" value={quantity}
+          <Button variant="secondary" size={big ? 'lg' : 'md'} iconOnly icon="minus" aria-label="Ubrat" onClick={() => bump(-1)} />
+          <input id="nova-vec-mnozstvi" inputMode="decimal" value={quantity}
             onChange={e => setQuantity(e.target.value)}
             className={`${field} text-center font-bold tabular-nums min-w-0 flex-1`}
             style={{ maxWidth: big ? 120 : 100 }} />
-          <button type="button" onClick={() => bump(1)}
-            className={`shrink-0 rounded-2xl glass font-bold text-[#16181A] active:scale-95 transition ${
-              big ? 'h-11 w-11 min-[360px]:h-12 min-[360px]:w-12 sm:h-14 sm:w-14 text-lg min-[360px]:text-xl sm:text-2xl' : 'h-10 w-10 min-[360px]:h-11 min-[360px]:w-11 text-base min-[360px]:text-lg'}`}>+</button>
-          <div className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
+          <Button variant="secondary" size={big ? 'lg' : 'md'} iconOnly icon="plus" aria-label="Přidat" onClick={() => bump(1)} />
+          {/* Vybraná jednotka je inkoustová pilulka (DP §3.8), ne limetka. */}
+          <div role="group" aria-label="Jednotka" className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
             {UNITS.map(u => (
-              <button key={u} type="button" onClick={() => setUnit(u)}
-                className={`tap-target-sm rounded-full font-semibold transition active:scale-95 whitespace-nowrap ${
-                  big ? 'px-3 py-2 text-sm sm:px-4 sm:py-2.5 sm:text-base' : 'px-3 py-1.5 text-xs'
-                } ${unit === u ? 'bg-[#C8F542] on-accent' : 'glass text-black/55'}`}>
+              <button key={u} type="button" onClick={() => setUnit(u)} aria-pressed={unit === u}
+                className={`filter-pill tap-target-sm whitespace-nowrap ${big ? '!text-sm sm:!text-base sm:!px-4 sm:!py-2.5' : ''} ${unit === u ? 'seg-on' : 'seg-off glass'}`}>
                 {u}
               </button>
             ))}
@@ -240,42 +234,42 @@ export default function NewStockEntry({
       </div>
 
       {/* Everything the shop can also fill in later */}
-      <button type="button" onClick={() => setMore(m => !m)}
-        className={`tap-target-sm font-semibold text-[#5B7A08] hover:brightness-110 transition ${big ? 'text-base' : 'text-sm'}`}>
-        {more ? '− Skrýt detaily' : '＋ Značka, cena, dodavatel…'}
-      </button>
+      <Button variant="ghost" size={big ? 'md' : 'sm'} iconAfter="chevron" aria-expanded={more}
+        className={more ? '[&_svg]:rotate-180' : ''} onClick={() => setMore(m => !m)}>
+        {more ? 'Skrýt detaily' : 'Značka, cena, dodavatel…'}
+      </Button>
       {more && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className={label}>Značka</label>
-            <input value={brand} onChange={e => setBrand(e.target.value)} className={field} placeholder="Např. Monin" />
+            <label htmlFor="nova-vec-znacka" className={label}>Značka</label>
+            <input id="nova-vec-znacka" value={brand} onChange={e => setBrand(e.target.value)} className={field} placeholder="Např. Monin" />
           </div>
           <div>
-            <label className={label}>Velikost balení</label>
-            <input inputMode="decimal" value={packageSize}
+            <label htmlFor="nova-vec-baleni" className={label}>Velikost balení</label>
+            <input id="nova-vec-baleni" inputMode="decimal" value={packageSize}
               onChange={e => setPackageSize(e.target.value)} className={field} placeholder="0,7" />
           </div>
           {smiCenu && (
             <div>
-              <label className={label}>Cena za kus</label>
-              <input type="number" inputMode="numeric" value={unitCost}
+              <label htmlFor="nova-vec-cena" className={label}>Cena za kus</label>
+              <input id="nova-vec-cena" type="number" inputMode="numeric" value={unitCost}
                 onChange={e => setUnitCost(e.target.value)} className={field} placeholder="Kč" />
             </div>
           )}
           <div>
-            <label className={label}>Odkud je</label>
-            <input value={supplier} onChange={e => setSupplier(e.target.value)} className={field} placeholder="Makro, dodavatel…" />
+            <label htmlFor="nova-vec-dodavatel" className={label}>Odkud je</label>
+            <input id="nova-vec-dodavatel" value={supplier} onChange={e => setSupplier(e.target.value)} className={field} placeholder="Makro, dodavatel…" />
           </div>
         </div>
       )}
 
       <div>
-        <label className={label}>Poznámka pro vedení</label>
-        <input value={note} onChange={e => setNote(e.target.value)} className={field}
+        <label htmlFor="nova-vec-poznamka" className={label}>Poznámka pro vedení</label>
+        <input id="nova-vec-poznamka" value={note} onChange={e => setNote(e.target.value)} className={field}
           placeholder="Např. přivezl dodavatel navíc, zkoušíme" />
       </div>
 
-      {err && <p className={`text-bad-ink ${big ? 'text-base' : 'text-sm'}`}>{err}</p>}
+      {err && <p className="note note-danger" role="alert">{err}</p>}
 
       {added.length > 0 && (
         <p className="note note-ok text-sm">
@@ -286,27 +280,23 @@ export default function NewStockEntry({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => save(true)} disabled={saving || uploading || !name.trim()}
-          title="Uloží a nechá kategorii, jednotku i dodavatele nastavené"
-          className={`rounded-full glass border border-black/10 text-[#16181A] font-semibold hover:bg-black/[0.05] disabled:opacity-40 transition ${
-            big ? 'px-6 py-4 text-lg' : 'px-4 py-3 text-sm'}`}>
-          <Icon name="plus" size={15} className="inline -mt-0.5 mr-1.5" />Uložit a přidat další
-        </button>
-        <button type="submit" disabled={saving || uploading || !name.trim()}
-          className={`flex-1 min-w-[10rem] rounded-full bg-[#16181A] text-white font-bold hover:bg-black disabled:opacity-40 transition ${
-            big ? 'px-6 py-4 text-lg' : 'px-5 py-3 text-sm'}`}>
-          {saving ? 'Zapisuji…' : added.length > 0 ? 'Zapsat a zavřít' : 'Zapsat do skladu'}
-        </button>
+        {/* Potvrzení formuláře je `primary` (DP §3.1) — dřív ručně psaná tmavá pilulka. */}
+        <Button type="submit" variant="primary" size={big ? 'lg' : 'md'} className="flex-1 min-w-[10rem] justify-center"
+          loading={saving} disabled={uploading || !name.trim()}>
+          {added.length > 0 ? 'Zapsat a zavřít' : 'Zapsat do skladu'}
+        </Button>
+        <Button variant="secondary" size={big ? 'lg' : 'md'} icon="plus" disabled={saving || uploading || !name.trim()}
+          title="Uloží a nechá kategorii, jednotku i dodavatele nastavené" onClick={() => save(true)}>
+          Uložit a přidat další
+        </Button>
         {onCancel && (
-          <button type="button" onClick={onCancel} disabled={saving}
-            className={`rounded-full glass text-black/55 font-semibold hover:text-[#16181A] transition ${
-              big ? 'px-6 py-4 text-lg' : 'px-5 py-3 text-sm'}`}>
-            Zrušit
-          </button>
+          <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>Zrušit</Button>
         )}
       </div>
-      <p className={`text-black/40 ${big ? 'text-sm' : 'text-xs'}`}>
-        Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a. Vedení ji jen potvrdí.
+      <p className="t-meta">
+        {ma('sklad.pridat')
+          ? 'Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a.'
+          : 'Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a. Vedení ji jen potvrdí.'}
       </p>
     </form>
   );

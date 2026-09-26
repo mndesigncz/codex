@@ -1,0 +1,46 @@
+{
+ "stranka": "zamestnanec.sklad",
+ "polozky": [
+  {
+   "id": "sklad-inventura",
+   "widget": "sklad.inventura",
+   "velikost": "M"
+  },
+  {
+   "id": "sklad-zapsat-novou",
+   "widget": "sklad.zapsat_novou",
+   "velikost": "S"
+  },
+  {
+   "id": "sklad-nahlasit",
+   "widget": "sklad.nahlasit",
+   "velikost": "S"
+  },
+  {
+   "id": "sklad-dochazi",
+   "widget": "sklad.dochazi",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "sklad.dochazi",
+  "vyroba.k_vyrobe",
+  "sklad.inventura",
+  "sklad.zapsat_novou",
+  "sklad.nahlasit",
+  "sklad.stav_kategorie",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

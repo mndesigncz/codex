@@ -1,0 +1,43 @@
+{
+ "open": {
+  "id": 5,
+  "status": "open",
+  "createdAt": "2026-09-26T07:00:00Z",
+  "completedAt": null,
+  "data": [
+   {
+    "itemId": 1,
+    "name": "Mléko plnotučné",
+    "category": "Mléčné",
+    "unit": "l",
+    "expected": 8,
+    "counted": 8
+   },
+   {
+    "itemId": 2,
+    "name": "Ovesné mléko",
+    "category": "Mléčné",
+    "unit": "l",
+    "expected": 1,
+    "counted": null
+   },
+   {
+    "itemId": 5,
+    "name": "Kelímky 0,4 l",
+    "category": "Obaly",
+    "unit": "ks",
+    "expected": 0,
+    "counted": null
+   }
+  ]
+ },
+ "history": [
+  {
+   "id": 4,
+   "status": "done",
+   "data": [],
+   "createdAt": "2026-08-30T07:00:00Z",
+   "completedAt": "2026-08-30T10:00:00Z"
+  }
+ ]
+}

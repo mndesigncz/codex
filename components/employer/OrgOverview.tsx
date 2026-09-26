@@ -1,141 +1,139 @@
 'use client';
 
-// Všechny podniky na jedné obrazovce — pro vedení řetězce.
+// Všechny podniky na jedné obrazovce — pro vedení řetězce (kolo 69, balík B5b:
+// stránka → plocha s widgety).
 //
 // Stejná čísla, jaká má každý podnik sám v Uzávěrkách, Financích a Skladu,
 // jen vedle sebe a sečtená. Sčítá se jen stejná měna; s korunami a eury
 // vedle sebe přehled řekne, že celek nedává smysl, místo aby ho vymyslel.
+//
+// Co se změnilo (audit „Všechny podniky"):
+//  - součty jsou widget Všechny podniky (organizace.podniky, střední) na ploše;
+//    nástrojem stránky je seznam podniků s „Otevřít" — jde přeskládat i skrýt;
+//  - hlavička: PageHeader, v nadpisu jen „Všechny podniky" (dřív „… · Moje
+//    kavárny" opakoval horní lištu a na telefonu se lámal), organizace
+//    v podtitulku a sdílený MonthNav místo ručních šipek;
+//  - mezi měsícem, součty a kartami podniků bylo 0 px — plocha má space-y-6;
+//  - tržby a mzdy bez oprávnění v podniku (API null) už nejsou „0 Kč", ale „skryto";
+//  - tvary po číslovce přes czCount („0 členů", ne „0 členové"), chipy přes Chip;
+//  - vypnutý přehled je EmptyState s cestou do nastavení, ne holá věta;
+//  - načítání je kostra, ne kolečko uprostřed.
 
-import { useEffect, useState } from 'react';
-import { czCount, czVerb, POLOZKA } from '@/lib/czech';
-import { Icon } from '../Icons';
-import { PageHeader, ErrorState } from '../ui';
-import { okJson, apiMessage } from '@/lib/api';
-import { formatMoney } from '@/lib/money';
+import { useState } from 'react';
+import { czCount, POLOZKA } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
-import type { RadekPodniku, Souhrn } from '@/lib/prehledOrganizace';
+import { Button, Card, Chip, EmptyState, ErrorState, MonthNav, Skeleton, Stat, StatRow } from '../ui';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
+import {
+  CLEN, MesicStrankyOrganizace, Penize, UZAVERKA, urlPrehledu, vyberPrehled, type PrehledOrganizace,
+} from '../widgety/oblasti/organizace';
 
-interface Data { available: boolean; reason?: string; message?: string; month?: string; organization?: { name: string }; teams?: RadekPodniku[]; total?: Souhrn }
-
-const posunMesic = (m: string, o: number) => {
-  const [y, mm] = m.split('-').map(Number);
-  const d = new Date(Date.UTC(y, mm - 1 + o, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-};
-const nazevMesice = (m: string) => new Date(m + '-01T12:00:00Z').toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
-
-export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: number) => Promise<string | null> }) {
-  const [month, setMonth] = useState(() => pragueToday().slice(0, 7));
-  const [data, setData] = useState<Data | null>(null);
-  const [err, setErr] = useState('');
-  const [tick, setTick] = useState(0);
-  /** Jiný měsíc se načítá: karty zůstávají, ale ztlumené — ne nový nadpis nad starými čísly. */
-  const [nacita, setNacita] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    setErr(''); setNacita(true);
-    fetch(`/api/organization/overview?month=${month}`).then(okJson)
-      .then(d => { if (alive) setData(d); })
-      .catch(e => { if (alive) setErr(apiMessage(e, 'Přehled se nenačetl.')); })
-      .finally(() => { if (alive) setNacita(false); });
-    return () => { alive = false; };
-  }, [month, tick]);
-
+/** Nástroj stránky: karta na podnik s čísly a „Otevřít" (přepnutí podniku přes server). */
+function SeznamPodniku({ mesic, onOpenTeam }: { mesic: string; onOpenTeam?: (teamId: number) => Promise<string | null> }) {
+  const nav = useNavigace();
+  const smi = useSmi();
+  const data = useDataWidgetu<PrehledOrganizace>(urlPrehledu(mesic), vyberPrehled);
+  const p = data.data;
   // „Otevřít" přepíná podnik na serveru; když to nevyjde (třeba vlastník
   // organizace není členem toho podniku), řekne se to u seznamu — ne jako
   // „Přehled se nenačetl", který by načtená čísla schoval.
   const [chybaPrepnuti, setChybaPrepnuti] = useState('');
+  const [otevira, setOtevira] = useState<number | null>(null);
   const otevri = async (teamId: number) => {
-    setChybaPrepnuti('');
+    setChybaPrepnuti(''); setOtevira(teamId);
     const chyba = await onOpenTeam?.(teamId);
+    setOtevira(null);
     if (chyba) setChybaPrepnuti(chyba);
   };
 
-  const penize = (n: number, cur: string) => formatMoney(n, cur);
+  if (data.error) return <ErrorState title="Přehled se nenačetl" detail={data.error} onRetry={data.reload} />;
+  if (!p) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-busy>
+        {[0, 1].map(i => <Card key={i}><Skeleton className="h-4 w-40 rounded-full" /><Skeleton className="mt-4 h-16" /></Card>)}
+      </div>
+    );
+  }
+  if (!p.dostupny) {
+    const vNastaveni = p.duvod === 'vypnuto' && nav.smiPohled('team-settings');
+    return (
+      <Card>
+        <EmptyState compact icon="overview" title={p.zprava ?? 'Přehled organizace teď nejde ukázat.'}
+          hint={p.duvod === 'vypnuto' ? 'Zapíná se v Nastavení týmu, v části Organizace.' : undefined}
+          action={vNastaveni ? <Button variant="secondary" icon="settings" onClick={() => nav.onNavigate('team-settings')}>Otevřít nastavení</Button> : undefined} />
+      </Card>
+    );
+  }
+
+  // Řada Tržby / Mzdy se kreslí, když ji divák smí v aktivním podniku, nebo když mu
+  // server aspoň v jednom podniku poslal číslo (klíč má jen jinde). „Skryto" tak zůstane
+  // jen pro smíšený případ; role, která klíč nemá nikde, řadu nevidí vůbec — zamčený
+  // náhled se nekreslí (DP §5.3) a stejně se chová widget nad seznamem.
+  const trzby = smi('finance.trzby') || p.podniky.some(t => t.revenue != null);
+  const mzdy = smi('finance.mzdy') || p.podniky.some(t => t.wages != null);
+  return (
+    <div className="space-y-4">
+      {chybaPrepnuti && <p role="alert" className="note note-danger">{chybaPrepnuti}</p>}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        {p.podniky.map(t => (
+          <Card key={t.teamId} as="article" aria-labelledby={`podnik-${t.teamId}`} data-podnik={t.teamId} className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 id={`podnik-${t.teamId}`} className="t-card truncate">{t.name}</h3>
+                <p className="t-meta">{czCount(t.members, CLEN)} · {czCount(t.closings, UZAVERKA)}</p>
+              </div>
+              {onOpenTeam && (
+                <Button variant="secondary" size="sm" loading={otevira === t.teamId} onClick={() => otevri(t.teamId)}>Otevřít</Button>
+              )}
+            </div>
+            {/* Dvě řady po dvou: čtyři částky vedle sebe se do půlky monitoru nevejdou.
+                Tržby a mzdy podniku, kam role nesmí, posílá API jako null a ukáže se „skryto";
+                rozhoduje server v každém podniku zvlášť. */}
+            {(trzby || mzdy) && (
+              <StatRow>
+                {trzby && <Stat label="Tržby" value={<Penize castka={t.revenue} mena={t.currency} />} />}
+                {mzdy && <Stat label="Mzdy" value={<Penize castka={t.wages} mena={t.currency} />}
+                  note={t.wages != null && t.revenue ? `${Math.round((t.wages / t.revenue) * 100)} % tržeb` : undefined} />}
+              </StatRow>
+            )}
+            <StatRow className={trzby || mzdy ? 'border-t border-[var(--surface-line)] pt-4' : ''}>
+              <Stat label="Na směně" value={t.onShiftNow.toLocaleString('cs-CZ')} />
+              <Stat label="Sklad dochází" value={t.stockAlerts.toLocaleString('cs-CZ')} note={t.stockAlerts > 0 ? czCount(t.stockAlerts, POLOZKA) : undefined} />
+            </StatRow>
+            {(t.missingClosings > 0 || t.pendingApproval > 0) && (
+              <div className="flex flex-wrap gap-2">
+                {t.missingClosings > 0 && <Chip tone="bad" size="sm">chybí {czCount(t.missingClosings, UZAVERKA)}</Chip>}
+                {t.pendingApproval > 0 && <Chip tone="wait" size="sm">{t.pendingApproval.toLocaleString('cs-CZ')} ke schválení</Chip>}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function OrgOverview({ onOpenTeam }: { onOpenTeam?: (teamId: number) => Promise<string | null> }) {
+  const dnes = pragueToday().slice(0, 7);
+  const [mesic, setMesic] = useState(dnes);
+  // Název organizace do podtitulku — stejná URL jako seznam, takže žádný dotaz navíc.
+  const data = useDataWidgetu<PrehledOrganizace>(urlPrehledu(mesic), vyberPrehled);
+  const org = data.data?.organizace;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader hintId="orgoverview" title={data?.organization?.name ? `Všechny podniky · ${data.organization.name}` : 'Všechny podniky'}
-        subtitle="Tržby, mzdy, uzávěrky a sklad za každý podnik — a celkem." />
-
-      {err && <ErrorState title="Přehled se nenačetl" hint={err} onRetry={() => setTick(t => t + 1)} />}
-
-      {data && !data.available && (
-        <div className="glass-card p-8 text-center space-y-2">
-          <Icon name="box" size={28} className="mx-auto text-black/30" />
-          <p className="text-sm text-black/60">{data.message}</p>
-          {data.reason === 'vypnuto' && <p className="text-xs text-black/40">Zapíná se v Nastavení týmu → Organizace.</p>}
-        </div>
-      )}
-
-      {data?.available && data.teams && data.total && !err && (
-        <div className={nacita ? 'opacity-50 pointer-events-none transition-opacity' : 'transition-opacity'} aria-busy={nacita}>
-          {chybaPrepnuti && <p role="alert" className="note note-danger mb-3">{chybaPrepnuti}</p>}
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setMonth(m => posunMesic(m, -1))} aria-label="Předchozí měsíc" className="btn-icon"><Icon name="chevron" size={16} className="rotate-90" /></button>
-            <p className="font-semibold text-[#16181A] cz-sentence min-w-[10rem] text-center">{nazevMesice(month)}</p>
-            <button type="button" onClick={() => setMonth(m => posunMesic(m, 1))} aria-label="Další měsíc" className="btn-icon"><Icon name="chevron" size={16} className="-rotate-90" /></button>
-          </div>
-
-          {/* Celek */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="glass-card rounded-3xl p-4">
-              <p className="t-label text-black/45">Tržby celkem</p>
-              <p className="text-2xl font-bold tabular-nums text-[#16181A] mt-1">
-                {data.total.currency ? penize(data.total.revenue, data.total.currency) : <span className="text-base text-black/45">různé měny</span>}
-              </p>
-            </div>
-            <div className="glass-card rounded-3xl p-4">
-              <p className="t-label text-black/45">Mzdy celkem</p>
-              <p className="text-2xl font-bold tabular-nums text-[#16181A] mt-1">
-                {data.total.currency ? penize(data.total.wages, data.total.currency) : <span className="text-base text-black/45">různé měny</span>}
-              </p>
-              {data.total.laborPct != null && <p className="text-xs text-black/45 mt-0.5">{data.total.laborPct} % tržeb</p>}
-            </div>
-            <div className={`glass-card rounded-3xl p-4 ${data.total.missingClosings > 0 ? 'card-danger' : ''}`}>
-              <p className="t-label text-black/45">Chybí uzávěrka</p>
-              <p className="text-2xl font-bold tabular-nums text-[#16181A] mt-1">{data.total.missingClosings}</p>
-              {data.total.pendingApproval > 0 && <p className="text-xs text-wait-ink mt-0.5">{data.total.pendingApproval} ke schválení</p>}
-            </div>
-            <div className="glass-card rounded-3xl p-4">
-              <p className="t-label text-black/45">Právě na směně</p>
-              <p className="text-2xl font-bold tabular-nums text-[#16181A] mt-1">{data.total.onShiftNow}</p>
-              {data.total.stockAlerts > 0 && <p className="text-xs text-wait-ink mt-0.5">{czCount(data.total.stockAlerts, POLOZKA)} {czVerb(data.total.stockAlerts, 'dochází', 'docházejí')}</p>}
-            </div>
-          </div>
-
-          {/* Po podniku */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {data.teams.map(t => (
-              <div key={t.teamId} className="glass-card p-5 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="t-card truncate">{t.name}</h3>
-                    <p className="text-xs text-black/45">{t.members} {t.members === 1 ? 'člen' : t.members < 5 ? 'členové' : 'členů'} · {t.closings} {t.closings === 1 ? 'uzávěrka' : t.closings < 5 ? 'uzávěrky' : 'uzávěrek'}</p>
-                  </div>
-                  {onOpenTeam && (
-                    <button type="button" onClick={() => otevri(t.teamId)} className="btn btn-secondary btn-sm shrink-0">Otevřít</button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  <div><p className="t-label text-black/45">Tržby</p><p className="font-bold tabular-nums">{penize(t.revenue, t.currency)}</p></div>
-                  <div><p className="t-label text-black/45">Mzdy</p><p className="font-bold tabular-nums">{penize(t.wages, t.currency)}{t.revenue > 0 && <span className="ml-1 text-xs font-normal text-black/45">{Math.round((t.wages / t.revenue) * 100)} %</span>}</p></div>
-                  <div><p className="t-label text-black/45">Na směně</p><p className="font-bold tabular-nums">{t.onShiftNow}</p></div>
-                  <div><p className="t-label text-black/45">Sklad dochází</p><p className={`font-bold tabular-nums ${t.stockAlerts > 0 ? 'text-wait-ink' : ''}`}>{t.stockAlerts}</p></div>
-                </div>
-                {(t.missingClosings > 0 || t.pendingApproval > 0) && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {t.missingClosings > 0 && <span className="chip chip-sm bg-bad/15 text-bad-ink">chybí {t.missingClosings} {t.missingClosings === 1 ? 'uzávěrka' : t.missingClosings < 5 ? 'uzávěrky' : 'uzávěrek'}</span>}
-                    {t.pendingApproval > 0 && <span className="chip chip-sm bg-wait/15 text-wait-ink">{t.pendingApproval} ke schválení</span>}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {!data && !err && <div className="flex items-center justify-center h-40"><div className="spinner" /></div>}
-    </div>
+    <MesicStrankyOrganizace.Provider value={mesic}>
+      <PlochaWidgetu
+        stranka="vedeni.vsechny_podniky"
+        hlavicka={{
+          title: 'Všechny podniky',
+          subtitle: org ? `${org} · tržby, mzdy, uzávěrky a sklad za každý podnik i celkem.` : 'Tržby, mzdy, uzávěrky a sklad za každý podnik i celkem.',
+          hintId: 'orgoverview',
+          aside: <MonthNav value={mesic} onChange={setMesic} max={dnes} />,
+        }}
+        nastroj={<SeznamPodniku mesic={mesic} onOpenTeam={onOpenTeam} />}
+      />
+    </MesicStrankyOrganizace.Provider>
   );
 }

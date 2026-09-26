@@ -24,6 +24,8 @@ import { dbTimeHM, dbTimeDayHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { openPrint, esc } from '@/lib/printDoc';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import { Avatar, Button, Chip } from '../ui';
+import { useSmi } from '../widgety/NavigaceKontext';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -61,8 +63,8 @@ const hours = (min: number | null) =>
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="pt-5 first:pt-0">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2.5">{title}</h3>
-      {hint && <p className="text-xs text-black/45 -mt-1.5 mb-2.5">{hint}</p>}
+      <h3 className="t-label mb-2.5">{title}</h3>
+      {hint && <p className="t-meta -mt-1.5 mb-2.5">{hint}</p>}
       {children}
     </section>
   );
@@ -89,8 +91,11 @@ function Row({ label, value, tone }: { label: string; value: React.ReactNode; to
   );
 }
 
-export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: {
+export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, mazatVlastni }: {
   id: number; onClose: () => void; onChanged?: () => void; payDailyCash?: boolean;
+  /** Otevřeno z widgetu Moje uzávěrky (jen vlastní uzávěrky): smazat smí i autor
+   *  s uzaverky.mazat_vlastni — server to ověří znovu. */
+  mazatVlastni?: boolean;
 }) {
   const money = useMoney();
   const symbol = useSymbol();
@@ -160,9 +165,16 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
     setPrintFailed(!ok);
   };
 
+  // Smazání se potvrzuje v patičce okna (dřív confirm() prohlížeče). Modal
+  // by tu byl okno nad oknem — detail sám je překryv nad stránkou.
+  const [potvrdSmazani, setPotvrdSmazani] = useState(false);
+  const smi = useSmi();
+  const smiSchvalit = smi('uzaverky.schvalovat');
+  // Cizí uzávěrku maže jen vedení (uzaverky.mazat); vlastní i autor, když detail
+  // otevřel z widgetu Moje uzávěrky (tam jsou jen jeho uzávěrky).
+  const smiSmazat = smi('uzaverky.mazat') || (!!mazatVlastni && smi('uzaverky.mazat_vlastni'));
   const remove = async () => {
     if (!c) return;
-    if (!confirm(`Smazat uzávěrku z ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ')}? Tohle nejde vrátit.`)) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/closings/${id}`, { method: 'DELETE' });
@@ -203,10 +215,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           </div>
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {c && !c.covered_by && (
-              <span className={`tap-target-sm text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
-                diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'}`}>
+              // Stav rozdílu jako Chip (tóny ze stavových tokenů, i v tmavém režimu) —
+              // dřív ručně psaná pilulka s hexy mimo tokeny.
+              <Chip tone={diff === 0 ? 'ok' : diff > 0 ? 'info' : 'bad'} className="tabular-nums">
                 {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
-              </span>
+              </Chip>
             )}
             <button onClick={modal.guard.attemptClose} aria-label="Zavřít"
               className="tap-target h-9 w-9 flex items-center justify-center rounded-full text-black/40 hover:text-[#16181A] hover:bg-black/[0.06] transition-colors">
@@ -350,7 +363,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                       const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
                       return (
                         <div key={i} className="flex items-center gap-2.5 py-2 text-sm">
-                          <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-black/40 w-24">{movementLabel(m.kind)}</span>
+                          <span className="t-label shrink-0 w-24">{movementLabel(m.kind)}</span>
                           <span className="min-w-0 flex-1 text-black/60">{m.note || '—'}</span>
                           <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
                         </div>
@@ -387,15 +400,15 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 <Section title="Předávka další směně">
                   <div className="space-y-2.5">
                     {c.handover.todo && (
-                      <div><p className="text-[11px] font-semibold uppercase tracking-wider text-black/40">Zbývá udělat</p>
+                      <div><p className="t-label">Zbývá udělat</p>
                         <p className="text-sm text-[#16181A] whitespace-pre-wrap">{c.handover.todo}</p></div>
                     )}
                     {c.handover.runningOut && (
-                      <div><p className="text-[11px] font-semibold uppercase tracking-wider text-black/40">Dochází</p>
+                      <div><p className="t-label">Dochází</p>
                         <p className="text-sm text-[#16181A] whitespace-pre-wrap">{c.handover.runningOut}</p></div>
                     )}
                     {c.handover.message && (
-                      <div><p className="text-[11px] font-semibold uppercase tracking-wider text-black/40">Vzkaz</p>
+                      <div><p className="t-label">Vzkaz</p>
                         <p className="text-sm text-[#16181A] whitespace-pre-wrap">{c.handover.message}</p></div>
                     )}
                   </div>
@@ -415,14 +428,14 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   {d.crew.map(p => (
                     <PersonLink key={p.id} id={p.id}
                       className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
-                      <span>{p.avatar ?? '👤'}</span>{p.name}
+                      <Avatar emoji={p.avatar} size="xs" ring={false} />{p.name}
                       {p.id === c.created_by && <span className="opacity-70">· vyplnil/a</span>}
                     </PersonLink>
                   ))}
                   {d.covered.map(cv => (
                     <PersonLink key={cv.id} id={cv.employeeId}
                       className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
-                      <span>{cv.avatar ?? '👤'}</span>{cv.name ?? 'Neznámý'}
+                      <Avatar emoji={cv.avatar} size="xs" ring={false} />{cv.name ?? 'Neznámý'}
                       {payDailyCash && cv.selfPayout > 0 && <span className="opacity-70">· výplata {money(cv.selfPayout)}</span>}
                     </PersonLink>
                   ))}
@@ -431,7 +444,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                   <div className="divide-y divide-black/[0.06]">
                     {d.attendance.map(a => (
                       <div key={a.id} className="flex items-center gap-2.5 py-2 text-sm">
-                        <span className="shrink-0">{a.employee?.avatar ?? '👤'}</span>
+                        <Avatar emoji={a.employee?.avatar} size="xs" ring={false} />
                         <span className="min-w-0 flex-1 truncate text-[#16181A]">{a.employee?.name ?? 'Neznámý'}</span>
                         <span className="shrink-0 text-black/45 tabular-nums text-[13px] whitespace-nowrap">
                           {hhmm(a.clockIn)}–{a.clockOut ? hhmm(a.clockOut) : 'běží'}
@@ -453,7 +466,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 ))}
                 {d.planned.length > 0 && (
                   <div className="mt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 mb-1.5">Podle rozvrhu</p>
+                    <p className="t-label mb-1.5">Podle rozvrhu</p>
                     <div className="flex flex-wrap gap-1.5">
                       {d.planned.map((p, i) => (
                         <span key={i} className="chip chip-muted">
@@ -475,7 +488,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                             className={`shrink-0 ${p.status === 'completed' ? 'text-[#5B7A08]' : 'text-black/30'}`} />
                           <span className="min-w-0 flex-1 truncate text-[#16181A]">
                             {p.name}
-                            {p.required && <span className="ml-1.5 text-[11px] font-bold uppercase tracking-wider text-black/35">povinný</span>}
+                            {p.required && <Chip tone="muted" size="sm" className="ml-1.5">povinný</Chip>}
                           </span>
                           <span className="shrink-0 text-black/45 text-[13px] tabular-nums whitespace-nowrap">
                             {p.done}/{p.total} · {p.employee?.name ?? '—'} · {hhmm(p.completedAt)}
@@ -546,7 +559,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
                 </div>
                 {c.review_note && (
                   <div className="mt-2 well border border-black/[0.06] p-3.5">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-black/40 mb-0.5">Poznámka vedení</p>
+                    <p className="t-label mb-0.5">Poznámka vedení</p>
                     <p className="text-sm text-black/65 whitespace-pre-wrap">{c.review_note}</p>
                   </div>
                 )}
@@ -561,25 +574,23 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           </p>
         )}
         {c && (
-          <div className="dock-strong shrink-0 px-5 sm:px-6 py-3 border-t border-black/[0.07] flex items-center gap-2">
-            {c.approved === false && (
-              <button onClick={approve} disabled={busy}
-                className="btn btn-primary hover:opacity-90 transition disabled:opacity-50">
-                {busy ? 'Schvaluji…' : 'Schválit uzávěrku'}
-              </button>
+          <div className="dock-strong shrink-0 px-5 sm:px-6 py-3 border-t border-black/[0.07] flex flex-wrap items-center gap-2">
+            {potvrdSmazani ? (
+              <>
+                <p className="text-sm text-[#16181A] min-w-0 flex-1">Smazat uzávěrku? Tohle nejde vrátit.</p>
+                <Button variant="secondary" size="sm" onClick={() => setPotvrdSmazani(false)}>Zrušit</Button>
+                <Button variant="danger-solid" size="sm" icon="trash" loading={busy} onClick={remove}>Smazat</Button>
+              </>
+            ) : (
+              <>
+                {c.approved === false && smiSchvalit && (
+                  <Button variant="primary" icon="check" loading={busy} onClick={approve}>Schválit uzávěrku</Button>
+                )}
+                <Button variant="secondary" icon="print" onClick={print}>Vytisknout</Button>
+                {smiSmazat && <Button variant="danger" onClick={() => setPotvrdSmazani(true)} disabled={busy}>Smazat</Button>}
+                <Button variant="secondary" onClick={onClose} className="ml-auto">Zavřít</Button>
+              </>
             )}
-            <button onClick={print}
-              className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition">
-              Vytisknout
-            </button>
-            <button onClick={remove} disabled={busy}
-              className="rounded-full text-bad-ink px-4 py-2.5 text-sm font-medium hover:bg-bad/[0.07] transition disabled:opacity-50">
-              Smazat
-            </button>
-            <button onClick={onClose}
-              className="ml-auto rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition">
-              Zavřít
-            </button>
           </div>
         )}
       </div>

@@ -1,0 +1,37 @@
+{
+ "stranka": "zamestnanec.uzaverka",
+ "polozky": [
+  {
+   "id": "uzaverky-moje-uzaverka",
+   "widget": "uzaverky.moje_uzaverka",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "uzaverky-moje-historie",
+   "widget": "uzaverky.moje_historie",
+   "velikost": "L"
+  },
+  {
+   "id": "uzaverky-predavka",
+   "widget": "uzaverky.predavka",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "uzaverky.moje_uzaverka",
+  "uzaverky.moje_historie",
+  "uzaverky.predavka"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

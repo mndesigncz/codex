@@ -1,0 +1,124 @@
+{
+ "connected": true,
+ "from": "DNES",
+ "to": "DNES",
+ "today": "DNES",
+ "placeName": "Kavárna Vinohrady",
+ "menuError": null,
+ "lastSyncAt": "2026-09-26T10:05:00Z",
+ "totals": {
+  "bills": 128,
+  "total": 21480,
+  "cash": 7400,
+  "card": 13080,
+  "other": 1000,
+  "tips": 860,
+  "tipsCash": 300,
+  "tipsCard": 560,
+  "discounts": 0,
+  "refundCount": 1,
+  "refundTotal": 120,
+  "methods": [
+   {
+    "id": "meal",
+    "label": "stravenky",
+    "amount": 1000
+   }
+  ],
+  "avgBill": 168,
+  "soldQty": 342,
+  "productRevenue": 21100
+ },
+ "days": [
+  {
+   "day": "DNES",
+   "bills": 128,
+   "cash": 7400,
+   "card": 13080,
+   "other": 1000,
+   "total": 21480,
+   "tips": 860,
+   "tipsCash": 300,
+   "tipsCard": 560,
+   "discounts": 0,
+   "refundCount": 1,
+   "refundTotal": 120,
+   "persons": 0,
+   "closings": 0,
+   "declared": null,
+   "diff": null
+  }
+ ],
+ "hours": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  420,
+  1800,
+  2600,
+  2200,
+  1900,
+  3100,
+  2800,
+  1500,
+  1200,
+  1400,
+  1300,
+  900,
+  260,
+  0,
+  0,
+  0,
+  0
+ ],
+ "byPerson": [
+  {
+   "name": "Eva Nováková",
+   "total": 12400,
+   "bills": 71
+  },
+  {
+   "name": "Petr Malý",
+   "total": 9080,
+   "bills": 57
+  }
+ ],
+ "items": [
+  {
+   "productId": "p1",
+   "name": "Flat white",
+   "category": "Káva",
+   "qty": 64,
+   "price": 85,
+   "revenue": 5440
+  },
+  {
+   "productId": "p2",
+   "name": "Croissant",
+   "category": "Pečivo",
+   "qty": 41,
+   "price": 55,
+   "revenue": 2255
+  },
+  {
+   "productId": "p3",
+   "name": "Matcha latte",
+   "category": "Čaj",
+   "qty": 22,
+   "price": null,
+   "revenue": null
+  }
+ ],
+ "notes": [
+  {
+   "tone": "warn",
+   "title": "1 položka nemá cenu",
+   "text": "Matcha latte chybí cena v menu pokladny."
+  }
+ ],
+ "note": "Účtenky vystavené do 6:00 patří k předchozímu dni."
+}

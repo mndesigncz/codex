@@ -89,10 +89,12 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
   };
 
   return (
-    <div className="rounded-2xl bg-white/70 border border-[#C8F542]/40 p-4 space-y-3 rise-in">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#5B7A08] flex items-center gap-1.5">
-        <Icon name="plus" size={13} /> Nová surovina do skladu
-      </p>
+    <div className="well p-4 space-y-3 rise-in">
+      {/* Neutrální jamka s nadpisem (kolo 69, audit Receptur) — dřív limetkový
+          rámeček a limetkový štítek verzálkami. */}
+      <h3 className="t-card flex items-center gap-2">
+        <Icon name="plus" size={15} className="text-black/40" /> Nová surovina do skladu
+      </h3>
 
       <input value={name} onChange={e => setName(e.target.value)} autoFocus
         placeholder="Např. Blue Curaçao" className={field} />

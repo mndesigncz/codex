@@ -1,0 +1,47 @@
+[
+ {
+  "id": 1,
+  "name": "Mléčné",
+  "position": 1,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 2,
+  "name": "Sirupy",
+  "position": 2,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 3,
+  "name": "Suroviny",
+  "position": 3,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 4,
+  "name": "Obaly",
+  "position": 4,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ },
+ {
+  "id": 5,
+  "name": "Alkohol",
+  "position": 5,
+  "parentId": null,
+  "zOrganizace": false,
+  "sdileno": false,
+  "spravuje": null
+ }
+]

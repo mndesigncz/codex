@@ -1,0 +1,96 @@
+{
+ "closings": [
+  {
+   "id": 503,
+   "team_id": 1,
+   "created_by": 16,
+   "date": "PRED3",
+   "shift_date": "PRED3",
+   "shift_label": "8:00–16:00",
+   "opening_cash": 2000,
+   "cash_revenue": 12400,
+   "card_revenue": 8600,
+   "tips": 300,
+   "tips_card": 0,
+   "expenses": 0,
+   "cash_removed": 0,
+   "self_payout": 0,
+   "closing_cash": 14450,
+   "customers": 86,
+   "notes": null,
+   "approved": true,
+   "covered_by": null,
+   "author_name": "Eva Testová",
+   "author_avatar": "🙂",
+   "event_title": null,
+   "movements": [],
+   "denominations": {},
+   "shiftEmployees": [
+    {
+     "id": 16,
+     "name": "Eva Testová",
+     "avatar": "🙂"
+    }
+   ],
+   "final_removal": 0,
+   "created_at": "PRED3T16:05:00Z"
+  },
+  {
+   "id": 505,
+   "team_id": 1,
+   "created_by": 16,
+   "date": "PRED5",
+   "shift_date": "PRED5",
+   "shift_label": "8:00–16:00",
+   "opening_cash": 2000,
+   "cash_revenue": 12400,
+   "card_revenue": 8600,
+   "tips": 300,
+   "tips_card": 0,
+   "expenses": 0,
+   "cash_removed": 0,
+   "self_payout": 0,
+   "closing_cash": 14400,
+   "customers": 86,
+   "notes": null,
+   "approved": false,
+   "covered_by": null,
+   "author_name": "Eva Testová",
+   "author_avatar": "🙂",
+   "event_title": null,
+   "movements": [],
+   "denominations": {},
+   "shiftEmployees": [
+    {
+     "id": 16,
+     "name": "Eva Testová",
+     "avatar": "🙂"
+    }
+   ],
+   "final_removal": 0,
+   "created_at": "PRED5T16:05:00Z"
+  }
+ ],
+ "suggestedDate": "DNES",
+ "canSeeAll": false,
+ "payDailyCash": false,
+ "payoutFromRegister": true,
+ "tipsInDrawer": false,
+ "requiresShift": true,
+ "isEmployer": false,
+ "isKiosk": false,
+ "eligibleShifts": [
+  {
+   "id": 901,
+   "date": "PREDEVCIREM",
+   "startTime": "14:00",
+   "endTime": "22:00",
+   "type": "normal"
+  }
+ ],
+ "members": [],
+ "scheduledByDate": {},
+ "missingClosings": [],
+ "missingToday": null,
+ "meId": 16
+}

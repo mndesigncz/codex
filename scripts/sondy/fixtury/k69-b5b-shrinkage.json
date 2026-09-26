@@ -1,0 +1,66 @@
+{
+ "ready": true,
+ "stocktake": {
+  "id": 3,
+  "completedAt": "2026-09-20T18:00:00Z",
+  "items": 40,
+  "counted": 38
+ },
+ "since": null,
+ "totals": {
+  "lostValue": -1840,
+  "surplusValue": 210,
+  "netValue": -1630,
+  "missing": 3,
+  "surplus": 1
+ },
+ "rows": [
+  {
+   "itemId": 1,
+   "name": "Káva Brazílie 1 kg",
+   "category": "Káva",
+   "unit": "ks",
+   "qtyDiff": -1,
+   "openDiff": null,
+   "diff": -1,
+   "diffUnit": "ks",
+   "sold": null,
+   "lossPct": null,
+   "value": -1200
+  },
+  {
+   "itemId": 2,
+   "name": "Mléko plnotučné",
+   "category": "Mléko",
+   "unit": "l",
+   "qtyDiff": -16,
+   "openDiff": null,
+   "diff": -16,
+   "diffUnit": "l",
+   "sold": 320,
+   "lossPct": 5,
+   "value": -480
+  },
+  {
+   "itemId": 3,
+   "name": "Sirup Monin vanilka",
+   "category": "Sirupy",
+   "unit": "ks",
+   "qtyDiff": 1,
+   "openDiff": null,
+   "diff": 1,
+   "diffUnit": "ks",
+   "sold": null,
+   "lossPct": null,
+   "value": 210
+  }
+ ],
+ "insights": [
+  {
+   "icon": "warning",
+   "tone": "warn",
+   "title": "Mléko mizí rychleji, než se prodává",
+   "text": "5 % z prodaného."
+  }
+ ]
+}

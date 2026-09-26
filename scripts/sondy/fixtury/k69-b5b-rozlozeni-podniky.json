@@ -1,0 +1,26 @@
+{
+ "stranka": "vedeni.vsechny_podniky",
+ "polozky": [
+  {
+   "id": "podniky",
+   "widget": "organizace.podniky",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "organizace.podniky",
+  "finance.souhrn_mesice"
+ ],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}
