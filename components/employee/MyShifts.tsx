@@ -1,214 +1,205 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { pragueToday } from '@/lib/pragueTime';
-import TeamSchedule from './TeamSchedule';
+// Moje směny (vedení i zaměstnanec) — plocha s widgety a nadcházející směny
+// jako hlavní nástroj (kolo 69, balík B1, spec §6.2).
+//
+// Do kola 68 tu natvrdo stály tři karty-dlaždice s číslem 30 px a limetkovým
+// proužkem, „Kdo má směnu" (TeamSchedule), modré pilulky schváleného volna,
+// seznam nadcházejících směn s dnešním řádkem tónovaným limetkou a minulé
+// směny s „★ 4/5". Každý blok si volal vlastní fetch (/api/shifts,
+// /api/timeoff, /api/rewards) a výpadek skončil prázdnem, které vypadalo jako
+// „žádné směny". Bloky jsou teď widgety (components/widgety/oblasti/
+// moje-smeny.tsx a rozvrh.tsx) se svým dotazem; tady zůstal seznam
+// nadcházejících směn s exportem do kalendáře a nabídkou směny do burzy —
+// ta dřív žila ve zvláštní kartě pod stránkou (ShiftSwap) a člověk musel
+// směnu hledat podruhé.
+//
+// Seznam bere /api/shifts?employeeId přes useDataWidgetu, ne vlastním
+// fetchem: widgety Moje směny v číslech a Minulé směny čtou tutéž URL, takže
+// je to na stránku jeden dotaz a po schválené výměně se srovná všechno naráz.
+//
+// Vedení i zaměstnanec mají stejnou komponentu, ale jinou stránku plochy
+// (vedeni.moje_smeny / zamestnanec.moje_smeny) — pozná se podle cesty
+// (/employer vs /employee), protože layouty patří jinému balíku a props
+// nepředávají.
 
-import { Icon } from '../Icons';
-import { PageHeader } from '../ui';
-import { okJson } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { Button, Card, Chip, EmptyState, ErrorState, Field, ListRow, Menu, Modal, Skeleton, Textarea } from '../ui';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { apiMessage, okJson } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
-interface Shift {
-  id: number;
-  employeeId: number;
-  date: string;
-  startTime: string;
-  endTime: string;
-  type: string;
-  typeLabel?: string;
-  typeColor?: string;
-}
+import { pragueToday } from '@/lib/pragueTime';
+import { czCount, SMENA } from '@/lib/czech';
+import {
+  UDALOST_ZMENA, den, denKratce, hm, kategorieBarvy, nadchazejiciSmeny, popisekTypu,
+  type MojeSmena, type NabidkaSmeny,
+} from '@/lib/rozvrhPrehled';
 
 interface Props {
   user: { id?: string; name?: string | null };
 }
 
+const URL_BURZA = '/api/shifts/offers';
+/** Kolik nadcházejících směn ukázat, než se seznam rozbalí. */
+const NA_ZACATEK = 8;
+
+function vyberSmeny(raw: any): MojeSmena[] {
+  if (!Array.isArray(raw)) throw new Error('Směny přišly v nečekaném tvaru.');
+  return raw;
+}
+function vyberBurzu(raw: any): NabidkaSmeny[] {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.offers)) throw new Error('Burza přišla v nečekaném tvaru.');
+  return raw.offers;
+}
+
 export default function MyShifts({ user }: Props) {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Ratings from shift reviews, keyed by date — shown instead of a made-up „Splněno" badge.
-  const [ratingByDate, setRatingByDate] = useState<Record<string, number>>({});
-  // Approved holidays — they belong right next to the shifts they carve out.
-  const [timeOff, setTimeOff] = useState<{ fromDate: string; toDate: string; type?: string }[]>([]);
-
+  const zamestnanec = (usePathname() ?? '').startsWith('/employee');
+  const smi = useSmi();
   const userId = parseInt(user.id ?? '0');
+  const urlSmen = userId ? `/api/shifts?employeeId=${userId}` : null;
+  const smeny = useDataWidgetu(urlSmen, vyberSmeny);
+  // Burza jen s rozvrh.burza (jde podniku vypnout) — stejná URL jako widget Výměny směn.
+  const smiBurza = smi('rozvrh.burza');
+  const burza = useDataWidgetu(smiBurza ? URL_BURZA : null, vyberBurzu);
+  const [vse, setVse] = useState(false);
+  const [nabidnout, setNabidnout] = useState<MojeSmena | null>(null);
+  const [poznamka, setPoznamka] = useState('');
+  const [odesilam, setOdesilam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const [hotovo, setHotovo] = useState<string | null>(null);
 
+  // Schválená výměna ve widgetu přepsala směnu — seznam se obnoví.
   useEffect(() => {
-    if (!userId) return;
-    fetch(`/api/shifts?employeeId=${userId}`)
-      .then(okJson)
-      .then(data => { if (Array.isArray(data)) setShifts(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [userId]);
+    if (!urlSmen) return;
+    const zmena = () => obnovDataWidgetu(urlSmen);
+    window.addEventListener(UDALOST_ZMENA, zmena);
+    return () => window.removeEventListener(UDALOST_ZMENA, zmena);
+  }, [urlSmen]);
 
-  useEffect(() => {
-    fetch('/api/timeoff').then(okJson).then(d => {
-      const today = pragueToday();
-      setTimeOff((Array.isArray(d?.requests) ? d.requests : [])
-        .filter((r: any) => r.status === 'approved' && r.toDate >= today)
-        .sort((a: any, b: any) => a.fromDate.localeCompare(b.fromDate)));
-    }).catch(() => {});
-    fetch('/api/rewards').then(okJson).then(d => {
-      const map: Record<string, number> = {};
-      (Array.isArray(d?.reviews) ? d.reviews : []).forEach((r: any) => {
-        const day = String(r.work_date ?? '').slice(0, 10);
-        if (day && Number(r.rating) > 0) map[day] = Number(r.rating);
-      });
-      setRatingByDate(map);
-    }).catch(() => {});
-  }, []);
+  const dnes = pragueToday();
+  const nadchazejici = useMemo(() => nadchazejiciSmeny(smeny.data ?? [], dnes), [smeny.data, dnes]);
+  // Směny, které už v burze visí (nabídnuté nebo převzaté a čekají) — podruhé nabídnout nejdou.
+  const vBurze = useMemo(() => new Set((burza.data ?? [])
+    .filter(o => o.status === 'open' || o.status === 'claimed').map(o => Number(o.shiftId))), [burza.data]);
 
-  const today = pragueToday();
-  const upcoming = shifts.filter(s => s.date >= today).sort((a, b) => a.date.localeCompare(b.date));
-  const past = shifts.filter(s => s.date < today).sort((a, b) => b.date.localeCompare(a.date));
-
-  // The shift already carries its own times, so there is no reason to guess 8h.
-  // An overnight shift (22:00–06:00) wraps past midnight and must not come out
-  // negative.
-  const hoursOf = (s: Shift) => {
-    const [sh, sm] = (s.startTime ?? '').split(':').map(Number);
-    const [eh, em] = (s.endTime ?? '').split(':').map(Number);
-    if ([sh, sm, eh, em].some(n => !Number.isFinite(n))) return 0;
-    const mins = (eh * 60 + em) - (sh * 60 + sm);
-    return (mins <= 0 ? mins + 24 * 60 : mins) / 60;
-  };
-  const sumHours = (list: Shift[]) => list.reduce((n, s) => n + hoursOf(s), 0);
-
-  const workedHours = sumHours(past);
-  const totalHours = sumHours(shifts);
-  const fmtHours = (h: number) =>
-    Number.isInteger(h) ? `${h}` : h.toFixed(1).replace('.', ',');
-
-  const formatDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'short' });
-
-  // Prefer the server-resolved configured type name; fall back to legacy labels.
-  const shiftLabel = (s: Shift) => s.type === 'event' ? 'Akce' : (s.typeLabel ?? (s.type === 'morning' ? 'Ranní' : s.type === 'afternoon' ? 'Odpolední' : 'Směna'));
-
-  // Směny do kalendáře. Soubor skládá `lib/ics` — dřív se tady lepil ručně
-  // a chyběl mu `DTSTAMP` i popis pásma, takže Outlook ho odmítl a klient,
-  // co nezná `Europe/Prague`, ukázal ranní směnu o dvě hodiny jinde.
+  // Směny do kalendáře. Soubor skládá `lib/ics` — dřív se lepil ručně a chyběl
+  // mu `DTSTAMP` i popis pásma, takže ho Outlook odmítl.
   const exportIcs = () => {
-    const ics = buildIcs(upcoming.map(s => ({
+    const ics = buildIcs(nadchazejici.map(s => ({
       uid: `managero-shift-${s.id}@managero`,
-      date: s.date,
-      startTime: s.startTime || '08:00',
-      endTime: s.endTime || '16:00',
-      summary: `${shiftLabel(s)} — Managero`,
-      description: s.startTime && s.endTime ? `${s.startTime}–${s.endTime}` : null,
+      date: den(s.date),
+      startTime: hm(s.startTime ?? s.start_time) || '08:00',
+      endTime: hm(s.endTime ?? s.end_time) || '16:00',
+      summary: `${popisekTypu(s)} — Managero`,
+      description: s.startTime && s.endTime ? `${hm(s.startTime)}–${hm(s.endTime)}` : null,
     })), '-//Managero//Smeny//CS');
     downloadIcs('moje-smeny.ics', ics);
   };
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto w-full">
-      <PageHeader hintId="myshifts" title="Moje směny" subtitle="Co tě čeká a co už máš odpracované." />
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
-          <p className="t-label">Nadcházející</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{upcoming.length}</p>
-          <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
-            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${shifts.length ? Math.min(100, (upcoming.length / shifts.length) * 100) : 0}%` }} />
-          </div>
-        </div>
-        <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
-          <p className="t-label">Odpracované</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2 tabular-nums">{fmtHours(workedHours)} h</p>
-          <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
-            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: `${totalHours ? Math.min(100, (workedHours / totalHours) * 100) : 0}%` }} />
-          </div>
-        </div>
-        <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
-          <p className="t-label">Celkem směn</p>
-          <p className="text-3xl font-bold tracking-tight text-[#16181A] mt-2">{shifts.length}</p>
-          <div className="mt-3 h-1 rounded-full bg-black/[0.06] overflow-hidden">
-            <div className="h-1 rounded-full bg-[#C8F542]" style={{ width: shifts.length ? '100%' : '0%' }} />
-          </div>
-        </div>
-      </div>
+  const odeslatNabidku = async () => {
+    if (!nabidnout) return;
+    setOdesilam(true); setChyba(null);
+    try {
+      const res = await fetch(URL_BURZA, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shiftId: nabidnout.id, note: poznamka.trim() || undefined }),
+      });
+      await okJson(res);
+      obnovDataWidgetu(URL_BURZA);
+      setHotovo(`Směna ${denKratce(den(nabidnout.date), dnes).toLowerCase()} je v burze. Kolegové dostali upozornění.`);
+      setNabidnout(null); setPoznamka('');
+    } catch (e) {
+      setChyba(apiMessage(e, 'Směnu se nepodařilo nabídnout — zkus to znovu.'));
+    }
+    setOdesilam(false);
+  };
 
-      {/* Kdo má kdy směnu — vidí se jen když to vedení nechá zapnuté. */}
-      <TeamSchedule />
-
-      {timeOff.length > 0 && (
-        <div className="glass-card p-5">
-          <p className="t-label mb-2.5"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Schválené volno</p>
-          <div className="flex flex-wrap gap-2">
-            {timeOff.map((t, i) => {
-              const one = t.fromDate === t.toDate;
-              const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
-              return (
-                <span key={i} className="rounded-full bg-[#0A84FF]/10 text-[#0A5CC0] px-3.5 py-1.5 text-sm font-medium whitespace-nowrap">
-                  {one ? fmt(t.fromDate) : `${fmt(t.fromDate)} – ${fmt(t.toDate)}`}
-                </span>
-              );
-            })}
+  const ukaz = vse ? nadchazejici : nadchazejici.slice(0, NA_ZACATEK);
+  const nastroj = (
+    <Card as="section" aria-labelledby="nadchazejici-smeny">
+      <h2 id="nadchazejici-smeny" className="t-card">Nadcházející směny</h2>
+      <div className="mt-3">
+        {hotovo && (
+          <p className="note note-ok text-sm mb-3 flex items-start justify-between gap-3" role="status">
+            <span>{hotovo}</span>
+            <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setHotovo(null)} />
+          </p>
+        )}
+        {smeny.error ? (
+          <ErrorState compact title="Směny se nenačetly" onRetry={smeny.reload} detail={smeny.error} className="!py-3" />
+        ) : smeny.loading || !urlSmen ? (
+          <div className="space-y-2" aria-busy>
+            <Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" />
           </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
-      ) : (
-        <>
-          <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
-            <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-              <h3 className="t-card"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nadcházející směny</h3>
-              {upcoming.length > 0 && (
-                <button onClick={exportIcs}
-                  className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-medium hover:bg-black/[0.05] transition whitespace-nowrap shrink-0">
-                  Do kalendáře (.ics) ↓
-                </button>
-              )}
-            </div>
-            {upcoming.length === 0 ? (
-              <p className="text-black/45 text-sm">Žádné nadcházející směny.</p>
-            ) : (
-              <div className="divide-y divide-black/[0.06]">
-                {upcoming.slice(0, 8).map(s => {
-                  const isToday = s.date === today;
-                  return (
-                    <div key={s.id} className={`flex items-center gap-x-3 gap-y-2 flex-wrap p-3 rounded-2xl transition-colors hover:bg-black/[0.03] ${isToday ? 'bg-[#C8F542]/10' : ''}`}>
-                      <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center ${isToday ? 'bg-[#C8F542]/15' : 'bg-black/[0.04]'}`}>
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
-                      </div>
-                      <div className="flex-1 min-w-0 basis-[calc(100%-3.5rem)] min-[380px]:basis-0">
-                        <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
-                          <p className="font-semibold text-[#16181A] text-sm truncate min-w-0 basis-full min-[380px]:basis-auto cz-sentence">{formatDate(s.date)}</p>
-                          {isToday && <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">Dnes</span>}
-                        </div>
-                        <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        ) : nadchazejici.length === 0 ? (
+          <EmptyState compact illustration="smeny" title="Žádné nadcházející směny"
+            hint="Jakmile vedení zveřejní rozvrh, uvidíš tu svoje směny." />
+        ) : (
+          <>
+            <ul className="list">
+              {ukaz.map(s => {
+                const kat = kategorieBarvy(s.typeColor);
+                const d = den(s.date);
+                const nabidnuto = vBurze.has(Number(s.id));
+                return (
+                  <ListRow key={s.id}
+                    title={<span className="cz-sentence">{denKratce(d, dnes)}</span>}
+                    meta={<>
+                      <span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />
+                      {popisekTypu(s)}
+                    </>}
+                    value={`${hm(s.startTime ?? s.start_time)}–${hm(s.endTime ?? s.end_time)}`}
+                    right={nabidnuto ? <Chip tone="info" size="sm">V burze</Chip> : d === dnes ? <Chip tone="ok" size="sm">Dnes</Chip> : undefined}
+                    actions={smiBurza && !nabidnuto ? (
+                      <Menu size="sm" label={`Další akce se směnou ${denKratce(d, dnes).toLowerCase()}`} items={[
+                        { label: 'Nabídnout do burzy…', icon: 'handover', hint: 'Kolega si ji může vzít, vedení výměnu schválí.', onClick: () => { setNabidnout(s); setPoznamka(''); setChyba(null); } },
+                      ]} />
+                    ) : undefined}
+                  />
+                );
+              })}
+            </ul>
+            {nadchazejici.length > NA_ZACATEK && (
+              <Button variant="ghost" size="sm" className="mt-2" icon={vse ? 'chevron' : 'chevronRight'} aria-expanded={vse} onClick={() => setVse(v => !v)}>
+                {vse ? 'Ukázat méně' : `Zobrazit všechny (${nadchazejici.length.toLocaleString('cs-CZ')})`}
+              </Button>
             )}
-          </div>
+          </>
+        )}
+      </div>
+    </Card>
+  );
 
-          {past.length > 0 && (
-            <div className="glass-card p-6 hover:bg-black/[0.05] transition duration-300">
-              <h3 className="font-bold tracking-tight text-[#16181A] mb-4"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Minulé směny</h3>
-              <div className="divide-y divide-black/[0.06]">
-                {past.slice(0, 5).map(s => (
-                  <div key={s.id} className="flex items-center gap-x-3 gap-y-2 flex-wrap p-3 rounded-2xl opacity-70 transition-colors hover:bg-black/[0.03]">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.typeColor ?? '#64748B' }} />
-                    <div className="flex-1 min-w-0 basis-[calc(100%-1.75rem)] min-[380px]:basis-0">
-                      <p className="text-sm text-[#16181A] font-medium truncate cz-sentence">{formatDate(s.date)}</p>
-                      <p className="text-xs text-black/45 line-clamp-2">{s.startTime} – {s.endTime} · {shiftLabel(s)}</p>
-                    </div>
-                    {ratingByDate[s.date] ? (
-                      <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-[#C8F542]/15 text-[#5B7A08]">★ {ratingByDate[s.date]}/5</span>
-                    ) : (
-                      <span className="tap-target-sm flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium bg-black/[0.05] text-black/40">Bez hodnocení</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+  const muzeExport = nadchazejici.length > 0;
+  return (
+    <>
+      <PlochaWidgetu
+        stranka={zamestnanec ? 'zamestnanec.moje_smeny' : 'vedeni.moje_smeny'}
+        hlavicka={{
+          title: 'Moje směny',
+          subtitle: nadchazejici.length ? `Před sebou máš ${czCount(nadchazejici.length, SMENA)}.` : 'Co tě čeká a co už máš odpracované.',
+          hintId: 'myshifts',
+          secondary: muzeExport ? <Button variant="secondary" icon="download" onClick={exportIcs}>Do kalendáře</Button> : undefined,
+          menu: muzeExport ? [{ label: 'Do kalendáře (.ics)', icon: 'download', onClick: exportIcs, hint: 'Nadcházející směny do Google, Apple nebo Outlook kalendáře.' }] : undefined,
+        }}
+        nastroj={nastroj}
+      />
+      {nabidnout && (
+        <Modal open onClose={() => setNabidnout(null)} size="sm" title="Nabídnout směnu do burzy"
+          subtitle={<span className="cz-sentence">{denKratce(den(nabidnout.date), dnes)} · {hm(nabidnout.startTime ?? nabidnout.start_time)}–{hm(nabidnout.endTime ?? nabidnout.end_time)}</span>}
+          footer={<>
+            <Button variant="secondary" onClick={() => setNabidnout(null)}>Zrušit</Button>
+            <Button variant="primary" icon="handover" loading={odesilam} onClick={odeslatNabidku}>Nabídnout</Button>
+          </>}>
+          <Field id="burza-poznamka" label="Proč směnu nabízíš?" hint="Nepovinné — kolegové to uvidí u nabídky.">
+            <Textarea id="burza-poznamka" rows={2} maxLength={160} value={poznamka} onChange={e => setPoznamka(e.target.value)} />
+          </Field>
+          {chyba && <p className="note note-danger text-sm mt-3" role="alert">{chyba}</p>}
+        </Modal>
       )}
-    </div>
+    </>
   );
 }

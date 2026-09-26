@@ -19,11 +19,25 @@ const shape = (r: any) => ({
 });
 
 // GET — bez volno.zobrazit vlastní žádosti, s ním celý tým.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const c = await pozaduj(null);
   if (jeOdpoved(c)) return c;
-  // Pole se dál jmenuje isEmployer kvůli klientům (TimeOffApprovals podle něj
-  // ukáže panel); znamená „odpověď nese žádosti týmu".
+  // `?mine=1` (kolo 69, widget Moje volno): vlastní žádosti i pro vedení,
+  // kterému by jinak přišel celý tým — a s LIMIT 100 by v něm vlastní
+  // dovolená po sezóně klidně chyběla. Jen aktivní podnik.
+  if (new URL(req.url).searchParams.get('mine') === '1') {
+    try {
+      const rows = await sql`
+        SELECT t.* FROM time_off_requests t
+        WHERE t.employee_id = ${c.meId} AND t.team_id = ${c.teamId}
+        ORDER BY t.from_date DESC LIMIT 50`;
+      return NextResponse.json({ requests: rows.map(shape), isEmployer: false });
+    } catch {
+      return NextResponse.json({ error: 'Žádosti o volno se nenačetly.' }, { status: 500 });
+    }
+  }
+  // Pole se dál jmenuje isEmployer kvůli klientům; znamená „odpověď nese
+  // žádosti týmu".
   const isEmployer = c.role.opravneni.has('volno.zobrazit');
   try {
     const rows = isEmployer

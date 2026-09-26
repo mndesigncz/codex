@@ -1,5 +1,9 @@
-// Stránka „Docházka" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B2 v kole 69.
+// Stránka „Docházka" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B2) zapnulo plochu.
+//
+// Nástroj = záznamy docházky po dnech (hledání, úprava, přidání, export). Přepínač období 7/30/90
+// zůstává v hlavičce stránky a řídí i widgety s volbou „Podle stránky" (Mzdy, Souhrn hodin).
+// Výchozí rozložení je z katalogu beze změny: nahoře kdo je teď na směně a zapomenuté odchody,
+// pod tím peníze a hodiny, nástroj na konci.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -34,5 +38,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

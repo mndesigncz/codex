@@ -1,8 +1,16 @@
 // Widgety oblasti „Docházka" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/dochazka.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B2 v kole 69 nenapíše a nepřepne na 'hotovo'.
+// Komponenty jsou v components/widgety/oblasti/dochazka.tsx, výpočty v lib/dochazkaPrehled.ts.
 // Soubor patří balíku B2; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// V kole 69 jsou hotové všechny widgety oblasti.
+//
+// Ikony (kolo 69): katalog dal skoro všem `clock`; na Docházce je ve výchozím rozložení pět
+// widgetů a ikona se nesmí opakovat (AK-19). Mzdy mají `coins`, Souhrn `chart`, Otevřené
+// příchody `warning`, Dnes v podniku `calendar`; `clock` si nechaly Píchačky a nástroj.
+//
+// Souhrn hodin dostal volbu „Podle stránky" (a je výchozí): stránka Docházka má přepínač
+// 7/30/90 dní a katalog u ní říká, že widgety s obdobím berou období ze stránky. S pevnými
+// 30 dny by pod přepínačem na týden ukazoval měsíc.
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -33,14 +41,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'dochazka',
     nazev: 'Dnes v podniku',
     popis: 'Plán proti skutečnosti: kdo má dnes směnu, kdo už přišel, kdo ještě ne (po začátku směny oranžově).',
-    ikona: 'clock',
+    ikona: 'calendar',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'kiosk'],
     stranky: ['vedeni.prehled', 'vedeni.dochazka', 'vedeni.togo', 'kiosk.smena'],
     opravneni: { vse: [], nektere: ['dochazka.zobrazit', 'dochazka.tablet'] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/attendance → roster[me].openSince; POST /api/attendance {employeeId, action: in|out}
   // Pozor: vlastní data — každý člen
@@ -66,7 +74,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'dochazka',
     nazev: 'Mzdy za období',
     popis: 'Mzdové náklady za období Docházky a jejich podíl na tržbách proti cíli.',
-    ikona: 'clock',
+    ikona: 'coins',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -91,7 +99,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'stranka',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=N → entries[{employeeId,employeeName,clockIn,clockOut}], roster.hourlyRate
   {
@@ -99,7 +107,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'dochazka',
     nazev: 'Souhrn hodin',
     popis: 'Odpracované hodiny a počet směn po lidech; se sazbami i výdělek.',
-    ikona: 'clock',
+    ikona: 'chart',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
     rozhrani: ['vedeni'],
@@ -112,11 +120,12 @@ export const WIDGETY: DefiniceWidgetu[] = [
         nazev: 'Období',
         typ: 'vyber',
         moznosti: [
+          { id: 'stranka', nazev: 'Podle stránky' },
           { id: '7_dni', nazev: '7 dní' },
           { id: '30_dni', nazev: '30 dní' },
           { id: '90_dni', nazev: '90 dní' },
         ],
-        vychozi: '30_dni',
+        vychozi: 'stranka',
       },
       {
         klic: 'razeni',
@@ -126,7 +135,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'hodiny',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=1 → roster[{openSince,shiftEnd}] (openSince && teď > shiftEnd)
   // Pozor: Server zapomenuté odchody v noci zavírá sám (autoCloseEntry); widget upozorní dřív.
@@ -135,14 +144,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'dochazka',
     nazev: 'Otevřené příchody',
     popis: 'Kdo je napíchnutý déle, než měl plánovanou směnu (typicky zapomenutý odchod) — s Ukončit.',
-    ikona: 'clock',
+    ikona: 'warning',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.dochazka'],
     opravneni: { vse: ['dochazka.zobrazit'], nektere: [], pole: { 'akce:ukoncit': 'dochazka.upravit' } },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/attendance → entries[{clockIn,clockOut}] (posledních 60 dní)
   // Pozor: Větev zaměstnance v /api/attendance nefiltruje team_id → sčítá hodiny ze všech podniků, kde člověk
@@ -170,13 +179,13 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'dochazka',
     nazev: 'Můj výdělek',
     popis: 'Kolik jsem si tento měsíc vydělal: hodiny × vlastní sazba.',
-    ikona: 'clock',
+    ikona: 'coins',
     velikosti: ['S'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec'],
     stranky: ['zamestnanec.domu', 'vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: ['finance.moje_mzda', 'finance.mzdy'] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

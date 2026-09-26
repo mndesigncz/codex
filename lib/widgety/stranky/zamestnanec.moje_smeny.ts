@@ -1,5 +1,10 @@
-// Stránka „Moje směny" (zaměstnanec). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni:
-// true) a doporučené i výchozí rozložení upřesní balík B1 v kole 69.
+// Stránka „Moje směny" (zaměstnanec). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B1)
+// plochu zapnulo. Nástroj = nadcházející směny s exportem do kalendáře a nabídkou do burzy
+// (components/employee/MyShifts.tsx). Bloky, které dřív stály natvrdo nad seznamem a pod ním
+// (tři dlaždice, Kdo má směnu, Schválené volno, Minulé směny, kalendář a burza), jsou widgety.
+//
+// Výchozí z katalogu: čísla nahoře, seznam, pak tým a vlastní historie. Kalendář uzávěrek
+// na konci ukáže zaměstnanci jeho vlastní dny (bez uzaverky.zobrazit_vse rozsah Tým nemá).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -8,7 +13,11 @@ export const STRANKA: DefiniceStranky = {
   nazev: 'Moje směny',
   pohled: 'my-shifts',
   pristup: null,
-  nastroj: { nazev: 'Moje směny', ikona: 'calendar', popis: 'Nadcházející směny s typem a export do kalendáře.' },
+  nastroj: {
+    nazev: 'Nadcházející směny',
+    ikona: 'calendar',
+    popis: 'Tvoje nadcházející směny, export do kalendáře a nabídka směny do burzy.',
+  },
   doporucene: [
     'moje.smeny_prehled',
     'rozvrh.tym_nahled',
@@ -34,5 +43,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'uzaverky.kalendar', s: 'L' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

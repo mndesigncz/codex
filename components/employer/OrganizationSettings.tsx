@@ -10,9 +10,15 @@
 // čtou. Vypnutí nebo změna zdroje není ztráta — podniky, které řádky zdroje
 // používaly, dostanou vlastní kopie; proto se před ním ptáme a po něm
 // vypisujeme, kam se co zkopírovalo (server vrací `kopie[]` za každý podnik).
+//
+// Kolo 69 (balík B2, audit Týmu): přepínače jsou SwitchRow z components/ui
+// v jedné kartě s .list (dřív vlastní inkoustový přepínač v bílém boxu = karta
+// v kartě), výběr zdroje má pevný sloupec (každý select začínal jinde),
+// potvrzení je Modal místo confirm() a „Uloženo ✓" je Toast.
 
 import { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
+import { Button, Card, Chip, Modal, Segmented, Select, SwitchRow, Toast } from '../ui';
 import { okJson } from '@/lib/api';
 import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, type Ciselnik, type NastaveniOrganizace, type ZdrojeCiselniku } from '@/lib/organizace';
 import { czCount, type CzNoun } from '@/lib/czech';
@@ -29,40 +35,17 @@ const RADKY: Partial<Record<Ciselnik, CzNoun>> = {
   kategorieNavodu: { one: 'kategorie', few: 'kategorie', many: 'kategorií' },
 };
 
-const selectClass = 'field border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] max-w-full';
-
-/**
- * Přepínač stojí MIMO komponentu nastavení: definovaný uvnitř by při každém
- * renderu vznikl jako nový typ, React by ho odmontoval a namontoval znovu
- * a po kliknutí by se ztratil fokus (klávesnice, odečítač).
- */
-function Prepinac({ on, title, hint, brzy, disabled, onToggle }: { on: boolean; title: string; hint: string; brzy?: boolean; disabled: boolean; onToggle: () => void }) {
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-[#16181A]">{title}{brzy && <span className="ml-2 chip chip-sm chip-muted align-middle">připravuje se</span>}</p>
-        <p className="text-xs text-black/45 mt-0.5">{hint}</p>
-      </div>
-      {/* aria-disabled místo disabled: zakázané tlačítko prohlížeč odfokusuje,
-          a přepínač je během ukládání zakázaný vždycky — klávesnice by po
-          každém přepnutí začínala od začátku stránky. */}
-      <button type="button" role="switch" aria-checked={on} aria-label={title} aria-disabled={disabled}
-        onClick={() => { if (!disabled) onToggle(); }}
-        className={`tap-target-sm relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition aria-disabled:opacity-50 aria-disabled:cursor-not-allowed ${on ? 'bg-[#16181A]' : 'bg-black/15'}`}>
-        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
-      </button>
-    </div>
-  );
-}
-
 export default function OrganizationSettings() {
   const [org, setOrg] = useState<Org | null>(null);
   const [nacteno, setNacteno] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const msgChyba = msg !== '' && msg !== 'Nastavení organizace uloženo.';
   /** Výpis kopií po posledním uložení — zůstává, dokud se neuloží znovu. */
   const [kopieInfo, setKopieInfo] = useState<{ text: string; chyba: boolean }[]>([]);
 
+  /** Změna, která něco vypíná nebo slučuje — čeká na potvrzení v okně. */
+  const [potvrdit, setPotvrdit] = useState<{ veta: string; patch: Partial<NastaveniOrganizace> } | null>(null);
   useEffect(() => {
     let alive = true;
     fetch('/api/organization').then(okJson)
@@ -112,10 +95,14 @@ export default function OrganizationSettings() {
         sKopii.length ? `Podniky dostanou vlastní kopie toho, co z organizace používají: ${nazvy(sKopii)}.` : '',
         bezKopie.length ? `Řádky z organizace přestanou být v podnicích vidět: ${nazvy(bezKopie)}.` : '',
         slucuje.length ? `Pokud mají podniky kopie z dřívějšího sdílení, nahradí je originál ze zdroje: ${nazvy(slucuje)} — co si v nich upravily, se ztratí.` : '',
-        'Pokračovat?',
       ].filter(Boolean).join(' ');
-      if (!confirm(veta)) return;
+      setPotvrdit({ veta, patch });
+      return;
     }
+    await proved(patch);
+  };
+
+  const proved = async (patch: Partial<NastaveniOrganizace>) => {
     setBusy(true); setMsg(''); setKopieInfo([]);
     const puvodni = org.settings;
     setOrg(o => o ? { ...o, settings: { ...o.settings, ...patch } } : o);
@@ -129,11 +116,10 @@ export default function OrganizationSettings() {
         if (d.organization?.settings) setOrg(o => o ? { ...o, settings: normalizujNastaveni(d.organization.settings) } : o);
         const info = popisKopie(Array.isArray(d.kopie) ? d.kopie : []);
         setKopieInfo(info);
-        setMsg(info.some(i => i.chyba) ? 'Uloženo, ale kopie se nepodařila.' : 'Uloženo ✓');
+        setMsg(info.some(i => i.chyba) ? 'Uloženo, ale kopie se nepodařila.' : 'Nastavení organizace uloženo.');
       }
     } catch { setOrg(o => o ? { ...o, settings: puvodni } : o); setMsg('Uložení se nepodařilo.'); }
     setBusy(false);
-    setTimeout(() => setMsg(''), 2500);
   };
 
   // Server merguje mělce, proto se vždy posílá celá mapa zdrojů.
@@ -144,82 +130,95 @@ export default function OrganizationSettings() {
   const vsechnyStejne = CISELNIKY.every(c => zdroje[c.klic] === zdroje[CISELNIKY[0].klic]);
   const spolecny = vsechnyStejne ? (zdroje[CISELNIKY[0].klic] == null ? '' : String(zdroje[CISELNIKY[0].klic])) : 'ruzne';
 
+  const zamceno = !org.isOwner || busy;
+  const volby = (
+    <>
+      <option value="">Každý podnik zvlášť</option>
+      {org.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+    </>
+  );
   return (
-    <section className="glass-card p-5 space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <h3 className="t-card"><Icon name="box" size={16} className="inline -mt-0.5 mr-1.5 text-[#5B7A08]" /> Organizace: {org.name}</h3>
-          <p className="text-xs text-black/45 mt-0.5">
-            {org.teams.length} {org.teams.length === 1 ? 'podnik' : org.teams.length < 5 ? 'podniky' : 'podniků'} pod jednou střechou: {org.teams.map(t => t.name).join(', ')}.
-            {!org.isOwner && ' Nastavení mění vlastník organizace.'}
+    <Card aria-labelledby="org-nadpis">
+      <h2 id="org-nadpis" className="t-card flex items-center gap-2 min-w-0">
+        <Icon name="grid" size={17} className="shrink-0 text-black/40" />
+        <span className="truncate">Organizace: {org.name}</span>
+      </h2>
+      <p className="t-meta mt-1 text-pretty">
+        {czCount(org.teams.length, { one: 'podnik', few: 'podniky', many: 'podniků' })} pod jednou střechou: {org.teams.map(t => t.name).join(', ')}.
+        {!org.isOwner && ' Nastavení mění vlastník organizace.'}
+      </p>
+      <ul className="list mt-2">
+        <SwitchRow checked={org.settings.sdileniLidi === true} disabled={zamceno} onChange={v => uloz({ sdileniLidi: v })}
+          title="Sdílení lidí mezi podniky" hint="Zaměstnanec může být členem víc podniků a přepínat mezi nimi. Vedení může vždy." />
+        <SwitchRow checked={org.settings.konsolidovanyPrehled === true} disabled={zamceno} onChange={v => uloz({ konsolidovanyPrehled: v })}
+          title="Přehled za všechny podniky" hint="Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce — v přepínači podniku nahoře, položka „Všechny podniky“." />
+        <SwitchRow checked={org.settings.sdileneCiselniky === true} disabled={zamceno} onChange={v => uloz({ sdileneCiselniky: v })}
+          title="Sdílené číselníky" hint="Jeden podnik číselník spravuje, ostatní ho vidí a používají. U každé položky je vidět, odkud je. Kontakty dodavatelů uvidí i ostatní podniky." />
+        <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+          <div className="min-w-0">
+            <p id="org-fakturace" className="text-sm font-semibold text-[#16181A]">Fakturace <Chip tone="muted" size="sm" className="ml-1 align-middle">připravuje se</Chip></p>
+            <p className="text-xs text-black/45 mt-0.5 text-pretty">Každý podnik má svůj plán a fakturu, nebo jedna faktura za organizaci.</p>
+          </div>
+          {org.isOwner ? (
+            <Segmented size="sm" ariaLabel="Fakturace" value={org.settings.fakturace ?? 'per_team'}
+              onChange={v => { if (!busy) void uloz({ fakturace: v }); }}
+              options={[{ id: 'per_team', label: 'Za podnik' }, { id: 'per_org', label: 'Za organizaci' }]} />
+          ) : (
+            <span className="t-meta">{org.settings.fakturace === 'per_org' ? 'Za organizaci' : 'Za podnik'}</span>
+          )}
+        </li>
+      </ul>
+      {org.settings.sdileneCiselniky && (
+        <div role="group" aria-labelledby="org-zdroje-nadpis" className="mt-3">
+          <p id="org-zdroje-nadpis" className="t-label">Kdo který číselník spravuje</p>
+          <ul className="list">
+            {/* Pevný sloupec selectu: dřív justify-between se selectem na šířku obsahu
+                a každý řádek začínal jinde (audit: x = 532, 464, 570…). Na telefonu pod sebou. */}
+            <li className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] items-center gap-x-4 gap-y-1.5 py-3">
+              <p id="org-zdroje-vse" className="text-sm font-semibold text-[#16181A]">Všechny najednou</p>
+              <Select aria-labelledby="org-zdroje-vse" value={spolecny} disabled={zamceno}
+                onChange={e => {
+                  if (e.target.value === 'ruzne') return;
+                  const v = hodnota(e.target.value);
+                  void ulozZdroje(Object.fromEntries(CISELNIKY.map(c => [c.klic, v])) as ZdrojeCiselniku);
+                }}>
+                {!vsechnyStejne && <option value="ruzne" disabled>Různě</option>}
+                {volby}
+              </Select>
+            </li>
+            {CISELNIKY.map(c => (
+              <li key={c.klic} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] items-center gap-x-4 gap-y-1.5 py-3">
+                <div className="min-w-0">
+                  <p id={`org-zdroj-${c.klic}`} className="text-sm text-[#16181A]">{c.nazev}</p>
+                  <p className="text-xs text-black/45 text-pretty">{c.hint}</p>
+                </div>
+                <Select aria-labelledby={`org-zdroj-${c.klic}`} value={zdroje[c.klic] == null ? '' : String(zdroje[c.klic])}
+                  disabled={zamceno} onChange={e => void ulozZdroje({ ...zdroje, [c.klic]: hodnota(e.target.value) })}>
+                  {volby}
+                </Select>
+              </li>
+            ))}
+          </ul>
+          <p className="t-meta mt-2 text-pretty">
+            Vypnutím dostanou podniky vlastní kopie toho, co z organizace používaly. Zapnutím se kopie z dřívějšího sdílení nahradí originálem. Nastavení veřejné stránky se nepřepojuje.
           </p>
         </div>
-        {msg && <span className={`text-xs font-semibold ${msg.endsWith('✓') ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>{msg}</span>}
-      </div>
-      <div className="space-y-2">
-        <Prepinac on={org.settings.sdileniLidi === true} disabled={!org.isOwner || busy} onToggle={() => uloz({ sdileniLidi: !(org.settings.sdileniLidi === true) })} title="Sdílení lidí mezi podniky"
-          hint="Zaměstnanec může být členem víc podniků a přepínat mezi nimi. Vedení může vždy." />
-        <Prepinac on={org.settings.konsolidovanyPrehled === true} disabled={!org.isOwner || busy} onToggle={() => uloz({ konsolidovanyPrehled: !(org.settings.konsolidovanyPrehled === true) })} title="Přehled za všechny podniky"
-          hint="Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce — v přepínači podniku nahoře, položka „Všechny podniky“." />
-        <Prepinac on={org.settings.sdileneCiselniky === true} disabled={!org.isOwner || busy} onToggle={() => uloz({ sdileneCiselniky: !(org.settings.sdileneCiselniky === true) })} title="Sdílené číselníky"
-          hint="Jeden podnik číselník spravuje, ostatní ho vidí a používají. U každé položky je vidět, odkud je. Kontakty dodavatelů uvidí i ostatní podniky." />
-        {org.settings.sdileneCiselniky && (
-          <div role="group" aria-labelledby="org-zdroje-nadpis" className="rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <p id="org-zdroje-nadpis" className="text-sm font-semibold text-[#16181A]">Kdo který číselník spravuje</p>
-              <div className="flex items-center gap-2">
-                <span id="org-zdroje-vse" className="text-xs text-black/45">Všechny spravuje</span>
-                <select aria-labelledby="org-zdroje-vse" value={spolecny} disabled={!org.isOwner || busy} className={selectClass}
-                  onChange={e => {
-                    if (e.target.value === 'ruzne') return;
-                    const v = hodnota(e.target.value);
-                    ulozZdroje(Object.fromEntries(CISELNIKY.map(c => [c.klic, v])) as ZdrojeCiselniku);
-                  }}>
-                  {!vsechnyStejne && <option value="ruzne" disabled>Různě</option>}
-                  <option value="">Každý podnik zvlášť</option>
-                  {org.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-            </div>
-            <ul className="divide-y divide-black/[0.06]">
-              {CISELNIKY.map(c => (
-                <li key={c.klic} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <p id={`org-zdroj-${c.klic}`} className="text-sm text-[#16181A]">{c.nazev}</p>
-                    <p className="text-xs text-black/45">{c.hint}</p>
-                  </div>
-                  <select aria-labelledby={`org-zdroj-${c.klic}`} value={zdroje[c.klic] == null ? '' : String(zdroje[c.klic])}
-                    disabled={!org.isOwner || busy} className={selectClass}
-                    onChange={e => ulozZdroje({ ...zdroje, [c.klic]: hodnota(e.target.value) })}>
-                    <option value="">Každý podnik zvlášť</option>
-                    {org.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-black/45">
-              Vypnutím dostanou podniky vlastní kopie toho, co z organizace používaly. Zapnutím se kopie z dřívějšího sdílení nahradí originálem. Nastavení veřejné stránky se nepřepojuje.
-            </p>
-          </div>
-        )}
-        {kopieInfo.length > 0 && (
-          <ul className="text-xs space-y-0.5 px-1" aria-live="polite">
-            {kopieInfo.map((k, i) => <li key={i} className={k.chyba ? 'text-bad-ink font-semibold' : 'text-black/60'}>{k.text}</li>)}
-          </ul>
-        )}
-        <div className="flex items-start justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#16181A]">Fakturace<span className="ml-2 chip chip-sm chip-muted align-middle">připravuje se</span></p>
-            <p className="text-xs text-black/45 mt-0.5">Každý podnik má svůj plán a fakturu, nebo jedna faktura za organizaci.</p>
-          </div>
-          <div className="flex gap-1 rounded-full bg-black/[0.05] p-0.5 shrink-0">
-            {([['per_team', 'Za podnik'], ['per_org', 'Za organizaci']] as const).map(([v, label]) => (
-              <button key={v} type="button" disabled={!org.isOwner || busy} onClick={() => uloz({ fakturace: v })}
-                className={`tap-target-sm rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${org.settings.fakturace === v ? 'seg-on' : 'seg-off'}`}>{label}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
+      )}
+      {kopieInfo.length > 0 && (
+        <ul className="mt-3 space-y-0.5 text-[13px]" aria-live="polite">
+          {kopieInfo.map((k, i) => <li key={i} className={k.chyba ? 'text-bad-ink font-semibold' : 'text-black/60'}>{k.text}</li>)}
+        </ul>
+      )}
+      {potvrdit && (
+        <Modal open onClose={() => setPotvrdit(null)} size="sm" title="Změnit sdílení?"
+          footer={<>
+            <Button variant="secondary" onClick={() => setPotvrdit(null)}>Zrušit</Button>
+            <Button variant="primary" loading={busy} onClick={async () => { const p = potvrdit.patch; setPotvrdit(null); await proved(p); }}>Pokračovat</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty">{potvrdit.veta}</p>
+        </Modal>
+      )}
+      <Toast message={msg || null} tone={msgChyba ? 'bad' : 'ok'} onClose={() => setMsg('')} />
+    </Card>
   );
 }

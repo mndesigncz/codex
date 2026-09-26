@@ -34,6 +34,18 @@ async function ensureShift(teamId: number, employeeId: number, date: string, sta
   } catch { /* best-effort */ }
 }
 
+// Sazba člověka v tomhle podniku: z členství, u starých účtů ze zrcadla
+// users (jako roster výš). Nula = nenastaveno; výpadek sloupce = null.
+async function vlastniSazba(userId: number, teamId: number): Promise<number | null> {
+  try {
+    const [r] = await sql`
+      SELECT CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(u.hourly_rate, 0) END AS sazba
+      FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${teamId}
+      WHERE u.id = ${userId}`;
+    return r ? Number(r.sazba) || 0 : null;
+  } catch { return null; }
+}
+
 // GET — s dochazka.tablet nebo dochazka.zobrazit: dnešní roster s živým
 // stavem; s dochazka.zobrazit navíc záznamy; hodinové sazby jen s
 // finance.mzdy (Provozní docházku vidí, sazby ne). Ostatní: vlastní záznamy.
@@ -131,6 +143,15 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* watchdog is best-effort */ }
 
+    // Vlastní sazba pro „Můj výdělek" (kolo 69, katalog: moje.vydelek): kdo
+    // vidí roster bez sazeb (bez finance.mzdy), ale smí znát svou mzdu
+    // (finance.moje_mzda), dostane sazbu jen na vlastním řádku. Cizí sazby
+    // tím nevidí — jinak by widget musel chodit na další endpoint.
+    if (!opr.has('finance.mzdy') && opr.has('finance.moje_mzda')) {
+      const ja = (roster as any[]).find(r => Number(r.id) === c.meId);
+      if (ja) ja.hourlyRate = await vlastniSazba(c.meId, c.teamId);
+    }
+
     let entries: any[] = [];
     if (opr.has('dochazka.zobrazit')) {
       const { searchParams } = new URL(req.url);
@@ -147,22 +168,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ roster, entries });
   }
 
-  // Employee — own entries (last 60 days).
+  // Zaměstnanec — vlastní záznamy (posledních 60 dní) v TOMHLE podniku.
+  // Kolo 69 (nález N14): bez filtru podniku sčítalo „Odpracováno" na Domů
+  // hodiny ze všech podniků, kde člověk pracuje — barista ve dvou kavárnách
+  // viděl součet obou. NULL připouští řádky z doby před sloupcem team_id
+  // (stejně jako otevřený příchod v POST).
   const entries = await sql`
     SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
     FROM time_entries
     WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '60 days'
+      AND (team_id = ${c.teamId} OR team_id IS NULL)
     ORDER BY clock_in DESC`;
   // Their own open entry rides along so the clock widget works for them too.
+  // Jen otevřený příchod v tomhle podniku: Píchačky by jinak ukazovaly
+  // „na směně" podle příchodu v jiném podniku a odchod (POST) by ho nenašel.
   let openSince: string | null = null;
   try {
     const [openRow] = await sql`
       SELECT clock_in FROM time_entries
       WHERE employee_id = ${c.meId} AND clock_out IS NULL
+        AND (team_id = ${c.teamId} OR team_id IS NULL)
       ORDER BY clock_in DESC LIMIT 1`;
     openSince = openRow?.clock_in ?? null;
   } catch { /* ignore */ }
-  return NextResponse.json({ roster: [{ id: c.meId, openSince }], entries });
+  // Vlastní sazba jen s oprávněním na vlastní (nebo všechny) mzdy — pro „Můj výdělek".
+  const smiSazbu = opr.has('finance.moje_mzda') || opr.has('finance.mzdy');
+  const ja: Record<string, unknown> = { id: c.meId, openSince };
+  if (smiSazbu) ja.hourlyRate = await vlastniSazba(c.meId, c.teamId);
+  return NextResponse.json({ roster: [ja], entries });
 }
 
 // POST — clock in / out. Sám za sebe kdokoli z podniku; za jiného jen
