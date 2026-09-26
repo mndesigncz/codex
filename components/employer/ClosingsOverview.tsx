@@ -31,6 +31,7 @@ import CashClosing from '../employee/CashClosing';
 import ClosingDetail from './ClosingDetail';
 import { okJson } from '@/lib/api';
 import { czCount } from '@/lib/czech';
+import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
@@ -144,7 +145,7 @@ export default function ClosingsOverview() {
   const obnov = useCallback((den?: string) => {
     obnovDataWidgetu(URL_SEZNAM);
     obnovDataWidgetu('/api/closings/handover');
-    const mesice = new Set([new Date().toISOString().slice(0, 7), ...(den ? [den.slice(0, 7)] : [])]);
+    const mesice = new Set([pragueToday().slice(0, 7), ...(den ? [den.slice(0, 7)] : [])]);
     mesice.forEach(m => obnovDataWidgetu(`/api/closings/calendar?month=${m}`));
   }, []);
 
