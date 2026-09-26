@@ -303,7 +303,7 @@ function ZpetnaVazba({ velikost }: WidgetProps) {
           {posledni.vytka && <Chip tone="bad" size="sm" icon="warning">Výtka</Chip>}
         </div>
       )}
-      {posledni?.poznamka && <p className="text-sm text-black/70 text-pretty line-clamp-3">„{posledni.poznamka}"</p>}
+      {posledni?.poznamka && <p className="text-sm text-black/70 text-pretty line-clamp-3">„{posledni.poznamka}“</p>}
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
       <Button variant="primary" size="sm" loading={potvrzuji} onClick={beruNaVedomi}>Beru na vědomí</Button>
     </div>

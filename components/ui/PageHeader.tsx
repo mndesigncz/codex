@@ -11,7 +11,7 @@ import { Menu, type MenuItem } from './Menu';
 // hlavní akce. Na telefonu jdou vedlejší akce do menu a hlavní zůstane.
 // Dřív měla každá obrazovka svůj nadpis (osm variant) a svou řadu tlačítek.
 
-export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, aside, className = '', as: Nadpis = 'h1' }: {
+export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, menuMobile, aside, className = '', as: Nadpis = 'h1' }: {
   title: React.ReactNode;
   /**
    * Úroveň nadpisu. Obrazovka má jeden `h1`; když se jedna obrazovka
@@ -34,6 +34,12 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   secondary?: React.ReactNode;
   /** Položky do „···". Na telefonu se sem přidají i vedlejší akce, pokud je dodáš znovu tady. */
   menu?: MenuItem[];
+  /**
+   * Položky „···" jen pod `md`, kde se vedlejší akce schovají — typicky
+   * zopakovaná vedlejší akce. Na monitoru by „···" jen opakovalo tlačítko
+   * vedle sebe; když stránka nemá vlastní `menu`, na monitoru „···" vůbec není.
+   */
+  menuMobile?: MenuItem[];
   /** Přepínač nebo filtr pod hlavičkou (Segmented, chipy). */
   aside?: React.ReactNode;
   className?: string;
@@ -55,11 +61,16 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   }, [hintId]);
 
   const showSubtitle = subtitle && !(hintId && subtitleHidden);
+  const maMenu = !!menu && menu.length > 0;
+  const maMenuMobil = !!menuMobile && menuMobile.length > 0;
+  // Bez limetky na telefonu nemá smysl dávat akcím vlastní řádek: samotné
+  // „···" pod nadpisem by stálo osiřelé a ubralo první obrazovce 68 px.
+  const vRadku = !primary;
 
   return (
     <div className={`space-y-4 ${className}`}>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div className="min-w-0 sm:flex-1">
+      <div className={`flex gap-3 ${vRadku ? 'flex-row items-start justify-between' : 'flex-col sm:flex-row sm:items-start sm:justify-between'}`}>
+        <div className={`min-w-0 ${vRadku ? 'flex-1' : 'sm:flex-1'}`}>
           <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
             <p className="t-meta mt-1.5 max-w-[70ch] text-pretty group">
@@ -76,10 +87,15 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
             </p>
           )}
         </div>
-        {(primary || secondary || (menu && menu.length > 0)) && (
-          <div className="flex items-center gap-2 sm:shrink-0 sm:ml-auto">
+        {(primary || secondary || maMenu || maMenuMobil) && (
+          <div className={`flex items-center gap-2 ${vRadku ? 'shrink-0' : 'sm:shrink-0 sm:ml-auto'}`}>
             {secondary && <div className="hidden md:flex items-center gap-2">{secondary}</div>}
-            {menu && menu.length > 0 && <Menu items={menu} />}
+            {maMenuMobil ? (
+              <>
+                <div className="md:hidden"><Menu items={[...(menu ?? []), ...menuMobile!]} /></div>
+                {maMenu && <div className="hidden md:block"><Menu items={menu!} /></div>}
+              </>
+            ) : maMenu && <Menu items={menu!} />}
             {primary && <div className="flex-1 sm:flex-none flex flex-col sm:flex-row gap-2 [&>*]:w-full sm:[&>*]:w-auto">{primary}</div>}
           </div>
         )}

@@ -126,7 +126,12 @@ export function KontextoveMenu({ menu, polozky, nazev, onZavrit }: {
         }}
       >
         {polozky.map(it => (
-          <MenuItemButton key={it.label} {...it} onClick={() => { pop.close(false); it.onClick(); }} />
+          // Fokus zpátky na widget DŘÍV, než položka otevře okno: useModal si
+          // místo návratu uloží při vykreslení (document.activeElement) a
+          // položka menu, která by to jinak byla, v tomtéž commitu zmizí —
+          // po zavření okna by fokus spadl na <body>. Bez místa návratu
+          // (menu z myši nebo prstu v klidu) se fokus nevrací.
+          <MenuItemButton key={it.label} {...it} onClick={() => { pop.close(!!menu.fokusZpet?.isConnected); it.onClick(); }} />
         ))}
       </MenuPanel>
     </div>,

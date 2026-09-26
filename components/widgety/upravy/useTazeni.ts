@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type React from 'react';
 import { krok, USAZENO, rychlostRolovani, rychlostZVzorku, type VzorekUkazatele } from '@/lib/widgety/pruzina';
-import { cilovyIndex, type Obdelnik } from '@/lib/widgety/mrizka';
+import { cilovyIndex, veVnitrniZone, type Obdelnik } from '@/lib/widgety/mrizka';
 import { presun } from '@/lib/widgety/rozlozeni';
 import { AKTIVACE_TAHU, HYSTEREZE_PX, PRODLEVA_CILE_MS, PRUZINA, RYCHLOST_PUSTENI, ZVEDNUTI } from '@/lib/widgety/konstanty';
 import { vibruj } from '../usePodrzeni';
@@ -275,6 +275,12 @@ interface Tah {
   rozvrzeni: Map<HTMLElement, Obdelnik | null>;
   spinave: boolean;
   kandidat: { index: number; od: number } | null;
+  /**
+   * Položka, která vyvolala poslední přeskládání. Znovu cílem být nemůže,
+   * dokud ukazatel neopustí její vnitřní zónu — jinak by karta, která po
+   * přesunu zůstala na místě, přeskládávala pořadí dokola (mrizka.cilovyIndex).
+   */
+  blok: HTMLElement | null;
   zvednutoV: number;
   rolovac: HTMLElement | null;
   zbytekRolovani: number;
@@ -391,13 +397,19 @@ export function useTazeni(o: VolbyTazeni) {
     polohuj(t, ted);
     // 3) Cíl: vnitřní zóna jiné položky; nový cíl platí, až v něm ukazatel
     //    vydrží 80 ms — rychlý přejezd nepřeskládá všechno, co minul.
+    const bod = { x: t.x, y: t.y };
+    if (t.blok) {
+      const rb = t.rozvrzeni.get(t.blok);
+      if (!rb || !veVnitrniZone(bod, rb)) t.blok = null;
+    }
     const tazeny = t.poradi.indexOf(t.li);
     const obdelniky = t.poradi.map(el => t.rozvrzeni.get(el) ?? null);
-    const c = cilovyIndex({ x: t.x, y: t.y }, obdelniky, tazeny, tazeny);
+    const c = cilovyIndex(bod, obdelniky, tazeny, tazeny, t.blok ? t.poradi.indexOf(t.blok) : -1);
     if (c === tazeny) { t.kandidat = null; return; }
     if (!t.kandidat || t.kandidat.index !== c) { t.kandidat = { index: c, od: ted }; return; }
     if (ted - t.kandidat.od < PRODLEVA_CILE_MS) return;
     t.kandidat = null;
+    t.blok = t.poradi[c];
     preskladej(t, presun(t.poradi, tazeny, c));
   };
 
@@ -438,6 +450,14 @@ export function useTazeni(o: VolbyTazeni) {
   const dosedni = (t: Tah, vx: number, vy: number, potvrdit: boolean) => {
     const o = oRef.current;
     o.pohyb.naSnimek(null);
+    // Pořadí se smí zapsat jen nad tímtéž modelem, nad kterým tah začal. Když
+    // se mezitím změnil (409 s novějším stavem z jiného okna, Vrátit z toastu
+    // druhým prstem), snímek `t.poradi` je zastaralý a zápis by novější stav
+    // tiše přepsal — tah se proto jen zruší (review kola 68, rev-fyz3 t7).
+    if (potvrdit) {
+      const vDom = polozky();
+      if (vDom.length !== t.poradi.length || t.poradi.some(el => !el.isConnected)) potvrdit = false;
+    }
     const li = t.li;
     const m = meritko(t, performance.now());
     if (!potvrdit && t.poradi.some((el, i) => el !== t.puvodni[i])) {
@@ -559,7 +579,7 @@ export function useTazeni(o: VolbyTazeni) {
 
   const novyTah = (li: HTMLElement, instance: string, pointerId: number, pointerType: string, x: number, y: number): Tah => ({
     faze: 'ceka', li, instance, pointerId, pointerType, startX: x, startY: y, x, y, offX: 0, offY: 0,
-    vzorky: [], casovac: null, poradi: [], puvodni: [], rozvrzeni: new Map(), spinave: false, kandidat: null,
+    vzorky: [], casovac: null, poradi: [], puvodni: [], rozvrzeni: new Map(), spinave: false, kandidat: null, blok: null,
     zvednutoV: 0, rolovac: null, zbytekRolovani: 0, ukonci: () => {},
   });
 

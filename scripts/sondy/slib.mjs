@@ -19,6 +19,11 @@ async function kontext() {
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
+    // Kolo 68: formulář oznámení žije ve widgetu Nástěnka na Přehledu (AnnouncementsManager
+    // a pohled „announcements" zmizely) — plocha dostane rozložení s Nástěnkou
+    // a vlastník oprávnění (psát na nástěnku smí jen s oznameni.spravovat).
+    if (new URL(u).pathname === '/api/teams/mine') { const r = JSON.parse(readFileSync(DIR + 'roles.json', 'utf8')); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8')), role: { klic: 'vedeni', roleId: null, nazev: 'Vlastník', typ: 'vedeni', jeVlastnik: true }, opravneni: r.ja.opravneni }) }); }
+    if (new URL(u).pathname === '/api/rozlozeni') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k68-rozlozeni-vedeni.json', 'utf8') });
     if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     const k = keyFor(u);
     if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
@@ -30,7 +35,7 @@ async function kontext() {
 const TEXT = 'Rozepsané oznámení, které se nesmí ztratit';
 
 async function napis(p) {
-  await p.goto('http://localhost:3000/employer/overview?view=announcements', { waitUntil: 'networkidle' });
+  await p.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' });
   await p.waitForTimeout(1000);
   const pole = p.locator('textarea').first();
   await pole.click();
@@ -67,7 +72,7 @@ async function jeTam(p) {
   await napis(p);
   await p.close();
   const p2 = await ctx.newPage();
-  await p2.goto('http://localhost:3000/employer/overview?view=announcements', { waitUntil: 'networkidle' });
+  await p2.goto('http://localhost:3000/employer/overview', { waitUntil: 'networkidle' });
   const r = await jeTam(p2);
   console.log(`zavřená a znovu otevřená záložka:  text zpátky=${r.text ? 'ano' : 'NE'} · nabídka „z minula"=${r.note ? 'ano' : 'ne'}`);
   await ctx.close();

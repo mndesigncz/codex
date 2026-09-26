@@ -8,7 +8,6 @@ import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
 import { CURRENCIES, LOCALES } from '@/lib/money';
-import { EMPLOYER_WIDGETS, EMPLOYEE_WIDGETS, isWidgetOn } from '@/lib/dashboardWidgets';
 import { useSymbol } from './CurrencyProvider';
 import ShareSettings from './employer/ShareSettings';
 import { useModal } from '@/lib/useModal';
@@ -59,7 +58,6 @@ interface Team {
   week_start?: number;
   labor_target_pct?: number | null;
   business_type?: string | null;
-  dashboard_config?: { employer?: Record<string, any>; employee?: Record<string, any> };
 }
 
 interface Invitation {
@@ -308,32 +306,6 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       setError('Nastavení se nepodařilo uložit.');
     } finally {
       setSavingRequiresShift(false);
-    }
-  };
-
-  const toggleWidget = async (role: 'employer' | 'employee', id: string, on: boolean) => {
-    const current = team?.dashboard_config ?? {};
-    const roleCfg = current[role] ?? {};
-    const layout = Array.isArray(roleCfg.layout) ? roleCfg.layout : null;
-    const nextLayout = layout
-      ? (on
-          ? (layout.some((e: any) => e?.id === id) ? layout : [...layout, { type: 'widget', id }])
-          : layout.filter((e: any) => e?.id !== id))
-      : undefined;
-    const next = {
-      ...current,
-      [role]: { ...roleCfg, [id]: on, ...(nextLayout ? { layout: nextLayout } : {}) },
-    };
-    setTeam(t => (t ? { ...t, dashboard_config: next } : t)); // optimistic
-    try {
-      const res = await fetch('/api/teams', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dashboardConfig: next }),
-      });
-      if (!res.ok) { setTeam(t => (t ? { ...t, dashboard_config: current } : t)); setError('Nastavení se nepodařilo uložit.'); }
-    } catch {
-      setTeam(t => (t ? { ...t, dashboard_config: current } : t));
-      setError('Nastavení se nepodařilo uložit.');
     }
   };
 
@@ -979,49 +951,6 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
       )}
 
-      {/* Dashboard customization */}
-      {ma('podnik.nastaveni') && (
-      <div className="glass-card p-6 space-y-5">
-        <div>
-          <h3 className="t-card flex items-center gap-2">
-            <Icon name="overview" size={18} /> Dashboardy
-          </h3>
-          <p className="text-black/45 text-sm mt-1">
-            Vyber, co se zobrazí na přehledu — tvém i zaměstnanců. Pořadí a dlaždice
-            s odkazy naskládáš přímo na přehledu přes ozubené kolečko vpravo nahoře.
-          </p>
-        </div>
-        {([['employer', 'Můj přehled (vedení)', EMPLOYER_WIDGETS], ['employee', 'Přehled zaměstnanců', EMPLOYEE_WIDGETS]] as const).map(([role, title, widgets]) => (
-          <div key={role}>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40 mb-2">{title}</p>
-            <div className="divide-y divide-black/[0.06]">
-              {widgets.map(w => {
-                const on = isWidgetOn(team?.dashboard_config?.[role], w.id);
-                return (
-                  <label key={w.id} className="flex items-center justify-between gap-4 py-2.5 cursor-pointer">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[#16181A]">{w.label}</p>
-                      {w.hint && <p className="text-xs text-black/40 mt-0.5">{w.hint}</p>}
-                    </div>
-                    <button
-                      type="button" role="switch" aria-checked={on}
-                      onClick={() => toggleWidget(role, w.id, !on)}
-                      className={`tap-target-sm relative shrink-0 w-11 h-6.5 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
-                      style={{ width: '2.75rem', height: '1.6rem' }}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-[1.15rem]' : ''}`} />
-                    </button>
-                  </label>
-                );
-              })}
-            </div>
-
-          </div>
-        ))}
-      </div>
-
-      )}
-
       {/* Public share links + their look */}
       {/* Sdílené odkazy a Noisium jen s oprávněním — bez něj by seznam
           odkazů vypadal prázdný a „Odpojit" by potichu nic neudělalo. */}
@@ -1161,18 +1090,4 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     </div>
   );
 }
-
-/* ---------- Quick-access shortcut editor ---------- */
-// Tiles the employer composes for a dashboard. Targets are either a nav view
-// or a stock category, so the same editor serves both roles.
-const SHORTCUT_VIEWS: { id: string; label: string; icon: string }[] = [
-  { id: 'inventory', label: 'Sklad', icon: 'box' },
-  { id: 'tasks', label: 'Úkoly', icon: 'check' },
-  { id: 'procedures', label: 'Postupy', icon: 'clipboard' },
-  { id: 'closing', label: 'Uzávěrka', icon: 'trend' },
-  { id: 'my-shifts', label: 'Směny', icon: 'calendar' },
-  { id: 'rewards', label: 'Odměny', icon: 'award' },
-  { id: 'guides', label: 'Návody', icon: 'book' },
-  { id: 'chat', label: 'Chat', icon: 'chat' },
-];
 

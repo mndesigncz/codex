@@ -168,6 +168,15 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
   klicPoslednihoRef.current = klicPosledniho;
   const zije = useRef(true);
   const generace = useRef(0);
+  /**
+   * Verze z poslední úspěšné odpovědi na PUT podle adresy — zapisuje se i po
+   * odmontování. Dopsání fronty v úklidu čeká na běžící zápis a potřebuje
+   * verzi z JEHO odpovědi; `verze.current` by byla stará a server by dopsání
+   * odmítl 409 (review kola 68, rev-fyz8).
+   */
+  const verzePodleUrl = useRef(new Map<string, number>());
+  /** Stránka se zavírá (pagehide): selhání fetch je pak konec stránky, ne síť — žádné opakování. */
+  const odchod = useRef(false);
 
   const udalost = (u: UdalostRozlozeni) => posluchac.current?.(u);
 
@@ -227,7 +236,7 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
     return { polozky: model.current, zamceno: zamcenoRef.current, verze: verze.current, odebrane };
   };
 
-  const odesli = useCallback(async (keepalive = false): Promise<boolean> => {
+  const odesli = useCallback(async (): Promise<boolean> => {
     if (casovac.current) { clearTimeout(casovac.current); casovac.current = null; }
     if (bezi.current) { znovu.current = true; return bezi.current; }
     if (!ceka.current) return true;
@@ -239,17 +248,23 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
       let res: Response | null = null;
       let d: any = {};
       try {
+        // keepalive vždy: když člověk zavře kartu uprostřed zápisu, prohlížeč
+        // by obyčejný fetch zrušil a dopsání s verzí +1 (dopisHned) by pak
+        // narazilo na 409.
         res = await fetch(u, {
-          method: 'PUT', keepalive,
+          method: 'PUT', keepalive: true,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(teloZapisu()),
         });
         d = await res.json().catch(() => ({}));
       } catch { res = null; }
+      if (res?.ok && Number.isInteger(d?.verze)) verzePodleUrl.current.set(u, d.verze);
       // Odpověď pro stránku (rozsah), která už není na obrazovce, se jen zahodí.
       if (!zije.current || u !== urlRef.current) return !!res?.ok;
       if (res?.ok) {
-        verze.current = Number.isInteger(d?.verze) ? d.verze : verze.current;
+        // Nejvýš: souběžné dopsání (dopisHned) mohlo verzi posunout dál, než
+        // o jakou se ví z téhle odpovědi. Verze na serveru jen roste.
+        verze.current = Number.isInteger(d?.verze) ? Math.max(verze.current, d.verze) : verze.current;
         setVerzeStav(verze.current);
         pokus.current = 0;
         nahlasenoNeulozeno.current = false;
@@ -312,6 +327,46 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
   const odesliRef = useRef(odesli);
   odesliRef.current = odesli;
 
+  /**
+   * Dopsání fronty při odchodu (pagehide, skrytí karty): pošle se HNED
+   * s keepalive, nečeká se za běžícím zápisem — stránka mezitím skončí a na
+   * `znovu` z odesli() by nikdo nedošel (spec §4.7). Běžící zápis A
+   * (keepalive, takže doběhne i po zavření) zvedne verzi o jedna, proto
+   * dopsání nese verzi + 1 a celý model: vyhrát má poslední stav.
+   * Když stránka žije dál (jen skrytá karta) a dopsání přesto dostane 409
+   * (A neprošel), zkusí se to po doběhnutí A běžnou cestou znovu.
+   */
+  const dopisHned = useCallback((u: string) => {
+    if (!ceka.current || urlRef.current !== u) return;
+    if (!bezi.current) { void odesliRef.current(); return; }
+    if (casovac.current) { clearTimeout(casovac.current); casovac.current = null; }
+    const odeslano = model.current;
+    const telo = { ...teloZapisu(), verze: verze.current + 1 };
+    ceka.current = false;
+    fetch(u, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(telo) })
+      .then(async res => {
+        const d = await res.json().catch(() => ({}));
+        if (res.ok && Number.isInteger(d?.verze)) {
+          verzePodleUrl.current.set(u, d.verze);
+          if (zije.current && urlRef.current === u) { verze.current = Math.max(verze.current, d.verze); setVerzeStav(verze.current); }
+          return;
+        }
+        if (!res.ok && zije.current && urlRef.current === u && model.current === odeslano) {
+          ceka.current = true;
+          const pred = bezi.current;
+          if (pred) znovu.current = true; else void odesliRef.current();
+        }
+      })
+      .catch(() => {
+        // Při zavírání stránky prohlížeč sliby fetch odmítne, i když keepalive
+        // požadavek doběhne — opakování by poslalo starou verzi a skončilo 409.
+        if (odchod.current) return;
+        if (zije.current && urlRef.current === u && model.current === odeslano) { ceka.current = true; if (!bezi.current) void odesliRef.current(); else znovu.current = true; }
+      });
+  // teloZapisu čte jen refy.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const naplanuj = useCallback(() => {
     ceka.current = true;
     pokus.current = 0;
@@ -331,25 +386,38 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
     setLzeVratit(false);
     nacti();
     const u = url;
-    const dopsat = (keepalive: boolean) => {
-      if (!ceka.current || urlRef.current !== u) return;
-      void odesliRef.current(keepalive);
-    };
-    const pryc = () => dopsat(true);
-    const skryti = () => { if (document.visibilityState === 'hidden') dopsat(true); };
+    const pryc = () => { odchod.current = true; dopisHned(u); };
+    // Stránka z bfcache (zpět v historii) žije dál — opakování zase platí.
+    const navrat = () => { odchod.current = false; };
+    const skryti = () => { if (document.visibilityState === 'hidden') dopisHned(u); };
     window.addEventListener('pagehide', pryc);
+    window.addEventListener('pageshow', navrat);
     document.addEventListener('visibilitychange', skryti);
     return () => {
       window.removeEventListener('pagehide', pryc);
+      window.removeEventListener('pageshow', navrat);
       document.removeEventListener('visibilitychange', skryti);
       if (casovac.current) { clearTimeout(casovac.current); casovac.current = null; }
       if (ceka.current) {
         // Odmontování plochy (navigace v bočním pásu) nebo jiný rozsah: dopsat
-        // s keepalive, ať zápis přežije i zavření stránky.
+        // s keepalive, ať zápis přežije i zavření stránky. Když ještě běží
+        // předchozí zápis, počká se na něj a pošle se s verzí z JEHO odpovědi —
+        // s `verze.current` by server dopsání odmítl 409 a poslední změna by se
+        // potichu ztratila (review kola 68). Aplikace (SPA) mezitím žije dál,
+        // takže počkat jde; zavření karty řeší pagehide (dopisHned).
         const telo = teloZapisu();
+        const verzeTed = verze.current;
         ceka.current = false;
-        fetch(u, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(telo) })
-          .catch(() => { /* stránka už je pryč; při dalším otevření platí poslední uložený stav */ });
+        // Stará hodnota by po „Obnovit výchozí" (DELETE, verze od nuly) lhala —
+        // platí jen verze z odpovědi, která přijde teď.
+        verzePodleUrl.current.delete(u);
+        const posli = () => {
+          const v = verzePodleUrl.current.get(u) ?? verzeTed;
+          fetch(u, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...telo, verze: v }) })
+            .catch(() => { /* stránka už je pryč; při dalším otevření platí poslední uložený stav */ });
+        };
+        const pred = bezi.current;
+        if (pred) void pred.catch(() => false).then(posli); else posli();
       }
       generace.current++;
     };

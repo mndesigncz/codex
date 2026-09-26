@@ -59,7 +59,9 @@ export default function ListaUprav({ open, popisek, onPridat, onHotovo, menu, ne
               <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} direction="up"
                 className="absolute bottom-full mb-2 right-0 origin-bottom-right">
                 {menu.map(it => (
-                  <MenuItemButton key={it.label} {...it} onClick={() => { pop.close(false); it.onClick(); }} />
+                  // Fokus zpátky na „···" dřív, než položka otevře okno — jinak si
+                  // okno jako místo návratu uloží položku menu, která zmizí.
+                  <MenuItemButton key={it.label} {...it} onClick={() => { pop.close(true); it.onClick(); }} />
                 ))}
               </MenuPanel>
             )}

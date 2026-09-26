@@ -1,0 +1,90 @@
+{
+ "stranka": "vedeni.prehled",
+ "rozsah": "typ:vedeni",
+ "polozky": [
+  {
+   "id": "sklad-dochazi",
+   "widget": "sklad.dochazi",
+   "velikost": "S"
+  },
+  {
+   "id": "ukoly-dnes",
+   "widget": "ukoly.dnes",
+   "velikost": "S"
+  },
+  {
+   "id": "chat-neprectene",
+   "widget": "chat.neprectene",
+   "velikost": "S"
+  },
+  {
+   "id": "tym-clenove",
+   "widget": "tym.clenove",
+   "velikost": "S"
+  },
+  {
+   "id": "pokladna-dnes",
+   "widget": "pokladna.dnes",
+   "velikost": "M"
+  },
+  {
+   "id": "dochazka-prave-na-smene",
+   "widget": "dochazka.prave_na_smene",
+   "velikost": "M"
+  },
+  {
+   "id": "akce-nejblizsi",
+   "widget": "akce.nejblizsi",
+   "velikost": "M"
+  },
+  {
+   "id": "oznameni-nastenka",
+   "widget": "oznameni.nastenka",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "prehled.ceka_na_tebe",
+  "prehled.prvni_kroky",
+  "odkaz",
+  "sdileni.pripnuta_nabidka",
+  "oznameni.nastenka",
+  "chat.neprectene",
+  "pokladna.dnes",
+  "uzaverky.predavka",
+  "uzaverky.moje_uzaverka",
+  "dochazka.prave_na_smene",
+  "dochazka.moje_pichacky",
+  "dochazka.moje_odpracovano",
+  "rozvrh.dnesni_smeny",
+  "rozvrh.dostupnost_tymu",
+  "rozvrh.pripominka_dostupnosti",
+  "moje.nejblizsi_smena",
+  "sklad.dochazi",
+  "vyroba.k_vyrobe",
+  "ukoly.dnes",
+  "hodnoceni.ohodnotit_smeny",
+  "moje.zpetna_vazba",
+  "moje.tento_mesic",
+  "akce.nejblizsi",
+  "klient.hoste_vernost",
+  "klient.objednavky_od_stolu",
+  "tym.clenove"
+ ],
+ "zamceno": false,
+ "verze": 0,
+ "zdroj": "aplikace",
+ "upraveno": null,
+ "rozsahy": [
+  {
+   "id": "typ:vedeni",
+   "nazev": "Celé vedení",
+   "clenu": 5
+  },
+  {
+   "id": "role:provozni",
+   "nazev": "Provozní / Manažer směny",
+   "clenu": 2
+  }
+ ]
+}

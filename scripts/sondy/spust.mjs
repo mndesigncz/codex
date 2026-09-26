@@ -93,9 +93,16 @@ export const ZELENE = [
   'prepnuti',
   'search',
   'slib',
+  'k68-plocha',
+  'k68-telefon',
+  'k68-klavesnice',
+  'k68-opravneni',
+  'k68-vychozi',
+  'k68-design',
+  'k68-fyzika',
 ];
 
-const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody']);
+const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne']);
 const vsechny = readdirSync(DIR).filter(f => f.endsWith('.mjs')).map(f => f.slice(0, -4)).filter(n => !MIMO.has(n)).sort();
 
 const args = process.argv.slice(2);

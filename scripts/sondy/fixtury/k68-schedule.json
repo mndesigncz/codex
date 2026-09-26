@@ -1,0 +1,37 @@
+{
+ "shifts": [
+  {
+   "id": 901,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "date": "DNES",
+   "startTime": "07:00",
+   "endTime": "15:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 902,
+   "employeeId": 2,
+   "employeeName": "Jana Nováková",
+   "employeeAvatar": "👤",
+   "date": "DNES",
+   "startTime": "12:00",
+   "endTime": "20:00",
+   "type": "Odpolední"
+  },
+  {
+   "id": 903,
+   "employeeId": 3,
+   "employeeName": "Petr Svoboda",
+   "employeeAvatar": "👤",
+   "date": "DNES",
+   "startTime": "15:00",
+   "endTime": "22:00",
+   "type": "Odpolední"
+  }
+ ],
+ "gaps": [],
+ "understaffed": [],
+ "demand": []
+}

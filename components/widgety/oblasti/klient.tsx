@@ -23,6 +23,11 @@
 //    Chip místo ručně barvených pilulek, „Přijmout" `primary` místo limetky
 //    (limetka je na ploše jen „Hotovo" v úpravách) a odmítnutí přes okno
 //    místo confirm(). StaffInbox sám upraví B8; tady se nemění.
+//    Z StaffInbox je převzatá i sbalená „Kartička hosta u kasy" (CardScan):
+//    Domů zaměstnance dřív kreslilo StaffInbox vždy a obsluha tam kartičku
+//    načítala z telefonu — bez ní by denní úkon u kasy zmizel ze
+//    zaměstnaneckého rozhraní úplně (review kola 68). Jen s vernost.karta,
+//    jen od M výš a nikdy v náhledu.
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť — „Čeká na tebe" čte tentýž
 // příjem), dotaz až při `nacteno && ma(klíč)` (spec §1.5). V náhledu (galerie)
@@ -41,6 +46,8 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
+import { Icon } from '../../Icons';
+import CardScan from '../../client/CardScan';
 
 // ---------------------------------------------------------------------------
 // Společné drobnosti
@@ -325,6 +332,8 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
   const klic = klicCasti(ID_OBJEDNAVKY, 'akce:vyridit');
   // Přijmout, hotovo i odmítnutí jen s objednavky.vyridit — bez něj jen přehled.
   const vyridi = !!klic && smi(klic);
+  const klicKarty = klicCasti(ID_OBJEDNAVKY, 'akce:karta');
+  const kartu = !nahled && !!klicKarty && smi(klicKarty);
   const [pracuji, setPracuji] = useState<number | null>(null);
   const [hlaska, setHlaska] = useState<Hlaska | null>(null);
   const [odmitam, setOdmitam] = useState<Objednavka | null>(null);
@@ -391,12 +400,25 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
 
   const M = velikost === 'M';
   const videt = M ? fronta.slice(0, 5) : fronta;
+  // Vyhledání kartičky je nástroj pro chvíli, kdy ji někdo drží v ruce — jeden
+  // sbalený řádek, ne obsah, který by objednávkám bral první pohled.
+  const karta = kartu ? (
+    <details className="group">
+      <summary className="tap-target-sm inline-flex items-center gap-2 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
+        <Icon name="card" size={16} />Kartička hosta u kasy<Icon name="chevron" size={14} className="transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-2"><CardScan onToast={text => setHlaska({ text, ton: 'ok' })} /></div>
+    </details>
+  ) : null;
   return (
     <>
       <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Objednávky', pohled: 'klient:orders' }}
         doplnek={nove.length > 0 ? <Chip tone="wait" size="sm">{cislo(nove.length)}</Chip> : undefined}
-        prazdno={fronta.length === 0 && !hlaska ? <p className="t-meta">Žádná objednávka od stolu teď nečeká.</p> : undefined}>
+        // S kartičkou se prázdný stav kreslí v těle: přepnutí mezi `prazdno`
+        // a tělem by CardScan odpojilo a načtený host by po hlášce zmizel.
+        prazdno={fronta.length === 0 && !hlaska && !karta ? <p className="t-meta">Žádná objednávka od stolu teď nečeká.</p> : undefined}>
         <div className="space-y-3">
+          {fronta.length === 0 && <p className="t-meta">Žádná objednávka od stolu teď nečeká.</p>}
           {hlaska && (
             <p className={`note ${hlaska.ton === 'ok' ? 'note-ok' : 'note-danger'}`} role={hlaska.ton === 'ok' ? 'status' : 'alert'}>{hlaska.text}</p>
           )}
@@ -409,6 +431,7 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
             </ul>
           )}
           {M && fronta.length > 5 && <p className="t-meta">{aDalsich(fronta.length - 5)}</p>}
+          {karta}
         </div>
       </Widget>
       {odmitam && !nahled && (

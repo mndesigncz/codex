@@ -5,10 +5,9 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { normalizePoints } from '@/lib/rewardLevels';
 import { pragueToday } from '@/lib/pragueTime';
-import { useModal } from '@/lib/useModal';
 import { czForm } from '@/lib/czech';
 import { okJson } from '@/lib/api';
-import { DiscardGuard } from '../ui/DiscardGuard';
+import { Modal, Button, Segmented, Skeleton } from '../ui';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -73,7 +72,6 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
     /** Opened from "ohodnotit celou směnu" — rate everyone who worked it. */
     initialWholeShift?: boolean;
     onClose: () => void; onSaved: () => void }) {
-  const m = useModal(true, onClose, 'Hodnocení směny');
   const money = useMoney();
   const [date, setDate] = useState(initialDate || todayStr());
   const [shiftDates, setShiftDates] = useState<string[]>([]);
@@ -247,30 +245,26 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   const coworkers = summary?.coworkers ?? [];
   const targetNames = [employee.name, ...coworkers.map(c => c.name)];
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={m.guard} />
-        <div className="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 glass-strong chrome-edge">
-          <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60">{employee.avatar || '👤'}</span>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-bold tracking-tight text-[#16181A] truncate">
-              {wholeShift && coworkers.length > 0
-                ? `Hodnotit směnu — ${targetNames.map(n => n.split(' ')[0]).join(' + ')}`
-                : `Hodnotit směnu — ${employee.name}`}
-            </h3>
-            <p className="text-xs text-black/45 truncate">
-              {summary?.shift
-                ? `${summary.shift.label}${summary.shift.startTime ? ` · ${summary.shift.startTime}–${summary.shift.endTime ?? ''}` : ''}${summary?.window?.overnight ? ' · přes půlnoc' : ''}`
-                : 'Rozklikni položky, oprav odškrtnutí a připiš poznámku.'}
-            </p>
-          </div>
-          <button onClick={onClose} className="tap-target rounded-full w-8 h-8 flex items-center justify-center text-black/45 hover:bg-black/[0.06]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-        </div>
+  const titulek = wholeShift && coworkers.length > 0
+    ? `Hodnotit směnu — ${targetNames.map(n => n.split(' ')[0]).join(' + ')}`
+    : `Hodnotit směnu — ${employee.name}`;
+  const podtitulek = summary?.shift
+    ? `${summary.shift.label}${summary.shift.startTime ? ` · ${summary.shift.startTime}–${summary.shift.endTime ?? ''}` : ''}${summary?.window?.overnight ? ' · přes půlnoc' : ''}`
+    : 'Rozklikni položky, oprav odškrtnutí a připiš poznámku.';
 
-        <div className="p-5 space-y-5">
+  // Společné okno (kolo 68, audit Přehledu vedení): dřív ručně skládané
+  // s vlastní šířkou 512 px mimo tři velikosti Modal, s vlastním křížkem
+  // a limetkovým „Uložit". Props komponenty zůstávají stejné — okno otevírá
+  // widget Ohodnotit směny, Odměny, kalendář hodnocení i profil člověka.
+  return (
+    <Modal open onClose={onClose} size="md" title={titulek} subtitle={podtitulek}
+      footer={<>
+        <Button variant="secondary" onClick={onClose} title="Body a poznámky u položek se ukládají průběžně">Hotovo</Button>
+        <Button variant="primary" onClick={saveRating} loading={saving}>
+          {wholeShift ? `Uložit pro ${targetNames.length} ${plural(targetNames.length, 'člověka', 'lidi', 'lidí')}` : 'Uložit hodnocení'}
+        </Button>
+      </>}>
+        <div className="space-y-5">
           {/* Date picker */}
           <div>
             <label className="field-label">Den směny</label>
@@ -288,19 +282,17 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
 
           {/* Who the verdict covers — first decision, so one shift is one job. */}
           {coworkers.length > 0 && (
-            <div className="rounded-2xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-3.5">
-              <label className="block text-xs uppercase tracking-wider text-black/50 mb-2">Koho hodnotíš</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 rounded-full glass border border-black/[0.07] p-1">
-                <button onClick={() => setWholeShift(true)}
-                  className={`px-3 py-2 rounded-full text-xs font-semibold truncate transition ${wholeShift ? 'seg-on' : 'seg-off'}`}>
-                  Celou směnu ({targetNames.length} lidi)
-                </button>
-                <button onClick={() => setWholeShift(false)}
-                  className={`px-3 py-2 rounded-full text-xs font-semibold transition ${!wholeShift ? 'seg-on' : 'seg-off'}`}>
-                  Jen {employee.name.split(' ')[0]}
-                </button>
-              </div>
-              <p className="text-[11px] text-black/50 mt-2">
+            // Bez limetkového panelu a ručního přepínače (DP §3, Segmented):
+            // výběr je rozhodnutí, ne upozornění, a limetka patří jen hlavní akci.
+            <div>
+              <p className="t-label mb-2">Koho hodnotíš</p>
+              <Segmented size="sm" ariaLabel="Koho hodnotíš" value={wholeShift ? 'smena' : 'jeden'}
+                onChange={v => setWholeShift(v === 'smena')}
+                options={[
+                  { id: 'smena', label: `Celou směnu (${targetNames.length} ${plural(targetNames.length, 'člověk', 'lidé', 'lidí')})` },
+                  { id: 'jeden', label: `Jen ${employee.name.split(' ')[0]}` },
+                ]} />
+              <p className="text-xs text-black/50 mt-2">
                 {wholeShift
                   ? `Hvězdičky, poznámka i body se uloží všem: ${targetNames.join(', ')}. Automatické body se počítají každému zvlášť podle toho, co odvedl.`
                   : `Uloží se jen pro ${employee.name}. Na směně byl/a ještě: ${coworkers.map(c => c.name).join(', ')}.`}
@@ -309,7 +301,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           )}
 
           {loadingSummary ? (
-            <div className="glass-card h-40 animate-pulse" />
+            <Skeleton className="h-40 rounded-3xl" />
           ) : summary && (
             <div className="space-y-3">
               {/* Closing */}
@@ -386,7 +378,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                 <div className="mt-2 space-y-1">
                                   {t.checklist.map((it, i) => (
                                     <button key={i} onClick={() => toggleTaskCheck(t.id, i)} className="w-full flex items-center gap-2.5 text-left group">
-                                      <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 group-hover:border-[#C8F542]/60'}`}>
+                                      <span className={`w-5 h-5 rounded-xl border flex items-center justify-center shrink-0 transition ${it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 group-hover:border-[#C8F542]/60'}`}>
                                         {it.done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
                                       </span>
                                       <span className={`text-[13px] ${it.done ? 'text-black/45 line-through' : 'text-[#16181A]'}`}>{it.text}</span>
@@ -436,7 +428,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                   const skipped = p.skipped.includes(i);
                                   return (
                                     <button key={i} onClick={() => toggleProcStep(p.id, i)} className="w-full flex items-center gap-2.5 text-left group">
-                                      <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : skipped ? 'bg-wait/80 border-wait text-white' : 'border-bad/40 group-hover:border-[#C8F542]/60'}`}>
+                                      <span className={`w-5 h-5 rounded-xl border flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : skipped ? 'bg-wait/80 border-wait text-white' : 'border-bad/40 group-hover:border-[#C8F542]/60'}`}>
                                         {checked ? <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span> : skipped ? <span className="text-[11px] font-bold">⤳</span> : null}
                                       </span>
                                       <span className={`text-[13px] ${checked ? 'text-black/45 line-through' : skipped ? 'text-wait-ink' : 'text-bad-ink'}`}>{p.steps[i] ?? `Krok ${i + 1}`}</span>
@@ -508,16 +500,9 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           </div>
         </div>
 
-        <div className="sticky bottom-0 flex gap-2 px-5 py-4 glass-strong border-t border-black/[0.06]">
-          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 text-sm font-medium hover:bg-black/[0.05] transition" title="Body a poznámky u položek se ukládají průběžně">Hotovo</button>
-          {saveErr && (
-            <p className="w-full text-sm font-medium text-bad-ink"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {saveErr}</p>
-          )}
-          <button onClick={saveRating} disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 transition">
-            {saving ? 'Ukládám…' : wholeShift ? `Uložit pro ${targetNames.length} ${plural(targetNames.length, 'člověka', 'lidi', 'lidí')}` : 'Uložit hodnocení'}
-          </button>
-        </div>
-      </div>
-    </div>
+        {saveErr && (
+          <p role="alert" className="note note-danger mt-5"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {saveErr}</p>
+        )}
+    </Modal>
   );
 }

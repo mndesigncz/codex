@@ -1,0 +1,67 @@
+{
+ "stranka": "zamestnanec.domu",
+ "polozky": [
+  {
+   "id": "dochazka-moje-pichacky",
+   "widget": "dochazka.moje_pichacky",
+   "velikost": "M"
+  },
+  {
+   "id": "moje-nejblizsi-smena",
+   "widget": "moje.nejblizsi_smena",
+   "velikost": "M"
+  },
+  {
+   "id": "chat-neprectene",
+   "widget": "chat.neprectene",
+   "velikost": "S"
+  },
+  {
+   "id": "sklad-dochazi",
+   "widget": "sklad.dochazi",
+   "velikost": "S"
+  },
+  {
+   "id": "dochazka-moje-odpracovano",
+   "widget": "dochazka.moje_odpracovano",
+   "velikost": "S"
+  },
+  {
+   "id": "ukoly-dnes",
+   "widget": "ukoly.dnes",
+   "velikost": "S"
+  },
+  {
+   "id": "oznameni-nastenka",
+   "widget": "oznameni.nastenka",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "odkaz",
+  "sdileni.pripnuta_nabidka",
+  "oznameni.nastenka",
+  "chat.neprectene",
+  "uzaverky.predavka",
+  "uzaverky.moje_uzaverka",
+  "dochazka.moje_pichacky",
+  "dochazka.moje_odpracovano",
+  "rozvrh.dnesni_smeny",
+  "rozvrh.pripominka_dostupnosti",
+  "moje.nejblizsi_smena",
+  "sklad.dochazi",
+  "vyroba.k_vyrobe",
+  "ukoly.dnes",
+  "moje.zpetna_vazba",
+  "moje.tento_mesic",
+  "akce.nejblizsi",
+  "klient.objednavky_od_stolu"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

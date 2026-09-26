@@ -62,6 +62,8 @@ function prednactiUpravy() {
 
 const VELIKOST_MALE: Record<Velikost, string> = { S: 'malý', M: 'střední', L: 'velký' };
 const NAVOD = 'Šipkami přesuneš, Enter otevře nabídku, Delete odebere, Escape ukončí úpravy.';
+/** Jak dlouho po operaci se klepnutí na prázdné místo nebere jako „klepnutí mimo" (pružina souseda dojíždí 0,35 s). */
+const KLID_PO_OPERACI_MS = 400;
 const VSTUP = 'Úpravy stránky. Widget přesuneš tažením nebo šipkami, Enter otevře nabídku, Delete odebere, Escape úpravy ukončí.';
 
 // ---------------------------------------------------------------------------
@@ -331,6 +333,15 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const zvednoutPo = useRef<null | { instance: string; pointerId: number; pointerType: string; x: number; y: number; offX: number; offY: number }>(null);
   const cekaNaUlozeni = useRef(false);
   const mimo = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Čas poslední operace (vstup do úprav, odebrání, přidání, přesun, Vrátit).
+   * Klepnutí těsně po ní není „klepnutí mimo": druhé rychlé klepnutí na „−"
+   * trefí prázdné místo, kde soused teprve dojíždí pružinou, a dvojklik na
+   * „Upravit" trefí nadpis, protože tlačítko po prvním kliku zmizelo.
+   */
+  const posledniOperace = useRef(0);
+  /** Fokus na widget až po zavření okna — viz efekt „po zavření okna" níž. */
+  const fokusPoOkne = useRef<string | null>(null);
   const posledniDotyk = useRef(0);
 
   // ---- Co se kreslí ----
@@ -396,11 +407,17 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     },
     onPusteni: (instance, z, na, pocet, poradi) => {
       if (na !== z) {
-        const mapa = new Map(polozkyRef.current.map(p => [p.id, p]));
-        const nove = poradi.map(id => mapa.get(id)).filter((p): p is PolozkaRozlozeni => !!p);
-        // Co v DOM nebylo (nemělo by se stát), zůstane na konci — nic se neztratí.
-        for (const p of polozkyRef.current) if (!poradi.includes(p.id)) nove.push(p);
-        r.zmen(nove);
+        // Pojistka k useTazeni: pořadí z tahu platí jen nad stejnou množinou
+        // widgetů. Jiná množina = model se během tahu změnil a zápis by
+        // přepsal novější stav — pak se nic nezapíše.
+        const pol = polozkyRef.current;
+        const mapa = new Map(pol.map(p => [p.id, p]));
+        if (poradi.length !== pol.length || poradi.some(id => !mapa.has(id))) {
+          oznam(`${nazevId(instance)} zůstal na svém místě.`);
+          return;
+        }
+        r.zmen(poradi.map(id => mapa.get(id)!));
+        posledniOperace.current = performance.now();
       }
       oznam(`${nazevId(instance)} položen na pozici ${na + 1} z ${pocet}.`);
     },
@@ -419,6 +436,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     setMenu(null);
     setUpravy(true);
     setUpravyNekdy(true);
+    posledniOperace.current = performance.now();
     oznam(VSTUP);
     // Z klávesnice a tlačítkem jde fokus na widget; při podržení zůstane, kde byl.
     if (zpusob !== 'podrzeni') fokusPo.current = fokusNa ?? 'prvni';
@@ -468,6 +486,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     const pred = new Set(polozkyRef.current.map(p => p.id));
     pripravFlip();
     if (!r.vratit()) return;
+    posledniOperace.current = performance.now();
     vraceneOd.current = pred;
     ukazToast('Vráceno');
     oznam('Vráceno.');
@@ -488,6 +507,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     menuRef.current = null;
     setMenu(null);
     r.zmen(pol.filter(x => x.id !== instance));
+    posledniOperace.current = performance.now();
     vibruj(pointerType);
     ukazToast('Widget odebrán', { akce: { label: 'Vrátit', onClick: () => vratitRef.current() } });
     oznam(`${nazevPolozky(p)} odebrán. Vrátit: Ctrl+Z.`);
@@ -503,6 +523,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     if (cil === i) return;
     pohyb.zrusVse();
     r.zmen(presun(pol, i, cil));
+    posledniOperace.current = performance.now();
     oznam(`${nazevPolozky(pol[i])}, pozice ${cil + 1} z ${pol.length}.`);
     fokusPo.current = instance;
   }, [pohyb, r, oznam, nazevPolozky]);
@@ -520,11 +541,14 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     const kam = odkud === 'lista' && pol.length && pol[pol.length - 1].widget === NASTROJ ? pol.length - 1 : pol.length;
     pripravFlip();
     r.zmen([...pol.slice(0, kam), polozka, ...pol.slice(kam)]);
+    posledniOperace.current = performance.now();
     setGalerie(null);
     setNova(id);
     predstahni([widgetId]);
     posunoutK.current = id;
-    fokusPo.current = id;
+    // Ne fokusPo: galerie se zavírá v tomtéž commitu a její useModal by fokus
+    // v pasivním úklidu vrátil na „Přidat widget" až PO layout efektu.
+    fokusPoOkne.current = id;
     oznam(`${def.nazev} přidán na pozici ${kam + 1} z ${pol.length + 1}.`);
   }, [pripravFlip, r, oznam]);
 
@@ -543,6 +567,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     const p = pol.find(x => x.id === instance);
     setNastaveni(null);
     if (!p) return;
+    posledniOperace.current = performance.now();
     pripravFlip();
     r.zmen(pol.map(x => {
       if (x.id !== instance) return x;
@@ -550,13 +575,17 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
       return Object.keys(hodnoty).length ? { ...zbytek, velikost, nastaveni: hodnoty } : { ...zbytek, velikost };
     }));
     oznam(`${nazevPolozky(p)}: ${VELIKOST_MALE[velikost]}.`);
-    fokusPo.current = instance;
+    fokusPoOkne.current = instance;
   }, [pripravFlip, r, oznam, nazevPolozky]);
 
   const obnovVychozi = useCallback(async () => {
     pripravFlip();
     const ok = await r.obnovVychozi();
-    if (ok) ukazToast('Obnoveno výchozí rozložení', { akce: { label: 'Vrátit', onClick: () => vratitRef.current() } });
+    if (!ok) return;
+    posledniOperace.current = performance.now();
+    // Položka nabídky, která měla fokus, je pryč — fokus na první widget, ne na <body>.
+    if (upravyRef.current) fokusPo.current = 'prvni';
+    ukazToast('Obnoveno výchozí rozložení', { akce: { label: 'Vrátit', onClick: () => vratitRef.current() } });
   }, [pripravFlip, r, ukazToast]);
 
   const otevriMenu = useCallback((m: OtevreneMenu) => {
@@ -600,6 +629,9 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
 
   const klavesaPolozky = useCallback((e: React.KeyboardEvent<HTMLElement>, instance: string) => {
     if (e.target !== e.currentTarget) return;
+    // Během tahu myší klávesy nic nedělají: přesun by zrušil snímkovou úlohu
+    // tahu a Delete by odebral kartu pod prstem (tah vyřídí jen Escape).
+    if (tahne()) { if (e.key !== 'Escape' && e.key !== 'Tab') e.preventDefault(); return; }
     const li = e.currentTarget;
     switch (e.key) {
       case 'ArrowLeft': case 'ArrowUp': e.preventDefault(); posun(instance, -1); break;
@@ -621,7 +653,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
         }
         break;
     }
-  }, [posun, odeber, otevriMenu]);
+  }, [posun, odeber, otevriMenu, tahne]);
 
   // Escape a Ctrl/Cmd+Z v úpravách. Otevřené menu nebo okno má Escape pro sebe
   // (usePopover i useModal ho zastaví dřív, než sem dojde).
@@ -638,12 +670,15 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
         if ((e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
         e.preventDefault();
+        // Vrátit uprostřed tahu by vložilo widget pod taženou kartu a tah by pak
+        // zapsal zastaralé pořadí — počká se, až karta dosedne.
+        if (tahne()) return;
         vratitRef.current();
       }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [upravy, vychoziRezim, ukonciUpravy]);
+  }, [upravy, vychoziRezim, ukonciUpravy, tahne]);
 
   // ---- Obsluha kořene plochy ----
 
@@ -654,7 +689,8 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     // „Klepnutí mimo" ukončí úpravy: mezera mřížky, pruh pod ní nebo hlavička —
     // ne widget, buňka „+", lišta, okno, menu ani toast (spec §4.4).
     const vHlavicce = !!hlavickaRef.current?.contains(cil) && !cil.closest('button, a, [data-plocha-chrom]');
-    mimo.current = cil === koren.current || cil === mrizka.current || vHlavicce ? { x: e.clientX, y: e.clientY } : null;
+    const tesnePoOperaci = performance.now() - posledniOperace.current < KLID_PO_OPERACI_MS;
+    mimo.current = !tesnePoOperaci && (cil === koren.current || cil === mrizka.current || vHlavicce) ? { x: e.clientX, y: e.clientY } : null;
   };
   const onClickKorene = (e: React.MouseEvent<HTMLDivElement>) => {
     const m = mimo.current;
@@ -686,10 +722,17 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
 
   // ---- Efekty po vykreslení ----
 
+  const predchoziModel = useRef(polozky);
   // FLIP po změně modelu, režimu nebo počtu sloupců: změřeno před změnou,
   // dojede se teď, ve stejném snímku, kdy React přerovnal DOM. Tamtéž se
   // po tahu smaže CSS `order` — přerovnání a smazání se nesmí rozejít o snímek.
   useLayoutEffect(() => {
+    // Model se změnil uprostřed tahu (409 s novějším stavem, odpověď serveru,
+    // Vrátit druhým prstem): tah stojí na zastaralém snímku pořadí, zruší se.
+    if (predchoziModel.current !== polozky) {
+      predchoziModel.current = polozky;
+      if (tahne()) zrusTah();
+    }
     dokonciPoradi();
     const f = flipPred.current;
     if (!f) return;
@@ -730,6 +773,18 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     if (f === 'prvni') { mrizka.current?.querySelector<HTMLElement>(':scope > li[data-instance]:not([hidden])')?.focus(); return; }
     const li = najdiLi(f);
     if (li && document.activeElement !== li) li.focus({ preventScroll: !!k });
+  });
+
+  // Po zavření okna (přidání z galerie, uložení nastavení): fokus na widget.
+  // Pasivní efekt, protože useModal zavírajícího se okna vrací fokus na svůj
+  // spouštěč v pasivním úklidu — ten React spouští až po layout efektech, ale
+  // před pasivními efekty téhož commitu. Tady tedy vyhrajeme my.
+  useEffect(() => {
+    const f = fokusPoOkne.current;
+    if (!f) return;
+    fokusPoOkne.current = null;
+    const li = najdiLi(f);
+    if (li && upravyRef.current) li.focus({ preventScroll: true });
   });
 
   // Počet sloupců podle šířky PLOCHY, ne okna (boční pás, TO GO, náhled v Nastavení).
@@ -891,10 +946,13 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const upravit = smiUpravit && !vychoziRezim && vedlejsiVlastni < 2 ? (
     <Button ref={upravitRef} variant="secondary" icon="pencil" onClick={() => vstupDoUprav('tlacitko')}>Upravit</Button>
   ) : null;
-  const menuHlavicky: MenuItem[] = [
-    ...(hlavicka.menu ?? []),
-    ...(smiUpravit && !vychoziRezim ? [{ label: 'Upravit stránku', icon: 'pencil', onClick: () => vstupDoUprav('tlacitko') }] : []),
-  ];
+  // „Upravit stránku" v „···" jen tam, kde tlačítko „Upravit" není vidět:
+  // na telefonu (vedlejší akce se schovají), na monitoru jen tehdy, když se
+  // tlačítko nevešlo vedle dvou vlastních akcí. Menu, které na monitoru
+  // opakuje sousední tlačítko, je ovládací prvek bez nové funkce (DP §0).
+  const upravitStranku: MenuItem[] = smiUpravit && !vychoziRezim ? [{ label: 'Upravit stránku', icon: 'pencil', onClick: () => vstupDoUprav('tlacitko') }] : [];
+  const menuHlavicky: MenuItem[] = [...(hlavicka.menu ?? []), ...(upravit ? [] : upravitStranku)];
+  const menuHlavickyMobil: MenuItem[] = upravit ? upravitStranku : [];
 
   const celaChyba = zaloha && chybaOpravneni;
   const nacitam = r.nacteni === 'nacitam' && !r.predbezne && !polozky.length;
@@ -927,6 +985,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
           primary={upravy ? undefined : hlavicka.primary}
           secondary={upravy ? undefined : (hlavicka.secondary || upravit ? <>{hlavicka.secondary}{upravit}</> : undefined)}
           menu={upravy ? undefined : menuHlavicky}
+          menuMobile={upravy ? undefined : menuHlavickyMobil}
           aside={hlavicka.aside ? <div inert={upravy || undefined}>{hlavicka.aside}</div> : undefined}
         />
       </div>

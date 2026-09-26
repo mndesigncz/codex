@@ -58,7 +58,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
     tarif: 'max',
     stav: 'planovany',
   },
-  // Data: GET /api/client/staff/inbox → orders[], reservations[] (s rezervace.zobrazit), newCount, stuck, pos
+  // Data: GET /api/client/staff/inbox → orders[], reservations[] (s rezervace.zobrazit), newCount, stuck, pos.
+  // Kartička hosta u kasy (CardScan) volá /api/client/staff/scan s vernost.karta.
   {
     id: 'klient.objednavky_od_stolu',
     oblast: 'klient',
@@ -69,7 +70,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
     stranky: ['zamestnanec.domu', 'vedeni.klient', 'kiosk.smena'],
-    opravneni: { vse: ['objednavky.zobrazit'], nektere: [], pole: { 'akce:vyridit': 'objednavky.vyridit' } },
+    opravneni: { vse: ['objednavky.zobrazit'], nektere: [], pole: { 'akce:vyridit': 'objednavky.vyridit', 'akce:karta': 'vernost.karta' } },
     tarif: 'max',
     stav: 'hotovo',
   },

@@ -187,9 +187,12 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
         <span aria-hidden className="pointer-events-none absolute -top-14 -right-10 h-32 w-32 rounded-full bg-[#C8F542]/25 blur-2xl" />
       )}
       <div className="relative flex items-start justify-between gap-3">
-        <h2 id={idTitulku} className={`t-card flex items-center gap-2 min-w-0 ${inkoust ? '!text-white' : ''}`}>
-          <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={17} className={`shrink-0 ${inkoust ? 'text-white/60' : 'text-black/40'}`} />
-          <span className="truncate">{nazev}</span>
+        {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~125 px:
+            „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
+            ním by nemělo jméno. U S proto dva řádky, ikona u prvního. */}
+        <h2 id={idTitulku} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${inkoust ? '!text-white' : ''}`}>
+          <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={17} className={`shrink-0 ${S ? 'mt-px' : ''} ${inkoust ? 'text-white/60' : 'text-black/40'}`} />
+          <span className={S ? 'line-clamp-2 break-words' : 'truncate'}>{nazev}</span>
           {doplnek}
         </h2>
         {vidiOdkaz && (

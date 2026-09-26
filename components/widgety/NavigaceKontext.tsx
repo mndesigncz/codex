@@ -27,19 +27,26 @@ export function useNavigace(): Navigace {
 }
 
 /**
- * Přísné oprávnění pro pole a akce widgetu: `nacteno && ma(klic)`.
+ * Přísné oprávnění pro pole a akce widgetu: po načtení `ma(klic)`, během
+ * načítání NE, a když /api/teams/mine selže, ANO.
  *
  * Samotné `ma()` před načtením oprávnění vrací ANO (záchyt, aby výpadek
  * /api/teams/mine neschoval půlku aplikace). Pro widget to nestačí: dotaz
  * na tržby by odešel dřív, než víme, jestli na ně divák má, a skončil by
  * 403 jako falešná chyba (spec §1.5). Pole = stačí kterékoli z klíčů.
+ *
+ * Při chybě načtení platí totéž rozhodnutí jako u brány widgetu (useBrana
+ * v oblasti obecne): plocha widgety připojí, server je vrátil v rozložení
+ * a každý dotaz si hlídá sám (403 widget ukáže jako „Nenačetly se: …").
+ * Kdyby tu bylo NE, „Čeká na tebe" by při výpadku potichu zmizelo celé —
+ * všechny fronty vypnuté, nic k ukázání (review kola 68).
  */
 export function useSmi(): Smi {
-  const { nacteno, ma, opravneni } = useOpravneni();
+  const { nacteno, chyba, ma, opravneni } = useOpravneni();
   // `ma` vzniká při každém vykreslení; widget dává výsledek do závislostí
   // efektů (URL dotazu), tak ať se funkce mění jen se stavem oprávnění.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useCallback((klic: string | readonly string[]) => nacteno && ma(klic), [nacteno, opravneni]);
+  return useCallback((klic: string | readonly string[]) => (nacteno ? ma(klic) : chyba), [nacteno, chyba, opravneni]);
 }
 
 /**

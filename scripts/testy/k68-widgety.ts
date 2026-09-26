@@ -352,6 +352,31 @@ export default function (t: Testy) {
     eq('cíl tahu: pod poslední řadou → konec', cilovyIndex({ x: 50, y: 300 }, r, 0, 0), 2);
     eq('cíl tahu: vlastní zóna tažené položky se nepočítá', cilovyIndex({ x: 50, y: 50 }, r, 0, 1), 1);
     eq('cíl tahu: skrytá položka (bez obdélníku) se přeskočí', cilovyIndex({ x: 160, y: 50 }, [r[0], null, r[2]], 0, 0), 0);
+    eq('cíl tahu: zóna položky, která vyvolala minulé přeskládání, cíl nemění', cilovyIndex({ x: 160, y: 50 }, r, 0, 0, 1), 0);
+    eq('cíl tahu: blokovaná položka neblokuje ostatní', cilovyIndex({ x: 270, y: 50 }, r, 0, 0, 1), 2);
+  }
+  {
+    // Review kola 68 (rev-fyz2): S se drží nad středem L, která zabírá celou
+    // řadu. Přesun S za L nechá L na místě (bez dense S spadne pod ni), takže
+    // ukazatel zůstane v zóně L. Bez blokace by cíl skákal „za L" / „před L"
+    // každých 80 ms. Simulace smyčky tahu: nejvýš jedno přeskládání.
+    const zona = (x: number, y: number, w: number, h: number) => ({ left: x, top: y, width: w, height: h });
+    const bod = { x: 640, y: 300 };
+    let poradi = ['s', 'L'];
+    let blok: string | null = null;
+    let preskladani = 0;
+    for (let snimek = 0; snimek < 20; snimek++) {
+      // Rozvržení: L vždy v řadě y 200–400 přes celou šířku; S nad ní, nebo pod ní.
+      const rozvrzeni: Record<string, ReturnType<typeof zona>> = { L: zona(0, 200, 1280, 200), s: poradi[0] === 's' ? zona(0, 0, 310, 180) : zona(0, 420, 310, 180) };
+      if (blok && !(bod.x >= 320 && bod.x <= 960 && bod.y >= 240 && bod.y <= 360)) blok = null;
+      const tazeny = poradi.indexOf('s');
+      const c = cilovyIndex(bod, poradi.map(id => rozvrzeni[id]), tazeny, tazeny, blok ? poradi.indexOf(blok) : -1);
+      if (c === tazeny) continue;
+      blok = poradi[c];
+      poradi = presun(poradi, tazeny, c);
+      preskladani++;
+    }
+    eq('cíl tahu: malá karta držená nad velkou přeskládá nejvýš jednou', preskladani, 1);
   }
 
   // ---- pružina ----

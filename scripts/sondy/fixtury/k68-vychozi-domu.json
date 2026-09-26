@@ -1,0 +1,67 @@
+{
+ "stranka": "zamestnanec.domu",
+ "rozsah": "typ:zamestnanec",
+ "polozky": [
+  {
+   "id": "dochazka-moje-pichacky",
+   "widget": "dochazka.moje_pichacky",
+   "velikost": "M"
+  },
+  {
+   "id": "moje-nejblizsi-smena",
+   "widget": "moje.nejblizsi_smena",
+   "velikost": "M"
+  },
+  {
+   "id": "uzaverky-predavka",
+   "widget": "uzaverky.predavka",
+   "velikost": "L"
+  },
+  {
+   "id": "ukoly-dnes",
+   "widget": "ukoly.dnes",
+   "velikost": "M"
+  },
+  {
+   "id": "oznameni-nastenka",
+   "widget": "oznameni.nastenka",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "odkaz",
+  "sdileni.pripnuta_nabidka",
+  "oznameni.nastenka",
+  "chat.neprectene",
+  "uzaverky.predavka",
+  "uzaverky.moje_uzaverka",
+  "dochazka.moje_pichacky",
+  "dochazka.moje_odpracovano",
+  "rozvrh.dnesni_smeny",
+  "rozvrh.pripominka_dostupnosti",
+  "moje.nejblizsi_smena",
+  "sklad.dochazi",
+  "vyroba.k_vyrobe",
+  "ukoly.dnes",
+  "moje.zpetna_vazba",
+  "moje.tento_mesic",
+  "akce.nejblizsi",
+  "klient.objednavky_od_stolu"
+ ],
+ "zamceno": false,
+ "verze": 0,
+ "zdroj": "aplikace",
+ "upraveno": null,
+ "rozsahy": [
+  {
+   "id": "typ:zamestnanec",
+   "nazev": "Všichni zaměstnanci",
+   "clenu": 12
+  },
+  {
+   "id": "role:barista",
+   "nazev": "Barista / Obsluha",
+   "clenu": 9
+  }
+ ]
+}
