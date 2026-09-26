@@ -3,7 +3,8 @@
 //
 // Výchozí pro vedení je z katalogu, jen přibyl ukoly.dnes S, aby v kole 68 zůstala řada čísel
 // (spec §6.1). Plánované widgety se vynechají, dokud je balík nedodá. Výchozí pro Provozní,
-// Skladníka a Účetní platí jen s aspoň třemi viditelnými widgety (spec §1.3, pravidlo tří).
+// Skladníka a Účetní platí jen s aspoň třemi viditelnými widgety a zároveň s aspoň polovinou
+// svých položek viditelných (spec §1.3, pravidlo tří; rozlozeni.ts vychoziZKodu).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {

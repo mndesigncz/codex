@@ -263,6 +263,22 @@ export interface OdpovedRozlozeni {
 /** Volba „Pro koho" u výchozího rozložení. */
 export interface RozsahVolba { id: Rozsah; nazev: string; clenu: number }
 
+/** Tělo PUT /api/rozlozeni/vychozi?stranka=…&rozsah=… */
+export interface ZapisVychoziho {
+  polozky: PolozkaRozlozeni[];
+  zamceno: boolean;
+  /** Verze výchozího řádku, kterou klient viděl (0 = ještě není). */
+  verze: number;
+  /**
+   * Id položek, které správce vědomě odebral. Server jinak vrací položky,
+   * které správce nevidí (oprávnění, tarif, jiné rozhraní), jako u osobního
+   * zápisu. Editor v Nastavení → Stránky vidí výchozí nefiltrované, takže
+   * posílá všechna id, která proti poslední odpovědi serveru chybí.
+   * „Uložit jako výchozí" z plochy ho neposílá.
+   */
+  odebrane?: string[];
+}
+
 /** GET /api/rozlozeni/vychozi?stranka=…&rozsah=… */
 export interface OdpovedVychozi {
   stranka: IdStranky;

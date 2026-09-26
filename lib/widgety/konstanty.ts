@@ -29,6 +29,9 @@ export const PRUZINA = { tlumeni: 1, odezva: 0.35 } as const;
 /** Strop rychlosti prstu předávané pružině. */
 export const STROP_RYCHLOSTI = 2500;
 
+/** Rychlost puštění: nejvýš tolik posledních vzorků z okna před puštěním (spec §4.5). */
+export const RYCHLOST_PUSTENI = { oknoMs: 100, vzorku: 5 } as const;
+
 /** Rolování u okraje při tahu: zóna od hrany a nejvyšší rychlost. */
 export const ROLOVANI_U_OKRAJE = { zonaPx: 72, maxPxS: 1100 } as const;
 
@@ -97,6 +100,13 @@ export const MAX_INSTANCI = 6;
  * 68, kdy jejich výchozí stojí hlavně na widgetech z kola 69.
  */
 export const PRAVIDLO_TRI = 3;
+
+/**
+ * …a zároveň aspoň tahle část položek výchozího role. Samotná trojka
+ * nestačí: Skladník s tarifem Max by z deseti položek viděl tři (dvě L)
+ * a měl by chudší plochu než se Pro, kde padne na výchozí vedení.
+ */
+export const PRAVIDLO_TRI_PODIL = 0.5;
 
 /** Limit zápisů rozložení na člověka: 120 za minutu. */
 export const LIMIT_ZAPISU = { max: 120, oknoS: 60 } as const;

@@ -182,7 +182,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'uzaverky.kalendar',
     oblast: 'uzaverky',
     nazev: 'Kalendář uzávěrek',
-    popis: 'Měsíc: kdo pracoval, kdo zavřel, kde chybí, co čeká; s finance.trzby i tržba dne. Klik na den filtruje seznam (na stránce Uzávěrky).',
+    popis: 'Měsíc: kdo pracoval, kdo zavřel, kde chybí a co čeká; s přístupem k tržbám i tržba dne.',
     ikona: 'trend',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',

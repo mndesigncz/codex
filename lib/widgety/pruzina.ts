@@ -7,7 +7,7 @@
 // Proto vlastní pružina místo knihovny (spec §4.14): pružina jde kdykoli
 // přerušit novým cílem a nese rychlost prstu.
 
-import { PRUZINA, ROLOVANI_U_OKRAJE, STROP_RYCHLOSTI } from './konstanty.ts';
+import { PRUZINA, ROLOVANI_U_OKRAJE, RYCHLOST_PUSTENI, STROP_RYCHLOSTI } from './konstanty.ts';
 
 /** Kritický tlumený krok: posun x a rychlost v (px, px/s) k cíli 0 za dt sekund. */
 export function krok(x: number, v: number, dt: number, odezva: number = PRUZINA.odezva): { x: number; v: number } {
@@ -24,19 +24,25 @@ export const USAZENO = (x: number, v: number): boolean => Math.abs(x) < 0.5 && M
 export interface VzorekUkazatele { t: number; x: number; y: number }
 
 /**
- * Rychlost puštění z posledních vzorků: nejvýš 5 vzorků z posledních 100 ms,
- * (poslední − první) / Δt po osách, oříznuté na ±strop. Starší vzorky by
+ * Rychlost puštění: nejvýš 5 vzorků z posledních 100 ms PŘED PUŠTĚNÍM,
+ * (puštění − první) / Δt po osách, oříznuté na ±strop. Starší vzorky by
  * do hodu započítaly i zpomalení před puštěním.
+ *
+ * `pusteni` je vzorek z pointerup (timeStamp, clientX/Y) a počítá se jako
+ * poslední. Okno se měří od něj, ne od posledního pointermove: když prst
+ * zastaví a chvíli drží, pointermove nechodí a rychlost z pohybu před
+ * zastavením by kartu „odhodila" až 2500 px/s. Mezi posledním pointermove
+ * a puštěním prst stál (pohyb by pointermove vyvolal), takže pauza rychlost
+ * srazí a po 100 ms klidu je nulová.
  */
-export function rychlostZVzorku(vzorky: readonly VzorekUkazatele[], strop: number = STROP_RYCHLOSTI): { vx: number; vy: number } {
-  if (vzorky.length < 2) return { vx: 0, vy: 0 };
-  const posledni = vzorky[vzorky.length - 1];
-  const okno = vzorky.filter(s => posledni.t - s.t <= 100).slice(-5);
+export function rychlostZVzorku(vzorky: readonly VzorekUkazatele[], pusteni: VzorekUkazatele, strop: number = STROP_RYCHLOSTI): { vx: number; vy: number } {
+  const { oknoMs, vzorku } = RYCHLOST_PUSTENI;
+  const okno = [...vzorky.filter(s => s.t < pusteni.t && pusteni.t - s.t <= oknoMs), pusteni].slice(-vzorku);
   const prvni = okno[0];
-  const dt = (posledni.t - prvni.t) / 1000;
+  const dt = (pusteni.t - prvni.t) / 1000;
   if (!(dt > 0)) return { vx: 0, vy: 0 };
   const orez = (v: number) => Math.max(-strop, Math.min(strop, v));
-  return { vx: orez((posledni.x - prvni.x) / dt), vy: orez((posledni.y - prvni.y) / dt) };
+  return { vx: orez((pusteni.x - prvni.x) / dt), vy: orez((pusteni.y - prvni.y) / dt) };
 }
 
 /**

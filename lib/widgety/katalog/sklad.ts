@@ -251,7 +251,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'sklad.zapsat_novou',
     oblast: 'sklad',
     nazev: 'Zapsat novou věc',
-    popis: 'Rychlá akce: přišlo zboží — vyfotit, napsat kolik; bez sklad.pridat jde jako návrh ke schválení.',
+    popis: 'Rychlá akce: přišlo zboží — vyfotit a napsat kolik; bez práva přidávat jde jako návrh ke schválení.',
     ikona: 'box',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',

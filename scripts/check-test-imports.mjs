@@ -9,13 +9,20 @@
 // Stalo se to přesně takhle: do `lib/productionPlan.ts` přibyl
 // `import { czCount } from '@/lib/czech'` a testy přestaly jít spustit.
 //
-// Kontrola projde graf importů od `scripts/test-units.ts` a hlídá jen
-// soubory, kterých se testy opravdu dotknou — zbytek repa alias používat může.
+// Kontrola projde graf importů od `scripts/test-units.ts` (a od každého
+// souboru ve `scripts/testy/`) a hlídá jen soubory, kterých se testy opravdu
+// dotknou — zbytek repa alias používat může. Import se hledá na jednom řádku:
+// víceřádkový `import {…} from` kontrola nevidí, proto ho v testovaném kódu
+// nepiš.
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 
 const ENTRY = 'scripts/test-units.ts';
+// Od kola 68 si test-units.ts načítá i scripts/testy/*.ts — dynamicky, podle
+// obsahu složky, takže je graf importů nevidí. Prochází se proto zvlášť.
+const TESTY = 'scripts/testy';
+const ENTRIES = [ENTRY, ...(existsSync(TESTY) ? readdirSync(TESTY).filter(f => f.endsWith('.ts')).sort().map(f => `${TESTY}/${f}`) : [])];
 
 /** Relativní import na skutečný soubor; zkusí i doplnit příponu. */
 function resolveLocal(from, spec) {
@@ -52,7 +59,7 @@ function walk(file) {
   }
 }
 
-walk(ENTRY);
+for (const e of ENTRIES) walk(e);
 
 if (hits.length) {
   console.error(`\nSoubory, které si načítá \`npm test\`, nesmí importovat přes alias \`@/\`.`);

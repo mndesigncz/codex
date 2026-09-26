@@ -5,6 +5,12 @@ import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
+import { zDashboardConfig } from '@/lib/widgety/migrace';
+
+/** Jednorázový převod dashboard_config → rozlozeni_stranek; zapne ho nasazení plochy na přehledech (kolo 68, krok C). */
+const PREVEST_DASHBOARD_CONFIG = false;
+import { normalizujRozlozeni } from '@/lib/widgety/rozlozeni';
+import { stranka as strankaRozlozeni } from '@/lib/widgety/stranky';
 
 export const dynamic = 'force-dynamic';
 
@@ -1877,6 +1883,109 @@ export async function GET(request: Request) {
     // databáze, mohl se odpíchnout za kohokoli. Nový sloupec drží hash;
     // starý se po prvním úspěšném přihlášení sám přepíše a vyprázdní.
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT`);
+
+    // ---- Rozložení stránek (kolo 68) ----
+    // Plocha s widgety: osobní rozložení člověka (rozsah osobni:<id>) a výchozí
+    // podniku pro typ role nebo konkrétní roli (typ:…, role:…). Rozložení je
+    // per člověk, ne per podnik, proto vlastní tabulka a ne JSON v teams:
+    // každý řádek má vlastní `verze` na souběh dvou oken (zápis s jinou verzí
+    // dostane 409) a nic se nečte a nepřepisuje celé. Řádek vzniká až při
+    // první úpravě, takže prázdné účty nic nestojí.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS rozlozeni_stranek (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        stranka TEXT NOT NULL,
+        rozsah TEXT NOT NULL,
+        user_id INTEGER,
+        polozky JSONB NOT NULL DEFAULT '[]',
+        zamceno BOOLEAN NOT NULL DEFAULT FALSE,
+        verze INTEGER NOT NULL DEFAULT 1,
+        zdroj TEXT,
+        upravil INTEGER,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS rozlozeni_stranek_klic ON rozlozeni_stranek (team_id, stranka, rozsah)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS rozlozeni_stranek_clen ON rozlozeni_stranek (team_id, user_id)`);
+    // Jednorázový převod starých přehledů z teams.dashboard_config (spec §1.7):
+    // kdo si přehled skládal, dostane ho jako výchozí podniku; kdo nic neměnil,
+    // dostane nové výchozí z kódu. Příznak migrovano68 se zapíše až po
+    // úspěšném vložení a zaručí, že se výchozí, které vedení později smaže,
+    // při dalším běhu initu nevrátí. Tým, u kterého selže vložení (databáze),
+    // příznak nedostane a zkusí se znovu (ON CONFLICT DO NOTHING nic
+    // nezdvojí). Nečitelná část configu je jiný případ: převod je
+    // deterministický a dalším během by se nespravila, takže se přeskočí,
+    // zaloguje a tým příznak dostane.
+    //
+    // Převod je zatím VYPNUTÝ (PREVEST_DASHBOARD_CONFIG). Dokud přehledy běží
+    // na starém editoru, vedení v něm pořád upravuje dashboard_config — a
+    // převod v tuhle chvíli by jeho pozdější úpravy při přepnutí na plochu
+    // zahodil. Do té doby rozložení počítá převod za běhu (vyresRozlozeni,
+    // krok 5) vždy z aktuálního configu. Zapne se ve stejném nasazení, které
+    // přehledy přepne na plochu widgetů.
+    if (PREVEST_DASHBOARD_CONFIG) try {
+      const tymy = await sql`
+        SELECT id, dashboard_config FROM teams
+        WHERE dashboard_config IS NOT NULL AND jsonb_typeof(dashboard_config) = 'object'
+          AND NOT (dashboard_config ? 'migrovano68')` as any[];
+      const prevedene: number[] = [];
+      for (const t of tymy) {
+        const chyby: string[] = [];
+        const prevod = zDashboardConfig(t.dashboard_config, { chyby });
+        if (chyby.length) console.warn('init: rozložení — část dashboard_config týmu', t.id, 'nejde převést, přeskočena:', chyby);
+        try {
+          for (const [s, rozsah, polozky] of prevod) {
+            const def = strankaRozlozeni(s);
+            const cista = def ? normalizujRozlozeni(def, polozky) : polozky;
+            await sql`
+              INSERT INTO rozlozeni_stranek (team_id, stranka, rozsah, polozky, zdroj)
+              VALUES (${t.id}, ${s}, ${rozsah}, ${JSON.stringify(cista)}::jsonb, 'dashboard_config')
+              ON CONFLICT (team_id, stranka, rozsah) DO NOTHING`;
+          }
+          prevedene.push(Number(t.id));
+        } catch (e) { migFails.push(String((e as any)?.message ?? e).slice(0, 120)); }
+      }
+      if (prevedene.length) {
+        await sql`UPDATE teams SET dashboard_config = dashboard_config || '{"migrovano68": true}'::jsonb WHERE id = ANY(${prevedene})`;
+      }
+    } catch (e) { migFails.push(String((e as any)?.message ?? e).slice(0, 120)); }
+
+    // ---- Kotvy pro kolo 69 ----
+    // Balík kola 69 smí do tohohle souboru přidat vlastní DDL JEN mezi svou
+    // dvojici kotev (spec §6.2), jinde nic neměnit. Každý balík má vlastní
+    // blok oddělený nezměněnými řádky, takže se změny při slučování nepotkají.
+    // ---- kolo 69: B1 ----
+    // ---- konec B1 ----
+
+    // ---- kolo 69: B2 ----
+    // ---- konec B2 ----
+
+    // ---- kolo 69: B3 ----
+    // ---- konec B3 ----
+
+    // ---- kolo 69: B4 ----
+    // ---- konec B4 ----
+
+    // ---- kolo 69: B5a ----
+    // ---- konec B5a ----
+
+    // ---- kolo 69: B5b ----
+    // ---- konec B5b ----
+
+    // ---- kolo 69: B6a ----
+    // ---- konec B6a ----
+
+    // ---- kolo 69: B6b ----
+    // ---- konec B6b ----
+
+    // ---- kolo 69: B7 ----
+    // ---- konec B7 ----
+
+    // ---- kolo 69: B8 ----
+    // ---- konec B8 ----
+
+    // ---- kolo 69: B9 ----
+    // ---- konec B9 ----
 
     // Narozeninové odměny: init běží denně jako cron, tak se tu po migracích
     // připíšou dárky členům, kteří mají dnes narozeniny. Jednou za rok na

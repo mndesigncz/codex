@@ -4,12 +4,35 @@
 // soubor zamčený (spec §6.2); převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
 import type { DefiniceWidgetu } from '../typy.ts';
 
+/**
+ * Odkud „Čeká na tebe" bere každou frontu (klíč = id fronty v nastavení i v `opravneni.pole`).
+ * Dotaz se pošle až po useSmi(pole[fronta]), a proto musí klíč fronty sám otevřít bránu endpointu —
+ * přímo, nebo přes `vyzaduje` v katalogu oprávnění (role se ukládají se závislostmi). Hlídá to test
+ * v scripts/testy/k68-widgety.ts, který čte pozaduj() z GET routy.
+ */
+export const ZDROJE_FRONT: Readonly<Record<string, string>> = {
+  volno: '/api/timeoff',
+  vymeny: '/api/shifts/offers',
+  uzaverky: '/api/closings',
+  navrhy_skladu: '/api/inventory',
+  hlaseni: '/api/inventory/reports',
+  odmeny: '/api/rewards/catalog',
+  postupy: '/api/procedures',
+  navody: '/api/guides',
+  rezervace: '/api/client/admin/reservations',
+  objednavky: '/api/client/staff/inbox',
+  slaba_hodnoceni: '/api/client/admin/summary',
+};
+
 export const WIDGETY: DefiniceWidgetu[] = [
-  // Data: GET /api/timeoff → requests[status=pending]; GET /api/shifts/offers → offers[status=claimed];
-  // GET /api/closings → closings[approved=false && !covered_by]; GET /api/inventory → [approved=false];
-  // GET /api/inventory/reports → reports[status!=done]; GET /api/rewards/catalog → redemptions[status=pending];
-  // GET /api/procedures → procedures[approved=false]; GET /api/guides → guides[approved=false];
-  // GET /api/client/admin/summary → reservations.requested, orders.new, reviews.low7
+  // Data (URL front v ZDROJE_FRONT): GET /api/timeoff → requests[status=pending]; GET /api/shifts/offers →
+  // offers[status=claimed]; GET /api/closings → closings[approved=false && !covered_by]; GET /api/inventory →
+  // [approved=false]; GET /api/inventory/reports → reports[status!=done]; GET /api/rewards/catalog →
+  // redemptions[status=pending]; GET /api/procedures → procedures[approved=false]; GET /api/guides →
+  // guides[approved=false]; GET /api/client/admin/reservations → reservations[status=requested] (60 dní dopředu);
+  // GET /api/client/staff/inbox → newCount (orders[status=new]); GET /api/client/admin/summary → reviews.low7
+  // Pozor: rezervace a objednávky nejdou přes /api/client/admin/summary — ten chce klient.prehled, který
+  // Provozní (rezervace.schvalovat, objednavky.vyridit) nemá, a fronty by skončily na 403.
   // Pozor: Dnes je fronta hlídaná jen smiPohled(view) — chip „žádost o volno" se ukáže i roli, která volno nesmí
   // schválit.
   {
