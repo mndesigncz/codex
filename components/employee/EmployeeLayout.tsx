@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, ErrorBoundary } from '../ui';
+import { Avatar, Badge, ErrorBoundary } from '../ui';
+import { czCount, NEPRECTENA_ZPRAVA } from '@/lib/czech';
 import NotificationBell from '../NotificationBell';
 import MessengerDock from '../chat/MessengerDock';
 import { useConversations } from '../chat/useChat';
@@ -272,11 +273,8 @@ export default function EmployeeLayout({ user }: Props) {
               <Icon key={currentView === item.id ? 'on' : 'off'} name={item.icon} size={22}
                 strokeWidth={currentView === item.id ? 2 : 1.7}
                 className="i-lead" motion={currentView === item.id ? 'pop' : undefined} />
-              {item.id === 'chat' && unreadChat > 0 && currentView !== 'chat' && (
-                <span aria-label={`${unreadChat} nepřečtených zpráv`}
-                  className="absolute top-0 right-1 min-w-[19px] h-[19px] px-1 rounded-full bg-[#16181A] text-[#C8F542] text-[11px] font-bold leading-none tabular-nums grid place-items-center ring-2 ring-[var(--bg)]">
-                  {unreadChat > 9 ? '9+' : unreadChat}
-                </span>
+              {item.id === 'chat' && currentView !== 'chat' && (
+                <Badge count={unreadChat} label={czCount(unreadChat, NEPRECTENA_ZPRAVA)} className="absolute top-0 right-1" />
               )}
               <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{(item as any).short ?? item.label}</span>
             </button>

@@ -12,11 +12,15 @@
 // (`useModal`) proti tomu zamyká pozadí a drží fokus uvnitř — panel to
 // nedělá schválně, protože se od něj čeká, že zmizí, jakmile se člověk
 // podívá jinam.
+//
+// Panel nemusí mít tlačítko: kontextové menu po podržení widgetu kotví
+// v místě stisku a fokus po zavření patří widgetu (`anchorRef`). Hranicí
+// „kliknutí mimo" je pak samotný panel.
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 
 export function usePopover(open: boolean, setOpen: (v: boolean) => void, opts: {
-  /** Po zavření Escapem se fokus vrátí na tlačítko, ne na <body>. */
+  /** Po zavření Escapem se fokus vrátí na tlačítko (nebo `anchorRef`), ne na <body>. */
   restoreFocus?: boolean;
   /** Po otevření skočit na první položku panelu. */
   focusFirst?: boolean;
@@ -24,9 +28,14 @@ export function usePopover(open: boolean, setOpen: (v: boolean) => void, opts: {
   arrowKeys?: boolean;
   /** Zavolá se před zavřením kliknutím mimo (např. „označit vše přečtené"). */
   onDismiss?: () => void;
+  /** Kam vrátit fokus, když panel neotevřelo tlačítko — u kontextového menu
+   *  z podržení je to widget (musí jít zaostřit, tj. mít `tabIndex`). Má
+   *  přednost před `triggerRef`. */
+  anchorRef?: RefObject<HTMLElement | null>;
 } = {}) {
-  const { restoreFocus = true, focusFirst = false, arrowKeys = false, onDismiss } = opts;
-  /** Obal panelu i tlačítka — podle něj se pozná „kliknutí mimo". */
+  const { restoreFocus = true, focusFirst = false, arrowKeys = false, onDismiss, anchorRef } = opts;
+  /** Obal panelu i tlačítka — podle něj se pozná „kliknutí mimo". Bez obalu
+   *  (kontextové menu nemá tlačítko) je hranicí samotný panel. */
   const ref = useRef<HTMLDivElement>(null);
   /** Samotný panel — v něm se hledají položky pro šipky a fokus. */
   const panelRef = useRef<HTMLDivElement>(null);
@@ -39,8 +48,8 @@ export function usePopover(open: boolean, setOpen: (v: boolean) => void, opts: {
 
   const close = useCallback((giveBackFocus = restoreFocus) => {
     setOpenRef.current(false);
-    if (giveBackFocus) triggerRef.current?.focus();
-  }, [restoreFocus]);
+    if (giveBackFocus) (anchorRef?.current ?? triggerRef.current)?.focus();
+  }, [restoreFocus, anchorRef]);
 
   const items = useCallback(
     () => Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
@@ -51,7 +60,10 @@ export function usePopover(open: boolean, setOpen: (v: boolean) => void, opts: {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      // Dřív se ptalo jen na obal: panel zapojený bez něj (kontextové menu)
+      // se klepnutím vedle nezavřel nikdy.
+      const hranice = ref.current ?? panelRef.current;
+      if (hranice && !hranice.contains(e.target as Node)) {
         dismissRef.current?.();
         // Kliknutí mimo znamená „chci pryč odsud", ne „vrať mě na tlačítko".
         setOpenRef.current(false);

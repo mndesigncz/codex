@@ -44,7 +44,9 @@ export function PersonLink({ id, children, className = '' }: {
       title="Zobrazit profil"
       onClick={e => { e.stopPropagation(); e.preventDefault(); open(id); }}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); open(id); } }}
-      className={`tap-target-sm tap-target cursor-pointer hover:underline decoration-black/25 underline-offset-2 ${className}`}
+      // rounded-full: prstenec fokusu kopíruje tvar prvku, a odkaz na profil
+      // nejčastěji obaluje kulatý avatar nebo pilulku se jménem.
+      className={`tap-target-sm tap-target rounded-full cursor-pointer hover:underline decoration-black/25 underline-offset-2 ${className}`}
     >
       {children}
     </span>

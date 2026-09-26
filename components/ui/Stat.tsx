@@ -23,9 +23,29 @@ export function Stat({ label, value, unit, note, icon, tone = 'muted', className
   );
 }
 
-/** Řada statistik oddělených linkou — bez karet v kartě. */
+/**
+ * Řada statistik oddělených linkou — bez karet v kartě. Patří do jedné karty
+ * (`<Card><StatRow>…</StatRow></Card>`); víc čísel vedle sebe, ne dlaždice
+ * na každé číslo.
+ *
+ * Na telefonu nejvýš dva sloupce a mezi řadami vodorovná linka, od `sm`
+ * jedna řada se svislými linkami. Dřív byla řada vždycky jedna
+ * (`grid-flow-col`), takže šest čísel na 390 px dostalo po šedesáti pixelech
+ * a zbyla z nich jen kolečka ikon (superadmin → Podniky). Lichý poslední
+ * údaj se na telefonu roztáhne přes oba sloupce, ať linka nad ním nekončí
+ * v půlce karty.
+ */
 export function StatRow({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`grid grid-flow-col auto-cols-fr divide-x divide-[var(--surface-line)] -mx-2 [&>*]:px-4 ${className}`}>{children}</div>;
+  return (
+    <div className={[
+      'grid -mx-2 [&>*]:px-4',
+      'max-sm:grid-cols-2 max-sm:gap-y-4',
+      'max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(n+3)]:border-[var(--surface-line)] max-sm:[&>*:nth-child(n+3)]:pt-4',
+      'max-sm:[&>*:last-child:nth-child(odd)]:col-span-2',
+      'sm:grid-flow-col sm:auto-cols-fr sm:divide-x sm:divide-[var(--surface-line)]',
+      className,
+    ].join(' ')}>{children}</div>
+  );
 }
 
 export default Stat;

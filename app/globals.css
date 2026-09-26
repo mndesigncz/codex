@@ -116,6 +116,14 @@ body::after {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
 }
+/* Preflight Tailwindu dává <button> průhledné pozadí se specifičností (0,0,1);
+   :where() má nulu, takže klikací karta zůstávala bez bílé — šedé dlaždice
+   na Přehledu, v TO GO i v Uzávěrkách. Utility bg-* (0,1,0) přebijí dál.
+   Tóny (.card-wait…) mají (0,1,0) taky, takže tónovaná karta tón neztratí.
+   `button:where(.glass)` sem schválně nepatří: srovnal by ~74 ručních
+   přepínačů pohledu naráz a to je samostatný krok se snímky před a po. */
+button:where(.card, .glass-card) { background: var(--surface); }
+button:where(.well) { background: var(--well); }
 .card-accent { background: linear-gradient(180deg, rgba(200,245,66,0.16), rgba(200,245,66,0.06)), var(--surface); border-color: rgba(200,245,66,0.55); }
 .card-wait   { background: linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04)), var(--surface); border-color: rgba(245,158,11,0.35); }
 .card-danger { background: linear-gradient(180deg, rgba(220,38,38,0.07), rgba(220,38,38,0.03)), var(--surface); border-color: rgba(220,38,38,0.25); }
@@ -293,6 +301,16 @@ body::after {
 .list > * + * { border-top: 1px solid var(--surface-line); }
 :where(.list-row) { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; min-height: 3.25rem; }
 :where(.list-row-tap) { border-radius: var(--r-md); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; transition: background-color var(--dur-2, .22s) ease; }
+/* Klikací řádek bývá <button>. Preflight Tailwindu mu dává `padding: 0;
+   margin: 0` se specifičností (0,0,1) a :where() výš má nulu — tatáž past
+   jako u klikací karty (§8.1), jen s odsazením místo pozadí. Řádek pak ztratil
+   svislé odsazení (dvouřádkový krok „Prvních kroků" ležel textem přímo na
+   linkách) i přesah podkladu, takže plocha pod ukazatelem nelícovala s textem.
+   Tlačítko se navíc samo neroztáhne (i s display:flex má šířku podle obsahu),
+   proto šířku dodává pravidlo: 100 % + oba přesahy. Utility (0,1,0) pořád
+   přebijí, takže `w-full` na klikací řádek nepatří — posunul by ho doleva. */
+button:where(.list-row) { padding: 0.75rem 0; }
+button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; width: calc(100% + 1rem); }
 @media (hover: hover) { .list-row-tap:hover { background: var(--well); } }
 .list-row-tap:active { background: rgba(22,24,26,0.06); }
 /* Sloupce řádku. Čísla drží svisle jen tehdy, když mají pevnou šířku —
@@ -445,6 +463,20 @@ input::-webkit-date-and-time-value { text-align: left; }
 @media (prefers-reduced-motion: no-preference) {
   .toast-in { animation: toast-in 0.22s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both; }
 }
+/* Místo toastu u spodní hrany. Plovoucí lišta (hromadné akce, úpravy
+   stránky) zapíše na :root `--lista-vyska` = vzdálenost své horní hrany od
+   spodku okna + 8 px, dokud je vidět. Toast si z ní vezme spodní odsazení,
+   takže „Widget odebrán · Vrátit" nikdy neleží přes „Hotovo" — na monitoru
+   seděly oba 24 px nad hranou a toast lištu zakrýval. Bez lišty proměnná
+   chybí a platí dosavadní odsazení. Když lišta odjede, toast za ní klidně
+   sjede dolů; při omezeném pohybu rovnou. */
+.toast-misto { bottom: max(var(--lista-vyska, 0px), env(safe-area-inset-bottom, 0px), 16px); }
+@media (min-width: 768px) {
+  .toast-misto { bottom: max(var(--lista-vyska, 0px), 1.5rem); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toast-misto { transition: bottom var(--dur-2, .22s) var(--ease-out, ease); }
+}
 
 .modal-sheet {
   /* Pevná bílá — sklo pod modálem nemá co ukazovat, jen mate. */
@@ -535,7 +567,6 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid rgba(143,184,17,0.65);
   outline-offset: 2px;
-  border-radius: inherit;
 }
 
 /* Okraj vodorovného posuvníku — useknutá dlaždice musí vypadat useknutě,
@@ -550,12 +581,24 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
    Prohlížeč kreslí modrý obdélník, který nepatří k žádnému designu. Kroužek
    v barvě značky říká totéž a je vidět i na limetkovém tlačítku. Myš a prst
    ho nevyvolají — jen klávesnice. */
+/* Obrys fokusu kopíruje tvar prvku sám (outline sleduje border-radius), takže
+   tvar se tu nenastavuje. Dřív tu i výš stálo `border-radius: inherit`: pravidlo
+   leží v CSS za utilitami se stejnou specifičností jako `.rounded-full`,
+   a tak každá pilulka (Button, Switch) při fokusu z klávesnice převzala rádius
+   rodiče — v obyčejném divu nebo v <li> hranatý obdélník. */
 :focus-visible {
   outline: 2px solid #8FB811;
   outline-offset: 2px;
-  border-radius: inherit;
 }
 button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+/* Fokus, který musí být vidět i na limetce (přepínač Switch). Globální obrys
+   #8FB811 má proti bílé kartě 2,3 : 1 a limetkový prstenec tlačítek 1,27 : 1 —
+   kolem zapnutého přepínače, který je sám limetkový, by splynul úplně.
+   Tmavý limetkový inkoust má na bílé 6,2 : 1 (WCAG 1.4.11 chce 3 : 1),
+   v tmavém režimu je to naopak limetka (14 : 1 na tmavé kartě). Obrys, ne
+   prstenec ze stínu: v režimu vynucených barev (Windows) stín zmizí, obrys ne. */
+.fokus-kontrast:focus-visible { outline: 2px solid var(--lime-ink); outline-offset: 2px; }
+:root[data-theme="dark"] .fokus-kontrast:focus-visible { outline-color: #C8F542; }
 input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: none;
   border-color: rgba(200,245,66,0.7) !important;
@@ -835,8 +878,15 @@ button:active:not(:disabled), .pressable:active { transition-duration: var(--dur
   from { opacity: 0; transform: scale(0.96) translateY(-4px); }
   to   { opacity: 1; transform: none; }
 }
+/* Totéž pro panel, který se otevírá NAHORU (nabídka „···" v liště u spodní
+   hrany): musí vyrůst od tlačítka pod sebou, ne padat shora. */
+@keyframes pop-in-up {
+  from { opacity: 0; transform: scale(0.96) translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .pop-in { animation: pop-in 0.16s var(--ease-out) both; }
+  .pop-in-up { animation: pop-in-up 0.16s var(--ease-out) both; }
 }
 
 /* Kostra načítání: světelný pruh běží přes tvar, který má obsah mít.
@@ -916,21 +966,47 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 .t-caption     { letter-spacing: 0.01em; }
 .tabular       { font-variant-numeric: tabular-nums; }
 
-/* ---------- Accessibility: the three signals, honoured ---------- */
+/* ---------- Accessibility: the three signals, honoured ----------
+   `.card` a `.glass-card` jsou tatáž plocha pod dvěma jmény, a tak musí
+   dostat i totéž tady — jinak by převod glass-card → card nebo <Card>
+   potichu vzal lidem se zapnutým „více kontrastu" zřetelný obrys karty.
+
+   Karta je pevná (bílá --surface) už sama od sebe, takže při „méně
+   průhlednosti" nepotřebuje žádné pozadí navíc. Pravidlo, které tu dřív
+   dávalo glass-card 94 % bílé, pocházelo z doby, kdy byla skleněná; s pevnou
+   kartou ji naopak zprůhlednilo a — protože stojí v CSS až za utilitami —
+   přebilo i její tón (`bg-wait/[0.06]`, `.card-wait`). Obě jména teď zůstávají
+   stejná jako bez téhle podmínky, jen bez rozmazání. */
 @media (prefers-reduced-transparency: reduce) {
-  .glass, .glass-strong, .glass-card, .modal-sheet, .modal-overlay {
+  .glass, .glass-strong, .glass-card, .card, .modal-sheet, .modal-overlay {
     backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
   }
-  .glass, .glass-card { background: rgba(255,255,255,0.94); }
+  .glass { background: rgba(255,255,255,0.94); }
   .modal-sheet { background: #fff; }
-  :root[data-theme="dark"] .glass,
-  :root[data-theme="dark"] .glass-card { background: rgba(28,31,34,0.96); }
+  :root[data-theme="dark"] .glass { background: rgba(28,31,34,0.96); }
   :root[data-theme="dark"] .modal-sheet { background: #1E2124; }
 }
+/* „Více kontrastu" zesílí jen OKRAJ plochy. Dřív tu stálo i `outline-color`
+   (25% černá), jenže obrys plocha nemá — jediný obrys, který na ní kdy je,
+   je fokus z klávesnice. Pravidlo stojí v CSS za `:focus-visible` se stejnou
+   specifičností, takže kartě-odkazu i kartě-tlačítku (a každému
+   `seg-off glass`) přebarvilo limetkový prstenec fokusu na šeď, v tmavém
+   režimu úplně neviditelnou: kdo si řekl o víc kontrastu, dostal slabší fokus.
+
+   Tónovaná karta (`card-wait` „Čeká na tebe", `card-danger` …) si tón nechá,
+   jen sytější — text stavu (`--*-ink-rgb`) na 70 %, v obou režimech aspoň
+   tak kontrastní jako neutrální okraj vedle. Bez toho by ji pravidlo výš
+   (stejná specifičnost, pozdější) přebarvilo na neutrální šeď jako každou
+   jinou kartu. */
 @media (prefers-contrast: more) {
-  .glass, .glass-card, .glass-strong { border-color: rgba(0,0,0,0.45); outline-color: rgba(0,0,0,0.25); }
+  .glass, .glass-card, .card, .glass-strong { border-color: rgba(0,0,0,0.45); }
   :root[data-theme="dark"] .glass,
-  :root[data-theme="dark"] .glass-card { border-color: rgba(255,255,255,0.5); }
+  :root[data-theme="dark"] .glass-card,
+  :root[data-theme="dark"] .card { border-color: rgba(255,255,255,0.5); }
+  .card-accent, :root[data-theme="dark"] .card-accent { border-color: rgb(var(--ok-ink-rgb) / 0.7); }
+  .card-wait,   :root[data-theme="dark"] .card-wait   { border-color: rgb(var(--wait-ink-rgb) / 0.7); }
+  .card-danger, :root[data-theme="dark"] .card-danger { border-color: rgb(var(--bad-ink-rgb) / 0.7); }
+  .card-info,   :root[data-theme="dark"] .card-info   { border-color: rgb(var(--info-ink-rgb) / 0.7); }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Not "no feedback" — a gentler, non-vestibular equivalent. */
@@ -950,6 +1026,100 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 :root[data-theme="dark"] .chrome-edge::after {
   background: linear-gradient(to bottom, rgba(18,20,22,0.55), rgba(18,20,22,0));
 }
+
+/* ===== Plocha s widgety (kolo 68): mřížka, režim úprav, vlnění, tah ===== */
+/* --sloupcu nastaví JS podle šířky plochy (ResizeObserver); do té doby náhradní počet podle okna. */
+.plocha-mrizka { --sloupcu-z: 1; display: grid; gap: .75rem; grid-template-columns: repeat(var(--sloupcu, var(--sloupcu-z)), minmax(0, 1fr)); }
+@media (min-width: 332px) { .plocha-mrizka { --sloupcu-z: 2; } }
+@media (min-width: 640px) { .plocha-mrizka { gap: 1rem; } }
+@media (min-width: 1024px) { .plocha-mrizka { --sloupcu-z: 4; } }
+.plocha-mrizka > li { position: relative; min-width: 0; }
+/* Tři vrstvy, každá má svou transformaci:
+   li = FLIP a tah (JS, style.transform) · .w-mer = promáčknutí a zmenšení v úpravách (přechod) · .w-kyv = vlnění (animace) */
+.w-mer { height: 100%; transition: transform var(--dur-1) var(--ease-out); }
+.w-mer[data-drzim] { transform: scale(.98); }
+.plocha[data-upravy] .w-mer { transform: scale(.98); transition-duration: var(--dur-2); }
+.w-kyv { position: relative; height: 100%; }
+@keyframes kyv {
+  from { transform: rotate(calc(var(--kyv, 1deg) * -1)); }
+  to   { transform: rotate(var(--kyv, 1deg)); }
+}
+/* Vlnění je deklarované jen tady. Globální „omezený pohyb" nastavuje všem
+   animacím 0,01 ms a jeden cyklus — kdyby kyv platil i mimo no-preference,
+   widget by při vstupu do úprav jednou škubl. */
+@media (prefers-reduced-motion: no-preference) {
+  .plocha[data-upravy] li:not([data-zvednuty]) .w-kyv {
+    animation: kyv var(--kyv-t, 260ms) cubic-bezier(.37, 0, .63, 1) var(--kyv-f, 0ms) infinite alternate;
+    will-change: transform;
+  }
+}
+@media (pointer: coarse) { .plocha .w-kyv { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }
+.plocha[data-upravy] li[data-widget] { touch-action: pan-y; }
+@media (pointer: fine) {
+  .plocha[data-upravy] li[data-widget] { cursor: grab; }
+  .plocha[data-tazeni], .plocha[data-tazeni] li[data-widget] { cursor: grabbing; user-select: none; }
+}
+.plocha li[data-zvednuty] { z-index: 20; }
+.plocha li[data-zvednuty] .card { box-shadow: var(--shadow-float); }
+@media (prefers-reduced-motion: reduce) {
+  .plocha[data-upravy] .w-mer, .plocha[data-upravy] .w-kyv { animation: none !important; transform: none !important; }
+  /* Podržení bez zmenšení — stejně jako stisk tlačítka výš: místo pohybu průhlednost. */
+  .w-mer[data-drzim] { transform: none; opacity: .8; }
+  /* Režim úprav bez vlnění prozradí přerušovaný obrys. Patří i jamce, která
+     v úpravách stojí místo widgetu bez oprávnění. */
+  .plocha[data-upravy] .w-kyv > :is(.card, .well) { outline: 1.5px dashed rgb(22 24 26 / .25); outline-offset: 3px; }
+  :root[data-theme="dark"] .plocha[data-upravy] .w-kyv > :is(.card, .well) { outline-color: rgb(237 242 228 / .3); }
+}
+
+/* Plovoucí lišta (PlovouciLista — lišta úprav stránky): vyjede zdola
+   a odjede stejnou cestou, odchod je rychlejší (220 / 160 ms). Hromadný pruh
+   (BulkBar) tuhle animaci nemá a objevuje se jako dosud — o pohyb si lišta
+   řekne sama. Při omezeném pohybu se objeví rovnou a při odchodu rovnou zmizí. */
+@keyframes lista-prijezd { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: none; } }
+@keyframes lista-odjezd  { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(100%); } }
+@media (prefers-reduced-motion: no-preference) {
+  .lista-prijezd { animation: lista-prijezd var(--dur-2) var(--ease-out) both; }
+  .lista-odjezd  { animation: lista-odjezd .16s var(--ease-out) both; }
+}
+@media (prefers-reduced-motion: reduce) { .lista-odjezd { opacity: 0; } }
+
+/* Plovoucí inkoustový chrom — pilulka lišty (hromadné akce, úpravy stránky)
+   a toastu. Plocha i stín jsou tady, ne v utilitách, ze dvou důvodů:
+   · `bg-[#16181A]` tmavý režim přepisuje na 14% bílou. Inkoustové ploše
+     v obsahu to nevadí (DP §2.8), jenže lišta plave NAD obsahem a přes
+     „Úpravy stránky" i „Vrátit" prosvítaly řádky, které pod ní jely.
+   · `shadow-[var(--shadow-float)]` si Tailwind 3.4 vyloží jako BARVU stínu
+     (co je v proměnné, nepozná) a box-shadow nevygeneruje vůbec — hromadná
+     lišta tak po převodu na PlovouciLista přišla o stín a toast ho neměl
+     nikdy. Stín z proměnné se v utilitě píše `shadow-[shadow:var(--…)]`.
+   V tmavém režimu je to pevná zvednutá šedá, o stupeň světlejší než karta
+   (#17191C) i okno, aby se od nich lišta odlepila — stín na tmavém papíře
+   skoro není vidět. Světlejší být nesmí: červené „Zamítnout" na tlumené
+   pilulce by kleslo pod 4 : 1 (tady 4,4 : 1, s odstínem odznaku jen 3,8 : 1). */
+.chrom-inkoust { background: #16181A; color: #fff; box-shadow: var(--shadow-float); }
+:root[data-theme="dark"] .chrom-inkoust { background: #2A2D31; }
+
+/* Odznak s počtem (Badge): inkoust s limetkovým číslem. Vlastní třída
+   místo `bg-[#16181A]`: ta se v tmavém režimu přepisuje na 14% bílou, takže
+   odznak byl průhledný a ikona pod ním (chat v doku) prosvítala číslem.
+   V tmavém je pevná zvednutá šedá — tentýž odstín, jaký dřív vznikal
+   průhledností na tmavém doku, jen bez prosvítání. */
+.odznak-inkoust { background: #16181A; color: #C8F542; }
+:root[data-theme="dark"] .odznak-inkoust { background: #34373B; color: #C8F542; }
+
+/* BarSpark: sloupky bez os. Kontext je tlumený inkoust a zvýrazněný sloupek
+   (dnes, vybrané období) plný inkoust — „vybráno = inkoust" jako v celé
+   aplikaci. Limetka to na bílé kartě být nemůže: vedle papíru má 1,3 : 1 a je
+   vyhrazená akci. Na inkoustové ploše (DP §2.10) se to obrací: kontext bílou,
+   zvýraznění limetkou, bez záře — záře patří jen hlavní akci. */
+.spark-sloupek    { background: rgba(22,24,26,0.18); }
+.spark-sloupek-hl { background: #16181A; }
+.spark-inkoust .spark-sloupek    { background: rgba(255,255,255,0.24); }
+.spark-inkoust .spark-sloupek-hl { background: #C8F542; }
+:root[data-theme="dark"] .spark-sloupek    { background: rgba(237,242,228,0.24); }
+:root[data-theme="dark"] .spark-sloupek-hl { background: #EDF2E4; }
+:root[data-theme="dark"] .spark-inkoust .spark-sloupek    { background: rgba(255,255,255,0.24); }
+:root[data-theme="dark"] .spark-inkoust .spark-sloupek-hl { background: #C8F542; }
 
 /* České datum se píše větně: „úterý 18. srpna" → „Úterý 18. srpna".
    Tailwindí `capitalize` zvětší KAŽDÉ slovo a udělá z toho anglický

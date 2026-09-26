@@ -72,7 +72,10 @@ export function ListRow({
   );
   const cls = `list-row ${interactive ? 'list-row-tap' : ''} ${className}`;
   if (href) return <Tag className="contents"><a href={href} className={cls}>{inner}</a></Tag>;
-  if (onClick) return <Tag className="contents"><button type="button" onClick={onClick} className={`${cls} w-full text-left`}>{inner}</button></Tag>;
+  // Tlačítku dává odsazení, přesah podkladu a šířku globals.css
+  // (`button:where(.list-row-tap)`) — preflight mu je jinak vynuluje.
+  // `w-full` sem nepatří: přebil by šířku a řádek by ujel o přesah doleva.
+  if (onClick) return <Tag className="contents"><button type="button" onClick={onClick} className={`${cls} text-left`}>{inner}</button></Tag>;
   return <Tag className={cls}>{inner}</Tag>;
 }
 
