@@ -115,6 +115,8 @@ export function KontextoveMenu({ menu, polozky, nazev, onZavrit }: {
         onKeyDown={pop.onPanelKeyDown}
         aria-label={`Nabídka widgetu ${nazev}`}
         direction={poloha?.nahoru ? 'up' : 'down'}
+        // Polohu u prstu počítá tohle menu samo (i s okrajem obrazovky).
+        vejdiSe={false}
         // Nad plochou i nad lištou úprav (z-40), pod okny (z-70).
         className="fixed !z-50"
         style={{

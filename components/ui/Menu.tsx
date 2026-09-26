@@ -54,7 +54,9 @@ export const MenuPanel = React.forwardRef<HTMLDivElement, {
   id?: string;
   'aria-label'?: string;
   'aria-labelledby'?: string;
-}>(function MenuPanel({ children, className = '', style, onKeyDown, direction = 'down', ...aria }, ref) {
+  /** false: místo použití si polohu hlídá samo (kontextové menu u prstu). */
+  vejdiSe?: boolean;
+}>(function MenuPanel({ children, className = '', style, onKeyDown, direction = 'down', vejdiSe: hlidat = true, ...aria }, ref) {
   const vlastni = useRef<HTMLDivElement | null>(null);
   const nastavRef = useCallback((el: HTMLDivElement | null) => {
     vlastni.current = el;
@@ -62,7 +64,7 @@ export const MenuPanel = React.forwardRef<HTMLDivElement, {
     else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
   }, [ref]);
   // Na telefonu panel nesmí utéct z obrazovky (viz useVejdiSe).
-  const vejdiSe = useVejdiSe(vlastni, { smer: direction });
+  const vejdiSe = useVejdiSe(vlastni, { smer: direction, aktivni: hlidat });
 
   return (
     <div
