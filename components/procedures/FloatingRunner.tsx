@@ -1,14 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+// Plovoucí běh postupu — nad všemi rozhraními (app/providers.tsx).
+//
+// Kolo 69 (B6b), audit final_sorted.json / obsah-kontrola.txt: zmenšená pilulka byla plná
+// limetka s animate-ping (s tlačítkem chatu dvě limetky dole) → inkoustová pilulka jako
+// BulkBar, bez pulzu; oslava s konfetami, odskokem a „Hotovo!" text-2xl → klidný panel
+// glass-strong s pop-in; ručně psaná tlačítka a inline SVG → Button a Icon; štítek
+// „Celkový čas" verzálkami ručně → t-label. „Dokončit" je primary vždy: běžec visí nad
+// stránkou, která svou limetku už má (DP: jedna limetka na obrazovce).
+
+import { useEffect, useRef, useState } from 'react';
 import { useProcedures } from './ProcedureProvider';
 import { parseSteps } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
-
 import { Icon } from '../Icons';
-import { czForm } from '@/lib/czech';
+import { Button, Chip, Input } from '../ui';
+import { czCount, czForm } from '@/lib/czech';
+
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
   const s = Math.max(0, sec) % 60;
@@ -27,40 +37,9 @@ function useElapsed(startedAt?: string | null) {
   return Math.max(0, Math.round((now - new Date(startedAt).getTime()) / 1000));
 }
 
-const CONFETTI = ['#C8F542', '#79D06B', '#2FA968', '#EEFFB4', '#16181A', '#ffd84d'];
-
-function Confetti() {
-  const pieces = useMemo(
-    () => Array.from({ length: 42 }, (_, i) => ({
-      left: Math.random() * 100,
-      delay: Math.random() * 0.5,
-      dur: 1.6 + Math.random() * 1.4,
-      color: CONFETTI[i % CONFETTI.length],
-      size: 6 + Math.random() * 6,
-      rot: Math.random() * 360,
-    })),
-    []
-  );
-  return (
-    <div className="pr-confetti-wrap" aria-hidden="true">
-      {pieces.map((p, i) => (
-        <span
-          key={i}
-          className="pr-confetti"
-          style={{
-            left: `${p.left}%`,
-            width: p.size,
-            height: p.size * 0.6,
-            background: p.color,
-            animationDelay: `${p.delay}s`,
-            animationDuration: `${p.dur}s`,
-            transform: `rotate(${p.rot}deg)`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+const KROK = { one: 'krok', few: 'kroky', many: 'kroků' };
+const POZICE = 'fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:left-4 md:w-[340px]';
+const PANEL = 'overflow-hidden glass-strong rounded-3xl shadow-[shadow:var(--shadow-float)] pop-in';
 
 export default function FloatingRunner() {
   const { active, justCompleted, syncFailed, toggleItem, toggleSkip, setSkipReason, complete, cancel, dismissCelebration } = useProcedures();
@@ -88,40 +67,22 @@ export default function FloatingRunner() {
   // ---- Celebration ----
   if (!active && justCompleted) {
     return (
-      <>
-        <StyleBlock />
-        <div className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:left-4 md:w-[340px]">
-          <div className="relative overflow-hidden glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-pop_0.4s_ease-out]">
-            <Confetti />
-            <div className="relative px-6 py-7 text-center">
-              <div className="text-5xl motion-safe:animate-[pr-bounce_0.7s_ease-out]"><Icon name="sparkle" size={15} /></div>
-              <h3 className="mt-3 text-2xl font-bold tracking-tight text-[#16181A]">Hotovo!</h3>
-              <p className="mt-1 text-sm text-black/60 truncate">{justCompleted.name}</p>
-              <div className="mt-5 flex items-center justify-center gap-2 tabular-nums">
-                <span className="text-5xl font-bold tracking-tight text-[#5B7A08]">{fmt(justCompleted.duration)}</span>
-              </div>
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-black/40">Celkový čas</p>
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 px-3 py-1 text-sm font-medium text-[#5B7A08]">
-                  {checkGlyph}
-                  {justCompleted.done} {stepsWord(justCompleted.done)} splněno
-                </span>
-                {justCompleted.skipped > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-wait/15 px-3 py-1 text-sm font-medium text-wait-ink">
-                    {justCompleted.skipped} přeskočeno
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={dismissCelebration}
-                className="mt-6 w-full rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 hover:brightness-110 transition"
-              >
-                Zavřít
-              </button>
+      <div className={POZICE}>
+        <div className={PANEL} role="status">
+          <div className="px-6 py-6 text-center">
+            <span aria-hidden className="chip-ok mx-auto grid h-11 w-11 place-items-center rounded-full"><Icon name="check" size={20} strokeWidth={2.2} /></span>
+            <h3 className="t-section mt-3">Postup je hotový</h3>
+            <p className="t-meta mt-1 truncate">{justCompleted.name}</p>
+            <p className="mt-4 text-[28px] font-bold leading-none tracking-tight text-[#16181A] tabular-nums">{fmt(justCompleted.duration)}</p>
+            <p className="t-label mt-1.5">Celkový čas</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+              <Chip tone="ok" size="sm" icon="check">{justCompleted.done} {czForm(justCompleted.done, KROK)} splněno</Chip>
+              {justCompleted.skipped > 0 && <Chip tone="wait" size="sm">{justCompleted.skipped} přeskočeno</Chip>}
             </div>
+            <Button variant="primary" block className="mt-5" onClick={dismissCelebration}>Zavřít</Button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -143,230 +104,135 @@ export default function FloatingRunner() {
   // ---- Minimized pill ----
   if (minimized) {
     return (
-      <>
-        <StyleBlock />
-        <button
-          onClick={() => setMinimized(false)}
-          className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] left-4 md:bottom-4 md:left-4 flex items-center gap-2.5 rounded-full bg-[#C8F542] text-black font-semibold pl-4 pr-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:brightness-110 transition"
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-black/60 opacity-75 motion-safe:animate-ping" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-black" />
-          </span>
-          <span className="max-w-[140px] truncate text-sm">{active.name}</span>
-          <span className="tabular-nums rounded-full bg-black/15 px-2 py-0.5 text-xs">{done}/{total}</span>
-        </button>
-      </>
+      <Button variant="primary" onClick={() => setMinimized(false)} aria-label={`Otevřít průběh postupu ${active.name}`}
+        className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] left-4 md:bottom-4 shadow-[shadow:var(--shadow-float)]">
+        <Icon name="play" size={14} />
+        <span className="max-w-[140px] truncate">{active.name}</span>
+        <span className="tabular-nums text-[#C8F542]">{done}/{total}</span>
+      </Button>
     );
   }
 
   // ---- Full floating window ----
   return (
-    <>
-      <StyleBlock />
-      <div className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:left-4 md:w-[340px]">
-        <div className="overflow-hidden glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-pop_0.28s_ease-out]">
-          {/* Progress bar */}
-          <div className="h-1 w-full bg-black/[0.06]">
-            <div
-              className="h-full bg-[#C8F542] transition-[width] duration-300 ease-out"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-
-          {/* The ticks live on this device but never reached the server, so the
-              employer wouldn't see the run at all. */}
-          {syncFailed && (
-            // 13 px, ne 11: je to nejdůležitější věta v celém okně a na
-            // tabletu za barem se čte na délku paže.
-            <p className="flex items-start gap-1.5 bg-wait/[0.12] px-4 py-2 text-[13px] font-medium leading-snug text-wait-ink">
-              <span aria-hidden className="mt-px shrink-0"><Icon name="warning" size={16} /></span>
-              Neukládá se na server — zkontroluj připojení a zkus to znovu.
-              Postup zůstane otevřený, dokud se odeslání nepovede.
-            </p>
-          )}
-
-          {/* Header */}
-          <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold tracking-tight text-[#16181A]">{active.name}</p>
-              <div className="mt-0.5 flex items-center gap-2 text-xs text-black/50">
-                <span className="tabular-nums font-medium text-[#5B7A08]">{done}/{total}</span>
-                <span className="text-black/25">•</span>
-                <span className="inline-flex items-center gap-1 tabular-nums">
-                  {clockGlyph}{fmt(elapsed)}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => setMinimized(true)}
-              title="Minimalizovat"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-black/45 hover:bg-black/[0.06] hover:text-black transition"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 12h12" /></svg>
-            </button>
-            <button
-              onClick={() => setConfirmClose(true)}
-              title="Zrušit průběh"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-black/45 hover:bg-bad/10 hover:text-bad-ink transition"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-            </button>
-          </div>
-
-          {confirmClose ? (
-            /* Confirm cancel — replaces the card body cleanly (no foggy overlay) */
-            <div className="px-5 pb-5 pt-4 text-center motion-safe:animate-[pr-pop_0.2s_ease-out]">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-bad/15 text-bad-ink">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-              </div>
-              <p className="mt-3 text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
-              <p className="mt-1 text-xs text-black/55">Odškrtnuté kroky se neuloží.</p>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => setConfirmClose(false)}
-                  className="flex-1 rounded-full bg-black/[0.05] border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.08] transition whitespace-nowrap"
-                >
-                  Pokračovat
-                </button>
-                <button
-                  onClick={doCancel}
-                  className="flex-1 rounded-full bg-bad text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110 transition whitespace-nowrap"
-                >
-                  Zrušit
-                </button>
-              </div>
-            </div>
-          ) : confirmFinish ? (
-            /* Confirm finishing with unfinished steps */
-            <div className="px-5 pb-5 pt-4 text-center motion-safe:animate-[pr-pop_0.2s_ease-out]">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-wait/15 text-wait-ink">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
-              </div>
-              <p className="mt-3 text-sm font-semibold text-[#16181A]">Dokončit, i když není vše hotové?</p>
-              <p className="mt-1 text-xs text-black/55">
-                {skipped > 0 && <>{skipped} {skipped === 1 ? 'krok přeskočen' : skipped <= 4 ? 'kroky přeskočeny' : 'kroků přeskočeno'}</>}
-                {skipped > 0 && remaining > 0 && ', '}
-                {remaining > 0 && <>{remaining} {remaining === 1 ? 'krok neodškrtnut' : remaining <= 4 ? 'kroky neodškrtnuty' : 'kroků neodškrtnuto'}</>}
-                . Vedení uvidí, co zůstalo nedokončené.
-              </p>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => setConfirmFinish(false)}
-                  disabled={completing}
-                  className="flex-1 rounded-full bg-black/[0.05] border border-black/10 text-[#16181A] px-4 py-2.5 text-sm font-medium hover:bg-black/[0.08] transition whitespace-nowrap disabled:opacity-60"
-                >
-                  Pokračovat
-                </button>
-                <button
-                  onClick={doComplete}
-                  disabled={completing}
-                  className="flex-1 btn btn-primary hover:brightness-110 transition whitespace-nowrap disabled:opacity-60"
-                >
-                  {completing ? 'Ukládám…' : 'Přesto dokončit'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Steps timeline */}
-              <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
-                <StepTimeline
-                  steps={parseSteps(active.items)}
-                  statuses={{
-                    ...Object.fromEntries(active.skippedItems.map(i => [i, 'skipped' as const])),
-                    ...Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const])),
-                  }}
-                  onToggle={toggleItem}
-                  onSkip={(i) => {
-                    if (active.skippedItems.includes(i)) toggleSkip(i);
-                    else { setSkipFor(i); setSkipNote(''); }
-                  }}
-                  interactive
-                  compact
-                  {...navodOdkaz}
-                />
-              </div>
-
-              {skipFor != null && (
-                <div className="px-3.5 pb-2">
-                  <div className="rounded-2xl border border-wait/30 bg-wait/[0.07] p-3 space-y-2">
-                    <p className="text-xs font-semibold text-wait-ink">Proč krok přeskakuješ?</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SKIP_REASONS.map(r => (
-                        <button key={r.id} type="button"
-                          onClick={() => {
-                            if (r.id === 'other' && !skipNote.trim()) return;
-                            toggleSkip(skipFor);
-                            setSkipReason(skipFor, r.id, r.id === 'other' ? skipNote.trim() : undefined);
-                            setSkipFor(null);
-                          }}
-                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                            r.excused ? 'bg-white/70 text-[#5B7A08] border border-[#C8F542]/40' : 'bg-white/70 text-black/60 border border-black/10'
-                          } hover:brightness-105 ${r.id === 'other' && !skipNote.trim() ? 'opacity-50' : ''}`}>
-                          {r.label}{r.excused ? '' : ' (−body)'}
-                        </button>
-                      ))}
-                    </div>
-                    <input value={skipNote} onChange={e => setSkipNote(e.target.value)} maxLength={200}
-                      placeholder={'U „Jiný důvod" napiš proč…'}
-                      className="w-full rounded-xl bg-white/70 border border-black/10 px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
-                    <button type="button" onClick={() => setSkipFor(null)} className="text-[11px] text-black/40 hover:text-black">Zrušit</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Footer / complete */}
-              <div className="px-3 pb-3 pt-1 space-y-2">
-                {/* Live tally — highlights anything not yet finished */}
-                {unfinished > 0 && (
-                  <p className="text-center text-[11px] font-medium text-black/50">
-                    <span className="text-[#5B7A08]">{done} hotovo</span>
-                    {skipped > 0 && <span className="text-wait-ink"> · {skipped} přeskočeno</span>}
-                    {remaining > 0 && <span className="text-black/45"> · {remaining} zbývá</span>}
-                  </p>
-                )}
-                <button
-                  onClick={onFinishClick}
-                  disabled={completing}
-                  className={`w-full rounded-full font-semibold px-5 py-3 transition disabled:opacity-60 flex items-center justify-center gap-2 ${
-                    allDone
-                      ? 'bg-[#C8F542] text-black hover:brightness-110 motion-safe:animate-[pr-pop_0.3s_ease-out]'
-                      : 'bg-[#16181A] text-white hover:brightness-110'
-                  }`}
-                >
-                  {completing ? 'Ukládám…' : <>Dokončit {checkGlyph}</>}
-                </button>
-              </div>
-            </>
-          )}
+    <div className={POZICE}>
+      <div className={PANEL}>
+        {/* Průběh: inkoust, ne limetka — limetka je akce. */}
+        <div className="h-1 w-full bg-black/[0.06]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Hotové kroky">
+          <div className="h-full bg-[#16181A] transition-[width] duration-300 ease-out" style={{ width: `${pct}%` }} />
         </div>
+
+        {/* The ticks live on this device but never reached the server, so the
+            employer wouldn't see the run at all. */}
+        {syncFailed && (
+          // 13 px, ne 11: je to nejdůležitější věta v celém okně a na
+          // tabletu za barem se čte na délku paže.
+          <p className="note note-wait !rounded-none flex items-start gap-1.5 text-[13px] font-medium leading-snug" role="alert">
+            <Icon name="warning" size={16} className="mt-px shrink-0" />
+            Neukládá se na server — zkontroluj připojení a zkus to znovu.
+            Postup zůstane otevřený, dokud se odeslání nepovede.
+          </p>
+        )}
+
+        {/* Header */}
+        <div className="flex items-center gap-1 px-4 pt-3 pb-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="t-card truncate">{active.name}</h3>
+            <p className="t-meta mt-0.5 flex items-center gap-2 tabular-nums">
+              <span>{done}/{total}</span>
+              <span aria-hidden className="text-black/25">·</span>
+              <span className="inline-flex items-center gap-1"><Icon name="clock" size={13} />{fmt(elapsed)}</span>
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" iconOnly icon="minus" aria-label="Zmenšit" title="Zmenšit" onClick={() => setMinimized(true)} />
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zrušit průběh" title="Zrušit průběh" onClick={() => setConfirmClose(true)} />
+        </div>
+
+        {confirmClose ? (
+          /* Confirm cancel — replaces the card body cleanly (no foggy overlay) */
+          <div className="px-5 pb-5 pt-3 text-center pop-in">
+            <p className="text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
+            <p className="t-meta mt-1">Odškrtnuté kroky se neuloží.</p>
+            <div className="mt-4 flex gap-2">
+              <Button variant="secondary" block onClick={() => setConfirmClose(false)}>Pokračovat</Button>
+              <Button variant="danger-solid" block onClick={doCancel}>Zrušit průběh</Button>
+            </div>
+          </div>
+        ) : confirmFinish ? (
+          /* Confirm finishing with unfinished steps */
+          <div className="px-5 pb-5 pt-3 text-center pop-in">
+            <p className="text-sm font-semibold text-[#16181A]">Dokončit, i když není vše hotové?</p>
+            <p className="t-meta mt-1 text-pretty">
+              {[skipped > 0 ? `přeskočeno: ${czCount(skipped, KROK)}` : null, remaining > 0 ? `neodškrtnuto: ${czCount(remaining, KROK)}` : null].filter(Boolean).join(', ')}.
+              {' '}Vedení uvidí, co zůstalo nedokončené.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button variant="secondary" block onClick={() => setConfirmFinish(false)} disabled={completing}>Pokračovat</Button>
+              <Button variant="primary" block onClick={doComplete} loading={completing}>Přesto dokončit</Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Steps timeline */}
+            <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
+              <StepTimeline
+                steps={parseSteps(active.items)}
+                statuses={{
+                  ...Object.fromEntries(active.skippedItems.map(i => [i, 'skipped' as const])),
+                  ...Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const])),
+                }}
+                onToggle={toggleItem}
+                onSkip={(i) => {
+                  if (active.skippedItems.includes(i)) toggleSkip(i);
+                  else { setSkipFor(i); setSkipNote(''); }
+                }}
+                interactive
+                compact
+                {...navodOdkaz}
+              />
+            </div>
+
+            {skipFor != null && (
+              <div className="px-3.5 pb-2">
+                <div className="well p-3 space-y-2" role="group" aria-label="Proč krok přeskakuješ">
+                  <p className="text-xs font-semibold text-[#16181A]">Proč krok přeskakuješ?</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SKIP_REASONS.map(r => (
+                      <button key={r.id} type="button"
+                        disabled={r.id === 'other' && !skipNote.trim()}
+                        onClick={() => {
+                          if (r.id === 'other' && !skipNote.trim()) return;
+                          toggleSkip(skipFor);
+                          setSkipReason(skipFor, r.id, r.id === 'other' ? skipNote.trim() : undefined);
+                          setSkipFor(null);
+                        }}
+                        className="filter-pill tap-target seg-off glass disabled:opacity-50">
+                        {r.label}{r.excused ? '' : ' (−body)'}
+                      </button>
+                    ))}
+                  </div>
+                  <Input value={skipNote} onChange={e => setSkipNote(e.target.value)} maxLength={200}
+                    aria-label="Důvod přeskočení (u „Jiný důvod“ povinný)" placeholder={'U „Jiný důvod" napiš proč…'} />
+                  <Button variant="ghost" size="sm" onClick={() => setSkipFor(null)}>Zrušit</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Footer / complete */}
+            <div className="px-3 pb-3 pt-1 space-y-2">
+              {/* Live tally — highlights anything not yet finished */}
+              {unfinished > 0 && (
+                <p className="t-meta text-center">
+                  {done} hotovo
+                  {skipped > 0 && <span className="text-wait-ink"> · {skipped} přeskočeno</span>}
+                  {remaining > 0 && <> · {remaining} zbývá</>}
+                </p>
+              )}
+              <Button variant="primary" block icon="check" onClick={onFinishClick} loading={completing}>Dokončit</Button>
+            </div>
+          </>
+        )}
       </div>
-    </>
-  );
-}
-
-const stepsWord = (n: number) => czForm(n, { one: 'krok', few: 'kroky', many: 'kroků' });
-
-const checkGlyph = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
-);
-const clockGlyph = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
-);
-
-// Scoped keyframes — respects prefers-reduced-motion via motion-safe:* utilities on elements.
-function StyleBlock() {
-  return (
-    <style>{`
-      @keyframes pr-pop { 0% { opacity:0; transform: translateY(8px) scale(0.98); } 100% { opacity:1; transform: translateY(0) scale(1); } }
-      @keyframes pr-bounce { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
-      @keyframes pr-fall { 0% { transform: translateY(-10%) rotate(0deg); opacity:1; } 100% { transform: translateY(360px) rotate(540deg); opacity:0; } }
-      .pr-confetti-wrap { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
-      .pr-confetti { position:absolute; top:-12px; border-radius:2px; }
-      @media (prefers-reduced-motion: no-preference) {
-        .pr-confetti { animation-name: pr-fall; animation-timing-function: ease-in; animation-iteration-count: 1; animation-fill-mode: forwards; }
-      }
-    `}</style>
+    </div>
   );
 }

@@ -262,7 +262,7 @@ function PoleOdkazu({ hodnoty, onZmena, smi, idZaklad }: {
     <div className="space-y-4">
       {druhy.length > 1 && (
         <Field label="Kam vede">
-          <Segmented size="sm" ariaLabel="Kam vede" value={druh} wrap
+          <Segmented size="sm" ariaLabel="Kam vede" value={druh}
             onChange={d => { setDruh(d); onZmena({ cil: undefined }); }}
             options={druhy} />
         </Field>

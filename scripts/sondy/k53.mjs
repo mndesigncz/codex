@@ -103,9 +103,12 @@ jeZam = false;
 await p.goto('http://localhost:3000/employer/overview?view=guides&guide=1', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const ctecka = p.locator('[role="dialog"]').first();
-const kdo = ctecka.getByRole('button', { name: /Kdo četl/ }).first();
-tvrdi('vedení má u povinného čtení tlačítko „Kdo četl"', await kdo.count() > 0,
-  'tlačítko není — číslo zůstalo jediná informace');
+// Kolo 69 (B6b): akce čtečky jsou v „···" (Akce s návodem), „Kdo četl" je položka menu.
+const akce = ctecka.getByRole('button', { name: 'Akce s návodem' }).first();
+if (await akce.count() > 0) await akce.click();
+const kdo = p.getByRole('menuitem', { name: /Kdo četl/ }).first();
+tvrdi('vedení má u povinného čtení volbu „Kdo četl"', await kdo.count() > 0,
+  'volba není — číslo zůstalo jediná informace');
 if (await kdo.count() > 0) {
   await kdo.click();
   await p.waitForTimeout(700);

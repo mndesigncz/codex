@@ -1,0 +1,37 @@
+[
+ {
+  "id": 1,
+  "title": "Nová sezónní káva",
+  "description": "Dýňové latte na podzim.",
+  "column": "ideas",
+  "position": 0
+ },
+ {
+  "id": 2,
+  "title": "Oprava mlýnku",
+  "description": "Servis přijede ve čtvrtek.",
+  "column": "in_progress",
+  "position": 0
+ },
+ {
+  "id": 3,
+  "title": "Letní terasa",
+  "description": "Zábradlí a květníky.",
+  "column": "review",
+  "position": 0
+ },
+ {
+  "id": 4,
+  "title": "Nový ceník",
+  "description": null,
+  "column": "review",
+  "position": 1
+ },
+ {
+  "id": 5,
+  "title": "Uklizený sklad",
+  "description": null,
+  "column": "done",
+  "position": 0
+ }
+]

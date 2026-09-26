@@ -1,8 +1,9 @@
 // Widgety oblasti „Nápady" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/napady.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B6a v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B6a; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/napady.tsx, výpočty v lib/ukolyPrehled.ts.
+// Soubor patří balíku B6a. Kolo 69: oba widgety hotové. Na stránce Nápady jsou ve výchozím
+// rozložení vedle sebe a nad nástrojem s ikonou `bulb` — proto `star` (nejvíc hlasů) a `inbox`
+// (čeká na posouzení), ať se ikona neopakuje (AK-19).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -12,7 +13,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'napady',
     nazev: 'Nejžádanější nápady',
     popis: 'Podněty týmu s nejvíc hlasy — hlasovat jde přímo z karty.',
-    ikona: 'bulb',
+    ikona: 'star',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
@@ -32,7 +33,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'nove',
       },
     ],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/suggestions → suggestions[status=new]
   {
@@ -40,13 +41,13 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'napady',
     nazev: 'Nové podněty',
     popis: 'Podněty ve stavu Nový, které čekají na posouzení.',
-    ikona: 'bulb',
+    ikona: 'inbox',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.planovani', 'vedeni.napady'],
     opravneni: { vse: ['napady.spravovat'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

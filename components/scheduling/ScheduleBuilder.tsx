@@ -886,7 +886,7 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   const aktivniTab: Tab = zalozky.some(z => z.id === tab) ? tab : 'rozvrh';
   const naRozvrhu = aktivniTab === 'rozvrh';
   const aside = zalozky.length > 1
-    ? <Segmented ariaLabel="Část rozvrhu" value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} wrap />
+    ? <Segmented ariaLabel="Část rozvrhu" value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} />
     : undefined;
 
   const menu: MenuItem[] = [];
@@ -2006,7 +2006,7 @@ function DayModal({
                 {shiftTypes.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-[13px] font-medium text-black/70" aria-hidden>Typ směny</p>
-                    <Segmented ariaLabel="Typ směny" wrap value={typeName || VLASTNI_CAS}
+                    <Segmented ariaLabel="Typ směny" value={typeName || VLASTNI_CAS}
                       onChange={(v) => {
                         if (v === VLASTNI_CAS) { pickCustom(); return; }
                         const t = shiftTypes.find(x => x.name === v);

@@ -1,0 +1,26 @@
+{
+ "stranka": "zamestnanec.napady",
+ "polozky": [
+  {
+   "id": "napady-nejzadanejsi",
+   "widget": "napady.nejzadanejsi",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "napady.nejzadanejsi",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

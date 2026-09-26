@@ -1,183 +1,189 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+// Kalendář hodnocení směn (část „Kalendář" nástroje stránky Odměny).
+//
+// Kolo 69 (balík B7): dřív tónované buňky přes celý měsíc (limetka, jantar,
+// červená), emoji avatary s náhradou 👤, vlastní šipky měsíce, spinner
+// uprostřed obsahu, detail dne jako šedý box s tlačítky-kartami na lidi,
+// „★" místo ikony a štítek „NEBO JEDNOTLIVĚ" psaný rukou. Teď neutrální buňky
+// s tečkou stavu (jako kalendář uzávěrek), MonthNav, kostra, detail dne jako
+// `.list` s Avatarem a stav Chipem. Měsíc čte přes useDataWidgetu ze stejné
+// adresy jako widget Nehodnocené směny — po uložení hodnocení se obnoví oběma.
+//
+// Den jde otevřít zvenku (`den`): widget Nehodnocené směny pošle událost
+// a stránka ji sem předá — kalendář skočí na měsíc a rozbalí ten den.
+
+import { useEffect, useState } from 'react';
 import { zkratkyDnu, zacatekTydne } from '@/lib/week';
 import { Icon } from '../Icons';
 import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
 import { pragueToday } from '@/lib/pragueTime';
-import { okJson } from '@/lib/api';
+import { bunkyMesice } from '@/lib/uzaverkyPrehled';
+import { czCount, czForm } from '@/lib/czech';
+import { NEHODNOCENA_SMENA } from '@/lib/odmenyPrehled';
+import { Avatar, Button, Card, Chip, ErrorState, ListRow, MonthNav, Skeleton } from '../ui';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
 
-interface Staff { id: number; name: string; avatar: string | null; reviewed: boolean; rating: number; flagged: boolean }
-interface Day { date: string; staff: Staff[]; pending: number }
+interface Clovek { id: number; name: string; avatar: string | null; reviewed: boolean; rating: number; flagged: boolean }
+interface Den { date: string; staff: Clovek[]; pending: number }
 
-const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+function vyberDny(raw: any): Record<string, Den> {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.days)) throw new Error('Kalendář hodnocení přišel v nečekaném tvaru.');
+  const mapa: Record<string, Den> = {};
+  for (const d of raw.days) {
+    if (!d?.date) continue;
+    mapa[String(d.date).slice(0, 10)] = {
+      date: String(d.date).slice(0, 10),
+      staff: Array.isArray(d.staff) ? d.staff : [],
+      pending: Number(d.pending) || 0,
+    };
+  }
+  return mapa;
+}
 
-const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-const pad = (n: number) => String(n).padStart(2, '0');
+type Stav = 'vytka' | 'ceka' | 'hotovo' | 'nic';
+const stavDne = (d: Den | undefined): Stav => !d ? 'nic' : d.staff.some(s => s.flagged) ? 'vytka' : d.pending > 0 ? 'ceka' : 'hotovo';
+// Tečka nese stav, buňka zůstává neutrální (DP §2.1: tóny nad ~6 % obsahu se nesmí).
+const TECKA: Record<Stav, string> = { hotovo: 'bg-[#8FB811]', ceka: 'bg-wait', vytka: 'bg-bad', nic: 'bg-transparent' };
+const POPIS: Record<Stav, string> = { hotovo: 'vše ohodnoceno', ceka: 'čeká na hodnocení', vytka: 'něco je špatně', nic: 'bez směny' };
+const LIDE = { one: 'člověk', few: 'lidé', many: 'lidí' };
+const denVetou = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 
-// Month view of who worked each day and whether their shift is already rated.
-// Clicking a day lists that day's staff; clicking a person opens the review.
-export default function ShiftReviewCalendar({ onSaved }: { onSaved?: () => void }) {
+export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }: {
+  onSaved?: () => void;
+  /** Den, který se má otevřít (z widgetu Nehodnocené směny). */
+  den?: string | null;
+  /** Bez hodnoceni.hodnotit se kalendář jen prohlíží — okno hodnocení se neotevře. */
+  smiHodnotit?: boolean;
+}) {
   const { weekStart } = useCurrency();
-  const [month, setMonth] = useState(ymOf(new Date()));
-  const [days, setDays] = useState<Record<string, Day>>({});
-  const [loading, setLoading] = useState(true);
-  const [sel, setSel] = useState<string | null>(null);
-  const [rating, setRating] = useState<{ person: Staff; date: string } & { whole?: boolean } | null>(null);
+  const dnes = pragueToday();
+  const tento = dnes.slice(0, 7);
+  const [mesic, setMesic] = useState(den ? den.slice(0, 7) : tento);
+  const [vybrany, setVybrany] = useState<string | null>(den ?? null);
+  const [hodnotim, setHodnotim] = useState<{ clovek: Clovek; den: string; cela: boolean } | null>(null);
+  // Nový den zvenku (další klepnutí ve widgetu) přepne měsíc i výběr.
+  useEffect(() => {
+    if (!den) return;
+    setMesic(den.slice(0, 7));
+    setVybrany(den);
+  }, [den]);
 
-  // Quick month-arrow taps overlap requests; only the newest may paint.
-  const reqRef = useRef(0);
-  const load = useCallback(async () => {
-    const req = ++reqRef.current;
-    setLoading(true);
-    try {
-      const d = await fetch(`/api/shift-reviews?month=${month}`).then(okJson);
-      if (req !== reqRef.current) return;
-      const map: Record<string, Day> = {};
-      if (Array.isArray(d?.days)) d.days.forEach((x: Day) => { map[x.date] = x; });
-      setDays(map);
-    } catch { if (req === reqRef.current) setDays({}); }
-    if (req === reqRef.current) setLoading(false);
-  }, [month]);
-  useEffect(() => { load(); }, [load]);
+  const data = useDataWidgetu(`/api/shift-reviews?month=${mesic}`, vyberDny);
+  const dny = data.data ?? {};
+  const bunky = bunkyMesice(mesic, zacatekTydne(weekStart));
+  const zkratky = zkratkyDnu(zacatekTydne(weekStart));
+  const detail = vybrany ? dny[vybrany] : undefined;
+  const cekaCelkem = Object.values(dny).filter(d => d.date <= dnes).reduce((s, d) => s + d.pending, 0);
 
-  const [y, m] = month.split('-').map(Number);
-  const wd = zkratkyDnu(zacatekTydne(weekStart));
-  const firstDow = new Date(y, m - 1, 1).getDay();
-  const lead = (firstDow - weekStart + 7) % 7;
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const todayStr = pragueToday();
-
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < lead; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(`${month}-${pad(d)}`);
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const step = (delta: number) => { setSel(null); setMonth(ymOf(new Date(y, m - 1 + delta, 1))); };
-  const detail = sel ? days[sel] : null;
-  const dayFlagged = (d: Day) => d.staff.some(s => s.flagged);
+  const zmenMesic = (m: string) => { setVybrany(null); setMesic(m); };
 
   return (
-    <div className="glass-card p-4 sm:p-5">
-      {/* Header + month nav */}
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <button onClick={() => step(-1)} className="btn-icon" aria-label="Předchozí měsíc">
-          <Icon name="chevron" size={16} className="rotate-90" />
-        </button>
-        <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence">{MONTHS[m - 1]} {y}</h3>
-        <button onClick={() => step(1)} className="btn-icon" aria-label="Další měsíc">
-          <Icon name="chevron" size={16} className="-rotate-90" />
-        </button>
+    <Card aria-labelledby="kalendar-hodnoceni">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="kalendar-hodnoceni" className="t-card flex items-center gap-2">
+          <Icon name="calendar" size={17} className="shrink-0 text-black/40" />
+          Kalendář hodnocení
+          {cekaCelkem > 0 && <Chip tone="wait" size="sm">{czCount(cekaCelkem, NEHODNOCENA_SMENA)}</Chip>}
+        </h2>
+        <MonthNav value={mesic} onChange={zmenMesic} max={tento} />
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-[11px] text-black/50">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#C8F542]" /> Ohodnoceno</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-wait" /> Čeká na hodnocení</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Něco je špatně</span>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center h-56"><div className="spinner" /></div>
+      {data.error ? (
+        <ErrorState compact title="Kalendář se nenačetl" onRetry={data.reload} detail={data.error} className="mt-3" />
+      ) : data.loading ? (
+        <div className="mt-4 space-y-2" aria-busy>
+          <Skeleton className="h-6" />
+          <Skeleton className="h-56" />
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-            {wd.map(w => <div key={w} className="text-center text-[11px] font-semibold text-black/35 pb-1">{w}</div>)}
-            {cells.map((date, i) => {
-              if (!date) return <div key={i} />;
-              const day = days[date];
-              const dnum = parseInt(date.slice(8, 10));
-              const isToday = date === todayStr;
-              const flagged = day ? dayFlagged(day) : false;
-              const tone = !day
-                ? 'bg-black/[0.015] border-transparent'
-                : flagged
-                  ? 'bg-bad/[0.08] border-bad/30'
-                  : day.pending > 0
-                    ? 'bg-wait/[0.08] border-wait/30'
-                    : 'bg-[#C8F542]/[0.12] border-[#C8F542]/40';
-              const active = sel === date;
-              return (
-                <button key={i} onClick={() => day ? setSel(active ? null : date) : undefined}
-                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}>
-                  <span className={`text-[11px] font-semibold leading-none mt-0.5 ${isToday ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{dnum}</span>
-                  {day && (
-                    <div className="flex flex-wrap justify-center gap-0.5 leading-none">
-                      {day.staff.slice(0, 3).map(p => (
-                        <span key={p.id} className="text-[11px]" title={`${p.name}${p.reviewed ? ` · ${p.rating}★` : ' · nehodnoceno'}`}>{p.avatar || '👤'}</span>
-                      ))}
-                      {day.staff.length > 3 && <span className="text-[11px] text-black/40">+{day.staff.length - 3}</span>}
-                    </div>
-                  )}
-                  {day && (
-                    <span className={`mt-auto w-1.5 h-1.5 rounded-full ${flagged ? 'bg-bad' : day.pending > 0 ? 'bg-wait' : 'bg-[#8FB811]'}`} />
-                  )}
+          <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label="Hodnocení po dnech">
+            {zkratky.map(z => <div key={z} aria-hidden className="text-center text-[11px] font-semibold text-black/45 pb-1">{z}</div>)}
+            {bunky.map((d, i) => {
+              if (!d) return <div key={`p${i}`} aria-hidden />;
+              const x = dny[d];
+              const stav = stavDne(x);
+              const cislo = Number(d.slice(8, 10));
+              const vybranyDen = vybrany === d;
+              const popis = `${cislo}. ${Number(d.slice(5, 7))}. — ${POPIS[stav]}${x ? `, na směně ${czCount(x.staff.length, LIDE)}` : ''}`;
+              const obsah = (
+                <>
+                  <span className={`text-[11px] font-semibold leading-none mt-0.5 tabular-nums ${vybranyDen ? 'chip-ink rounded-full px-1.5 py-0.5 -mt-0.5' : d === dnes ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{cislo}</span>
+                  {x && <span className="text-[11px] leading-none text-black/45 tabular-nums">{x.staff.length}×</span>}
+                  <span aria-hidden className={`mt-auto h-1.5 w-1.5 rounded-full ${TECKA[stav]}`} />
+                </>
+              );
+              const tvar = `h-14 sm:h-16 min-w-0 rounded-xl p-1 flex flex-col items-center justify-start gap-0.5 ${x ? 'bg-black/[0.03]' : ''}`;
+              return x ? (
+                <button key={d} type="button" title={popis} aria-label={popis} aria-pressed={vybranyDen}
+                  onClick={() => setVybrany(vybranyDen ? null : d)}
+                  className={`${tvar} tap-target transition-colors hover:bg-black/[0.06]`}>
+                  {obsah}
                 </button>
+              ) : (
+                <div key={d} title={popis} className={tvar}>
+                  <span className="sr-only">{popis}</span>
+                  <span aria-hidden className="contents">{obsah}</span>
+                </div>
               );
             })}
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
+            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.hotovo}`} /> Ohodnoceno</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.ceka}`} /> Čeká na hodnocení</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.vytka}`} /> Něco je špatně</span>
+          </div>
 
-          {/* Day detail — pick a person to rate */}
-          {detail && sel && (
-            <div className="mt-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="font-bold tracking-tight text-[#16181A] cz-sentence">
-                  {new Date(sel + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </p>
-                <span className={`text-xs font-medium ${detail.pending > 0 ? 'text-wait-ink' : 'text-[#5B7A08]'}`}>
-                  {detail.pending > 0 ? `${detail.pending} k ohodnocení` : 'Vše ohodnoceno'}
-                </span>
+          {Object.keys(dny).length === 0 && <p className="t-meta mt-4">V tomhle měsíci zatím nikdo neměl směnu.</p>}
+
+          {/* Detail dne: kdo pracoval a jestli je ohodnocený; klepnutí otevře hodnocení. */}
+          {detail && vybrany && (
+            <section aria-labelledby="den-hodnoceni" className="mt-5 border-t border-[var(--surface-line)] pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 id="den-hodnoceni" className="t-card cz-sentence">{denVetou(vybrany)}</h3>
+                {detail.pending > 0
+                  ? <Chip tone="wait" size="sm">{czCount(detail.pending, NEHODNOCENA_SMENA)}</Chip>
+                  : <Chip tone="ok" size="sm" icon="check">Vše ohodnoceno</Chip>}
               </div>
-              {detail.staff.length > 1 && (
-                <button
-                  onClick={() => setRating({ person: detail.staff[0], date: sel, whole: true })}
-                  className="w-full flex items-center gap-2.5 rounded-2xl bg-[#16181A] text-white px-4 py-3 text-sm font-bold hover:bg-black transition">
-                  <Icon name="users" size={16} className="shrink-0" />
-                  <span className="flex-1 text-left truncate">
-                    Ohodnotit celou směnu ({detail.staff.map(p => p.name.split(' ')[0]).join(' + ')})
-                  </span>
-                  <Icon name="chevron" size={15} className="-rotate-90 opacity-60 shrink-0" />
-                </button>
+              {smiHodnotit && detail.staff.length > 1 && (
+                <Button variant="secondary" size="sm" icon="users" className="mt-3"
+                  onClick={() => setHodnotim({ clovek: detail.staff[0], den: vybrany, cela: true })}>
+                  Ohodnotit celou směnu ({detail.staff.length} {czForm(detail.staff.length, LIDE)})
+                </Button>
               )}
-              <div className="space-y-2">
-                {detail.staff.length > 1 && (
-                  <p className="text-[11px] uppercase tracking-wider text-black/40 font-semibold pt-1">nebo jednotlivě</p>
-                )}
-                {detail.staff.map(p => (
-                  <button key={p.id} onClick={() => setRating({ person: p, date: sel, whole: false })}
-                    className={`w-full flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition hover:bg-black/[0.03] ${p.flagged ? 'border-bad/40 bg-bad/[0.06]' : 'border-black/[0.06] bg-white/40'}`}>
-                    <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.avatar || '👤'}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium text-[#16181A] truncate">{p.name}</span>
-                      <span className={`block text-xs ${p.reviewed ? 'text-black/45' : 'text-wait-ink'}`}>
-                        {p.reviewed ? `Ohodnoceno${p.rating ? ` · ${p.rating}★` : ''}` : 'Čeká na hodnocení'}
-                      </span>
-                    </span>
-                    {p.flagged && <Icon name="warning" size={15} className="text-bad-ink shrink-0" />}
-                    {p.reviewed && !p.flagged && <Icon name="check" size={15} className="text-[#5B7A08] shrink-0" />}
-                    <Icon name="chevron" size={15} className="-rotate-90 text-black/30 shrink-0" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {Object.keys(days).length === 0 && (
-            <p className="mt-4 text-sm text-black/40 text-center">V tomto měsíci zatím nikdo neměl směnu.</p>
+              <ul className="list mt-2">
+                {detail.staff.map(p => {
+                  const stav = !p.reviewed ? <Chip tone="wait" size="sm">Čeká</Chip>
+                    : p.flagged ? <Chip tone="bad" size="sm" icon="warning">Výtka</Chip>
+                    : <Chip tone="ok" size="sm" icon="star">{p.rating > 0 ? `${p.rating}/5` : 'Hodnoceno'}</Chip>;
+                  return smiHodnotit ? (
+                    <li key={p.id}>
+                      <ListRow as="div" lead={<Avatar emoji={p.avatar} size="sm" />} title={p.name}
+                        meta={p.reviewed ? 'Ohodnoceno' : 'Čeká na hodnocení'} right={stav}
+                        onClick={() => setHodnotim({ clovek: p, den: vybrany, cela: false })} />
+                    </li>
+                  ) : (
+                    <ListRow key={p.id} lead={<Avatar emoji={p.avatar} size="sm" />} title={p.name}
+                      meta={p.reviewed ? 'Ohodnoceno' : 'Čeká na hodnocení'} right={stav} />
+                  );
+                })}
+              </ul>
+            </section>
           )}
         </>
       )}
 
-      {rating && (
+      {hodnotim && (
         <ShiftReviewModal
-          employee={{ id: rating.person.id, name: rating.person.name, avatar: rating.person.avatar ?? undefined }}
-          initialDate={rating.date}
-          initialWholeShift={rating.whole}
-          onClose={() => setRating(null)}
-          onSaved={() => { setRating(null); load(); onSaved?.(); }}
+          employee={{ id: hodnotim.clovek.id, name: hodnotim.clovek.name, avatar: hodnotim.clovek.avatar ?? undefined }}
+          initialDate={hodnotim.den}
+          initialWholeShift={hodnotim.cela}
+          onClose={() => setHodnotim(null)}
+          onSaved={() => { setHodnotim(null); data.reload(); onSaved?.(); }}
         />
       )}
-    </div>
+    </Card>
   );
 }

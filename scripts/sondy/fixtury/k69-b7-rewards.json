@@ -1,0 +1,197 @@
+{
+ "role": "employer",
+ "levels": [
+  {
+   "name": "Nováček",
+   "minPoints": 0,
+   "perks": ""
+  },
+  {
+   "name": "Barista",
+   "minPoints": 150,
+   "perks": "Sleva 10 % na vlastní nákup"
+  },
+  {
+   "name": "Mistr",
+   "minPoints": 500,
+   "perks": "Sleva 20 % + přednostní výběr směn"
+  },
+  {
+   "name": "Legenda",
+   "minPoints": 1200,
+   "perks": "Sleva 30 % + bonus k výplatě"
+  }
+ ],
+ "points": {
+  "task": 5,
+  "procedure": 10,
+  "closing": 15,
+  "ratingStar": 4,
+  "taskMissed": -5,
+  "procedureSkipped": -2,
+  "procedureMissed": -4,
+  "closingMissing": -10,
+  "closingBalanced": 3
+ },
+ "standings": [
+  {
+   "id": 2,
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "points": 640,
+   "breakdown": {
+    "tasks": 18,
+    "procedures": 12,
+    "closings": 9,
+    "reviewPoints": 210,
+    "ratedShifts": 20,
+    "autoPoints": 30,
+    "itemPoints": 40,
+    "flagged": 2
+   },
+   "flagged": 2,
+   "flaggedUnseen": 1,
+   "pending": 1,
+   "oldestPending": "2026-09-14",
+   "levelName": "Mistr",
+   "levelIndex": 2,
+   "next": {
+    "name": "Legenda",
+    "minPoints": 1200,
+    "perks": ""
+   },
+   "pctToNext": 20,
+   "pointsIntoLevel": 140,
+   "pointsForNext": 700
+  },
+  {
+   "id": 3,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "points": 320,
+   "breakdown": {
+    "tasks": 10,
+    "procedures": 5,
+    "closings": 4,
+    "reviewPoints": 90,
+    "ratedShifts": 9,
+    "autoPoints": 0,
+    "itemPoints": 0,
+    "flagged": 1
+   },
+   "flagged": 1,
+   "flaggedUnseen": 0,
+   "pending": 0,
+   "oldestPending": null,
+   "levelName": "Barista",
+   "levelIndex": 1,
+   "next": {
+    "name": "Mistr",
+    "minPoints": 500,
+    "perks": ""
+   },
+   "pctToNext": 49,
+   "pointsIntoLevel": 170,
+   "pointsForNext": 350
+  },
+  {
+   "id": 4,
+   "name": "Tereza Malá",
+   "avatar": null,
+   "points": 60,
+   "breakdown": {
+    "tasks": 4,
+    "procedures": 1,
+    "closings": 0,
+    "reviewPoints": 10,
+    "ratedShifts": 2,
+    "autoPoints": 0,
+    "itemPoints": 0,
+    "flagged": 0
+   },
+   "flagged": 0,
+   "flaggedUnseen": 0,
+   "pending": 2,
+   "oldestPending": "2026-09-20",
+   "levelName": "Nováček",
+   "levelIndex": 0,
+   "next": {
+    "name": "Barista",
+    "minPoints": 150,
+    "perks": ""
+   },
+   "pctToNext": 40,
+   "pointsIntoLevel": 60,
+   "pointsForNext": 150
+  }
+ ],
+ "me": {
+  "points": 212,
+  "breakdown": {
+   "tasks": 10,
+   "procedures": 3,
+   "closings": 4,
+   "reviewPoints": 40,
+   "ratedShifts": 6,
+   "autoPoints": -8,
+   "itemPoints": -30,
+   "flagged": 1
+  },
+  "levelName": "Barista",
+  "levelIndex": 1,
+  "perks": "Sleva 10 % na vlastní nákup",
+  "next": {
+   "name": "Mistr",
+   "minPoints": 500,
+   "perks": ""
+  },
+  "pctToNext": 17,
+  "pointsIntoLevel": 62,
+  "pointsForNext": 350
+ },
+ "reviews": [
+  {
+   "work_date": "2026-09-24",
+   "rating": 4,
+   "note": "Krásně uklizený bar, díky!",
+   "points": 16,
+   "autoPoints": -2,
+   "flagged": false,
+   "scope": "individual",
+   "seen_at": "2026-09-25T08:00:00Z",
+   "created_at": "2026-09-24T22:00:00Z"
+  },
+  {
+   "work_date": "2026-09-20",
+   "rating": 2,
+   "note": "Chyběla uzávěrka a sirupy nebyly doplněné.",
+   "points": 0,
+   "autoPoints": -10,
+   "flagged": true,
+   "scope": "shift",
+   "seen_at": null,
+   "created_at": "2026-09-21T09:00:00Z"
+  }
+ ],
+ "items": [
+  {
+   "work_date": "2026-09-20",
+   "kind": "task",
+   "refId": 5,
+   "label": "Doplnit sirupy",
+   "points": -3,
+   "note": "Došel karamel.",
+   "flagged": true
+  },
+  {
+   "work_date": "2026-09-18",
+   "kind": "closing",
+   "refId": 9,
+   "label": "Uzávěrka — ranní",
+   "points": 2,
+   "note": null,
+   "flagged": false
+  }
+ ],
+ "unseenFlagged": 1
+}

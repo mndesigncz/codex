@@ -48,7 +48,7 @@ export default function Podniky() {
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <SearchField value={q} onChange={setQ} placeholder="Název podniku, e-mail nebo jméno majitele, id…" ariaLabel="Hledat podnik" className="sm:flex-1" />
-        <Segmented options={FILTRY} value={filtr} onChange={setFiltr} size="sm" ariaLabel="Stav podniku" wrap />
+        <Segmented options={FILTRY} value={filtr} onChange={setFiltr} size="sm" ariaLabel="Stav podniku" />
       </div>
 
       {seznam.error ? (

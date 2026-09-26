@@ -1,0 +1,39 @@
+{
+ "stranka": "zamestnanec.postupy",
+ "polozky": [
+  {
+   "id": "postupy-povinne-dnes",
+   "widget": "postupy.povinne_dnes",
+   "velikost": "M"
+  },
+  {
+   "id": "postupy-pripominky",
+   "widget": "postupy.pripominky",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "postupy-posledni-prubehy",
+   "widget": "postupy.posledni_prubehy",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "postupy.povinne_dnes",
+  "postupy.posledni_prubehy",
+  "postupy.pripominky",
+  "postupy.spustit",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

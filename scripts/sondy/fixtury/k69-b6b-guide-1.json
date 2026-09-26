@@ -1,0 +1,14 @@
+{
+ "guide": {
+  "id": 1,
+  "title": "Jak se dělá flat white",
+  "content": "Dvojité espresso.\n- mléko do 60 °C\n- nalít jedním tahem",
+  "checklist": [
+   "Namlít kávu",
+   "Napěnit mléko"
+  ],
+  "categoryId": 1,
+  "updatedAt": "2026-09-25T09:10:00Z",
+  "author": "Martin"
+ }
+}

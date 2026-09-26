@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, type ButtonSize } from './Button';
 import { usePopover } from '@/lib/usePopover';
+import { useVejdiSe } from '@/lib/useVejdiSe';
 
 // Přetékající menu „···".
 //
@@ -53,13 +54,24 @@ export const MenuPanel = React.forwardRef<HTMLDivElement, {
   id?: string;
   'aria-label'?: string;
   'aria-labelledby'?: string;
-}>(function MenuPanel({ children, className = '', style, onKeyDown, direction = 'down', ...aria }, ref) {
+  /** false: místo použití si polohu hlídá samo (kontextové menu u prstu). */
+  vejdiSe?: boolean;
+}>(function MenuPanel({ children, className = '', style, onKeyDown, direction = 'down', vejdiSe: hlidat = true, ...aria }, ref) {
+  const vlastni = useRef<HTMLDivElement | null>(null);
+  const nastavRef = useCallback((el: HTMLDivElement | null) => {
+    vlastni.current = el;
+    if (typeof ref === 'function') ref(el);
+    else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+  }, [ref]);
+  // Na telefonu panel nesmí utéct z obrazovky (viz useVejdiSe).
+  const vejdiSe = useVejdiSe(vlastni, { smer: direction, aktivni: hlidat });
+
   return (
     <div
       role="menu"
-      ref={ref}
+      ref={nastavRef}
       onKeyDown={onKeyDown}
-      style={style}
+      style={{ ...style, ...vejdiSe }}
       {...aria}
       // Roste z tlačítka, které ho otevřelo — ne ze středu. Rychlé
       // (160 ms): menu se otevírá desetkrát denně, ne jednou.

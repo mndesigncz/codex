@@ -1,0 +1,29 @@
+{
+ "guides": [
+  {
+   "id": 1,
+   "title": "Jak se dělá flat white",
+   "precetlo": 4,
+   "celkem": 6,
+   "neprecetli": [
+    {
+     "id": 7,
+     "name": "Jana Nováková",
+     "avatar": "🙂"
+    },
+    {
+     "id": 9,
+     "name": "Ota Veselý",
+     "avatar": null
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "title": "Čištění mlýnku",
+   "precetlo": 6,
+   "celkem": 6,
+   "neprecetli": []
+  }
+ ]
+}

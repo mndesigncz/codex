@@ -1,246 +1,226 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { TaskChecklist, recurrenceLabel, ChecklistItem } from '../TaskChecklist';
+// Úkoly (zaměstnanec): co je dnes na mně a co je pro kohokoli.
+//
+// Kolo 69 (balík B6a): stránka je plocha s widgety. Hlavička jde do PlochaWidgetu
+// (přepínač Seznam/Týden do `aside` — dřív seděl ve slotu pro limetkovou akci
+// a na telefonu se roztáhl přes celou šířku), tahle komponenta kreslí nástroj.
+// Data čte přes useDataWidgetu z téže adresy jako widgety (Po termínu, Úkoly na
+// týden), takže stránka se ptá jednou.
+//
+// Z auditu: každý úkol byl vlastní karta a vedení mělo tentýž seznam v jedné kartě
+// s linkami — teď je skupina jedna karta s `.list` jako u vedení. Stav byl nativní
+// <select> převlečený za barevný štítek (s ručními hex barvami): stav nese Chip a mění
+// se přes Menu. „Tohle není dnešní úkol" už není confirm(), ale okno; prázdno „Vše
+// hotovo. 🎉" je EmptyState bez emoji; štítky (výroba, pro kohokoli, opakování) jsou
+// Chip a odkaz na návod ghost tlačítko.
+
+import { useState, useMemo } from 'react';
+import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskChecklist';
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
-
-import { EmptyState, PageHeader, Segmented } from '../ui';
-import { Toast } from '../ui/Toast';
+import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Skeleton, Toast } from '../ui';
 import { Icon } from '../Icons';
-import { okJson } from '@/lib/api';
-interface Task {
-  id: number;
-  title: string;
-  description?: string;
-  priority: string;
-  status: string;
-  dueDate?: string;
-  recurrence?: string | null;
-  teamTask?: boolean;
-  completedByName?: string | null;
-  checklist?: ChecklistItem[];
-  source?: string | null;
-  sourceMeta?: { guideId?: number | null; guideTitle?: string | null } | null;
-}
+import { apiMessage, okJson } from '@/lib/api';
+import { czCount, type CzNoun } from '@/lib/czech';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { URL_UKOLY, UKOL, Zaskrtnuti } from '../widgety/oblasti/ukoly';
+import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, type Ukol } from '@/lib/ukolyPrehled';
 
 interface Props {
   user: { id?: string };
 }
 
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Čeká', color: 'bg-black/[0.05] text-black/60' },
-  { value: 'in_progress', label: 'Probíhá', color: 'bg-[#0A84FF]/15 text-[#0A5CC0]' },
-  { value: 'done', label: 'Hotovo', color: 'bg-[#C8F542]/15 text-[#5B7A08]' },
-];
+const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
+const STAVY: Record<string, { label: string; tone: 'muted' | 'info' | 'ok' }> = {
+  pending: { label: 'Čeká', tone: 'muted' },
+  in_progress: { label: 'Probíhá', tone: 'info' },
+  done: { label: 'Hotovo', tone: 'ok' },
+};
+const denDlouze = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 export default function Tasks({ user }: Props) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ja = parseInt(user.id ?? '0') || null;
+  const smi = useSmi();
+  const data = useDataWidgetu<Ukol[]>(ja ? URL_UKOLY : null, vyberUkoly);
+  // Server vrací moje a pro kohokoli; kdo má ukoly.zobrazit_tym, dostane celý tým —
+  // tahle stránka je ale „moje úkoly", tak cizí nechává seznamu vedení.
+  const tasks = useMemo(() => vRozsahu(data.data ?? [], 'moje_a_volne', ja), [data.data, ja]);
   const [view, setView] = useState<'list' | 'week'>('list');
   const [showLater, setShowLater] = useState(false);
-  const [saveErr, setSaveErr] = useState('');
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [bodyToast, setBodyToast] = useState<string | null>(null);
+  const [mimoDen, setMimoDen] = useState<Ukol | null>(null);
   const { weekStart } = useCurrency();
-
-  const userId = parseInt(user.id ?? '0');
-
-  useEffect(() => {
-    if (!userId) return;
-    fetch(`/api/tasks?assignedTo=${userId}`)
-      .then(okJson)
-      .then(data => { if (Array.isArray(data)) setTasks(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [userId]);
 
   const today = pragueToday();
   const weekAhead = pragueToday(7);
+  const smiSplnit = (t: Ukol) => !jeCiziUkol(t, ja) || smi('ukoly.plnit');
 
-  const [bodyToast, setBodyToast] = useState<string | null>(null);
-  const updateStatus = async (task: Task, newStatus: string) => {
-    // Completing a task on a day that isn't its due day → warn first.
-    if (newStatus === 'done' && task.dueDate && task.dueDate !== today) {
-      const d = new Date(task.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
-      if (!confirm(`Tohle není dnešní úkol (termín: ${d}). Opravdu ho chceš splnit teď?`)) return;
-    }
+  const zmenStav = async (task: Ukol, newStatus: string) => {
+    setSaveErr(null);
+    const puvodni = task.status;
+    data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: newStatus } : t)));
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: task.id, status: newStatus }),
-      });
-      if (res.ok) {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
-        // Body se přičítaly potichu. Když je člověk uvidí hned, ví, že
-        // odškrtnutí něco znamená — a „vyrob limonádu" přestane být otrava.
-        const d = await res.json().catch(() => null);
-        const pts = Number(d?.pointsEarned);
-        if (newStatus === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`+${pts} ${pts === 1 ? 'bod' : pts < 5 ? 'body' : 'bodů'} za splněný úkol`);
-      }
-      else { setSaveErr('Změnu stavu se nepodařilo uložit.'); setTimeout(() => setSaveErr(''), 4000); }
+      const d = await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: task.id, status: newStatus }) }).then(okJson);
+      // Body se přičítaly potichu. Když je člověk uvidí hned, ví, že
+      // odškrtnutí něco znamená — a „vyrob limonádu" přestane být otrava.
+      const pts = Number(d?.pointsEarned);
+      if (newStatus === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`+${czCount(pts, BOD)} za splněný úkol`);
+      data.reload();
     } catch (e) {
-      console.error(e);
-      setSaveErr('Změnu stavu se nepodařilo uložit.'); setTimeout(() => setSaveErr(''), 4000);
+      data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: puvodni } : t)));
+      setSaveErr(apiMessage(e, 'Změnu stavu se nepodařilo uložit.'));
     }
   };
 
-  const saveChecklist = async (task: Task, next: { text: string; done: boolean }[]) => {
-    const prev = tasks;
-    setTasks(ts => ts.map(x => x.id === task.id ? { ...x, checklist: next } : x));
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: task.id, checklist: next }),
-      });
-      if (!res.ok) throw new Error();
-    } catch { setTasks(prev); }
+  /** Splnit úkol, který není na dnešek, se napřed zeptá oknem (dřív confirm()). */
+  const updateStatus = (task: Ukol, newStatus: string) => {
+    if (!smiSplnit(task)) return;
+    if (newStatus === 'done' && task.dueDate && task.dueDate !== today) { setMimoDen(task); return; }
+    void zmenStav(task, newStatus);
   };
 
-  const toggleChecklistItem = (task: Task, index: number) =>
-    saveChecklist(task, (task.checklist ?? []).map((it, i) => i === index ? { ...it, done: !it.done } : it));
-
+  const saveChecklist = async (task: Ukol, next: ChecklistItem[]) => {
+    setSaveErr(null);
+    const puvodni = task.checklist;
+    data.set(prev => (prev ?? []).map(x => (x.id === task.id ? { ...x, checklist: next } : x)));
+    try {
+      await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: task.id, checklist: next }) }).then(okJson);
+    } catch (e) {
+      data.set(prev => (prev ?? []).map(x => (x.id === task.id ? { ...x, checklist: puvodni } : x)));
+      setSaveErr(apiMessage(e, 'Kontrolní seznam se nepodařilo uložit.'));
+    }
+  };
+  const toggleChecklistItem = (task: Ukol, index: number) =>
+    saveChecklist(task, task.checklist.map((it, i) => (i === index ? { ...it, done: !it.done } : it)));
   /** Odškrtnout nebo odškrtnutí zrušit u celého seznamu jedním požadavkem. */
-  const toggleChecklistAll = (task: Task, done: boolean) =>
-    saveChecklist(task, (task.checklist ?? []).map(it => ({ ...it, done })));
+  const toggleChecklistAll = (task: Ukol, done: boolean) => saveChecklist(task, task.checklist.map(it => ({ ...it, done })));
 
-  const priorityColor = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
-  const getStatusOption = (status: string) => STATUS_OPTIONS.find(s => s.value === status) ?? STATUS_OPTIONS[0];
+  const skupiny = rozdelPoDnech(tasks, today, weekAhead, 20);
 
-  // Rozdělení podle dne. Šest filtrů a tři řazení se přepočítávají jen když se
-  // změní úkoly (ne při každém překreslení kvůli jinému stavu komponenty).
-  const { overdue, todayTasks, upcomingSoon, upcomingLater, done } = useMemo(() => {
-    const byDate = (a: Task, b: Task) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? ''));
-    const undone = tasks.filter(t => t.status !== 'done');
-    const upcoming = undone.filter(t => t.dueDate && t.dueDate > today).sort(byDate);
-    return {
-      overdue: undone.filter(t => t.dueDate && t.dueDate < today).sort(byDate),
-      todayTasks: undone.filter(t => !t.dueDate || t.dueDate === today).sort(byDate),
-      upcomingSoon: upcoming.filter(t => t.dueDate! <= weekAhead),
-      upcomingLater: upcoming.filter(t => t.dueDate! > weekAhead),
-      done: tasks.filter(t => t.status === 'done').sort((a, b) => byDate(b, a)).slice(0, 20),
-    };
-  }, [tasks, today, weekAhead]);
-
-  const card = (task: Task) => {
-    const statusOpt = getStatusOption(task.status);
-    // Future occurrences aren't active yet → show them greyed until their day comes.
-    const inactive = task.status !== 'done' && !!task.dueDate && task.dueDate > today;
+  const row = (task: Ukol) => {
+    const hotovo = task.status === 'done';
+    // Budoucí výskyty ještě neplatí → tlumeně, dokud nepřijde jejich den.
+    const inactive = !hotovo && !!task.dueDate && task.dueDate > today;
+    const pozde = !hotovo && !!task.dueDate && task.dueDate < today;
+    const opakovani = recurrenceLabel(task.recurrence);
+    const stav = STAVY[task.status] ?? STAVY.pending;
     return (
-      <div key={task.id} className={`glass-card p-5 sm:p-6 transition ${task.status === 'done' ? 'opacity-50' : inactive ? 'opacity-60' : ''}`}>
-        <div className="flex items-start gap-3">
-          <button
-            onClick={() => updateStatus(task, task.status === 'done' ? 'pending' : 'done')}
-            aria-pressed={task.status === 'done'}
-            aria-label={`${task.status === 'done' ? 'Zrušit splnění' : 'Označit jako hotové'} — ${task.title}`}
-            className={`tap-target w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
-              task.status === 'done' ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15 hover:border-[#C8F542]/60'
-            }`}
-          >
-            {task.status === 'done' && <span className="text-xs font-bold"><Icon name="check" size={15} /></span>}
-          </button>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <p className={`font-semibold text-[#16181A] tracking-tight ${task.status === 'done' ? 'line-through' : ''}`}>
-                <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${priorityColor(task.priority)}`} />{task.title}
-              </p>
-              <select
-                value={task.status}
-                aria-label={`Stav úkolu — ${task.title}`}
-                onChange={e => updateStatus(task, e.target.value)}
-                className={`tap-target-sm text-xs px-3 py-1 min-h-[36px] rounded-full border-0 font-medium cursor-pointer ${statusOpt.color} focus:outline-none`}
-              >
-                {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-            {task.description && <p className="text-sm text-black/55 mt-1.5 whitespace-pre-wrap">{task.description}</p>}
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {task.dueDate && (
-                <p className={`text-xs ${task.dueDate < today && task.status !== 'done' ? 'text-bad-ink font-medium' : 'text-black/45'}`}>
-                  {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
-                  {task.dueDate < today && task.status !== 'done' && ' · po termínu'}
-                </p>
-              )}
-              {task.source === 'production' && (
-                <span className="chip chip-sm chip-info" title="Odškrtnutí naskladní dávku a odepíše suroviny"><Icon name="leaf" size={12} className="inline -mt-0.5 mr-1 shrink-0" /> Výroba</span>
-              )}
-              {/* Postup bydlí v návodu — odsud se na něj dá dostat jedním
-                  ťuknutím místo hledání v seznamu návodů. */}
-              {task.sourceMeta?.guideId && (
-                <a href={`/employee/shifts?view=guides&guide=${task.sourceMeta.guideId}`}
-                  className="chip chip-sm bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 transition"
-                  title={task.sourceMeta.guideTitle ?? 'Otevřít návod'}>
-                  <Icon name="book" size={12} className="inline -mt-0.5 mr-1 shrink-0" />
-                  {task.sourceMeta.guideTitle ?? 'Návod'}
-                </a>
-              )}
-              {task.teamTask && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#0A84FF]/15 text-[#0A5CC0] px-2 py-0.5 text-[11px] font-semibold"><Icon name="calendar" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pro kohokoliv</span>
-              )}
-              {recurrenceLabel(task.recurrence) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2 py-0.5 text-[11px] font-semibold">↻ {recurrenceLabel(task.recurrence)}</span>
-              )}
-              {task.status === 'done' && task.completedByName && (
-                <span className="text-[11px] text-black/40">splnil {task.completedByName}</span>
-              )}
-            </div>
-            {task.checklist && task.checklist.length > 0 && (
-              <TaskChecklist items={task.checklist} onToggle={i => toggleChecklistItem(task, i)}
-                onToggleAll={d => toggleChecklistAll(task, d)} />
+      <li key={task.id} className="list-row items-start">
+        <span className="shrink-0 pt-0.5">
+          <Zaskrtnuti hotovo={hotovo} nazev={task.title} zamceno={!smiSplnit(task)} ceka={false}
+            onClick={() => updateStatus(task, hotovo ? 'pending' : 'done')} />
+        </span>
+        <div className={`min-w-0 flex-1 ${inactive ? 'opacity-60' : ''}`}>
+          <p className={`font-medium text-[15px] leading-snug ${hotovo ? 'text-black/45' : 'text-[#16181A]'}`}>{task.title}</p>
+          {task.description && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{task.description}</p>}
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[13px] text-black/55">
+            {task.dueDate && <span className={pozde ? 'text-bad-ink font-medium' : undefined}><span className="cz-sentence">{denKratce(task.dueDate)}</span>{pozde && ' · po termínu'}</span>}
+            {task.status === 'in_progress' && <Chip tone={stav.tone} size="sm">{stav.label}</Chip>}
+            {task.source === 'production' && <Chip tone="info" size="sm" icon="leaf">Výroba</Chip>}
+            {task.teamTask && <Chip tone="info" size="sm" icon="users">Pro kohokoli</Chip>}
+            {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
+            {hotovo && task.completedByName && <span>splnil {task.completedByName}</span>}
+            {/* Postup bydlí v návodu — odsud se na něj dá dostat jedním ťuknutím místo hledání v seznamu návodů. */}
+            {task.sourceMeta?.guideId && (
+              <a href={`/employee/shifts?view=guides&guide=${task.sourceMeta.guideId}`} className="btn btn-ghost btn-sm -my-1"
+                title={task.sourceMeta.guideTitle ?? 'Otevřít návod'}>
+                <Icon name="book" size={15} className="shrink-0" />
+                <span className="truncate max-w-[12rem]">{task.sourceMeta.guideTitle ?? 'Návod'}</span>
+              </a>
             )}
           </div>
+          {task.checklist.length > 0 && (
+            <TaskChecklist items={task.checklist} onToggle={smiSplnit(task) ? i => toggleChecklistItem(task, i) : undefined}
+              onToggleAll={smiSplnit(task) ? d => toggleChecklistAll(task, d) : undefined} />
+          )}
         </div>
-      </div>
+        {!hotovo && smiSplnit(task) && (
+          <Menu size="sm" label={`Stav úkolu ${task.title}`} className="shrink-0 -my-1" items={
+            task.status === 'in_progress'
+              ? [{ label: 'Vrátit na Čeká', icon: 'undo', onClick: () => updateStatus(task, 'pending') }, { label: 'Hotovo', icon: 'check', onClick: () => updateStatus(task, 'done') }]
+              : [{ label: 'Začít — probíhá', icon: 'play', onClick: () => updateStatus(task, 'in_progress') }, { label: 'Hotovo', icon: 'check', onClick: () => updateStatus(task, 'done') }]
+          } />
+        )}
+      </li>
     );
   };
 
-  const section = (title: string, list: Task[], tone = 'text-black/45') =>
+  const section = (title: string, list: Ukol[], tone = '') =>
     list.length > 0 && (
-      <div className="space-y-2.5">
-        <h3 className={`text-xs font-bold uppercase tracking-[0.13em] ${tone}`}>{title} ({list.length})</h3>
-        {list.map(card)}
-      </div>
+      <section className="space-y-2" aria-label={title}>
+        <h2 className={`t-label ${tone}`}>{title} ({list.length.toLocaleString('cs-CZ')})</h2>
+        <Card pad="none" className="px-5"><ul className="list">{list.map(row)}</ul></Card>
+      </section>
     );
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-2xl mx-auto w-full">
-      <PageHeader hintId="tasks" title="Úkoly" subtitle="Co je dnes na tobě — a co je pro kohokoli."
-        primary={<Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
-          options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />} />
-
-      {saveErr && <div className="note note-danger px-4 py-2.5 text-sm">{saveErr}</div>}
-      <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
-
-      {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
+  const zbyva = skupiny.poTerminu.length + skupiny.dnes.length;
+  const nastroj = (
+    <div className="space-y-6">
+      {saveErr && <p className="note note-danger text-sm" role="alert">{saveErr}</p>}
+      {data.error && !data.data ? (
+        <Card><ErrorState title="Úkoly se nenačetly" onRetry={data.reload} detail={data.error} /></Card>
+      ) : data.loading ? (
+        <Card aria-busy className="space-y-2">
+          <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 w-2/3" />
+        </Card>
       ) : view === 'week' ? (
         <TaskWeekBoard tasks={tasks} weekStart={weekStart}
-          onComplete={(t, done) => updateStatus(t as Task, done ? 'done' : 'pending')}
-          labelFor={(t) => (t.teamTask ? 'Pro kohokoliv' : '')} />
+          onComplete={(t, done) => { const u = tasks.find(x => x.id === t.id); if (u) updateStatus(u, done ? 'done' : 'pending'); }}
+          canComplete={t => { const u = tasks.find(x => x.id === t.id); return !!u && smiSplnit(u); }}
+          labelFor={t => (t.teamTask ? 'Pro kohokoli' : '')} />
       ) : tasks.length === 0 ? (
-        <div className="glass-card"><EmptyState illustration="ukoly" title="Žádné úkoly" hint="Až ti vedení něco zadá, objeví se to tady i v přehledu." compact /></div>
+        <Card><EmptyState illustration="ukoly" title="Žádné úkoly" hint="Až ti vedení něco zadá, objeví se to tady i v přehledu." compact /></Card>
       ) : (
         <>
-          {section('Po termínu', overdue, 'text-bad-ink')}
-          {section('Dnes', todayTasks, 'text-[#5B7A08]')}
-          {section('Tento týden', upcomingSoon)}
-          {upcomingLater.length > 0 && (
-            showLater ? (
-              section('Později', upcomingLater)
-            ) : (
-              <button
-                onClick={() => setShowLater(true)}
-                className="w-full rounded-2xl border border-dashed border-black/15 py-2.5 text-xs font-semibold text-black/45 hover:text-[#5B7A08] hover:border-[#C8F542]/60 transition"
-              >
-                Zobrazit další úkoly ({upcomingLater.length}) →
-              </button>
+          {section('Po termínu', skupiny.poTerminu, 'text-bad-ink')}
+          {section('Dnes', skupiny.dnes)}
+          {zbyva === 0 && (
+            <Card><EmptyState compact illustration="ukoly" title="Na dnešek máš hotovo" hint="Nic po termínu ani na dnes — další úkoly jsou níž." /></Card>
+          )}
+          {section('Tento týden', skupiny.tentoTyden)}
+          {skupiny.pozdeji.length > 0 && (
+            showLater ? section('Později', skupiny.pozdeji) : (
+              <Button variant="ghost" size="sm" iconAfter="chevron" onClick={() => setShowLater(true)}>
+                Zobrazit další úkoly ({skupiny.pozdeji.length.toLocaleString('cs-CZ')})
+              </Button>
             )
           )}
-          {section('Hotové — posledních 20', done)}
-          {overdue.length + todayTasks.length + upcomingSoon.length + upcomingLater.length === 0 && (
-            <div className="glass-card p-8 text-center"><p className="text-black/45">Vše hotovo. 🎉</p></div>
-          )}
+          {section('Hotové — posledních 20', skupiny.hotove)}
         </>
       )}
     </div>
+  );
+
+  return (
+    <>
+      <PlochaWidgetu
+        stranka="zamestnanec.ukoly"
+        hlavicka={{
+          title: 'Úkoly',
+          subtitle: data.data && zbyva > 0 ? `Na dnešek a po termínu: ${czCount(zbyva, UKOL)}.` : 'Co je dnes na tobě — a co je pro kohokoli.',
+          hintId: 'tasks',
+          aside: <Segmented size="sm" ariaLabel="Zobrazení" value={view} onChange={setView}
+            options={[{ id: 'list', label: 'Seznam' }, { id: 'week', label: 'Týden' }]} />,
+        }}
+        nastroj={nastroj}
+      />
+      {mimoDen && (
+        <Modal open onClose={() => setMimoDen(null)} size="sm" title="Tohle není dnešní úkol"
+          footer={<>
+            <Button variant="secondary" onClick={() => setMimoDen(null)}>Zrušit</Button>
+            <Button variant="primary" icon="check" onClick={() => { const t = mimoDen; setMimoDen(null); void zmenStav(t, 'done'); }}>Splnit teď</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">„{mimoDen.title}" má termín {denDlouze(mimoDen.dueDate!)}.</span> Opravdu ho chceš splnit už teď?</p>
+        </Modal>
+      )}
+      <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
+    </>
   );
 }

@@ -1,0 +1,33 @@
+{
+ "stranka": "zamestnanec.navody",
+ "polozky": [
+  {
+   "id": "navody-povinne-cteni",
+   "widget": "navody.povinne_cteni",
+   "velikost": "M"
+  },
+  {
+   "id": "navody-nove",
+   "widget": "navody.nove",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "navody.povinne_cteni",
+  "navody.nove",
+  "navody.k_uzaverce",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

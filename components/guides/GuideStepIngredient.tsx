@@ -53,7 +53,8 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
   }
 
   return (
-    <div className="rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 p-3 space-y-2">
+    <div className="well p-3 space-y-2">
+      {/* Kolo 69 (B6b): surovina kroku byla limetkově tónovaný blok s ručními poli — teď Well a .field. */}
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={step.itemId ?? ''}
@@ -64,7 +65,8 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
               unit: next ? (next.contentUnit ?? next.unit ?? null) : null,
             });
           }}
-          className="flex-1 min-w-[160px] max-w-[22rem] rounded-2xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+          aria-label="Surovina ze skladu"
+          className="field flex-1 min-w-[160px] max-w-[22rem]">
           <option value="">— vyber ze skladu —</option>
           {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
         </select>
@@ -73,33 +75,32 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
           value={step.amount == null ? '' : String(step.amount).replace('.', ',')}
           onChange={e => onChange({ amount: e.target.value === '' ? null : dec(e.target.value) })}
           placeholder="0,04"
-          className="w-24 rounded-2xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-center tabular-nums text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
+          aria-label="Množství suroviny"
+          className="field !w-24 text-center tabular-nums"
         />
         <div className="flex gap-1">
           {units.map(u => (
-            <button key={u} type="button" onClick={() => onChange({ unit: u })}
-              className={`rounded-full px-2.5 py-2 text-xs font-bold transition active:scale-95 ${
-                (step.unit ?? '') === u ? 'bg-[#C8F542] on-accent' : 'glass text-black/50'
-              }`}>
+            <button key={u} type="button" onClick={() => onChange({ unit: u })} aria-pressed={(step.unit ?? '') === u}
+              className={`filter-pill tap-target ${(step.unit ?? '') === u ? 'seg-on' : 'seg-off glass'}`}>
               {u}
             </button>
           ))}
         </div>
         <button type="button" onClick={() => onChange({ itemId: null, amount: null, unit: null })}
           title="Zrušit surovinu" aria-label="Zrušit surovinu"
-          className="tap-target rounded-full w-8 h-8 flex items-center justify-center text-black/30 hover:text-bad-ink transition">
+          className="btn-icon tap-target">
           <Icon name="close" size={14} />
         </button>
       </div>
 
       {!step.itemId && (
         <button type="button" onClick={() => setCreating(true)}
-          className="text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
+          className="btn btn-ghost btn-sm">
           <Icon name="plus" size={13} /> Sklad ji ještě nezná — založit
         </button>
       )}
       {item && Number(item.packageSize) > 0 && (
-        <p className="text-[11px] text-black/45">
+        <p className="t-meta">
           Balení {Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}
           {Number(item.unitCost) > 0 ? ` · ${item.unitCost} Kč` : ' · cena chybí'}
         </p>

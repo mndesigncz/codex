@@ -115,7 +115,7 @@ export function SkupinyDoporuceni({ d }: { d: Doporuceni }) {
         {celkem > 0 && <> · dohromady se tu mluví o <span className="font-semibold text-[#16181A] tabular-nums">{money(celkem)}</span></>}
       </p>
       {moznosti.length > 2 && (
-        <Segmented size="sm" wrap ariaLabel="Skupina doporučení" options={moznosti} value={jen} onChange={setJen} />
+        <Segmented size="sm" ariaLabel="Skupina doporučení" options={moznosti} value={jen} onChange={setJen} />
       )}
       {SKUPINY.filter(s => jen === 'vse' || s.id === jen).map(s => {
         const list = podleSkupin.get(s.id) ?? [];

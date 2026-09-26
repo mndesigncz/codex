@@ -1,8 +1,8 @@
 // Widgety oblasti „Plánování" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/planovani.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B6a v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B6a; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/planovani.tsx, výpočty v lib/ukolyPrehled.ts.
+// Soubor patří balíku B6a. Kolo 69: oba widgety hotové. Karty ke schválení mají ikonu `inbox`
+// (fronta, která čeká), ať se na stránce Plánování neopakuje `kanban` nástroje (AK-19).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -19,7 +19,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.planovani', 'vedeni.napady'],
     opravneni: { vse: ['planovani.zobrazit'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/planning → [column=review]{title,description}
   {
@@ -27,13 +27,13 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'planovani',
     nazev: 'Karty ke schválení',
     popis: 'Karty ve sloupci Ke schválení.',
-    ikona: 'kanban',
+    ikona: 'inbox',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.planovani'],
     opravneni: { vse: ['planovani.zobrazit'], nektere: [], pole: { 'akce:presunout': 'planovani.upravit' } },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

@@ -11,10 +11,27 @@ export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
 
 // Vlastní body a hodnocení vidí každý člen; žebříček týmu odmeny.zebricek.
+// `kiosk` je typ účtu — sdílený tablet body ani hodnocení nemá.
 async function ctx() {
   const c = await pozaduj(null);
   if (jeOdpoved(c)) return c;
-  return { meId: c.meId, teamId: c.teamId, opr: c.role.opravneni };
+  return { meId: c.meId, teamId: c.teamId, opr: c.role.opravneni, kiosk: c.role.typ === 'kiosk' };
+}
+
+// Nepotvrzené výtky po lidech (widget Výtky v týmu: „kolik výtek kdo dostal
+// a jestli je viděl"). Jen hodnocení celé směny — seen_at mají jen ta;
+// výtka u položky se potvrzuje spolu s hodnocením dne.
+async function neviseneVytky(teamId: number, userIds: number[]): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  if (userIds.length === 0) return map;
+  try {
+    const rows = await sql`
+      SELECT employee_id AS uid, COUNT(*)::int AS n FROM shift_reviews
+      WHERE team_id = ${teamId} AND employee_id = ANY(${userIds}) AND flagged = TRUE AND seen_at IS NULL
+      GROUP BY employee_id`;
+    for (const r of rows as any[]) map.set(r.uid, r.n ?? 0);
+  } catch { /* sloupce ještě nejsou — nuly */ }
+  return map;
 }
 
 // Worked days in the recent past that still have no review — the employer's
@@ -108,6 +125,7 @@ export async function GET() {
     const memberIds = members.map(m => m.id);
     const breakdowns = await breakdownForTeam(c.teamId, memberIds);
     const pendings = vidiHodnoceni ? await pendingForTeam(c.teamId, memberIds) : new Map<number, { n: number; oldest: string | null }>();
+    const nevidene = vidiHodnoceni ? await neviseneVytky(c.teamId, memberIds) : new Map<number, number>();
     const standings = members.map(m => {
       const b0 = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
       const total = totalPoints(b0, points);
@@ -117,16 +135,26 @@ export async function GET() {
       return {
         id: m.id, name: m.name, avatar: m.avatar,
         points: total, breakdown: b,
-        flagged: b.flagged, pending: p.n, oldestPending: p.oldest,
+        flagged: b.flagged, flaggedUnseen: vidiHodnoceni ? (nevidene.get(m.id) ?? 0) : 0, pending: p.n, oldestPending: p.oldest,
         levelName: st.level.name, levelIndex: st.levelIndex,
         next: st.next, pctToNext: st.pctToNext, pointsIntoLevel: st.pointsIntoLevel, pointsForNext: st.pointsForNext,
       };
     });
     standings.sort((a, b) => b.points - a.points);
-    return NextResponse.json({ role: 'employer', levels, points, standings });
+    // N12 (kolo 69): dřív tahle větev vracela jen žebříček a člověk se
+    // žebříčkem (vedoucí směny, zaměstnanecká role s odmeny.zebricek)
+    // přišel o vlastní body, úroveň i zpětnou vazbu. Vlastní část je teď
+    // v odpovědi vždy — kromě tabletu, který body nemá.
+    return NextResponse.json({ role: 'employer', levels, points, standings, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
   }
 
-  // Employee — own standing + recent feedback.
+  return NextResponse.json({ role: 'employee', levels, points, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
+}
+
+// Vlastní úroveň, body a zpětná vazba člena (obě větve GET).
+async function vlastni(teamId: number, meId: number, levels: ReturnType<typeof normalizeLevels>, points: ReturnType<typeof normalizePoints>) {
+  const c = { teamId, meId };
+
   const b = await breakdownFor(c.teamId, c.meId);
   const total = totalPoints(b, points);
   const st = standingForPoints(levels, total);
@@ -154,8 +182,7 @@ export async function GET() {
     unseenFlagged = r?.n ?? unseenFlagged;
   } catch { /* columns not migrated */ }
 
-  return NextResponse.json({
-    role: 'employee', levels, points,
+  return {
     me: {
       points: total, breakdown: b,
       levelName: st.level.name, levelIndex: st.levelIndex, perks: st.level.perks,
@@ -169,7 +196,7 @@ export async function GET() {
     })),
     items,
     unseenFlagged,
-  });
+  };
 }
 
 // POST { markSeen: true } — the employee acknowledged their new feedback.

@@ -1,0 +1,70 @@
+{
+ "catalog": [
+  {
+   "id": 1,
+   "team_id": 1,
+   "title": "Káva zdarma na směně",
+   "icon": "☕",
+   "cost": 50,
+   "active": true,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 2,
+   "team_id": 1,
+   "title": "Volný pátek",
+   "icon": null,
+   "cost": 300,
+   "active": true,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 3,
+   "team_id": 1,
+   "title": "Oběd na účet podniku",
+   "icon": "🍝",
+   "cost": 120,
+   "active": true,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 931,
+   "team_id": 1,
+   "title": "Volný den z organizace",
+   "icon": "🌴",
+   "cost": 500,
+   "active": true,
+   "zOrganizace": true,
+   "sdileno": false,
+   "spravuje": "Kavárna Vinohrady"
+  }
+ ],
+ "redemptions": [
+  {
+   "id": 21,
+   "team_id": 1,
+   "employee_id": 16,
+   "reward_id": 1,
+   "title": "Káva zdarma na směně",
+   "cost": 50,
+   "status": "pending",
+   "created_at": "2026-09-17T10:00:00Z"
+  },
+  {
+   "id": 25,
+   "team_id": 1,
+   "employee_id": 16,
+   "reward_id": 1,
+   "title": "Káva zdarma na směně",
+   "cost": 50,
+   "status": "approved",
+   "created_at": "2026-09-01T10:00:00Z"
+  }
+ ]
+}
