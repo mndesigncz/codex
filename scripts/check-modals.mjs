@@ -12,7 +12,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const BASELINE = 32; // kolo 68: ShiftReviewModal → <Modal>
+const BASELINE = 30; // kolo 69 (B5b): detail účtenky a export ve Financích → <Modal>
 
 const hits = [];
 const walk = (dir) => {

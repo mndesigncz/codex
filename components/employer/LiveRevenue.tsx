@@ -21,88 +21,13 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { BarSpark, Chip, ListRow } from '../ui';
 import { czCount, type CzNoun } from '@/lib/czech';
-import { pragueToday } from '@/lib/pragueTime';
 
-export type TonPoznamky = 'good' | 'warn' | 'info';
-export interface PoznamkaPokladny { tone: TonPoznamky; title: string; text: string }
-export interface DenPokladny {
-  day: string; bills: number; cash: number; card: number; other: number; total: number;
-  tips: number; refundCount: number; refundTotal: number;
-  closings: number; declared: number | null; diff: number | null;
-}
-export interface PolozkaPokladny { productId: string; name: string; category: string | null; qty: number; revenue: number | null }
-export interface OsobaPokladny { name: string; total: number; bills: number }
-export interface SouctyPokladny {
-  bills: number; total: number; cash: number; card: number; other: number; tips: number;
-  tipsCash: number; tipsCard: number; refundCount: number; refundTotal: number;
-  avgBill: number; soldQty: number; productRevenue: number;
-  methods: { id: string; label: string; amount: number }[];
-}
+import type { DenPokladny, OsobaPokladny, PolozkaPokladny, TonRady } from '@/lib/financeWidgety';
 
-/** Odpověď /api/pos/daily vybraná pro widgety. Obal (nikdy null), aby „nepropojeno" nebylo „načítám". */
-export interface DenniPokladna {
-  propojeno: boolean;
-  from: string; to: string;
-  misto: string | null;
-  posledniSynchronizace: string | null;
-  soucty: SouctyPokladny;
-  dny: DenPokladny[];
-  hodiny: number[];
-  obsluha: OsobaPokladny[];
-  polozky: PolozkaPokladny[];
-  poznamky: PoznamkaPokladny[];
-  poznamka: string;
-}
-
-const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-const text = (v: unknown) => (typeof v === 'string' ? v : '');
-
-/** Vybere z /api/pos/daily jen to, co widgety kreslí; nečekaný tvar je chyba widgetu, ne prázdno. */
-export function vyberDenniPokladnu(raw: any): DenniPokladna {
-  if (!raw || typeof raw !== 'object') throw new Error('Pokladna odpověděla v nečekaném tvaru.');
-  const t = raw.totals ?? {};
-  return {
-    propojeno: raw.connected === true && !!raw.totals,
-    from: text(raw.from), to: text(raw.to),
-    misto: text(raw.placeName).trim() || null,
-    posledniSynchronizace: typeof raw.lastSyncAt === 'string' ? raw.lastSyncAt : null,
-    soucty: {
-      bills: n(t.bills), total: n(t.total), cash: n(t.cash), card: n(t.card), other: n(t.other), tips: n(t.tips),
-      tipsCash: n(t.tipsCash), tipsCard: n(t.tipsCard), refundCount: n(t.refundCount), refundTotal: n(t.refundTotal),
-      avgBill: n(t.avgBill), soldQty: n(t.soldQty), productRevenue: n(t.productRevenue),
-      methods: Array.isArray(t.methods) ? t.methods.map((m: any) => ({ id: text(m?.id), label: text(m?.label) || text(m?.id), amount: n(m?.amount) })) : [],
-    },
-    dny: Array.isArray(raw.days) ? raw.days.map((d: any) => ({
-      day: text(d?.day), bills: n(d?.bills), cash: n(d?.cash), card: n(d?.card), other: n(d?.other), total: n(d?.total),
-      tips: n(d?.tips), refundCount: n(d?.refundCount), refundTotal: n(d?.refundTotal),
-      closings: n(d?.closings), declared: d?.declared == null ? null : n(d.declared), diff: d?.diff == null ? null : n(d.diff),
-    })) : [],
-    hodiny: Array.isArray(raw.hours) ? raw.hours.map(n) : [],
-    obsluha: Array.isArray(raw.byPerson) ? raw.byPerson.map((p: any) => ({ name: text(p?.name) || 'Bez jména', total: n(p?.total), bills: n(p?.bills) })) : [],
-    polozky: Array.isArray(raw.items) ? raw.items.map((i: any) => ({
-      productId: text(i?.productId) || text(i?.name), name: text(i?.name) || 'Bez názvu', category: text(i?.category) || null,
-      qty: n(i?.qty), revenue: i?.revenue == null ? null : n(i.revenue),
-    })) : [],
-    poznamky: Array.isArray(raw.notes) ? raw.notes
-      .filter((x: any) => x && (x.tone === 'good' || x.tone === 'warn' || x.tone === 'info'))
-      .map((x: any) => ({ tone: x.tone, title: text(x.title), text: text(x.text) })) : [],
-    poznamka: text(raw.note),
-  };
-}
-
-/** Období widgetu tržeb → dny od–do v pražském čase. `mesic` = od prvního dne měsíce do dneška. */
-export function obdobiPokladny(id: unknown): { from: string; to: string; popis: string } {
-  const dnes = pragueToday();
-  switch (id) {
-    case 'vcera': return { from: pragueToday(-1), to: pragueToday(-1), popis: 'Včera' };
-    case '7_dni': return { from: pragueToday(-6), to: dnes, popis: 'Posledních 7 dní' };
-    case '14_dni': return { from: pragueToday(-13), to: dnes, popis: 'Posledních 14 dní' };
-    case '30_dni': return { from: pragueToday(-29), to: dnes, popis: 'Posledních 30 dní' };
-    case 'mesic':
-    case 'tento_mesic': return { from: `${dnes.slice(0, 7)}-01`, to: dnes, popis: 'Tento měsíc' };
-    default: return { from: dnes, to: dnes, popis: 'Dnes' };
-  }
-}
+// Výběr dat z /api/pos/daily a období jsou čistá logika v lib/financeWidgety (testuje se v Node);
+// odsud se jen znovu vyvážejí, ať widgety tržeb berou všechno z jednoho místa.
+export { obdobiPokladny, vyberDenniPokladnu, type DenniPokladna, type DenPokladny } from '@/lib/financeWidgety';
+export type TonPoznamky = TonRady;
 
 export const UCTENKA: CzNoun = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
 export const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' };

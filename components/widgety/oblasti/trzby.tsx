@@ -34,12 +34,13 @@
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť), v náhledu nic nenaviguje ani nezapisuje.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
-import { czCount, czForm } from '@/lib/czech';
+import { DEN, czCount, czForm } from '@/lib/czech';
 import { dbTimeHM, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
+import { dnyObdobi, kasaProtiUzaverkam, mesiceObdobi, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { BarSpark, Button, Chip, ListRow, Stat, StatRow } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -48,7 +49,7 @@ import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import {
   DnyPokladny, HodinyPokladny, ObsluhaPokladny, ProdanoPokladny, RadyJakoSeznam,
-  UCTENKA, kratkeDatum, obdobiPokladny, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
+  KUS, UCTENKA, kratkeDatum, obdobiPokladny, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
 } from '../../employer/LiveRevenue';
 
 // ---------------------------------------------------------------------------
@@ -253,7 +254,7 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
           )}
           {L && d.polozky.length > 0 && (
             <div>
-              <p className="t-label mb-1">Co se prodalo · {czCount(Math.round(t.soldQty), { one: 'kus', few: 'kusy', many: 'kusů' })}</p>
+              <p className="t-label mb-1">Co se prodalo · {czCount(Math.round(t.soldQty), KUS)}</p>
               <ProdanoPokladny polozky={d.polozky} limit={10} />
             </div>
           )}
@@ -277,24 +278,6 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
 
 interface DenTrzby { den: string; trzba: number }
 
-/** Dny od–do včetně (pražské „RRRR-MM-DD", poledne UTC, ať přechod času nevadí). */
-function dnyObdobi(od: string, doDne: string): string[] {
-  const out: string[] = [];
-  for (let t = Date.parse(`${od}T12:00:00Z`), konec = Date.parse(`${doDne}T12:00:00Z`); t <= konec; t += 86_400_000) {
-    out.push(new Date(t).toISOString().slice(0, 10));
-  }
-  return out;
-}
-
-/** Z /api/closings/calendar vybere tržby po dnech; bez tržeb (role bez finance.trzby) je to chyba, ne nuly. */
-function vyberKalendar(raw: any): Record<string, number> {
-  if (!raw || typeof raw !== 'object' || typeof raw.days !== 'object') throw new Error('Uzávěrky přišly v nečekaném tvaru.');
-  if (raw.selfOnly === true) throw new Error('Tržby z uzávěrek vidí jen ten, kdo smí vidět všechny uzávěrky.');
-  const out: Record<string, number> = {};
-  for (const [den, v] of Object.entries(raw.days as Record<string, any>)) if (v && v.revenue != null) out[den] = Number(v.revenue) || 0;
-  return out;
-}
-
 function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: string }>) {
   const money = useMoney();
   const smi = useSmi();
@@ -304,7 +287,7 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const { data: pos, obdobi } = useDenniPokladna(ok && !chceUzaverky, nastaveni.obdobi);
   // Bez pokladny (nepropojená, nebo tarif bez ní) spadne na uzávěrky, když na ně divák smí.
   const zUzaverek = chceUzaverky || (smiUzaverky && pos.data?.propojeno === false);
-  const mesice = useMemo(() => [...new Set([obdobi.from.slice(0, 7), obdobi.to.slice(0, 7)])], [obdobi.from, obdobi.to]);
+  const mesice = useMemo(() => mesiceObdobi(obdobi.from, obdobi.to), [obdobi.from, obdobi.to]);
   const kal1 = useDataWidgetu(zUzaverek ? `/api/closings/calendar?month=${mesice[0]}` : null, vyberKalendar);
   const kal2 = useDataWidgetu(zUzaverek && mesice[1] ? `/api/closings/calendar?month=${mesice[1]}` : null, vyberKalendar);
 
@@ -430,8 +413,8 @@ function TopProdukty({ velikost, nastaveni }: WidgetProps<{ obdobi: string; raze
   const limit = velikost === 'M' ? Math.min(5, pocet) : pocet;
   const propojeno = podleMarze ? marze.data?.propojeno : pos.data?.propojeno;
 
-  let obsah: React.ReactNode = null;
-  let prazdno: React.ReactNode | undefined;
+  let obsah: ReactNode = null;
+  let prazdno: ReactNode | undefined;
   if (propojeno === false) prazdno = <NepropojenaPokladna />;
   else if (podleMarze && marze.data) {
     const s = marze.data.polozky.filter(p => p.marginPct != null).sort((a, b) => (b.marginPct ?? 0) - (a.marginPct ?? 0));
@@ -441,7 +424,7 @@ function TopProdukty({ velikost, nastaveni }: WidgetProps<{ obdobi: string; raze
         <p className="t-meta">Tento měsíc · podle marže</p>
         <ul className="list mt-1">
           {s.slice(0, limit).map(p => (
-            <ListRow key={p.name} title={p.name} meta={czCount(Math.round(p.qty), { one: 'kus', few: 'kusy', many: 'kusů' })}
+            <ListRow key={p.name} title={p.name} meta={czCount(Math.round(p.qty), KUS)}
               value={<span className="tabular-nums">{p.marginPct} %</span>} valueMeta={p.revenue != null ? money(p.revenue) : undefined} />
           ))}
         </ul>
@@ -554,11 +537,7 @@ function KasaVsUzaverky({ velikost, nastaveni }: WidgetProps<{ obdobi: string; p
   const prah = Math.max(0, Number(nastaveni.prah) || 0);
   const dnes = pragueToday();
   // Dnešek se nepočítá: uzávěrka se píše až na konci směny a „rozdíl" by byl celá tržba.
-  const dny = (d?.dny ?? []).filter(x => x.day < dnes);
-  const mimo = dny.filter(x => x.diff != null && Math.abs(x.diff) > prah);
-  const bezUzaverky = dny.filter(x => x.closings === 0 && x.total > 0);
-  const cisty = dny.reduce((s, x) => s + (x.diff ?? 0), 0);
-  const vse = [...mimo, ...bezUzaverky].sort((a, b) => b.day.localeCompare(a.day));
+  const { mimo, bezUzaverky, cisty, vse } = kasaProtiUzaverkam(d?.dny ?? [], prah, dnes);
   const L = velikost === 'L';
 
   return (
@@ -568,7 +547,7 @@ function KasaVsUzaverky({ velikost, nastaveni }: WidgetProps<{ obdobi: string; p
         <div className="space-y-3">
           <p className="t-meta cz-sentence">{obdobi.popis} · práh {money(prah)}</p>
           <StatRow>
-            <Stat label="Dny mimo" value={cislo(mimo.length)} note={bezUzaverky.length ? `${czCount(bezUzaverky.length, { one: 'den', few: 'dny', many: 'dní' })} bez uzávěrky` : 'všechny dny mají uzávěrku'} />
+            <Stat label="Dny mimo" value={cislo(mimo.length)} note={bezUzaverky.length ? `${czCount(bezUzaverky.length, DEN)} bez uzávěrky` : 'všechny dny mají uzávěrku'} />
             <Stat label="Čistý rozdíl" value={`${cisty > 0 ? '+' : cisty < 0 ? '−' : ''}${money(Math.abs(cisty))}`} />
           </StatRow>
           {vse.length === 0 ? (

@@ -1,0 +1,48 @@
+{
+ "stranka": "vedeni.uzaverky",
+ "polozky": [
+  {
+   "id": "uzaverky-chybejici",
+   "widget": "uzaverky.chybejici",
+   "velikost": "M"
+  },
+  {
+   "id": "uzaverky-ke-schvaleni",
+   "widget": "uzaverky.ke_schvaleni",
+   "velikost": "M"
+  },
+  {
+   "id": "uzaverky-souhrn",
+   "widget": "uzaverky.souhrn",
+   "velikost": "L"
+  },
+  {
+   "id": "uzaverky-kalendar",
+   "widget": "uzaverky.kalendar",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "uzaverky.chybejici",
+  "uzaverky.ke_schvaleni",
+  "uzaverky.souhrn",
+  "uzaverky.rozdil_kasy",
+  "uzaverky.trendy",
+  "uzaverky.mesic_v_cislech",
+  "uzaverky.kalendar",
+  "uzaverky.predavka",
+  "pokladna.dnes"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

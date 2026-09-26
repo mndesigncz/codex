@@ -1,21 +1,39 @@
 'use client';
 
+// Uzávěrka směny — formulář a (pro zaměstnance) stránka s plochou widgetů.
+//
+// Kolo 69 (balík B5a, spec §6.2): na záložce Uzávěrka je formulář hlavním
+// nástrojem plochy `zamestnanec.uzaverka`. Výzva „Chybí ti uzávěrka" nad ním
+// a historie „Moje uzávěrky" pod ním jsou widgety (uzaverky.moje_uzaverka,
+// uzaverky.moje_historie) — dají se přesunout, odebrat a nahradit předávkou
+// nebo povinnými postupy. Tablet a vedení („Nová uzávěrka") dostávají dál
+// holý formulář s vlastní hlavičkou: tablet plochu nemá (B9) a vedení jde
+// do formuláře z přehledu uzávěrek.
+//
+// Designové opravy z auditu (DP §1.3, §4 D): kroky už nejsou karty v kartě se
+// štítkem „KROK 1/4", ale oddíly jedné karty oddělené linkou; hlavní
+// „Odeslat uzávěrku" je jediná limetka (dřív tmavá) a vedlejší „Přidat"
+// sekundární (dřív limetka); přepínače jsou SwitchRow, ruční štítky t-label,
+// název ikony postupu se už netiskne jako text a `confirm()` nahradil Modal.
+
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState, PageHeader, Modal, Button } from '../ui';
+import { Avatar, Button, Chip, Modal, PageHeader, Segmented, SwitchRow } from '../ui';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
-  DIFF_REASONS, diffReasonLabel, explainDifference,
+  DIFF_REASONS, explainDifference,
   type DenominationCounts, denominationsFor, sumDenominations, hasDenominations,
-  cashLeft,
 } from '@/lib/closing';
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
 import { pragueToday } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
-import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { KLIC_VYPLNIT, UDALOST_VYPLNIT } from '@/lib/uzaverkyPrehled';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -66,7 +84,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
   const fmtDenom = (d: number) => (Number.isInteger(d) ? String(d) : d.toFixed(2).replace('.', ','));
 
   return (
-    <div className="rounded-2xl bg-white/70 border border-black/[0.06] overflow-hidden">
+    <div className="well overflow-hidden !p-0">
       <div className="divide-y divide-black/[0.05]">
         {denomSet.map(d => {
           const cnt = counts[String(d)] ?? 0;
@@ -88,8 +106,9 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
                   placeholder="0"
                   className="w-14 h-9 text-center field rounded-xl border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                 />
+                {/* Plus bylo limetkové — dvanáct limetek pod sebou vedle jediné hlavní akce. */}
                 <button type="button" onClick={() => bump(d, 1)} aria-label={`Přidat ${fmtDenom(d)} ${symbol}`}
-                  className="rounded-xl bg-[#C8F542] w-9 h-9 flex items-center justify-center text-lg leading-none text-black hover:brightness-110 active:scale-95 transition">+</button>
+                  className="rounded-xl glass w-9 h-9 flex items-center justify-center text-lg leading-none text-black/60 hover:text-black active:scale-95 transition">+</button>
               </div>
               <span className={`w-20 shrink-0 text-right text-xs tabular-nums ${cnt > 0 ? 'text-[#5B7A08] font-semibold' : 'text-black/20'}`}>
                 {cnt > 0 ? money(d * cnt) : '—'}
@@ -98,9 +117,10 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
           );
         })}
       </div>
-      <div className="flex items-center justify-between gap-3 px-4 py-3 bg-[#16181A] text-white">
-        <span className="text-sm font-semibold">Napočítáno v kase</span>
-        <span className="text-lg font-bold tabular-nums">{money(sumDenominations(counts))}</span>
+      {/* Součet už není druhá inkoustová plocha — ta je v obsahu jen jedna (Očekáváno v kase). */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[var(--surface-line)]">
+        <span className="text-sm font-semibold text-[#16181A]">Napočítáno v kase</span>
+        <span className="text-lg font-bold tabular-nums text-[#16181A]">{money(sumDenominations(counts))}</span>
       </div>
     </div>
   );
@@ -131,10 +151,10 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
   };
 
   return (
-    <div className="rounded-2xl bg-white/60 border border-black/[0.07] p-4 space-y-3">
+    <div className="well p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <p className="text-sm font-semibold text-[#16181A]">Pohyby v kase</p>
-        <p className="text-[11px] text-black/40">Rozepiš, co se z kasy bralo — vedení pak vidí za co.</p>
+        <p className="t-meta">Rozepiš, co se z kasy bralo — vedení pak vidí za co.</p>
       </div>
 
       {movements.length > 0 && (
@@ -143,17 +163,13 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
             const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
             return (
               <div key={i} className="flex items-center gap-2.5 py-2">
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-                  spec?.sign === 1 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-black/[0.06] text-black/50'
-                }`}>
-                  {movementLabel(m.kind)}
-                </span>
+                <Chip tone={spec?.sign === 1 ? 'ok' : 'muted'} size="sm" className="shrink-0">{movementLabel(m.kind)}</Chip>
                 <span className="min-w-0 flex-1 truncate text-sm text-black/60">{m.note || '—'}</span>
                 <span className="shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
                   {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
                 </span>
                 <button type="button" onClick={() => setMovements(movements.filter((_, idx) => idx !== i))}
-                  title="Odebrat"
+                  aria-label={`Odebrat pohyb ${movementLabel(m.kind)}`}
                   className="shrink-0 btn-icon btn-icon-danger"><Icon name="close" size={15} /></button>
               </div>
             );
@@ -164,10 +180,8 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
       <div className="flex flex-wrap gap-1.5">
         {kinds.map(k => (
           <button key={k.kind} type="button" onClick={() => setKind(k.kind)}
-            title={k.hint}
-            className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              kind === k.kind ? 'seg-on' : 'seg-off glass'
-            }`}>
+            title={k.hint} aria-pressed={kind === k.kind}
+            className={`filter-pill tap-target-sm ${kind === k.kind ? 'seg-on' : 'seg-off glass'}`}>
             {k.label}
           </button>
         ))}
@@ -187,10 +201,10 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
           aria-label="Za co byl pohyb v kase"
           placeholder={MOVEMENT_KINDS.find(k => k.kind === kind)?.hint ?? 'Za co'}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
-        <button type="button" onClick={add} disabled={!amount}
-          className="tap-target-sm shrink-0 grow sm:grow-0 justify-center rounded-2xl bg-[#C8F542] text-black px-4 py-2 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
+        {/* Vedlejší akce: limetka patří jen „Odeslat uzávěrku" (DP §4 D). */}
+        <Button variant="secondary" size="sm" icon="plus" onClick={add} disabled={!amount} className="shrink-0 grow sm:grow-0 justify-center">
           Přidat
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -205,51 +219,33 @@ function hodinyMinuty(ms: number): string {
 }
 
 function Step({
-  num, total, icon, title, subtitle, children, tone = 'plain', refCb, guide,
+  icon, title, subtitle, children, refCb, guide,
 }: {
-  num: number; total: number; icon: string; title: string; subtitle: string;
-  children: React.ReactNode; tone?: 'plain' | 'climax';
+  icon: string; title: string; subtitle: string;
+  children: React.ReactNode;
   refCb?: (el: HTMLElement | null) => void;
   /** Návod připnutý k tomuhle kroku — viz „Připnout k uzávěrce" v Návodech. */
   guide?: { id: number; title: string; href: string | null; onOpen?: () => void } | null;
 }) {
-  const climax = tone === 'climax';
+  // Krok je oddíl jedné karty formuláře oddělený linkou, ne karta v kartě
+  // (DP §4 D). Štítek „KROK 1/4" nad nadpisem zmizel — pořadí ukazuje
+  // stepper nahoře jednou, ne nadpis každého kroku.
   return (
-    <section
-      ref={refCb}
-      className={`relative rounded-3xl border p-3.5 min-[400px]:p-5 sm:p-6 space-y-4 sm:space-y-5 transition ${
-        climax
-          ? 'bg-[#C8F542]/[0.07] border-[#C8F542]/40 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset]'
-          : 'bg-black/[0.025] border-black/[0.06]'
-      }`}
-    >
+    <section ref={refCb} className="scroll-mt-20 border-t border-[var(--surface-line)] pt-5 sm:pt-6 space-y-4 sm:space-y-5">
       <div className="flex items-start gap-3.5">
-        <div
-          className={`flex-shrink-0 grid place-items-center h-11 w-11 rounded-2xl ${
-            climax ? 'bg-[#16181A] text-[#C8F542]' : 'bg-white text-[#16181A] border border-black/[0.06] shadow-sm'
-          }`}
-        >
-          <Icon name={icon} size={20} />
-        </div>
+        <span aria-hidden className="well grid h-11 w-11 shrink-0 place-items-center !p-0">
+          <Icon name={icon} size={20} className="text-black/55" />
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-black/35">
-              Krok {num}/{total}
-            </span>
-          </div>
-          <h4 className="font-bold tracking-tight text-[#16181A] leading-tight">{title}</h4>
-          <p className="text-black/45 text-[13px] mt-0.5">{subtitle}</p>
+          <h3 className="t-card">{title}</h3>
+          <p className="t-meta mt-0.5">{subtitle}</p>
           {/* Když kasa nesedí, odpověď na „co teď" nesmí být v jiné záložce. */}
           {guide && (guide.href || guide.onOpen) && (
             guide.onOpen ? (
-              <button type="button" onClick={guide.onOpen}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1.5 text-[11px] font-semibold transition">
-                <Icon name="book" size={13} /> {guide.title}
-              </button>
+              <Button variant="secondary" size="sm" icon="book" onClick={guide.onOpen} className="mt-2">{guide.title}</Button>
             ) : (
-              <a href={guide.href as string}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 text-[#5B7A08] hover:bg-[#C8F542]/40 px-3 py-1.5 text-[11px] font-semibold transition">
-                <Icon name="book" size={13} /> {guide.title}
+              <a href={guide.href as string} className="btn btn-secondary btn-sm mt-2 inline-flex items-center gap-1.5">
+                <Icon name="book" size={15} /> {guide.title}
               </a>
             )
           )}
@@ -260,29 +256,13 @@ function Step({
   );
 }
 
-// Labelled on/off switch for the per-closing money-flow options (payout source,
-// where the tips end up). Both directly change the expected-cash maths.
+// Přepínače peněžních toků uzávěrky (odkud výplata, kde je spropitné) —
+// obojí přímo mění očekávaný stav kasy. Dřív vlastní kopie přepínače (jedna
+// z devíti v aplikaci), teď SwitchRow z components/ui.
 function Toggle({ title, hint, on, onChange }: {
   title: string; hint: string; on: boolean; onChange: (v: boolean) => void;
 }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-[#16181A]">{title}</p>
-        <p className="text-xs text-black/45 mt-0.5">{hint}</p>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={title}
-        onClick={() => onChange(!on)}
-        className={`tap-target-sm relative shrink-0 w-12 h-7 rounded-full transition-colors ${on ? 'bg-[#C8F542]' : 'bg-black/15'}`}
-      >
-        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
-      </button>
-    </div>
-  );
+  return <SwitchRow as="div" title={title} hint={hint} checked={on} onChange={onChange} className="well !py-2 px-4" />;
 }
 
 type EligibleShift = {
@@ -294,11 +274,43 @@ type Member = { id: number; name: string; avatar?: string };
 
 type Coworker = { id: number; name: string; avatar?: string; startTime: string | null; endTime: string | null; hadShift?: boolean };
 
-export default function CashClosing({ user, hideHistory, onSubmitted, initialDate }: {
+type PropsUzaverky = {
   user: { id: number; name: string };
+  /** Vložený formulář (vedení z přehledu uzávěrek) — bez plochy. */
   hideHistory?: boolean;
   onSubmitted?: () => void;
   initialDate?: string;
+};
+
+/**
+ * Záložka Uzávěrka. Zaměstnanec (a vedoucí na své záložce) dostane plochu
+ * s widgety a formulářem jako nástrojem; tablet (uživatel s rolí kiosk)
+ * a vložený formulář vedení dostanou jen formulář s vlastní hlavičkou.
+ * Rozhoduje se tady, protože layouty, které CashClosing vykreslují, patří
+ * jiným balíkům a nový prop by do nich musel sahat.
+ */
+export default function CashClosing(props: PropsUzaverky) {
+  const tablet = (props.user as { role?: string }).role === 'kiosk';
+  if (tablet || props.hideHistory || props.onSubmitted) return <FormularUzaverky {...props} />;
+  return <StrankaUzaverky user={props.user} />;
+}
+
+function StrankaUzaverky({ user }: { user: PropsUzaverky['user'] }) {
+  const smi = useSmi();
+  // Kdo má jen předávku (kuchař), formulář nedostane — zůstane mu plocha
+  // s předávkou (poznámka katalogu). Formulář by mu API stejně neodeslalo.
+  return (
+    <PlochaWidgetu
+      stranka="zamestnanec.uzaverka"
+      hlavicka={{ title: 'Uzávěrka', subtitle: 'Spočítej kasu na konci směny — tržby se předvyplní z pokladny.', hintId: 'cashclosing' }}
+      nastroj={smi('uzaverky.vytvorit') ? <FormularUzaverky user={user} vPlose /> : null}
+    />
+  );
+}
+
+function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: PropsUzaverky & {
+  /** Nástroj plochy: hlavičku kreslí plocha, výzvu a historii widgety. */
+  vPlose?: boolean;
 }) {
   const [closings, setClosings] = useState<Closing[]>([]);
   // Návod připnutý k uzávěrce („Připnout k uzávěrce" v Návodech). Ukazuje se
@@ -339,7 +351,6 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [pickedShiftId, setPickedShiftId] = useState<number | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [meId, setMeId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -384,6 +395,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   const [hoTodo, setHoTodo] = useState('');
   const [hoRunningOut, setHoRunningOut] = useState('');
   const [hoMessage, setHoMessage] = useState('');
+  // Den, za který chce uzávěrku widget („Moje uzávěrka" → řádek směny). Z jiné
+  // stránky přijde přes sessionStorage a uplatní se, až dorazí seznam směn.
+  const chtenyDen = useRef<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const eligibleRef = useRef<EligibleShift[]>([]);
+  // Vedení odesílá i s nedokončenými povinnými postupy — dřív přes confirm().
+  const [potvrditPostupy, setPotvrditPostupy] = useState(false);
   const money = useMoney();
   const symbol = useSymbol();
   const { currency } = useCurrency();
@@ -472,15 +490,32 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       setMeId(myId);
       // Employer submits on behalf of themselves by default.
       if (d.isEmployer) setSelEmployee(myId);
-      // Preselect the most recent unclosed shift for employees / kiosk.
-      if (!d.isEmployer && shifts[0]) {
-        setForm(f => ({ ...f, date: shifts[0].date, shiftLabel: `${shifts[0].startTime}–${shifts[0].endTime}` }));
-        if (d.isKiosk) setSelEmployee(shifts[0].employeeId ?? null);
+      // Preselect the most recent unclosed shift for employees / kiosk —
+      // nebo tu, o kterou si řekl widget.
+      const chteny = chtenyDen.current;
+      chtenyDen.current = null;
+      const prvni = (chteny ? shifts.find(s => s.date === chteny) : undefined) ?? shifts[0];
+      if (!d.isEmployer && prvni) {
+        setForm(f => ({ ...f, date: prvni.date, shiftLabel: `${prvni.startTime}–${prvni.endTime}` }));
+        if (chteny && prvni.date === chteny) setPickedShiftId(prvni.id);
+        if (d.isKiosk) setSelEmployee(prvni.employeeId ?? null);
+      } else if (chteny) {
+        setForm(f => ({ ...f, date: chteny }));
       }
+      if (chteny) requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch { /* ignore */ }
-    setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (vPlose) {
+      try {
+        chtenyDen.current = sessionStorage.getItem(KLIC_VYPLNIT);
+        sessionStorage.removeItem(KLIC_VYPLNIT);
+      } catch { /* soukromé okno: formulář se otevře na výchozí směně */ }
+    }
+    load();
+    // Jednorázově při připojení; `vPlose` se za života formuláře nemění.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Employer opened the form for a specific missing day → preselect that date.
   useEffect(() => {
@@ -537,6 +572,27 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
     setPickedShiftId(s.id);
     if (isKiosk) setSelEmployee(s.employeeId ?? null);
   };
+  eligibleRef.current = eligible;
+
+  // Widget na téže ploše („Moje uzávěrka" → řádek směny) si řekne o den.
+  useEffect(() => {
+    if (!vPlose) return;
+    const naVyplnit = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (!d?.hodnota) return;
+      d.prijato = true;
+      const s = eligibleRef.current.find(x => x.date === d.hodnota);
+      if (s) {
+        setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
+        setPickedShiftId(s.id);
+      } else {
+        setForm(f => ({ ...f, date: d.hodnota }));
+      }
+      requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
+    window.addEventListener(UDALOST_VYPLNIT, naVyplnit);
+    return () => window.removeEventListener(UDALOST_VYPLNIT, naVyplnit);
+  }, [vPlose]);
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -616,7 +672,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       setErr(`Nejdřív dokonči ${missingRequired.length === 1 ? 'povinný postup' : 'povinné postupy'}: ${missingRequired.map(p => p.name).join(', ')}. Pak půjde uzávěrka odeslat.`);
       return;
     }
-    if (missingRequired.length > 0 && isEmployer && !confirm(`Povinné postupy nejsou dokončené (${missingRequired.map(p => p.name).join(', ')}). Odeslat uzávěrku přesto?`)) return;
+    if (missingRequired.length > 0 && isEmployer) { setPotvrditPostupy(true); return; }
+    pokracuj();
+  };
+
+  const pokracuj = () => {
+    setPotvrditPostupy(false);
     // Employee closing a day they weren't on shift ⇒ confirm the approval path.
     if (isSelf && !onShift) { setShowConfirm(true); return; }
     doSubmit();
@@ -652,7 +713,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
       });
       if (res.ok) {
         const d = await res.json().catch(() => ({}));
-        const forCoworkers = includedCoworkers.length > 0 ? ' (i za kolegy)' : '';
+        const forCoworkers = includedCoworkers.length > 0 ? ' i za kolegy' : '';
         // Kdo se zapomněl odpíchnout, to musí slyšet teď, ne ráno z nočního
         // úklidu. Server jim poslal i push; tady je to pro toho, kdo stojí u
         // obrazovky a zrovna odeslal.
@@ -660,7 +721,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         const dovetek = neodpichnuti.length
           ? ` Nezapomeň se odpíchnout${neodpichnuti.length > 1 ? ` (${neodpichnuti.map(o => o.name).join(', ')})` : ''} — jinak se směna uzavře podle času uzávěrky.`
           : '';
-        setMsg((d.approved === false ? 'Uzávěrka odeslána ke schválení vedení. ✓' : `Uzávěrka byla odeslána. ✓${forCoworkers}`) + dovetek);
+        setMsg((d.approved === false ? 'Uzávěrka odeslána ke schválení vedení.' : `Uzávěrka byla odeslána${forCoworkers}.`) + dovetek);
+        // Widgety na ploše (Moje uzávěrka, Moje uzávěrky, Předávka) čtou tytéž URL.
+        obnovDataWidgetu('/api/closings');
+        obnovDataWidgetu('/api/closings/handover');
         setForm(emptyForm());
         setPickedShiftId(null);
         setCoworkerSel({});
@@ -705,56 +769,31 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
-      <PageHeader hintId="cashclosing" title="Uzávěrka" subtitle="Spočítej kasu na konci směny — tržby se předvyplní z pokladny." />
+    <div className={vPlose ? 'space-y-4' : 'p-4 sm:p-6 space-y-5 sm:space-y-6'}>
+      {/* Na ploše hlavičku kreslí plocha (jediný h1); tablet a vedení ji mají tady. */}
+      {!vPlose && <PageHeader hintId="cashclosing" title="Uzávěrka" subtitle="Spočítej kasu na konci směny — tržby se předvyplní z pokladny." />}
       {msg && (
-        <div className="p-3.5 rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 text-[#5B7A08] text-sm flex items-center gap-2">
-          <Icon name="check" size={17} /> {msg}
-        </div>
+        <p className="note note-ok text-sm flex items-center gap-2" role="status">
+          <Icon name="check" size={17} className="shrink-0" /> {msg}
+        </p>
       )}
       {err && (
-        <div className="p-3.5 note note-danger text-sm flex items-center gap-2">
-          <Icon name="warning" size={17} /> {err}
-        </div>
+        <p className="note note-danger text-sm flex items-center gap-2" role="alert">
+          <Icon name="warning" size={17} className="shrink-0" /> {err}
+        </p>
       )}
+      {/* Výzva „Chybí ti uzávěrka" nad formulářem je od kola 69 widget
+          uzaverky.moje_uzaverka; směny k vyplnění nabízí i první krok. */}
 
-      {/* Missing-closing nudge: shifts the employee worked but never closed. */}
-      {isSelf && eligible.length > 0 && (
-        <div className="p-4 rounded-2xl bg-wait/[0.09] border border-wait/30 space-y-2.5">
-          <p className="flex items-center gap-2 font-semibold text-[#16181A] text-sm">
-            <span className="text-lg" aria-hidden><Icon name="warning" size={15} /></span>
-            {eligible.length === 1 ? 'Chybí ti uzávěrka za den, kdy jsi měl/a směnu' : `Chybí ti ${czCount(eligible.length, { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' })} za dny, kdy jsi měl/a směnu`}
-          </p>
-          <p className="text-xs text-black/55">
-            Vyplň ji prosím — vyber den a projdi formulář níže.
-            {eligible.filter(s => s.date === form.date).length > 1
-              && ' Ten den máš dvě směny; uzávěrka je za celý den jedna.'}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {eligible.map(s => (
-              <button key={s.id} type="button" onClick={() => pickShift(s)}
-                className={`rounded-full border px-3.5 py-2 text-xs font-semibold cz-sentence transition ${
-                  form.date === s.date
-                    ? 'bg-wait text-white border-wait'
-                    : 'bg-white border-wait/30 text-wait-ink hover:border-wait/60'
-                } cz-sentence`}>
-                {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
-                <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={submit} className="glass-card p-3.5 min-[400px]:p-5 sm:p-7 space-y-5 sm:space-y-6">
+      <form ref={formRef} onSubmit={submit} className="card scroll-mt-4 p-4 min-[400px]:p-5 sm:p-7 space-y-5 sm:space-y-6">
         {/* Header + visual step progress */}
         <div>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-xl font-bold tracking-tight text-[#16181A] flex items-center gap-2">
-                <Icon name="leaf" size={20} /> Uzávěrka směny
-              </h3>
-              <p className="text-black/45 text-sm mt-1">Projdi čtyři kroky — na konci ti spočítáme, jestli kasa sedí.</p>
+              <h2 className="t-section flex items-center gap-2">
+                <Icon name="coins" size={17} className="shrink-0 text-black/40" /> Uzávěrka směny
+              </h2>
+              <p className="t-meta mt-1">Projdi čtyři kroky — na konci ti spočítáme, jestli kasa sedí.</p>
             </div>
           </div>
           <div className="mt-5 flex items-center gap-2">
@@ -770,11 +809,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                         : 'bg-black/[0.08] text-black/45 group-hover:bg-black/[0.14]'
                     }`}
                   >
-                    {stepDone[i] ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
-                    ) : i + 1}
+                    {stepDone[i] ? <Icon name="check" size={12} strokeWidth={3} /> : i + 1}
                   </span>
-                  <span className={`text-[11px] font-semibold hidden sm:inline transition ${stepDone[i] ? 'text-[#5B7A08]' : 'text-black/45'}`}>{lbl}</span>
+                  <span className={`text-[11px] font-semibold hidden sm:inline transition ${stepDone[i] ? 'text-ok-ink' : 'text-black/45'}`}>{lbl}</span>
                 </button>
                 {i < totalSteps - 1 && <span className={`h-px flex-1 transition ${stepDone[i] ? 'bg-[#C8F542]/60' : 'bg-black/[0.09]'}`} />}
               </div>
@@ -786,7 +823,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             field they fill visibly moves the number they'll be checking against. */}
         {(form.openingCash !== '' || form.cashRevenue !== '') && (
           <button type="button" onClick={() => scrollToStep(3)}
-            className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A]/95 backdrop-blur px-4 py-2.5 text-white shadow-lg shadow-black/15 active:scale-[0.99] transition">
+            // Jediná inkoustová plocha formuláře (souhrn peněz, DP §4 D) — bez
+            // rozmazání: blur v obsahu je zákaz a plná barva čte stejně.
+            className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] px-4 py-2.5 text-white shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
             <span className="text-xs font-medium text-white/70">Očekáváno v kase</span>
             <span className="flex items-center gap-2.5 min-w-0">
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
@@ -806,21 +845,21 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         {/* Nabízí se jen akce dne, za který se uzávěrka dělá — dřív tu visel
             seznam všech akcí historie a „ten den je akce" nešlo poznat. */}
         {evsToday.length > 0 && (
-            <div className="rounded-2xl border border-[#0A84FF]/25 bg-[#0A84FF]/[0.06] p-4 space-y-2.5" role="radiogroup" aria-label="Za co je tahle uzávěrka">
-              <p className="text-sm font-semibold text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {evsToday.length === 1 ? `Ten den se koná akce: ${evsToday[0].title}` : 'Ten den se konají akce'}</p>
-              <p className="text-[12px] text-black/45">
+            <div className="well p-4 space-y-2.5" role="radiogroup" aria-label="Za co je tahle uzávěrka">
+              <p className="text-sm font-semibold text-[#16181A] flex items-center gap-1.5"><Icon name="calendarCheck" size={15} className="shrink-0 text-black/40" /> {evsToday.length === 1 ? `Ten den se koná akce: ${evsToday[0].title}` : 'Ten den se konají akce'}</p>
+              <p className="t-meta">
                 Výjezd s vlastní kasou má uzávěrku zvlášť („Za akci") a s kasou podniku se
                 nemíchá. U akce u nás stačí běžná uzávěrka podniku — kolik z tržby spadlo
                 do okna akce se po uložení rozepíše samo (z účtenek pokladny).
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button type="button" role="radio" aria-checked={eventId === ''} onClick={() => setEventId('')}
-                  className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === '' ? 'seg-on' : 'seg-off glass'}`}>
+                  className={`filter-pill tap-target-sm ${eventId === '' ? 'seg-on' : 'seg-off glass'}`}>
                   Uzávěrka podniku
                 </button>
                 {evsToday.map(ev => (
                   <button key={ev.id} type="button" role="radio" aria-checked={eventId === ev.id} onClick={() => setEventId(ev.id)}
-                    className={`tap-target-sm rounded-full px-3.5 py-2 text-xs font-semibold transition ${eventId === ev.id ? 'bg-[#0A84FF] text-white' : 'bg-white/70 border border-[#0A84FF]/25 text-[#0A5CC0] hover:bg-[#0A84FF]/10'}`}>
+                    className={`filter-pill tap-target-sm ${eventId === ev.id ? 'seg-on' : 'seg-off glass'}`}>
                     Za akci: {ev.title}
                   </button>
                 ))}
@@ -828,7 +867,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
         )}
 
-        <Step refCb={el => { stepRefs.current[0] = el; }} num={1} total={totalSteps} icon="clock" title="Kasa na začátku"
+        <Step refCb={el => { stepRefs.current[0] = el; }} icon="clock" title="Kasa na začátku"
           subtitle="Kolik bylo v kase, když směna začala.">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="min-w-0 space-y-2">
@@ -838,12 +877,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   : 'Počáteční stav hotovosti v kase.',
               })}
               {closings.some(c => c.date === form.date) && (
-                <p className="text-[11px] font-medium text-wait-ink bg-wait/[0.1] border border-wait/25 rounded-xl px-3 py-2">
+                <p className="note note-wait text-[13px]">
                   Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
                 </p>
               )}
               {gapDays.length > 0 && gapDays.every(d => d < form.date) && (
-                <p role="alert" className="text-[11px] font-medium text-bad-ink bg-bad/[0.08] border border-bad/25 rounded-xl px-3 py-2">
+                <p role="alert" className="note note-danger text-[13px]">
                   Mezi poslední uzávěrkou a dneškem chybí uzávěrka za{' '}
                   {gapDays.map(d => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })).join(', ')}.
                   Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící,
@@ -853,15 +892,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               {carry && (
                 <div className="flex items-center gap-2 flex-wrap">
                   {n(form.openingCash) === Math.round(carry.amount) ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-3 py-1 text-[11px] font-semibold">
-                      <Icon name="check" size={12} /> Převzato z předchozí směny
-                    </span>
+                    <Chip tone="ok" size="sm" icon="check">Převzato z předchozí směny</Chip>
                   ) : (
-                    <button type="button"
-                      onClick={() => setForm(f => ({ ...f, openingCash: String(Math.round(carry.amount)) }))}
-                      className="rounded-full glass border border-black/10 px-3 py-1 text-[11px] font-medium text-[#16181A] hover:bg-black/[0.05]">
+                    <Button variant="secondary" size="sm"
+                      onClick={() => setForm(f => ({ ...f, openingCash: String(Math.round(carry.amount)) }))}>
                       Převzít {money(carry.amount)} z předchozí směny
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -882,7 +918,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                         }`}
                       >
                         <span className="min-w-0 flex items-center gap-2.5">
-                          {s.employeeName && <span className="text-xl shrink-0">{s.employeeAvatar ?? '👤'}</span>}
+                          {s.employeeName && <Avatar emoji={s.employeeAvatar} size="sm" />}
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-[#16181A] cz-sentence truncate">
                               {s.employeeName ? `${s.employeeName} · ` : ''}
@@ -892,7 +928,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                           </span>
                         </span>
                         <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full border-2 ${active ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
+                          <Icon name="check" size={12} strokeWidth={3} />
                         </span>
                       </button>
                     );
@@ -929,13 +965,12 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                         <button
                           key={s.id}
                           type="button"
+                          aria-pressed={active}
                           onClick={() => pickShift(s)}
-                          className={`rounded-full border px-3.5 py-2 text-xs font-semibold cz-sentence transition ${
-                            active ? 'bg-[#C8F542]/[0.18] border-[#C8F542]/50 text-[#5B7A08]' : 'bg-white border-black/[0.08] text-[#16181A] hover:border-black/20'
-                          }`}
+                          className={`filter-pill tap-target-sm cz-sentence ${active ? 'seg-on' : 'seg-off glass'}`}
                         >
                           {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
-                          <span className="text-black/40 font-normal"> · {s.startTime}–{s.endTime}</span>
+                          <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
                         </button>
                       );
                     })}
@@ -955,19 +990,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         {/* Step 2 — revenue */}
-        <Step refCb={el => { stepRefs.current[1] = el; }} num={2} total={totalSteps} icon="trend" title="Tržby"
+        <Step refCb={el => { stepRefs.current[1] = el; }} icon="trend" title="Tržby"
           subtitle="Co za směnu přišlo — hotově, kartou a spropitné.">
           {pos && (
-            <div className="rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-4 mb-1">
+            <div className="well p-4 mb-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-[#16181A] min-w-0">
-                  <Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Pokladna {pos.placeName ? `(${pos.placeName})` : 'Storyous'}
+                  <Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0 text-black/40" /> Pokladna {pos.placeName ? `(${pos.placeName})` : 'Storyous'}
                   <span className="font-normal text-black/50"> · {pos.bills} účtenek · hotově {money(pos.cash)} · kartou {money(pos.card)}{pos.other > 0 ? ` · jinak ${money(pos.other)}` : ''}{pos.tips > 0 ? ` · spropitné ${money(pos.tips)}` : ''}
                     {pos.tips > 0 && (pos.tipsCard > 0 || pos.tipsCash > 0)
                       ? ` (hotově ${money(pos.tipsCash ?? 0)} · kartou ${money(pos.tipsCard ?? 0)}${(pos.tipsOther ?? 0) > 0 ? ` · nerozlišeno ${money(pos.tipsOther)}` : ''})`
                       : ''}</span>
                 </p>
-                <button type="button"
+                <Button variant="primary" size="sm"
                   onClick={() => setForm(f => ({
                     ...f,
                     cashRevenue: String(pos.cash),
@@ -975,9 +1010,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     tips: pos.tips > 0 ? String(pos.tips) : f.tips,
                     tipsCard: pos.tipsCard != null && pos.tipsCard > 0 ? String(pos.tipsCard) : f.tipsCard,
                   }))}
-                  className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
+                  className="shrink-0">
                   Předvyplnit z pokladny
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1003,7 +1038,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
         </Step>
 
         {/* Step 3 — expenses & payouts */}
-        <Step refCb={el => { stepRefs.current[2] = el; }} num={3} total={totalSteps} icon="box" title="Výdaje a odvody"
+        <Step refCb={el => { stepRefs.current[2] = el; }} icon="box" title="Výdaje a odvody"
           subtitle="Co z kasy odešlo během směny.">
           <MovementEditor
             movements={movements} setMovements={setMovements}
@@ -1034,65 +1069,67 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
         {/* Kolegové na směně — one person closes for the whole crew */}
         {coworkers.length > 0 && (
-          <section className="relative rounded-3xl border border-[#C8F542]/40 bg-[#C8F542]/[0.06] p-5 sm:p-6 space-y-4">
+          // Oddíl jako kroky (linka, jamka s ikonou), ne limetková karta v kartě.
+          <section className="border-t border-[var(--surface-line)] pt-5 sm:pt-6 space-y-3">
             <div className="flex items-start gap-3.5">
-              <div className="flex-shrink-0 grid place-items-center h-11 w-11 rounded-2xl bg-white text-[#16181A] border border-black/[0.06] shadow-sm">
-                <Icon name="users" size={20} />
-              </div>
+              <span aria-hidden className="well grid h-11 w-11 shrink-0 place-items-center !p-0">
+                <Icon name="users" size={20} className="text-black/55" />
+              </span>
               <div className="min-w-0 flex-1">
-                <h4 className="font-bold tracking-tight text-[#16181A] leading-tight">Byl někdo další na směně?</h4>
-                <p className="text-black/45 text-[13px] mt-0.5">
+                <h3 className="t-card">Byl někdo další na směně?</h3>
+                <p className="t-meta mt-0.5">
                   Zaškrtni kolegy a uzavři to i za ně{payDailyCash ? ' i s výplatou' : ''}. Kdo neměl směnu, tomu se automaticky přidá a dostane stejný čas jako ty (vedení pak může upravit).
                 </p>
               </div>
             </div>
-            <div className="space-y-2">
+            <ul className="list">
               {coworkers.map(cw => {
                 const sel = coworkerSel[cw.id];
                 const on = !!sel?.on;
                 return (
-                  <div key={cw.id} className={`rounded-2xl border px-4 py-3 transition ${on ? 'bg-white border-[#C8F542]/50' : 'bg-white/50 border-black/[0.08]'}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setCoworkerSel(s => ({ ...s, [cw.id]: { on: !on, payout: s[cw.id]?.payout ?? '' } }))}
-                        className="flex items-center gap-2.5 min-w-0 text-left flex-wrap"
-                      >
-                        <span className={`shrink-0 flex h-6 w-6 items-center justify-center rounded-full border-2 transition ${on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7" /></svg>
-                        </span>
-                        <span className="text-lg shrink-0">{cw.avatar ?? '👤'}</span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
-                          {cw.hadShift
-                            ? <span className="block text-xs text-black/45 tabular-nums">{cw.startTime}–{cw.endTime}</span>
-                            : <span className="block text-xs text-wait-ink">bez naplánované směny — přidá se</span>}
-                        </span>
-                      </button>
-                      {on && payDailyCash && (
-                        <div className="relative shrink-0 w-32">
-                          <input
-                            type="number" inputMode="numeric"
-                            value={sel?.payout ?? ''}
-                            onChange={e => setCoworkerSel(s => ({ ...s, [cw.id]: { on: true, payout: e.target.value } }))}
-                            placeholder="výplata" className={`${inputClass} pr-9 !py-2.5 text-sm`} />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <li key={cw.id} className="flex items-center justify-between gap-3 py-2.5 min-h-[3.25rem]">
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      onClick={() => setCoworkerSel(s => ({ ...s, [cw.id]: { on: !on, payout: s[cw.id]?.payout ?? '' } }))}
+                      className="flex items-center gap-2.5 min-w-0 text-left"
+                    >
+                      <span className={`shrink-0 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors ${on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
+                        <Icon name="check" size={13} strokeWidth={3} />
+                      </span>
+                      <Avatar emoji={cw.avatar} size="sm" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
+                        {cw.hadShift
+                          ? <span className="block t-meta tabular-nums">{cw.startTime}–{cw.endTime}</span>
+                          : <span className="block text-[13px] text-wait-ink">bez naplánované směny — přidá se</span>}
+                      </span>
+                    </button>
+                    {on && payDailyCash && (
+                      <div className="relative shrink-0 w-32">
+                        <input
+                          type="number" inputMode="numeric"
+                          value={sel?.payout ?? ''}
+                          onChange={e => setCoworkerSel(s => ({ ...s, [cw.id]: { on: true, payout: e.target.value } }))}
+                          aria-label={`Výplata pro ${cw.name} v ${symbol}`}
+                          placeholder="výplata" className={`${inputClass} pr-9 !py-2.5 text-sm`} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/45">{symbol}</span>
+                      </div>
+                    )}
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </section>
         )}
 
         {/* Step 4 — the climax: expected vs counted */}
-        <Step refCb={el => { stepRefs.current[3] = el; }} num={4} total={totalSteps} icon="check" tone="climax" title="Kontrola kasy"
+        <Step refCb={el => { stepRefs.current[3] = el; }} icon="check" title="Kontrola kasy"
           subtitle="Spočítej hotovost v kase a porovnej s očekáváním."
           guide={navodUzaverky}>
           {/* The arithmetic spelled out — no mystery number to argue with. */}
-          <div className="rounded-2xl bg-white/70 border border-black/[0.06] px-4 py-3.5 space-y-1.5">
+          <div className="well px-4 py-3.5 space-y-1.5">
             {expectedLines.map(l => (
               <div key={l.label} className="flex items-center justify-between gap-3 text-[13px]">
                 <span className="text-black/50 min-w-0 truncate">{l.label}</span>
@@ -1109,19 +1146,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <label className="block text-xs uppercase tracking-wider text-black/45">Skutečný stav kasy na konci *</label>
+              <p id="uzaverka-kasa-konec" className="field-label !mb-0">Skutečný stav kasy na konci *</p>
               {denomSet.length > 0 && (
-                <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 max-w-full flex-wrap">
-                  {([[false, 'Zadat celkem'], [true, 'Spočítat bankovky']] as const).map(([mode, lbl]) => (
-                    <button key={String(mode)} type="button"
-                      onClick={() => setCountMode(mode)}
-                      className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-                        countMode === mode ? 'seg-on' : 'seg-off'
-                      }`}>
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
+                <Segmented size="sm" ariaLabel="Jak kasu spočítáš" value={countMode ? 'bankovky' : 'celkem'}
+                  onChange={v => setCountMode(v === 'bankovky')}
+                  options={[{ id: 'celkem', label: 'Zadat celkem' }, { id: 'bankovky', label: 'Spočítat bankovky' }]} />
               )}
             </div>
 
@@ -1137,7 +1166,7 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                       closingCash: hasDenominations(next) ? String(Math.round(sumDenominations(next))) : '',
                     }));
                   }} />
-                <p className="text-[11px] text-black/40">
+                <p className="t-meta">
                   Napiš ke každé bankovce a minci, kolik jich v kase je — součet se doplní sám.
                 </p>
               </>
@@ -1152,15 +1181,10 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           </div>
 
           {diff === null ? (
-            <p className="text-[13px] text-black/40 text-center py-1">Zadej skutečný stav a hned uvidíš výsledek.</p>
+            <p className="t-meta text-center py-1">Zadej skutečný stav a hned uvidíš výsledek.</p>
           ) : (
-            <div className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3.5 border ${
-              diff === 0
-                ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
-                : diff > 0
-                  ? 'bg-[#0A84FF]/10 border-[#0A84FF]/25 text-[#0A5CC0]'
-                  : 'bg-bad/10 border-bad/25 text-bad-ink'
-            }`}>
+            // Výsledek je stav, ne ozdoba: tón `note` podle toho, jestli kasa sedí.
+            <div role="status" className={`note flex flex-wrap items-center justify-between gap-2 ${diff === 0 ? 'note-ok' : diff > 0 ? 'note-info' : 'note-danger'}`}>
               <span className="flex items-center gap-2 font-semibold">
                 <Icon name={diff === 0 ? 'check' : diff > 0 ? 'trend' : 'warning'} size={18} />
                 {diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek v kase' : 'Manko v kase'}
@@ -1171,13 +1195,13 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
           {/* When it doesn't match: say why, so the employer isn't left guessing. */}
           {diff !== null && diff !== 0 && (
-            <div className="rounded-2xl bg-white/60 border border-black/[0.07] p-4 space-y-3">
+            <div className="well p-4 space-y-3">
               <p className="text-sm font-semibold text-[#16181A]">Čím to nejspíš je?</p>
 
               {hints.length > 0 && (
                 <div className="space-y-1.5">
                   {hints.map((h, i) => (
-                    <p key={i} className="text-[12px] text-[#5B7A08] bg-[#C8F542]/[0.14] border border-[#C8F542]/25 rounded-xl px-3 py-2">
+                    <p key={i} className="note note-info text-[13px]">
                       {h}
                     </p>
                   ))}
@@ -1186,17 +1210,16 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
 
               <div className="flex flex-wrap gap-1.5">
                 {DIFF_REASONS.map(r => (
-                  <button key={r.id} type="button" title={r.hint}
+                  <button key={r.id} type="button" title={r.hint} aria-pressed={diffReason === r.id}
                     onClick={() => setDiffReason(diffReason === r.id ? '' : r.id)}
-                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      diffReason === r.id ? 'seg-on' : 'seg-off glass'
-                    }`}>
+                    className={`filter-pill tap-target-sm ${diffReason === r.id ? 'seg-on' : 'seg-off glass'}`}>
                     {r.label}
                   </button>
                 ))}
               </div>
 
               <textarea value={diffNote} onChange={e => setDiffNote(e.target.value)} rows={2}
+                aria-label="Co se stalo s kasou"
                 placeholder="Co se stalo — vlastními slovy (nepovinné)"
                 className={`${inputClass} resize-none py-2`} />
             </div>
@@ -1206,19 +1229,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               the diff above judges), and only then does the surplus go to the
               safe. What stays here is what the next shift takes over. */}
           {form.closingCash !== '' && (
-            <div className="rounded-2xl bg-white/60 border border-black/[0.07] p-4 space-y-3">
+            <div className="well p-4 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-[#16181A]">Odvod na konci směny</p>
-                <p className="text-[12px] text-black/45 mt-0.5">
+                <p className="t-meta mt-0.5">
                   {drawerFloat != null
                     ? `Podnik má nastavený stav kasy ${drawerFloat.toLocaleString('cs-CZ')} ${symbol} — kolik odložit, spočítám tak, aby v kase zůstalo přesně tolik. Číslo můžeš upravit.`
                     : 'Napiš, kolik v kase necháváš pro další směnu — kolik odložit spočítám. Nech prázdné, pokud v kase zůstává všechno.'}
                 </p>
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">V kase necháváš</label>
+                <label htmlFor="uzaverka-nechavas" className="field-label">V kase necháváš</label>
                 <div className="relative">
-                  <input type="number" inputMode="numeric" value={leaveCash}
+                  <input id="uzaverka-nechavas" type="number" inputMode="numeric" value={leaveCash}
                     onChange={e => setLeaveCash(e.target.value)}
                     placeholder={`${n(form.closingCash)}`}
                     className={`${inputClass} pr-12`} />
@@ -1230,16 +1253,17 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   V kase je napočítáno jen {money(n(form.closingCash))} — nemůže v ní zůstat víc.
                 </p>
               ) : leaveCash !== '' && finalRemoval > 0 ? (
-                <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] text-white px-4 py-3">
-                  <span className="text-sm font-medium flex items-center gap-2 min-w-0">
-                    <Icon name="swap" size={16} /> Odlož ven (trezor / odvod)
+                // Dřív druhá inkoustová plocha; číslo stačí tučně na bílém podkladu.
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-[var(--surface-line)] px-4 py-3">
+                  <span className="text-sm font-medium flex items-center gap-2 min-w-0 text-[#16181A]">
+                    <Icon name="swap" size={16} className="shrink-0 text-black/40" /> Odlož ven (trezor / odvod)
                   </span>
-                  <span className="text-lg font-bold tabular-nums shrink-0 whitespace-nowrap">{money(finalRemoval)}</span>
+                  <span className="text-lg font-bold tabular-nums shrink-0 whitespace-nowrap text-[#16181A]">{money(finalRemoval)}</span>
                 </div>
               ) : leaveCash !== '' ? (
-                <p className="text-[13px] text-black/45">V kase zůstává všechno — žádný odvod.</p>
+                <p className="t-meta">V kase zůstává všechno — žádný odvod.</p>
               ) : (
-                <p className="text-[12px] text-black/35">Nech prázdné, pokud v kase zůstává všechno.</p>
+                <p className="t-meta">Nech prázdné, pokud v kase zůstává všechno.</p>
               )}
             </div>
           )}
@@ -1249,8 +1273,8 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
           {/* Say WHY nothing is being demanded, so a blank space doesn't read
               as a bug the next time somebody expects the checklist. */}
           {missingRequired.length === 0 && requiredProcs.length > 0 && !proceduresApply && (
-            <div className="well border border-black/[0.06] px-4 py-3">
-              <p className="text-[13px] text-black/50">
+            <div className="well px-4 py-3">
+              <p className="t-meta">
                 {eventId !== '' ? 'Uzávěrka za akci — povinné postupy prodejny se u ní neřeší.'
                   : !closingIsToday ? 'Uzávěrka za jiný den — dnešní postupy ji neblokují.'
                   : 'Tenhle den nemáš směnu — uzávěrku můžeš odeslat a vedení ji potvrdí.'}
@@ -1258,24 +1282,23 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
           )}
           {missingRequired.length > 0 && (
-            <div className="rounded-2xl bg-bad/[0.07] border border-bad/25 p-4 rise-in">
-              <p className="text-sm font-semibold text-bad-ink flex items-center gap-2">
-                <Icon name="warning" size={16} /> Před uzávěrkou je potřeba dokončit:
+            <div className="note note-danger rise-in" role="alert">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Icon name="warning" size={16} className="shrink-0" /> Před uzávěrkou je potřeba dokončit:
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2">
+                {/* Ikona postupu je název ikony — dřív se vytiskl jako text („moon Zavírací rutina"). */}
                 {missingRequired.map(p => (
-                  <span key={p.id} className="rounded-full bg-white/70 border border-bad/20 px-3 py-1.5 text-sm text-[#16181A]">
-                    {p.icon ?? '📋'} {p.name}
-                  </span>
+                  <Chip key={p.id} tone="bad" icon={p.icon || 'clipboard'}>{p.name}</Chip>
                 ))}
               </div>
-              <p className="text-[12px] text-black/45 mt-2">Najdeš je v sekci Postupy. Jakmile je někdo ze směny dokončí, uzávěrka půjde odeslat.</p>
+              <p className="text-[13px] mt-2">Najdeš je v sekci Postupy. Jakmile je někdo ze směny dokončí, uzávěrka půjde odeslat.</p>
             </div>
           )}
 
           {todayRuns.length > 0 && (
-            <div className="well border border-black/[0.06] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní postupy</p>
+            <div className="well p-4 mt-3">
+              <p className="t-label mb-2">Dnešní postupy</p>
               <div className="flex flex-wrap gap-1.5">
                 {todayRuns.map((r: any) => {
                   const missing = Math.max(0, (Number(r.total_items) || 0)
@@ -1283,27 +1306,23 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                     - (Array.isArray(r.skipped_items) ? r.skipped_items.length : 0));
                   const running = r.status === 'running';
                   return (
-                    <span key={r.id} className={`tap-target-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                      running ? 'bg-wait/15 text-wait-ink'
-                      : missing > 0 ? 'bg-wait/15 text-wait-ink'
-                      : 'bg-[#C8F542]/15 text-[#5B7A08]'
-                    }`}>
-                      {r.procedure_icon ?? '📋'} {r.procedure_name}
+                    <Chip key={r.id} tone={running || missing > 0 ? 'wait' : 'ok'} icon={r.procedure_icon || 'clipboard'}>
+                      {r.procedure_name}
                       {running ? ' · běží' : missing > 0 ? ` · ${missing} nedokončeno` : ' · hotovo'}
-                    </span>
+                    </Chip>
                   );
                 })}
               </div>
               {todayRuns.some((r: any) => r.status === 'running') && (
-                <p className="text-[12px] text-wait-ink mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
+                <p className="text-[13px] text-wait-ink mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
               )}
             </div>
           )}
 
           {mzda && !mzda.wage.noEntries && (
-            <div className="rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/30 p-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#5B7A08]">
-                <Icon name="clock" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Tvoje směna
+            <div className="well p-4 space-y-2 mt-3">
+              <p className="t-label flex items-center gap-1.5">
+                <Icon name="clock" size={13} className="shrink-0" /> Tvoje směna
               </p>
               {mzda.wage.suspicious ? (
                 <p className="text-sm text-bad-ink">
@@ -1324,9 +1343,9 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
                   )}
                 </div>
               )}
-              <p className="text-[12px] text-black/55">
-                Body za dnešek: <span className="font-semibold text-[#5B7A08] tabular-nums">+{mzda.points.total}</span>
-                <span className="text-black/40">
+              <p className="text-[13px] text-black/55">
+                Body za dnešek: <span className="font-semibold text-ok-ink tabular-nums">+{mzda.points.total}</span>
+                <span className="text-black/45">
                   {' '}— {mzda.points.closingPts} za uzávěrku
                   {mzda.points.tasks > 0 ? `, ${mzda.points.taskPts} za ${mzda.points.tasks === 1 ? 'úkol' : mzda.points.tasks < 5 ? 'úkoly' : 'úkolů'}` : ''}
                   {mzda.points.procedures > 0 ? `, ${mzda.points.procPts} za ${mzda.points.procedures === 1 ? 'postup' : mzda.points.procedures < 5 ? 'postupy' : 'postupů'}` : ''}
@@ -1335,8 +1354,11 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             </div>
           )}
 
-          <div className="well border border-black/[0.06] p-4 space-y-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-black/45"><Icon name="handover" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Předávka pro další směnu <span className="normal-case font-normal text-black/35">(nepovinné — uvidí ji tým na přehledu a tabletu)</span></p>
+          <div className="well p-4 space-y-2.5 mt-3">
+            <div>
+              <p className="t-label flex items-center gap-1.5"><Icon name="handover" size={13} className="shrink-0" /> Předávka pro další směnu</p>
+              <p className="t-meta mt-0.5">Nepovinné — uvidí ji tým na přehledu a tabletu.</p>
+            </div>
             <input value={hoTodo} onChange={e => setHoTodo(e.target.value)} maxLength={500}
               aria-label="Předávka: co zbývá dodělat"
               placeholder="Co zbývá dodělat…"
@@ -1351,122 +1373,18 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
               className={inputClass} />
           </div>
 
-          <label htmlFor="uzaverka-poznamka" className="field-label">Poznámka</label>
+          <label htmlFor="uzaverka-poznamka" className="field-label mt-4 block">Poznámka</label>
           <textarea id="uzaverka-poznamka" value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
         </div>
 
-        <button type="submit" disabled={submitting}
-          className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-7 py-3.5 text-sm hover:bg-black disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
-          {submitting ? 'Odesílám…' : <>Odeslat uzávěrku <Icon name="check" size={17} /></>}
-        </button>
+        {/* Jediná limetka obrazovky (DP §4 D) — dřív tmavá, zatímco limetku nesl vedlejší „Přidat". */}
+        <Button type="submit" variant="accent" size="lg" block iconAfter="check" loading={submitting}>
+          Odeslat uzávěrku
+        </Button>
       </form>
 
-      {/* My past closings (hidden on the shared kiosk and when embedded) */}
-      {!isKiosk && !hideHistory && (
-      <div className="space-y-3">
-        <h3 className="t-card flex items-center gap-2">
-          <Icon name="clock" size={18} /> Moje uzávěrky
-        </h3>
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="spinner" />
-          </div>
-        ) : closings.length === 0 ? (
-          <div className="glass-card"><EmptyState illustration="uzaverka" title="Zatím žádná uzávěrka" hint="Po směně spočítej kasu a vyplň ji tady — vedení ji pak schválí." compact /></div>
-        ) : (
-          closings.map(c => {
-            const d = cashDifference(c);
-            // `approved` isn't on the shared Closing type; old rows omit it (⇒ approved).
-            const pending = (c as { approved?: boolean }).approved === false;
-            return (
-              <div key={c.id} className="glass-card p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <p className="font-bold tracking-tight text-[#16181A] min-w-0 cz-sentence">
-                    {new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    {c.shift_label && <span className="text-black/40 font-normal"> · {c.shift_label}</span>}
-                  </p>
-                  <div className="flex items-center gap-2 flex-wrap min-w-0 ml-auto">
-                  {pending && (
-                    <span className="tap-target-sm rounded-full bg-wait/15 text-wait-ink px-2.5 py-1 text-xs font-medium whitespace-nowrap">Čeká na schválení</span>
-                  )}
-                  <button aria-label="Smazat uzávěrku"
-                    type="button"
-                    title="Smazat uzávěrku"
-                    onClick={async () => {
-                      if (!confirm('Smazat tuhle uzávěrku? Po smazání ji můžeš vyplnit znovu správně.')) return;
-                      const res = await fetch(`/api/closings/${c.id}`, { method: 'DELETE' });
-                      if (res.ok) setClosings(prev => prev.filter(x => x.id !== c.id));
-                      else { const d = await res.json().catch(() => ({})); setErr(d.error || 'Smazání se nepodařilo.'); }
-                    }}
-                    className="tap-target rounded-full w-8 h-8 flex items-center justify-center glass text-black/40 hover:text-bad-ink transition-colors"
-                  ><Icon name="close" size={15} /></button>
-                  <span className={`tap-target-sm text-xs font-semibold rounded-full px-2.5 py-1 whitespace-nowrap shrink-0 max-w-full ${
-                    d === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : d > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'
-                  }`}>{d === 0 ? 'Sedí' : d > 0 ? `Přebytek +${money(d)}` : `Manko ${money(d)}`}</span>
-                  </div>
-                </div>
-                {/* Bez denní výplaty jsou statistiky tři — dva sloupce by
-                    nechaly třetí samotnou na druhém řádku. Počet sloupců
-                    kopíruje počet položek, ať je řádek vždycky plný. */}
-                <div className={`grid ${payDailyCash ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2 text-xs`}>
-                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba hotově</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_revenue)}</p></div>
-                  <div className="min-w-0"><span className="block text-black/40 truncate">Tržba kartou</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.card_revenue)}</p></div>
-                  <div className="min-w-0"><span className="block text-black/40 truncate">Odloženo</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.cash_removed)}</p></div>
-                  {payDailyCash && <div className="min-w-0"><span className="block text-black/40 truncate">Moje výplata</span><p className="font-semibold text-[#16181A] tabular-nums truncate">{money(c.self_payout)}</p></div>}
-                </div>
-                {(c.movements?.length ?? 0) > 0 && (
-                  <div className="mt-3 well border border-black/[0.06] p-3">
-                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Pohyby v kase</p>
-                    <div className="divide-y divide-black/[0.06]">
-                      {c.movements!.map((m, i) => {
-                        const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
-                        return (
-                          <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
-                            <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-black/40">{movementLabel(m.kind)}</span>
-                            <span className="min-w-0 flex-1 truncate text-black/55">{m.note || '—'}</span>
-                            <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">
-                              {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {hasDenominations(c.denominations) && (
-                  <div className="mt-3 well border border-black/[0.06] p-3">
-                    <p className="text-[11px] uppercase tracking-wider text-black/45 font-semibold mb-1.5">Kasa napočítaná po bankovkách</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {Object.entries(c.denominations!)
-                        .sort((a, b) => Number(b[0]) - Number(a[0]))
-                        .map(([denom, count]) => (
-                          <span key={denom} className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
-                            <strong>{count}×</strong> {Number(denom).toLocaleString('cs-CZ')}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
-                {(Number(c.final_removal) || 0) > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 well border border-black/[0.06] px-3 py-2.5 text-sm">
-                    <span className="text-black/55 whitespace-nowrap">Odvod na konci: <strong className="text-[#16181A] tabular-nums">−{money(Number(c.final_removal))}</strong></span>
-                    <span className="text-black/55 whitespace-nowrap">V kase zůstalo: <strong className="text-[#16181A] tabular-nums">{money(cashLeft(c))}</strong></span>
-                  </div>
-                )}
-                {(c.diff_reason || c.diff_note) && (
-                  <div className="mt-3 rounded-2xl bg-wait/[0.08] border border-wait/25 p-3">
-                    <p className="text-[11px] uppercase tracking-wider text-wait-ink font-semibold mb-1">Proč kasa nesedí</p>
-                    {c.diff_reason && <p className="text-sm font-medium text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
-                    {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
-                  </div>
-                )}
-                {c.notes && <p className="text-sm text-black/55 bg-black/[0.04] border border-black/[0.06] rounded-2xl p-3 mt-3">{c.notes}</p>}
-              </div>
-            );
-          })
-        )}
-      </div>
-      )}
+      {/* Historie „Moje uzávěrky" je od kola 69 widget uzaverky.moje_historie
+          (na tabletu a ve vloženém formuláři vedení nebyla nikdy). */}
 
       {/* Off-shift confirmation — closing a day the employee wasn't scheduled
           goes to management for approval. */}
@@ -1482,6 +1400,19 @@ export default function CashClosing({ user, hideHistory, onSubmitted, initialDat
             <Icon name="warning" size={17} className="shrink-0 mt-0.5" />
             <p className="text-sm">Vedení uvidí, že uzávěrku poslal někdo mimo rozpis, a potvrdí ji.</p>
           </div>
+        </Modal>
+      )}
+
+      {/* Vedení odesílá i bez povinných postupů — dřív přes confirm() prohlížeče. */}
+      {potvrditPostupy && (
+        <Modal open onClose={() => setPotvrditPostupy(false)} size="sm"
+          title="Povinné postupy nejsou dokončené"
+          subtitle={missingRequired.map(p => p.name).join(', ')}
+          footer={<>
+            <Button variant="secondary" onClick={() => setPotvrditPostupy(false)}>Zrušit</Button>
+            <Button variant="primary" icon="send" loading={submitting} onClick={pokracuj}>Odeslat přesto</Button>
+          </>}>
+          <p className="text-sm text-black/60">Uzávěrka se odešle, i když dnešní povinné postupy nikdo nedokončil.</p>
         </Modal>
       )}
     </div>

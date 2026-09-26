@@ -1,0 +1,52 @@
+{
+ "stranka": "vedeni.togo",
+ "polozky": [
+  {
+   "id": "pokladna-dnes",
+   "widget": "pokladna.dnes",
+   "velikost": "M"
+  },
+  {
+   "id": "po-dnech",
+   "widget": "trzby.po_dnech",
+   "velikost": "M"
+  },
+  {
+   "id": "chat",
+   "widget": "chat.neprectene",
+   "velikost": "S"
+  },
+  {
+   "id": "sklad",
+   "widget": "sklad.dochazi",
+   "velikost": "S"
+  },
+  {
+   "id": "uctenky",
+   "widget": "finance.uctenky",
+   "velikost": "S"
+  },
+  {
+   "id": "prumer",
+   "widget": "trzby.prumerna_uctenka",
+   "velikost": "S"
+  }
+ ],
+ "dostupne": [
+  "pokladna.dnes",
+  "trzby.po_dnech",
+  "chat.neprectene",
+  "sklad.dochazi",
+  "finance.uctenky",
+  "trzby.prumerna_uctenka",
+  "odkaz",
+  "vyroba.k_vyrobe"
+ ],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

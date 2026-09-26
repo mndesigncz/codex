@@ -1,0 +1,22 @@
+{
+ "receipts": [
+  {
+   "id": 11,
+   "photoUrl": null,
+   "supplier": "Makro",
+   "amount": 2480,
+   "note": "mléko, cukr",
+   "createdAt": "DNEST10:00:00Z",
+   "authorName": "Martin"
+  },
+  {
+   "id": 10,
+   "photoUrl": null,
+   "supplier": "Večerka",
+   "amount": 320,
+   "note": null,
+   "createdAt": "DNEST08:00:00Z",
+   "authorName": "Eva"
+  }
+ ]
+}

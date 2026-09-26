@@ -1,0 +1,39 @@
+{
+ "month": "MESIC",
+ "selfOnly": false,
+ "days": {
+  "VCERA": {
+   "onShift": [
+    {
+     "id": 15,
+     "name": "Martin Nemeškal",
+     "avatar": "🙂",
+     "hadClosing": true
+    }
+   ],
+   "closedBy": [
+    {
+     "id": 15,
+     "name": "Martin Nemeškal",
+     "avatar": "🙂"
+    }
+   ],
+   "hasClosing": true,
+   "missing": false,
+   "revenue": 21000
+  },
+  "PRED6": {
+   "onShift": [
+    {
+     "id": 16,
+     "name": "Eva Testová",
+     "avatar": "🙂",
+     "hadClosing": false
+    }
+   ],
+   "closedBy": [],
+   "hasClosing": false,
+   "missing": true
+  }
+ }
+}

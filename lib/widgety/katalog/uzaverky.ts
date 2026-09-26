@@ -3,7 +3,9 @@
 // Komponenty jsou v components/widgety/oblasti/uzaverky.tsx, výpočty v lib/uzaverkyPrehled.ts.
 // Soubor patří balíku B5a; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
 // Kolo 69: všech deset widgetů má komponentu (stav 'hotovo'). Ikony už nejsou všude
-// „trend" — v galerii se jinak nedaly od sebe rozeznat.
+// „trend" — v galerii se jinak nedaly od sebe rozeznat. Vybrané tak, aby se na žádné stránce,
+// kde widget stojí ve výchozím rozložení, neopakovaly (AK-19): proto „bell" a „send" místo
+// obvyklejších „warning" a „inbox", které už mají Ztráty a Čeká na tebe.
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -16,7 +18,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Chybějící uzávěrky',
     popis: 'Dny, kdy někdo pracoval, ale uzávěrka chybí — s lidmi na směně a tlačítkem Vyplnit.',
-    ikona: 'warning',
+    ikona: 'bell',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
@@ -38,7 +40,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'uzaverky',
     nazev: 'Uzávěrky ke schválení',
     popis: 'Uzávěrky odeslané bez směny, které čekají na schválení — autor, den, rozdíl kasy, Schválit.',
-    ikona: 'inbox',
+    ikona: 'send',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],

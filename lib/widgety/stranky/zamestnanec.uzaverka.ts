@@ -12,7 +12,7 @@ export const STRANKA: DefiniceStranky = {
   nazev: 'Uzávěrka',
   pohled: 'closing',
   pristup: ['uzaverky.vytvorit', 'uzaverky.predavka'],
-  nastroj: { nazev: 'Uzávěrka směny', ikona: 'coins', popis: 'Formulář uzávěrky směny krok za krokem s předávkou.' },
+  nastroj: { nazev: 'Uzávěrka směny', ikona: 'receipt', popis: 'Formulář uzávěrky směny krok za krokem s předávkou.' },
   doporucene: [
     'uzaverky.moje_uzaverka',
     'uzaverky.predavka',
